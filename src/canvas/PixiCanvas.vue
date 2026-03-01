@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { Application, Container, Graphics } from 'pixi.js'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js'
 import { useNodesStore } from '../stores/nodes'
 
 const canvasRef = ref<HTMLDivElement>()
@@ -16,6 +16,19 @@ const viewport = ref({
   y: 0,
   zoom: 1,
 })
+
+// Watch for store changes
+watch(
+  () => [store.nodes.length, store.edges.length],
+  () => {
+    renderGraph()
+  }
+)
+
+function renderGraph() {
+  renderEdges()
+  renderNodes()
+}
 
 async function initCanvas() {
   if (!canvasRef.value) return
@@ -40,8 +53,7 @@ async function initCanvas() {
   setupInteraction()
 
   // Render initial graph
-  renderNodes()
-  renderEdges()
+  renderGraph()
 }
 
 function setupInteraction() {
@@ -96,53 +108,96 @@ function renderNodes() {
   // Clear existing
   nodesContainer.removeChildren()
 
+  const titleStyle = new TextStyle({
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontSize: 14,
+    fontWeight: '600',
+    fill: 0x18181b,
+    wordWrap: true,
+    wordWrapWidth: 180,
+  })
+
   // Render each node
   for (const node of store.nodes) {
-    const nodeGraphics = new Graphics()
+    const nodeContainer = new Container()
+    nodeContainer.x = node.canvas_x || 0
+    nodeContainer.y = node.canvas_y || 0
 
-    // Draw node rectangle
+    const nodeGraphics = new Graphics()
+    const width = node.width || 200
+    const height = node.height || 100
+
+    // Draw node rectangle with shadow effect
     nodeGraphics
-      .roundRect(0, 0, node.width || 200, node.height || 100, 8)
+      .roundRect(0, 0, width, height, 8)
       .fill(0xffffff)
       .stroke({ width: 1, color: 0xe4e4e7 })
 
-    nodeGraphics.x = node.canvas_x || 0
-    nodeGraphics.y = node.canvas_y || 0
-    nodeGraphics.eventMode = 'static'
-    nodeGraphics.cursor = 'pointer'
+    nodeContainer.addChild(nodeGraphics)
+
+    // Add title text
+    const titleText = new Text({
+      text: node.title || 'Untitled',
+      style: titleStyle,
+    })
+    titleText.x = 12
+    titleText.y = 12
+    nodeContainer.addChild(titleText)
+
+    // Add node type indicator
+    const typeStyle = new TextStyle({
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontSize: 11,
+      fill: 0xa1a1aa,
+    })
+    const typeText = new Text({
+      text: node.node_type || 'note',
+      style: typeStyle,
+    })
+    typeText.x = 12
+    typeText.y = height - 24
+    nodeContainer.addChild(typeText)
+
+    nodeContainer.eventMode = 'static'
+    nodeContainer.cursor = 'pointer'
 
     // Make draggable
     let dragging = false
     let dragOffset = { x: 0, y: 0 }
 
-    nodeGraphics.on('pointerdown', (e) => {
+    nodeContainer.on('pointerdown', (e) => {
       dragging = true
       dragOffset = {
-        x: e.global.x - nodeGraphics.x * viewport.value.zoom - viewport.value.x,
-        y: e.global.y - nodeGraphics.y * viewport.value.zoom - viewport.value.y,
+        x: e.global.x - nodeContainer.x * viewport.value.zoom - viewport.value.x,
+        y: e.global.y - nodeContainer.y * viewport.value.zoom - viewport.value.y,
       }
+      store.selectNode(node.id)
       e.stopPropagation()
     })
 
-    nodeGraphics.on('globalpointermove', (e) => {
+    nodeContainer.on('globalpointermove', (e) => {
       if (!dragging) return
-      nodeGraphics.x = (e.global.x - viewport.value.x - dragOffset.x) / viewport.value.zoom
-      nodeGraphics.y = (e.global.y - viewport.value.y - dragOffset.y) / viewport.value.zoom
+      nodeContainer.x = (e.global.x - viewport.value.x - dragOffset.x) / viewport.value.zoom
+      nodeContainer.y = (e.global.y - viewport.value.y - dragOffset.y) / viewport.value.zoom
+      // Update edges in real-time
+      renderEdges()
     })
 
-    nodeGraphics.on('pointerup', () => {
+    nodeContainer.on('pointerup', () => {
       if (dragging) {
-        // Update store
-        store.updateNodePosition(node.id, nodeGraphics.x, nodeGraphics.y)
+        store.updateNodePosition(node.id, nodeContainer.x, nodeContainer.y)
       }
       dragging = false
     })
 
-    nodeGraphics.on('pointerupoutside', () => {
+    nodeContainer.on('pointerupoutside', () => {
+      if (dragging) {
+        store.updateNodePosition(node.id, nodeContainer.x, nodeContainer.y)
+      }
       dragging = false
     })
 
-    nodesContainer.addChild(nodeGraphics)
+    nodesContainer.addChild(nodeContainer)
   }
 }
 
@@ -162,18 +217,34 @@ function renderEdges() {
     // Get edge color based on type
     const color = getEdgeColor(edge.link_type)
 
-    // Draw bezier curve
-    const sx = (source.canvas_x || 0) + (source.width || 200) / 2
-    const sy = (source.canvas_y || 0) + (source.height || 100) / 2
-    const tx = (target.canvas_x || 0) + (target.width || 200) / 2
-    const ty = (target.canvas_y || 0) + (target.height || 100) / 2
+    // Get actual positions from rendered nodes if available
+    let sx = (source.canvas_x || 0) + (source.width || 200) / 2
+    let sy = (source.canvas_y || 0) + (source.height || 100) / 2
+    let tx = (target.canvas_x || 0) + (target.width || 200) / 2
+    let ty = (target.canvas_y || 0) + (target.height || 100) / 2
+
+    // Check if nodes are being dragged - get from container
+    if (nodesContainer) {
+      for (const child of nodesContainer.children) {
+        const container = child as Container
+        // Match by approximate position
+        if (Math.abs(container.x - (source.canvas_x || 0)) < 1) {
+          sx = container.x + (source.width || 200) / 2
+          sy = container.y + (source.height || 100) / 2
+        }
+        if (Math.abs(container.x - (target.canvas_x || 0)) < 1) {
+          tx = container.x + (target.width || 200) / 2
+          ty = container.y + (target.height || 100) / 2
+        }
+      }
+    }
 
     const cpOffset = Math.abs(tx - sx) / 2
 
     edgeGraphics
       .moveTo(sx, sy)
       .bezierCurveTo(sx + cpOffset, sy, tx - cpOffset, ty, tx, ty)
-      .stroke({ width: 2, color })
+      .stroke({ width: 2, color, alpha: 0.6 })
 
     edgesContainer.addChild(edgeGraphics)
   }
@@ -182,6 +253,7 @@ function renderEdges() {
 function getEdgeColor(linkType: string): number {
   const colors: Record<string, number> = {
     related: 0xa1a1aa,
+    wikilink: 0x8b5cf6,
     cites: 0x3b82f6,
     blocks: 0xef4444,
     supports: 0x22c55e,

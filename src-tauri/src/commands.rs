@@ -208,6 +208,14 @@ pub async fn stop_watching(watcher_state: State<'_, WatcherState>) -> Result<(),
     Ok(())
 }
 
+/// Extract wikilinks from markdown content
+fn extract_wikilinks(content: &str) -> Vec<String> {
+    let re = regex::Regex::new(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]").unwrap();
+    re.captures_iter(content)
+        .map(|cap| cap[1].to_string())
+        .collect()
+}
+
 #[tauri::command]
 pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
     let path = PathBuf::from(path);
@@ -218,6 +226,8 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
 
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     let mut nodes = Vec::new();
+    let mut title_to_id: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut node_links: Vec<(String, Vec<String>)> = Vec::new();
 
     // Walk directory and import .md files
     for entry in walkdir::WalkDir::new(&path)
@@ -237,19 +247,31 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
                 .unwrap_or("Untitled")
                 .to_string();
 
+            // Extract wikilinks
+            let links = extract_wikilinks(&content);
+
             // Compute checksum
             let checksum = crate::checksum::compute_string(&content);
 
-            // Create node (position will be set by auto-layout)
+            // Create node with random initial position (will be adjusted by d3-force)
             let now = chrono::Utc::now().timestamp();
+            let node_id = uuid::Uuid::new_v4().to_string();
+
+            // Random initial positions in a grid-like pattern
+            let idx = nodes.len();
+            let cols = 5;
+            let spacing = 250.0;
+            let initial_x = (idx % cols) as f64 * spacing + 100.0;
+            let initial_y = (idx / cols) as f64 * spacing + 100.0;
+
             let node = Node {
-                id: uuid::Uuid::new_v4().to_string(),
-                title,
+                id: node_id.clone(),
+                title: title.clone(),
                 file_path: Some(file_path.to_string_lossy().to_string()),
                 markdown_content: Some(content),
                 node_type: "note".to_string(),
-                canvas_x: 0.0, // Will be set by d3-force
-                canvas_y: 0.0,
+                canvas_x: initial_x,
+                canvas_y: initial_y,
                 width: 200.0,
                 height: 120.0,
                 z_index: 0,
@@ -268,7 +290,30 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
                 .await
                 .map_err(|e| e.to_string())?;
 
+            title_to_id.insert(title.to_lowercase(), node_id.clone());
+            node_links.push((node_id, links));
             nodes.push(node);
+        }
+    }
+
+    // Create edges for wikilinks
+    let now = chrono::Utc::now().timestamp();
+    for (source_id, links) in node_links {
+        for link in links {
+            if let Some(target_id) = title_to_id.get(&link.to_lowercase()) {
+                if source_id != *target_id {
+                    let edge = database::edges::Edge {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        source_node_id: source_id.clone(),
+                        target_node_id: target_id.clone(),
+                        label: None,
+                        link_type: "wikilink".to_string(),
+                        weight: 1.0,
+                        created_at: now,
+                    };
+                    let _ = database::edges::create(pool, &edge).await;
+                }
+            }
         }
     }
 
