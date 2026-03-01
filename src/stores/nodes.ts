@@ -16,6 +16,7 @@ export interface Node {
   frame_id: string | null
   color_theme: string | null
   is_collapsed: boolean
+  auto_fit: boolean
   tags: string | null
   workspace_id: string | null
   checksum: string | null
@@ -54,16 +55,54 @@ export interface CreateEdgeInput {
   link_type?: string
 }
 
+export interface Workspace {
+  id: string
+  name: string
+  created_at: number
+}
+
+// Load workspaces from localStorage
+function loadWorkspacesFromStorage(): Workspace[] {
+  try {
+    const stored = localStorage.getItem('nodus-workspaces')
+    return stored ? JSON.parse(stored) : []
+  } catch {
+    return []
+  }
+}
+
+function loadCurrentWorkspaceFromStorage(): string | null {
+  return localStorage.getItem('nodus-current-workspace')
+}
+
 export const useNodesStore = defineStore('nodes', () => {
   const nodes = ref<Node[]>([])
   const edges = ref<Edge[]>([])
   const selectedNodeId = ref<string | null>(null)
+  const workspaces = ref<Workspace[]>(loadWorkspacesFromStorage())
+  const currentWorkspaceId = ref<string | null>(loadCurrentWorkspaceFromStorage())
   const loading = ref(false)
   const error = ref<string | null>(null)
 
   const selectedNode = computed(() =>
     nodes.value.find(n => n.id === selectedNodeId.value)
   )
+
+  // Filtered nodes/edges for current workspace
+  const filteredNodes = computed(() => {
+    if (!currentWorkspaceId.value) {
+      // Default workspace: show nodes with no workspace_id
+      return nodes.value.filter(n => !n.workspace_id)
+    }
+    return nodes.value.filter(n => n.workspace_id === currentWorkspaceId.value)
+  })
+
+  const filteredEdges = computed(() => {
+    const nodeIds = new Set(filteredNodes.value.map(n => n.id))
+    return edges.value.filter(e =>
+      nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
+    )
+  })
 
   async function initialize() {
     loading.value = true
@@ -157,13 +196,46 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  async function updateNodeSize(id: string, width: number, height: number) {
+    const node = nodes.value.find(n => n.id === id)
+    if (node) {
+      node.width = width
+      node.height = height
+      node.updated_at = Date.now()
+      try {
+        await invoke('update_node_size', { id, width, height })
+      } catch (e) {
+        console.error('Failed to update size:', e)
+      }
+    }
+  }
+
   function selectNode(id: string | null) {
     selectedNodeId.value = id
   }
 
+  async function updateNodeContent(id: string, content: string) {
+    const node = nodes.value.find(n => n.id === id)
+    if (node) {
+      node.markdown_content = content
+      node.updated_at = Date.now()
+      try {
+        await invoke('update_node_content', { id, content })
+      } catch (e) {
+        console.error('Failed to update content:', e)
+      }
+    }
+  }
+
   async function createNode(data: CreateNodeInput): Promise<Node> {
+    // Assign current workspace if not specified
+    const inputWithWorkspace = {
+      ...data,
+      workspace_id: data.workspace_id ?? currentWorkspaceId.value ?? undefined,
+    }
+
     try {
-      const node = await invoke<Node>('create_node', { input: data })
+      const node = await invoke<Node>('create_node', { input: inputWithWorkspace })
       nodes.value.push(node)
       return node
     } catch (e) {
@@ -184,7 +256,7 @@ export const useNodesStore = defineStore('nodes', () => {
         color_theme: null,
         is_collapsed: false,
         tags: data.tags ? JSON.stringify(data.tags) : null,
-        workspace_id: data.workspace_id || null,
+        workspace_id: currentWorkspaceId.value,
         checksum: null,
         created_at: Date.now(),
         updated_at: Date.now(),
@@ -251,21 +323,67 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  // Workspace management
+  function saveWorkspacesToStorage() {
+    localStorage.setItem('nodus-workspaces', JSON.stringify(workspaces.value))
+    localStorage.setItem('nodus-current-workspace', currentWorkspaceId.value || '')
+  }
+
+  function createWorkspace(name: string): Workspace {
+    const workspace: Workspace = {
+      id: crypto.randomUUID(),
+      name,
+      created_at: Date.now(),
+    }
+    workspaces.value.push(workspace)
+    saveWorkspacesToStorage()
+    return workspace
+  }
+
+  function switchWorkspace(workspaceId: string | null) {
+    currentWorkspaceId.value = workspaceId
+    saveWorkspacesToStorage()
+  }
+
+  function deleteWorkspace(id: string) {
+    workspaces.value = workspaces.value.filter(w => w.id !== id)
+    if (currentWorkspaceId.value === id) {
+      currentWorkspaceId.value = null
+    }
+    saveWorkspacesToStorage()
+  }
+
+  function clearCanvas() {
+    nodes.value = []
+    edges.value = []
+    selectedNodeId.value = null
+  }
+
   return {
     nodes,
     edges,
+    filteredNodes,
+    filteredEdges,
     selectedNodeId,
     selectedNode,
     loading,
     error,
+    workspaces,
+    currentWorkspaceId,
     initialize,
     getNode,
     updateNodePosition,
+    updateNodeSize,
+    updateNodeContent,
     selectNode,
     createNode,
     deleteNode,
     createEdge,
     deleteEdge,
     importVault,
+    createWorkspace,
+    switchWorkspace,
+    deleteWorkspace,
+    clearCanvas,
   }
 })

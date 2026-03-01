@@ -167,6 +167,14 @@ pub async fn delete_edge(id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn update_node_content(id: String, content: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_content(pool, &id, &content)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ============================================================================
 // Vault Watcher Commands
 // ============================================================================

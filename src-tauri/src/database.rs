@@ -173,6 +173,21 @@ pub mod nodes {
             .await?;
         Ok(())
     }
+
+    pub async fn update_content(
+        pool: &DbPool,
+        id: &str,
+        content: &str,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET markdown_content = ?, updated_at = ? WHERE id = ?")
+            .bind(content)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
 }
 
 // Edge CRUD operations

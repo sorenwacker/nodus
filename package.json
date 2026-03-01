@@ -20,9 +20,12 @@
   "dependencies": {
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tiptap/extension-placeholder": "^2.27.2",
     "@tiptap/starter-kit": "^2.2.0",
     "@tiptap/vue-3": "^2.2.0",
     "d3-force": "^3.0.0",
+    "marked": "^17.0.3",
+    "mermaid": "^11.12.3",
     "pinia": "^2.1.0",
     "pixi.js": "^7.4.3",
     "vue": "^3.4.0",
