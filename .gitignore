@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+dist-ssr/
+
+# Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Database (local dev)
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Tauri build
+src-tauri/WixTools/
+src-tauri/icons/
+
+# Docker
+.docker/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Claude
+.claude/settings.json

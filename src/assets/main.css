@@ -1,0 +1,62 @@
+:root {
+  --bg-canvas: #f4f4f5;
+  --bg-node: #ffffff;
+  --text-main: #18181b;
+  --text-muted: #71717a;
+  --border-node: #e4e4e7;
+  --primary-color: #3b82f6;
+  --edge-related: #a1a1aa;
+  --edge-cites: #3b82f6;
+  --edge-blocks: #ef4444;
+  --edge-supports: #22c55e;
+  --edge-contradicts: #f97316;
+}
+
+[data-theme='dark'] {
+  --bg-canvas: #18181b;
+  --bg-node: #27272a;
+  --text-main: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --border-node: #3f3f46;
+}
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-canvas);
+  color: var(--text-main);
+}
+
+/* Canvas container */
+.canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* DOM overlay for node text editing */
+.node-text-overlay {
+  position: absolute;
+  pointer-events: none;
+}
+
+.node-text-overlay.editing {
+  pointer-events: auto;
+}
+
+.node-editor {
+  background: var(--bg-node);
+  border: 1px solid var(--border-node);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-main);
+  resize: none;
+  outline: none;
+}
+
+.node-editor:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}

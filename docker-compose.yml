@@ -1,0 +1,44 @@
+# Nodus Development Environment
+version: '3.8'
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Source code
+      - .:/app
+      # Preserve node_modules
+      - node_modules:/app/node_modules
+      # Preserve Cargo cache
+      - cargo_cache:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+      - target_cache:/app/src-tauri/target
+    environment:
+      - RUST_BACKTRACE=1
+      - CARGO_HOME=/usr/local/cargo
+    # For GUI apps (Tauri), you need X11 forwarding
+    # On Linux: export DISPLAY and mount /tmp/.X11-unix
+    # On macOS: use XQuartz
+    ports:
+      - "1420:1420"  # Vite dev server
+    stdin_open: true
+    tty: true
+
+  # SQLite viewer for debugging
+  sqlite-web:
+    image: coleifer/sqlite-web
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "8080:8080"
+    command: sqlite_web -H 0.0.0.0 /data/nodus.db
+    profiles:
+      - debug
+
+volumes:
+  node_modules:
+  cargo_cache:
+  cargo_git:
+  target_cache:

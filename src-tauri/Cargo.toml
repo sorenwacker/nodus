@@ -1,0 +1,38 @@
+[package]
+name = "nodus"
+version = "0.1.0"
+description = "Local-first knowledge graph"
+authors = ["Nodus Team"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = ["devtools"] }
+tauri-plugin-shell = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite"] }
+
+# File watching
+notify = "6.0"
+fs2 = "0.4"
+
+# Utilities
+uuid = { version = "1.0", features = ["v4", "serde"] }
+sha2 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+walkdir = "2.4"
+hex = "0.4"
+
+[dev-dependencies]
+tempfile = "3.10"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
