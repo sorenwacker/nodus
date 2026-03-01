@@ -108,8 +108,8 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  background: var(--bg-node);
-  border-bottom: 1px solid var(--border-node);
+  background: #ffffff;
+  border-bottom: 1px solid #e4e4e7;
   gap: 16px;
 }
 
@@ -124,7 +124,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 16px;
-  color: var(--text-muted);
+  color: #71717a;
   font-size: 13px;
 }
 
@@ -137,16 +137,16 @@ onMounted(async () => {
 .toolbar button {
   padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid var(--border-node);
-  background: var(--bg-canvas);
-  color: var(--text-main);
+  border: 1px solid #e4e4e7;
+  background: #f4f4f5;
+  color: #18181b;
   cursor: pointer;
   font-size: 13px;
   transition: background 0.15s;
 }
 
 .toolbar button:hover {
-  background: var(--bg-node);
+  background: #ffffff;
 }
 
 .toolbar button:disabled {
@@ -167,6 +167,7 @@ onMounted(async () => {
 
 .loading-message {
   padding: 20px;
-  color: var(--text-muted);
+  color: #71717a;
+  font-size: 16px;
 }
 </style>

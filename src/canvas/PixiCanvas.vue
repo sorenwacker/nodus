@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { Application, Container, Graphics, Text } from 'pixi.js'
+import * as PIXI from 'pixi.js'
 import { useNodesStore } from '../stores/nodes'
 
 const canvasRef = ref<HTMLDivElement>()
 const store = useNodesStore()
 
-let app: Application | null = null
-let nodesContainer: Container | null = null
-let edgesContainer: Container | null = null
+let app: PIXI.Application | null = null
+let nodesContainer: PIXI.Container | null = null
+let edgesContainer: PIXI.Container | null = null
 
 // Viewport state
 const viewport = ref({
@@ -30,29 +30,27 @@ function renderGraph() {
   renderNodes()
 }
 
-async function initCanvas() {
-  console.log('PixiCanvas: initCanvas called, canvasRef:', canvasRef.value)
+function initCanvas() {
+  console.log('PixiCanvas: initCanvas called')
   if (!canvasRef.value) {
     console.error('PixiCanvas: canvasRef is null')
     return
   }
 
   try {
-    console.log('PixiCanvas: Creating Application...')
-    app = new Application()
-    await app.init({
+    // PixiJS 7 API
+    app = new PIXI.Application({
       resizeTo: canvasRef.value,
-      background: 0xf4f4f5,
+      backgroundColor: 0xf4f4f5,
       antialias: true,
     })
-    console.log('PixiCanvas: Application initialized')
 
-    canvasRef.value.appendChild(app.canvas)
+    canvasRef.value.appendChild(app.view as HTMLCanvasElement)
     console.log('PixiCanvas: Canvas appended')
 
     // Create containers
-    edgesContainer = new Container()
-    nodesContainer = new Container()
+    edgesContainer = new PIXI.Container()
+    nodesContainer = new PIXI.Container()
 
     app.stage.addChild(edgesContainer)
     app.stage.addChild(nodesContainer)
@@ -71,10 +69,11 @@ async function initCanvas() {
 function setupInteraction() {
   if (!app) return
 
+  const canvas = app.view as HTMLCanvasElement
   let isDragging = false
   let lastPos = { x: 0, y: 0 }
 
-  app.canvas.addEventListener('mousedown', (e: MouseEvent) => {
+  canvas.addEventListener('mousedown', (e: MouseEvent) => {
     isDragging = true
     lastPos = { x: e.clientX, y: e.clientY }
   })
@@ -101,7 +100,7 @@ function setupInteraction() {
   })
 
   // Zoom with wheel
-  app.canvas.addEventListener('wheel', (e: WheelEvent) => {
+  canvas.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault()
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1
     viewport.value.zoom *= zoomFactor
@@ -120,59 +119,53 @@ function renderNodes() {
   nodesContainer.removeChildren()
 
   for (const node of store.nodes) {
-    const nodeContainer = new Container()
+    const nodeContainer = new PIXI.Container()
     nodeContainer.x = node.canvas_x || 0
     nodeContainer.y = node.canvas_y || 0
 
-    const nodeGraphics = new Graphics()
+    const nodeGraphics = new PIXI.Graphics()
     const width = node.width || 200
     const height = node.height || 100
 
     // Draw node rectangle
-    nodeGraphics
-      .roundRect(0, 0, width, height, 8)
-      .fill(0xffffff)
-      .stroke({ width: 1, color: 0xe4e4e7 })
+    nodeGraphics.beginFill(0xffffff)
+    nodeGraphics.lineStyle(1, 0xe4e4e7)
+    nodeGraphics.drawRoundedRect(0, 0, width, height, 8)
+    nodeGraphics.endFill()
 
     nodeContainer.addChild(nodeGraphics)
 
     // Add title text
-    const titleText = new Text({
-      text: node.title || 'Untitled',
-      style: {
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: 14,
-        fontWeight: '600',
-        fill: 0x18181b,
-        wordWrap: true,
-        wordWrapWidth: 180,
-      },
+    const titleText = new PIXI.Text(node.title || 'Untitled', {
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontSize: 14,
+      fontWeight: '600',
+      fill: 0x18181b,
+      wordWrap: true,
+      wordWrapWidth: 180,
     })
     titleText.x = 12
     titleText.y = 12
     nodeContainer.addChild(titleText)
 
     // Add node type indicator
-    const typeText = new Text({
-      text: node.node_type || 'note',
-      style: {
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: 11,
-        fill: 0xa1a1aa,
-      },
+    const typeText = new PIXI.Text(node.node_type || 'note', {
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontSize: 11,
+      fill: 0xa1a1aa,
     })
     typeText.x = 12
     typeText.y = height - 24
     nodeContainer.addChild(typeText)
 
-    nodeContainer.eventMode = 'static'
+    nodeContainer.interactive = true
     nodeContainer.cursor = 'pointer'
 
     // Make draggable
     let dragging = false
     let dragOffset = { x: 0, y: 0 }
 
-    nodeContainer.on('pointerdown', (e) => {
+    nodeContainer.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
       dragging = true
       dragOffset = {
         x: e.global.x - nodeContainer.x * viewport.value.zoom - viewport.value.x,
@@ -182,7 +175,7 @@ function renderNodes() {
       e.stopPropagation()
     })
 
-    nodeContainer.on('globalpointermove', (e) => {
+    nodeContainer.on('globalpointermove', (e: PIXI.FederatedPointerEvent) => {
       if (!dragging) return
       nodeContainer.x = (e.global.x - viewport.value.x - dragOffset.x) / viewport.value.zoom
       nodeContainer.y = (e.global.y - viewport.value.y - dragOffset.y) / viewport.value.zoom
@@ -218,7 +211,7 @@ function renderEdges() {
 
     if (!source || !target) continue
 
-    const edgeGraphics = new Graphics()
+    const edgeGraphics = new PIXI.Graphics()
     const color = getEdgeColor(edge.link_type)
 
     // Get positions
@@ -229,10 +222,9 @@ function renderEdges() {
 
     const cpOffset = Math.abs(tx - sx) / 2
 
-    edgeGraphics
-      .moveTo(sx, sy)
-      .bezierCurveTo(sx + cpOffset, sy, tx - cpOffset, ty, tx, ty)
-      .stroke({ width: 2, color, alpha: 0.6 })
+    edgeGraphics.lineStyle(2, color, 0.6)
+    edgeGraphics.moveTo(sx, sy)
+    edgeGraphics.bezierCurveTo(sx + cpOffset, sy, tx - cpOffset, ty, tx, ty)
 
     edgesContainer.addChild(edgeGraphics)
   }
