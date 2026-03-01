@@ -8,6 +8,8 @@ mod watcher;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Initialize database
             let app_handle = app.handle().clone();
