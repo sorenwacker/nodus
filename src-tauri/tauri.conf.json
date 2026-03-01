@@ -33,11 +33,5 @@
     "targets": "all",
     "icon": []
   },
-  "plugins": {
-    "shell": {
-      "open": false
-    },
-    "fs": {},
-    "dialog": {}
-  }
+  "plugins": {}
 }
