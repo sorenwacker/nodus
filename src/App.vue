@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { open } from '@tauri-apps/plugin-dialog'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import NodePanel from './components/NodePanel.vue'
 import { useNodesStore } from './stores/nodes'
@@ -8,6 +7,8 @@ import { useNodesStore } from './stores/nodes'
 const store = useNodesStore()
 const theme = ref<'light' | 'dark'>('light')
 const importing = ref(false)
+const ready = ref(false)
+const initError = ref<string | null>(null)
 
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
@@ -16,6 +17,7 @@ function toggleTheme() {
 
 async function importVault() {
   try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       directory: true,
       multiple: false,
@@ -44,8 +46,16 @@ function addNode() {
   })
 }
 
-onMounted(() => {
-  store.initialize()
+onMounted(async () => {
+  try {
+    console.log('App: Initializing store...')
+    await store.initialize()
+    console.log('App: Store initialized, nodes:', store.nodes.length)
+    ready.value = true
+  } catch (e) {
+    console.error('App: Init error', e)
+    initError.value = String(e)
+  }
 })
 </script>
 
@@ -72,8 +82,16 @@ onMounted(() => {
       </div>
     </header>
     <main class="canvas-container">
-      <PixiCanvas />
-      <NodePanel />
+      <div v-if="initError" class="error-message">
+        Error: {{ initError }}
+      </div>
+      <div v-else-if="!ready" class="loading-message">
+        Loading...
+      </div>
+      <template v-else>
+        <PixiCanvas />
+        <NodePanel />
+      </template>
     </main>
   </div>
 </template>
@@ -139,5 +157,16 @@ onMounted(() => {
 .canvas-container {
   flex: 1;
   position: relative;
+}
+
+.error-message {
+  color: red;
+  padding: 20px;
+  font-family: monospace;
+}
+
+.loading-message {
+  padding: 20px;
+  color: var(--text-muted);
 }
 </style>

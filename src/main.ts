@@ -3,6 +3,14 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import './assets/main.css'
 
-const app = createApp(App)
-app.use(createPinia())
-app.mount('#app')
+console.log('Nodus: Starting app...')
+
+try {
+  const app = createApp(App)
+  app.use(createPinia())
+  app.mount('#app')
+  console.log('Nodus: App mounted')
+} catch (e) {
+  console.error('Nodus: Failed to mount app', e)
+  document.body.innerHTML = `<pre style="color:red;padding:20px">Error: ${e}</pre>`
+}
