@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import PixiCanvas from './canvas/PixiCanvas.vue'
+import NodePanel from './components/NodePanel.vue'
 import { useNodesStore } from './stores/nodes'
 
 const store = useNodesStore()
@@ -72,6 +73,7 @@ onMounted(() => {
     </header>
     <main class="canvas-container">
       <PixiCanvas />
+      <NodePanel />
     </main>
   </div>
 </template>
