@@ -25,3 +25,9 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window
 }
+
+export async function openExternal(url: string): Promise<void> {
+  // Use window.open - works in both browser and Tauri webview
+  // For full native shell integration, install @tauri-apps/plugin-shell
+  window.open(url, '_blank')
+}

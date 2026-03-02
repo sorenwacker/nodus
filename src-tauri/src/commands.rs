@@ -12,7 +12,8 @@ use tauri::State;
 /// Global watcher state
 pub struct WatcherState(pub Mutex<Option<VaultWatcher>>);
 
-/// Global file locks state
+/// Global file locks state (reserved for future use)
+#[allow(dead_code)]
 pub struct LocksState(pub Mutex<std::collections::HashMap<String, FileLock>>);
 
 // ============================================================================
@@ -84,6 +85,7 @@ pub async fn create_node(input: CreateNodeInput) -> Result<Node, String> {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct UpdateNodeInput {
     pub id: String,
     pub title: Option<String>,

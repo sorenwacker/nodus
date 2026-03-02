@@ -13,6 +13,7 @@ use thiserror::Error;
 use crate::checksum;
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum WatcherError {
     #[error("Notify error: {0}")]
     Notify(#[from] notify::Error),
@@ -24,12 +25,14 @@ pub enum WatcherError {
     NotInitialized,
 }
 
-/// File lock handle
+/// File lock handle (reserved for future use)
+#[allow(dead_code)]
 pub struct FileLock {
     file: File,
     path: PathBuf,
 }
 
+#[allow(dead_code)]
 impl FileLock {
     /// Acquire a shared (read) lock on a file
     pub fn shared(path: &Path) -> Result<Self, WatcherError> {
@@ -149,6 +152,7 @@ impl VaultWatcher {
 
 /// File change event
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct FileChangeEvent {
     pub path: PathBuf,
     pub change_type: ChangeType,

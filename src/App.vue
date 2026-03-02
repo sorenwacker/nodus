@@ -42,6 +42,11 @@ function selectSearchResult(nodeId: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // Cmd/Ctrl + R: Reload app
+  if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+    e.preventDefault()
+    window.location.reload()
+  }
   // Cmd/Ctrl + K: Open search
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault()
@@ -61,13 +66,13 @@ function onKeydown(e: KeyboardEvent) {
       store.selectNode(null)
     }
   }
-  // Delete/Backspace: Delete selected node (when not in input)
-  if ((e.key === 'Delete' || e.key === 'Backspace') && store.selectedNodeId) {
+  // Delete/Backspace: Delete selected nodes (when not in input)
+  if ((e.key === 'Delete' || e.key === 'Backspace') && store.selectedNodeIds.length > 0) {
     const target = e.target as HTMLElement
     if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
       e.preventDefault()
-      if (confirm('Delete this node?')) {
-        store.deleteNode(store.selectedNodeId)
+      for (const id of [...store.selectedNodeIds]) {
+        store.deleteNode(id)
       }
     }
   }
