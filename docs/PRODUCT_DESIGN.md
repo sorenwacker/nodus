@@ -1,6 +1,6 @@
 # Nodus - Product Design Document
 
-Version: 0.9.0
+Version: 0.10.0
 Date: 2026-03-01
 Status: Ready for Implementation
 
@@ -608,17 +608,55 @@ Users want to point Ollama at their notes. We make this easy:
 - SQLite database (queryable)
 - Markdown content (readable)
 - JSON export (portable)
-- MCP server (tool interface)
+- Built-in agent with tool calling
 
-### Local LLM Integration (Ollama)
+### Local LLM Agent (Ollama)
 
-- Summarize node content
-- Expand notes
-- Suggest connections between nodes
-- Find related nodes semantically
-- Generate from template
+The canvas includes a built-in agent that can build and modify knowledge graphs via natural language.
 
-### MCP Server (AI Tool Interface)
+**Architecture:**
+- Direct Ollama API integration (`/api/chat` with tools)
+- Tool calling with native support + fallback JSON parsing
+- Stateless requests (no history bleeding between requests)
+- System prompt includes current canvas state (existing nodes)
+
+**Agent Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `create_node(title, content)` | Create a single node |
+| `create_nodes_batch(nodes)` | Upsert multiple nodes (updates existing by title, creates new) |
+| `create_edge(from_title, to_title)` | Connect two nodes |
+| `update_node(title, new_content)` | Update node content |
+| `delete_node(title)` | Remove a node |
+| `query_nodes(filter)` | Query DB: "all", "empty", "has_content", or search term |
+| `for_each_node(filter, action, template)` | Iterator: action="search"\|"set"\|"append", uses {title} |
+| `web_search(query)` | Search web with thinking layer (query refinement) |
+| `auto_layout(layout)` | Arrange nodes: "grid", "horizontal", "vertical" |
+| `done(summary)` | Signal completion |
+
+**Key Design Decisions:**
+
+1. **Upsert Behavior:** `create_nodes_batch` checks existing titles (case-insensitive). Updates existing nodes, creates new ones. Prevents duplicates.
+
+2. **Iterator Pattern:** `for_each_node` with filter allows batch operations:
+   - `for_each_node({ filter: "empty", action: "search", template: "{title} info" })`
+   - Processes only nodes matching filter
+
+3. **Query Before Execute:** `query_nodes` returns node list for planning before action.
+
+4. **Thinking Layer:** Web search refines query via LLM before executing search.
+
+5. **No Clear Canvas:** Removed from agent tools to prevent accidental deletion.
+
+6. **Stateless Requests:** Each request starts fresh with current canvas state in system prompt. No conversation history pollution.
+
+**Content Rules (System Prompt):**
+- Title = label, Content = substance
+- No meta-commentary
+- Be concise: data, definitions, or markdown only
+
+### MCP Server (Future)
 
 ```yaml
 resources:
@@ -1164,4 +1202,4 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 ---
 
 *Document: `/docs/PRODUCT_DESIGN.md`*
-*Version: 0.9.0 — Added file locking workflow, Yjs↔PixiJS integration, hybrid rendering details, mobile PWA strategy, Week 1 success metrics. Ready for implementation.*
+*Version: 0.10.0 — Added LLM Agent section with tool calling, iterator pattern, query/execute workflow, thinking layer for web search, upsert behavior.*
