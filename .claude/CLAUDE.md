@@ -136,6 +136,17 @@ nodus/
 
 ---
 
+## LLM Agent Rules
+
+- **No regex for natural language.** Use LLM to extract semantic meaning from user instructions. Regex is fragile and fails on varied phrasing.
+- Agent tools should be composable and simple
+- Per-node LLM reasoning for semantic categorization (smart_move)
+- Per-pair LLM reasoning for connections (smart_connect) - handles any instruction type
+- smart_connect returns edge types: related, cites, blocks, supports, contradicts
+- Removed tools: connect_matching, move_matching (too rigid, replaced by smart_* tools)
+
+---
+
 ## Key Decisions
 
 ### Why Tauri over Electron?

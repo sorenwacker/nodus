@@ -16,7 +16,7 @@ export interface Node {
   frame_id: string | null
   color_theme: string | null
   is_collapsed: boolean
-  auto_fit: boolean
+  auto_fit?: boolean
   tags: string | null
   workspace_id: string | null
   checksum: string | null
@@ -78,12 +78,14 @@ function loadCurrentWorkspaceFromStorage(): string | null {
 export const useNodesStore = defineStore('nodes', () => {
   const nodes = ref<Node[]>([])
   const edges = ref<Edge[]>([])
-  const selectedNodeId = ref<string | null>(null)
+  const selectedNodeIds = ref<string[]>([])
   const workspaces = ref<Workspace[]>(loadWorkspacesFromStorage())
   const currentWorkspaceId = ref<string | null>(loadCurrentWorkspaceFromStorage())
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  // For backwards compatibility
+  const selectedNodeId = computed(() => selectedNodeIds.value[0] || null)
   const selectedNode = computed(() =>
     nodes.value.find(n => n.id === selectedNodeId.value)
   )
@@ -210,8 +212,20 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  function selectNode(id: string | null) {
-    selectedNodeId.value = id
+  function selectNode(id: string | null, addToSelection = false) {
+    if (id === null) {
+      selectedNodeIds.value = []
+    } else if (addToSelection) {
+      // Toggle selection
+      const idx = selectedNodeIds.value.indexOf(id)
+      if (idx >= 0) {
+        selectedNodeIds.value.splice(idx, 1)
+      } else {
+        selectedNodeIds.value.push(id)
+      }
+    } else {
+      selectedNodeIds.value = [id]
+    }
   }
 
   async function updateNodeContent(id: string, content: string) {
@@ -227,11 +241,29 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  async function updateNodeTitle(id: string, title: string) {
+    const node = nodes.value.find(n => n.id === id)
+    if (node) {
+      node.title = title
+      node.updated_at = Date.now()
+      try {
+        await invoke('update_node_title', { id, title })
+      } catch (e) {
+        console.error('Failed to update title:', e)
+      }
+    }
+  }
+
   async function createNode(data: CreateNodeInput): Promise<Node> {
-    // Assign current workspace if not specified
+    // Only use workspace_id if it exists in known workspaces, otherwise use null
+    const validWorkspaceId = data.workspace_id
+      ?? (currentWorkspaceId.value && workspaces.value.some(w => w.id === currentWorkspaceId.value)
+          ? currentWorkspaceId.value
+          : null)
+
     const inputWithWorkspace = {
       ...data,
-      workspace_id: data.workspace_id ?? currentWorkspaceId.value ?? undefined,
+      workspace_id: validWorkspaceId,
     }
 
     try {
@@ -256,7 +288,7 @@ export const useNodesStore = defineStore('nodes', () => {
         color_theme: null,
         is_collapsed: false,
         tags: data.tags ? JSON.stringify(data.tags) : null,
-        workspace_id: currentWorkspaceId.value,
+        workspace_id: validWorkspaceId,
         checksum: null,
         created_at: Date.now(),
         updated_at: Date.now(),
@@ -356,7 +388,16 @@ export const useNodesStore = defineStore('nodes', () => {
   function clearCanvas() {
     nodes.value = []
     edges.value = []
-    selectedNodeId.value = null
+    selectedNodeIds.value = []
+  }
+
+  function cleanupOrphanEdges() {
+    const nodeIds = new Set(nodes.value.map(n => n.id))
+    const before = edges.value.length
+    edges.value = edges.value.filter(
+      e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
+    )
+    return before - edges.value.length
   }
 
   return {
@@ -364,6 +405,7 @@ export const useNodesStore = defineStore('nodes', () => {
     edges,
     filteredNodes,
     filteredEdges,
+    selectedNodeIds,
     selectedNodeId,
     selectedNode,
     loading,
@@ -375,6 +417,7 @@ export const useNodesStore = defineStore('nodes', () => {
     updateNodePosition,
     updateNodeSize,
     updateNodeContent,
+    updateNodeTitle,
     selectNode,
     createNode,
     deleteNode,
@@ -385,5 +428,6 @@ export const useNodesStore = defineStore('nodes', () => {
     switchWorkspace,
     deleteWorkspace,
     clearCanvas,
+    cleanupOrphanEdges,
   }
 })
