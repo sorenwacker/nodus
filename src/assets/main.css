@@ -1,37 +1,37 @@
 :root {
-  --bg-canvas: #f8fafc;
+  --bg-canvas: #f0f4f8;
   --bg-surface: #ffffff;
-  --bg-surface-alt: #fafafa;
+  --bg-surface-alt: #f8fafc;
   --bg-elevated: #ffffff;
   --text-main: #18181b;
   --text-secondary: #3f3f46;
   --text-muted: #71717a;
-  --border-default: #e4e4e7;
-  --border-subtle: #f4f4f5;
+  --border-default: #c4c8cc;
+  --border-subtle: #e4e4e7;
   --primary-color: #3b82f6;
   --danger-color: #dc2626;
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
-  --dot-color: #eef1f5;
-  --shadow-sm: rgba(0, 0, 0, 0.05);
-  --shadow-md: rgba(0, 0, 0, 0.1);
+  --dot-color: #dde3ea;
+  --shadow-sm: rgba(0, 0, 0, 0.08);
+  --shadow-md: rgba(0, 0, 0, 0.12);
 }
 
 [data-theme='dark'] {
-  --bg-canvas: #18181b;
-  --bg-surface: #27272a;
-  --bg-surface-alt: #1f1f23;
+  --bg-canvas: #0f0f12;
+  --bg-surface: #1e1e22;
+  --bg-surface-alt: #252529;
   --bg-elevated: #3f3f46;
   --text-main: #f4f4f5;
   --text-secondary: #d4d4d8;
   --text-muted: #a1a1aa;
-  --border-default: #3f3f46;
-  --border-subtle: #27272a;
+  --border-default: #505058;
+  --border-subtle: #3f3f46;
   --danger-bg: #450a0a;
   --danger-border: #7f1d1d;
-  --dot-color: #27272a;
-  --shadow-sm: rgba(0, 0, 0, 0.2);
-  --shadow-md: rgba(0, 0, 0, 0.3);
+  --dot-color: #1a1a1e;
+  --shadow-sm: rgba(0, 0, 0, 0.3);
+  --shadow-md: rgba(0, 0, 0, 0.4);
 }
 
 * {

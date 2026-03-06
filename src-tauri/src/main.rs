@@ -5,11 +5,14 @@ mod commands;
 mod database;
 mod watcher;
 
+use std::sync::Mutex;
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(commands::WatcherState(Mutex::new(None)))
         .setup(|app| {
             // Initialize database
             let app_handle = app.handle().clone();
@@ -29,6 +32,8 @@ fn main() {
             commands::delete_node,
             commands::update_node_position,
             commands::update_node_content,
+            commands::update_node_title,
+            commands::update_node_size,
             commands::get_edges,
             commands::create_edge,
             commands::delete_edge,

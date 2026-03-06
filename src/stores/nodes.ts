@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { invoke } from '../lib/tauri'
+import { invoke, listen, readTextFile } from '../lib/tauri'
+
+export interface FileChangeEvent {
+  path: string
+  change_type: 'Created' | 'Modified' | 'Deleted'
+  new_checksum: string | null
+}
 
 export interface Node {
   id: string
@@ -55,6 +61,17 @@ export interface CreateEdgeInput {
   link_type?: string
 }
 
+export interface Frame {
+  id: string
+  title: string
+  canvas_x: number
+  canvas_y: number
+  width: number
+  height: number
+  color: string | null
+  workspace_id: string | null
+}
+
 export interface Workspace {
   id: string
   name: string
@@ -78,11 +95,15 @@ function loadCurrentWorkspaceFromStorage(): string | null {
 export const useNodesStore = defineStore('nodes', () => {
   const nodes = ref<Node[]>([])
   const edges = ref<Edge[]>([])
+  const frames = ref<Frame[]>([])
   const selectedNodeIds = ref<string[]>([])
+  const selectedFrameId = ref<string | null>(null)
   const workspaces = ref<Workspace[]>(loadWorkspacesFromStorage())
   const currentWorkspaceId = ref<string | null>(loadCurrentWorkspaceFromStorage())
   const loading = ref(false)
   const error = ref<string | null>(null)
+  // Version counter to trigger edge re-routing when node positions/sizes change
+  const nodeLayoutVersion = ref(0)
 
   // For backwards compatibility
   const selectedNodeId = computed(() => selectedNodeIds.value[0] || null)
@@ -97,6 +118,13 @@ export const useNodesStore = defineStore('nodes', () => {
       return nodes.value.filter(n => !n.workspace_id)
     }
     return nodes.value.filter(n => n.workspace_id === currentWorkspaceId.value)
+  })
+
+  const filteredFrames = computed(() => {
+    if (!currentWorkspaceId.value) {
+      return frames.value.filter(f => !f.workspace_id)
+    }
+    return frames.value.filter(f => f.workspace_id === currentWorkspaceId.value)
   })
 
   const filteredEdges = computed(() => {
@@ -190,6 +218,7 @@ export const useNodesStore = defineStore('nodes', () => {
       node.canvas_x = x
       node.canvas_y = y
       node.updated_at = Date.now()
+      nodeLayoutVersion.value++ // Trigger edge re-routing
       try {
         await invoke('update_node_position', { id, x, y })
       } catch (e) {
@@ -198,17 +227,112 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  async function updateNodeSize(id: string, width: number, height: number) {
+  async function updateNodeSize(id: string, width: number, height: number, pushOthers = false) {
+    console.log('updateNodeSize called:', id, width, height, 'pushOthers:', pushOthers)
     const node = nodes.value.find(n => n.id === id)
     if (node) {
       node.width = width
       node.height = height
       node.updated_at = Date.now()
+      nodeLayoutVersion.value++ // Trigger edge re-routing
+
+      // Push overlapping nodes away
+      if (pushOthers) {
+        console.log('Calling pushOverlappingNodes...')
+        pushOverlappingNodes(node)
+      }
+
       try {
         await invoke('update_node_size', { id, width, height })
       } catch (e) {
         console.error('Failed to update size:', e)
       }
+    }
+  }
+
+  /**
+   * Push nodes that overlap with the given node away (ripples through graph)
+   */
+  function pushOverlappingNodes(sourceNode: Node, processed = new Set<string>()) {
+    const PADDING = 15 // Minimum gap between nodes
+    const MAX_ITERATIONS = 50 // Prevent infinite loops
+
+    console.log('pushOverlappingNodes called for:', sourceNode.id, 'size:', sourceNode.width, 'x', sourceNode.height)
+
+    if (processed.size > MAX_ITERATIONS) return
+    processed.add(sourceNode.id)
+
+    const sw = sourceNode.width || 200
+    const sh = sourceNode.height || 120
+    const sx = sourceNode.canvas_x
+    const sy = sourceNode.canvas_y
+    const scx = sx + sw / 2
+    const scy = sy + sh / 2
+
+    const pushedNodes: Node[] = []
+
+    for (const node of nodes.value) {
+      if (node.id === sourceNode.id) continue
+      if (node.workspace_id !== sourceNode.workspace_id) continue
+      if (processed.has(node.id)) continue
+
+      const nw = node.width || 200
+      const nh = node.height || 120
+      const nx = node.canvas_x
+      const ny = node.canvas_y
+
+      // Check for overlap (with padding)
+      const overlapX = sx < nx + nw + PADDING && sx + sw + PADDING > nx
+      const overlapY = sy < ny + nh + PADDING && sy + sh + PADDING > ny
+
+      console.log('Checking overlap with:', node.id, 'overlapX:', overlapX, 'overlapY:', overlapY,
+        'source:', sx, sy, sw, sh, 'node:', nx, ny, nw, nh)
+
+      if (overlapX && overlapY) {
+        console.log('OVERLAP DETECTED - pushing node:', node.id)
+        // Calculate push direction (away from source node center)
+        const ncx = nx + nw / 2
+        const ncy = ny + nh / 2
+        const dx = ncx - scx
+        const dy = ncy - scy
+
+        // Calculate how much to push
+        let pushX = 0, pushY = 0
+        if (Math.abs(dx) > Math.abs(dy)) {
+          // Push horizontally
+          if (dx > 0) {
+            pushX = (sx + sw + PADDING) - nx
+          } else {
+            pushX = (sx - PADDING) - (nx + nw)
+          }
+        } else {
+          // Push vertically
+          if (dy > 0) {
+            pushY = (sy + sh + PADDING) - ny
+          } else {
+            pushY = (sy - PADDING) - (ny + nh)
+          }
+        }
+
+        // Apply push
+        node.canvas_x += pushX
+        node.canvas_y += pushY
+        node.updated_at = Date.now()
+
+        // Persist position
+        invoke('update_node_position', {
+          id: node.id,
+          x: node.canvas_x,
+          y: node.canvas_y
+        }).catch(e => console.error('Failed to update pushed node position:', e))
+
+        pushedNodes.push(node)
+      }
+    }
+
+    // Recursively push nodes that the pushed nodes now overlap with
+    for (const pushedNode of pushedNodes) {
+      pushOverlappingNodes(pushedNode, processed)
     }
   }
 
@@ -234,7 +358,11 @@ export const useNodesStore = defineStore('nodes', () => {
       node.markdown_content = content
       node.updated_at = Date.now()
       try {
-        await invoke('update_node_content', { id, content })
+        const newChecksum = await invoke<string | null>('update_node_content', { id, content })
+        // Update checksum if file was written (prevents watcher reload loop)
+        if (newChecksum) {
+          node.checksum = newChecksum
+        }
       } catch (e) {
         console.error('Failed to update content:', e)
       }
@@ -341,17 +469,100 @@ export const useNodesStore = defineStore('nodes', () => {
     edges.value = edges.value.filter(e => e.id !== id)
   }
 
-  async function importVault(path: string): Promise<Node[]> {
+  async function importVault(path: string, targetWorkspaceId?: string): Promise<Node[]> {
     loading.value = true
     try {
-      const importedNodes = await invoke<Node[]>('import_vault', { path })
+      // Use provided workspace or current workspace
+      const workspaceId = targetWorkspaceId ?? currentWorkspaceId.value
+      console.log('Importing vault:', path, 'to workspace:', workspaceId)
+
+      const importedNodes = await invoke<Node[]>('import_vault', {
+        path,
+        workspaceId
+      })
+
+      console.log('Imported nodes:', importedNodes.length)
       nodes.value.push(...importedNodes)
+
+      // Fetch all edges to include newly created wikilink edges
+      const fetchedEdges = await invoke<Edge[]>('get_edges')
+      edges.value = fetchedEdges
+      console.log('Fetched edges:', fetchedEdges.length)
+
       return importedNodes
     } catch (e) {
       error.value = String(e)
+      console.error('Import failed:', e)
       throw e
     } finally {
       loading.value = false
+    }
+  }
+
+  let watcherUnlisten: (() => void) | null = null
+
+  async function watchVault(path: string): Promise<void> {
+    // Stop any existing watcher
+    await stopWatching()
+
+    // Start listening for file change events
+    watcherUnlisten = await listen<FileChangeEvent>('vault-file-changed', handleFileChange)
+
+    // Start the vault watcher
+    await invoke('watch_vault', { path })
+  }
+
+  async function stopWatching(): Promise<void> {
+    if (watcherUnlisten) {
+      watcherUnlisten()
+      watcherUnlisten = null
+    }
+    try {
+      await invoke('stop_watching')
+    } catch {
+      // Ignore errors if not watching
+    }
+  }
+
+  async function handleFileChange(event: FileChangeEvent) {
+    const filePath = event.path
+
+    switch (event.change_type) {
+      case 'Created': {
+        // New file detected - log for now, could auto-import later
+        console.log('New file detected:', filePath)
+        break
+      }
+      case 'Modified': {
+        // Find node with this file_path and reload content
+        const node = nodes.value.find(n => n.file_path === filePath)
+        if (node && event.new_checksum && node.checksum !== event.new_checksum) {
+          console.log('File modified externally, reloading:', filePath)
+          try {
+            const content = await readTextFile(filePath)
+            node.markdown_content = content
+            node.checksum = event.new_checksum
+            node.updated_at = Date.now()
+            // Update database content (file already has correct content, just sync DB)
+            await invoke<string | null>('update_node_content', { id: node.id, content })
+          } catch (e) {
+            console.error('Failed to reload file content:', e)
+            // Still update checksum to avoid repeated reload attempts
+            node.checksum = event.new_checksum
+          }
+        }
+        break
+      }
+      case 'Deleted': {
+        // Find node with this file_path and mark as orphaned
+        const node = nodes.value.find(n => n.file_path === filePath)
+        if (node) {
+          console.log('File deleted externally:', filePath)
+          node.file_path = null
+          node.updated_at = Date.now()
+        }
+        break
+      }
     }
   }
 
@@ -385,6 +596,14 @@ export const useNodesStore = defineStore('nodes', () => {
     saveWorkspacesToStorage()
   }
 
+  function renameWorkspace(id: string, newName: string) {
+    const workspace = workspaces.value.find(w => w.id === id)
+    if (workspace) {
+      workspace.name = newName
+      saveWorkspacesToStorage()
+    }
+  }
+
   function clearCanvas() {
     nodes.value = []
     edges.value = []
@@ -400,14 +619,92 @@ export const useNodesStore = defineStore('nodes', () => {
     return before - edges.value.length
   }
 
+  // Frame management
+  function createFrame(x: number, y: number, width = 400, height = 300, title = 'Frame'): Frame {
+    const frame: Frame = {
+      id: crypto.randomUUID(),
+      title,
+      canvas_x: x,
+      canvas_y: y,
+      width,
+      height,
+      color: null,
+      workspace_id: currentWorkspaceId.value,
+    }
+    frames.value.push(frame)
+    return frame
+  }
+
+  function updateFramePosition(id: string, x: number, y: number) {
+    const frame = frames.value.find(f => f.id === id)
+    if (frame) {
+      frame.canvas_x = x
+      frame.canvas_y = y
+    }
+  }
+
+  function updateFrameSize(id: string, width: number, height: number) {
+    const frame = frames.value.find(f => f.id === id)
+    if (frame) {
+      frame.width = width
+      frame.height = height
+    }
+  }
+
+  function updateFrameTitle(id: string, title: string) {
+    const frame = frames.value.find(f => f.id === id)
+    if (frame) {
+      frame.title = title
+    }
+  }
+
+  function updateFrameColor(id: string, color: string | null) {
+    const frame = frames.value.find(f => f.id === id)
+    if (frame) {
+      frame.color = color
+    }
+  }
+
+  function deleteFrame(id: string) {
+    // Unassign nodes from this frame
+    for (const node of nodes.value) {
+      if (node.frame_id === id) {
+        node.frame_id = null
+      }
+    }
+    frames.value = frames.value.filter(f => f.id !== id)
+    if (selectedFrameId.value === id) {
+      selectedFrameId.value = null
+    }
+  }
+
+  function selectFrame(id: string | null) {
+    selectedFrameId.value = id
+    if (id) {
+      selectedNodeIds.value = []
+    }
+  }
+
+  function assignNodesToFrame(nodeIds: string[], frameId: string | null) {
+    for (const node of nodes.value) {
+      if (nodeIds.includes(node.id)) {
+        node.frame_id = frameId
+      }
+    }
+  }
+
   return {
     nodes,
     edges,
+    frames,
     filteredNodes,
     filteredEdges,
+    filteredFrames,
+    nodeLayoutVersion,
     selectedNodeIds,
     selectedNodeId,
     selectedNode,
+    selectedFrameId,
     loading,
     error,
     workspaces,
@@ -423,10 +720,21 @@ export const useNodesStore = defineStore('nodes', () => {
     deleteNode,
     createEdge,
     deleteEdge,
+    createFrame,
+    updateFramePosition,
+    updateFrameSize,
+    updateFrameTitle,
+    updateFrameColor,
+    deleteFrame,
+    selectFrame,
+    assignNodesToFrame,
     importVault,
+    watchVault,
+    stopWatching,
     createWorkspace,
     switchWorkspace,
     deleteWorkspace,
+    renameWorkspace,
     clearCanvas,
     cleanupOrphanEdges,
   }

@@ -114,6 +114,16 @@ pub mod nodes {
         Ok(node)
     }
 
+    pub async fn get_by_file_path(pool: &DbPool, file_path: &str) -> Result<Option<Node>, DatabaseError> {
+        let node = sqlx::query_as::<_, Node>(
+            "SELECT * FROM nodes WHERE file_path = ? AND deleted_at IS NULL"
+        )
+        .bind(file_path)
+        .fetch_optional(pool)
+        .await?;
+        Ok(node)
+    }
+
     pub async fn create(pool: &DbPool, node: &Node) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
@@ -186,6 +196,57 @@ pub mod nodes {
             .bind(id)
             .execute(pool)
             .await?;
+        Ok(())
+    }
+
+    pub async fn update_title(
+        pool: &DbPool,
+        id: &str,
+        title: &str,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET title = ?, updated_at = ? WHERE id = ?")
+            .bind(title)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_size(
+        pool: &DbPool,
+        id: &str,
+        width: f64,
+        height: f64,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET width = ?, height = ?, updated_at = ? WHERE id = ?")
+            .bind(width)
+            .bind(height)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_content_and_checksum(
+        pool: &DbPool,
+        id: &str,
+        content: &str,
+        checksum: &str,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query(
+            "UPDATE nodes SET markdown_content = ?, checksum = ?, updated_at = ? WHERE id = ?"
+        )
+        .bind(content)
+        .bind(checksum)
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await?;
         Ok(())
     }
 }

@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { marked } from 'marked'
 import { openExternal } from '../lib/tauri'
+import { routeAllEdges, routeEdgesWithBundling, type NodeRect } from './edgeRouting'
+
+// Toast notification injection
+const showToast = inject<(msg: string, type: 'error' | 'success' | 'info') => void>('showToast', () => {})
+
+// Undo injection for position changes
+const pushUndo = inject<() => void>('pushUndo', () => {})
 
 // Configure marked
 marked.use({
@@ -23,6 +30,7 @@ function updateTheme() {
 let hasInitiallyCentered = false
 
 onMounted(() => {
+
   updateTheme()
   // Watch for theme changes
   const observer = new MutationObserver(updateTheme)
@@ -30,7 +38,49 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ['data-theme']
   })
-  onUnmounted(() => observer.disconnect())
+
+  // Track viewport size for node culling
+  const updateViewportSize = () => {
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (rect) {
+      viewportWidth.value = rect.width
+      viewportHeight.value = rect.height
+    }
+  }
+  updateViewportSize()
+  window.addEventListener('resize', updateViewportSize)
+
+  // Keyboard handler for Delete/Backspace
+  const handleKeydown = (e: KeyboardEvent) => {
+    // Skip if user is typing in an input
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return
+    }
+
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault()
+      // Delete selected nodes
+      if (store.selectedNodeIds.length > 0) {
+        deleteSelectedNodes()
+      }
+      // Delete selected edge
+      else if (selectedEdge.value) {
+        deleteSelectedEdge()
+      }
+      // Delete selected frame
+      else if (store.selectedFrameId) {
+        deleteSelectedFrame()
+      }
+    }
+  }
+  window.addEventListener('keydown', handleKeydown)
+
+  onUnmounted(() => {
+    observer.disconnect()
+    window.removeEventListener('resize', updateViewportSize)
+    window.removeEventListener('keydown', handleKeydown)
+  })
 
   // Center the grid initially
   centerGrid()
@@ -74,6 +124,155 @@ watch(() => store.currentWorkspaceId, () => {
 const scale = ref(1)
 const offsetX = ref(0)
 const offsetY = ref(0)
+const isZooming = ref(false)
+let zoomTimeout: number | null = null
+
+// Viewport size for culling (updated on resize)
+const viewportWidth = ref(window.innerWidth)
+const viewportHeight = ref(window.innerHeight)
+
+// Only render nodes visible in viewport (with margin for smooth scrolling)
+const visibleNodes = computed(() => {
+  const margin = 200 // Extra margin to prevent pop-in
+  const s = scale.value
+  const ox = offsetX.value
+  const oy = offsetY.value
+
+  // Viewport bounds in canvas coordinates
+  const viewLeft = -ox / s - margin
+  const viewTop = -oy / s - margin
+  const viewRight = (viewportWidth.value - ox) / s + margin
+  const viewBottom = (viewportHeight.value - oy) / s + margin
+
+  return store.filteredNodes.filter(node => {
+    const nodeRight = node.canvas_x + (node.width || 200)
+    const nodeBottom = node.canvas_y + (node.height || 120)
+    // Check if node intersects viewport
+    return nodeRight >= viewLeft &&
+           node.canvas_x <= viewRight &&
+           nodeBottom >= viewTop &&
+           node.canvas_y <= viewBottom
+  })
+})
+
+// Set of visible node IDs for quick lookup
+const visibleNodeIds = computed(() => new Set(visibleNodes.value.map(n => n.id)))
+
+// Large graph threshold - disable expensive features
+const isLargeGraph = computed(() => store.filteredNodes.length > 200 || store.filteredEdges.length > 500)
+
+// Semantic zoom: collapse nodes when zoomed out below 50%
+const SEMANTIC_ZOOM_THRESHOLD = 0.5
+// Semantic zoom collapse disabled - nodes always show full content
+const isSemanticZoomCollapsed = computed(() => false)
+
+// Magnifying lens - shows when zoomed out far
+const MAGNIFIER_THRESHOLD = 0.4
+const MAGNIFIER_SIZE = 200
+const MAGNIFIER_ZOOM = 2.5
+const showMagnifier = ref(false)
+const isMouseOnCanvas = ref(false)
+const magnifierPos = ref({ x: 0, y: 0 })
+const magnifierEnabled = ref(localStorage.getItem('nodus-magnifier') !== 'false')
+const shouldShowMagnifier = computed(() => magnifierEnabled.value && scale.value < MAGNIFIER_THRESHOLD && showMagnifier.value && !isLargeGraph.value)
+
+// Only render nodes visible within magnifier viewport for performance
+const magnifierVisibleNodes = computed(() => {
+  if (!shouldShowMagnifier.value) return []
+
+  // Calculate the canvas area visible in the magnifier
+  const viewRadius = (MAGNIFIER_SIZE / 2) / MAGNIFIER_ZOOM / scale.value
+  const centerX = (magnifierPos.value.x - offsetX.value) / scale.value
+  const centerY = (magnifierPos.value.y - offsetY.value) / scale.value
+
+  return store.filteredNodes.filter(node => {
+    const nodeRight = node.canvas_x + (node.width || 200)
+    const nodeBottom = node.canvas_y + (node.height || 120)
+    // Check if node intersects with magnifier circle (use bounding box approximation)
+    const closestX = Math.max(node.canvas_x, Math.min(centerX, nodeRight))
+    const closestY = Math.max(node.canvas_y, Math.min(centerY, nodeBottom))
+    const dx = centerX - closestX
+    const dy = centerY - closestY
+    return (dx * dx + dy * dy) < (viewRadius * viewRadius * 4) // 2x radius for margin
+  })
+})
+
+// Edge stroke width - slight scaling to stay visible at low zoom
+const edgeStrokeWidth = computed(() => {
+  if (scale.value >= 1) return 2
+  return Math.min(2 / Math.sqrt(scale.value), 4)
+})
+
+// Minimap
+const MINIMAP_SIZE = 150
+const MINIMAP_PADDING = 10
+
+const minimapBounds = computed(() => {
+  const nodes = store.filteredNodes
+  if (nodes.length === 0) {
+    return { minX: 0, minY: 0, maxX: 1000, maxY: 800, width: 1000, height: 800 }
+  }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const node of nodes) {
+    minX = Math.min(minX, node.canvas_x)
+    minY = Math.min(minY, node.canvas_y)
+    maxX = Math.max(maxX, node.canvas_x + node.width)
+    maxY = Math.max(maxY, node.canvas_y + node.height)
+  }
+  // Add padding
+  const pad = 100
+  minX -= pad; minY -= pad; maxX += pad; maxY += pad
+  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }
+})
+
+const minimapScale = computed(() => {
+  const bounds = minimapBounds.value
+  const scaleX = (MINIMAP_SIZE - MINIMAP_PADDING * 2) / bounds.width
+  const scaleY = (MINIMAP_SIZE - MINIMAP_PADDING * 2) / bounds.height
+  return Math.min(scaleX, scaleY)
+})
+
+const minimapViewport = computed(() => {
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (!rect) return { x: 0, y: 0, width: 50, height: 40 }
+
+  const bounds = minimapBounds.value
+  const mScale = minimapScale.value
+
+  // Convert screen viewport to canvas coordinates
+  const viewLeft = -offsetX.value / scale.value
+  const viewTop = -offsetY.value / scale.value
+  const viewWidth = rect.width / scale.value
+  const viewHeight = rect.height / scale.value
+
+  return {
+    x: (viewLeft - bounds.minX) * mScale + MINIMAP_PADDING,
+    y: (viewTop - bounds.minY) * mScale + MINIMAP_PADDING,
+    width: viewWidth * mScale,
+    height: viewHeight * mScale,
+  }
+})
+
+function onMinimapClick(e: MouseEvent) {
+  const target = e.currentTarget as HTMLElement
+  const rect = target.getBoundingClientRect()
+  const clickX = e.clientX - rect.left
+  const clickY = e.clientY - rect.top
+
+  const bounds = minimapBounds.value
+  const mScale = minimapScale.value
+
+  // Convert minimap click to canvas coordinates
+  const canvasX = (clickX - MINIMAP_PADDING) / mScale + bounds.minX
+  const canvasY = (clickY - MINIMAP_PADDING) / mScale + bounds.minY
+
+  // Center viewport on that point
+  const canvasRect = canvasRef.value?.getBoundingClientRect()
+  if (canvasRect) {
+    offsetX.value = canvasRect.width / 2 - canvasX * scale.value
+    offsetY.value = canvasRect.height / 2 - canvasY * scale.value
+  }
+}
 
 // Interaction state
 const draggingNode = ref<string | null>(null)
@@ -94,6 +293,15 @@ let lastDragEndTime = 0
 const resizingNode = ref<string | null>(null)
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
 const resizePreview = ref({ width: 0, height: 0 })
+
+// Frame interaction
+const draggingFrame = ref<string | null>(null)
+const frameDragStart = ref({ x: 0, y: 0, frameX: 0, frameY: 0 })
+const frameContainedNodes = ref<Map<string, { x: number, y: number }>>(new Map())
+const resizingFrame = ref<string | null>(null)
+const frameResizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
+const editingFrameId = ref<string | null>(null)
+const editFrameTitle = ref('')
 
 // Gridlock (snap to grid)
 const gridLockEnabled = ref(false)
@@ -205,6 +413,31 @@ const editingNodeId = ref<string | null>(null)
 const editContent = ref('')
 const editingTitleId = ref<string | null>(null)
 const editTitle = ref('')
+
+// Autosave with debounce
+let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
+let autosaveTitleTimer: ReturnType<typeof setTimeout> | null = null
+const AUTOSAVE_DELAY = 1000 // Save 1 second after typing stops
+
+watch(editContent, (newContent) => {
+  if (!editingNodeId.value) return
+  if (autosaveContentTimer) clearTimeout(autosaveContentTimer)
+  autosaveContentTimer = setTimeout(() => {
+    if (editingNodeId.value) {
+      store.updateNodeContent(editingNodeId.value, newContent)
+    }
+  }, AUTOSAVE_DELAY)
+})
+
+watch(editTitle, (newTitle) => {
+  if (!editingTitleId.value) return
+  if (autosaveTitleTimer) clearTimeout(autosaveTitleTimer)
+  autosaveTitleTimer = setTimeout(() => {
+    if (editingTitleId.value) {
+      store.updateNodeTitle(editingTitleId.value, newTitle)
+    }
+  }, AUTOSAVE_DELAY)
+})
 
 // LLM interface
 const graphPrompt = ref('')
@@ -557,6 +790,20 @@ const agentTools = [
           groups: { type: 'string', description: 'Group descriptions: "animals, car brands"' },
         },
         required: ['groups'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'smart_color',
+      description: 'Color nodes based on semantic criteria. LLM reasons about each node. Use for "color males blue, females pink" or "color urgent items red".',
+      parameters: {
+        type: 'object',
+        properties: {
+          instruction: { type: 'string', description: 'Natural language: "males blue, females pink" or "urgent red, normal green"' },
+        },
+        required: ['instruction'],
       },
     },
   },
@@ -1164,6 +1411,38 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
           const newContent = (node.markdown_content || '') + '\n\n' + query
           await store.updateNodeContent(node.id, newContent)
           results.push(`${node.title}: appended`)
+        } else if (args.action === 'llm') {
+          // Use LLM to generate content for this node
+          try {
+            const llmResponse = await fetch('http://localhost:11434/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: ollamaModel.value,
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'You are a helpful assistant. Provide concise, factual information. Output only the content, no meta-commentary.'
+                  },
+                  {
+                    role: 'user',
+                    content: query
+                  }
+                ],
+                stream: false,
+              }),
+            })
+            const data = await llmResponse.json()
+            const content = data.message?.content?.trim() || ''
+            if (content) {
+              await store.updateNodeContent(node.id, content)
+              results.push(`${node.title}: generated`)
+            } else {
+              results.push(`${node.title}: empty response`)
+            }
+          } catch (e) {
+            results.push(`${node.title}: llm failed`)
+          }
         }
       }
       return `Processed ${nodes.length} nodes: ${results.slice(0, 3).join(', ')}${results.length > 3 ? '...' : ''}`
@@ -1289,6 +1568,102 @@ Answer with ONLY the category name, nothing else:`,
       }
 
       return `AGENT_DONE: Moved ${moves.length} nodes into ${groupKeys.length} groups: ${groupKeys.join(', ')}`
+    }
+
+    case 'smart_color': {
+      const nodes = store.filteredNodes
+      if (nodes.length === 0) return 'No nodes to color'
+
+      // Ask LLM to extract color assignments from instruction
+      const instruction = args.instruction || ''
+
+      // Available colors (matching nodeColorPalette)
+      const availableColors: Record<string, string> = {
+        'blue': '#3b82f6',
+        'green': '#22c55e',
+        'yellow': '#eab308',
+        'red': '#ef4444',
+        'purple': '#a855f7',
+        'pink': '#ec4899',
+        'orange': '#f97316',
+        'cyan': '#06b6d4',
+        'gray': '#6b7280',
+        'white': '#ffffff',
+      }
+
+      // Extract categories and colors from instruction
+      let colorMappings: { category: string; color: string }[] = []
+      try {
+        const mapResponse = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: ollamaModel.value,
+            prompt: `Extract category-color pairs from: "${instruction}"
+
+Available colors: blue, green, yellow, red, purple, pink, orange, cyan, gray, white
+
+Output as JSON array: [{"category": "...", "color": "..."}]
+Example: "males blue, females pink" -> [{"category": "male", "color": "blue"}, {"category": "female", "color": "pink"}]
+
+JSON:`,
+            stream: false,
+          }),
+        })
+        const mapData = await mapResponse.json()
+        const jsonMatch = (mapData.response || '').match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          colorMappings = JSON.parse(jsonMatch[0])
+        }
+      } catch { /* fallback */ }
+
+      if (colorMappings.length === 0) {
+        return 'Could not parse color instruction'
+      }
+
+      agentLog.value.push(`> Smart color: ${nodes.length} nodes with mappings: ${colorMappings.map(m => `${m.category}→${m.color}`).join(', ')}`)
+
+      const colored: { id: string; title: string; color: string }[] = []
+
+      for (const node of nodes) {
+        try {
+          const categoryList = colorMappings.map(m => m.category).join(', ')
+          const response = await fetch('http://localhost:11434/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: ollamaModel.value,
+              prompt: `Classify "${node.title}" into exactly ONE category: ${categoryList}, or "none" if it doesn't fit.
+
+Answer with ONLY the category name:`,
+              stream: false,
+            }),
+          })
+          const data = await response.json()
+          let category = (data.response || 'none').toLowerCase().trim().split(/\s+/)[0].replace(/[^a-z]/g, '')
+
+          // Find matching color mapping
+          const mapping = colorMappings.find(m =>
+            category.includes(m.category.toLowerCase()) ||
+            m.category.toLowerCase().includes(category)
+          )
+
+          if (mapping && availableColors[mapping.color]) {
+            const colorHex = availableColors[mapping.color]
+            // Update node color
+            const nodeIndex = store.nodes.findIndex(n => n.id === node.id)
+            if (nodeIndex >= 0) {
+              store.nodes[nodeIndex].color_theme = colorHex
+            }
+            colored.push({ id: node.id, title: node.title, color: mapping.color })
+            agentLog.value.push(`> ${node.title}: ${mapping.color}`)
+          }
+        } catch {
+          // Skip
+        }
+      }
+
+      return `AGENT_DONE: Colored ${colored.length} nodes`
     }
 
     case 'smart_connect': {
@@ -1417,8 +1792,8 @@ function getSystemPrompt() {
 
 RULES:
 - ONLY do what user asks. Do NOT add extra actions.
-- For SEMANTIC tasks (categories like "animals", "car brands"): USE smart_move or smart_connect.
-- After smart_move or smart_connect: call done() immediately. These tools are complete operations.
+- For SEMANTIC tasks (categories like "animals", "car brands"): USE smart_move, smart_color, or smart_connect.
+- After smart_move, smart_color, or smart_connect: call done() immediately. These tools are complete operations.
 
 CANVAS: x right, y down.
 
@@ -1436,9 +1811,10 @@ TOOLS:
 - delete_matching(filter): Delete multiple nodes. filter="all"|"even"|"odd"|"empty"|term
 - auto_layout("grid"|"horizontal"|"vertical"|"circle"|"clock"|"star"): Arrange all nodes
 - query_nodes(filter): Query DB. filter="all"|"empty"|"has_content"|"search term". Returns node list.
-- for_each_node(action, template, filter?): CONTENT with math templates. {title}, {n}, {n^2}
+- for_each_node(action, template, filter?): action="set"|"append"|"search"|"llm". {title}, {n}. llm=ask LLM to generate content per node.
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}]. YOU generate the values.
 - smart_move(instruction): Move nodes by semantic criteria. E.g., "car brands to left, animals to right".
+- smart_color(instruction): Color nodes by semantic criteria. E.g., "males blue, females pink" or "urgent red".
 - smart_connect(groups): Connect nodes within groups. E.g., "animals, car brands" connects animals together and cars together.
 - web_search(query): Search web for information
 - done(summary): Call when finished
@@ -1450,7 +1826,8 @@ CONTENT RULES:
 
 RULES:
 - Use create_nodes_batch for 3+ nodes
-- Create exactly what user asks - no more, no less
+- Do EXACTLY what user asks - no more, no less
+- Do NOT add extra operations (don't move nodes unless asked, don't connect unless asked)
 - ALWAYS call done() when finished
 - Never output plain text - only use tools`,
   }
@@ -1757,9 +2134,21 @@ function getNodeEdgePoint(
   }
 }
 
+// Collapsed height constant for semantic zoom
+const COLLAPSED_NODE_HEIGHT = 48
+
 // Get node height - use stored height or estimate from content
-function getNodeHeight(node: { height: number; markdown_content: string | null }): number {
-  if (node.height) return node.height
+// When semantic zoom is active, returns collapsed height instead
+function getNodeHeight(node: { height?: number; markdown_content: string | null }, respectCollapse = true): number {
+  // When semantic zoom collapse is active, all nodes render at fixed height
+  if (respectCollapse && isSemanticZoomCollapsed.value) {
+    return COLLAPSED_NODE_HEIGHT
+  }
+  // Check for explicitly set height (not undefined, not null, and greater than 0)
+  if (node.height !== undefined && node.height !== null && node.height > 0) {
+    return node.height
+  }
+  // Fallback: estimate from content
   const content = node.markdown_content || ''
   const lineCount = content.split('\n').length
   const charCount = content.length
@@ -1767,9 +2156,67 @@ function getNodeHeight(node: { height: number; markdown_content: string | null }
   return Math.max(60, Math.min(324, lineCount * 22 + Math.floor(charCount / 40) * 18))
 }
 
-// Compute edge lines with endpoints at node boundaries
 const edgeLines = computed(() => {
-  const edges = store.filteredEdges
+  // Force dependency on node positions by reading them
+  // This ensures re-computation when any node moves
+  const _trigger = store.nodes.reduce((sum, n) => sum + n.canvas_x + n.canvas_y + (n.width || 0) + (n.height || 0), 0)
+  void _trigger
+
+  let edges = store.filteredEdges
+
+  // Deduplicate edges - only one edge per node pair
+  const seenPairs = new Set<string>()
+  edges = edges.filter(e => {
+    const pairKey = `${e.source_node_id}:${e.target_node_id}`
+    const pairKeyRev = `${e.target_node_id}:${e.source_node_id}`
+    if (seenPairs.has(pairKey) || seenPairs.has(pairKeyRev)) return false
+    seenPairs.add(pairKey)
+    return true
+  })
+
+  // For large graphs, only render edges connected to visible nodes
+  if (isLargeGraph.value) {
+    const visIds = visibleNodeIds.value
+    edges = edges.filter(e => visIds.has(e.source_node_id) || visIds.has(e.target_node_id))
+  }
+
+  // Build node map for efficient lookup
+  const nodeMap = new Map<string, NodeRect>()
+  for (const node of store.filteredNodes) {
+    nodeMap.set(node.id, {
+      id: node.id,
+      canvas_x: node.canvas_x,
+      canvas_y: node.canvas_y,
+      width: node.width || 200,
+      height: getNodeHeight(node),
+    })
+  }
+
+  // Get edge style
+  const style = globalEdgeStyle.value
+
+  // For orthogonal/smart, use batch routing (with optional bundling)
+  let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; bundleSize?: number }> | null = null
+  if (style === 'orthogonal' || style === 'smart') {
+    const edgeDefs = edges.map(e => ({
+      id: e.id,
+      source_node_id: e.source_node_id,
+      target_node_id: e.target_node_id,
+    }))
+    const nodeRects = store.filteredNodes.map(n => ({
+      id: n.id,
+      canvas_x: n.canvas_x,
+      canvas_y: n.canvas_y,
+      width: n.width || 200,
+      height: getNodeHeight(n),
+    }))
+
+    if (edgeBundling.value) {
+      routedEdges = routeEdgesWithBundling(edgeDefs, nodeRects, nodeMap)
+    } else {
+      routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap)
+    }
+  }
 
   return edges.map(edge => {
     const source = store.getNode(edge.source_node_id)
@@ -1801,49 +2248,61 @@ const edgeLines = computed(() => {
     const dy = endEdge.y - startEdge.y
     const len = Math.sqrt(dx * dx + dy * dy)
 
-    // Visual gap from node edges (same on both sides)
-    const gap = 6
-    // Arrow size (markerWidth=5 * strokeWidth=2 = 10px, but arrow points forward from line end)
-    const arrowSize = isBidirectional ? 0 : 10
+    // Visual gap from node edges
+    const gap = 2
+    // Arrow head extends beyond line end, so pull line back a bit
+    const arrowOffset = isBidirectional ? 0 : 6
 
     let x1 = startEdge.x
     let y1 = startEdge.y
     let x2 = endEdge.x
     let y2 = endEdge.y
 
-    if (len > gap * 2 + arrowSize) {
-      // Source side: gap from node edge
+    if (len > gap * 2 + arrowOffset) {
+      // Source side: small gap from node edge
       x1 = startEdge.x + (dx / len) * gap
       y1 = startEdge.y + (dy / len) * gap
-      // Target side: gap + arrow size, so arrow tip ends at 'gap' from node
-      x2 = endEdge.x - (dx / len) * (gap + arrowSize)
-      y2 = endEdge.y - (dy / len) * (gap + arrowSize)
+      // Target side: pull back for arrow head
+      x2 = endEdge.x - (dx / len) * (gap + arrowOffset)
+      y2 = endEdge.y - (dy / len) * (gap + arrowOffset)
     }
 
-    // Get edge style
-    const style = edgeStyleMap.value[edge.id] || 'straight'
+    // Get edge style - respect user choice
+    const edgeStyle = edgeStyleMap.value[edge.id] || style
 
     // Generate path based on style
     let path = ''
-    if (style === 'curved') {
+    if (edgeStyle === 'curved') {
       // Quadratic bezier curve
       const midX = (x1 + x2) / 2
       const midY = (y1 + y2) / 2
-      // Control point perpendicular to the line
       const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
       const curveOffset = dist * 0.2
       const angle = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2
       const cx = midX + Math.cos(angle) * curveOffset
       const cy = midY + Math.sin(angle) * curveOffset
       path = `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`
-    } else if (style === 'orthogonal') {
-      // Right-angle path
-      const midX = (x1 + x2) / 2
-      path = `M${x1},${y1} L${midX},${y1} L${midX},${y2} L${x2},${y2}`
+    } else if ((edgeStyle === 'orthogonal' || edgeStyle === 'smart') && routedEdges) {
+      // Use pre-computed orthogonal path
+      const routed = routedEdges.get(edge.id)
+      if (routed) {
+        path = routed.svgPath
+      } else {
+        // Fallback to straight line
+        path = `M${x1},${y1} L${x2},${y2}`
+      }
     } else {
-      // Straight line
+      // Straight line (default, fastest)
       path = `M${x1},${y1} L${x2},${y2}`
     }
+
+    // Get stroke width and trunk info (from bundling or default)
+    const routed = routedEdges?.get(edge.id)
+    const bundleStrokeWidth = routed?.strokeWidth || 1.5
+    const bundleSize = routed?.bundleSize || 1
+    const trunkPath = routed?.trunkPath
+    const trunkStrokeWidth = routed?.trunkStrokeWidth || 3
+    const isTrunkOwner = routed?.isTrunkOwner || false
 
     return {
       id: edge.id,
@@ -1852,7 +2311,12 @@ const edgeLines = computed(() => {
       x2,
       y2,
       path,
-      style,
+      style: edgeStyle,
+      strokeWidth: bundleStrokeWidth,
+      bundleSize,
+      trunkPath,
+      trunkStrokeWidth,
+      isTrunkOwner,
       // Full extent for hit area (includes arrow)
       hitX1: startEdge.x,
       hitY1: startEdge.y,
@@ -1861,13 +2325,16 @@ const edgeLines = computed(() => {
       link_type: edge.link_type,
       label: edge.label,
       isBidirectional,
+      // Debug: port offset info
+      debugInfo: routed?.debugInfo,
     }
   }).filter(Boolean)
 })
 
 // Transform for the canvas content
 const transform = computed(() => {
-  return `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`
+  // Use translate3d for GPU acceleration
+  return `translate3d(${offsetX.value}px, ${offsetY.value}px, 0) scale(${scale.value})`
 })
 
 // Screen to canvas coordinates
@@ -1895,12 +2362,11 @@ function onWheel(e: WheelEvent) {
       const atTop = el.scrollTop <= 0
       const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
 
-      // Only allow zoom if scrolling past boundary
+      // Only allow canvas interaction if scrolling past boundary
       if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
         return // Let the element scroll
       }
     }
-    // Content doesn't need scrolling or at boundary - continue to zoom
   }
 
   e.preventDefault()
@@ -1911,14 +2377,72 @@ function onWheel(e: WheelEvent) {
   const mouseX = e.clientX - rect.left
   const mouseY = e.clientY - rect.top
 
-  const delta = e.deltaY > 0 ? 0.9 : 1.1
-  const newScale = Math.min(Math.max(scale.value * delta, 0.1), 3)
+  // Two-finger vertical (up/down) = zoom
+  // Two-finger horizontal = pan
+  // Pinch = zoom (ctrlKey is set)
+  const isHorizontalPan = Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.3
 
-  // Zoom toward mouse position
-  const scaleChange = newScale / scale.value
-  offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
-  offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
-  scale.value = newScale
+  if (isHorizontalPan && !e.ctrlKey) {
+    // Horizontal pan - disable smooth transitions
+    isZooming.value = false
+    offsetX.value -= e.deltaX
+    offsetY.value -= e.deltaY
+  } else {
+    // Smooth zoom - use deltaY magnitude for proportional zooming
+    isZooming.value = true
+    if (zoomTimeout) clearTimeout(zoomTimeout)
+    zoomTimeout = window.setTimeout(() => { isZooming.value = false }, 150)
+
+    const zoomIntensity = 0.003
+    const delta = Math.exp(-e.deltaY * zoomIntensity)
+    const newScale = Math.min(Math.max(scale.value * delta, 0.1), 3)
+    const scaleChange = newScale / scale.value
+    offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
+    offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
+    scale.value = newScale
+
+    // Update magnifier visibility when zoom crosses threshold
+    if (isMouseOnCanvas.value) {
+      showMagnifier.value = newScale < MAGNIFIER_THRESHOLD
+    }
+  }
+}
+
+// Magnifier mouse tracking (throttled for performance)
+let magnifierRafId: number | null = null
+
+function onCanvasMouseMove(e: MouseEvent) {
+  // Throttle magnifier updates using requestAnimationFrame
+  if (magnifierRafId) return
+
+  magnifierRafId = requestAnimationFrame(() => {
+    magnifierRafId = null
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (rect) {
+      magnifierPos.value = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      }
+    }
+    // Update magnifier visibility based on current zoom level
+    if (scale.value < MAGNIFIER_THRESHOLD && isMouseOnCanvas.value) {
+      showMagnifier.value = true
+    } else {
+      showMagnifier.value = false
+    }
+  })
+}
+
+function onCanvasMouseEnter() {
+  isMouseOnCanvas.value = true
+  if (scale.value < MAGNIFIER_THRESHOLD) {
+    showMagnifier.value = true
+  }
+}
+
+function onCanvasMouseLeave() {
+  isMouseOnCanvas.value = false
+  showMagnifier.value = false
 }
 
 // Pan with left mouse drag on empty canvas space
@@ -1926,8 +2450,8 @@ function onCanvasMouseDown(e: MouseEvent) {
   // Left click - start panning or lasso if not on a node
   if (e.button === 0) {
     const target = e.target as HTMLElement
-    // Don't pan if clicking on a node, edge, or panel
-    if (target.closest('.node-card') || target.closest('.edge-line') || target.closest('.edge-panel')) {
+    // Don't pan if clicking on a node, edge, panel, or frame
+    if (target.closest('.node-card') || target.closest('.edge-line') || target.closest('.edge-panel') || target.closest('.canvas-frame')) {
       return
     }
     e.preventDefault()
@@ -1948,6 +2472,7 @@ function onCanvasMouseDown(e: MouseEvent) {
     }
 
     store.selectNode(null)
+    store.selectFrame(null)
     selectedEdge.value = null
     startPan(e)
     return
@@ -2012,6 +2537,9 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   const node = store.getNode(nodeId)
   if (!node) return
 
+  // Capture undo state before dragging
+  pushUndo()
+
   draggingNode.value = nodeId
   store.selectNode(nodeId, e.shiftKey || e.metaKey)
   selectedEdge.value = null
@@ -2039,14 +2567,182 @@ function onNodeDrag(e: MouseEvent) {
 }
 
 function stopNodeDrag() {
+  // Push overlapping nodes away after drag
+  if (draggingNode.value) {
+    pushOverlappingNodesAway(draggingNode.value)
+  }
+
   draggingNode.value = null
   lastDragEndTime = Date.now()
   document.removeEventListener('mousemove', onNodeDrag)
   document.removeEventListener('mouseup', stopNodeDrag)
 }
 
+// Frame interaction
+function onFrameMouseDown(e: MouseEvent, frameId: string) {
+  e.preventDefault()
+  store.selectFrame(frameId)
+  store.selectNode(null)
+
+  const frame = store.frames.find(f => f.id === frameId)
+  if (!frame) return
+
+  draggingFrame.value = frameId
+  const pos = screenToCanvas(e.clientX, e.clientY)
+  frameDragStart.value = {
+    x: pos.x,
+    y: pos.y,
+    frameX: frame.canvas_x,
+    frameY: frame.canvas_y,
+  }
+
+  // Find nodes inside the frame and store their initial positions
+  frameContainedNodes.value.clear()
+  for (const node of store.filteredNodes) {
+    const nodeRight = node.canvas_x + (node.width || 200)
+    const nodeBottom = node.canvas_y + (node.height || 120)
+    const frameRight = frame.canvas_x + frame.width
+    const frameBottom = frame.canvas_y + frame.height
+
+    // Check if node overlaps with frame (at least 50% inside)
+    const overlapX = Math.max(0, Math.min(nodeRight, frameRight) - Math.max(node.canvas_x, frame.canvas_x))
+    const overlapY = Math.max(0, Math.min(nodeBottom, frameBottom) - Math.max(node.canvas_y, frame.canvas_y))
+    const nodeArea = (node.width || 200) * (node.height || 120)
+    const overlapArea = overlapX * overlapY
+
+    if (overlapArea > nodeArea * 0.5) {
+      frameContainedNodes.value.set(node.id, { x: node.canvas_x, y: node.canvas_y })
+    }
+  }
+
+  document.addEventListener('mousemove', onFrameDrag)
+  document.addEventListener('mouseup', stopFrameDrag)
+}
+
+function onFrameDrag(e: MouseEvent) {
+  if (!draggingFrame.value) return
+  const pos = screenToCanvas(e.clientX, e.clientY)
+  const dx = pos.x - frameDragStart.value.x
+  const dy = pos.y - frameDragStart.value.y
+  const newX = snapToGrid(frameDragStart.value.frameX + dx)
+  const newY = snapToGrid(frameDragStart.value.frameY + dy)
+  store.updateFramePosition(draggingFrame.value, newX, newY)
+
+  // Move contained nodes with the frame
+  for (const [nodeId, initialPos] of frameContainedNodes.value) {
+    const newNodeX = snapToGrid(initialPos.x + dx)
+    const newNodeY = snapToGrid(initialPos.y + dy)
+    store.updateNodePosition(nodeId, newNodeX, newNodeY)
+  }
+}
+
+function stopFrameDrag() {
+  draggingFrame.value = null
+  frameContainedNodes.value.clear()
+  document.removeEventListener('mousemove', onFrameDrag)
+  document.removeEventListener('mouseup', stopFrameDrag)
+}
+
+function startFrameResize(e: MouseEvent, frameId: string) {
+  e.preventDefault()
+  const frame = store.frames.find(f => f.id === frameId)
+  if (!frame) return
+
+  resizingFrame.value = frameId
+  frameResizeStart.value = {
+    x: e.clientX,
+    y: e.clientY,
+    width: frame.width,
+    height: frame.height,
+  }
+
+  document.addEventListener('mousemove', onFrameResize)
+  document.addEventListener('mouseup', stopFrameResize)
+}
+
+function onFrameResize(e: MouseEvent) {
+  if (!resizingFrame.value) return
+  const dx = (e.clientX - frameResizeStart.value.x) / scale.value
+  const dy = (e.clientY - frameResizeStart.value.y) / scale.value
+  const newWidth = Math.max(200, frameResizeStart.value.width + dx)
+  const newHeight = Math.max(100, frameResizeStart.value.height + dy)
+  store.updateFrameSize(resizingFrame.value, newWidth, newHeight)
+}
+
+function stopFrameResize() {
+  resizingFrame.value = null
+  document.removeEventListener('mousemove', onFrameResize)
+  document.removeEventListener('mouseup', stopFrameResize)
+}
+
+function startEditingFrameTitle(frameId: string) {
+  const frame = store.frames.find(f => f.id === frameId)
+  if (!frame) return
+  editingFrameId.value = frameId
+  editFrameTitle.value = frame.title
+  nextTick(() => {
+    const input = document.querySelector('.frame-title-editor') as HTMLInputElement
+    input?.focus()
+    input?.select()
+  })
+}
+
+function saveFrameTitleEditing() {
+  if (editingFrameId.value && editFrameTitle.value.trim()) {
+    store.updateFrameTitle(editingFrameId.value, editFrameTitle.value.trim())
+  }
+  editingFrameId.value = null
+}
+
+function cancelFrameTitleEditing() {
+  editingFrameId.value = null
+}
+
+function createFrameAtCenter() {
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (!rect) return
+
+  // If nodes are selected, create frame around them
+  if (store.selectedNodeIds.length > 0) {
+    const selectedNodes = store.filteredNodes.filter(n => store.selectedNodeIds.includes(n.id))
+    const padding = 40
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const node of selectedNodes) {
+      minX = Math.min(minX, node.canvas_x)
+      minY = Math.min(minY, node.canvas_y)
+      maxX = Math.max(maxX, node.canvas_x + (node.width || 200))
+      maxY = Math.max(maxY, node.canvas_y + (node.height || 120))
+    }
+
+    const frameX = minX - padding
+    const frameY = minY - padding
+    const frameWidth = maxX - minX + padding * 2
+    const frameHeight = maxY - minY + padding * 2
+
+    const frame = store.createFrame(frameX, frameY, frameWidth, frameHeight, 'Frame')
+    store.selectFrame(frame.id)
+    store.selectNode(null)
+    return
+  }
+
+  // No selection - create frame at viewport center
+  const centerX = (rect.width / 2 - offsetX.value) / scale.value
+  const centerY = (rect.height / 2 - offsetY.value) / scale.value
+  const frame = store.createFrame(centerX - 200, centerY - 150, 400, 300, 'New Frame')
+  store.selectFrame(frame.id)
+}
+
+function deleteSelectedFrame() {
+  if (store.selectedFrameId) {
+    store.deleteFrame(store.selectedFrameId)
+    store.selectFrame(null)
+  }
+}
+
 // Node resizing
 function onResizeMouseDown(e: MouseEvent, nodeId: string) {
+  console.log('onResizeMouseDown called for node:', nodeId)
   e.stopPropagation()
   e.preventDefault()
 
@@ -2085,18 +2781,83 @@ function onResizeMove(e: MouseEvent) {
 }
 
 function stopResize() {
+  console.log('stopResize called, resizingNode:', resizingNode.value)
   if (resizingNode.value) {
-    // Only update store on mouse up
-    const node = store.nodes.find(n => n.id === resizingNode.value)
-    if (node) {
-      node.width = resizePreview.value.width
-      node.height = resizePreview.value.height
-    }
+    const nodeId = resizingNode.value
+    const width = resizePreview.value.width
+    const height = resizePreview.value.height
+
+    // Update node size
+    store.updateNodeSize(nodeId, width, height)
+
+    // Push overlapping nodes away
+    pushOverlappingNodesAway(nodeId)
   }
   resizingNode.value = null
   lastDragEndTime = Date.now()
   document.removeEventListener('mousemove', onResizeMove)
   document.removeEventListener('mouseup', stopResize)
+}
+
+/**
+ * Push nodes that overlap with the given node away (ripples through graph)
+ */
+function pushOverlappingNodesAway(sourceId: string) {
+  const PADDING = 50  // Space between nodes for edges
+
+  const sourceNode = store.getNode(sourceId)
+  if (!sourceNode) return
+
+  const sw = sourceNode.width || 200
+  const sh = sourceNode.height || 120
+  const sx = sourceNode.canvas_x
+  const sy = sourceNode.canvas_y
+  const scx = sx + sw / 2
+  const scy = sy + sh / 2
+
+  for (const node of store.filteredNodes) {
+    if (node.id === sourceId) continue
+
+    const nw = node.width || 200
+    const nh = node.height || 120
+    const nx = node.canvas_x
+    const ny = node.canvas_y
+
+    // Check if nodes overlap (with padding)
+    const overlapX = sx < nx + nw + PADDING && sx + sw + PADDING > nx
+    const overlapY = sy < ny + nh + PADDING && sy + sh + PADDING > ny
+
+    if (overlapX && overlapY) {
+      const ncx = nx + nw / 2
+      const ncy = ny + nh / 2
+
+      // Direction from source to this node
+      const dx = ncx - scx
+      const dy = ncy - scy
+
+      let newX = nx
+      let newY = ny
+
+      // Push in the dominant direction
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        // Push horizontally
+        if (dx >= 0) {
+          newX = sx + sw + PADDING  // Push right
+        } else {
+          newX = sx - nw - PADDING  // Push left
+        }
+      } else {
+        // Push vertically
+        if (dy >= 0) {
+          newY = sy + sh + PADDING  // Push down
+        } else {
+          newY = sy - nh - PADDING  // Push up
+        }
+      }
+
+      store.updateNodePosition(node.id, newX, newY)
+    }
+  }
 }
 
 // Handle clicks in node content (for external links)
@@ -2386,15 +3147,159 @@ function resetView() {
   offsetY.value = 0
 }
 
-async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' = 'grid') {
-  const nodes = store.filteredNodes
+// Animation state for layout
+let layoutAnimationId: number | null = null
+let forceSimulation: any = null
+
+function stopLayoutAnimation() {
+  if (layoutAnimationId) {
+    cancelAnimationFrame(layoutAnimationId)
+    layoutAnimationId = null
+  }
+  if (forceSimulation) {
+    forceSimulation.stop()
+    forceSimulation = null
+  }
+}
+
+// Animate nodes from current positions to target positions
+function animateToPositions(targets: Map<string, { x: number, y: number }>, duration = 400) {
+  stopLayoutAnimation()
+
+  const startTime = performance.now()
+  const startPositions = new Map<string, { x: number, y: number }>()
+
+  for (const [id, _target] of targets) {
+    const node = store.nodes.find(n => n.id === id)
+    if (node) {
+      startPositions.set(id, { x: node.canvas_x, y: node.canvas_y })
+    }
+  }
+
+  function easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3)
+  }
+
+  function animate() {
+    const elapsed = performance.now() - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    const eased = easeOutCubic(progress)
+
+    for (const [id, target] of targets) {
+      const start = startPositions.get(id)
+      if (start) {
+        const x = start.x + (target.x - start.x) * eased
+        const y = start.y + (target.y - start.y) * eased
+        store.updateNodePosition(id, x, y)
+      }
+    }
+
+    if (progress < 1) {
+      layoutAnimationId = requestAnimationFrame(animate)
+    } else {
+      layoutAnimationId = null
+    }
+  }
+
+  layoutAnimationId = requestAnimationFrame(animate)
+}
+
+async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
+  // Use selected nodes if any, otherwise all filtered nodes
+  const selectedIds = store.selectedNodeIds
+  const allNodes = store.filteredNodes
+  const nodes = selectedIds.length > 0
+    ? allNodes.filter(n => selectedIds.includes(n.id))
+    : allNodes
+
   if (nodes.length === 0) return
 
-  const startX = 100
-  const startY = 100
+  // Push undo state before layout change
+  pushUndo()
+
+  // Stop any running animation
+  stopLayoutAnimation()
+
+  // Calculate current center of all nodes (this stays consistent across layouts)
+  let sumX = 0, sumY = 0
+  for (const node of nodes) {
+    sumX += node.canvas_x + (node.width || 200) / 2
+    sumY += node.canvas_y + (node.height || 120) / 2
+  }
+  const centerX = sumX / nodes.length
+  const centerY = sumY / nodes.length
+
   const nodeWidth = 220
   const nodeHeight = 150
   const gap = 30
+
+  if (layout === 'force') {
+    // Use d3-force for graph-aware layout with live animation
+    const { forceSimulation: createSimulation, forceLink, forceManyBody, forceCenter, forceCollide } = await import('d3-force')
+
+    // Create simulation nodes with current positions
+    const simNodes = nodes.map(n => ({
+      id: n.id,
+      x: n.canvas_x || Math.random() * 500,
+      y: n.canvas_y || Math.random() * 500,
+    }))
+
+    // Create links from edges (only between selected nodes if selection exists)
+    const nodeIdSet = new Set(nodes.map(n => n.id))
+    const edges = store.filteredEdges.filter(e =>
+      nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
+    )
+    const simLinks = edges.map(e => ({
+      source: e.source_node_id,
+      target: e.target_node_id,
+    }))
+
+    // Create and run simulation with live updates, centered on current center
+    // Calculate collision radius based on average node size (diagonal / 2 + padding)
+    const avgWidth = nodes.reduce((sum, n) => sum + (n.width || 200), 0) / nodes.length
+    const avgHeight = nodes.reduce((sum, n) => sum + (n.height || 120), 0) / nodes.length
+    const collisionRadius = Math.sqrt(avgWidth * avgWidth + avgHeight * avgHeight) / 2 + 20
+
+    forceSimulation = createSimulation(simNodes)
+      .force('link', forceLink(simLinks).id((d: any) => d.id).distance(250))
+      .force('charge', forceManyBody().strength(-500))
+      .force('center', forceCenter(centerX, centerY))
+      .force('collide', forceCollide().radius(collisionRadius).strength(1))
+      .alphaDecay(0.02)
+      .on('tick', () => {
+        // Update node positions on each tick for smooth animation
+        for (const simNode of simNodes) {
+          store.updateNodePosition(simNode.id, simNode.x!, simNode.y!)
+        }
+      })
+      .on('end', () => {
+        forceSimulation = null
+      })
+
+    return
+  }
+
+  // For grid/horizontal/vertical layouts, calculate targets centered on current center
+  const targets = new Map<string, { x: number, y: number }>()
+
+  // First calculate layout dimensions to center it
+  let layoutWidth: number, layoutHeight: number
+  if (layout === 'horizontal') {
+    layoutWidth = nodes.length * (nodeWidth + gap) - gap
+    layoutHeight = nodeHeight
+  } else if (layout === 'vertical') {
+    layoutWidth = nodeWidth
+    layoutHeight = nodes.length * (nodeHeight + gap) - gap
+  } else {
+    const cols = Math.ceil(Math.sqrt(nodes.length))
+    const rows = Math.ceil(nodes.length / cols)
+    layoutWidth = cols * (nodeWidth + gap) - gap
+    layoutHeight = rows * (nodeHeight + gap) - gap
+  }
+
+  // Start position to center the layout on current center
+  const startX = centerX - layoutWidth / 2
+  const startY = centerY - layoutHeight / 2
 
   for (let i = 0; i < nodes.length; i++) {
     let x: number, y: number
@@ -2409,8 +3314,10 @@ async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' = 'gri
       x = startX + (i % cols) * (nodeWidth + gap)
       y = startY + Math.floor(i / cols) * (nodeHeight + gap)
     }
-    await store.updateNodePosition(nodes[i].id, x, y)
+    targets.set(nodes[i].id, { x, y })
   }
+
+  animateToPositions(targets, 500)
 }
 
 function fitToContent() {
@@ -2484,6 +3391,25 @@ const edgeStyles = [
 
 // Store edge styles (edgeId -> style)
 const edgeStyleMap = ref<Record<string, string>>({})
+const globalEdgeStyle = ref<'straight' | 'curved' | 'orthogonal' | 'smart'>('orthogonal')
+
+// Edge bundling - merge edges with shared endpoints
+const edgeBundling = ref(false)
+
+function toggleEdgeBundling() {
+  edgeBundling.value = !edgeBundling.value
+}
+
+function toggleMagnifier() {
+  magnifierEnabled.value = !magnifierEnabled.value
+  localStorage.setItem('nodus-magnifier', String(magnifierEnabled.value))
+}
+
+function cycleEdgeStyle() {
+  const styles: typeof globalEdgeStyle.value[] = ['straight', 'orthogonal', 'smart']
+  const idx = styles.indexOf(globalEdgeStyle.value)
+  globalEdgeStyle.value = styles[(idx + 1) % styles.length]
+}
 
 function getEdgeStyle(edgeId: string): string {
   return edgeStyleMap.value[edgeId] || 'straight'
@@ -2495,7 +3421,15 @@ function setEdgeStyle(style: string) {
   }
 }
 
-function getEdgeColor(edge: { link_type: string }): string {
+function getEdgeColor(edge: { link_type: string; debugInfo?: { srcOffset: number } }): string {
+  // DEBUG: Color by port offset to visualize spreading
+  if (edge.debugInfo) {
+    const offset = edge.debugInfo.srcOffset
+    if (offset < -10) return '#ef4444' // red - negative offset
+    if (offset > 10) return '#22c55e'  // green - positive offset
+    if (offset !== 0) return '#f59e0b' // orange - small offset
+    // offset === 0 falls through to default
+  }
   // link_type now stores the color directly, or defaults to gray
   const color = edge.link_type
   if (color && color.startsWith('#')) return color
@@ -2519,6 +3453,65 @@ function changeEdgeColor(color: string) {
 // Render markdown to HTML with caching
 const markdownCache = new Map<string, string>()
 let mermaidCounter = 0
+let typstCounter = 0
+
+// Typst math cache: math expression -> rendered SVG
+const typstCache = new Map<string, string>()
+let typstRenderer: any = null
+let typstInitPromise: Promise<void> | null = null
+
+async function initTypstRenderer() {
+  if (typstRenderer) return
+  if (typstInitPromise) return typstInitPromise
+
+  typstInitPromise = (async () => {
+    try {
+      const { createTypstRenderer } = await import('@myriaddreamin/typst.ts')
+      typstRenderer = await createTypstRenderer()
+      console.log('Typst renderer initialized')
+    } catch (e) {
+      console.warn('Typst renderer failed to load:', e)
+    }
+  })()
+  return typstInitPromise
+}
+
+async function renderTypstMath() {
+  if (!typstRenderer) {
+    await initTypstRenderer()
+    if (!typstRenderer) return
+  }
+
+  const elements = document.querySelectorAll('.typst-pending')
+  for (const el of elements) {
+    const math = el.getAttribute('data-math')
+    const isDisplay = el.classList.contains('typst-display')
+    if (!math) continue
+
+    // Check cache
+    const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
+    if (typstCache.has(cacheKey)) {
+      el.innerHTML = typstCache.get(cacheKey)!
+      el.classList.remove('typst-pending')
+      continue
+    }
+
+    try {
+      const typstCode = isDisplay ? `$ ${math} $` : `$${math}$`
+      const svg = await typstRenderer.runWithSession(async (session: any) => {
+        return await session.svg({ mainContent: typstCode })
+      })
+      typstCache.set(cacheKey, svg)
+      el.innerHTML = svg
+      el.classList.remove('typst-pending')
+    } catch (e) {
+      console.warn('Typst render error:', e)
+      el.textContent = math // Fallback to raw math
+      el.classList.remove('typst-pending')
+      el.classList.add('typst-error')
+    }
+  }
+}
 
 function renderMarkdown(content: string | null): string {
   if (!content) return ''
@@ -2553,9 +3546,38 @@ function renderMarkdown(content: string | null): string {
     return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${decoded}</pre></div>`
   })
 
+  // Post-process to handle math expressions ($...$ and $$...$$)
+  // Display math: $$...$$
+  let needsTypstRender = false
+  html = html.replace(/\$\$([^$]+)\$\$/g, (match, math) => {
+    const id = `typst-${typstCounter++}`
+    const cacheKey = `d:${math.trim()}`
+    if (typstCache.has(cacheKey)) {
+      return `<div class="typst-math typst-display">${typstCache.get(cacheKey)}</div>`
+    }
+    needsTypstRender = true
+    return `<div class="typst-math typst-display typst-pending" id="${id}" data-math="${math.trim()}">${math}</div>`
+  })
+
+  // Inline math: $...$  (but not $$)
+  html = html.replace(/(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g, (match, math) => {
+    const id = `typst-${typstCounter++}`
+    const cacheKey = `i:${math.trim()}`
+    if (typstCache.has(cacheKey)) {
+      return `<span class="typst-math typst-inline">${typstCache.get(cacheKey)}</span>`
+    }
+    needsTypstRender = true
+    return `<span class="typst-math typst-inline typst-pending" id="${id}" data-math="${math.trim()}">${math}</span>`
+  })
+
   // Only schedule mermaid render if there are uncached diagrams
   if (needsMermaidRender) {
     setTimeout(renderMermaidDiagrams, 50)
+  }
+
+  // Schedule Typst render if needed
+  if (needsTypstRender) {
+    setTimeout(renderTypstMath, 50)
   }
 
   // Cache the result (limit cache size)
@@ -2699,6 +3721,18 @@ const nodeColors = [
   { value: '#fce7f3' },
 ]
 
+// Frame border colors (more saturated for visibility)
+const frameColors = [
+  { value: null },
+  { value: '#ef4444' },
+  { value: '#f97316' },
+  { value: '#eab308' },
+  { value: '#22c55e' },
+  { value: '#3b82f6' },
+  { value: '#8b5cf6' },
+  { value: '#ec4899' },
+]
+
 function updateNodeColor(nodeId: string, color: string | null) {
   const node = store.nodes.find(n => n.id === nodeId)
   if (node) {
@@ -2821,6 +3855,9 @@ function onContextMenu(e: MouseEvent) {
       class="canvas-viewport"
       @wheel="onWheel"
       @mousedown="onCanvasMouseDown"
+      @mousemove="onCanvasMouseMove"
+      @mouseenter="onCanvasMouseEnter"
+      @mouseleave="onCanvasMouseLeave"
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
       :class="{ panning: isPanning }"
@@ -2838,34 +3875,60 @@ function onContextMenu(e: MouseEvent) {
           </marker>
         </defs>
 
-        <!-- Existing edges -->
-        <g v-for="edge in edgeLines" :key="edge.id">
-          <!-- Invisible wider hit area -->
+        <!-- Existing edges (simplified for large graphs) -->
+        <template v-if="isLargeGraph">
+          <!-- Fast rendering: paths without hit areas or markers -->
           <path
+            v-for="edge in edgeLines"
+            :key="edge.id"
             :d="edge.path"
-            stroke="transparent"
-            stroke-width="16"
+            :stroke="getEdgeColor(edge)"
+            :stroke-width="1"
             fill="none"
-            class="edge-hit-area"
-            @click="onEdgeClick($event, edge.id)"
+            class="edge-line-fast"
           />
-          <!-- Visible edge path -->
-          <path
-            :d="edge.path"
-            :stroke="selectedEdge === edge.id ? '#3b82f6' : getEdgeColor(edge)"
-            :stroke-width="selectedEdge === edge.id ? 3 : 2"
-            :marker-end="edge.isBidirectional ? undefined : (selectedEdge === edge.id ? 'url(#arrow-selected)' : `url(#${getArrowMarkerId(getEdgeColor(edge))})`)"
-            fill="none"
-            class="edge-line-visible"
-            pointer-events="none"
-          />
-          <text
-            v-if="edge.label"
-            :x="(edge.x1 + edge.x2) / 2"
-            :y="(edge.y1 + edge.y2) / 2 - 8"
-            class="edge-label"
-          >{{ edge.label }}</text>
-        </g>
+        </template>
+        <template v-else>
+          <g v-for="edge in edgeLines" :key="edge.id">
+            <!-- Invisible wider hit area -->
+            <path
+              :d="edge.path"
+              stroke="transparent"
+              stroke-width="12"
+              fill="none"
+              class="edge-hit-area"
+              @click="onEdgeClick($event, edge.id)"
+            />
+            <!-- Trunk path (thick, shared segment) - only rendered by trunk owner -->
+            <path
+              v-if="edgeBundling && edge.isTrunkOwner && edge.trunkPath"
+              :d="edge.trunkPath"
+              :stroke="getEdgeColor(edge)"
+              :stroke-width="edge.trunkStrokeWidth * edgeStrokeWidth"
+              stroke-linecap="round"
+              fill="none"
+              class="edge-trunk"
+              pointer-events="none"
+            />
+            <!-- Visible edge path (branch for bundled, full path for unbundled) -->
+            <path
+              :d="edge.path"
+              :stroke="selectedEdge === edge.id ? '#3b82f6' : getEdgeColor(edge)"
+              :stroke-width="selectedEdge === edge.id ? 3 : (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth)"
+              :marker-end="edge.isBidirectional ? undefined : (selectedEdge === edge.id ? 'url(#arrow-selected)' : `url(#${getArrowMarkerId(getEdgeColor(edge))})`)"
+              stroke-linecap="round"
+              fill="none"
+              class="edge-line-visible"
+              pointer-events="none"
+            />
+            <text
+              v-if="edge.label"
+              :x="(edge.x1 + edge.x2) / 2"
+              :y="(edge.y1 + edge.y2) / 2 - 8"
+              class="edge-label"
+            >{{ edge.label }}</text>
+          </g>
+        </template>
 
         <!-- Lasso selection -->
         <polygon
@@ -2890,9 +3953,56 @@ function onContextMenu(e: MouseEvent) {
         />
       </svg>
 
-      <!-- Node cards -->
+      <!-- Frames -->
       <div
-        v-for="node in store.filteredNodes"
+        v-for="frame in store.filteredFrames"
+        :key="'frame-' + frame.id"
+        class="canvas-frame"
+        :class="{ selected: store.selectedFrameId === frame.id }"
+        :style="{
+          transform: `translate(${frame.canvas_x}px, ${frame.canvas_y}px)`,
+          width: frame.width + 'px',
+          height: frame.height + 'px',
+          borderColor: frame.color || 'var(--border-default)',
+        }"
+        @mousedown.stop="onFrameMouseDown($event, frame.id)"
+        @dblclick.stop="startEditingFrameTitle(frame.id)"
+      >
+        <div class="frame-header">
+          <input
+            v-if="editingFrameId === frame.id"
+            v-model="editFrameTitle"
+            class="frame-title-editor"
+            @blur="saveFrameTitleEditing"
+            @keydown.enter="saveFrameTitleEditing"
+            @keydown.escape="cancelFrameTitleEditing"
+            @click.stop
+            @mousedown.stop
+          />
+          <span v-else class="frame-title">{{ frame.title }}</span>
+          <div v-if="store.selectedFrameId === frame.id && editingFrameId !== frame.id" class="frame-color-picker" @mousedown.stop>
+            <button
+              v-for="color in frameColors"
+              :key="color.value || 'default'"
+              class="frame-color-dot"
+              :class="{ active: frame.color === color.value }"
+              :style="{ background: color.value || 'var(--border-default)' }"
+              @click.stop="store.updateFrameColor(frame.id, color.value)"
+            ></button>
+          </div>
+          <button
+            v-if="store.selectedFrameId === frame.id && editingFrameId !== frame.id"
+            class="frame-delete-btn"
+            @click.stop="deleteSelectedFrame"
+            title="Delete frame"
+          >x</button>
+        </div>
+        <div class="frame-resize-handle" @mousedown.stop="startFrameResize($event, frame.id)"></div>
+      </div>
+
+      <!-- Node cards (viewport culled for performance) -->
+      <div
+        v-for="node in visibleNodes"
         :key="node.id"
         :data-node-id="node.id"
         class="node-card"
@@ -2900,10 +4010,11 @@ function onContextMenu(e: MouseEvent) {
           selected: store.selectedNodeIds.includes(node.id),
           dragging: draggingNode === node.id,
           resizing: resizingNode === node.id,
-          editing: editingNodeId === node.id
+          editing: editingNodeId === node.id,
+          collapsed: isSemanticZoomCollapsed
         }"
         :style="{
-          transform: `translate(${node.canvas_x}px, ${node.canvas_y}px)`,
+          transform: `translate3d(${node.canvas_x}px, ${node.canvas_y}px, 0)`,
           width: (resizingNode === node.id ? resizePreview.width : (node.width || 200)) + 'px',
           height: (resizingNode === node.id ? resizePreview.height : (node.height || 120)) + 'px',
           ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
@@ -2925,18 +4036,18 @@ function onContextMenu(e: MouseEvent) {
           />
           <span v-else>{{ node.title || 'Untitled' }}</span>
         </div>
-        <!-- Editing mode -->
+        <!-- Editing mode (disabled when collapsed) -->
         <textarea
-          v-if="editingNodeId === node.id"
+          v-if="editingNodeId === node.id && !isSemanticZoomCollapsed"
           v-model="editContent"
           class="inline-editor"
           @blur="saveEditing($event)"
           @keydown="onEditorKeydown"
           placeholder="Write markdown..."
         ></textarea>
-        <!-- View mode - uses pre-rendered content to avoid re-renders during drag -->
+        <!-- View mode - hidden when collapsed for performance -->
         <div
-          v-else
+          v-else-if="!isSemanticZoomCollapsed"
           class="node-content"
           v-html="nodeRenderedContent[node.id] || ''"
           @click="handleContentClick"
@@ -3064,26 +4175,154 @@ function onContextMenu(e: MouseEvent) {
 
     <!-- Controls -->
     <div class="zoom-controls">
-      <button @click="scale = Math.min(scale * 1.25, 3)">+</button>
+      <button @click="scale = Math.min(scale * 1.25, 3)" data-tooltip="Zoom In">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
       <span>{{ Math.round(scale * 100) }}%</span>
-      <button @click="scale = Math.max(scale * 0.8, 0.1)">-</button>
-      <button @click="resetView" title="Reset view">R</button>
-      <button @click="fitToContent" title="Fit to content">F</button>
-      <button @click="centerViewOnContent" title="Center view">C</button>
+      <button @click="scale = Math.max(scale * 0.8, 0.1)" data-tooltip="Zoom Out">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button @click="resetView" data-tooltip="Reset View - Return to 100% zoom">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button @click="fitToContent" data-tooltip="Fit to Content - Show all nodes">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+      </button>
       <button
         @click="gridLockEnabled = !gridLockEnabled"
         :class="{ active: gridLockEnabled }"
-        title="Snap to grid"
-      >G</button>
-      <button @click="autoLayoutNodes('grid')" title="Auto-layout grid">L</button>
+        data-tooltip="Snap to Grid - Align nodes to grid when dragging"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </button>
+      <button @click="autoLayoutNodes('grid')" data-tooltip="Grid Layout - Arrange nodes in a grid">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="10" y="3" width="5" height="5"/><rect x="17" y="3" width="5" height="5"/><rect x="3" y="10" width="5" height="5"/><rect x="10" y="10" width="5" height="5"/><rect x="17" y="10" width="5" height="5"/></svg>
+      </button>
+      <button @click="autoLayoutNodes('force')" data-tooltip="Force Layout - Arrange by connections">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><line x1="8" y1="8" x2="10" y2="16"/><line x1="16" y1="8" x2="14" y2="16"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
+      </button>
+      <button
+        @click="cycleEdgeStyle"
+        :class="{ active: globalEdgeStyle !== 'straight' }"
+        :disabled="isLargeGraph"
+        :data-tooltip="`Edge Style: ${globalEdgeStyle} - Click to cycle (straight → orthogonal → smart)`"
+      >
+        <svg v-if="globalEdgeStyle === 'straight'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+        <svg v-else-if="globalEdgeStyle === 'orthogonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L4 12 L20 12 L20 4"/></svg>
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 Q4 12 12 12 Q20 12 20 4"/></svg>
+      </button>
+      <button
+        @click="toggleEdgeBundling"
+        :class="{ active: edgeBundling }"
+        data-tooltip="Edge Bundling - Merge edges with shared endpoints"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4 L12 12 L4 20"/>
+          <path d="M8 4 L12 12 L8 20"/>
+          <line x1="12" y1="12" x2="20" y2="12" stroke-width="3"/>
+        </svg>
+      </button>
+      <button
+        @click="toggleMagnifier"
+        :class="{ active: magnifierEnabled }"
+        data-tooltip="Magnifier - Show magnified view when zoomed out"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="10" cy="10" r="7"/>
+          <line x1="15" y1="15" x2="21" y2="21"/>
+        </svg>
+      </button>
+      <button @click="createFrameAtCenter" data-tooltip="Add Frame - Group selected nodes">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+      </button>
     </div>
 
     <div class="status-bar">
-      <span>{{ store.filteredNodes.length }} nodes</span>
+      <span v-if="isLargeGraph" class="perf-mode">PERF</span>
+      <span>{{ visibleNodes.length }}/{{ store.filteredNodes.length }} nodes</span>
       <span class="sep">|</span>
-      <span>{{ store.filteredEdges.length }} edges</span>
+      <span>{{ edgeLines.length }}/{{ store.filteredEdges.length }} edges</span>
       <span class="sep">|</span>
-      <span class="hint">Drag: pan | Scroll: zoom | Alt+drag: link | Dbl-click: new</span>
+      <span class="hint">Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new</span>
+    </div>
+
+    <!-- SVG filter for fisheye warp effect -->
+    <svg width="0" height="0" style="position: absolute;">
+      <defs>
+        <filter id="fisheye-warp" x="-50%" y="-50%" width="200%" height="200%">
+          <!-- Slight barrel distortion effect -->
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur" />
+          <feDisplacementMap
+            in="blur"
+            in2="SourceGraphic"
+            scale="0"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </defs>
+    </svg>
+
+    <!-- Magnifying lens (when zoomed out far) -->
+    <div
+      v-if="shouldShowMagnifier && magnifierVisibleNodes.length > 0"
+      class="magnifier"
+      :style="{
+        left: (magnifierPos.x - MAGNIFIER_SIZE / 2) + 'px',
+        top: (magnifierPos.y - MAGNIFIER_SIZE / 2) + 'px',
+        width: MAGNIFIER_SIZE + 'px',
+        height: MAGNIFIER_SIZE + 'px',
+      }"
+    >
+      <div class="magnifier-warp">
+        <div
+          v-for="node in magnifierVisibleNodes"
+          :key="'mag-' + node.id"
+          class="magnifier-node"
+          :style="{
+            left: ((node.canvas_x - (magnifierPos.x - offsetX) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
+            top: ((node.canvas_y - (magnifierPos.y - offsetY) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
+            width: ((node.width || 200) * MAGNIFIER_ZOOM) + 'px',
+            height: ((node.height || 120) * MAGNIFIER_ZOOM) + 'px',
+            background: node.color_theme || '#ffffff',
+          }"
+        >
+          <span class="magnifier-node-title">{{ node.title || 'Untitled' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimap -->
+    <div
+      v-if="store.filteredNodes.length > 0"
+      class="minimap"
+      @click="onMinimapClick"
+    >
+      <svg :width="MINIMAP_SIZE" :height="MINIMAP_SIZE">
+        <!-- Nodes -->
+        <rect
+          v-for="node in store.filteredNodes"
+          :key="'mm-' + node.id"
+          :x="(node.canvas_x - minimapBounds.minX) * minimapScale + MINIMAP_PADDING"
+          :y="(node.canvas_y - minimapBounds.minY) * minimapScale + MINIMAP_PADDING"
+          :width="Math.max((node.width || 200) * minimapScale, 3)"
+          :height="Math.max((node.height || 120) * minimapScale, 2)"
+          :fill="node.color_theme || 'var(--text-muted)'"
+          :opacity="store.selectedNodeIds.includes(node.id) ? 1 : 0.6"
+          rx="1"
+        />
+        <!-- Viewport indicator -->
+        <rect
+          :x="minimapViewport.x"
+          :y="minimapViewport.y"
+          :width="minimapViewport.width"
+          :height="minimapViewport.height"
+          fill="none"
+          stroke="var(--primary-color)"
+          stroke-width="2"
+          rx="2"
+        />
+      </svg>
     </div>
 
     <!-- Empty state overlay -->
@@ -3434,6 +4673,12 @@ function onContextMenu(e: MouseEvent) {
   width: 1px;
   height: 1px;
   transform-origin: 0 0;
+  /* GPU acceleration */
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  contain: layout style;
 }
 
 .canvas-viewport {
@@ -3455,7 +4700,15 @@ function onContextMenu(e: MouseEvent) {
 
 .edge-line-visible {
   stroke-linecap: round;
-  transition: stroke-width 0.1s;
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+}
+
+/* Fast edge rendering for large graphs */
+.edge-line-fast {
+  stroke-linecap: round;
+  shape-rendering: optimizeSpeed;
+  pointer-events: none;
 }
 
 .edge-hit-area:hover + .edge-line-visible {
@@ -3478,15 +4731,47 @@ function onContextMenu(e: MouseEvent) {
 .node-card {
   position: absolute;
   background: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  border: 2px solid var(--border-default);
   border-radius: 8px;
   cursor: grab;
-  box-shadow: 0 1px 3px var(--shadow-sm);
+  box-shadow: 0 2px 6px var(--shadow-sm), 0 1px 2px var(--shadow-md);
   user-select: none;
-  transition: box-shadow 0.15s, border-color 0.15s;
   display: flex;
   flex-direction: column;
   min-height: 60px;
+  /* GPU acceleration */
+  will-change: transform;
+  contain: layout style paint;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Semantic zoom: collapsed state when zoomed out */
+.node-card.collapsed {
+  min-height: 48px;
+  height: 48px !important;
+  overflow: hidden;
+  border-width: 3px;
+  box-shadow: 0 3px 8px var(--shadow-md);
+}
+
+.node-card.collapsed .node-header {
+  border-bottom: none;
+  border-radius: 5px;
+  font-size: 20px;
+  font-weight: 800;
+  padding: 12px 16px;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+  text-shadow: 0 1px 2px var(--shadow-sm);
+}
+
+.node-card.collapsed .node-content,
+.node-card.collapsed .inline-editor,
+.node-card.collapsed .node-color-bar,
+.node-card.collapsed .resize-handle,
+.node-card.collapsed .delete-node-btn {
+  display: none;
 }
 
 .node-header {
@@ -3500,7 +4785,7 @@ function onContextMenu(e: MouseEvent) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: text;
+  cursor: inherit;
 }
 
 .title-editor {
@@ -3760,6 +5045,7 @@ function onContextMenu(e: MouseEvent) {
   padding: 12px;
   padding-bottom: 20px;
   border-radius: 0 0 7px 7px;
+  cursor: inherit;
 }
 
 .node-content :deep(p) {
@@ -3864,6 +5150,44 @@ function onContextMenu(e: MouseEvent) {
   /* Keep text crisp */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typst math rendering */
+.node-content :deep(.typst-math) {
+  font-family: 'Computer Modern', serif;
+}
+
+.node-content :deep(.typst-display) {
+  display: block;
+  text-align: center;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.node-content :deep(.typst-inline) {
+  display: inline;
+  vertical-align: middle;
+}
+
+.node-content :deep(.typst-pending) {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.node-content :deep(.typst-error) {
+  color: var(--error-text, #dc2626);
+  font-family: monospace;
+  font-size: 0.85em;
+  background: var(--error-bg, #fef2f2);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.node-content :deep(.typst-math svg) {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
 }
 
 .empty-state-overlay {
@@ -4101,6 +5425,36 @@ function onContextMenu(e: MouseEvent) {
   cursor: pointer;
   font-size: 14px;
   color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+}
+
+/* Tooltip styles */
+.zoom-controls button[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  box-shadow: 0 2px 8px var(--shadow-md);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.zoom-controls button svg {
+  flex-shrink: 0;
 }
 
 .zoom-controls button:hover {
@@ -4161,6 +5515,220 @@ function onContextMenu(e: MouseEvent) {
   background: var(--primary-color);
   color: white;
   border-color: var(--primary-color);
+}
+
+.status-bar .perf-mode {
+  background: #f97316;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+/* Magnifying lens - water droplet effect (GPU accelerated) */
+.magnifier {
+  position: absolute;
+  border-radius: 50%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 100;
+  border: 3px solid #3b82f6;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: transparent;
+}
+
+@keyframes magnifier-appear {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Removed white highlight - was distracting */
+
+/* Warp container - circular clip */
+.magnifier-warp {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-canvas, #f4f4f5);
+}
+
+.magnifier-node {
+  position: absolute;
+  border: 3px solid #333;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  background: #fff !important;
+}
+
+.magnifier-node-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #000 !important;
+  line-height: 1.3;
+  display: block;
+}
+
+.minimap {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 50;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.minimap:hover {
+  border-color: var(--text-muted);
+}
+
+.minimap svg {
+  display: block;
+}
+
+/* Frames */
+.canvas-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 2px dashed var(--border-default);
+  border-radius: 12px;
+  background: transparent;
+  pointer-events: auto;
+  cursor: move;
+  z-index: 0;
+}
+
+.canvas-frame.selected {
+  border-style: solid;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.frame-header {
+  position: absolute;
+  top: -28px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.frame-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.canvas-frame.selected .frame-title {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.frame-title-editor {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  background: var(--bg-surface);
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--primary-color);
+  outline: none;
+  min-width: 100px;
+}
+
+.frame-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 50%,
+    var(--border-default) 50%,
+    var(--border-default) 60%,
+    transparent 60%,
+    transparent 70%,
+    var(--border-default) 70%,
+    var(--border-default) 80%,
+    transparent 80%
+  );
+  border-radius: 0 0 10px 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.canvas-frame:hover .frame-resize-handle,
+.canvas-frame.selected .frame-resize-handle {
+  opacity: 1;
+}
+
+.frame-delete-btn {
+  margin-left: 8px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: var(--danger-color);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+}
+
+.frame-delete-btn:hover {
+  opacity: 1;
+}
+
+.frame-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 4px 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.frame-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.frame-color-dot:hover {
+  transform: scale(1.2);
+}
+
+.frame-color-dot.active {
+  border-color: var(--text-main);
 }
 
 </style>

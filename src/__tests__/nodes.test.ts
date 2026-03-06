@@ -2,13 +2,35 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 
+// Mock localStorage
+const localStorageMock = {
+  store: {} as Record<string, string>,
+  getItem: vi.fn((key: string) => localStorageMock.store[key] || null),
+  setItem: vi.fn((key: string, value: string) => {
+    localStorageMock.store[key] = value
+  }),
+  removeItem: vi.fn((key: string) => {
+    delete localStorageMock.store[key]
+  }),
+  clear: vi.fn(() => {
+    localStorageMock.store = {}
+  }),
+}
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
+
 // Mock Tauri invoke
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockRejectedValue(new Error('Mock: No backend')),
 }))
 
+// Mock Tauri event
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn().mockResolvedValue(() => {}),
+}))
+
 describe('Nodes Store', () => {
   beforeEach(() => {
+    localStorageMock.clear()
     setActivePinia(createPinia())
   })
 
@@ -144,6 +166,14 @@ describe('Nodes Store', () => {
       await store.deleteEdge('e1')
 
       expect(store.edges.length).toBe(0)
+    })
+  })
+
+  describe('watchVault', () => {
+    it('should expose watchVault and stopWatching functions', async () => {
+      const store = useNodesStore()
+      expect(typeof store.watchVault).toBe('function')
+      expect(typeof store.stopWatching).toBe('function')
     })
   })
 })

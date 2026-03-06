@@ -3,11 +3,11 @@
 //! All commands are async and return Results for proper error handling.
 
 use crate::database::{self, edges::Edge, nodes::Node};
-use crate::watcher::{FileLock, VaultWatcher};
+use crate::watcher::{write_file_locked, FileChangeEvent, FileLock, VaultWatcher};
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 /// Global watcher state
 pub struct WatcherState(pub Mutex<Option<VaultWatcher>>);
@@ -169,10 +169,53 @@ pub async fn delete_edge(id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Update node content. Returns the new checksum if file was written.
 #[tauri::command]
-pub async fn update_node_content(id: String, content: String) -> Result<(), String> {
+pub async fn update_node_content(id: String, content: String) -> Result<Option<String>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Check if node has a file_path - if so, write to file with locking
+    if let Some(node) = database::nodes::get_by_id(pool, &id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Some(ref file_path) = node.file_path {
+            let path = std::path::Path::new(file_path);
+            if path.exists() {
+                // Write to file with exclusive lock and get new checksum
+                let checksum = write_file_locked(path, &content)
+                    .map_err(|e| e.to_string())?;
+
+                // Update content and checksum in database
+                database::nodes::update_content_and_checksum(pool, &id, &content, &checksum)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                return Ok(Some(checksum));
+            }
+        }
+    }
+
+    // No file_path or file doesn't exist - just update database
     database::nodes::update_content(pool, &id, &content)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(None)
+}
+
+#[tauri::command]
+pub async fn update_node_title(id: String, title: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_title(pool, &id, &title)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_node_size(id: String, width: f64, height: f64) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_size(pool, &id, width, height)
         .await
         .map_err(|e| e.to_string())
 }
@@ -184,6 +227,7 @@ pub async fn update_node_content(id: String, content: String) -> Result<(), Stri
 #[tauri::command]
 pub async fn watch_vault(
     path: String,
+    app_handle: AppHandle,
     watcher_state: State<'_, WatcherState>,
 ) -> Result<(), String> {
     let path = PathBuf::from(path);
@@ -192,9 +236,10 @@ pub async fn watch_vault(
         return Err("Vault path does not exist".to_string());
     }
 
-    let mut watcher = VaultWatcher::new(path, |event| {
-        println!("File change detected: {:?}", event);
-        // TODO: Emit Tauri event to frontend
+    let mut watcher = VaultWatcher::new(path, move |event: FileChangeEvent| {
+        if let Err(e) = app_handle.emit("vault-file-changed", &event) {
+            eprintln!("Failed to emit file change event: {}", e);
+        }
     })
     .map_err(|e| e.to_string())?;
 
@@ -227,8 +272,10 @@ fn extract_wikilinks(content: &str) -> Vec<String> {
 }
 
 #[tauri::command]
-pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
-    let path = PathBuf::from(path);
+pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<Vec<Node>, String> {
+    let path = PathBuf::from(&path);
+
+    println!("Importing vault from: {:?}, workspace_id: {:?}", path, workspace_id);
 
     if !path.exists() {
         return Err("Vault path does not exist".to_string());
@@ -238,6 +285,7 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
     let mut nodes = Vec::new();
     let mut title_to_id: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     let mut node_links: Vec<(String, Vec<String>)> = Vec::new();
+    let mut skipped = 0;
 
     // Walk directory and import .md files
     for entry in walkdir::WalkDir::new(&path)
@@ -247,6 +295,14 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
         let file_path = entry.path();
 
         if file_path.extension().map_or(false, |ext| ext == "md") {
+            let file_path_str = file_path.to_string_lossy().to_string();
+
+            // Check if this file is already imported (skip if exists)
+            if let Ok(Some(_existing)) = database::nodes::get_by_file_path(pool, &file_path_str).await {
+                skipped += 1;
+                continue; // Skip already imported files
+            }
+
             // Read file content
             let content = std::fs::read_to_string(file_path).map_err(|e| e.to_string())?;
 
@@ -277,7 +333,7 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
             let node = Node {
                 id: node_id.clone(),
                 title: title.clone(),
-                file_path: Some(file_path.to_string_lossy().to_string()),
+                file_path: Some(file_path_str),
                 markdown_content: Some(content),
                 node_type: "note".to_string(),
                 canvas_x: initial_x,
@@ -289,7 +345,7 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
                 color_theme: None,
                 is_collapsed: false,
                 tags: None,
-                workspace_id: None,
+                workspace_id: workspace_id.clone(),
                 checksum: Some(checksum),
                 created_at: now,
                 updated_at: now,
@@ -308,6 +364,7 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
 
     // Create edges for wikilinks
     let now = chrono::Utc::now().timestamp();
+    let mut edge_count = 0;
     for (source_id, links) in node_links {
         for link in links {
             if let Some(target_id) = title_to_id.get(&link.to_lowercase()) {
@@ -321,11 +378,15 @@ pub async fn import_vault(path: String) -> Result<Vec<Node>, String> {
                         weight: 1.0,
                         created_at: now,
                     };
-                    let _ = database::edges::create(pool, &edge).await;
+                    if database::edges::create(pool, &edge).await.is_ok() {
+                        edge_count += 1;
+                    }
                 }
             }
         }
     }
+
+    println!("Import complete: {} nodes imported, {} skipped, {} edges created", nodes.len(), skipped, edge_count);
 
     Ok(nodes)
 }

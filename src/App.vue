@@ -1,16 +1,87 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed, provide } from 'vue'
 import { useNodesStore } from './stores/nodes'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 
 const store = useNodesStore()
 const showImportDialog = ref(false)
 const showWorkspaceDialog = ref(false)
+const showWorkspaceEditor = ref(false)
 const vaultPath = ref('')
+const importTarget = ref<'current' | 'new'>('new')
+const importWorkspaceName = ref('')
 const searchQuery = ref('')
 const showSearch = ref(false)
-const isDark = ref(false)
+const isDark = ref(localStorage.getItem('nodus-theme') === 'dark')
 const newWorkspaceName = ref('')
+const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
+
+// Undo/Redo for position changes
+interface PositionSnapshot {
+  positions: Map<string, { x: number; y: number }>
+}
+const undoStack = ref<PositionSnapshot[]>([])
+const redoStack = ref<PositionSnapshot[]>([])
+const MAX_UNDO = 50
+
+function capturePositionSnapshot(): PositionSnapshot {
+  const positions = new Map<string, { x: number; y: number }>()
+  for (const node of store.filteredNodes) {
+    positions.set(node.id, { x: node.canvas_x, y: node.canvas_y })
+  }
+  return { positions }
+}
+
+function pushUndo() {
+  undoStack.value.push(capturePositionSnapshot())
+  if (undoStack.value.length > MAX_UNDO) {
+    undoStack.value.shift()
+  }
+  redoStack.value = []
+}
+
+async function undo() {
+  if (undoStack.value.length === 0) return
+  redoStack.value.push(capturePositionSnapshot())
+  const snapshot = undoStack.value.pop()!
+  for (const [id, pos] of snapshot.positions) {
+    await store.updateNodePosition(id, pos.x, pos.y)
+  }
+  showToast('Undo', 'info')
+}
+
+async function redo() {
+  if (redoStack.value.length === 0) return
+  undoStack.value.push(capturePositionSnapshot())
+  const snapshot = redoStack.value.pop()!
+  for (const [id, pos] of snapshot.positions) {
+    await store.updateNodePosition(id, pos.x, pos.y)
+  }
+  showToast('Redo', 'info')
+}
+
+// Expose pushUndo to child components
+provide('pushUndo', pushUndo)
+
+// Toast notifications
+interface Toast {
+  id: number
+  message: string
+  type: 'error' | 'success' | 'info'
+}
+const toasts = ref<Toast[]>([])
+let toastId = 0
+
+function showToast(message: string, type: 'error' | 'success' | 'info' = 'info') {
+  const id = ++toastId
+  toasts.value.push({ id, message, type })
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(t => t.id !== id)
+  }, 4000)
+}
+
+// Provide toast function to child components
+provide('showToast', showToast)
 
 function createNewWorkspace() {
   if (!newWorkspaceName.value.trim()) return
@@ -21,10 +92,45 @@ function createNewWorkspace() {
   showWorkspaceDialog.value = false
 }
 
+function openWorkspaceEditor() {
+  const current = store.workspaces.find(w => w.id === store.currentWorkspaceId)
+  if (current) {
+    editingWorkspace.value = { id: current.id, name: current.name, description: '' }
+  } else {
+    editingWorkspace.value = { id: '', name: 'Default Workspace', description: '' }
+  }
+  showWorkspaceEditor.value = true
+}
+
+function saveWorkspaceChanges() {
+  if (!editingWorkspace.value) return
+  if (editingWorkspace.value.id) {
+    store.renameWorkspace(editingWorkspace.value.id, editingWorkspace.value.name)
+  }
+  showWorkspaceEditor.value = false
+  showToast('Workspace updated', 'success')
+}
+
+function deleteCurrentWorkspace() {
+  if (!editingWorkspace.value?.id) {
+    showToast('Cannot delete default workspace', 'error')
+    return
+  }
+  const id = editingWorkspace.value.id
+  const name = editingWorkspace.value.name
+  store.deleteWorkspace(id)
+  showWorkspaceEditor.value = false
+  showToast(`Deleted workspace "${name}"`, 'info')
+}
+
 function toggleTheme() {
   isDark.value = !isDark.value
   document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light')
+  localStorage.setItem('nodus-theme', isDark.value ? 'dark' : 'light')
 }
+
+// Apply saved theme on load
+document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light')
 
 const searchResults = computed(() => {
   if (!searchQuery.value.trim()) return []
@@ -42,6 +148,21 @@ function selectSearchResult(nodeId: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  const target = e.target as HTMLElement
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
+  // Cmd/Ctrl + Z: Undo (not in input)
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !isInput) {
+    e.preventDefault()
+    undo()
+    return
+  }
+  // Cmd/Ctrl + Shift + Z or Cmd/Ctrl + Y: Redo (not in input)
+  if ((e.metaKey || e.ctrlKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y') && !isInput) {
+    e.preventDefault()
+    redo()
+    return
+  }
   // Cmd/Ctrl + R: Reload app
   if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
     e.preventDefault()
@@ -66,14 +187,17 @@ function onKeydown(e: KeyboardEvent) {
       store.selectNode(null)
     }
   }
-  // Delete/Backspace: Delete selected nodes (when not in input)
-  if ((e.key === 'Delete' || e.key === 'Backspace') && store.selectedNodeIds.length > 0) {
-    const target = e.target as HTMLElement
-    if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+  // Delete/Backspace: Delete selected nodes or frames (when not in input)
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
+    if (store.selectedNodeIds.length > 0) {
       e.preventDefault()
       for (const id of [...store.selectedNodeIds]) {
         store.deleteNode(id)
       }
+    } else if (store.selectedFrameId) {
+      e.preventDefault()
+      store.deleteFrame(store.selectedFrameId)
+      store.selectFrame(null)
     }
   }
 }
@@ -90,13 +214,24 @@ onUnmounted(() => {
 
 async function importVault() {
   if (!vaultPath.value.trim()) return
+  if (importTarget.value === 'new' && !importWorkspaceName.value.trim()) return
+
   try {
-    await store.importVault(vaultPath.value.trim())
+    // Create new workspace if requested
+    if (importTarget.value === 'new') {
+      const ws = store.createWorkspace(importWorkspaceName.value.trim())
+      store.switchWorkspace(ws.id)
+    }
+
+    const imported = await store.importVault(vaultPath.value.trim())
     showImportDialog.value = false
     vaultPath.value = ''
+    importWorkspaceName.value = ''
+    importTarget.value = 'new'
+    showToast(`Imported ${imported.length} nodes`, 'success')
   } catch (e) {
     console.error('Import failed:', e)
-    alert('Failed to import vault: ' + e)
+    showToast('Failed to import vault: ' + e, 'error')
   }
 }
 
@@ -112,7 +247,12 @@ async function openFolderDialog() {
       vaultPath.value = selected as string
     }
   } catch (e) {
-    console.error('Dialog not available:', e)
+    console.error('Dialog error:', e)
+    // Fallback: prompt user to enter path manually
+    const path = window.prompt('Enter vault path (dialog not available in browser mode):')
+    if (path) {
+      vaultPath.value = path
+    }
   }
 }
 
@@ -149,20 +289,35 @@ async function addNewNode() {
               {{ ws.name }}
             </option>
           </select>
-          <button class="new-ws-btn" @click="showWorkspaceDialog = true" title="New Workspace">+</button>
+          <button class="icon-btn" @click="openWorkspaceEditor" title="Edit Workspace">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="icon-btn" @click="showWorkspaceDialog = true" title="New Workspace">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
         </div>
+        <div class="toolbar-divider"></div>
+        <button class="icon-btn" @click="undo" :disabled="undoStack.length === 0" title="Undo (Cmd+Z)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+        <button class="icon-btn" @click="redo" :disabled="redoStack.length === 0" title="Redo (Cmd+Shift+Z)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+        </button>
       </div>
       <div class="toolbar-center">
         <button class="search-trigger" @click="showSearch = true">
-          <span class="search-icon">S</span>
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <span class="search-placeholder">Search nodes...</span>
           <span class="search-shortcut">Cmd+K</span>
         </button>
       </div>
       <div class="toolbar-actions">
-        <button class="toolbar-btn" @click="showImportDialog = true">Import</button>
-        <button class="toolbar-btn theme-btn" @click="toggleTheme" :title="isDark ? 'Light mode' : 'Dark mode'">
-          {{ isDark ? 'L' : 'D' }}
+        <button class="icon-btn" @click="showImportDialog = true" title="Import Vault">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+        <button class="icon-btn theme-btn" @click="toggleTheme" :title="isDark ? 'Light mode' : 'Dark mode'">
+          <svg v-if="isDark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
       </div>
     </header>
@@ -220,10 +375,33 @@ async function addNewNode() {
               <button class="browse-btn" @click="openFolderDialog">Browse</button>
             </div>
           </label>
+
+          <div class="import-target-section">
+            <label class="radio-label">
+              <input type="radio" v-model="importTarget" value="new" />
+              <span>Create new workspace</span>
+            </label>
+            <input
+              v-if="importTarget === 'new'"
+              v-model="importWorkspaceName"
+              type="text"
+              placeholder="Workspace name"
+              class="path-input workspace-name-input"
+            />
+
+            <label class="radio-label">
+              <input type="radio" v-model="importTarget" value="current" />
+              <span>Import into current workspace</span>
+            </label>
+          </div>
         </div>
         <div class="dialog-actions">
           <button class="cancel-btn" @click="showImportDialog = false">Cancel</button>
-          <button class="import-btn" @click="importVault" :disabled="!vaultPath.trim()">Import</button>
+          <button
+            class="import-btn"
+            @click="importVault"
+            :disabled="!vaultPath.trim() || (importTarget === 'new' && !importWorkspaceName.trim())"
+          >Import</button>
         </div>
       </div>
     </div>
@@ -248,6 +426,64 @@ async function addNewNode() {
           <button class="cancel-btn" @click="showWorkspaceDialog = false">Cancel</button>
           <button class="import-btn" @click="createNewWorkspace" :disabled="!newWorkspaceName.trim()">Create</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Workspace Editor Dialog -->
+    <div v-if="showWorkspaceEditor && editingWorkspace" class="dialog-overlay" @click.self="showWorkspaceEditor = false">
+      <div class="dialog workspace-editor">
+        <h2>Edit Workspace</h2>
+        <div class="dialog-content">
+          <label>
+            Name:
+            <input
+              v-model="editingWorkspace.name"
+              type="text"
+              placeholder="Workspace name"
+              class="path-input"
+              :disabled="!store.currentWorkspaceId"
+            />
+          </label>
+          <label>
+            Description:
+            <textarea
+              v-model="editingWorkspace.description"
+              placeholder="What is this workspace for?"
+              class="description-input"
+              rows="3"
+            ></textarea>
+          </label>
+          <div class="workspace-stats">
+            <span>{{ store.filteredNodes.length }} nodes</span>
+            <span class="stat-sep">|</span>
+            <span>{{ store.filteredEdges.length }} edges</span>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button
+            v-if="editingWorkspace?.id"
+            class="delete-btn"
+            @click="deleteCurrentWorkspace"
+          >
+            Delete Workspace
+          </button>
+          <div class="actions-right">
+            <button class="cancel-btn" @click="showWorkspaceEditor = false">Cancel</button>
+            <button class="import-btn" @click="saveWorkspaceChanges">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div class="toast-container">
+      <div
+        v-for="toast in toasts"
+        :key="toast.id"
+        class="toast"
+        :class="toast.type"
+      >
+        {{ toast.message }}
       </div>
     </div>
   </div>
@@ -308,25 +544,45 @@ async function addNewNode() {
   border-color: var(--text-muted);
 }
 
-.new-ws-btn {
-  width: 28px;
-  height: 28px;
+.icon-btn {
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
   background: var(--bg-surface);
   cursor: pointer;
-  font-size: 16px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
-.new-ws-btn:hover {
+.icon-btn:hover:not(:disabled) {
   background: var(--bg-elevated);
   border-color: var(--text-muted);
+  color: var(--text-main);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.icon-btn svg {
+  flex-shrink: 0;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-default);
+  margin: 0 4px;
 }
 
 .toolbar-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .toolbar-btn {
@@ -582,6 +838,33 @@ async function addNewNode() {
   background: var(--bg-elevated);
 }
 
+.import-target-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.radio-label input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-color);
+}
+
+.workspace-name-input {
+  margin-left: 24px;
+  margin-top: 4px;
+}
+
 .dialog-actions {
   display: flex;
   gap: 12px;
@@ -616,5 +899,135 @@ async function addNewNode() {
 
 .import-btn:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: toast-slide-in 0.3s ease;
+  max-width: 350px;
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border-left: 4px solid #dc2626;
+}
+
+.toast.success {
+  background: #f0fdf4;
+  color: #166534;
+  border-left: 4px solid #22c55e;
+}
+
+.toast.info {
+  background: #eff6ff;
+  color: #1e40af;
+  border-left: 4px solid #3b82f6;
+}
+
+[data-theme='dark'] .toast.error {
+  background: #450a0a;
+  color: #fecaca;
+}
+
+[data-theme='dark'] .toast.success {
+  background: #052e16;
+  color: #bbf7d0;
+}
+
+[data-theme='dark'] .toast.info {
+  background: #172554;
+  color: #bfdbfe;
+}
+
+/* Workspace Editor */
+.workspace-editor .dialog-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.workspace-editor .actions-right {
+  display: flex;
+  gap: 8px;
+}
+
+.description-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  resize: vertical;
+  font-family: inherit;
+}
+
+.description-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.workspace-stats {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-surface-alt);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.stat-sep {
+  color: var(--border-default);
+}
+
+.delete-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: 6px;
+  background: var(--danger-bg);
+  color: var(--danger-color);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.delete-btn:hover {
+  background: var(--danger-color);
+  color: white;
+  border-color: var(--danger-color);
+}
+
+.theme-btn {
+  width: 32px;
+  padding: 0;
 }
 </style>
