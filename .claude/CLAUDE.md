@@ -17,6 +17,33 @@ Design document: `/docs/PRODUCT_DESIGN.md` (v0.9.0)
 3. **Version docs:** Increment version on significant changes
 4. **Reference docs:** Code comments should reference doc sections
 
+### Documentation Standard: ISO/IEC 26514
+
+All user-facing documentation follows ISO/IEC 26514 (Systems and software engineering — Design and development of information for users).
+
+**Structure requirements:**
+
+| Information Type | Purpose | Format |
+|------------------|---------|--------|
+| Conceptual | Explain what and why | Short paragraphs, diagrams |
+| Procedural | Step-by-step tasks | Numbered lists, prerequisites stated |
+| Reference | Quick lookup | Tables, alphabetical/logical order |
+
+**Style requirements:**
+
+- Task-oriented: Focus on user goals, not features
+- Active voice, imperative mood for procedures
+- Consistent terminology (define terms on first use)
+- One instruction per step
+- State prerequisites before procedures
+- Include expected results for verification
+
+**Minimalism principles:**
+
+- Omit information users do not need
+- Support error recognition and recovery
+- Use realistic examples from actual use cases
+
 ### Test-Driven Development (TDD)
 
 1. **Write test first:** Define expected behavior before implementation
