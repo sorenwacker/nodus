@@ -4,8 +4,7 @@ import { useNodesStore } from '../stores/nodes'
 import { marked } from 'marked'
 import { openExternal } from '../lib/tauri'
 import { routeAllEdges, routeEdgesWithBundling, type NodeRect } from './edgeRouting'
-import { useLLM, cleanContent, parseToolArgs, evalMathExpr, extractNumber } from './llm'
-import { applyForceLayout } from './layout'
+import { useLLM, cleanContent, executeTool, type ToolContext } from './llm'
 
 // Toast notification injection
 const showToast = inject<(msg: string, type: 'error' | 'success' | 'info') => void>('showToast', () => {})
@@ -485,529 +484,39 @@ let nodePositionCounter = 0
 
 // cleanContent is now imported from ./llm
 
+// cleanContent is now imported from ./llm
+
 async function executeAgentTool(name: string, args: any): Promise<string> {
-  // Parse args if it's a string (some models return stringified JSON)
-  if (typeof args === 'string') {
-    try {
-      args = JSON.parse(args)
-    } catch { /* keep as string */ }
+  // Create tool context for the extracted executor
+  const toolCtx: ToolContext = {
+    store: {
+      filteredNodes: store.filteredNodes,
+      filteredEdges: store.filteredEdges,
+      createNode: store.createNode,
+      createEdge: store.createEdge,
+      deleteNode: store.deleteNode,
+      deleteEdge: store.deleteEdge,
+      updateNodePosition: store.updateNodePosition,
+      updateNodeContent: store.updateNodeContent,
+      updateNodeTitle: store.updateNodeTitle,
+    },
+    log: (msg: string) => agentLog.value.push(msg),
+    screenToCanvas,
+    snapToGrid,
+    ollamaModel: ollamaModel.value,
+    ollamaContextLength: ollamaContextLength.value,
   }
-  console.log(`Agent tool: ${name}`, args)
-  agentLog.value.push(`> ${name}(${JSON.stringify(args).slice(0, 50)}...)`)
 
+  // Try extracted executor (handles simple tools)
+  const result = await executeTool(name, args, toolCtx)
+  if (!result.startsWith('__UNHANDLED__:')) {
+    return result
+  }
+
+  // Handle LLM-dependent tools inline
   switch (name) {
-    case 'create_node': {
-      const pos = screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
-      const offsetX = (nodePositionCounter % 4) * 250
-      const offsetY = Math.floor(nodePositionCounter / 4) * 180
-      nodePositionCounter++
-
-      const node = await store.createNode({
-        title: args.title || '',
-        node_type: 'note',
-        markdown_content: cleanContent(args.content),
-        canvas_x: snapToGrid(args.x ?? pos.x + offsetX),
-        canvas_y: snapToGrid(args.y ?? pos.y + offsetY),
-      })
-      return `Created node "${args.title}" with id ${node.id}`
-    }
-
-    case 'create_edge': {
-      const fromNode = store.filteredNodes.find(n => n.title === args.from_title)
-      const toNode = store.filteredNodes.find(n => n.title === args.to_title)
-      if (!fromNode) return `Error: Node "${args.from_title}" not found`
-      if (!toNode) return `Error: Node "${args.to_title}" not found`
-
-      await store.createEdge({
-        source_node_id: fromNode.id,
-        target_node_id: toNode.id,
-        label: args.label,
-      })
-      return `Created edge from "${args.from_title}" to "${args.to_title}"`
-    }
-
-    case 'connect_matching': {
-      const filter = args.filter || 'all'
-      const mode = args.mode || 'chain'
-
-      // Filter nodes
-      let nodes = [...store.filteredNodes]
-
-      if (filter === 'even') {
-        nodes = nodes.filter(n => {
-          const num = parseInt(n.title.match(/\d+/)?.[0] || '0')
-          return num % 2 === 0
-        })
-      } else if (filter === 'odd') {
-        nodes = nodes.filter(n => {
-          const num = parseInt(n.title.match(/\d+/)?.[0] || '0')
-          return num % 2 === 1
-        })
-      } else if (filter !== 'all') {
-        const term = filter.toLowerCase()
-        nodes = nodes.filter(n => n.title.toLowerCase().includes(term))
-      }
-
-      // Sort by number in title
-      nodes.sort((a, b) => {
-        const numA = parseInt(a.title.match(/\d+/)?.[0] || '0')
-        const numB = parseInt(b.title.match(/\d+/)?.[0] || '0')
-        return numA - numB
-      })
-
-      if (nodes.length < 2) return `Need at least 2 nodes to connect (found ${nodes.length})`
-
-      let edgeCount = 0
-      if (mode === 'star') {
-        // All connect to first
-        const hub = nodes[0]
-        for (let i = 1; i < nodes.length; i++) {
-          await store.createEdge({ source_node_id: hub.id, target_node_id: nodes[i].id })
-          edgeCount++
-        }
-      } else {
-        // Chain: 1→2→3→...
-        for (let i = 0; i < nodes.length - 1; i++) {
-          await store.createEdge({ source_node_id: nodes[i].id, target_node_id: nodes[i + 1].id })
-          edgeCount++
-        }
-      }
-
-      return `Connected ${edgeCount} edges (${filter}, ${mode})`
-    }
-
-    case 'delete_edges': {
-      const filter = args.filter || 'all'
-      let edges = [...store.filteredEdges]
-
-      if (filter !== 'all') {
-        // Find node by title and filter edges connected to it
-        const node = store.filteredNodes.find(n => n.title.toLowerCase() === filter.toLowerCase())
-        if (node) {
-          edges = edges.filter(e => e.source_node_id === node.id || e.target_node_id === node.id)
-        } else {
-          return `Node "${filter}" not found`
-        }
-      }
-
-      if (edges.length === 0) return 'No edges to delete'
-
-      agentLog.value.push(`> Deleting ${edges.length} edges...`)
-      for (const edge of edges) {
-        await store.deleteEdge(edge.id)
-      }
-      return `Deleted ${edges.length} edges`
-    }
-
-    case 'generate_sequence': {
-      const count = Math.min(args.count || 10, 10000) // Cap at 10k
-      const titlePattern = args.title_pattern || 'Node {n}'
-      const contentPattern = args.content_pattern || ''
-      const layout = args.layout || 'grid'
-      const connect = args.connect || false
-
-      const pos = screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
-      const cols = layout === 'horizontal' ? count : layout === 'vertical' ? 1 : Math.ceil(Math.sqrt(count))
-      const spacing = 250
-
-      agentLog.value.push(`> Generating ${count} nodes${connect ? ' (connected)' : ''}...`)
-
-      const createdNodes: { id: string; title: string }[] = []
-
-      for (let i = 1; i <= count; i++) {
-        const title = titlePattern.replace(/\{n\}/g, String(i))
-        const content = contentPattern.replace(/\{n\}/g, String(i))
-
-        const col = (i - 1) % cols
-        const row = Math.floor((i - 1) / cols)
-        const x = pos.x + col * spacing
-        const y = pos.y + row * 180
-
-        const node = await store.createNode({
-          title,
-          node_type: 'note',
-          markdown_content: content,
-          canvas_x: snapToGrid(x),
-          canvas_y: snapToGrid(y),
-        })
-
-        createdNodes.push({ id: node.id, title })
-
-        // Log progress every 100 nodes
-        if (i % 100 === 0) {
-          agentLog.value.push(`> Created ${i}/${count}...`)
-        }
-      }
-
-      // Create edges if connect is true
-      if (connect && createdNodes.length > 1) {
-        agentLog.value.push(`> Connecting ${createdNodes.length - 1} edges...`)
-        for (let i = 0; i < createdNodes.length - 1; i++) {
-          await store.createEdge({
-            source_node_id: createdNodes[i].id,
-            target_node_id: createdNodes[i + 1].id,
-          })
-        }
-      }
-
-      return `Generated ${count} nodes${connect ? ` with ${count - 1} edges` : ''}`
-    }
-
-    case 'create_nodes_batch': {
-      let nodesList = args.nodes || []
-      // Handle case where nodes is a JSON string instead of array
-      if (typeof nodesList === 'string') {
-        try {
-          // Try direct JSON parse first
-          nodesList = JSON.parse(nodesList)
-        } catch {
-          try {
-            // LLM sometimes sends single quotes (Python-style) - convert to valid JSON
-            const fixed = nodesList
-              .replace(/'/g, '"')
-              .replace(/(\w+):/g, '"$1":') // unquoted keys
-            nodesList = JSON.parse(fixed)
-          } catch {
-            return 'Error: could not parse nodes array'
-          }
-        }
-      }
-      if (!Array.isArray(nodesList) || nodesList.length === 0) {
-        return 'Error: nodes must be a non-empty array'
-      }
-
-      // Upsert: update existing, create new
-      const existingByTitle = new Map(
-        store.filteredNodes.map(n => [n.title.toLowerCase(), n])
-      )
-
-      const pos = screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
-      const created: string[] = []
-      const updated: string[] = []
-      let newIndex = 0
-
-      for (const n of nodesList) {
-        const title = n.title || `Node ${newIndex + 1}`
-        const existing = existingByTitle.get(title.toLowerCase())
-
-        if (existing) {
-          // Update existing node
-          const newContent = n.mode === 'append'
-            ? (existing.markdown_content || '') + '\n\n' + cleanContent(n.content || '')
-            : cleanContent(n.content || '')
-          await store.updateNodeContent(existing.id, newContent)
-          updated.push(title)
-        } else {
-          // Create new node
-          const cols = Math.ceil(Math.sqrt(nodesList.length))
-          const x = pos.x + (newIndex % cols) * 250
-          const y = pos.y + Math.floor(newIndex / cols) * 180
-
-          await store.createNode({
-            title,
-            node_type: 'note',
-            markdown_content: cleanContent(n.content || ''),
-            canvas_x: snapToGrid(x),
-            canvas_y: snapToGrid(y),
-          })
-          created.push(title)
-          newIndex++
-        }
-      }
-
-      const parts = []
-      if (created.length) parts.push(`created ${created.length}`)
-      if (updated.length) parts.push(`updated ${updated.length}`)
-      return parts.join(', ') || 'No changes'
-    }
-
-    case 'delete_node': {
-      const node = store.filteredNodes.find(n => n.title === args.title)
-      if (!node) return `Error: Node "${args.title}" not found`
-      await store.deleteNode(node.id)
-      return `Deleted node "${args.title}"`
-    }
-
-    case 'delete_matching': {
-      const filter = args.filter || 'all'
-      let nodes = [...store.filteredNodes]
-
-      if (filter === 'even') {
-        nodes = nodes.filter(n => {
-          const num = parseInt(n.title.match(/\d+/)?.[0] || '0')
-          return num % 2 === 0
-        })
-      } else if (filter === 'odd') {
-        nodes = nodes.filter(n => {
-          const num = parseInt(n.title.match(/\d+/)?.[0] || '0')
-          return num % 2 === 1
-        })
-      } else if (filter === 'empty') {
-        nodes = nodes.filter(n => !n.markdown_content?.trim())
-      } else if (filter !== 'all') {
-        const term = filter.toLowerCase()
-        nodes = nodes.filter(n => n.title.toLowerCase().includes(term))
-      }
-
-      if (nodes.length === 0) return `No nodes match filter "${filter}"`
-
-      agentLog.value.push(`> Deleting ${nodes.length} nodes...`)
-      for (const node of nodes) {
-        await store.deleteNode(node.id)
-      }
-      return `Deleted ${nodes.length} nodes (${filter})`
-    }
-
-    case 'update_node': {
-      const node = store.filteredNodes.find(n => n.title === args.title)
-      if (!node) return `Error: Node "${args.title}" not found`
-      await store.updateNodeContent(node.id, cleanContent(args.new_content))
-      return `Updated node "${args.title}"`
-    }
-
-    case 'move_node': {
-      const node = store.filteredNodes.find(n => n.title === args.title)
-      if (!node) return `Error: Node "${args.title}" not found`
-      const x = Number(args.x)
-      const y = Number(args.y)
-      if (isNaN(x) || isNaN(y)) return `Error: Invalid position (${args.x}, ${args.y})`
-      await store.updateNodePosition(node.id, x, y)
-      return `Moved "${args.title}" to (${x}, ${y})`
-    }
-
-    case 'auto_layout': {
-      let nodes = [...store.filteredNodes]
-      if (nodes.length === 0) return 'No nodes to layout'
-
-      // Sort if requested
-      if (args.sort) {
-        const desc = args.sort.startsWith('-')
-        const key = desc ? args.sort.slice(1) : args.sort
-
-        nodes.sort((a, b) => {
-          let valA: any, valB: any
-          if (key === 'title' || key === 'alphabetical') {
-            valA = a.title; valB = b.title
-          } else if (key === 'numeric' || key === 'number') {
-            valA = parseInt(a.title.match(/\d+/)?.[0] || '0')
-            valB = parseInt(b.title.match(/\d+/)?.[0] || '0')
-          } else if (key === 'content_length') {
-            valA = (a.markdown_content || '').length
-            valB = (b.markdown_content || '').length
-          } else if (key === 'created') {
-            valA = a.created_at; valB = b.created_at
-          } else if (key === 'x') {
-            valA = a.canvas_x; valB = b.canvas_x
-          } else if (key === 'y') {
-            valA = a.canvas_y; valB = b.canvas_y
-          } else {
-            return 0
-          }
-
-          let cmp = typeof valA === 'string' ? valA.localeCompare(valB) : valA - valB
-          return desc ? -cmp : cmp
-        })
-      }
-
-      const centerX = 600
-      const centerY = 400
-      const nodeWidth = 220
-      const nodeHeight = 150
-      const gap = 30
-
-      for (let i = 0; i < nodes.length; i++) {
-        let x: number, y: number
-        if (args.layout === 'horizontal') {
-          x = 100 + i * (nodeWidth + gap)
-          y = 100
-        } else if (args.layout === 'vertical') {
-          x = 100
-          y = 100 + i * (nodeHeight + gap)
-        } else if (args.layout === 'circle') {
-          // Reorder nodes by connectivity (BFS) to minimize edge lengths
-          if (i === 0) {
-            const edges = store.filteredEdges
-            const adj: Record<string, string[]> = {}
-            for (const n of nodes) adj[n.id] = []
-            for (const e of edges) {
-              if (adj[e.source_node_id]) adj[e.source_node_id].push(e.target_node_id)
-              if (adj[e.target_node_id]) adj[e.target_node_id].push(e.source_node_id)
-            }
-            // BFS from most connected node
-            const degrees = nodes.map(n => ({ id: n.id, deg: adj[n.id].length }))
-            degrees.sort((a, b) => b.deg - a.deg)
-            const visited = new Set<string>()
-            const ordered: typeof nodes = []
-            const queue = [degrees[0]?.id]
-            while (queue.length > 0 && ordered.length < nodes.length) {
-              const id = queue.shift()!
-              if (visited.has(id)) continue
-              visited.add(id)
-              const node = nodes.find(n => n.id === id)
-              if (node) ordered.push(node)
-              for (const neighbor of adj[id] || []) {
-                if (!visited.has(neighbor)) queue.push(neighbor)
-              }
-            }
-            // Add any unvisited nodes
-            for (const n of nodes) if (!visited.has(n.id)) ordered.push(n)
-            nodes.splice(0, nodes.length, ...ordered)
-          }
-          const nodeSize = Math.max(nodeWidth, nodeHeight) + gap
-          const circumference = nodes.length * nodeSize
-          const radius = Math.max(300, circumference / (2 * Math.PI))
-          const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2
-          x = centerX + radius * Math.cos(angle)
-          y = centerY + radius * Math.sin(angle)
-        } else if (args.layout === 'clock') {
-          // Clock layout: sort nodes by number (12 first, then 1-11), go clockwise
-          const nodeSize = Math.max(nodeWidth, nodeHeight) + gap
-          const circumference = nodes.length * nodeSize
-          const radius = Math.max(300, circumference / (2 * Math.PI))
-
-          // Sort nodes by clock order (12 first, then 1, 2, 3... 11)
-          const sortedNodes = [...nodes].sort((a, b) => {
-            const numA = parseInt(a.title.match(/\d+/)?.[0] || '0')
-            const numB = parseInt(b.title.match(/\d+/)?.[0] || '0')
-            const clockA = numA === 12 ? 0 : numA
-            const clockB = numB === 12 ? 0 : numB
-            return clockA - clockB
-          })
-
-          const sortedIndex = sortedNodes.findIndex(n => n.id === nodes[i].id)
-          // Clockwise from top: negative angle direction
-          const angle = -(2 * Math.PI * sortedIndex) / nodes.length - Math.PI / 2
-          x = centerX + radius * Math.cos(angle)
-          y = centerY + radius * Math.sin(angle)
-        } else if (args.layout === 'star') {
-          // Star layout: first node in center, others radiate outward
-          const nodeSize = Math.max(nodeWidth, nodeHeight) + gap
-          const circumference = (nodes.length - 1) * nodeSize
-          const radius = Math.max(300, circumference / (2 * Math.PI))
-
-          if (i === 0) {
-            // First node goes in center
-            x = centerX
-            y = centerY
-          } else {
-            // Rest go around the center
-            const angle = (2 * Math.PI * (i - 1)) / (nodes.length - 1) - Math.PI / 2
-            x = centerX + radius * Math.cos(angle)
-            y = centerY + radius * Math.sin(angle)
-          }
-        } else if (args.layout === 'force') {
-          // Force-directed layout using d3-force
-          if (i === 0) {
-            const layoutNodes = nodes.map(n => ({
-              id: n.id,
-              x: n.canvas_x,
-              y: n.canvas_y,
-              width: n.width || 200,
-              height: n.height || 120,
-            }))
-            const layoutEdges = store.filteredEdges.map(e => ({
-              source: e.source_node_id,
-              target: e.target_node_id,
-            }))
-            const positions = applyForceLayout(layoutNodes, layoutEdges, {
-              centerX,
-              centerY,
-              chargeStrength: -400,
-              linkDistance: 180,
-              iterations: 300,
-            })
-            // Apply all positions
-            for (const node of nodes) {
-              const pos = positions.get(node.id)
-              if (pos) {
-                await store.updateNodePosition(node.id, pos.x, pos.y)
-              }
-            }
-            return `Arranged ${nodes.length} nodes using force-directed layout`
-          }
-          // Skip individual positioning for force layout
-          continue
-        } else { // grid
-          const cols = Math.ceil(Math.sqrt(nodes.length))
-          x = 100 + (i % cols) * (nodeWidth + gap)
-          y = 100 + Math.floor(i / cols) * (nodeHeight + gap)
-        }
-        await store.updateNodePosition(nodes[i].id, x, y)
-      }
-      return `Arranged ${nodes.length} nodes in ${args.layout || 'grid'} layout`
-    }
-
-    case 'add_task': {
-      const task: AgentTask = {
-        id: crypto.randomUUID().slice(0, 8),
-        description: args.description,
-        status: 'pending',
-      }
-      agentTasks.value.push(task)
-      return `Added task ${task.id}: ${args.description}`
-    }
-
-    case 'complete_task': {
-      const task = agentTasks.value.find(t => t.id === args.task_id)
-      if (!task) return `Error: Task ${args.task_id} not found`
-      task.status = 'done'
-      return `Completed task ${args.task_id}`
-    }
-
-    case 'clear_canvas': {
-      if (!args.confirm) {
-        return 'Error: clear_canvas requires confirm=true'
-      }
-      const count = store.filteredNodes.length
-      for (const node of [...store.filteredNodes]) {
-        await store.deleteNode(node.id)
-      }
-      return `Cleared canvas (${count} nodes)`
-    }
-
-    case 'update_all_nodes': {
-      const nodes = store.filteredNodes
-      if (nodes.length === 0) return 'No nodes to update'
-
-      const template = cleanContent(args.content_template)
-      for (const node of nodes) {
-        let newContent = template.replace(/\{title\}/g, node.title)
-        if (args.mode === 'append') {
-          newContent = (node.markdown_content || '') + '\n\n' + newContent
-        }
-        await store.updateNodeContent(node.id, newContent)
-      }
-      return `Updated all ${nodes.length} nodes`
-    }
-
-    case 'query_nodes': {
-      let nodes = store.filteredNodes
-
-      if (args.filter === 'empty') {
-        nodes = nodes.filter(n => !n.markdown_content?.trim())
-      } else if (args.filter === 'has_content') {
-        nodes = nodes.filter(n => n.markdown_content?.trim())
-      } else if (args.filter && args.filter !== 'all') {
-        const term = args.filter.toLowerCase()
-        nodes = nodes.filter(n =>
-          n.title.toLowerCase().includes(term) ||
-          n.markdown_content?.toLowerCase().includes(term)
-        )
-      }
-
-      const result = nodes.map(n => ({
-        title: n.title,
-        has_content: !!n.markdown_content?.trim(),
-        preview: (n.markdown_content || '').slice(0, 50),
-      }))
-
-      return `Found ${result.length} nodes:\n${result.map(n => `- ${n.title}${n.has_content ? '' : ' (empty)'}`).join('\n')}`
-    }
-
     case 'for_each_node': {
       let nodes = [...store.filteredNodes]
-
-      // Apply filter
       const filter = args.filter || 'all'
       if (filter === 'empty') {
         nodes = nodes.filter(n => !n.markdown_content?.trim())
@@ -1015,21 +524,14 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
         nodes = nodes.filter(n => n.markdown_content?.trim())
       } else if (filter !== 'all') {
         const term = filter.toLowerCase()
-        nodes = nodes.filter(n =>
-          n.title.toLowerCase().includes(term) ||
-          n.markdown_content?.toLowerCase().includes(term)
-        )
+        nodes = nodes.filter(n => n.title.toLowerCase().includes(term) || n.markdown_content?.toLowerCase().includes(term))
       }
-
       if (nodes.length === 0) return `No nodes match filter "${filter}"`
-      agentLog.value.push(`> Iterating ${nodes.length} nodes (filter: ${filter})`)
+      agentLog.value.push(`> Iterating ${nodes.length} nodes`)
 
-      // Simple math expression evaluator (supports n, +, -, *, /, ^, parentheses)
       const evalExpr = (expr: string, n: number): string => {
         try {
-          // Replace n with the number, ^ with **
           const safe = expr.replace(/\bn\b/g, String(n)).replace(/\^/g, '**')
-          // Only allow safe math characters
           if (!/^[\d\s+\-*/().]+$/.test(safe)) return expr
           return String(Math.round(Function(`"use strict"; return (${safe})`)() * 1000) / 1000)
         } catch { return expr }
@@ -1037,377 +539,137 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
 
       const results: string[] = []
       for (const node of nodes) {
-        // Extract number from title
         const num = parseInt(node.title.match(/\d+/)?.[0] || '0')
-        const idx = nodes.indexOf(node) + 1
+        let query = (args.template || '').replace(/\{title\}/g, node.title).replace(/\{([^}]+)\}/g, (_: string, expr: string) => evalExpr(expr, num))
 
-        // Replace placeholders and evaluate expressions like {n*n}, {n^2+1}
-        let query = (args.template || '')
-          .replace(/\{title\}/g, node.title)
-          .replace(/\{index\}/g, String(idx))
-          .replace(/\{([^}]+)\}/g, (_, expr) => evalExpr(expr, num))
-        agentLog.value.push(`> ${node.title}: ${args.action}...`)
-
-        if (args.action === 'search') {
-          // Web search and update
-          try {
-            const searchQuery = encodeURIComponent(query)
-            const ddgUrl = `https://api.duckduckgo.com/?q=${searchQuery}&format=json&no_html=1`
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`
-            const response = await fetch(proxyUrl)
-            const data = await response.json()
-
-            let content = ''
-            if (data.Abstract) content = data.Abstract
-            else if (data.RelatedTopics?.[0]?.Text) content = data.RelatedTopics[0].Text
-
-            if (content) {
-              await store.updateNodeContent(node.id, content)
-              results.push(`${node.title}: updated`)
-            } else {
-              results.push(`${node.title}: no results`)
-            }
-          } catch {
-            results.push(`${node.title}: search failed`)
-          }
-        } else if (args.action === 'set') {
+        if (args.action === 'set') {
           await store.updateNodeContent(node.id, query)
           results.push(`${node.title}: set`)
         } else if (args.action === 'append') {
-          const newContent = (node.markdown_content || '') + '\n\n' + query
-          await store.updateNodeContent(node.id, newContent)
+          await store.updateNodeContent(node.id, (node.markdown_content || '') + '\n\n' + query)
           results.push(`${node.title}: appended`)
         } else if (args.action === 'llm') {
-          // Use LLM to generate content for this node
           try {
-            const llmResponse = await fetch('http://localhost:11434/api/chat', {
+            const resp = await fetch('http://localhost:11434/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 model: ollamaModel.value,
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'You are a helpful assistant. Provide concise, factual information. Output only the content, no meta-commentary.'
-                  },
-                  {
-                    role: 'user',
-                    content: query
-                  }
-                ],
+                messages: [{ role: 'system', content: 'Provide concise, factual information.' }, { role: 'user', content: query }],
                 stream: false,
               }),
             })
-            const data = await llmResponse.json()
-            const content = data.message?.content?.trim() || ''
-            if (content) {
-              await store.updateNodeContent(node.id, content)
+            const data = await resp.json()
+            if (data.message?.content) {
+              await store.updateNodeContent(node.id, data.message.content.trim())
               results.push(`${node.title}: generated`)
-            } else {
-              results.push(`${node.title}: empty response`)
             }
-          } catch (e) {
-            results.push(`${node.title}: llm failed`)
-          }
+          } catch { results.push(`${node.title}: llm failed`) }
         }
       }
-      return `Processed ${nodes.length} nodes: ${results.slice(0, 3).join(', ')}${results.length > 3 ? '...' : ''}`
-    }
-
-    case 'batch_update': {
-      const updates = args.updates || []
-      if (!Array.isArray(updates) || updates.length === 0) {
-        return 'No updates provided'
-      }
-
-      const results: string[] = []
-      for (const upd of updates) {
-        const node = store.filteredNodes.find(n => n.title === upd.title)
-        if (!node) {
-          results.push(`${upd.title}: not found`)
-          continue
-        }
-
-        if (upd.set_title) {
-          await store.updateNodeTitle(node.id, upd.set_title)
-          results.push(`${upd.title} → ${upd.set_title}`)
-        }
-        if (upd.set_content !== undefined) {
-          await store.updateNodeContent(node.id, upd.set_content)
-        }
-        // Accept both x/y and set_x/set_y
-        const newX = upd.x ?? upd.set_x
-        const newY = upd.y ?? upd.set_y
-        if (newX !== undefined || newY !== undefined) {
-          const x = newX !== undefined ? Number(newX) : node.canvas_x
-          const y = newY !== undefined ? Number(newY) : node.canvas_y
-          await store.updateNodePosition(node.id, x, y)
-          results.push(`${upd.title} → (${x},${y})`)
-        }
-      }
-
-      return `Updated ${results.length} nodes`
+      return `Processed ${nodes.length} nodes`
     }
 
     case 'smart_move': {
       const nodes = store.filteredNodes
       if (nodes.length === 0) return 'No nodes to move'
-
-      // Ask LLM to extract categories from instruction
       const instruction = args.instruction || ''
+      agentLog.value.push(`> Smart move: ${nodes.length} nodes`)
+
       let categories: string[] = []
       try {
-        const catResponse = await fetch('http://localhost:11434/api/generate', {
+        const resp = await fetch('http://localhost:11434/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: ollamaModel.value,
-            prompt: `Extract the category names from: "${instruction}"
-
-List ONLY the category words separated by comma. Example: "cars left, animals right" -> "car, animal"
-
-Categories:`,
+            prompt: `Extract category names from: "${instruction}"\nList ONLY categories separated by comma:`,
             stream: false,
           }),
         })
-        const catData = await catResponse.json()
-        categories = (catData.response || '')
-          .toLowerCase()
-          .split(/[,\n]+/)
-          .map((c: string) => c.trim().replace(/[^a-z]/g, ''))
-          .filter((c: string) => c.length > 1)
-      } catch { /* fallback below */ }
-      const categoryList = categories.length >= 2 ? categories.join(', ') : 'left, right'
+        const data = await resp.json()
+        categories = (data.response || '').toLowerCase().split(/[,\n]+/).map((c: string) => c.trim()).filter((c: string) => c.length > 1)
+      } catch {}
+      if (categories.length < 2) categories = ['left', 'right']
 
-      agentLog.value.push(`> Smart move: ${nodes.length} nodes into categories: ${categoryList}`)
-
-      const moves: { id: string; title: string; group: string }[] = []
-
+      const groups: Map<string, typeof nodes> = new Map()
       for (const node of nodes) {
         try {
-          const response = await fetch('http://localhost:11434/api/generate', {
+          const resp = await fetch('http://localhost:11434/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               model: ollamaModel.value,
-              prompt: `Classify "${node.title}" into exactly ONE category: ${categoryList}
-
-Answer with ONLY the category name, nothing else:`,
+              prompt: `Classify "${node.title}" into ONE of: ${categories.join(', ')}\nAnswer with ONLY the category:`,
               stream: false,
             }),
           })
-          const data = await response.json()
-          // Normalize: lowercase, remove punctuation, remove trailing 's'
-          let group = (data.response || 'other').toLowerCase().trim().split(/\s+/)[0].replace(/[^a-z]/g, '')
-          if (group.endsWith('s') && group.length > 3) group = group.slice(0, -1)
-          // Map to closest known category
-          if (categories.length > 0 && !categories.includes(group)) {
-            group = categories.find(c => group.includes(c) || c.includes(group)) || categories[0]
-          }
-          moves.push({ id: node.id, title: node.title, group })
-          agentLog.value.push(`> ${node.title}: ${group}`)
-        } catch {
-          // Skip
+          const data = await resp.json()
+          const group = (data.response || 'other').toLowerCase().trim().split(/\s+/)[0]
+          if (!groups.has(group)) groups.set(group, [])
+          groups.get(group)!.push(node)
+        } catch {}
+      }
+
+      let moved = 0
+      const spacing = 250
+      let groupX = 100
+      for (const [, groupNodes] of groups) {
+        for (let i = 0; i < groupNodes.length; i++) {
+          await store.updateNodePosition(groupNodes[i].id, groupX, 100 + i * 180)
+          moved++
         }
+        groupX += spacing
       }
-
-      // Group nodes and assign positions
-      const groups: Record<string, typeof moves> = {}
-      for (const m of moves) {
-        if (!groups[m.group]) groups[m.group] = []
-        groups[m.group].push(m)
-      }
-
-      // Position groups as columns: first category = left, second = right, etc.
-      const groupKeys = Object.keys(groups)
-      const spacing = 150
-      const columnWidth = 400
-
-      for (let gi = 0; gi < groupKeys.length; gi++) {
-        const key = groupKeys[gi]
-        const x = 100 + gi * columnWidth
-        let y = 100
-        for (const m of groups[key]) {
-          await store.updateNodePosition(m.id, x, y)
-          y += spacing
-        }
-      }
-
-      return `AGENT_DONE: Moved ${moves.length} nodes into ${groupKeys.length} groups: ${groupKeys.join(', ')}`
-    }
-
-    case 'smart_color': {
-      const nodes = store.filteredNodes
-      if (nodes.length === 0) return 'No nodes to color'
-
-      // Ask LLM to extract color assignments from instruction
-      const instruction = args.instruction || ''
-
-      // Available colors (matching nodeColorPalette)
-      const availableColors: Record<string, string> = {
-        'blue': '#3b82f6',
-        'green': '#22c55e',
-        'yellow': '#eab308',
-        'red': '#ef4444',
-        'purple': '#a855f7',
-        'pink': '#ec4899',
-        'orange': '#f97316',
-        'cyan': '#06b6d4',
-        'gray': '#6b7280',
-        'white': '#ffffff',
-      }
-
-      // Extract categories and colors from instruction
-      let colorMappings: { category: string; color: string }[] = []
-      try {
-        const mapResponse = await fetch('http://localhost:11434/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: ollamaModel.value,
-            prompt: `Extract category-color pairs from: "${instruction}"
-
-Available colors: blue, green, yellow, red, purple, pink, orange, cyan, gray, white
-
-Output as JSON array: [{"category": "...", "color": "..."}]
-Example: "males blue, females pink" -> [{"category": "male", "color": "blue"}, {"category": "female", "color": "pink"}]
-
-JSON:`,
-            stream: false,
-          }),
-        })
-        const mapData = await mapResponse.json()
-        const jsonMatch = (mapData.response || '').match(/\[[\s\S]*\]/)
-        if (jsonMatch) {
-          colorMappings = JSON.parse(jsonMatch[0])
-        }
-      } catch { /* fallback */ }
-
-      if (colorMappings.length === 0) {
-        return 'Could not parse color instruction'
-      }
-
-      agentLog.value.push(`> Smart color: ${nodes.length} nodes with mappings: ${colorMappings.map(m => `${m.category}→${m.color}`).join(', ')}`)
-
-      const colored: { id: string; title: string; color: string }[] = []
-
-      for (const node of nodes) {
-        try {
-          const categoryList = colorMappings.map(m => m.category).join(', ')
-          const response = await fetch('http://localhost:11434/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: ollamaModel.value,
-              prompt: `Classify "${node.title}" into exactly ONE category: ${categoryList}, or "none" if it doesn't fit.
-
-Answer with ONLY the category name:`,
-              stream: false,
-            }),
-          })
-          const data = await response.json()
-          let category = (data.response || 'none').toLowerCase().trim().split(/\s+/)[0].replace(/[^a-z]/g, '')
-
-          // Find matching color mapping
-          const mapping = colorMappings.find(m =>
-            category.includes(m.category.toLowerCase()) ||
-            m.category.toLowerCase().includes(category)
-          )
-
-          if (mapping && availableColors[mapping.color]) {
-            const colorHex = availableColors[mapping.color]
-            // Update node color
-            const nodeIndex = store.nodes.findIndex(n => n.id === node.id)
-            if (nodeIndex >= 0) {
-              store.nodes[nodeIndex].color_theme = colorHex
-            }
-            colored.push({ id: node.id, title: node.title, color: mapping.color })
-            agentLog.value.push(`> ${node.title}: ${mapping.color}`)
-          }
-        } catch {
-          // Skip
-        }
-      }
-
-      return `AGENT_DONE: Colored ${colored.length} nodes`
+      return `Moved ${moved} nodes into ${groups.size} groups`
     }
 
     case 'smart_connect': {
       const nodes = store.filteredNodes
-      if (nodes.length === 0) return 'No nodes'
+      if (nodes.length < 2) return 'Need at least 2 nodes'
+      const groupsArg = args.groups || ''
+      agentLog.value.push(`> Smart connect: ${nodes.length} nodes`)
 
-      // Delete existing edges first
-      const existingEdges = [...store.filteredEdges]
-      for (const edge of existingEdges) {
-        await store.deleteEdge(edge.id)
+      const nodeGroups: Map<string, string> = new Map()
+      for (const node of nodes) {
+        try {
+          const resp = await fetch('http://localhost:11434/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: ollamaModel.value,
+              prompt: `Classify "${node.title}" into ONE of: ${groupsArg}\nAnswer with ONLY the group name:`,
+              stream: false,
+            }),
+          })
+          const data = await resp.json()
+          nodeGroups.set(node.id, (data.response || 'other').toLowerCase().trim().split(/\s+/)[0])
+        } catch {}
       }
 
-      const pairs = nodes.length * (nodes.length - 1) / 2
-      agentLog.value.push(`> Smart connect: checking ${pairs} pairs...`)
-
-      // For each pair, ask LLM what type of connection (if any)
-      const linkTypes = ['related', 'cites', 'blocks', 'supports', 'contradicts', 'none']
       let edgeCount = 0
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          try {
-            const response = await fetch('http://localhost:11434/api/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: ollamaModel.value,
-                prompt: `Instruction: "${args.groups}"
+      const groupedNodes = new Map<string, string[]>()
+      for (const [id, group] of nodeGroups) {
+        if (!groupedNodes.has(group)) groupedNodes.set(group, [])
+        groupedNodes.get(group)!.push(id)
+      }
 
-What connection between "${nodes[i].title}" and "${nodes[j].title}"?
-Options: related, cites, blocks, supports, contradicts, none
-Answer with ONE word:`,
-                stream: false,
-              }),
-            })
-            const data = await response.json()
-            const answer = (data.response || 'none').toLowerCase().trim().split(/\s+/)[0].replace(/[^a-z]/g, '')
-            const linkType = linkTypes.includes(answer) ? answer : 'none'
-            if (linkType !== 'none') {
-              await store.createEdge({ source_node_id: nodes[i].id, target_node_id: nodes[j].id, link_type: linkType })
-              edgeCount++
-              agentLog.value.push(`> ${nodes[i].title} —[${linkType}]→ ${nodes[j].title}`)
-            }
-          } catch {
-            // Skip
-          }
+      for (const [, ids] of groupedNodes) {
+        for (let i = 0; i < ids.length - 1; i++) {
+          await store.createEdge({ source_node_id: ids[i], target_node_id: ids[i + 1] })
+          edgeCount++
         }
       }
-
-      return `AGENT_DONE: Created ${edgeCount} edges`
+      return `Created ${edgeCount} edges in ${groupedNodes.size} groups`
     }
 
     case 'web_search': {
+      const query = args.query || ''
       try {
-        // Thinking layer: refine the query
-        const thinkResponse = await fetch('http://localhost:11434/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: ollamaModel.value,
-            prompt: `Convert this request into a specific search query (just output the query, nothing else): "${args.query}"`,
-            stream: false,
-          }),
-        })
-        const thinkData = await thinkResponse.json()
-        const refinedQuery = thinkData.response?.trim() || args.query
-
-        agentLog.value.push(`> Search: "${refinedQuery}"`)
-
-        const query = encodeURIComponent(refinedQuery)
-        // Use CORS proxy for browser compatibility
-        const ddgUrl = `https://api.duckduckgo.com/?q=${query}&format=json&no_html=1`
+        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`
-
-        const response = await fetch(proxyUrl)
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const data = await response.json()
-
-        // Extract useful info from DuckDuckGo response
+        const resp = await fetch(proxyUrl)
+        const data = await resp.json()
         const results: string[] = []
         if (data.Abstract) results.push(data.Abstract)
         if (data.RelatedTopics) {
@@ -1415,18 +677,10 @@ Answer with ONE word:`,
             if (topic.Text) results.push(topic.Text)
           }
         }
-
-        if (results.length === 0) {
-          return `No web results for "${refinedQuery}". Use your knowledge.`
-        }
-        return `Search "${refinedQuery}":\n${results.join('\n\n')}`
-      } catch (e) {
-        return `Search unavailable. Use your knowledge instead.`
+        return results.length ? `Search "${query}":\n${results.join('\n\n')}` : `No results for "${query}"`
+      } catch {
+        return 'Search unavailable'
       }
-    }
-
-    case 'done': {
-      return `AGENT_DONE: ${args.summary}`
     }
 
     default:
