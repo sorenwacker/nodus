@@ -2,8 +2,11 @@
  * Edge rendering composable
  * Handles edge path computation, styling, and orthogonal routing
  */
-import { computed, ref, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, type ComputedRef } from 'vue'
 import { findOrthogonalPath, pathToSvg } from '../edgeRouting'
+import type { Edge } from '../../types'
+
+export type { Edge }
 
 export interface EdgeStyle {
   type: 'straight' | 'curved' | 'orthogonal' | 'smart'
@@ -26,6 +29,7 @@ export interface ComputedEdge {
   isBidirectional: boolean
 }
 
+/** Node with rendering info for edge computation */
 export interface NodeRect {
   id: string
   canvas_x: number
@@ -33,14 +37,6 @@ export interface NodeRect {
   width: number
   height: number
   markdown_content: string | null
-}
-
-export interface Edge {
-  id: string
-  source_node_id: string
-  target_node_id: string
-  link_type: string
-  label: string | null
 }
 
 interface UseEdgesOptions {

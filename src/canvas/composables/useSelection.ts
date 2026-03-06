@@ -2,15 +2,8 @@
  * Selection composable
  * Handles node selection, multi-select, and selection box
  */
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
-
-interface NodeRect {
-  id: string
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-}
+import { ref, computed } from 'vue'
+import type { NodeRect } from '../../types'
 
 interface SelectionBox {
   x: number

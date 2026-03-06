@@ -4,24 +4,7 @@
  */
 import { cleanContent } from './utils'
 import { applyForceLayout } from '../layout'
-import type { Ref } from 'vue'
-
-interface Node {
-  id: string
-  title: string
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-  markdown_content: string | null
-  color_theme: string | null
-}
-
-interface Edge {
-  id: string
-  source_node_id: string
-  target_node_id: string
-}
+import type { Node, Edge } from '../../types'
 
 interface Store {
   filteredNodes: Node[]

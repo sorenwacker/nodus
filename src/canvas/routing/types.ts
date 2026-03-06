@@ -1,12 +1,14 @@
 /**
  * Type definitions for edge routing
  */
+import type { Point } from '../../types'
 
-export interface Point {
-  x: number
-  y: number
-}
+export type { Point }
 
+/**
+ * NodeRect for routing - relaxed version with optional fields
+ * Use when exact dimensions aren't always available
+ */
 export interface NodeRect {
   id?: string
   canvas_x: number
