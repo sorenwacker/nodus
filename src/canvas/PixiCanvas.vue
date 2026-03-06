@@ -5,6 +5,7 @@ import { marked } from 'marked'
 import { openExternal } from '../lib/tauri'
 import { routeAllEdges, routeEdgesWithBundling, type NodeRect } from './edgeRouting'
 import { useLLM, cleanContent, parseToolArgs, evalMathExpr, extractNumber } from './llm'
+import { applyForceLayout } from './layout'
 
 // Toast notification injection
 const showToast = inject<(msg: string, type: 'error' | 'success' | 'info') => void>('showToast', () => {})
@@ -894,6 +895,38 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
             x = centerX + radius * Math.cos(angle)
             y = centerY + radius * Math.sin(angle)
           }
+        } else if (args.layout === 'force') {
+          // Force-directed layout using d3-force
+          if (i === 0) {
+            const layoutNodes = nodes.map(n => ({
+              id: n.id,
+              x: n.canvas_x,
+              y: n.canvas_y,
+              width: n.width || 200,
+              height: n.height || 120,
+            }))
+            const layoutEdges = store.filteredEdges.map(e => ({
+              source: e.source_node_id,
+              target: e.target_node_id,
+            }))
+            const positions = applyForceLayout(layoutNodes, layoutEdges, {
+              centerX,
+              centerY,
+              chargeStrength: -400,
+              linkDistance: 180,
+              iterations: 300,
+            })
+            // Apply all positions
+            for (const node of nodes) {
+              const pos = positions.get(node.id)
+              if (pos) {
+                await store.updateNodePosition(node.id, pos.x, pos.y)
+              }
+            }
+            return `Arranged ${nodes.length} nodes using force-directed layout`
+          }
+          // Skip individual positioning for force layout
+          continue
         } else { // grid
           const cols = Math.ceil(Math.sqrt(nodes.length))
           x = 100 + (i % cols) * (nodeWidth + gap)

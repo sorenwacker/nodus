@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke, listen, readTextFile } from '../lib/tauri'
+import { applyForceLayout } from '../canvas/layout'
 
 export interface FileChangeEvent {
   path: string
@@ -693,6 +694,60 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  /**
+   * Apply force-directed layout to all nodes or a subset
+   */
+  async function layoutNodes(
+    nodeIds?: string[],
+    options?: {
+      centerX?: number
+      centerY?: number
+      chargeStrength?: number
+      linkDistance?: number
+    }
+  ) {
+    const targetNodes = nodeIds
+      ? filteredNodes.value.filter(n => nodeIds.includes(n.id))
+      : filteredNodes.value
+
+    if (targetNodes.length === 0) return
+
+    const layoutNodes = targetNodes.map(n => ({
+      id: n.id,
+      x: n.canvas_x,
+      y: n.canvas_y,
+      width: n.width || 200,
+      height: n.height || 120,
+    }))
+
+    const layoutEdges = filteredEdges.value
+      .filter(e => {
+        const nodeIdSet = new Set(targetNodes.map(n => n.id))
+        return nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
+      })
+      .map(e => ({
+        source: e.source_node_id,
+        target: e.target_node_id,
+      }))
+
+    const positions = applyForceLayout(layoutNodes, layoutEdges, {
+      centerX: options?.centerX ?? 400,
+      centerY: options?.centerY ?? 300,
+      chargeStrength: options?.chargeStrength ?? -400,
+      linkDistance: options?.linkDistance ?? 180,
+      iterations: 300,
+    })
+
+    // Update positions
+    const updates: Promise<void>[] = []
+    for (const [id, pos] of positions) {
+      updates.push(updateNodePosition(id, pos.x, pos.y))
+    }
+    await Promise.all(updates)
+
+    nodeLayoutVersion.value++
+  }
+
   return {
     nodes,
     edges,
@@ -737,5 +792,6 @@ export const useNodesStore = defineStore('nodes', () => {
     renameWorkspace,
     clearCanvas,
     cleanupOrphanEdges,
+    layoutNodes,
   }
 })

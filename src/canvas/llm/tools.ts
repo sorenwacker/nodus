@@ -162,7 +162,7 @@ export const agentTools: AgentTool[] = [
       parameters: {
         type: 'object',
         properties: {
-          layout: { type: 'string', description: '"grid", "horizontal", "vertical", "circle", "clock", "star"' },
+          layout: { type: 'string', description: '"grid", "horizontal", "vertical", "circle", "clock", "star", "force" (force-directed based on edges)' },
           sort: { type: 'string', description: '"alphabetical", "numeric", "reverse" (optional)' },
         },
         required: ['layout'],
