@@ -3,11 +3,29 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from '
 import { useNodesStore } from '../stores/nodes'
 import { marked } from 'marked'
 import { openExternal } from '../lib/tauri'
-import { routeAllEdges, routeEdgesWithBundling, type NodeRect } from './edgeRouting'
-import { useLLM, cleanContent, executeTool, type ToolContext } from './llm'
-
-// Toast notification injection
-const showToast = inject<(msg: string, type: 'error' | 'success' | 'info') => void>('showToast', () => {})
+import {
+  routeAllEdges,
+  routeEdgesWithBundling,
+  assignPorts,
+  calculatePortOffset,
+  getSide,
+  getPortPoint,
+  getStandoff,
+  GridTracker,
+  routeDiagonal,
+  routeOrthogonal,
+  findObstacles,
+  findObstaclesInRegion,
+  PORT_SPACING,
+  OBSTACLE_MARGIN,
+  type NodeRect,
+  type EdgeStyle,
+} from './edgeRouting'
+import { useLLM, executeTool, type ToolContext } from './llm'
+import { uiStorage } from '../lib/storage'
+import { canvasLogger } from '../lib/logger'
+import { useMinimap } from './composables/useMinimap'
+import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 
 // Undo injection for position changes
 const pushUndo = inject<() => void>('pushUndo', () => {})
@@ -29,6 +47,46 @@ function updateTheme() {
 
 // Track if we've centered the view initially
 let hasInitiallyCentered = false
+
+// Canvas transform state - restored from localStorage if available
+// MUST be defined before onMounted and watchers that reference it
+const VIEW_STORAGE_KEY = 'nodus-canvas-view'
+
+function loadViewState(): { scale: number; offsetX: number; offsetY: number } | null {
+  try {
+    const stored = localStorage.getItem(VIEW_STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (typeof parsed.scale === 'number' && typeof parsed.offsetX === 'number' && typeof parsed.offsetY === 'number') {
+        return parsed
+      }
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+const savedView = loadViewState()
+const scale = ref(savedView?.scale ?? 1)
+const offsetX = ref(savedView?.offsetX ?? 0)
+const offsetY = ref(savedView?.offsetY ?? 0)
+const isZooming = ref(false)
+let zoomTimeout: number | null = null
+let viewSaveTimeout: number | null = null
+
+function saveViewState() {
+  try {
+    localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify({
+      scale: scale.value,
+      offsetX: offsetX.value,
+      offsetY: offsetY.value,
+    }))
+  } catch { /* ignore */ }
+}
+
+function scheduleSaveViewState() {
+  if (viewSaveTimeout) clearTimeout(viewSaveTimeout)
+  viewSaveTimeout = window.setTimeout(saveViewState, 500)
+}
 
 onMounted(() => {
 
@@ -74,6 +132,18 @@ onMounted(() => {
         deleteSelectedFrame()
       }
     }
+
+    // L key triggers force layout
+    if (e.key === 'l' || e.key === 'L') {
+      e.preventDefault()
+      store.layoutNodes()
+    }
+
+    // N key toggles neighborhood view
+    if (e.key === 'n' || e.key === 'N') {
+      e.preventDefault()
+      toggleNeighborhoodMode(store.selectedNodeIds[0])
+    }
   }
   window.addEventListener('keydown', handleKeydown)
 
@@ -83,8 +153,10 @@ onMounted(() => {
     window.removeEventListener('keydown', handleKeydown)
   })
 
-  // Center the grid initially
-  centerGrid()
+  // Only center if no saved view state
+  if (!savedView) {
+    centerGrid()
+  }
 })
 
 // Center the grid so origin (0,0) is in the middle of the viewport
@@ -97,36 +169,25 @@ function centerGrid() {
 }
 
 // Center view when nodes are first loaded, or center grid when empty
-watch(() => store.filteredNodes.length, (newLen, oldLen) => {
-  if (newLen > 0 && !hasInitiallyCentered) {
+// But only if there's no saved view state
+watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
+  if (newLen > 0 && !hasInitiallyCentered && !savedView) {
     hasInitiallyCentered = true
     setTimeout(fitToContent, 50)
-  } else if (newLen === 0) {
+  } else if (newLen === 0 && !savedView) {
     // Empty workspace - center the grid
     hasInitiallyCentered = false
     setTimeout(centerGrid, 50)
+  } else if (newLen > 0) {
+    hasInitiallyCentered = true
   }
 }, { immediate: true })
 
-// Re-center when workspace changes
+// Re-center when workspace changes - but preserve view if user has panned/zoomed
 watch(() => store.currentWorkspaceId, () => {
-  hasInitiallyCentered = false
-  setTimeout(() => {
-    if (store.filteredNodes.length > 0) {
-      fitToContent()
-      hasInitiallyCentered = true
-    } else {
-      centerGrid()
-    }
-  }, 50)
+  // Don't auto-reset view on workspace change - let user control it
+  hasInitiallyCentered = store.filteredNodes.length > 0
 })
-
-// Canvas transform state
-const scale = ref(1)
-const offsetX = ref(0)
-const offsetY = ref(0)
-const isZooming = ref(false)
-let zoomTimeout: number | null = null
 
 // Viewport size for culling (updated on resize)
 const viewportWidth = ref(window.innerWidth)
@@ -145,7 +206,8 @@ const visibleNodes = computed(() => {
   const viewRight = (viewportWidth.value - ox) / s + margin
   const viewBottom = (viewportHeight.value - oy) / s + margin
 
-  return store.filteredNodes.filter(node => {
+  // Use displayNodes which respects neighborhood mode
+  return displayNodes.value.filter(node => {
     const nodeRight = node.canvas_x + (node.width || 200)
     const nodeBottom = node.canvas_y + (node.height || 120)
     // Check if node intersects viewport
@@ -162,8 +224,229 @@ const visibleNodeIds = computed(() => new Set(visibleNodes.value.map(n => n.id))
 // Large graph threshold - disable expensive features
 const isLargeGraph = computed(() => store.filteredNodes.length > 200 || store.filteredEdges.length > 500)
 
-// Semantic zoom: collapse nodes when zoomed out below 50%
-const SEMANTIC_ZOOM_THRESHOLD = 0.5
+// Canvas element ref (needed early for layout functions)
+const canvasRef = ref<HTMLElement | null>(null)
+
+// Neighborhood view mode - show only focus node and its direct neighbors
+const neighborhoodMode = ref(false)
+const focusNodeId = ref<string | null>(null)
+// Local positions for neighborhood view (independent from global positions)
+const neighborhoodPositions = ref<Map<string, { x: number; y: number }>>(new Map())
+
+// Get IDs of nodes directly connected to focus node
+const neighborhoodNodeIds = computed(() => {
+  if (!neighborhoodMode.value || !focusNodeId.value) return null
+
+  const neighbors = new Set<string>([focusNodeId.value])
+  for (const edge of store.filteredEdges) {
+    if (edge.source_node_id === focusNodeId.value) {
+      neighbors.add(edge.target_node_id)
+    }
+    if (edge.target_node_id === focusNodeId.value) {
+      neighbors.add(edge.source_node_id)
+    }
+  }
+  return neighbors
+})
+
+// Nodes to display (filtered by neighborhood if active, with local positions)
+const displayNodes = computed(() => {
+  if (neighborhoodNodeIds.value) {
+    const positions = neighborhoodPositions.value
+    return store.filteredNodes
+      .filter(n => neighborhoodNodeIds.value!.has(n.id))
+      .map(n => {
+        const pos = positions.get(n.id)
+        if (pos) {
+          return { ...n, canvas_x: pos.x, canvas_y: pos.y }
+        }
+        return n
+      })
+  }
+  return store.filteredNodes
+})
+
+// Get visual node (with correct position accounting for neighborhood mode)
+function getVisualNode(nodeId: string) {
+  return displayNodes.value.find(n => n.id === nodeId)
+}
+
+// Toggle neighborhood mode for a node
+function toggleNeighborhoodMode(nodeId?: string) {
+  const targetId = nodeId || store.selectedNodeIds[0] || focusNodeId.value
+
+  // If already in neighborhood mode and clicking the same node (or no node specified), exit
+  if (neighborhoodMode.value && (!nodeId || focusNodeId.value === targetId)) {
+    neighborhoodMode.value = false
+    focusNodeId.value = null
+    neighborhoodPositions.value = new Map()
+  } else if (targetId) {
+    // Enter or navigate to new focus
+    focusNodeId.value = targetId
+    layoutNeighborhood(targetId)
+    neighborhoodMode.value = true
+  }
+}
+
+// Layout neighborhood nodes with focus node centered (uses local positions, not store)
+function layoutNeighborhood(focusId: string): boolean {
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (!rect) return false
+
+  const focusNode = store.getNode(focusId)
+  if (!focusNode) return false
+
+  // Categorize neighbors:
+  // - Parents (top): nodes that ONLY link TO focus
+  // - Siblings (left/right): nodes with bidirectional edges
+  // - Children (bottom): nodes that focus ONLY links TO
+  const incomingFrom = new Set<string>() // nodes that link TO focus
+  const outgoingTo = new Set<string>()   // nodes that focus links TO
+
+  for (const edge of store.filteredEdges) {
+    if (edge.target_node_id === focusId && edge.source_node_id !== focusId) {
+      incomingFrom.add(edge.source_node_id)
+    }
+    if (edge.source_node_id === focusId && edge.target_node_id !== focusId) {
+      outgoingTo.add(edge.target_node_id)
+    }
+  }
+
+  const parents: string[] = []   // only incoming
+  const children: string[] = []  // only outgoing
+  const siblings: string[] = []  // both directions
+
+  for (const id of incomingFrom) {
+    if (outgoingTo.has(id)) {
+      siblings.push(id)
+    } else {
+      parents.push(id)
+    }
+  }
+  for (const id of outgoingTo) {
+    if (!incomingFrom.has(id)) {
+      children.push(id)
+    }
+  }
+
+  // Calculate center of viewport in canvas coordinates
+  const viewCenterX = (rect.width / 2 - offsetX.value) / scale.value
+  const viewCenterY = (rect.height / 2 - offsetY.value) / scale.value
+
+  // Hierarchical layout - focus in center, parents above, children below
+  const positions = new Map<string, { x: number; y: number }>()
+  const focusWidth = focusNode.width || 200
+  const focusHeight = focusNode.height || 120
+  const verticalGap = 200 // Vertical distance between rows
+  const horizontalGap = 50 // Horizontal gap between nodes in same row
+
+  // Focus node at center (position is top-left corner)
+  positions.set(focusId, {
+    x: viewCenterX - focusWidth / 2,
+    y: viewCenterY - focusHeight / 2,
+  })
+
+  // Layout parents in a row above the focus node
+  if (parents.length > 0) {
+    const totalWidth = parents.reduce((sum, id) => {
+      const n = store.getNode(id)
+      return sum + (n?.width || 200) + horizontalGap
+    }, -horizontalGap)
+    let xOffset = viewCenterX - totalWidth / 2
+
+    parents.forEach(parentId => {
+      const n = store.getNode(parentId)
+      const nodeWidth = n?.width || 200
+      const nodeHeight = n?.height || 120
+      positions.set(parentId, {
+        x: xOffset,
+        y: viewCenterY - focusHeight / 2 - verticalGap - nodeHeight,
+      })
+      xOffset += nodeWidth + horizontalGap
+    })
+  }
+
+  // Layout children in a row below the focus node
+  if (children.length > 0) {
+    const totalWidth = children.reduce((sum, id) => {
+      const n = store.getNode(id)
+      return sum + (n?.width || 200) + horizontalGap
+    }, -horizontalGap)
+    let xOffset = viewCenterX - totalWidth / 2
+
+    children.forEach(childId => {
+      const n = store.getNode(childId)
+      const nodeWidth = n?.width || 200
+      positions.set(childId, {
+        x: xOffset,
+        y: viewCenterY + focusHeight / 2 + verticalGap,
+      })
+      xOffset += nodeWidth + horizontalGap
+    })
+  }
+
+  // Layout siblings (bidirectional) on left and right of focus
+  if (siblings.length > 0) {
+    const horizontalDistance = 350 // Distance from focus center to sibling center
+    const verticalSpacing = 30 // Vertical gap between stacked siblings
+
+    // Split siblings: odd indices left, even indices right
+    const leftSiblings = siblings.filter((_, i) => i % 2 === 0)
+    const rightSiblings = siblings.filter((_, i) => i % 2 === 1)
+
+    // Layout left siblings
+    const leftTotalHeight = leftSiblings.reduce((sum, id) => {
+      const n = store.getNode(id)
+      return sum + (n?.height || 120) + verticalSpacing
+    }, -verticalSpacing)
+    let yOffset = viewCenterY - leftTotalHeight / 2
+
+    leftSiblings.forEach(sibId => {
+      const n = store.getNode(sibId)
+      const nodeWidth = n?.width || 200
+      const nodeHeight = n?.height || 120
+      positions.set(sibId, {
+        x: viewCenterX - horizontalDistance - nodeWidth / 2,
+        y: yOffset,
+      })
+      yOffset += nodeHeight + verticalSpacing
+    })
+
+    // Layout right siblings
+    const rightTotalHeight = rightSiblings.reduce((sum, id) => {
+      const n = store.getNode(id)
+      return sum + (n?.height || 120) + verticalSpacing
+    }, -verticalSpacing)
+    yOffset = viewCenterY - rightTotalHeight / 2
+
+    rightSiblings.forEach(sibId => {
+      const n = store.getNode(sibId)
+      const nodeWidth = n?.width || 200
+      const nodeHeight = n?.height || 120
+      positions.set(sibId, {
+        x: viewCenterX + horizontalDistance - nodeWidth / 2,
+        y: yOffset,
+      })
+      yOffset += nodeHeight + verticalSpacing
+    })
+  }
+
+  // Store positions locally (not in store)
+  neighborhoodPositions.value = positions
+
+  // Center view on the focus node
+  const focusPos = positions.get(focusId)
+  if (focusPos) {
+    const nodeCenterX = focusPos.x + (focusNode.width || 200) / 2
+    const nodeCenterY = focusPos.y + (focusNode.height || 120) / 2
+
+    // Set offset so node center is at viewport center
+    offsetX.value = rect.width / 2 - nodeCenterX * scale.value
+    offsetY.value = rect.height / 2 - nodeCenterY * scale.value
+  }
+  return true
+}
+
 // Semantic zoom collapse disabled - nodes always show full content
 const isSemanticZoomCollapsed = computed(() => false)
 
@@ -174,7 +457,7 @@ const MAGNIFIER_ZOOM = 2.5
 const showMagnifier = ref(false)
 const isMouseOnCanvas = ref(false)
 const magnifierPos = ref({ x: 0, y: 0 })
-const magnifierEnabled = ref(localStorage.getItem('nodus-magnifier') !== 'false')
+const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
 const shouldShowMagnifier = computed(() => magnifierEnabled.value && scale.value < MAGNIFIER_THRESHOLD && showMagnifier.value && !isLargeGraph.value)
 
 // Only render nodes visible within magnifier viewport for performance
@@ -204,74 +487,33 @@ const edgeStrokeWidth = computed(() => {
   return Math.min(2 / Math.sqrt(scale.value), 4)
 })
 
-// Minimap
-const MINIMAP_SIZE = 150
-const MINIMAP_PADDING = 10
-
-const minimapBounds = computed(() => {
-  const nodes = store.filteredNodes
-  if (nodes.length === 0) {
-    return { minX: 0, minY: 0, maxX: 1000, maxY: 800, width: 1000, height: 800 }
-  }
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const node of nodes) {
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + node.width)
-    maxY = Math.max(maxY, node.canvas_y + node.height)
-  }
-  // Add padding
-  const pad = 100
-  minX -= pad; minY -= pad; maxX += pad; maxY += pad
-  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }
-})
-
-const minimapScale = computed(() => {
-  const bounds = minimapBounds.value
-  const scaleX = (MINIMAP_SIZE - MINIMAP_PADDING * 2) / bounds.width
-  const scaleY = (MINIMAP_SIZE - MINIMAP_PADDING * 2) / bounds.height
-  return Math.min(scaleX, scaleY)
-})
-
-const minimapViewport = computed(() => {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return { x: 0, y: 0, width: 50, height: 40 }
-
-  const bounds = minimapBounds.value
-  const mScale = minimapScale.value
-
-  // Convert screen viewport to canvas coordinates
-  const viewLeft = -offsetX.value / scale.value
-  const viewTop = -offsetY.value / scale.value
-  const viewWidth = rect.width / scale.value
-  const viewHeight = rect.height / scale.value
-
-  return {
-    x: (viewLeft - bounds.minX) * mScale + MINIMAP_PADDING,
-    y: (viewTop - bounds.minY) * mScale + MINIMAP_PADDING,
-    width: viewWidth * mScale,
-    height: viewHeight * mScale,
-  }
+// Minimap - using composable
+const minimap = useMinimap({
+  nodes: computed(() => store.filteredNodes.map(n => ({
+    id: n.id,
+    canvas_x: n.canvas_x,
+    canvas_y: n.canvas_y,
+    width: n.width || 200,
+    height: n.height || 120,
+    color_theme: n.color_theme,
+  }))),
+  selectedNodeIds: computed(() => store.selectedNodeIds),
+  scale,
+  offsetX,
+  offsetY,
+  getViewportSize: () => {
+    const rect = canvasRef.value?.getBoundingClientRect()
+    return rect ? { width: rect.width, height: rect.height } : null
+  },
 })
 
 function onMinimapClick(e: MouseEvent) {
   const target = e.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
-  const clickX = e.clientX - rect.left
-  const clickY = e.clientY - rect.top
-
-  const bounds = minimapBounds.value
-  const mScale = minimapScale.value
-
-  // Convert minimap click to canvas coordinates
-  const canvasX = (clickX - MINIMAP_PADDING) / mScale + bounds.minX
-  const canvasY = (clickY - MINIMAP_PADDING) / mScale + bounds.minY
-
-  // Center viewport on that point
-  const canvasRect = canvasRef.value?.getBoundingClientRect()
-  if (canvasRect) {
-    offsetX.value = canvasRect.width / 2 - canvasX * scale.value
-    offsetY.value = canvasRect.height / 2 - canvasY * scale.value
+  const result = minimap.handleClick(e.clientX - rect.left, e.clientY - rect.top)
+  if (result) {
+    offsetX.value = result.offsetX
+    offsetY.value = result.offsetY
   }
 }
 
@@ -281,6 +523,16 @@ const dragStart = ref({ x: 0, y: 0, nodeX: 0, nodeY: 0 })
 const isPanning = ref(false)
 const panStart = ref({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
 const selectedEdge = ref<string | null>(null)
+const hoveredNodeId = ref<string | null>(null)
+
+// Check if an edge is connected to a hovered or selected node
+function isEdgeHighlighted(edge: { source_node_id: string, target_node_id: string }): boolean {
+  const activeNodes = new Set<string>()
+  if (hoveredNodeId.value) activeNodes.add(hoveredNodeId.value)
+  for (const id of store.selectedNodeIds) activeNodes.add(id)
+  if (activeNodes.size === 0) return false
+  return activeNodes.has(edge.source_node_id) || activeNodes.has(edge.target_node_id)
+}
 
 // Edge creation
 const isCreatingEdge = ref(false)
@@ -290,10 +542,11 @@ const edgePreviewEnd = ref({ x: 0, y: 0 })
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
 
-// Node resizing
+// Node resizing (supports multiple selected nodes)
 const resizingNode = ref<string | null>(null)
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
 const resizePreview = ref({ width: 0, height: 0 })
+const multiResizeInitial = ref<Map<string, { width: number, height: number }>>(new Map())
 
 // Frame interaction
 const draggingFrame = ref<string | null>(null)
@@ -371,31 +624,70 @@ function fitNodeToContent(nodeId: string) {
   const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`) as HTMLElement
   if (!cardEl) return
 
+  // Try to find content element (view mode) or inline-editor (edit mode)
   const contentEl = cardEl.querySelector('.node-content') as HTMLElement
-  if (!contentEl) return
+  const editorEl = cardEl.querySelector('.inline-editor') as HTMLTextAreaElement
+  const headerEl = cardEl.querySelector('.node-header') as HTMLElement
 
-  // Get actual rendered content dimensions
-  const contentRect = contentEl.getBoundingClientRect()
-  const children = contentEl.children
-  let maxBottom = 0
+  const padding = 32
+  const headerHeight = headerEl?.offsetHeight || 36
+  const minWidth = 180
+  const minHeight = 80
 
-  // Find the actual bottom of content by checking all children
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i] as HTMLElement
-    const rect = child.getBoundingClientRect()
-    const bottom = rect.bottom - contentRect.top
-    if (bottom > maxBottom) maxBottom = bottom
+  let width: number
+  let height: number
+
+  if (contentEl) {
+    // View mode: measure rendered content
+    // Temporarily remove size constraints to measure true content size
+    const oldWidth = cardEl.style.width
+    const oldHeight = cardEl.style.height
+    cardEl.style.width = 'auto'
+    cardEl.style.height = 'auto'
+    contentEl.style.overflow = 'visible'
+
+    // Measure actual content
+    const contentWidth = contentEl.scrollWidth
+    const contentHeight = contentEl.scrollHeight
+
+    // Also check children for elements that might overflow
+    let maxChildRight = 0
+    let maxChildBottom = 0
+    const contentRect = contentEl.getBoundingClientRect()
+    for (let i = 0; i < contentEl.children.length; i++) {
+      const child = contentEl.children[i] as HTMLElement
+      const rect = child.getBoundingClientRect()
+      maxChildRight = Math.max(maxChildRight, rect.right - contentRect.left)
+      maxChildBottom = Math.max(maxChildBottom, rect.bottom - contentRect.top)
+    }
+
+    // Restore styles
+    cardEl.style.width = oldWidth
+    cardEl.style.height = oldHeight
+    contentEl.style.overflow = ''
+
+    width = Math.max(contentWidth, maxChildRight, minWidth) + padding
+    height = Math.max(contentHeight, maxChildBottom, minHeight - headerHeight) + padding + headerHeight
+  } else if (editorEl) {
+    // Edit mode: measure textarea scroll dimensions
+    // Temporarily auto-size to measure
+    const oldHeight = editorEl.style.height
+    editorEl.style.height = 'auto'
+
+    width = Math.max(editorEl.scrollWidth + padding, minWidth)
+    height = Math.max(editorEl.scrollHeight + padding + headerHeight, minHeight)
+
+    editorEl.style.height = oldHeight
+  } else {
+    return
   }
 
-  // Use measured content height, with minimum padding
-  const padding = 24
-  const minWidth = 180
-  const minHeight = 60
-
-  const width = Math.min(Math.max(contentEl.scrollWidth + padding, minWidth), 600)
-  const height = Math.max(maxBottom + padding, minHeight)
-
   store.updateNodeSize(nodeId, width, height)
+
+  // In neighborhood mode, re-layout to adapt to new sizes
+  if (neighborhoodMode.value && focusNodeId.value) {
+    setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
+  }
 }
 
 // Auto-fit after mermaid renders (only for nodes with auto_fit enabled)
@@ -407,6 +699,18 @@ function autoFitAllNodes() {
       }
     }
   }, 100)
+}
+
+// Fit all visible nodes to their content (auto-expand to show all content)
+function fitAllNodesToContent() {
+  // Wait for DOM to render
+  setTimeout(() => {
+    for (const node of store.filteredNodes) {
+      fitNodeToContent(node.id)
+    }
+    // Trigger edge re-routing after sizes change
+    store.nodeLayoutVersion++
+  }, 50)
 }
 
 // Inline editing
@@ -446,12 +750,10 @@ const {
   model: ollamaModel,
   contextLength: ollamaContextLength,
   systemPrompt: customSystemPrompt,
-  DEFAULT_SYSTEM_PROMPT: defaultSystemPrompt,
   isRunning: agentRunning,
   log: agentLog,
   tasks: agentTasks,
   conversationHistory,
-  promptHistory,
   simpleGenerate: callOllama,
   savePromptToHistory,
   navigateHistory,
@@ -462,7 +764,6 @@ const graphPrompt = ref('')
 const nodePrompt = ref('')
 const isGraphLLMLoading = ref(false)
 const isNodeLLMLoading = ref(false)
-const showGraphLLM = ref(true)
 const showLLMSettings = ref(false)
 
 function onPromptKeydown(e: KeyboardEvent) {
@@ -476,15 +777,6 @@ function onPromptKeydown(e: KeyboardEvent) {
     if (next !== null) graphPrompt.value = next
   }
 }
-
-// Agent state and tools are now from useLLM composable
-
-
-let nodePositionCounter = 0
-
-// cleanContent is now imported from ./llm
-
-// cleanContent is now imported from ./llm
 
 async function executeAgentTool(name: string, args: any): Promise<string> {
   // Create tool context for the extracted executor
@@ -589,7 +881,7 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
         })
         const data = await resp.json()
         categories = (data.response || '').toLowerCase().split(/[,\n]+/).map((c: string) => c.trim()).filter((c: string) => c.length > 1)
-      } catch {}
+      } catch { /* ignore LLM errors, use fallback categories */ }
       if (categories.length < 2) categories = ['left', 'right']
 
       const groups: Map<string, typeof nodes> = new Map()
@@ -608,7 +900,7 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
           const group = (data.response || 'other').toLowerCase().trim().split(/\s+/)[0]
           if (!groups.has(group)) groups.set(group, [])
           groups.get(group)!.push(node)
-        } catch {}
+        } catch { /* ignore classification errors */ }
       }
 
       let moved = 0
@@ -644,7 +936,7 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
           })
           const data = await resp.json()
           nodeGroups.set(node.id, (data.response || 'other').toLowerCase().trim().split(/\s+/)[0])
-        } catch {}
+        } catch { /* ignore classification errors */ }
       }
 
       let edgeCount = 0
@@ -688,299 +980,65 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
   }
 }
 
-function getSystemPrompt() {
-  // Use selected nodes if any, otherwise all filtered nodes
-  const hasSelection = store.selectedNodeIds.length > 0
-  const nodes = hasSelection
-    ? store.filteredNodes.filter(n => store.selectedNodeIds.includes(n.id))
-    : store.filteredNodes
-
-  // Build node list with positions for smaller sets, just titles for large sets
-  let nodeList = 'none'
-  const prefix = hasSelection ? '(SELECTED) ' : ''
-  if (nodes.length > 0 && nodes.length <= 30) {
-    nodeList = nodes.map((n, i) =>
-      `${i+1}. "${n.title}" @(${Math.round(n.canvas_x)},${Math.round(n.canvas_y)})`
-    ).join('\n')
-  } else if (nodes.length > 30) {
-    nodeList = nodes.slice(0, 20).map(n => n.title).join(', ') + `... (${nodes.length} total)`
-  }
-
-  return {
-    role: 'system',
-    content: `You are a graph builder agent.
-
-RULES:
-- ONLY do what user asks. Do NOT add extra actions.
-- For SEMANTIC tasks (categories like "animals", "car brands"): USE smart_move, smart_color, or smart_connect.
-- After smart_move, smart_color, or smart_connect: call done() immediately. These tools are complete operations.
-
-CANVAS: x right, y down.
-
-${prefix}NODES (${nodes.length}):
-${nodeList}
-
-TOOLS:
-- create_node(title, content): Create one node
-- generate_sequence(count, title_pattern, content_pattern?, layout?, connect?): Generate N nodes. {n}=number. connect=true links 1→2→3...
-- create_nodes_batch(nodes): Create/update up to ~50 nodes. nodes=[{title, content}]. Updates existing.
-- create_edge(from_title, to_title): Connect two nodes
-- delete_edges(filter): Delete edges. filter="all" or node title
-- update_node(title, new_content): Edit a node's content
-- delete_node(title): Remove a single node
-- delete_matching(filter): Delete multiple nodes. filter="all"|"even"|"odd"|"empty"|term
-- auto_layout("grid"|"horizontal"|"vertical"|"circle"|"clock"|"star"): Arrange all nodes
-- query_nodes(filter): Query DB. filter="all"|"empty"|"has_content"|"search term". Returns node list.
-- for_each_node(action, template, filter?): action="set"|"append"|"search"|"llm". {title}, {n}. llm=ask LLM to generate content per node.
-- batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}]. YOU generate the values.
-- smart_move(instruction): Move nodes by semantic criteria. E.g., "car brands to left, animals to right".
-- smart_color(instruction): Color nodes by semantic criteria. E.g., "males blue, females pink" or "urgent red".
-- smart_connect(groups): Connect nodes within groups. E.g., "animals, car brands" connects animals together and cars together.
-- web_search(query): Search web for information
-- done(summary): Call when finished
-
-CONTENT RULES:
-- Title = label, Content = substance
-- No meta-commentary ("This node contains...", "Here is...")
-- Be concise: data, definitions, or markdown only
-
-RULES:
-- Use create_nodes_batch for 3+ nodes
-- Do EXACTLY what user asks - no more, no less
-- Do NOT add extra operations (don't move nodes unless asked, don't connect unless asked)
-- ALWAYS call done() when finished
-- Never output plain text - only use tools`,
-  }
-}
-
 function clearConversation() {
   conversationHistory.value = []
 }
 
-let agentAbortController: AbortController | null = null
+// Agent runner composable - handles the main agent loop
+const agentContext: AgentContext = {
+  filteredNodes: () => {
+    // Use selected nodes if any, otherwise all filtered nodes
+    const hasSelection = store.selectedNodeIds.length > 0
+    return hasSelection
+      ? store.filteredNodes.filter(n => store.selectedNodeIds.includes(n.id))
+      : store.filteredNodes
+  },
+  cleanupOrphanEdges: () => store.cleanupOrphanEdges(),
+  model: ollamaModel,
+  contextLength: ollamaContextLength,
+  isRunning: agentRunning,
+  log: agentLog,
+  tasks: agentTasks,
+  conversationHistory,
+  agentTools,
+  executeAgentTool,
+}
+
+const agentRunner = useAgentRunner(agentContext)
 
 function stopAgent() {
-  if (agentAbortController) {
-    agentAbortController.abort()
-    agentAbortController = null
-  }
-  agentRunning.value = false
-  agentLog.value.push('> Stopped by user')
-}
-
-// Prune messages to manage context size - keep only essential info
-function pruneMessages(messages: any[], keepRecent: number = 6): any[] {
-  if (messages.length <= keepRecent + 2) return messages
-
-  // Keep system prompt (first) and recent messages
-  const systemPrompt = messages[0]
-  const userRequest = messages[1] // Original user request
-  const recentMessages = messages.slice(-keepRecent)
-
-  // Count completed actions from pruned messages
-  const prunedCount = messages.length - keepRecent - 2
-  const summary = `[Completed ${prunedCount} previous actions successfully. Continue with remaining work.]`
-
-  return [
-    systemPrompt,
-    userRequest,
-    { role: 'assistant', content: summary },
-    ...recentMessages,
-  ]
-}
-
-async function runAgent(userRequest: string) {
-  // Singleton - stop any existing agent
-  if (agentRunning.value) {
-    stopAgent()
-  }
-
-  // Auto-cleanup orphan edges
-  store.cleanupOrphanEdges()
-
-  agentAbortController = new AbortController()
-  agentRunning.value = true
-  agentTasks.value = []
-  // Append new request to log (add separator if log not empty)
-  if (agentLog.value.length > 0) {
-    agentLog.value.push('---')
-  }
-  agentLog.value.push(`User: ${userRequest}`)
-  nodePositionCounter = 0
-
-  // Each request starts fresh - system prompt has current nodes
-  let messages: any[] = [
-    getSystemPrompt(),
-    { role: 'user', content: userRequest },
-  ]
-
-  const maxIterations = 200  // Enough for complex graphs
-  const pruneEvery = 10  // Prune context every N iterations
-
-  for (let i = 0; i < maxIterations; i++) {
-    // Prune context periodically to manage size
-    if (i > 0 && i % pruneEvery === 0) {
-      messages = pruneMessages(messages)
-      agentLog.value.push(`> Pruned context (${messages.length} messages)`)
-    }
-
-    try {
-      const response = await fetch('http://localhost:11434/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: ollamaModel.value,
-          messages,
-          tools: agentTools,
-          stream: false,
-          options: { num_ctx: ollamaContextLength.value },
-        }),
-        signal: agentAbortController?.signal,
-      })
-
-      if (!response.ok) throw new Error(`Ollama error: ${response.status}`)
-      const data = await response.json()
-      const msg = data.message
-
-      messages.push(msg)
-
-      // Check for native tool calls
-      if (msg.tool_calls && msg.tool_calls.length > 0) {
-        for (const tc of msg.tool_calls) {
-          const result = await executeAgentTool(tc.function.name, tc.function.arguments)
-          messages.push({
-            role: 'tool',
-            content: result,
-          })
-
-          if (result.startsWith('AGENT_DONE:')) {
-            // Save assistant's final response to history
-            conversationHistory.value.push({ role: 'assistant', content: result.replace('AGENT_DONE:', '').trim() })
-            agentRunning.value = false
-            agentAbortController = null
-            return result.replace('AGENT_DONE:', '').trim()
-          }
-        }
-      } else if (msg.content) {
-        agentLog.value.push(`LLM: ${msg.content.slice(0, 80)}...`)
-
-        // If LLM asks a question or says it's done, stop and return
-        if (msg.content.includes('?') || /done|complete|finished|empty/i.test(msg.content)) {
-          agentRunning.value = false
-          return msg.content.slice(0, 200)
-        }
-
-        // Try to parse tool calls from text (fallback for models without native tool calling)
-        // Pattern 1: ```json { "name": ..., "arguments": ... } ```
-        // Pattern 2: <|python_tag|>{"name": ..., "parameters": ...}
-        let toolJson: string | null = null
-
-        const jsonMatch = msg.content.match(/```json\s*([\s\S]*?)\s*```/)
-        if (jsonMatch) {
-          toolJson = jsonMatch[1]
-        }
-
-        // Llama 3.x python_tag format
-        const pythonTagMatch = msg.content.match(/<\|python_tag\|>\s*(\{[\s\S]*\})/)
-        if (!toolJson && pythonTagMatch) {
-          toolJson = pythonTagMatch[1]
-        }
-
-        // Raw JSON object at start of content
-        const rawJsonMatch = msg.content.match(/^\s*(\{"name"\s*:[\s\S]*\})/)
-        if (!toolJson && rawJsonMatch) {
-          toolJson = rawJsonMatch[1]
-        }
-
-        if (toolJson) {
-          try {
-            const parsed = JSON.parse(toolJson)
-            const toolName = parsed.name
-            const toolArgs = parsed.arguments || parsed.parameters || {}
-
-            if (toolName) {
-              const result = await executeAgentTool(toolName, toolArgs)
-              messages.push({
-                role: 'assistant',
-                content: `Executed: ${toolName}`,
-              })
-              messages.push({
-                role: 'user',
-                content: `Tool result: ${result}\n\nContinue with the next action or call done if finished.`,
-              })
-
-              if (result.startsWith('AGENT_DONE:')) {
-                conversationHistory.value.push({ role: 'assistant', content: result.replace('AGENT_DONE:', '').trim() })
-                agentRunning.value = false
-                return result.replace('AGENT_DONE:', '').trim()
-              }
-              continue
-            }
-          } catch { /* Not valid tool JSON */ }
-        }
-        // No tool calls found - check if LLM thinks it's done
-        const looksComplete = /now shows|complete|finished|created|done|successfully/i.test(msg.content)
-        if (looksComplete) {
-          // LLM is summarizing - treat as done
-          agentRunning.value = false
-          agentAbortController = null
-          return 'Done'
-        }
-
-        // Otherwise prompt to continue
-        messages.push({
-          role: 'user',
-          content: 'Use tools only. Call done() when finished.',
-        })
-        continue
-      }
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        agentLog.value.push('> Agent stopped')
-        agentRunning.value = false
-        agentAbortController = null
-        return 'Agent stopped by user'
-      }
-      console.error('Agent error:', e)
-      agentRunning.value = false
-      throw e
-    }
-  }
-
-  agentRunning.value = false
-  agentAbortController = null
-  return 'Agent reached max iterations'
+  agentRunner.stop()
 }
 
 async function sendGraphPrompt() {
   if (!graphPrompt.value.trim() || isGraphLLMLoading.value) return
 
-  // Save to history
   const prompt = graphPrompt.value.trim()
-  if (prompt && promptHistory.value[promptHistory.value.length - 1] !== prompt) {
-    promptHistory.value.push(prompt)
-    // Keep last 50 prompts
-    if (promptHistory.value.length > 50) promptHistory.value.shift()
-    localStorage.setItem('nodus-prompt-history', JSON.stringify(promptHistory.value))
-  }
-  historyIndex = -1
+  savePromptToHistory(prompt)
 
   isGraphLLMLoading.value = true
   try {
-    const result = await runAgent(graphPrompt.value)
-    console.log('Agent result:', result)
+    await agentRunner.run(prompt)
     graphPrompt.value = ''
-  } catch (e: any) {
-    alert(e.message)
+  } catch (e) {
+    alert(e instanceof Error ? e.message : 'Unknown error')
   } finally {
     isGraphLLMLoading.value = false
   }
 }
 
 async function sendNodePrompt() {
-  if (!nodePrompt.value.trim() || isNodeLLMLoading.value || !editingNodeId.value) return
+  // Work with editing node or selected node
+  const nodeId = editingNodeId.value || store.selectedNodeIds[0]
+  if (!nodePrompt.value.trim() || isNodeLLMLoading.value || !nodeId) return
 
-  const nodeId = editingNodeId.value
+  const node = store.getNode(nodeId)
+  if (!node) return
+
+  const isEditing = editingNodeId.value === nodeId
+  // Get current content from editing buffer or store
+  const currentContent = isEditing ? editContent.value : (node.markdown_content || '')
+
   isNodeLLMLoading.value = true
   try {
     // Get connected nodes for context
@@ -1002,17 +1060,23 @@ async function sendNodePrompt() {
 REWRITE the note based on the user's request. Return ONLY the new content.
 ${neighborsContext}
 CURRENT NOTE CONTENT:
-${editContent.value || '(empty)'}
+${currentContent || '(empty)'}
 ---`
 
     const response = await callOllama(nodePrompt.value, nodeSystemPrompt)
-    editContent.value = response
     nodePrompt.value = ''
 
+    if (isEditing) {
+      // Update the editing buffer
+      editContent.value = response
+    } else {
+      // Directly update the node content in store
+      await store.updateNodeContent(nodeId, response)
+      setTimeout(renderMermaidDiagrams, 100)
+    }
+
     // Auto-fit after LLM updates content (if enabled for this node)
-    const node = store.getNode(nodeId)
-    if (node?.auto_fit) {
-      store.updateNodeContent(nodeId, editContent.value)
+    if (node.auto_fit) {
       setTimeout(() => {
         renderMermaidDiagrams()
         setTimeout(() => fitNodeToContent(nodeId), 100)
@@ -1022,35 +1086,6 @@ ${editContent.value || '(empty)'}
     alert(e.message)
   } finally {
     isNodeLLMLoading.value = false
-  }
-}
-
-const canvasRef = ref<HTMLElement | null>(null)
-
-// Calculate intersection point of line with node rectangle
-function getNodeEdgePoint(
-  nodeX: number, nodeY: number, nodeW: number, nodeH: number,
-  fromX: number, fromY: number
-): { x: number; y: number } {
-  const cx = nodeX + nodeW / 2
-  const cy = nodeY + nodeH / 2
-  const dx = fromX - cx
-  const dy = fromY - cy
-
-  if (dx === 0 && dy === 0) return { x: cx, y: cy }
-
-  // Calculate intersection with rectangle edges
-  const halfW = nodeW / 2
-  const halfH = nodeH / 2
-
-  // Check which edge the line crosses
-  const scaleX = dx !== 0 ? halfW / Math.abs(dx) : Infinity
-  const scaleY = dy !== 0 ? halfH / Math.abs(dy) : Infinity
-  const scale = Math.min(scaleX, scaleY)
-
-  return {
-    x: cx + dx * scale,
-    y: cy + dy * scale,
   }
 }
 
@@ -1068,31 +1103,44 @@ function getNodeHeight(node: { height?: number; markdown_content: string | null 
   if (node.height !== undefined && node.height !== null && node.height > 0) {
     return node.height
   }
-  // Fallback: estimate from content
+  // Fallback: estimate from content with generous padding for routing
   const content = node.markdown_content || ''
   const lineCount = content.split('\n').length
   const charCount = content.length
-  // Rough estimate: ~20px per line, min 60px, max 324px
-  return Math.max(60, Math.min(324, lineCount * 22 + Math.floor(charCount / 40) * 18))
+  // More generous estimate: ~24px per line + header (40px) + padding (40px)
+  // Allow taller nodes to avoid routing through them
+  const contentHeight = lineCount * 24 + Math.floor(charCount / 35) * 20
+  return Math.max(120, Math.min(600, contentHeight + 80))
 }
 
 const edgeLines = computed(() => {
-  // Force dependency on node positions by reading them
-  // This ensures re-computation when any node moves
-  const _trigger = store.nodes.reduce((sum, n) => sum + n.canvas_x + n.canvas_y + (n.width || 0) + (n.height || 0), 0)
-  void _trigger
+  // Force dependency on node positions, edge properties, and layout version
+  // nodeLayoutVersion is incremented when nodes move, edges change, or layout is recalculated
+  const _layoutVersion = store.nodeLayoutVersion
+  const _nodeTrigger = store.nodes.reduce((sum, n) => sum + n.canvas_x + n.canvas_y + (n.width || 0) + (n.height || 0), 0)
+  const _edgeTrigger = store.filteredEdges.reduce((sum, e) => sum + (e.link_type?.length || 0), 0)
+  const _edgeCount = store.edges.length // Track edge additions/removals
+  void _layoutVersion
+  void _nodeTrigger
+  void _edgeTrigger
+  void _edgeCount
 
   let edges = store.filteredEdges
 
-  // Deduplicate edges - only one edge per node pair
-  const seenPairs = new Set<string>()
+  // Deduplicate only exact duplicate edges (same source AND target AND id)
+  // Keep bidirectional edges (A→B and B→A are different edges)
+  const seenEdgeIds = new Set<string>()
   edges = edges.filter(e => {
-    const pairKey = `${e.source_node_id}:${e.target_node_id}`
-    const pairKeyRev = `${e.target_node_id}:${e.source_node_id}`
-    if (seenPairs.has(pairKey) || seenPairs.has(pairKeyRev)) return false
-    seenPairs.add(pairKey)
+    if (seenEdgeIds.has(e.id)) return false
+    seenEdgeIds.add(e.id)
     return true
   })
+
+  // Filter edges for neighborhood mode - only show edges between visible neighbors
+  if (neighborhoodNodeIds.value) {
+    const neighborIds = neighborhoodNodeIds.value
+    edges = edges.filter(e => neighborIds.has(e.source_node_id) && neighborIds.has(e.target_node_id))
+  }
 
   // For large graphs, only render edges connected to visible nodes
   if (isLargeGraph.value) {
@@ -1101,44 +1149,113 @@ const edgeLines = computed(() => {
   }
 
   // Build node map for efficient lookup
+  // IMPORTANT: Use actual heights for routing obstacle detection
+  // Use displayNodes so hidden nodes (in neighborhood mode) aren't included
   const nodeMap = new Map<string, NodeRect>()
-  for (const node of store.filteredNodes) {
+  for (const node of displayNodes.value) {
     nodeMap.set(node.id, {
       id: node.id,
       canvas_x: node.canvas_x,
       canvas_y: node.canvas_y,
       width: node.width || 200,
-      height: getNodeHeight(node),
+      height: getNodeHeight(node, false),  // false = use real height for routing
     })
   }
+
+  // Filter edges to only those with valid source and target nodes
+  edges = edges.filter(e => nodeMap.has(e.source_node_id) && nodeMap.has(e.target_node_id))
+
+  // Deduplicate edges by source-target pair (keep first occurrence)
+  // Also handles bidirectional duplicates (A->B and B->A count as same pair)
+  const seenPairs = new Set<string>()
+  edges = edges.filter(e => {
+    const ids = [e.source_node_id, e.target_node_id].sort()
+    const key = `${ids[0]}:${ids[1]}`
+    if (seenPairs.has(key)) return false
+    seenPairs.add(key)
+    return true
+  })
 
   // Get edge style
   const style = globalEdgeStyle.value
 
-  // For orthogonal/smart, use batch routing (with optional bundling)
-  let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; bundleSize?: number }> | null = null
-  if (style === 'orthogonal' || style === 'smart') {
-    const edgeDefs = edges.map(e => ({
-      id: e.id,
-      source_node_id: e.source_node_id,
-      target_node_id: e.target_node_id,
-    }))
-    const nodeRects = store.filteredNodes.map(n => ({
-      id: n.id,
-      canvas_x: n.canvas_x,
-      canvas_y: n.canvas_y,
-      width: n.width || 200,
-      height: getNodeHeight(n),
-    }))
+  // Convert edges to EdgeDef format for routing analysis
+  const edgeDefs = edges.map(e => ({
+    id: e.id,
+    source_node_id: e.source_node_id,
+    target_node_id: e.target_node_id,
+  }))
+  // IMPORTANT: Use actual heights for routing, NOT collapsed heights
+  // Otherwise edges route through nodes when zoomed out
+  // Use displayNodes for routing so hidden nodes (in neighborhood mode) aren't obstacles
+  const nodeRects = displayNodes.value.map(n => ({
+    id: n.id,
+    canvas_x: n.canvas_x,
+    canvas_y: n.canvas_y,
+    width: n.width || 200,
+    height: getNodeHeight(n, false),  // false = ignore collapse, use real height
+  }))
 
-    if (edgeBundling.value) {
-      routedEdges = routeEdgesWithBundling(edgeDefs, nodeRects, nodeMap)
-    } else {
-      routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap)
-    }
+  // Compute port assignments for ALL edges (for proper port spreading)
+  // Remove internal deduplication since we already deduplicate above
+  const edgeInfos: Array<{
+    edge: { id: string; source_node_id: string; target_node_id: string }
+    source: NodeRect
+    target: NodeRect
+    sourceSide: 'left' | 'right' | 'top' | 'bottom'
+    targetSide: 'left' | 'right' | 'top' | 'bottom'
+  }> = []
+
+  for (const edge of edgeDefs) {
+    const source = nodeMap.get(edge.source_node_id)!
+    const target = nodeMap.get(edge.target_node_id)!
+    const targetCx = target.canvas_x + (target.width || 200) / 2
+    const targetCy = target.canvas_y + (target.height || 120) / 2
+    const sourceCx = source.canvas_x + (source.width || 200) / 2
+    const sourceCy = source.canvas_y + (source.height || 120) / 2
+
+    const sourceSide = getSide(source, targetCx, targetCy)
+    const targetSide = getSide(target, sourceCx, sourceCy)
+
+    edgeInfos.push({ edge, source, target, sourceSide, targetSide })
   }
 
-  return edges.map(edge => {
+  const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
+
+  // Use batch routing for both diagonal and orthogonal styles
+  // The routing modules handle grid tracking, obstacle avoidance, and path generation
+  const effectiveStyle: EdgeStyle = style === 'curved' ? 'orthogonal' : style
+  let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; bundleSize?: number; path?: Array<{x: number; y: number}>; debugInfo?: { srcOffset: number; tgtOffset: number; srcSide: string; tgtSide: string } }> | null = null
+
+  if (edgeBundling.value) {
+    routedEdges = routeEdgesWithBundling(edgeDefs, nodeRects, nodeMap, effectiveStyle)
+  } else {
+    routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
+  }
+
+  // Grid tracker for curved edges (which still need manual routing)
+  const gridTracker = new GridTracker(PORT_SPACING)
+
+  // Sort edges to minimize crossings
+  // Edges are sorted by their midpoint position so parallel edges don't cross
+  const sortedEdges = [...edges].sort((a, b) => {
+    const sourceA = store.getNode(a.source_node_id)
+    const targetA = store.getNode(a.target_node_id)
+    const sourceB = store.getNode(b.source_node_id)
+    const targetB = store.getNode(b.target_node_id)
+    if (!sourceA || !targetA || !sourceB || !targetB) return 0
+
+    const midAx = (sourceA.canvas_x + targetA.canvas_x) / 2
+    const midAy = (sourceA.canvas_y + targetA.canvas_y) / 2
+    const midBx = (sourceB.canvas_x + targetB.canvas_x) / 2
+    const midBy = (sourceB.canvas_y + targetB.canvas_y) / 2
+
+    // Sort by Y first (top to bottom), then by X (left to right)
+    if (Math.abs(midAy - midBy) > 50) return midAy - midBy
+    return midAx - midBx
+  })
+
+  return sortedEdges.map(edge => {
     const source = store.getNode(edge.source_node_id)
     const target = store.getNode(edge.target_node_id)
     if (!source || !target) return null
@@ -1154,70 +1271,101 @@ const edgeLines = computed(() => {
     const targetCx = target.canvas_x + tw / 2
     const targetCy = target.canvas_y + th / 2
 
-    // Get edge points at node boundaries
-    const startEdge = getNodeEdgePoint(source.canvas_x, source.canvas_y, sw, sh, targetCx, targetCy)
-    const endEdge = getNodeEdgePoint(target.canvas_x, target.canvas_y, tw, th, sourceCx, sourceCy)
+    // Get port assignments for edge spreading
+    const srcAssign = sourceAssignments.get(edge.id)
+    const tgtAssign = targetAssignments.get(edge.id)
+    const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
+    const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
+
+    // Determine which side each edge exits/enters
+    const sourceRect = nodeMap.get(edge.source_node_id)
+    const targetRect = nodeMap.get(edge.target_node_id)
+    const sourceSide = sourceRect ? getSide(sourceRect, targetCx, targetCy) : 'right'
+    const targetSide = targetRect ? getSide(targetRect, sourceCx, sourceCy) : 'left'
+
+    // Get fixed port positions at center of each side (with offset for spreading)
+    const startPort = sourceRect
+      ? getPortPoint(sourceRect, sourceSide, srcOffset)
+      : { x: sourceCx, y: sourceCy }
+    const endPort = targetRect
+      ? getPortPoint(targetRect, targetSide, tgtOffset)
+      : { x: targetCx, y: targetCy }
+
+    // Get standoff points (edges leave nodes orthogonally)
+    const STANDOFF_DIST = 20
+    const startStandoff = getStandoff(startPort, sourceSide, STANDOFF_DIST)
+    const endStandoff = getStandoff(endPort, targetSide, STANDOFF_DIST)
 
     // Check if this edge is bidirectional (reverse edge exists)
-    const isBidirectional = edges.some(
+    // Use store.filteredEdges, not the deduplicated edges array
+    const isBidirectional = store.filteredEdges.some(
       e => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
     )
 
-    // Calculate direction and length
-    const dx = endEdge.x - startEdge.x
-    const dy = endEdge.y - startEdge.y
-    const len = Math.sqrt(dx * dx + dy * dy)
-
-    // Visual gap from node edges
-    const gap = 2
-    // Arrow head extends beyond line end, so pull line back a bit
+    // Arrow offset for non-bidirectional edges
     const arrowOffset = isBidirectional ? 0 : 6
 
-    let x1 = startEdge.x
-    let y1 = startEdge.y
-    let x2 = endEdge.x
-    let y2 = endEdge.y
-
-    if (len > gap * 2 + arrowOffset) {
-      // Source side: small gap from node edge
-      x1 = startEdge.x + (dx / len) * gap
-      y1 = startEdge.y + (dy / len) * gap
-      // Target side: pull back for arrow head
-      x2 = endEdge.x - (dx / len) * (gap + arrowOffset)
-      y2 = endEdge.y - (dy / len) * (gap + arrowOffset)
+    // Adjust end port for arrow head
+    let endEdge = { ...endPort }
+    if (arrowOffset > 0) {
+      // Pull back along the standoff direction
+      if (targetSide === 'left') endEdge.x += arrowOffset
+      else if (targetSide === 'right') endEdge.x -= arrowOffset
+      else if (targetSide === 'top') endEdge.y += arrowOffset
+      else if (targetSide === 'bottom') endEdge.y -= arrowOffset
     }
+
+    // For hit detection, use the original port positions
+    const x1 = startPort.x
+    const y1 = startPort.y
+    const x2 = endPort.x
+    const y2 = endPort.y
 
     // Get edge style - respect user choice
     const edgeStyle = edgeStyleMap.value[edge.id] || style
 
     // Generate path based on style
+    // Use pre-routed paths for diagonal/orthogonal, manual routing only for curved
     let path = ''
+    const routed = routedEdges?.get(edge.id)
+
     if (edgeStyle === 'curved') {
-      // Quadratic bezier curve
-      const midX = (x1 + x2) / 2
-      const midY = (y1 + y2) / 2
-      const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-      const curveOffset = dist * 0.2
-      const angle = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2
-      const cx = midX + Math.cos(angle) * curveOffset
-      const cy = midY + Math.sin(angle) * curveOffset
-      path = `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`
-    } else if ((edgeStyle === 'orthogonal' || edgeStyle === 'smart') && routedEdges) {
-      // Use pre-computed orthogonal path
-      const routed = routedEdges.get(edge.id)
-      if (routed) {
-        path = routed.svgPath
+      // Curved: port -> standoff -> bezier curve -> standoff -> port
+      // Use grid tracker to offset control point and prevent overlapping curves
+      const midX = (startStandoff.x + endStandoff.x) / 2
+      const midY = (startStandoff.y + endStandoff.y) / 2
+      const dist = Math.sqrt((endStandoff.x - startStandoff.x) ** 2 + (endStandoff.y - startStandoff.y) ** 2)
+      const baseCurveAmt = Math.min(dist * 0.3, 50)
+
+      // Find a free channel for the curve's peak (perpendicular to the edge direction)
+      const angle = Math.atan2(endStandoff.y - startStandoff.y, endStandoff.x - startStandoff.x) + Math.PI / 2
+      const isMoreHorizontal = Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))
+
+      // Track channel based on curve direction using GridTracker
+      let curveOffset = 0
+      if (isMoreHorizontal) {
+        const idealX = midX + Math.cos(angle) * baseCurveAmt
+        const channelX = gridTracker.findAndMarkChannel(idealX, false, startStandoff.y, endStandoff.y)
+        curveOffset = channelX - idealX
       } else {
-        // Fallback to straight line
-        path = `M${x1},${y1} L${x2},${y2}`
+        const idealY = midY + Math.sin(angle) * baseCurveAmt
+        const channelY = gridTracker.findAndMarkChannel(idealY, true, startStandoff.x, endStandoff.x)
+        curveOffset = channelY - idealY
       }
+
+      const curveAmt = baseCurveAmt + curveOffset
+      const cx = midX + Math.cos(angle) * curveAmt
+      const cy = midY + Math.sin(angle) * curveAmt
+      path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} Q${cx},${cy} ${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+    } else if (routed?.svgPath) {
+      // Use pre-routed path from routing modules (diagonal or orthogonal)
+      path = routed.svgPath
     } else {
-      // Straight line (default, fastest)
-      path = `M${x1},${y1} L${x2},${y2}`
+      // Fallback: simple line via standoff points
+      path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
     }
 
     // Get stroke width and trunk info (from bundling or default)
-    const routed = routedEdges?.get(edge.id)
     const bundleStrokeWidth = routed?.strokeWidth || 1.5
     const bundleSize = routed?.bundleSize || 1
     const trunkPath = routed?.trunkPath
@@ -1226,6 +1374,8 @@ const edgeLines = computed(() => {
 
     return {
       id: edge.id,
+      source_node_id: edge.source_node_id,
+      target_node_id: edge.target_node_id,
       x1,
       y1,
       x2,
@@ -1238,10 +1388,10 @@ const edgeLines = computed(() => {
       trunkStrokeWidth,
       isTrunkOwner,
       // Full extent for hit area (includes arrow)
-      hitX1: startEdge.x,
-      hitY1: startEdge.y,
-      hitX2: endEdge.x,
-      hitY2: endEdge.y,
+      hitX1: startPort.x,
+      hitY1: startPort.y,
+      hitX2: endPort.x,
+      hitY2: endPort.y,
       link_type: edge.link_type,
       label: edge.label,
       isBidirectional,
@@ -1282,10 +1432,15 @@ function onWheel(e: WheelEvent) {
       const atTop = el.scrollTop <= 0
       const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
 
-      // Only allow canvas interaction if scrolling past boundary
+      // Let the element scroll if not at boundary
       if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
-        return // Let the element scroll
+        return // Let the element scroll normally
       }
+
+      // At boundary - prevent canvas zoom, just absorb the event
+      e.preventDefault()
+      e.stopPropagation()
+      return
     }
   }
 
@@ -1326,6 +1481,9 @@ function onWheel(e: WheelEvent) {
       showMagnifier.value = newScale < MAGNIFIER_THRESHOLD
     }
   }
+
+  // Save view state (debounced)
+  scheduleSaveViewState()
 }
 
 // Magnifier mouse tracking (throttled for performance)
@@ -1463,6 +1621,13 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   draggingNode.value = nodeId
   store.selectNode(nodeId, e.shiftKey || e.metaKey)
   selectedEdge.value = null
+
+  // In neighborhood mode, clicking a neighbor navigates to its neighborhood
+  if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
+    focusNodeId.value = nodeId
+    // Layout and center on the new focus (synchronous)
+    layoutNeighborhood(nodeId)
+  }
 
   const pos = screenToCanvas(e.clientX, e.clientY)
   dragStart.value = {
@@ -1620,7 +1785,10 @@ function cancelFrameTitleEditing() {
 
 function createFrameAtCenter() {
   const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return
+  if (!rect) {
+    console.error('createFrameAtCenter: canvasRef not available')
+    return
+  }
 
   // If nodes are selected, create frame around them
   if (store.selectedNodeIds.length > 0) {
@@ -1660,9 +1828,8 @@ function deleteSelectedFrame() {
   }
 }
 
-// Node resizing
+// Node resizing (supports multiple selected nodes)
 function onResizeMouseDown(e: MouseEvent, nodeId: string) {
-  console.log('onResizeMouseDown called for node:', nodeId)
   e.stopPropagation()
   e.preventDefault()
 
@@ -1677,6 +1844,17 @@ function onResizeMouseDown(e: MouseEvent, nodeId: string) {
     height: node.height || 120,
   }
   resizePreview.value = { width: node.width || 200, height: node.height || 120 }
+
+  // Store initial sizes of all selected nodes for multi-resize
+  multiResizeInitial.value.clear()
+  if (store.selectedNodeIds.includes(nodeId) && store.selectedNodeIds.length > 1) {
+    for (const id of store.selectedNodeIds) {
+      const n = store.getNode(id)
+      if (n) {
+        multiResizeInitial.value.set(id, { width: n.width || 200, height: n.height || 120 })
+      }
+    }
+  }
 
   document.addEventListener('mousemove', onResizeMove)
   document.addEventListener('mouseup', stopResize)
@@ -1698,22 +1876,53 @@ function onResizeMove(e: MouseEvent) {
   }
 
   resizePreview.value = { width, height }
+
+  // Update all selected nodes in real-time during resize
+  if (multiResizeInitial.value.size > 0) {
+    for (const [id, initial] of multiResizeInitial.value) {
+      if (id === resizingNode.value) continue // Primary node uses resizePreview
+      const newWidth = Math.max(120, initial.width + dx)
+      const newHeight = Math.max(60, initial.height + dy)
+      const n = store.getNode(id)
+      if (n) {
+        n.width = gridLockEnabled.value ? snapToGrid(newWidth) : newWidth
+        n.height = gridLockEnabled.value ? snapToGrid(newHeight) : newHeight
+      }
+    }
+  }
 }
 
 function stopResize() {
-  console.log('stopResize called, resizingNode:', resizingNode.value)
   if (resizingNode.value) {
     const nodeId = resizingNode.value
     const width = resizePreview.value.width
     const height = resizePreview.value.height
 
-    // Update node size
+    // Update primary node size
     store.updateNodeSize(nodeId, width, height)
 
-    // Push overlapping nodes away
-    pushOverlappingNodesAway(nodeId)
+    // Update all other selected nodes
+    if (multiResizeInitial.value.size > 0) {
+      for (const [id] of multiResizeInitial.value) {
+        if (id === nodeId) continue
+        const n = store.getNode(id)
+        if (n) {
+          store.updateNodeSize(id, n.width || 200, n.height || 120)
+        }
+      }
+    }
+
+    // In neighborhood mode, re-layout to adapt to new sizes
+    if (neighborhoodMode.value && focusNodeId.value) {
+      // Small delay to ensure store is updated
+      setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
+    } else {
+      // Push overlapping nodes away (only in normal mode)
+      pushOverlappingNodesAway(nodeId)
+    }
   }
   resizingNode.value = null
+  multiResizeInitial.value.clear()
   lastDragEndTime = Date.now()
   document.removeEventListener('mousemove', onResizeMove)
   document.removeEventListener('mouseup', stopResize)
@@ -1866,11 +2075,6 @@ function saveEditing(e?: FocusEvent) {
   editingNodeId.value = null
   editContent.value = ''
   nodePrompt.value = ''
-}
-
-function cancelEditing() {
-  editingNodeId.value = null
-  editContent.value = ''
 }
 
 function onEditorKeydown(e: KeyboardEvent) {
@@ -2069,16 +2273,11 @@ function resetView() {
 
 // Animation state for layout
 let layoutAnimationId: number | null = null
-let forceSimulation: any = null
 
 function stopLayoutAnimation() {
   if (layoutAnimationId) {
     cancelAnimationFrame(layoutAnimationId)
     layoutAnimationId = null
-  }
-  if (forceSimulation) {
-    forceSimulation.stop()
-    forceSimulation = null
   }
 }
 
@@ -2089,7 +2288,7 @@ function animateToPositions(targets: Map<string, { x: number, y: number }>, dura
   const startTime = performance.now()
   const startPositions = new Map<string, { x: number, y: number }>()
 
-  for (const [id, _target] of targets) {
+  for (const [id] of targets) {
     const node = store.nodes.find(n => n.id === id)
     if (node) {
       startPositions.set(id, { x: node.canvas_x, y: node.canvas_y })
@@ -2124,6 +2323,132 @@ function animateToPositions(targets: Map<string, { x: number, y: number }>, dura
   layoutAnimationId = requestAnimationFrame(animate)
 }
 
+/**
+ * Tetris-style bin packing for grid layout using maximal rectangles algorithm
+ * Places larger nodes first, then fills gaps with smaller nodes
+ */
+function tetrisGridLayout(
+  nodes: typeof store.filteredNodes,
+  startX: number,
+  startY: number,
+  gap: number
+): Map<string, { x: number; y: number }> {
+  const targets = new Map<string, { x: number; y: number }>()
+
+  if (nodes.length === 0) return targets
+
+  // Calculate total area to estimate ideal dimensions
+  let totalArea = 0
+  let maxNodeWidth = 0
+  let maxNodeHeight = 0
+  for (const node of nodes) {
+    const w = node.width || 200
+    const h = node.height || 120
+    totalArea += (w + gap) * (h + gap)
+    maxNodeWidth = Math.max(maxNodeWidth, w)
+    maxNodeHeight = Math.max(maxNodeHeight, h)
+  }
+
+  // Target a roughly square layout
+  const idealSide = Math.sqrt(totalArea) * 1.2
+  const maxWidth = Math.max(idealSide, maxNodeWidth + gap)
+
+  // Sort nodes by area (largest first) for better packing
+  const sorted = [...nodes].sort((a, b) => {
+    const areaA = (a.width || 200) * (a.height || 120)
+    const areaB = (b.width || 200) * (b.height || 120)
+    return areaB - areaA
+  })
+
+  // Track placed rectangles
+  const placed: { x: number; y: number; w: number; h: number }[] = []
+
+  // Check if rectangle overlaps with any placed node
+  function overlaps(x: number, y: number, w: number, h: number): boolean {
+    for (const rect of placed) {
+      if (x < rect.x + rect.w + gap &&
+          x + w + gap > rect.x &&
+          y < rect.y + rect.h + gap &&
+          y + h + gap > rect.y) {
+        return true
+      }
+    }
+    return false
+  }
+
+  // Find best position using bottom-left with maxWidth constraint
+  function findBestPosition(w: number, h: number): { x: number; y: number } {
+    // Generate candidate positions from corners of placed rectangles
+    const candidates: { x: number; y: number; score: number }[] = []
+
+    // Always try origin
+    candidates.push({ x: startX, y: startY, score: 0 })
+
+    // Add positions at corners of placed rectangles
+    for (const rect of placed) {
+      // Right of this rect
+      const rightX = rect.x + rect.w + gap
+      if (rightX + w <= startX + maxWidth) {
+        candidates.push({ x: rightX, y: rect.y, score: rect.y * 10000 + rightX })
+      }
+
+      // Below this rect
+      candidates.push({ x: rect.x, y: rect.y + rect.h + gap, score: (rect.y + rect.h + gap) * 10000 + rect.x })
+
+      // Below this rect, at start
+      candidates.push({ x: startX, y: rect.y + rect.h + gap, score: (rect.y + rect.h + gap) * 10000 })
+
+      // Right of this rect, at top of layout
+      if (rightX + w <= startX + maxWidth) {
+        candidates.push({ x: rightX, y: startY, score: startY * 10000 + rightX })
+      }
+
+      // Try to fit in vertical gaps next to tall nodes
+      for (const other of placed) {
+        if (other === rect) continue
+        // Gap between rect bottom and other top
+        if (other.y > rect.y + rect.h + gap) {
+          const gapTop = rect.y + rect.h + gap
+          const gapHeight = other.y - gapTop - gap
+          if (gapHeight >= h) {
+            candidates.push({ x: rect.x, y: gapTop, score: gapTop * 10000 + rect.x })
+          }
+        }
+      }
+    }
+
+    // Sort by score (prefer top-left: lower y first, then lower x)
+    candidates.sort((a, b) => a.score - b.score)
+
+    // Find first valid position
+    for (const cand of candidates) {
+      if (cand.x >= startX && cand.y >= startY &&
+          cand.x + w <= startX + maxWidth &&
+          !overlaps(cand.x, cand.y, w, h)) {
+        return { x: cand.x, y: cand.y }
+      }
+    }
+
+    // Fallback: place below everything
+    let maxBottom = startY
+    for (const rect of placed) {
+      maxBottom = Math.max(maxBottom, rect.y + rect.h + gap)
+    }
+    return { x: startX, y: maxBottom }
+  }
+
+  // Place each node
+  for (const node of sorted) {
+    const w = node.width || 200
+    const h = node.height || 120
+    const pos = findBestPosition(w, h)
+    targets.set(node.id, pos)
+    placed.push({ x: pos.x, y: pos.y, w, h })
+  }
+
+  return targets
+}
+
 async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
   // Use selected nodes if any, otherwise all filtered nodes
   const selectedIds = store.selectedNodeIds
@@ -2149,92 +2474,77 @@ async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' | 'for
   const centerX = sumX / nodes.length
   const centerY = sumY / nodes.length
 
-  const nodeWidth = 220
-  const nodeHeight = 150
-  const gap = 30
+  // Gap between nodes - enough for edge routing (standoff + arrow + margin)
+  // Needs ~50px standoff on each side + space for edge labels
+  const gap = 150
 
   if (layout === 'force') {
-    // Use d3-force for graph-aware layout with live animation
-    const { forceSimulation: createSimulation, forceLink, forceManyBody, forceCenter, forceCollide } = await import('d3-force')
-
-    // Create simulation nodes with current positions
-    const simNodes = nodes.map(n => ({
-      id: n.id,
-      x: n.canvas_x || Math.random() * 500,
-      y: n.canvas_y || Math.random() * 500,
-    }))
-
-    // Create links from edges (only between selected nodes if selection exists)
-    const nodeIdSet = new Set(nodes.map(n => n.id))
-    const edges = store.filteredEdges.filter(e =>
-      nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
-    )
-    const simLinks = edges.map(e => ({
-      source: e.source_node_id,
-      target: e.target_node_id,
-    }))
-
-    // Create and run simulation with live updates, centered on current center
-    // Calculate collision radius based on average node size (diagonal / 2 + padding)
-    const avgWidth = nodes.reduce((sum, n) => sum + (n.width || 200), 0) / nodes.length
-    const avgHeight = nodes.reduce((sum, n) => sum + (n.height || 120), 0) / nodes.length
-    const collisionRadius = Math.sqrt(avgWidth * avgWidth + avgHeight * avgHeight) / 2 + 20
-
-    forceSimulation = createSimulation(simNodes)
-      .force('link', forceLink(simLinks).id((d: any) => d.id).distance(250))
-      .force('charge', forceManyBody().strength(-500))
-      .force('center', forceCenter(centerX, centerY))
-      .force('collide', forceCollide().radius(collisionRadius).strength(1))
-      .alphaDecay(0.02)
-      .on('tick', () => {
-        // Update node positions on each tick for smooth animation
-        for (const simNode of simNodes) {
-          store.updateNodePosition(simNode.id, simNode.x!, simNode.y!)
-        }
-      })
-      .on('end', () => {
-        forceSimulation = null
-      })
-
+    // Use centralized force layout from store
+    const nodeIds = selectedIds.length > 0 ? selectedIds : undefined
+    await store.layoutNodes(nodeIds, {
+      centerX,
+      centerY,
+    })
     return
   }
 
   // For grid/horizontal/vertical layouts, calculate targets centered on current center
   const targets = new Map<string, { x: number, y: number }>()
 
-  // First calculate layout dimensions to center it
-  let layoutWidth: number, layoutHeight: number
-  if (layout === 'horizontal') {
-    layoutWidth = nodes.length * (nodeWidth + gap) - gap
-    layoutHeight = nodeHeight
-  } else if (layout === 'vertical') {
-    layoutWidth = nodeWidth
-    layoutHeight = nodes.length * (nodeHeight + gap) - gap
-  } else {
-    const cols = Math.ceil(Math.sqrt(nodes.length))
-    const rows = Math.ceil(nodes.length / cols)
-    layoutWidth = cols * (nodeWidth + gap) - gap
-    layoutHeight = rows * (nodeHeight + gap) - gap
-  }
+  if (layout === 'grid') {
+    // Use tetris-style bin packing
+    // First, do a trial layout to get dimensions
+    const trialTargets = tetrisGridLayout(nodes, 0, 0, gap)
 
-  // Start position to center the layout on current center
-  const startX = centerX - layoutWidth / 2
-  const startY = centerY - layoutHeight / 2
-
-  for (let i = 0; i < nodes.length; i++) {
-    let x: number, y: number
-    if (layout === 'horizontal') {
-      x = startX + i * (nodeWidth + gap)
-      y = startY
-    } else if (layout === 'vertical') {
-      x = startX
-      y = startY + i * (nodeHeight + gap)
-    } else {
-      const cols = Math.ceil(Math.sqrt(nodes.length))
-      x = startX + (i % cols) * (nodeWidth + gap)
-      y = startY + Math.floor(i / cols) * (nodeHeight + gap)
+    // Calculate bounding box of trial layout
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const node of nodes) {
+      const pos = trialTargets.get(node.id)!
+      const w = node.width || 200
+      const h = node.height || 120
+      minX = Math.min(minX, pos.x)
+      minY = Math.min(minY, pos.y)
+      maxX = Math.max(maxX, pos.x + w)
+      maxY = Math.max(maxY, pos.y + h)
     }
-    targets.set(nodes[i].id, { x, y })
+
+    // Center the layout on current center
+    const layoutCenterX = (minX + maxX) / 2
+    const layoutCenterY = (minY + maxY) / 2
+    const offsetX = centerX - layoutCenterX
+    const offsetY = centerY - layoutCenterY
+
+    // Apply offset to all positions
+    for (const [id, pos] of trialTargets) {
+      targets.set(id, { x: pos.x + offsetX, y: pos.y + offsetY })
+    }
+  } else {
+    // Horizontal and vertical layouts - use actual node sizes
+    if (layout === 'horizontal') {
+      // Sort by height for better alignment
+      const sorted = [...nodes].sort((a, b) => (b.height || 120) - (a.height || 120))
+      let totalWidth = sorted.reduce((sum, n) => sum + (n.width || 200) + gap, -gap)
+      let x = centerX - totalWidth / 2
+      const maxHeight = Math.max(...sorted.map(n => n.height || 120))
+
+      for (const node of sorted) {
+        const h = node.height || 120
+        targets.set(node.id, { x, y: centerY - maxHeight / 2 + (maxHeight - h) / 2 })
+        x += (node.width || 200) + gap
+      }
+    } else if (layout === 'vertical') {
+      // Sort by width for better alignment
+      const sorted = [...nodes].sort((a, b) => (b.width || 200) - (a.width || 200))
+      let totalHeight = sorted.reduce((sum, n) => sum + (n.height || 120) + gap, -gap)
+      let y = centerY - totalHeight / 2
+      const maxWidth = Math.max(...sorted.map(n => n.width || 200))
+
+      for (const node of sorted) {
+        const w = node.width || 200
+        targets.set(node.id, { x: centerX - maxWidth / 2 + (maxWidth - w) / 2, y })
+        y += (node.height || 120) + gap
+      }
+    }
   }
 
   animateToPositions(targets, 500)
@@ -2266,31 +2576,6 @@ function fitToContent() {
   offsetY.value = (rect.height - contentHeight * scale.value) / 2 - minY * scale.value + padding * scale.value
 }
 
-// Center the view on the content without changing scale
-function centerViewOnContent() {
-  if (store.filteredNodes.length === 0) return
-
-  // Find bounding box
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const node of store.filteredNodes) {
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + (node.width || 200))
-    maxY = Math.max(maxY, node.canvas_y + (node.height || 100))
-  }
-
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return
-
-  // Center of the content in canvas coordinates
-  const contentCenterX = (minX + maxX) / 2
-  const contentCenterY = (minY + maxY) / 2
-
-  // Set offset so content center is at viewport center
-  offsetX.value = rect.width / 2 - contentCenterX * scale.value
-  offsetY.value = rect.height / 2 - contentCenterY * scale.value
-}
-
 // Edge color palette
 const edgeColorPalette = [
   { value: '#94a3b8' }, // gray (default)
@@ -2304,14 +2589,13 @@ const edgeColorPalette = [
 
 // Edge style types
 const edgeStyles = [
-  { value: 'straight', label: '—' },
-  { value: 'curved', label: '⌒' },
+  { value: 'diagonal', label: '/' },
   { value: 'orthogonal', label: '⌐' },
 ]
 
 // Store edge styles (edgeId -> style)
 const edgeStyleMap = ref<Record<string, string>>({})
-const globalEdgeStyle = ref<'straight' | 'curved' | 'orthogonal' | 'smart'>('orthogonal')
+const globalEdgeStyle = ref<'diagonal' | 'orthogonal'>('orthogonal')
 
 // Edge bundling - merge edges with shared endpoints
 const edgeBundling = ref(false)
@@ -2322,17 +2606,17 @@ function toggleEdgeBundling() {
 
 function toggleMagnifier() {
   magnifierEnabled.value = !magnifierEnabled.value
-  localStorage.setItem('nodus-magnifier', String(magnifierEnabled.value))
+  uiStorage.setMagnifierEnabled(magnifierEnabled.value)
 }
 
 function cycleEdgeStyle() {
-  const styles: typeof globalEdgeStyle.value[] = ['straight', 'orthogonal', 'smart']
+  const styles: typeof globalEdgeStyle.value[] = ['diagonal', 'orthogonal']
   const idx = styles.indexOf(globalEdgeStyle.value)
   globalEdgeStyle.value = styles[(idx + 1) % styles.length]
 }
 
 function getEdgeStyle(edgeId: string): string {
-  return edgeStyleMap.value[edgeId] || 'straight'
+  return edgeStyleMap.value[edgeId] || 'diagonal'
 }
 
 function setEdgeStyle(style: string) {
@@ -2342,15 +2626,7 @@ function setEdgeStyle(style: string) {
 }
 
 function getEdgeColor(edge: { link_type: string; debugInfo?: { srcOffset: number } }): string {
-  // DEBUG: Color by port offset to visualize spreading
-  if (edge.debugInfo) {
-    const offset = edge.debugInfo.srcOffset
-    if (offset < -10) return '#ef4444' // red - negative offset
-    if (offset > 10) return '#22c55e'  // green - positive offset
-    if (offset !== 0) return '#f59e0b' // orange - small offset
-    // offset === 0 falls through to default
-  }
-  // link_type now stores the color directly, or defaults to gray
+  // link_type stores the color directly, or defaults to gray
   const color = edge.link_type
   if (color && color.startsWith('#')) return color
   return '#94a3b8'
@@ -2363,10 +2639,7 @@ function getArrowMarkerId(color: string): string {
 
 function changeEdgeColor(color: string) {
   if (selectedEdge.value) {
-    const edge = store.edges.find(e => e.id === selectedEdge.value)
-    if (edge) {
-      edge.link_type = color
-    }
+    store.updateEdgeLinkType(selectedEdge.value, color)
   }
 }
 
@@ -2388,9 +2661,9 @@ async function initTypstRenderer() {
     try {
       const { createTypstRenderer } = await import('@myriaddreamin/typst.ts')
       typstRenderer = await createTypstRenderer()
-      console.log('Typst renderer initialized')
+      canvasLogger.info('Typst renderer initialized')
     } catch (e) {
-      console.warn('Typst renderer failed to load:', e)
+      canvasLogger.warn('Typst renderer failed to load:', e)
     }
   })()
   return typstInitPromise
@@ -2441,8 +2714,8 @@ function renderMarkdown(content: string | null): string {
     return markdownCache.get(content)!
   }
 
-  const preview = content.slice(0, 2000)
-  let html = marked.parse(preview) as string
+  // Render full content (no truncation)
+  let html = marked.parse(content) as string
 
   // Post-process to handle mermaid code blocks
   const mermaidRegex = /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g
@@ -2665,12 +2938,12 @@ function toggleNodeAutoFit(nodeId: string) {
   const node = store.nodes.find(n => n.id === nodeId)
   if (node) {
     node.auto_fit = !node.auto_fit
-    // Only applies on next save, no immediate resize
+    // Immediately fit the node to content when enabling
+    if (node.auto_fit) {
+      // Small delay to ensure mermaid content is rendered
+      setTimeout(() => fitNodeToContent(nodeId), 100)
+    }
   }
-}
-
-async function deleteNode(nodeId: string) {
-  await store.deleteNode(nodeId)
 }
 
 async function deleteSelectedNodes() {
@@ -2718,18 +2991,18 @@ function onContextMenu(e: MouseEvent) {
           type="text"
           placeholder="Ask about the graph..."
           class="llm-input"
+          :disabled="isGraphLLMLoading"
           @keydown.enter="sendGraphPrompt"
           @keydown.up="onPromptKeydown"
           @keydown.down="onPromptKeydown"
-          :disabled="isGraphLLMLoading"
         />
-        <button class="llm-settings-btn" @click="showLLMSettings = !showLLMSettings" :class="{ active: showLLMSettings }" title="Settings">
+        <button class="llm-settings-btn" :class="{ active: showLLMSettings }" title="Settings" @click="showLLMSettings = !showLLMSettings">
           S
         </button>
-        <button class="llm-clear-btn" @click="clearConversation" title="Clear conversation memory" :class="{ active: conversationHistory.length > 0 }">
+        <button class="llm-clear-btn" title="Clear conversation memory" :class="{ active: conversationHistory.length > 0 }" @click="clearConversation">
           {{ conversationHistory.length || 'C' }}
         </button>
-        <button v-if="!agentRunning" class="llm-send" @click="sendGraphPrompt" :disabled="isGraphLLMLoading || !graphPrompt.trim()">
+        <button v-if="!agentRunning" class="llm-send" :disabled="isGraphLLMLoading || !graphPrompt.trim()" @click="sendGraphPrompt">
           {{ isGraphLLMLoading ? '...' : 'Go' }}
         </button>
         <button v-else class="llm-stop" @click="stopAgent">Stop</button>
@@ -2773,6 +3046,8 @@ function onContextMenu(e: MouseEvent) {
     <div
       ref="canvasRef"
       class="canvas-viewport"
+      :class="{ panning: isPanning }"
+      :style="{ backgroundPosition: offsetX + 'px ' + offsetY + 'px', backgroundSize: (24 * scale) + 'px ' + (24 * scale) + 'px' }"
       @wheel="onWheel"
       @mousedown="onCanvasMouseDown"
       @mousemove="onCanvasMouseMove"
@@ -2780,17 +3055,15 @@ function onContextMenu(e: MouseEvent) {
       @mouseleave="onCanvasMouseLeave"
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
-      :class="{ panning: isPanning }"
-      :style="{ backgroundPosition: offsetX + 'px ' + offsetY + 'px', backgroundSize: (24 * scale) + 'px ' + (24 * scale) + 'px' }"
     >
     <div class="canvas-content" :style="{ transform }">
       <!-- SVG for edges -->
       <svg class="edges-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;">
         <defs>
-          <marker v-for="color in edgeColorPalette" :key="color.value" :id="getArrowMarkerId(color.value)" viewBox="0 0 10 10" markerWidth="5" markerHeight="5" refX="0" refY="5" orient="auto">
+          <marker v-for="color in edgeColorPalette" :id="getArrowMarkerId(color.value)" :key="color.value" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="10" refY="5" orient="auto">
             <path d="M0,0 L10,5 L0,10 z" :fill="color.value" />
           </marker>
-          <marker id="arrow-selected" viewBox="0 0 10 10" markerWidth="5" markerHeight="5" refX="0" refY="5" orient="auto">
+          <marker id="arrow-selected" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="10" refY="5" orient="auto">
             <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6" />
           </marker>
         </defs>
@@ -2830,15 +3103,28 @@ function onContextMenu(e: MouseEvent) {
               class="edge-trunk"
               pointer-events="none"
             />
+            <!-- Glow effect for selected edge -->
+            <path
+              v-if="selectedEdge === edge.id"
+              :d="edge.path"
+              :stroke="getEdgeColor(edge)"
+              :stroke-width="(edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth) + 6"
+              stroke-linecap="round"
+              fill="none"
+              class="edge-glow"
+              opacity="0.3"
+              pointer-events="none"
+            />
             <!-- Visible edge path (branch for bundled, full path for unbundled) -->
             <path
               :d="edge.path"
-              :stroke="selectedEdge === edge.id ? '#3b82f6' : getEdgeColor(edge)"
-              :stroke-width="selectedEdge === edge.id ? 3 : (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth)"
-              :marker-end="edge.isBidirectional ? undefined : (selectedEdge === edge.id ? 'url(#arrow-selected)' : `url(#${getArrowMarkerId(getEdgeColor(edge))})`)"
+              :stroke="isEdgeHighlighted(edge) ? '#3b82f6' : getEdgeColor(edge)"
+              :stroke-width="selectedEdge === edge.id || isEdgeHighlighted(edge) ? (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth) + 2 : (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth)"
+              :marker-end="edge.isBidirectional ? undefined : `url(#${isEdgeHighlighted(edge) ? 'arrow-selected' : getArrowMarkerId(getEdgeColor(edge))})`"
               stroke-linecap="round"
               fill="none"
               class="edge-line-visible"
+              :class="{ 'edge-selected': selectedEdge === edge.id, 'edge-highlighted': isEdgeHighlighted(edge) }"
               pointer-events="none"
             />
             <text
@@ -2913,8 +3199,8 @@ function onContextMenu(e: MouseEvent) {
           <button
             v-if="store.selectedFrameId === frame.id && editingFrameId !== frame.id"
             class="frame-delete-btn"
-            @click.stop="deleteSelectedFrame"
             title="Delete frame"
+            @click.stop="deleteSelectedFrame"
           >x</button>
         </div>
         <div class="frame-resize-handle" @mousedown.stop="startFrameResize($event, frame.id)"></div>
@@ -2931,7 +3217,9 @@ function onContextMenu(e: MouseEvent) {
           dragging: draggingNode === node.id,
           resizing: resizingNode === node.id,
           editing: editingNodeId === node.id,
-          collapsed: isSemanticZoomCollapsed
+          collapsed: isSemanticZoomCollapsed,
+          'neighborhood-mode': neighborhoodMode,
+          'neighborhood-focus': neighborhoodMode && node.id === focusNodeId
         }"
         :style="{
           transform: `translate3d(${node.canvas_x}px, ${node.canvas_y}px, 0)`,
@@ -2940,6 +3228,8 @@ function onContextMenu(e: MouseEvent) {
           ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
         }"
         @mousedown="onNodeMouseDown($event, node.id)"
+        @mouseenter="hoveredNodeId = node.id"
+        @mouseleave="hoveredNodeId = null"
         @dblclick.stop="startEditing(node.id)"
       >
         <!-- Node title header -->
@@ -2961,20 +3251,20 @@ function onContextMenu(e: MouseEvent) {
           v-if="editingNodeId === node.id && !isSemanticZoomCollapsed"
           v-model="editContent"
           class="inline-editor"
+          placeholder="Write markdown..."
           @blur="saveEditing($event)"
           @keydown="onEditorKeydown"
-          placeholder="Write markdown..."
         ></textarea>
         <!-- View mode - hidden when collapsed for performance -->
         <div
           v-else-if="!isSemanticZoomCollapsed"
           class="node-content"
-          v-html="nodeRenderedContent[node.id] || ''"
           @click="handleContentClick"
+          v-html="nodeRenderedContent[node.id] || ''"
         ></div>
 
-        <!-- Color palette and options (shown when editing) -->
-        <div v-if="editingNodeId === node.id" class="node-color-bar" @mousedown.prevent>
+        <!-- Color palette and options (shown when selected or editing) -->
+        <div v-if="store.selectedNodeIds.includes(node.id) || editingNodeId === node.id" class="node-color-bar" @mousedown.prevent>
           <button
             v-for="color in nodeColors"
             :key="color.value || 'default'"
@@ -2987,8 +3277,8 @@ function onContextMenu(e: MouseEvent) {
           <button
             class="autofit-toggle"
             :class="{ active: node.auto_fit }"
-            @click.stop="toggleNodeAutoFit(node.id)"
             title="Auto-fit to content"
+            @click.stop="toggleNodeAutoFit(node.id)"
           >Fit</button>
         </div>
 
@@ -3004,13 +3294,13 @@ function onContextMenu(e: MouseEvent) {
 
       <!-- Empty state (positioned in viewport, not canvas) -->
 
-      <!-- Floating Node LLM bar (above editing node) -->
+      <!-- Floating Node LLM bar (above selected/editing node) -->
       <div
-        v-if="editingNodeId && store.getNode(editingNodeId)"
+        v-if="(store.selectedNodeIds.length === 1 || editingNodeId) && getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
         class="node-llm-bar-floating"
         :style="{
-          transform: `translate(${store.getNode(editingNodeId)!.canvas_x}px, ${store.getNode(editingNodeId)!.canvas_y - 40}px)`,
-          width: (store.getNode(editingNodeId)!.width || 200) + 'px'
+          transform: `translate(${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x}px, ${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y - 40}px)`,
+          width: (getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || 200) + 'px'
         }"
         @mousedown.stop
         @click.stop
@@ -3021,17 +3311,17 @@ function onContextMenu(e: MouseEvent) {
           placeholder="Ask AI to update this note..."
           class="node-llm-input"
           tabindex="0"
+          :disabled="isNodeLLMLoading"
           @mousedown.stop
           @keydown.enter.stop="sendNodePrompt"
           @keydown.stop
-          :disabled="isNodeLLMLoading"
         />
         <button
           class="node-llm-send"
           tabindex="0"
+          :disabled="isNodeLLMLoading || !nodePrompt.trim()"
           @mousedown.stop
           @click.stop="sendNodePrompt"
-          :disabled="isNodeLLMLoading || !nodePrompt.trim()"
         >
           {{ isNodeLLMLoading ? '...' : 'AI' }}
         </button>
@@ -3049,9 +3339,9 @@ function onContextMenu(e: MouseEvent) {
         <input
           type="text"
           :value="store.filteredEdges.find(e => e.id === selectedEdge)?.label || ''"
-          @input="changeEdgeLabel(($event.target as HTMLInputElement).value)"
           placeholder="e.g. depends on"
           class="edge-label-input"
+          @input="changeEdgeLabel(($event.target as HTMLInputElement).value)"
         />
         <label>Color:</label>
         <div class="edge-color-picker">
@@ -3076,17 +3366,17 @@ function onContextMenu(e: MouseEvent) {
         </div>
         <label>Direction:</label>
         <div class="direction-btns">
-          <button @click.stop="reverseEdge" title="Reverse direction">Flip</button>
+          <button title="Reverse direction" @click.stop="reverseEdge">Flip</button>
           <button
-            v-if="!isEdgeBidirectional(selectedEdge || '')"
-            @click.stop="makeBidirectional"
-            title="Make bidirectional"
-          >Both</button>
+            v-if="isEdgeBidirectional(selectedEdge || '')"
+            title="Make directional (one-way)"
+            @click.stop="makeUnidirectional"
+          >Directional</button>
           <button
             v-else
-            @click.stop="makeUnidirectional"
-            title="Make unidirectional"
-          >One</button>
+            title="Make non-directional (both ways)"
+            @click.stop="makeBidirectional"
+          >Non-directional</button>
         </div>
         <button class="insert-node-btn" @click="insertNodeOnEdge">Insert Node</button>
         <button class="delete-edge-btn" @click="deleteSelectedEdge">Delete Edge</button>
@@ -3095,46 +3385,49 @@ function onContextMenu(e: MouseEvent) {
 
     <!-- Controls -->
     <div class="zoom-controls">
-      <button @click="scale = Math.min(scale * 1.25, 3)" data-tooltip="Zoom In">
+      <button data-tooltip="Zoom In" @click="scale = Math.min(scale * 1.25, 3)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
       <span>{{ Math.round(scale * 100) }}%</span>
-      <button @click="scale = Math.max(scale * 0.8, 0.1)" data-tooltip="Zoom Out">
+      <button data-tooltip="Zoom Out" @click="scale = Math.max(scale * 0.8, 0.1)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
-      <button @click="resetView" data-tooltip="Reset View - Return to 100% zoom">
+      <button data-tooltip="Reset View - Return to 100% zoom" @click="resetView">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
       </button>
-      <button @click="fitToContent" data-tooltip="Fit to Content - Show all nodes">
+      <button data-tooltip="Fit to Content - Show all nodes" @click="fitToContent">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
       </button>
       <button
-        @click="gridLockEnabled = !gridLockEnabled"
         :class="{ active: gridLockEnabled }"
         data-tooltip="Snap to Grid - Align nodes to grid when dragging"
+        @click="gridLockEnabled = !gridLockEnabled"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       </button>
-      <button @click="autoLayoutNodes('grid')" data-tooltip="Grid Layout - Arrange nodes in a grid">
+      <button data-tooltip="Grid Layout - Arrange nodes in a grid" @click="autoLayoutNodes('grid')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="10" y="3" width="5" height="5"/><rect x="17" y="3" width="5" height="5"/><rect x="3" y="10" width="5" height="5"/><rect x="10" y="10" width="5" height="5"/><rect x="17" y="10" width="5" height="5"/></svg>
       </button>
-      <button @click="autoLayoutNodes('force')" data-tooltip="Force Layout - Arrange by connections">
+      <button data-tooltip="Force Layout - Arrange by connections" @click="autoLayoutNodes('force')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><line x1="8" y1="8" x2="10" y2="16"/><line x1="16" y1="8" x2="14" y2="16"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
       </button>
+      <button data-tooltip="Fit Nodes to Content - Resize all nodes to show full content" @click="fitAllNodesToContent">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>
+      </button>
       <button
-        @click="cycleEdgeStyle"
-        :class="{ active: globalEdgeStyle !== 'straight' }"
+        :class="{ active: true }"
         :disabled="isLargeGraph"
-        :data-tooltip="`Edge Style: ${globalEdgeStyle} - Click to cycle (straight → orthogonal → smart)`"
+        :data-tooltip="`Edge Style: ${globalEdgeStyle} - Click to cycle (diagonal → orthogonal)`"
+        @click="cycleEdgeStyle"
       >
-        <svg v-if="globalEdgeStyle === 'straight'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+        <svg v-if="globalEdgeStyle === 'diagonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L12 12 L20 12 L20 4"/></svg>
         <svg v-else-if="globalEdgeStyle === 'orthogonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L4 12 L20 12 L20 4"/></svg>
         <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 Q4 12 12 12 Q20 12 20 4"/></svg>
       </button>
       <button
-        @click="toggleEdgeBundling"
         :class="{ active: edgeBundling }"
         data-tooltip="Edge Bundling - Merge edges with shared endpoints"
+        @click="toggleEdgeBundling"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 4 L12 12 L4 20"/>
@@ -3143,16 +3436,33 @@ function onContextMenu(e: MouseEvent) {
         </svg>
       </button>
       <button
-        @click="toggleMagnifier"
         :class="{ active: magnifierEnabled }"
         data-tooltip="Magnifier - Show magnified view when zoomed out"
+        @click="toggleMagnifier"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="10" cy="10" r="7"/>
           <line x1="15" y1="15" x2="21" y2="21"/>
         </svg>
       </button>
-      <button @click="createFrameAtCenter" data-tooltip="Add Frame - Group selected nodes">
+      <button
+        :class="{ active: neighborhoodMode }"
+        data-tooltip="Neighborhood View - Show only selected node and direct neighbors (N)"
+        @mousedown.stop.prevent="toggleNeighborhoodMode()"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4"/>
+          <circle cx="4" cy="8" r="2"/>
+          <circle cx="20" cy="8" r="2"/>
+          <circle cx="4" cy="16" r="2"/>
+          <circle cx="20" cy="16" r="2"/>
+          <line x1="8" y1="10" x2="6" y2="9"/>
+          <line x1="16" y1="10" x2="18" y2="9"/>
+          <line x1="8" y1="14" x2="6" y2="15"/>
+          <line x1="16" y1="14" x2="18" y2="15"/>
+        </svg>
+      </button>
+      <button data-tooltip="Add Frame - Group selected nodes" @click="createFrameAtCenter">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
       </button>
     </div>
@@ -3218,25 +3528,25 @@ function onContextMenu(e: MouseEvent) {
       class="minimap"
       @click="onMinimapClick"
     >
-      <svg :width="MINIMAP_SIZE" :height="MINIMAP_SIZE">
+      <svg :width="minimap.MINIMAP_SIZE" :height="minimap.MINIMAP_SIZE">
         <!-- Nodes -->
         <rect
           v-for="node in store.filteredNodes"
           :key="'mm-' + node.id"
-          :x="(node.canvas_x - minimapBounds.minX) * minimapScale + MINIMAP_PADDING"
-          :y="(node.canvas_y - minimapBounds.minY) * minimapScale + MINIMAP_PADDING"
-          :width="Math.max((node.width || 200) * minimapScale, 3)"
-          :height="Math.max((node.height || 120) * minimapScale, 2)"
+          :x="minimap.getNodePosition(node).x"
+          :y="minimap.getNodePosition(node).y"
+          :width="minimap.getNodePosition(node).width"
+          :height="minimap.getNodePosition(node).height"
           :fill="node.color_theme || 'var(--text-muted)'"
-          :opacity="store.selectedNodeIds.includes(node.id) ? 1 : 0.6"
+          :opacity="minimap.isSelected(node.id) ? 1 : 0.6"
           rx="1"
         />
         <!-- Viewport indicator -->
         <rect
-          :x="minimapViewport.x"
-          :y="minimapViewport.y"
-          :width="minimapViewport.width"
-          :height="minimapViewport.height"
+          :x="minimap.viewport.x"
+          :y="minimap.viewport.y"
+          :width="minimap.viewport.width"
+          :height="minimap.viewport.height"
           fill="none"
           stroke="var(--primary-color)"
           stroke-width="2"
@@ -3648,6 +3958,20 @@ function onContextMenu(e: MouseEvent) {
   stroke-linejoin: round;
 }
 
+.edge-highlighted {
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
+}
+
+.edge-line-visible:not(.edge-highlighted) {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* Dim non-highlighted edges when a node is hovered/selected */
+.edges-layer:has(.edge-highlighted) .edge-line-visible:not(.edge-highlighted) {
+  opacity: 0.25;
+}
+
 .node-card {
   position: absolute;
   background: var(--bg-surface);
@@ -3664,6 +3988,16 @@ function onContextMenu(e: MouseEvent) {
   contain: layout style paint;
   backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Neighborhood mode transitions */
+.node-card.neighborhood-mode {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.node-card.neighborhood-focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-color-alpha), 0 4px 12px var(--shadow-md);
 }
 
 /* Semantic zoom: collapsed state when zoomed out */
@@ -3727,6 +4061,9 @@ function onContextMenu(e: MouseEvent) {
 .node-card.selected {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(59,130,246,0.2), 0 4px 12px var(--shadow-md);
+  /* Override paint containment so color bar below is visible */
+  contain: layout style;
+  overflow: visible;
 }
 
 .node-card.dragging,
@@ -3780,6 +4117,9 @@ function onContextMenu(e: MouseEvent) {
 
 .node-card.editing {
   cursor: text;
+  /* Override paint containment so color bar below is visible */
+  contain: layout style;
+  overflow: visible;
 }
 
 .node-llm-bar-floating {
@@ -3966,6 +4306,7 @@ function onContextMenu(e: MouseEvent) {
   padding-bottom: 20px;
   border-radius: 0 0 7px 7px;
   cursor: inherit;
+  overscroll-behavior: contain;
 }
 
 .node-content :deep(p) {
@@ -4147,7 +4488,7 @@ function onContextMenu(e: MouseEvent) {
 .edge-panel {
   position: absolute;
   top: 16px;
-  right: 16px;
+  right: 180px;
   width: 180px;
   background: var(--bg-surface-alt);
   border: 1px solid var(--border-default);
