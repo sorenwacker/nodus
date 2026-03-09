@@ -115,7 +115,7 @@ describe('routing module', () => {
       expect(uniqueYCoords.size).toBe(3) // All three should be different
     })
 
-    it('deduplicates edges between same node pair', () => {
+    it('routes all edges including multiple edges between same node pair', () => {
       const nodes: NodeRect[] = [
         { id: 'a', canvas_x: 0, canvas_y: 0, width: 200, height: 120 },
         { id: 'b', canvas_x: 300, canvas_y: 0, width: 200, height: 120 },
@@ -125,14 +125,18 @@ describe('routing module', () => {
 
       const edges: EdgeDef[] = [
         { id: 'e1', source_node_id: 'a', target_node_id: 'b' },
-        { id: 'e2', source_node_id: 'a', target_node_id: 'b' }, // Duplicate
-        { id: 'e3', source_node_id: 'b', target_node_id: 'a' }, // Reverse duplicate
+        { id: 'e2', source_node_id: 'a', target_node_id: 'b' }, // Same pair, different edge
+        { id: 'e3', source_node_id: 'b', target_node_id: 'a' }, // Reverse direction
       ]
 
       const result = routeAllEdges(edges, nodes, nodeMap)
 
-      // Should only have one edge routed
-      expect(result.size).toBe(1)
+      // All edges with unique IDs should be routed (no deduplication by node pair)
+      expect(result.size).toBe(3)
+
+      // Each edge should have a unique path due to port spreading
+      const paths = [...result.values()].map(r => r.svgPath)
+      expect(new Set(paths).size).toBe(3)
     })
   })
 })

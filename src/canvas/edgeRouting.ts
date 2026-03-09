@@ -11,6 +11,9 @@ export {
   type RoutedEdge,
   type Side,
   type PortAssignment,
+  type EdgeStyle,
+  type EdgeRouteParams,
+  type EdgeRouteResult,
 
   // Functions
   routeAllEdges,
@@ -27,7 +30,19 @@ export {
   cleanPath,
   findOrthogonalPath,
 
+  // New routing modules
+  GridTracker,
+  routeDiagonal,
+  routeOrthogonal,
+  validateDiagonalPath,
+  validateOrthogonalPath,
+  segmentIntersectsNode,
+  findObstacles,
+  findObstaclesInRegion,
+  OBSTACLE_MARGIN,
+
   // Constants
   PORT_SPACING,
-  CORNER_MARGIN
+  CORNER_MARGIN,
+  DEFAULT_GRID_SIZE
 } from './routing'

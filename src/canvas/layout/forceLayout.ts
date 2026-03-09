@@ -6,8 +6,9 @@ import {
   forceSimulation,
   forceLink,
   forceManyBody,
-  forceCenter,
   forceCollide,
+  forceX,
+  forceY,
   type Simulation,
   type SimulationNodeDatum,
   type SimulationLinkDatum,
@@ -39,6 +40,8 @@ export interface ForceLayoutOptions {
   collisionMultiplier?: number
   /** Number of simulation ticks */
   iterations?: number
+  /** Gravity strength - pulls nodes towards center (0 = none, 1 = strong) */
+  gravityStrength?: number
   /** Callback for each tick (for animation) */
   onTick?: (nodes: LayoutNode[]) => void
 }
@@ -61,10 +64,11 @@ export function applyForceLayout(
   const {
     centerX = 0,
     centerY = 0,
-    chargeStrength = -500,
-    linkDistance = 200,
-    collisionMultiplier = 1.2,
+    chargeStrength = -100,
+    linkDistance = 150,
+    collisionMultiplier = 1.0,  // Not used anymore - collision uses actual node sizes
     iterations = 300,
+    gravityStrength = 0.6,
     onTick,
   } = options
 
@@ -92,21 +96,47 @@ export function applyForceLayout(
       target: e.target,
     }))
 
-  // Calculate average node size for collision
-  const avgSize = simNodes.reduce((sum, n) => sum + Math.max(n.width, n.height), 0) / simNodes.length
+  // Find disconnected nodes (no edges)
+  const connectedIds = new Set<string>()
+  for (const e of edges) {
+    connectedIds.add(e.source)
+    connectedIds.add(e.target)
+  }
+  const disconnectedIds = new Set(simNodes.filter(n => !connectedIds.has(n.id)).map(n => n.id))
+  console.log('[FORCE] total nodes:', simNodes.length, 'connected:', connectedIds.size, 'disconnected:', disconnectedIds.size, 'center:', centerX, centerY)
 
-  // Create simulation
+  // Calculate average node diagonal for base spacing
+  const avgDiagonal = simNodes.reduce((sum, n) =>
+    sum + Math.sqrt(n.width ** 2 + n.height ** 2), 0) / simNodes.length
+
+  // Create simulation - keep nodes close together
   const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(simNodes)
     .force('link', forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks)
       .id(d => d.id)
       .distance(linkDistance)
-      .strength(0.5))
+      .strength(1.0))
     .force('charge', forceManyBody<SimNode>()
-      .strength(chargeStrength))
-    .force('center', forceCenter(centerX, centerY))
+      .strength(d => {
+        // Disconnected nodes don't repel - they only get pulled to center
+        if (disconnectedIds.has(d.id)) return 0
+        return chargeStrength
+      })
+      .distanceMin(20)
+      .distanceMax(300))
+    // Strong gravity to keep nodes clustered
+    .force('gravityX', forceX<SimNode>(centerX).strength(d =>
+      disconnectedIds.has(d.id) ? gravityStrength : gravityStrength * 0.5))
+    .force('gravityY', forceY<SimNode>(centerY).strength(d =>
+      disconnectedIds.has(d.id) ? gravityStrength : gravityStrength * 0.5))
     .force('collide', forceCollide<SimNode>()
-      .radius(d => Math.max(d.width, d.height) * collisionMultiplier / 2)
-      .strength(0.8))
+      .radius(d => {
+        // Use actual node diagonal / 2 as collision radius
+        // This is the minimum to prevent overlap, plus small gap for edges
+        const diagonal = Math.sqrt(d.width ** 2 + d.height ** 2)
+        return diagonal / 2 + 30  // 30px gap for edge routing
+      })
+      .strength(1.0)
+      .iterations(4))
 
   // Run simulation
   if (onTick) {

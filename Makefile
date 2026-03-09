@@ -1,7 +1,7 @@
 # Nodus Makefile
 # Development workflow automation
 
-.PHONY: help install dev build test clean docker-dev docker-build lint fmt audit
+.PHONY: help install dev build test clean docker-dev docker-build lint fmt audit kill
 
 # Default target
 help:
@@ -38,7 +38,7 @@ docker-build:
 # =============================================================================
 
 dev:
-	npm run tauri:dev
+	npm run tauri dev
 
 docker-dev:
 	docker-compose up dev
@@ -110,10 +110,10 @@ audit-fix:
 # =============================================================================
 
 build:
-	npm run tauri:build
+	npm run tauri build
 
 build-debug:
-	npm run tauri:build -- --debug
+	npm run tauri build -- --debug
 
 # =============================================================================
 # Database
@@ -161,3 +161,12 @@ release-minor:
 release-major:
 	npm version major
 	cd src-tauri && cargo set-version --bump major
+
+# =============================================================================
+# Utilities
+# =============================================================================
+
+kill:
+	pkill -f vite || true
+	pkill -f "tauri dev" || true
+	@echo "Dev servers stopped"

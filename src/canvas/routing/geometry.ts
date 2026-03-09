@@ -4,10 +4,14 @@
 
 import type { Point, NodeRect, Side } from './types'
 
-export const CORNER_MARGIN = 12
+export const CORNER_MARGIN = 8
 
 /**
  * Determine which side of a node faces another point
+ *
+ * Takes node aspect ratio into account - wider nodes prefer left/right,
+ * taller nodes prefer top/bottom. This provides more port space and
+ * reduces crossings.
  */
 export function getSide(node: NodeRect, targetX: number, targetY: number): Side {
   const w = node.width || 200
@@ -17,7 +21,12 @@ export function getSide(node: NodeRect, targetX: number, targetY: number): Side 
   const dx = targetX - cx
   const dy = targetY - cy
 
-  if (Math.abs(dx) > Math.abs(dy)) {
+  // Normalize by node dimensions to account for aspect ratio
+  // This makes wider nodes prefer left/right, taller nodes prefer top/bottom
+  const normalizedDx = Math.abs(dx) / w
+  const normalizedDy = Math.abs(dy) / h
+
+  if (normalizedDx > normalizedDy) {
     return dx > 0 ? 'right' : 'left'
   }
   return dy > 0 ? 'bottom' : 'top'
@@ -35,15 +44,19 @@ export function getPortPoint(node: NodeRect, side: Side, offset: number): Point 
   const maxOffsetY = (h / 2) - CORNER_MARGIN
   const maxOffsetX = (w / 2) - CORNER_MARGIN
 
+  // Clamp offset to available space
+  const clampedY = Math.max(-maxOffsetY, Math.min(maxOffsetY, offset))
+  const clampedX = Math.max(-maxOffsetX, Math.min(maxOffsetX, offset))
+
   switch (side) {
     case 'right':
-      return { x: node.canvas_x + w, y: cy + Math.max(-maxOffsetY, Math.min(maxOffsetY, offset)) }
+      return { x: node.canvas_x + w, y: cy + clampedY }
     case 'left':
-      return { x: node.canvas_x, y: cy + Math.max(-maxOffsetY, Math.min(maxOffsetY, offset)) }
+      return { x: node.canvas_x, y: cy + clampedY }
     case 'bottom':
-      return { x: cx + Math.max(-maxOffsetX, Math.min(maxOffsetX, offset)), y: node.canvas_y + h }
+      return { x: cx + clampedX, y: node.canvas_y + h }
     case 'top':
-      return { x: cx + Math.max(-maxOffsetX, Math.min(maxOffsetX, offset)), y: node.canvas_y }
+      return { x: cx + clampedX, y: node.canvas_y }
   }
 }
 

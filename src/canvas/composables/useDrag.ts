@@ -2,7 +2,7 @@
  * Drag composable
  * Handles node dragging with multi-select support
  */
-import { ref, type Ref } from 'vue'
+import { ref } from 'vue'
 
 interface DragState {
   nodeId: string
@@ -11,12 +11,6 @@ interface DragState {
   nodeStartX: number
   nodeStartY: number
   otherNodes: Array<{ id: string; startX: number; startY: number }>
-}
-
-interface NodePosition {
-  id: string
-  canvas_x: number
-  canvas_y: number
 }
 
 export function useDrag() {

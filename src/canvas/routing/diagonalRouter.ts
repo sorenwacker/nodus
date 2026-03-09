@@ -45,12 +45,13 @@ export interface DiagonalRouteParams {
 const MIN_DIAG_DIST = 10
 
 // Minimum orthogonal segment length before/after diagonal
-// Should be at least 4x arrow marker size (6px * 4 = 24px) for clean visual separation
-const MIN_ORTHO_SEGMENT = 24
+// Must be longer than arrow for clean entry/exit
+const MIN_ORTHO_SEGMENT = 40
 
 /**
  * Calculate diagonal path points with offset
- * Ensures minimum orthogonal segment length before diagonal starts
+ * Ensures minimum orthogonal segment length BOTH before and after diagonal
+ * while maintaining strict 45-degree diagonal angle
  */
 function calculateDiagonalPoints(
   startStandoff: Point,
@@ -69,24 +70,49 @@ function calculateDiagonalPoints(
   let p2: Point
 
   if (isHorizDominant) {
+    // For 45-degree diagonal: diagonal horizontal distance = vertical distance
     const diagDist = absDy
-    // Calculate ideal position, then enforce minimum orthogonal segment
-    let orthoSegment = (absDx - diagDist) / 2
-    // Ensure minimum orthogonal segment at start (before diagonal)
-    orthoSegment = Math.max(orthoSegment, MIN_ORTHO_SEGMENT)
+    // Total orthogonal space = total horizontal - diagonal horizontal
+    const totalOrtho = absDx - diagDist
 
-    const p1X = startStandoff.x + orthoSegment * signX + offset
+    // Position diagonal to leave MIN_ORTHO_SEGMENT at END (for arrow)
+    // Start orthogonal gets whatever remains
+    let endOrtho = Math.min(MIN_ORTHO_SEGMENT, totalOrtho / 2)
+    let startOrtho = totalOrtho - endOrtho
+
+    // But also ensure start has minimum if possible
+    if (startOrtho < MIN_ORTHO_SEGMENT && totalOrtho >= MIN_ORTHO_SEGMENT) {
+      startOrtho = MIN_ORTHO_SEGMENT
+      endOrtho = totalOrtho - startOrtho
+    }
+
+    // Prioritize end segment for arrow visibility
+    endOrtho = Math.max(endOrtho, Math.min(MIN_ORTHO_SEGMENT, totalOrtho))
+
+    const p1X = startStandoff.x + startOrtho * signX + offset
 
     p1 = { x: p1X, y: startStandoff.y }
     p2 = { x: p1X + diagDist * signX, y: endStandoff.y }
   } else {
+    // For 45-degree diagonal: diagonal vertical distance = horizontal distance
     const diagDist = absDx
-    // Calculate ideal position, then enforce minimum orthogonal segment
-    let orthoSegment = (absDy - diagDist) / 2
-    // Ensure minimum orthogonal segment at start (before diagonal)
-    orthoSegment = Math.max(orthoSegment, MIN_ORTHO_SEGMENT)
+    // Total orthogonal space = total vertical - diagonal vertical
+    const totalOrtho = absDy - diagDist
 
-    const p1Y = startStandoff.y + orthoSegment * signY + offset
+    // Position diagonal to leave MIN_ORTHO_SEGMENT at END (for arrow)
+    let endOrtho = Math.min(MIN_ORTHO_SEGMENT, totalOrtho / 2)
+    let startOrtho = totalOrtho - endOrtho
+
+    // But also ensure start has minimum if possible
+    if (startOrtho < MIN_ORTHO_SEGMENT && totalOrtho >= MIN_ORTHO_SEGMENT) {
+      startOrtho = MIN_ORTHO_SEGMENT
+      endOrtho = totalOrtho - startOrtho
+    }
+
+    // Prioritize end segment for arrow visibility
+    endOrtho = Math.max(endOrtho, Math.min(MIN_ORTHO_SEGMENT, totalOrtho))
+
+    const p1Y = startStandoff.y + startOrtho * signY + offset
 
     p1 = { x: startStandoff.x, y: p1Y }
     p2 = { x: endStandoff.x, y: p1Y + diagDist * signY }

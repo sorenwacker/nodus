@@ -38,8 +38,8 @@ import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
 
 // Minimum orthogonal standoff distance from node edge
-// Should be at least 4x arrow marker size (6px * 4 = 24px) for clean visual separation
-const STANDOFF = 24
+// Must be longer than arrow (6px marker + 10px refX offset = ~16px) plus margin
+const STANDOFF = 40
 
 /**
  * Route all edges with proper port spreading, grid tracking, and obstacle avoidance
@@ -61,15 +61,53 @@ export function routeAllEdges(
   // Create grid tracker for edge overlap prevention
   const gridTracker = new GridTracker(PORT_SPACING)
 
-  // Sort edges to minimize crossings (top-to-bottom, left-to-right)
+  // Sort edges to minimize crossings
+  // Strategy: Group edges by direction (down, up, right, left), then by position
+  // This processes edges flowing in similar directions together, reducing crossings
   const sortedInfos = [...edgeInfos].sort((a, b) => {
-    const midAx = (a.source.canvas_x + a.target.canvas_x) / 2
-    const midAy = (a.source.canvas_y + a.target.canvas_y) / 2
-    const midBx = (b.source.canvas_x + b.target.canvas_x) / 2
-    const midBy = (b.source.canvas_y + b.target.canvas_y) / 2
+    const srcAx = a.source.canvas_x + (a.source.width || 200) / 2
+    const srcAy = a.source.canvas_y + (a.source.height || 120) / 2
+    const tgtAx = a.target.canvas_x + (a.target.width || 200) / 2
+    const tgtAy = a.target.canvas_y + (a.target.height || 120) / 2
 
-    if (Math.abs(midAy - midBy) > 50) return midAy - midBy
-    return midAx - midBx
+    const srcBx = b.source.canvas_x + (b.source.width || 200) / 2
+    const srcBy = b.source.canvas_y + (b.source.height || 120) / 2
+    const tgtBx = b.target.canvas_x + (b.target.width || 200) / 2
+    const tgtBy = b.target.canvas_y + (b.target.height || 120) / 2
+
+    // Calculate primary direction for each edge
+    const dxA = tgtAx - srcAx
+    const dyA = tgtAy - srcAy
+    const dxB = tgtBx - srcBx
+    const dyB = tgtBy - srcBy
+
+    // Classify into quadrants (0=right, 1=down, 2=left, 3=up)
+    const getQuadrant = (dx: number, dy: number) => {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        return dx > 0 ? 0 : 2  // Right or Left
+      } else {
+        return dy > 0 ? 1 : 3  // Down or Up
+      }
+    }
+
+    const quadA = getQuadrant(dxA, dyA)
+    const quadB = getQuadrant(dxB, dyB)
+
+    // Sort by quadrant first (process downward edges, then rightward, etc.)
+    if (quadA !== quadB) return quadA - quadB
+
+    // Within same quadrant, sort by source position
+    // For down/up edges: sort by source X (left to right)
+    // For left/right edges: sort by source Y (top to bottom)
+    if (quadA === 1 || quadA === 3) {
+      // Vertical edges: sort by X, then Y
+      if (Math.abs(srcAx - srcBx) > 30) return srcAx - srcBx
+      return srcAy - srcBy
+    } else {
+      // Horizontal edges: sort by Y, then X
+      if (Math.abs(srcAy - srcBy) > 30) return srcAy - srcBy
+      return srcAx - srcBx
+    }
   })
 
   // Route each edge

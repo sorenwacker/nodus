@@ -44,3 +44,22 @@ export interface PortAssignment {
   index: number
   total: number
 }
+
+export type EdgeStyle = 'diagonal' | 'orthogonal' | 'curved'
+
+export interface EdgeRouteParams {
+  startPort: Point
+  startStandoff: Point
+  endPort: Point
+  endStandoff: Point
+  sourceSide: Side
+  targetSide: Side
+  excludeIds: Set<string>
+  arrowOffset?: number
+}
+
+export interface EdgeRouteResult {
+  path: Point[]
+  svgPath: string
+  usedDetour?: boolean
+}

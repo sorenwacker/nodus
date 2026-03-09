@@ -40,6 +40,10 @@ fn main() {
             commands::watch_vault,
             commands::stop_watching,
             commands::import_vault,
+            commands::create_workspace,
+            commands::get_workspaces,
+            commands::delete_workspace,
+            commands::deduplicate_edges,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

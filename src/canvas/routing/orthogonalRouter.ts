@@ -96,7 +96,7 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   const dx = endStandoff.x - startStandoff.x
   const dy = endStandoff.y - startStandoff.y
   const isHorizontalStart = sourceSide === 'left' || sourceSide === 'right'
-
+  const isHorizontalEnd = targetSide === 'left' || targetSide === 'right'
 
   // Adjust end port for arrow head
   let endEdge = { ...endPort }
@@ -111,6 +111,66 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   let path: Point[]
   let svgPath: string
   let usedDetour = false
+
+  // ==========================================================================
+  // TRY SIMPLE PATHS FIRST (fewer segments = fewer crossings)
+  // ==========================================================================
+
+  // Case 1: STRAIGHT LINE - standoffs are aligned
+  // e.g., both exit bottom/top and have same X, or both exit left/right and have same Y
+  const alignedX = Math.abs(startStandoff.x - endStandoff.x) < 5
+  const alignedY = Math.abs(startStandoff.y - endStandoff.y) < 5
+
+  if (alignedX && !isHorizontalStart && !isHorizontalEnd) {
+    // Vertical straight line (top/bottom to top/bottom, same X)
+    const obs = findObstacles(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
+    if (obs.length === 0 && gridTracker.canPlace(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)) {
+      gridTracker.mark(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)
+      path = [startPort, startStandoff, endStandoff, endEdge]
+      svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+      return { path, svgPath, usedDetour: false }
+    }
+  }
+
+  if (alignedY && isHorizontalStart && isHorizontalEnd) {
+    // Horizontal straight line (left/right to left/right, same Y)
+    const obs = findObstacles(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
+    if (obs.length === 0 && gridTracker.canPlace(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)) {
+      gridTracker.mark(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)
+      path = [startPort, startStandoff, endStandoff, endEdge]
+      svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+      return { path, svgPath, usedDetour: false }
+    }
+  }
+
+  // Case 2: L-SHAPE (2 segments) - when source is horizontal and target is vertical (or vice versa)
+  // The corner point is where they naturally meet
+  if (isHorizontalStart !== isHorizontalEnd) {
+    // One exits horizontal, one exits vertical - perfect for L-shape
+    const corner: Point = isHorizontalStart
+      ? { x: endStandoff.x, y: startStandoff.y }  // horizontal first, then vertical
+      : { x: startStandoff.x, y: endStandoff.y }  // vertical first, then horizontal
+
+    const seg1Obs = findObstacles(startStandoff.x, startStandoff.y, corner.x, corner.y, nodes, excludeIds)
+    const seg2Obs = findObstacles(corner.x, corner.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
+
+    if (seg1Obs.length === 0 && seg2Obs.length === 0) {
+      const canPlace1 = gridTracker.canPlace(startStandoff.x, startStandoff.y, corner.x, corner.y)
+      const canPlace2 = gridTracker.canPlace(corner.x, corner.y, endStandoff.x, endStandoff.y)
+
+      if (canPlace1 && canPlace2) {
+        gridTracker.mark(startStandoff.x, startStandoff.y, corner.x, corner.y)
+        gridTracker.mark(corner.x, corner.y, endStandoff.x, endStandoff.y)
+        path = [startPort, startStandoff, corner, endStandoff, endEdge]
+        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${corner.x},${corner.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+        return { path, svgPath, usedDetour: false }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // FALLBACK: 3-segment path (U-shape or Z-shape)
+  // ==========================================================================
 
   if (isHorizontalStart) {
     // Start horizontal, then vertical, then horizontal

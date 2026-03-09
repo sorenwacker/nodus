@@ -9,7 +9,7 @@ import type { Edge } from '../../types'
 export type { Edge }
 
 export interface EdgeStyle {
-  type: 'straight' | 'curved' | 'orthogonal' | 'smart'
+  type: 'diagonal' | 'curved' | 'orthogonal'
 }
 
 export interface ComputedEdge {
@@ -102,7 +102,7 @@ export function useEdges(options: UseEdgesOptions) {
   const { nodes, edges, getNode, isLargeGraph, visibleNodeIds } = options
 
   // Global edge style
-  const globalStyle = ref<'straight' | 'curved' | 'orthogonal' | 'smart'>('straight')
+  const globalStyle = ref<'diagonal' | 'curved' | 'orthogonal'>('orthogonal')
 
   // Per-edge style overrides
   const styleOverrides = ref<Record<string, string>>({})
@@ -110,7 +110,7 @@ export function useEdges(options: UseEdgesOptions) {
   // Track offsets for parallel edges
   const parallelOffsets = new Map<string, number>()
 
-  const styles: Array<typeof globalStyle.value> = ['straight', 'orthogonal', 'smart']
+  const styles: Array<typeof globalStyle.value> = ['diagonal', 'orthogonal']
 
   function cycleStyle() {
     const idx = styles.indexOf(globalStyle.value)
@@ -175,13 +175,13 @@ export function useEdges(options: UseEdgesOptions) {
       }
 
       const style = isLargeGraph.value
-        ? 'straight'
+        ? 'diagonal'
         : (styleOverrides.value[edge.id] || globalStyle.value)
 
       let path = ''
       if (style === 'curved' && !isLargeGraph.value) {
         path = createCurvedPath(x1, y1, x2, y2)
-      } else if ((style === 'orthogonal' || style === 'smart') && !isLargeGraph.value) {
+      } else if (style === 'orthogonal' && !isLargeGraph.value) {
         const excludeIds = new Set([edge.source_node_id, edge.target_node_id])
         const pairKey = [edge.source_node_id, edge.target_node_id].sort().join('-')
         const existingOffset = parallelOffsets.get(pairKey) || 0

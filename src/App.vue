@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, computed, provide } from 'vue'
 import { useNodesStore } from './stores/nodes'
 import PixiCanvas from './canvas/PixiCanvas.vue'
+import { themeStorage } from './lib/storage'
 
 const store = useNodesStore()
 const showImportDialog = ref(false)
@@ -12,7 +13,7 @@ const importTarget = ref<'current' | 'new'>('new')
 const importWorkspaceName = ref('')
 const searchQuery = ref('')
 const showSearch = ref(false)
-const isDark = ref(localStorage.getItem('nodus-theme') === 'dark')
+const isDark = ref(themeStorage.isDark())
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
 
@@ -83,13 +84,18 @@ function showToast(message: string, type: 'error' | 'success' | 'info' = 'info')
 // Provide toast function to child components
 provide('showToast', showToast)
 
-function createNewWorkspace() {
+async function createNewWorkspace() {
   if (!newWorkspaceName.value.trim()) return
-  const ws = store.createWorkspace(newWorkspaceName.value.trim())
-  store.switchWorkspace(ws.id)
-  store.clearCanvas()
-  newWorkspaceName.value = ''
-  showWorkspaceDialog.value = false
+  try {
+    const ws = await store.createWorkspace(newWorkspaceName.value.trim())
+    store.switchWorkspace(ws.id)
+    store.clearCanvas()
+    newWorkspaceName.value = ''
+    showWorkspaceDialog.value = false
+  } catch (e) {
+    console.error('Failed to create workspace:', e)
+    showToast('Failed to create workspace: ' + e, 'error')
+  }
 }
 
 function openWorkspaceEditor() {
@@ -125,8 +131,9 @@ function deleteCurrentWorkspace() {
 
 function toggleTheme() {
   isDark.value = !isDark.value
-  document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light')
-  localStorage.setItem('nodus-theme', isDark.value ? 'dark' : 'light')
+  const theme = isDark.value ? 'dark' : 'light'
+  document.documentElement.setAttribute('data-theme', theme)
+  themeStorage.set(theme)
 }
 
 // Apply saved theme on load
@@ -203,7 +210,6 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  console.log('Nodus: App mounted, initializing store...')
   store.initialize()
   window.addEventListener('keydown', onKeydown)
 })
@@ -219,7 +225,7 @@ async function importVault() {
   try {
     // Create new workspace if requested
     if (importTarget.value === 'new') {
-      const ws = store.createWorkspace(importWorkspaceName.value.trim())
+      const ws = await store.createWorkspace(importWorkspaceName.value.trim())
       store.switchWorkspace(ws.id)
     }
 
@@ -256,22 +262,6 @@ async function openFolderDialog() {
   }
 }
 
-async function addNewNode() {
-  console.log('Creating new node...')
-  try {
-    const node = await store.createNode({
-      title: 'New Node',
-      node_type: 'note',
-      canvas_x: 100 + Math.random() * 300,
-      canvas_y: 100 + Math.random() * 300,
-    })
-    console.log('Node created:', node)
-    console.log('Filtered nodes:', store.filteredNodes.length)
-    store.selectNode(node.id)
-  } catch (e) {
-    console.error('Failed to create node:', e)
-  }
-}
 </script>
 
 <template>
@@ -289,18 +279,18 @@ async function addNewNode() {
               {{ ws.name }}
             </option>
           </select>
-          <button class="icon-btn" @click="openWorkspaceEditor" title="Edit Workspace">
+          <button class="icon-btn" title="Edit Workspace" @click="openWorkspaceEditor">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="icon-btn" @click="showWorkspaceDialog = true" title="New Workspace">
+          <button class="icon-btn" title="New Workspace" @click="showWorkspaceDialog = true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
         <div class="toolbar-divider"></div>
-        <button class="icon-btn" @click="undo" :disabled="undoStack.length === 0" title="Undo (Cmd+Z)">
+        <button class="icon-btn" :disabled="undoStack.length === 0" title="Undo (Cmd+Z)" @click="undo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
         </button>
-        <button class="icon-btn" @click="redo" :disabled="redoStack.length === 0" title="Redo (Cmd+Shift+Z)">
+        <button class="icon-btn" :disabled="redoStack.length === 0" title="Redo (Cmd+Shift+Z)" @click="redo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
       </div>
@@ -312,10 +302,10 @@ async function addNewNode() {
         </button>
       </div>
       <div class="toolbar-actions">
-        <button class="icon-btn" @click="showImportDialog = true" title="Import Vault">
+        <button class="icon-btn" title="Import Vault" @click="showImportDialog = true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
-        <button class="icon-btn theme-btn" @click="toggleTheme" :title="isDark ? 'Light mode' : 'Dark mode'">
+        <button class="icon-btn theme-btn" :title="isDark ? 'Light mode' : 'Dark mode'" @click="toggleTheme">
           <svg v-if="isDark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
           <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
@@ -378,7 +368,7 @@ async function addNewNode() {
 
           <div class="import-target-section">
             <label class="radio-label">
-              <input type="radio" v-model="importTarget" value="new" />
+              <input v-model="importTarget" type="radio" value="new" />
               <span>Create new workspace</span>
             </label>
             <input
@@ -390,7 +380,7 @@ async function addNewNode() {
             />
 
             <label class="radio-label">
-              <input type="radio" v-model="importTarget" value="current" />
+              <input v-model="importTarget" type="radio" value="current" />
               <span>Import into current workspace</span>
             </label>
           </div>
@@ -399,8 +389,8 @@ async function addNewNode() {
           <button class="cancel-btn" @click="showImportDialog = false">Cancel</button>
           <button
             class="import-btn"
-            @click="importVault"
             :disabled="!vaultPath.trim() || (importTarget === 'new' && !importWorkspaceName.trim())"
+            @click="importVault"
           >Import</button>
         </div>
       </div>
@@ -424,7 +414,7 @@ async function addNewNode() {
         </div>
         <div class="dialog-actions">
           <button class="cancel-btn" @click="showWorkspaceDialog = false">Cancel</button>
-          <button class="import-btn" @click="createNewWorkspace" :disabled="!newWorkspaceName.trim()">Create</button>
+          <button class="import-btn" :disabled="!newWorkspaceName.trim()" @click="createNewWorkspace">Create</button>
         </div>
       </div>
     </div>

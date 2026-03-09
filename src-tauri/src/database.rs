@@ -116,12 +116,21 @@ pub mod nodes {
 
     pub async fn get_by_file_path(pool: &DbPool, file_path: &str) -> Result<Option<Node>, DatabaseError> {
         let node = sqlx::query_as::<_, Node>(
-            "SELECT * FROM nodes WHERE file_path = ? AND deleted_at IS NULL"
+            "SELECT * FROM nodes WHERE file_path = ?"
         )
         .bind(file_path)
         .fetch_optional(pool)
         .await?;
         Ok(node)
+    }
+
+    /// Hard delete a node (completely remove from database)
+    pub async fn hard_delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
+        sqlx::query("DELETE FROM nodes WHERE id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
     }
 
     pub async fn create(pool: &DbPool, node: &Node) -> Result<(), DatabaseError> {
@@ -295,6 +304,84 @@ pub mod edges {
 
     pub async fn delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
         sqlx::query("DELETE FROM edges WHERE id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Remove duplicate edges, keeping only the first one for each source-target pair
+    pub async fn deduplicate(pool: &DbPool) -> Result<u64, DatabaseError> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM edges
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM edges
+                GROUP BY source_node_id, target_node_id
+            )
+            "#
+        )
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+}
+
+// Workspace CRUD operations
+pub mod workspaces {
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+    pub struct Workspace {
+        pub id: String,
+        pub name: String,
+        pub color: Option<String>,
+        pub vault_path: Option<String>,
+        pub created_at: i64,
+        pub updated_at: i64,
+    }
+
+    pub async fn get_all(pool: &DbPool) -> Result<Vec<Workspace>, DatabaseError> {
+        let workspaces = sqlx::query_as::<_, Workspace>(
+            "SELECT * FROM workspaces ORDER BY created_at"
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(workspaces)
+    }
+
+    pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Workspace>, DatabaseError> {
+        let workspace = sqlx::query_as::<_, Workspace>(
+            "SELECT * FROM workspaces WHERE id = ?"
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+        Ok(workspace)
+    }
+
+    pub async fn create(pool: &DbPool, workspace: &Workspace) -> Result<(), DatabaseError> {
+        sqlx::query(
+            r#"
+            INSERT INTO workspaces (id, name, color, vault_path, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#
+        )
+        .bind(&workspace.id)
+        .bind(&workspace.name)
+        .bind(&workspace.color)
+        .bind(&workspace.vault_path)
+        .bind(workspace.created_at)
+        .bind(workspace.updated_at)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
+        sqlx::query("DELETE FROM workspaces WHERE id = ?")
             .bind(id)
             .execute(pool)
             .await?;

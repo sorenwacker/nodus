@@ -84,10 +84,10 @@ async function deleteNode() {
     <div class="panel-content">
       <textarea
         v-model="editContent"
-        @input="updateContent"
         class="markdown-editor"
         placeholder="Write markdown here..."
         spellcheck="false"
+        @input="updateContent"
       ></textarea>
     </div>
 
@@ -196,6 +196,7 @@ async function deleteNode() {
   background: var(--bg-surface);
   resize: none;
   outline: none;
+  overscroll-behavior: contain;
 }
 
 .markdown-editor:focus {

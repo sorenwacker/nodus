@@ -4,6 +4,7 @@
  */
 import { cleanContent } from './utils'
 import { applyForceLayout } from '../layout'
+import { agentLogger } from '../../lib/logger'
 import type { Node, Edge } from '../../types'
 
 interface Store {
@@ -54,7 +55,7 @@ export async function executeTool(
     args = (rawArgs as Record<string, unknown>) || {}
   }
 
-  console.log(`Agent tool: ${name}`, args)
+  agentLogger.debug(`Tool: ${name}`, args)
   ctx.log(`> ${name}(${JSON.stringify(args).slice(0, 50)}...)`)
 
   const { store, snapToGrid, screenToCanvas } = ctx
@@ -281,7 +282,7 @@ export async function executeTool(
     }
 
     case 'auto_layout': {
-      let nodes = [...store.filteredNodes]
+      const nodes = [...store.filteredNodes]
       if (nodes.length === 0) return 'No nodes to layout'
 
       // Sort if requested
@@ -328,8 +329,6 @@ export async function executeTool(
         const positions = applyForceLayout(layoutNodes, layoutEdges, {
           centerX,
           centerY,
-          chargeStrength: -400,
-          linkDistance: 180,
           iterations: 300,
         })
         for (const node of nodes) {

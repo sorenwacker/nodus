@@ -6,6 +6,7 @@ import { ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
 import { generate, chat } from './ollama'
 import { agentTools } from './tools'
+import { llmStorage } from '../../lib/storage'
 
 const DEFAULT_SYSTEM_PROMPT = `You are a terse note-taker for a knowledge graph canvas.
 
@@ -32,15 +33,15 @@ RULES:
 - No ASCII art, no explanations`
 
 export function useLLM() {
-  // Settings (persisted to localStorage)
-  const model = ref(localStorage.getItem('nodus_llm_model') || 'llama3.2')
-  const contextLength = ref(parseInt(localStorage.getItem('nodus_llm_context') || '4096'))
-  const systemPrompt = ref(localStorage.getItem('nodus_llm_prompt') || DEFAULT_SYSTEM_PROMPT)
+  // Settings (persisted via llmStorage)
+  const model = ref(llmStorage.getModel())
+  const contextLength = ref(llmStorage.getContextLength())
+  const systemPrompt = ref(llmStorage.getSystemPrompt(DEFAULT_SYSTEM_PROMPT))
 
   // Persist settings
-  watch(model, (v) => localStorage.setItem('nodus_llm_model', v))
-  watch(contextLength, (v) => localStorage.setItem('nodus_llm_context', String(v)))
-  watch(systemPrompt, (v) => localStorage.setItem('nodus_llm_prompt', v))
+  watch(model, (v) => llmStorage.setModel(v))
+  watch(contextLength, (v) => llmStorage.setContextLength(v))
+  watch(systemPrompt, (v) => llmStorage.setSystemPrompt(v))
 
   // Agent state
   const isRunning = ref(false)
@@ -49,14 +50,14 @@ export function useLLM() {
   const conversationHistory = ref<ChatMessage[]>([])
 
   // Prompt history
-  const promptHistory = ref<string[]>(JSON.parse(localStorage.getItem('nodus-prompt-history') || '[]'))
+  const promptHistory = ref<string[]>(llmStorage.getPromptHistory())
   let historyIndex = -1
 
   function savePromptToHistory(prompt: string) {
     if (prompt.trim() && promptHistory.value[promptHistory.value.length - 1] !== prompt) {
       promptHistory.value.push(prompt)
       if (promptHistory.value.length > 50) promptHistory.value.shift()
-      localStorage.setItem('nodus-prompt-history', JSON.stringify(promptHistory.value))
+      llmStorage.setPromptHistory(promptHistory.value)
     }
     historyIndex = -1
   }

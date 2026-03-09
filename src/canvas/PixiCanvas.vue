@@ -174,12 +174,16 @@ watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
   if (newLen > 0 && !hasInitiallyCentered && !savedView) {
     hasInitiallyCentered = true
     setTimeout(fitToContent, 50)
+    // Render mermaid diagrams after initial load (use arrow fn to defer lookup)
+    setTimeout(() => renderMermaidDiagrams?.(), 200)
   } else if (newLen === 0 && !savedView) {
     // Empty workspace - center the grid
     hasInitiallyCentered = false
     setTimeout(centerGrid, 50)
-  } else if (newLen > 0) {
+  } else if (newLen > 0 && !hasInitiallyCentered) {
     hasInitiallyCentered = true
+    // Render mermaid diagrams after initial load (even with saved view)
+    setTimeout(() => renderMermaidDiagrams?.(), 200)
   }
 }, { immediate: true })
 
@@ -1292,7 +1296,7 @@ const edgeLines = computed(() => {
       : { x: targetCx, y: targetCy }
 
     // Get standoff points (edges leave nodes orthogonally)
-    const STANDOFF_DIST = 20
+    const STANDOFF_DIST = 40
     const startStandoff = getStandoff(startPort, sourceSide, STANDOFF_DIST)
     const endStandoff = getStandoff(endPort, targetSide, STANDOFF_DIST)
 
@@ -1320,6 +1324,10 @@ const edgeLines = computed(() => {
     const y1 = startPort.y
     const x2 = endPort.x
     const y2 = endPort.y
+
+    // Check if edge is too short for arrow (distance < 50px)
+    const edgeLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    const isShortEdge = edgeLength < 50
 
     // Get edge style - respect user choice
     const edgeStyle = edgeStyleMap.value[edge.id] || style
@@ -1395,6 +1403,7 @@ const edgeLines = computed(() => {
       link_type: edge.link_type,
       label: edge.label,
       isBidirectional,
+      isShortEdge,
       // Debug: port offset info
       debugInfo: routed?.debugInfo,
     }
@@ -2264,13 +2273,6 @@ async function onCanvasDoubleClick(e: MouseEvent) {
   })
 }
 
-// Reset view
-function resetView() {
-  scale.value = 1
-  offsetX.value = 0
-  offsetY.value = 0
-}
-
 // Animation state for layout
 let layoutAnimationId: number | null = null
 
@@ -2765,7 +2767,7 @@ function renderMarkdown(content: string | null): string {
 
   // Only schedule mermaid render if there are uncached diagrams
   if (needsMermaidRender) {
-    setTimeout(renderMermaidDiagrams, 50)
+    setTimeout(() => renderMermaidDiagrams?.(), 50)
   }
 
   // Schedule Typst render if needed
@@ -2804,17 +2806,27 @@ let mermaidLoaded = false
 let mermaidApi: any = null
 const mermaidCache = new Map<string, string>() // code -> svg
 let mermaidRenderPending = false
+let mermaidRenderQueued = false
 
 async function renderMermaidDiagrams() {
-  // Debounce: prevent multiple concurrent renders
-  if (mermaidRenderPending) return
+  // If already rendering, queue another render for when it's done
+  if (mermaidRenderPending) {
+    mermaidRenderQueued = true
+    return
+  }
   mermaidRenderPending = true
+  mermaidRenderQueued = false
 
   await nextTick()
 
   const elements = document.querySelectorAll('.mermaid')
   if (elements.length === 0) {
     mermaidRenderPending = false
+    // Check if another render was queued
+    if (mermaidRenderQueued) {
+      mermaidRenderQueued = false
+      setTimeout(renderMermaidDiagrams, 50)
+    }
     return
   }
 
@@ -2878,6 +2890,12 @@ async function renderMermaidDiagrams() {
   }
 
   mermaidRenderPending = false
+
+  // Check if another render was queued while we were rendering
+  if (mermaidRenderQueued) {
+    mermaidRenderQueued = false
+    setTimeout(renderMermaidDiagrams, 50)
+  }
 }
 
 // Track mermaid code for re-rendering (only changes when actual mermaid content changes)
@@ -2934,16 +2952,9 @@ function updateNodeColor(nodeId: string, color: string | null) {
   }
 }
 
-function toggleNodeAutoFit(nodeId: string) {
-  const node = store.nodes.find(n => n.id === nodeId)
-  if (node) {
-    node.auto_fit = !node.auto_fit
-    // Immediately fit the node to content when enabling
-    if (node.auto_fit) {
-      // Small delay to ensure mermaid content is rendered
-      setTimeout(() => fitNodeToContent(nodeId), 100)
-    }
-  }
+// One-shot fit to content (does NOT enable auto_fit)
+function fitNodeNow(nodeId: string) {
+  setTimeout(() => fitNodeToContent(nodeId), 50)
 }
 
 async function deleteSelectedNodes() {
@@ -3120,7 +3131,7 @@ function onContextMenu(e: MouseEvent) {
               :d="edge.path"
               :stroke="isEdgeHighlighted(edge) ? '#3b82f6' : getEdgeColor(edge)"
               :stroke-width="selectedEdge === edge.id || isEdgeHighlighted(edge) ? (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth) + 2 : (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth)"
-              :marker-end="edge.isBidirectional ? undefined : `url(#${isEdgeHighlighted(edge) ? 'arrow-selected' : getArrowMarkerId(getEdgeColor(edge))})`"
+              :marker-end="edge.isBidirectional || edge.isShortEdge ? undefined : `url(#${isEdgeHighlighted(edge) ? 'arrow-selected' : getArrowMarkerId(getEdgeColor(edge))})`"
               stroke-linecap="round"
               fill="none"
               class="edge-line-visible"
@@ -3276,9 +3287,8 @@ function onContextMenu(e: MouseEvent) {
           <span class="color-bar-sep"></span>
           <button
             class="autofit-toggle"
-            :class="{ active: node.auto_fit }"
-            title="Auto-fit to content"
-            @click.stop="toggleNodeAutoFit(node.id)"
+            title="Fit node to content"
+            @click.stop="fitNodeNow(node.id)"
           >Fit</button>
         </div>
 
@@ -3391,9 +3401,6 @@ function onContextMenu(e: MouseEvent) {
       <span>{{ Math.round(scale * 100) }}%</span>
       <button data-tooltip="Zoom Out" @click="scale = Math.max(scale * 0.8, 0.1)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      </button>
-      <button data-tooltip="Reset View - Return to 100% zoom" @click="resetView">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
       </button>
       <button data-tooltip="Fit to Content - Show all nodes" @click="fitToContent">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>

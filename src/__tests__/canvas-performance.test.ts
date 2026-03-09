@@ -92,7 +92,7 @@ describe('Canvas Performance', () => {
       for (let frame = 0; frame < iterations; frame++) {
         const start = performance.now()
         // Update all node positions (simulates pan/drag)
-        store.nodes.forEach((node, i) => {
+        store.nodes.forEach((node) => {
           node.canvas_x += 1
           node.canvas_y += 0.5
         })

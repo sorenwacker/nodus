@@ -2,6 +2,9 @@
 // Uses @myriaddreamin/typst.ts for WASM-based typesetting
 
 import { createTypstRenderer, type TypstRenderer } from '@myriaddreamin/typst.ts'
+import { createLogger } from './logger'
+
+const log = createLogger('Typst')
 
 let renderer: TypstRenderer | null = null
 let initPromise: Promise<void> | null = null
@@ -20,9 +23,9 @@ export async function initTypst(): Promise<void> {
   initPromise = (async () => {
     try {
       renderer = await createTypstRenderer()
-      console.log('Typst WASM renderer initialized')
+      log.info('WASM renderer initialized')
     } catch (error) {
-      console.error('Failed to initialize Typst renderer:', error)
+      log.error('Failed to initialize renderer:', error)
       throw error
     }
   })()
@@ -52,7 +55,7 @@ export async function renderMath(
   }
 
   if (!renderer) {
-    console.warn('Typst renderer not available')
+    log.warn('Renderer not available')
     return null
   }
 
@@ -84,7 +87,7 @@ export async function renderMath(
 
     return result
   } catch (error) {
-    console.error('Typst rendering error:', error)
+    log.error('Rendering error:', error)
     return null
   }
 }

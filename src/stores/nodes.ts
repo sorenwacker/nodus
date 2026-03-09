@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke, listen, readTextFile } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
+import { workspaceStorage } from '../lib/storage'
+import { storeLogger } from '../lib/logger'
 import type {
   Node,
   Edge,
@@ -15,28 +17,14 @@ import type {
 // Re-export types for consumers
 export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent }
 
-// Load workspaces from localStorage
-function loadWorkspacesFromStorage(): Workspace[] {
-  try {
-    const stored = localStorage.getItem('nodus-workspaces')
-    return stored ? JSON.parse(stored) : []
-  } catch {
-    return []
-  }
-}
-
-function loadCurrentWorkspaceFromStorage(): string | null {
-  return localStorage.getItem('nodus-current-workspace')
-}
-
 export const useNodesStore = defineStore('nodes', () => {
   const nodes = ref<Node[]>([])
   const edges = ref<Edge[]>([])
   const frames = ref<Frame[]>([])
   const selectedNodeIds = ref<string[]>([])
   const selectedFrameId = ref<string | null>(null)
-  const workspaces = ref<Workspace[]>(loadWorkspacesFromStorage())
-  const currentWorkspaceId = ref<string | null>(loadCurrentWorkspaceFromStorage())
+  const workspaces = ref<Workspace[]>(workspaceStorage.getAll())
+  const currentWorkspaceId = ref<string | null>(workspaceStorage.getCurrent())
   const loading = ref(false)
   const error = ref<string | null>(null)
   // Version counter to trigger edge re-routing when node positions/sizes change
@@ -71,16 +59,66 @@ export const useNodesStore = defineStore('nodes', () => {
     )
   })
 
+  // Sync localStorage workspaces to the database
+  // This ensures foreign key constraints are satisfied
+  async function syncWorkspacesToDatabase() {
+    interface DbWorkspace {
+      id: string
+      name: string
+      color: string | null
+      vault_path: string | null
+      created_at: number
+      updated_at: number
+    }
+
+    const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
+    const dbIds = new Set(dbWorkspaces.map(w => w.id))
+
+    // Create any localStorage workspaces that don't exist in the database
+    for (const ws of workspaces.value) {
+      if (!dbIds.has(ws.id)) {
+        storeLogger.info(`Syncing workspace to database: ${ws.name} (${ws.id})`)
+        await invoke('create_workspace', {
+          input: {
+            id: ws.id,
+            name: ws.name,
+            color: null,
+            vaultPath: null,
+          }
+        })
+      }
+    }
+  }
+
   async function initialize() {
     loading.value = true
     error.value = null
     try {
+      // Sync localStorage workspaces to database (for foreign key constraints)
+      await syncWorkspacesToDatabase()
+
       const [fetchedNodes, fetchedEdges] = await Promise.all([
         invoke<Node[]>('get_nodes'),
         invoke<Edge[]>('get_edges'),
       ])
       nodes.value = fetchedNodes
-      edges.value = fetchedEdges
+
+      // Deduplicate edges (keep first occurrence of each source-target pair)
+      // Also handles bidirectional duplicates (A->B and B->A count as same pair)
+      const seenPairs = new Set<string>()
+      const beforeCount = fetchedEdges.length
+      edges.value = fetchedEdges.filter(e => {
+        // Create canonical key (smaller ID first) to catch bidirectional duplicates
+        const ids = [e.source_node_id, e.target_node_id].sort()
+        const key = `${ids[0]}:${ids[1]}`
+        if (seenPairs.has(key)) return false
+        seenPairs.add(key)
+        return true
+      })
+      const removed = beforeCount - edges.value.length
+      if (removed > 0) {
+        storeLogger.info(`Initialize: deduplicated ${removed} edges (${beforeCount} -> ${edges.value.length})`)
+      }
     } catch (e) {
       error.value = String(e)
       console.error('Failed to load nodes:', e)
@@ -165,7 +203,6 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function updateNodeSize(id: string, width: number, height: number, pushOthers = false) {
-    console.log('updateNodeSize called:', id, width, height, 'pushOthers:', pushOthers)
     const node = nodes.value.find(n => n.id === id)
     if (node) {
       node.width = width
@@ -175,7 +212,6 @@ export const useNodesStore = defineStore('nodes', () => {
 
       // Push overlapping nodes away
       if (pushOthers) {
-        console.log('Calling pushOverlappingNodes...')
         pushOverlappingNodes(node)
       }
 
@@ -193,8 +229,6 @@ export const useNodesStore = defineStore('nodes', () => {
   function pushOverlappingNodes(sourceNode: Node, processed = new Set<string>()) {
     const PADDING = 15 // Minimum gap between nodes
     const MAX_ITERATIONS = 50 // Prevent infinite loops
-
-    console.log('pushOverlappingNodes called for:', sourceNode.id, 'size:', sourceNode.width, 'x', sourceNode.height)
 
     if (processed.size > MAX_ITERATIONS) return
     processed.add(sourceNode.id)
@@ -222,11 +256,7 @@ export const useNodesStore = defineStore('nodes', () => {
       const overlapX = sx < nx + nw + PADDING && sx + sw + PADDING > nx
       const overlapY = sy < ny + nh + PADDING && sy + sh + PADDING > ny
 
-      console.log('Checking overlap with:', node.id, 'overlapX:', overlapX, 'overlapY:', overlapY,
-        'source:', sx, sy, sw, sh, 'node:', nx, ny, nw, nh)
-
       if (overlapX && overlapY) {
-        console.log('OVERLAP DETECTED - pushing node:', node.id)
         // Calculate push direction (away from source node center)
         const ncx = nx + nw / 2
         const ncy = ny + nh / 2
@@ -406,30 +436,53 @@ export const useNodesStore = defineStore('nodes', () => {
     edges.value = edges.value.filter(e => e.id !== id)
   }
 
+  function updateEdgeLinkType(id: string, linkType: string) {
+    const idx = edges.value.findIndex(e => e.id === id)
+    if (idx !== -1) {
+      edges.value = edges.value.map(e =>
+        e.id === id ? { ...e, link_type: linkType } : e
+      )
+    }
+  }
+
   async function importVault(path: string, targetWorkspaceId?: string): Promise<Node[]> {
     loading.value = true
     try {
-      // Use provided workspace or current workspace
       const workspaceId = targetWorkspaceId ?? currentWorkspaceId.value
-      console.log('Importing vault:', path, 'to workspace:', workspaceId)
+      storeLogger.info(`Importing vault: ${path}`)
 
       const importedNodes = await invoke<Node[]>('import_vault', {
         path,
         workspaceId
       })
 
-      console.log('Imported nodes:', importedNodes.length)
+      storeLogger.info(`Imported ${importedNodes.length} nodes`)
       nodes.value.push(...importedNodes)
 
       // Fetch all edges to include newly created wikilink edges
       const fetchedEdges = await invoke<Edge[]>('get_edges')
       edges.value = fetchedEdges
-      console.log('Fetched edges:', fetchedEdges.length)
+
+      // Deduplicate edges (frontend only since backend already ran during import)
+      // Also handles bidirectional duplicates (A->B and B->A count as same pair)
+      const seenPairs = new Set<string>()
+      const beforeCount = edges.value.length
+      edges.value = edges.value.filter(e => {
+        const ids = [e.source_node_id, e.target_node_id].sort()
+        const key = `${ids[0]}:${ids[1]}`
+        if (seenPairs.has(key)) return false
+        seenPairs.add(key)
+        return true
+      })
+      const removed = beforeCount - edges.value.length
+      if (removed > 0) {
+        storeLogger.info(`Frontend deduplication removed ${removed} duplicate edges`)
+      }
 
       return importedNodes
     } catch (e) {
       error.value = String(e)
-      console.error('Import failed:', e)
+      storeLogger.error('Import failed:', e)
       throw e
     } finally {
       loading.value = false
@@ -466,35 +519,30 @@ export const useNodesStore = defineStore('nodes', () => {
 
     switch (event.change_type) {
       case 'Created': {
-        // New file detected - log for now, could auto-import later
-        console.log('New file detected:', filePath)
+        storeLogger.debug(`New file detected: ${filePath}`)
         break
       }
       case 'Modified': {
-        // Find node with this file_path and reload content
         const node = nodes.value.find(n => n.file_path === filePath)
         if (node && event.new_checksum && node.checksum !== event.new_checksum) {
-          console.log('File modified externally, reloading:', filePath)
+          storeLogger.debug(`File modified externally: ${filePath}`)
           try {
             const content = await readTextFile(filePath)
             node.markdown_content = content
             node.checksum = event.new_checksum
             node.updated_at = Date.now()
-            // Update database content (file already has correct content, just sync DB)
             await invoke<string | null>('update_node_content', { id: node.id, content })
           } catch (e) {
-            console.error('Failed to reload file content:', e)
-            // Still update checksum to avoid repeated reload attempts
+            storeLogger.error('Failed to reload file content:', e)
             node.checksum = event.new_checksum
           }
         }
         break
       }
       case 'Deleted': {
-        // Find node with this file_path and mark as orphaned
         const node = nodes.value.find(n => n.file_path === filePath)
         if (node) {
-          console.log('File deleted externally:', filePath)
+          storeLogger.debug(`File deleted externally: ${filePath}`)
           node.file_path = null
           node.updated_at = Date.now()
         }
@@ -505,16 +553,27 @@ export const useNodesStore = defineStore('nodes', () => {
 
   // Workspace management
   function saveWorkspacesToStorage() {
-    localStorage.setItem('nodus-workspaces', JSON.stringify(workspaces.value))
-    localStorage.setItem('nodus-current-workspace', currentWorkspaceId.value || '')
+    workspaceStorage.setAll(workspaces.value)
+    workspaceStorage.setCurrent(currentWorkspaceId.value)
   }
 
-  function createWorkspace(name: string): Workspace {
+  async function createWorkspace(name: string): Promise<Workspace> {
     const workspace: Workspace = {
       id: crypto.randomUUID(),
       name,
       created_at: Date.now(),
     }
+
+    // Create workspace in database first (for foreign key constraints)
+    await invoke('create_workspace', {
+      input: {
+        id: workspace.id,
+        name: workspace.name,
+        color: null,
+        vaultPath: null,
+      }
+    })
+
     workspaces.value.push(workspace)
     saveWorkspacesToStorage()
     return workspace
@@ -554,6 +613,36 @@ export const useNodesStore = defineStore('nodes', () => {
       e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
     )
     return before - edges.value.length
+  }
+
+  /**
+   * Deduplicate edges both in frontend and backend database
+   * Returns the number of duplicates removed
+   */
+  async function deduplicateEdges(): Promise<number> {
+    // Backend deduplication
+    let backendRemoved = 0
+    try {
+      backendRemoved = await invoke<number>('deduplicate_edges')
+      storeLogger.info(`Backend deduplication removed ${backendRemoved} edges`)
+    } catch (e) {
+      storeLogger.error('Backend deduplication failed:', e)
+    }
+
+    // Frontend deduplication (handles bidirectional duplicates)
+    const seenPairs = new Set<string>()
+    const beforeCount = edges.value.length
+    edges.value = edges.value.filter(e => {
+      const ids = [e.source_node_id, e.target_node_id].sort()
+      const key = `${ids[0]}:${ids[1]}`
+      if (seenPairs.has(key)) return false
+      seenPairs.add(key)
+      return true
+    })
+    const frontendRemoved = beforeCount - edges.value.length
+    storeLogger.info(`Frontend deduplication removed ${frontendRemoved} edges`)
+
+    return backendRemoved + frontendRemoved
   }
 
   // Frame management
@@ -656,6 +745,10 @@ export const useNodesStore = defineStore('nodes', () => {
       height: n.height || 120,
     }))
 
+    // Calculate centroid of current nodes to use as center
+    const centroidX = layoutNodes.reduce((sum, n) => sum + n.x, 0) / layoutNodes.length
+    const centroidY = layoutNodes.reduce((sum, n) => sum + n.y, 0) / layoutNodes.length
+
     const layoutEdges = filteredEdges.value
       .filter(e => {
         const nodeIdSet = new Set(targetNodes.map(n => n.id))
@@ -667,11 +760,11 @@ export const useNodesStore = defineStore('nodes', () => {
       }))
 
     const positions = applyForceLayout(layoutNodes, layoutEdges, {
-      centerX: options?.centerX ?? 400,
-      centerY: options?.centerY ?? 300,
-      chargeStrength: options?.chargeStrength ?? -400,
-      linkDistance: options?.linkDistance ?? 180,
-      iterations: 300,
+      centerX: options?.centerX ?? centroidX,
+      centerY: options?.centerY ?? centroidY,
+      chargeStrength: options?.chargeStrength,
+      linkDistance: options?.linkDistance,
+      iterations: 400,
     })
 
     // Update positions
@@ -711,6 +804,7 @@ export const useNodesStore = defineStore('nodes', () => {
     deleteNode,
     createEdge,
     deleteEdge,
+    updateEdgeLinkType,
     createFrame,
     updateFramePosition,
     updateFrameSize,
@@ -728,6 +822,7 @@ export const useNodesStore = defineStore('nodes', () => {
     renameWorkspace,
     clearCanvas,
     cleanupOrphanEdges,
+    deduplicateEdges,
     layoutNodes,
   }
 })

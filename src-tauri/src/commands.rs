@@ -169,6 +169,16 @@ pub async fn delete_edge(id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn deduplicate_edges() -> Result<u64, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let removed = database::edges::deduplicate(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    println!("Removed {} duplicate edges", removed);
+    Ok(removed)
+}
+
 /// Update node content. Returns the new checksum if file was written.
 #[tauri::command]
 pub async fn update_node_content(id: String, content: String) -> Result<Option<String>, String> {
@@ -297,10 +307,16 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         if file_path.extension().map_or(false, |ext| ext == "md") {
             let file_path_str = file_path.to_string_lossy().to_string();
 
-            // Check if this file is already imported (skip if exists)
-            if let Ok(Some(_existing)) = database::nodes::get_by_file_path(pool, &file_path_str).await {
-                skipped += 1;
-                continue; // Skip already imported files
+            // Check if this file is already imported
+            if let Ok(Some(existing)) = database::nodes::get_by_file_path(pool, &file_path_str).await {
+                if existing.deleted_at.is_some() {
+                    // Node was soft-deleted, hard delete it so we can re-import
+                    let _ = database::nodes::hard_delete(pool, &existing.id).await;
+                } else {
+                    // Node exists and is active, skip it
+                    skipped += 1;
+                    continue;
+                }
             }
 
             // Read file content
@@ -362,13 +378,27 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         }
     }
 
-    // Create edges for wikilinks
+    // Create edges for wikilinks (deduplicated)
     let now = chrono::Utc::now().timestamp();
     let mut edge_count = 0;
+    let mut seen_edges: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+
     for (source_id, links) in node_links {
-        for link in links {
-            if let Some(target_id) = title_to_id.get(&link.to_lowercase()) {
+        // Deduplicate links within the same source node
+        let unique_links: std::collections::HashSet<String> = links.into_iter()
+            .map(|l| l.to_lowercase())
+            .collect();
+
+        for link in unique_links {
+            if let Some(target_id) = title_to_id.get(&link) {
                 if source_id != *target_id {
+                    // Skip if we've already created this edge
+                    let edge_key = (source_id.clone(), target_id.clone());
+                    if seen_edges.contains(&edge_key) {
+                        continue;
+                    }
+                    seen_edges.insert(edge_key);
+
                     let edge = database::edges::Edge {
                         id: uuid::Uuid::new_v4().to_string(),
                         source_node_id: source_id.clone(),
@@ -386,7 +416,60 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         }
     }
 
-    println!("Import complete: {} nodes imported, {} skipped, {} edges created", nodes.len(), skipped, edge_count);
+    // Clean up any duplicate edges (from previous imports or database issues)
+    let duplicates_removed = database::edges::deduplicate(pool).await.unwrap_or(0);
+
+    println!("Import complete: {} nodes imported, {} skipped, {} edges created, {} duplicates removed",
+             nodes.len(), skipped, edge_count, duplicates_removed);
 
     Ok(nodes)
+}
+
+// ============================================================================
+// Workspace Commands
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct CreateWorkspaceInput {
+    pub id: String,
+    pub name: String,
+    pub color: Option<String>,
+    pub vault_path: Option<String>,
+}
+
+#[tauri::command]
+pub async fn create_workspace(input: CreateWorkspaceInput) -> Result<database::workspaces::Workspace, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    let now = chrono::Utc::now().timestamp();
+    let workspace = database::workspaces::Workspace {
+        id: input.id,
+        name: input.name,
+        color: input.color,
+        vault_path: input.vault_path,
+        created_at: now,
+        updated_at: now,
+    };
+
+    database::workspaces::create(pool, &workspace)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(workspace)
+}
+
+#[tauri::command]
+pub async fn get_workspaces() -> Result<Vec<database::workspaces::Workspace>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::workspaces::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_workspace(id: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::workspaces::delete(pool, &id)
+        .await
+        .map_err(|e| e.to_string())
 }

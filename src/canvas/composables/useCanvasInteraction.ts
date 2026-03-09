@@ -2,7 +2,7 @@
  * Canvas interaction composable
  * Handles pan, zoom, and coordinate transformations
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed } from 'vue'
 
 interface UseCanvasInteractionOptions {
   minScale?: number
