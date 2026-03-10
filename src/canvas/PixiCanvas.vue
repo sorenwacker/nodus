@@ -1701,6 +1701,9 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   const node = store.getNode(nodeId)
   if (!node) return
 
+  // Check if file content has changed (on-demand sync)
+  store.refreshNodeFromFile(nodeId)
+
   // Capture undo state before dragging
   pushUndo()
 

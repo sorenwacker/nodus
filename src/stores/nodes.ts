@@ -325,6 +325,30 @@ export const useNodesStore = defineStore('nodes', () => {
     return nodes.value.find(n => n.title.toLowerCase() === lowerTitle)
   }
 
+  // Check if node's file has changed and refresh content if needed
+  async function refreshNodeFromFile(id: string): Promise<boolean> {
+    const node = nodes.value.find(n => n.id === id)
+    if (!node?.file_path) return false
+
+    try {
+      const content = await readTextFile(node.file_path)
+      if (content !== node.markdown_content) {
+        storeLogger.debug(`File changed, refreshing: ${node.file_path}`)
+        node.markdown_content = content
+        node.updated_at = Date.now()
+        // Update in backend too
+        const newChecksum = await invoke<string | null>('update_node_content', { id, content })
+        if (newChecksum) {
+          node.checksum = newChecksum
+        }
+        return true
+      }
+    } catch (e) {
+      storeLogger.error('Failed to refresh from file:', e)
+    }
+    return false
+  }
+
   async function updateNodeContent(id: string, content: string) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
@@ -843,6 +867,7 @@ export const useNodesStore = defineStore('nodes', () => {
     updateNodeContent,
     updateNodeTitle,
     selectNode,
+    refreshNodeFromFile,
     createNode,
     deleteNode,
     createEdge,
