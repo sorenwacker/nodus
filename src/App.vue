@@ -34,7 +34,11 @@ function capturePositionSnapshot(): PositionSnapshot {
 }
 
 function pushUndo() {
-  undoStack.value.push(capturePositionSnapshot())
+  const snapshot = capturePositionSnapshot()
+  if (snapshot.positions.size === 0) {
+    return // Don't push empty snapshots
+  }
+  undoStack.value.push(snapshot)
   if (undoStack.value.length > MAX_UNDO) {
     undoStack.value.shift()
   }
@@ -42,7 +46,10 @@ function pushUndo() {
 }
 
 async function undo() {
-  if (undoStack.value.length === 0) return
+  if (undoStack.value.length === 0) {
+    showToast('Nothing to undo', 'info')
+    return
+  }
   redoStack.value.push(capturePositionSnapshot())
   const snapshot = undoStack.value.pop()!
   for (const [id, pos] of snapshot.positions) {

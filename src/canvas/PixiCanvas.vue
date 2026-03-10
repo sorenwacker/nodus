@@ -29,7 +29,14 @@ import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 
 // Undo injection for position changes
-const pushUndo = inject<() => void>('pushUndo', () => {})
+const injectedPushUndo = inject<(() => void) | undefined>('pushUndo')
+const pushUndo = () => {
+  if (injectedPushUndo) {
+    injectedPushUndo()
+  } else {
+    console.warn('pushUndo not provided - undo will not work')
+  }
+}
 
 // Configure marked
 marked.use({
