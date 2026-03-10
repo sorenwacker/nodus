@@ -39,6 +39,7 @@ export interface DiagonalRouteParams {
   excludeIds: Set<string>
   gridTracker: GridTracker
   arrowOffset?: number
+  skipGridCheck?: boolean
 }
 
 // Minimum diagonal distance for meaningful 45° segment

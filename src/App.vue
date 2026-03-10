@@ -84,6 +84,20 @@ function showToast(message: string, type: 'error' | 'success' | 'info' = 'info')
 // Provide toast function to child components
 provide('showToast', showToast)
 
+// Reset all nodes to default size
+async function resetAllNodeSizes() {
+  const count = store.filteredNodes.length
+
+  // Batch update - don't await each one
+  const updates = store.filteredNodes.map(node =>
+    store.updateNodeSize(node.id, 200, 120)
+  )
+  await Promise.all(updates)
+
+  store.nodeLayoutVersion++
+  showToast(`Reset ${count} node sizes to default`, 'info')
+}
+
 async function createNewWorkspace() {
   if (!newWorkspaceName.value.trim()) return
   try {
@@ -193,6 +207,11 @@ function onKeydown(e: KeyboardEvent) {
     } else if (store.selectedNodeId) {
       store.selectNode(null)
     }
+  }
+  // Shift+R: Reset all node sizes to default
+  if ((e.key === 'R' || e.key === 'r') && e.shiftKey && !isInput) {
+    e.preventDefault()
+    resetAllNodeSizes()
   }
   // Delete/Backspace: Delete selected nodes or frames (when not in input)
   if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {

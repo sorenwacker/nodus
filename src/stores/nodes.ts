@@ -759,12 +759,16 @@ export const useNodesStore = defineStore('nodes', () => {
         target: e.target_node_id,
       }))
 
+    // Adaptive iterations based on graph size
+    const nodeCount = layoutNodes.length
+    const iterations = nodeCount > 300 ? 150 : nodeCount > 100 ? 250 : 400
+
     const positions = applyForceLayout(layoutNodes, layoutEdges, {
       centerX: options?.centerX ?? centroidX,
       centerY: options?.centerY ?? centroidY,
       chargeStrength: options?.chargeStrength,
       linkDistance: options?.linkDistance,
-      iterations: 400,
+      iterations,
     })
 
     // Update positions
