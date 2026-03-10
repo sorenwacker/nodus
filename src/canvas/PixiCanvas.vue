@@ -11,6 +11,7 @@ import {
   getSide,
   getPortPoint,
   getStandoff,
+  getAngledStandoff,
   GridTracker,
   routeDiagonal,
   routeOrthogonal,
@@ -1348,10 +1349,15 @@ const edgeLines = computed(() => {
       ? getPortPoint(targetRect, targetSide, tgtOffset)
       : { x: targetCx, y: targetCy }
 
-    // Get standoff points (edges leave nodes orthogonally)
+    // Get standoff points with angled entry for natural flow
     const STANDOFF_DIST = 40
-    const startStandoff = getStandoff(startPort, sourceSide, STANDOFF_DIST)
-    const endStandoff = getStandoff(endPort, targetSide, STANDOFF_DIST)
+    const ANGLE_OFFSET = 12 // Perpendicular offset for angled entry
+    const rawStartStandoff = getStandoff(startPort, sourceSide, STANDOFF_DIST)
+    const rawEndStandoff = getStandoff(endPort, targetSide, STANDOFF_DIST)
+
+    // Apply angled offset based on edge direction (avoid 0-degree entries)
+    const startStandoff = getAngledStandoff(startPort, rawStartStandoff, sourceSide, rawEndStandoff, ANGLE_OFFSET)
+    const endStandoff = getAngledStandoff(endPort, rawEndStandoff, targetSide, rawStartStandoff, ANGLE_OFFSET)
 
     // Check if this edge is bidirectional (reverse edge exists)
     // Use store.filteredEdges, not the deduplicated edges array

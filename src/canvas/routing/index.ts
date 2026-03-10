@@ -8,7 +8,7 @@ export * from './types'
 
 // Re-export utilities
 export { pathToSvg } from './svgPath'
-export { getSide, getPortPoint, getStandoff, getNodeCenter, CORNER_MARGIN } from './geometry'
+export { getSide, getPortPoint, getStandoff, getAngledStandoff, getNodeCenter, CORNER_MARGIN } from './geometry'
 export { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING } from './portAssignment'
 export { createOrthogonalPath, cleanPath, findOrthogonalPath } from './pathBuilder'
 

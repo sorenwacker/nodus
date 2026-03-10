@@ -73,6 +73,33 @@ export function getStandoff(point: Point, side: Side, distance: number): Point {
 }
 
 /**
+ * Get angled standoff point for natural-looking edge entry
+ * Adds a perpendicular offset based on edge direction to avoid 0-degree entries
+ */
+export function getAngledStandoff(
+  port: Point,
+  standoff: Point,
+  side: Side,
+  incomingDirection: Point,
+  angleOffset: number = 15
+): Point {
+  // Calculate incoming angle relative to side normal
+  const dx = incomingDirection.x - standoff.x
+  const dy = incomingDirection.y - standoff.y
+
+  // Offset perpendicular to the side normal based on incoming direction
+  if (side === 'left' || side === 'right') {
+    // Horizontal sides: offset vertically based on vertical component of incoming direction
+    const offsetSign = dy > 0 ? 1 : dy < 0 ? -1 : 0
+    return { x: standoff.x, y: standoff.y + offsetSign * angleOffset }
+  } else {
+    // Vertical sides: offset horizontally based on horizontal component of incoming direction
+    const offsetSign = dx > 0 ? 1 : dx < 0 ? -1 : 0
+    return { x: standoff.x + offsetSign * angleOffset, y: standoff.y }
+  }
+}
+
+/**
  * Get center point of a node
  */
 export function getNodeCenter(node: NodeRect): Point {

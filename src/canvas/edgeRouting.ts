@@ -22,6 +22,7 @@ export {
   getSide,
   getPortPoint,
   getStandoff,
+  getAngledStandoff,
   getNodeCenter,
   analyzeEdges,
   assignPorts,
