@@ -338,7 +338,7 @@ export const useNodesStore = defineStore('nodes', () => {
     }
 
     try {
-      console.log('[refresh] Reading file:', node.file_path)
+      console.log('[refresh] Node file_path:', JSON.stringify(node.file_path), 'length:', node.file_path.length)
       const content = await readTextFile(node.file_path)
       console.log('[refresh] File read, length:', content.length, 'stored length:', node.markdown_content?.length)
       if (content !== node.markdown_content) {
