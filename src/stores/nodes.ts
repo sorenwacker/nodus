@@ -328,12 +328,21 @@ export const useNodesStore = defineStore('nodes', () => {
   // Check if node's file has changed and refresh content if needed
   async function refreshNodeFromFile(id: string): Promise<boolean> {
     const node = nodes.value.find(n => n.id === id)
-    if (!node?.file_path) return false
+    if (!node) {
+      console.log('[refresh] Node not found:', id)
+      return false
+    }
+    if (!node.file_path) {
+      console.log('[refresh] No file_path for node:', node.title)
+      return false
+    }
 
     try {
+      console.log('[refresh] Reading file:', node.file_path)
       const content = await readTextFile(node.file_path)
+      console.log('[refresh] File read, length:', content.length, 'stored length:', node.markdown_content?.length)
       if (content !== node.markdown_content) {
-        storeLogger.debug(`File changed, refreshing: ${node.file_path}`)
+        console.log('[refresh] Content changed, updating node')
         node.markdown_content = content
         node.updated_at = Date.now()
         // Update in backend too
@@ -342,9 +351,11 @@ export const useNodesStore = defineStore('nodes', () => {
           node.checksum = newChecksum
         }
         return true
+      } else {
+        console.log('[refresh] Content unchanged')
       }
     } catch (e) {
-      storeLogger.error('Failed to refresh from file:', e)
+      console.error('[refresh] Failed to read file:', e)
     }
     return false
   }
