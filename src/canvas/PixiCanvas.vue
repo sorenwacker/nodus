@@ -144,6 +144,18 @@ onMounted(() => {
       e.preventDefault()
       toggleNeighborhoodMode(store.selectedNodeIds[0])
     }
+
+    // Shift+R resets all node sizes to default
+    if ((e.key === 'R' || e.key === 'r') && e.shiftKey) {
+      e.preventDefault()
+      resetAllNodeSizes()
+    }
+
+    // Shift+E exports graph as YAML
+    if ((e.key === 'E' || e.key === 'e') && e.shiftKey) {
+      e.preventDefault()
+      exportGraphAsYaml()
+    }
   }
   window.addEventListener('keydown', handleKeydown)
 
@@ -157,6 +169,23 @@ onMounted(() => {
   if (!savedView) {
     centerGrid()
   }
+
+  // Render mermaid diagrams after mount (delayed to ensure DOM is ready)
+  setTimeout(() => renderMermaidDiagrams?.(), 500)
+
+  // Periodically check for unrendered mermaid diagrams
+  // Less frequent for large graphs to save CPU
+  const mermaidCheckInterval = store.filteredNodes.length > 200 ? 5000 : 2000
+  const mermaidInterval = setInterval(() => {
+    const unrendered = document.querySelectorAll('.mermaid:not(:has(svg))')
+    if (unrendered.length > 0) {
+      renderMermaidDiagrams?.()
+    }
+  }, mermaidCheckInterval)
+
+  onUnmounted(() => {
+    clearInterval(mermaidInterval)
+  })
 })
 
 // Center the grid so origin (0,0) is in the middle of the viewport
@@ -175,7 +204,7 @@ watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
     hasInitiallyCentered = true
     setTimeout(fitToContent, 50)
     // Render mermaid diagrams after initial load (use arrow fn to defer lookup)
-    setTimeout(() => renderMermaidDiagrams?.(), 200)
+    setTimeout(() => renderMermaidDiagrams?.(), 500)
   } else if (newLen === 0 && !savedView) {
     // Empty workspace - center the grid
     hasInitiallyCentered = false
@@ -183,7 +212,7 @@ watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
   } else if (newLen > 0 && !hasInitiallyCentered) {
     hasInitiallyCentered = true
     // Render mermaid diagrams after initial load (even with saved view)
-    setTimeout(() => renderMermaidDiagrams?.(), 200)
+    setTimeout(() => renderMermaidDiagrams?.(), 500)
   }
 }, { immediate: true })
 
@@ -199,7 +228,7 @@ const viewportHeight = ref(window.innerHeight)
 
 // Only render nodes visible in viewport (with margin for smooth scrolling)
 const visibleNodes = computed(() => {
-  const margin = 200 // Extra margin to prevent pop-in
+  const margin = 500 // Large margin to prevent edge flickering during pan/zoom
   const s = scale.value
   const ox = offsetX.value
   const oy = offsetY.value
@@ -225,8 +254,8 @@ const visibleNodes = computed(() => {
 // Set of visible node IDs for quick lookup
 const visibleNodeIds = computed(() => new Set(visibleNodes.value.map(n => n.id)))
 
-// Large graph threshold - disable expensive features
-const isLargeGraph = computed(() => store.filteredNodes.length > 200 || store.filteredEdges.length > 500)
+// Graph size thresholds - defined after displayNodes so they use actual displayed count
+// (moved below displayNodes definition)
 
 // Canvas element ref (needed early for layout functions)
 const canvasRef = ref<HTMLElement | null>(null)
@@ -269,6 +298,13 @@ const displayNodes = computed(() => {
   }
   return store.filteredNodes
 })
+
+// Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
+// In neighborhood mode, always use full routing since we have few nodes
+const isLargeGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 200 || store.filteredEdges.length > 500))
+const isVeryLargeGraph = computed(() => !neighborhoodMode.value && displayNodes.value.length > 500)
+const isHugeGraph = computed(() => !neighborhoodMode.value && displayNodes.value.length > 350)
+const isMassiveGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 300 || store.filteredEdges.length > 800))
 
 // Get visual node (with correct position accounting for neighborhood mode)
 function getVisualNode(nodeId: string) {
@@ -451,8 +487,8 @@ function layoutNeighborhood(focusId: string): boolean {
   return true
 }
 
-// Semantic zoom collapse disabled - nodes always show full content
-const isSemanticZoomCollapsed = computed(() => false)
+// Semantic zoom collapse - hide content for massive graphs when zoomed out
+const isSemanticZoomCollapsed = computed(() => isMassiveGraph.value && scale.value < 0.6)
 
 // Magnifying lens - shows when zoomed out far
 const MAGNIFIER_THRESHOLD = 0.4
@@ -633,55 +669,71 @@ function fitNodeToContent(nodeId: string) {
   const editorEl = cardEl.querySelector('.inline-editor') as HTMLTextAreaElement
   const headerEl = cardEl.querySelector('.node-header') as HTMLElement
 
-  const padding = 32
-  const headerHeight = headerEl?.offsetHeight || 36
   const minWidth = 180
   const minHeight = 80
+  const maxHeight = 800  // Reasonable max - can scroll if content is longer
+  const currentWidth = node.width || 200
 
   let width: number
   let height: number
 
   if (contentEl) {
-    // View mode: measure rendered content
-    // Temporarily remove size constraints to measure true content size
-    const oldWidth = cardEl.style.width
-    const oldHeight = cardEl.style.height
-    cardEl.style.width = 'auto'
-    cardEl.style.height = 'auto'
-    contentEl.style.overflow = 'visible'
+    // View mode: use scrollHeight which always returns full content height
+    const contentScrollHeight = contentEl.scrollHeight
+    const headerHeight = headerEl?.offsetHeight || 36
+    const border = 4  // 2px top + 2px bottom
 
-    // Measure actual content
-    const contentWidth = contentEl.scrollWidth
-    const contentHeight = contentEl.scrollHeight
+    // Check for fixed-size content that needs more width
+    let requiredWidth = currentWidth
+    const images = contentEl.querySelectorAll('img')
+    const mermaidSvgs = contentEl.querySelectorAll('.mermaid svg')
 
-    // Also check children for elements that might overflow
-    let maxChildRight = 0
-    let maxChildBottom = 0
-    const contentRect = contentEl.getBoundingClientRect()
-    for (let i = 0; i < contentEl.children.length; i++) {
-      const child = contentEl.children[i] as HTMLElement
-      const rect = child.getBoundingClientRect()
-      maxChildRight = Math.max(maxChildRight, rect.right - contentRect.left)
-      maxChildBottom = Math.max(maxChildBottom, rect.bottom - contentRect.top)
+    for (const img of images) {
+      const imgWidth = (img as HTMLImageElement).naturalWidth
+      if (imgWidth > 0) {
+        requiredWidth = Math.max(requiredWidth, Math.min(imgWidth + 24, 600))
+      }
+    }
+    for (const svg of mermaidSvgs) {
+      const svgWidth = (svg as SVGElement).getBoundingClientRect().width
+      if (svgWidth > 0) {
+        requiredWidth = Math.max(requiredWidth, Math.min(svgWidth + 24, 800))
+      }
     }
 
-    // Restore styles
-    cardEl.style.width = oldWidth
-    cardEl.style.height = oldHeight
-    contentEl.style.overflow = ''
+    width = Math.max(requiredWidth, minWidth)
+    height = Math.min(maxHeight, Math.max(contentScrollHeight + headerHeight + border, minHeight))
 
-    width = Math.max(contentWidth, maxChildRight, minWidth) + padding
-    height = Math.max(contentHeight, maxChildBottom, minHeight - headerHeight) + padding + headerHeight
+    console.log('[FIT]', nodeId, {
+      contentScrollHeight,
+      headerHeight,
+      border,
+      calculatedHeight: contentScrollHeight + headerHeight + border,
+      finalHeight: height,
+      currentNodeHeight: node.height,
+      widthChanged: width !== currentWidth,
+    })
   } else if (editorEl) {
-    // Edit mode: measure textarea scroll dimensions
-    // Temporarily auto-size to measure
-    const oldHeight = editorEl.style.height
+    // Edit mode: measure textarea content
+    // Save current style
+    const savedStyle = editorEl.style.cssText
+
+    // Temporarily auto-size
     editorEl.style.height = 'auto'
+    editorEl.style.overflow = 'hidden'
 
-    width = Math.max(editorEl.scrollWidth + padding, minWidth)
-    height = Math.max(editorEl.scrollHeight + padding + headerHeight, minHeight)
+    // Force reflow and measure
+    void editorEl.offsetHeight
+    const scrollHeight = editorEl.scrollHeight
 
-    editorEl.style.height = oldHeight
+    // Restore
+    editorEl.style.cssText = savedStyle
+
+    const headerHeight = headerEl?.offsetHeight || 36
+    const borderHeight = 4
+
+    width = currentWidth
+    height = Math.min(maxHeight, Math.max(scrollHeight + headerHeight + borderHeight, minHeight))
   } else {
     return
   }
@@ -715,6 +767,14 @@ function fitAllNodesToContent() {
     // Trigger edge re-routing after sizes change
     store.nodeLayoutVersion++
   }, 50)
+}
+
+// Reset all nodes to default size (200x120)
+async function resetAllNodeSizes() {
+  for (const node of store.filteredNodes) {
+    await store.updateNodeSize(node.id, 200, 120)
+  }
+  store.nodeLayoutVersion++
 }
 
 // Inline editing
@@ -1146,11 +1206,54 @@ const edgeLines = computed(() => {
     edges = edges.filter(e => neighborIds.has(e.source_node_id) && neighborIds.has(e.target_node_id))
   }
 
-  // For large graphs, only render edges connected to visible nodes
-  if (isLargeGraph.value) {
-    const visIds = visibleNodeIds.value
-    edges = edges.filter(e => visIds.has(e.source_node_id) || visIds.has(e.target_node_id))
+  // MASSIVE GRAPH OPTIMIZATION: Skip all expensive routing, use simple center-to-center lines
+  if (isMassiveGraph.value) {
+    // Build simple node lookup
+    const nodeMap = new Map(displayNodes.value.map(n => [n.id, n]))
+
+    return edges.map(edge => {
+      const source = nodeMap.get(edge.source_node_id)
+      const target = nodeMap.get(edge.target_node_id)
+      if (!source || !target) return null
+
+      const sw = source.width || 200
+      const sh = source.height || 120
+      const tw = target.width || 200
+      const th = target.height || 120
+
+      // Simple center-to-center coordinates
+      const x1 = source.canvas_x + sw / 2
+      const y1 = source.canvas_y + sh / 2
+      const x2 = target.canvas_x + tw / 2
+      const y2 = target.canvas_y + th / 2
+
+      // Simple straight line
+      const path = `M${x1},${y1} L${x2},${y2}`
+
+      return {
+        id: edge.id,
+        source_node_id: edge.source_node_id,
+        target_node_id: edge.target_node_id,
+        x1, y1, x2, y2,
+        path,
+        style: 'straight' as const,
+        strokeWidth: 1,
+        bundleSize: 1,
+        trunkPath: undefined,
+        trunkStrokeWidth: 3,
+        isTrunkOwner: false,
+        hitX1: x1, hitY1: y1, hitX2: x2, hitY2: y2,
+        link_type: edge.link_type,
+        label: edge.label,
+        isBidirectional: false,
+        isShortEdge: Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) < 50,
+        debugInfo: undefined,
+      }
+    }).filter(Boolean) as any[]
   }
+
+  // NOTE: Don't filter by visibleNodeIds here - that would make routing
+  // recalculate on every pan/zoom! Visibility filtering happens at render time.
 
   // Build node map for efficient lookup
   // IMPORTANT: Use actual heights for routing obstacle detection
@@ -1337,7 +1440,10 @@ const edgeLines = computed(() => {
     let path = ''
     const routed = routedEdges?.get(edge.id)
 
-    if (edgeStyle === 'curved') {
+    // For huge graphs (400+ nodes), use simple straight lines for performance
+    if (isHugeGraph.value) {
+      path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
+    } else if (edgeStyle === 'curved') {
       // Curved: port -> standoff -> bezier curve -> standoff -> port
       // Use grid tracker to offset control point and prevent overlapping curves
       const midX = (startStandoff.x + endStandoff.x) / 2
@@ -1408,6 +1514,21 @@ const edgeLines = computed(() => {
       debugInfo: routed?.debugInfo,
     }
   }).filter(Boolean)
+})
+
+// Visible edges - filtered for large graphs (cheap filter, runs on pan/zoom)
+const visibleEdgeLines = computed(() => {
+  // Don't filter during zoom to prevent flickering
+  if (!isLargeGraph.value || isZooming.value) return edgeLines.value
+
+  // Don't filter when zoomed in - edges can extend far and user expects to see them
+  if (scale.value > 0.8) return edgeLines.value
+
+  // For large graphs when zoomed out, only render edges where at least one node is visible
+  const visIds = visibleNodeIds.value
+  return edgeLines.value.filter(e =>
+    visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
+  )
 })
 
 // Transform for the canvas content
@@ -2560,7 +2681,7 @@ function fitToContent() {
     minX = Math.min(minX, node.canvas_x)
     minY = Math.min(minY, node.canvas_y)
     maxX = Math.max(maxX, node.canvas_x + (node.width || 200))
-    maxY = Math.max(maxY, node.canvas_y + 100)
+    maxY = Math.max(maxY, node.canvas_y + (node.height || 120))
   }
 
   const rect = canvasRef.value?.getBoundingClientRect()
@@ -2883,10 +3004,11 @@ async function renderMermaidDiagrams() {
     }
   }
 
-  // Only clear markdown cache and auto-fit if we actually rendered something new
+  // Only clear markdown cache if we actually rendered something new
   if (didRenderNew) {
     markdownCache.clear()
-    autoFitAllNodes()
+    // Note: Don't auto-fit here - it causes unexpected node resizing
+    // Users can manually fit nodes with the Fit button
   }
 
   mermaidRenderPending = false
@@ -2990,6 +3112,54 @@ function getNodeBackground(colorTheme: string | null): string | undefined {
 function onContextMenu(e: MouseEvent) {
   e.preventDefault()
 }
+
+// Export current graph/subgraph as YAML for debugging
+function exportGraphAsYaml() {
+  const nodes = displayNodes.value.map(n => ({
+    id: n.id,
+    title: n.title,
+    x: n.canvas_x,
+    y: n.canvas_y,
+    width: n.width || 200,
+    height: n.height || 120,
+  }))
+
+  const edges = edgeLines.value.map(e => ({
+    id: e.id,
+    source: e.source_node_id,
+    target: e.target_node_id,
+    path: e.path,
+    style: e.style,
+  }))
+
+  const yaml = `# Graph Export - ${new Date().toISOString()}
+# Nodes: ${nodes.length}, Edges: ${edges.length}
+# Neighborhood mode: ${neighborhoodMode.value}
+
+nodes:
+${nodes.map(n => `  - id: "${n.id}"
+    title: "${n.title?.replace(/"/g, '\\"') || 'Untitled'}"
+    x: ${n.x}
+    y: ${n.y}
+    width: ${n.width}
+    height: ${n.height}`).join('\n')}
+
+edges:
+${edges.map(e => `  - id: "${e.id}"
+    source: "${e.source}"
+    target: "${e.target}"
+    style: "${e.style}"
+    path: "${e.path}"`).join('\n')}
+`
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(yaml).then(() => {
+    console.log('[EXPORT] Graph YAML copied to clipboard')
+  })
+}
+
+// Expose export function globally for debugging
+;(window as any).exportGraphAsYaml = exportGraphAsYaml
 </script>
 
 <template>
@@ -3083,17 +3253,18 @@ function onContextMenu(e: MouseEvent) {
         <template v-if="isLargeGraph">
           <!-- Fast rendering: paths without hit areas or markers -->
           <path
-            v-for="edge in edgeLines"
+            v-for="edge in visibleEdgeLines"
             :key="edge.id"
             :d="edge.path"
-            :stroke="getEdgeColor(edge)"
-            :stroke-width="1"
+            :stroke="isEdgeHighlighted(edge) ? '#3b82f6' : getEdgeColor(edge)"
+            :stroke-width="isEdgeHighlighted(edge) ? 2.5 : 1"
             fill="none"
             class="edge-line-fast"
+            :class="{ 'edge-highlighted': isEdgeHighlighted(edge) }"
           />
         </template>
         <template v-else>
-          <g v-for="edge in edgeLines" :key="edge.id">
+          <g v-for="edge in visibleEdgeLines" :key="edge.id">
             <!-- Invisible wider hit area -->
             <path
               :d="edge.path"
@@ -3916,6 +4087,8 @@ function onContextMenu(e: MouseEvent) {
   backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
   contain: layout style;
+  /* Allow clicks to pass through to canvas-viewport */
+  pointer-events: none;
 }
 
 .canvas-viewport {
@@ -3995,6 +4168,8 @@ function onContextMenu(e: MouseEvent) {
   contain: layout style paint;
   backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
+  /* Re-enable pointer events (parent has none) */
+  pointer-events: auto;
 }
 
 /* Neighborhood mode transitions */
@@ -4009,11 +4184,12 @@ function onContextMenu(e: MouseEvent) {
 
 /* Semantic zoom: collapsed state when zoomed out */
 .node-card.collapsed {
-  min-height: 48px;
-  height: 48px !important;
   overflow: hidden;
   border-width: 3px;
   box-shadow: 0 3px 8px var(--shadow-md);
+  /* Center content vertically */
+  justify-content: center;
+  align-items: center;
 }
 
 .node-card.collapsed .node-header {
@@ -4025,6 +4201,9 @@ function onContextMenu(e: MouseEvent) {
   color: var(--text-main);
   letter-spacing: -0.3px;
   text-shadow: 0 1px 2px var(--shadow-sm);
+  /* Center text */
+  text-align: center;
+  width: 100%;
 }
 
 .node-card.collapsed .node-content,
@@ -4316,6 +4495,19 @@ function onContextMenu(e: MouseEvent) {
   overscroll-behavior: contain;
 }
 
+.node-content-minimal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.node-content-minimal .minimal-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: 0;
+  opacity: 0.7;
+}
+
 .node-content :deep(p) {
   margin: 0 0 8px 0;
 }
@@ -4382,6 +4574,13 @@ function onContextMenu(e: MouseEvent) {
 
 .node-content :deep(em) {
   font-style: italic;
+}
+
+.node-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 4px 0;
 }
 
 .node-content :deep(a) {

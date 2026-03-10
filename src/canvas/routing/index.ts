@@ -39,7 +39,8 @@ import { routeOrthogonal } from './orthogonalRouter'
 
 // Minimum orthogonal standoff distance from node edge
 // Must be longer than arrow (6px marker + 10px refX offset = ~16px) plus margin
-const STANDOFF = 40
+// Increased to 60px for better visual separation with default 200px node spacing
+const STANDOFF = 60
 
 /**
  * Route all edges with proper port spreading, grid tracking, and obstacle avoidance
@@ -96,17 +97,23 @@ export function routeAllEdges(
     // Sort by quadrant first (process downward edges, then rightward, etc.)
     if (quadA !== quadB) return quadA - quadB
 
-    // Within same quadrant, sort by source position
-    // For down/up edges: sort by source X (left to right)
-    // For left/right edges: sort by source Y (top to bottom)
+    // Within same quadrant, sort for symmetric fan-out:
+    // Process INNER edges first (closer to source center line), OUTER edges last
+    // This way inner edges get offset 0, outer edges get larger offsets
     if (quadA === 1 || quadA === 3) {
-      // Vertical edges: sort by X, then Y
-      if (Math.abs(srcAx - srcBx) > 30) return srcAx - srcBx
-      return srcAy - srcBy
+      // Vertical edges (down/up): sort by distance from source center X
+      // Inner edges (target X close to source X) first
+      const distA = Math.abs(tgtAx - srcAx)
+      const distB = Math.abs(tgtBx - srcBx)
+      if (Math.abs(distA - distB) > 30) return distA - distB
+      // Tie-breaker: left-to-right for consistent ordering
+      return tgtAx - tgtBx
     } else {
-      // Horizontal edges: sort by Y, then X
-      if (Math.abs(srcAy - srcBy) > 30) return srcAy - srcBy
-      return srcAx - srcBx
+      // Horizontal edges (left/right): sort by distance from source center Y
+      const distA = Math.abs(tgtAy - srcAy)
+      const distB = Math.abs(tgtBy - srcBy)
+      if (Math.abs(distA - distB) > 30) return distA - distB
+      return tgtAy - tgtBy
     }
   })
 
@@ -143,6 +150,22 @@ export function routeAllEdges(
         gridTracker,
       })
     } else {
+      // Calculate channel offset to create non-crossing parallel paths.
+      //
+      // Use the LARGER of srcOffset or tgtOffset to spread channels:
+      // - srcOffset spreads edges from the same source going to different targets
+      // - tgtOffset spreads edges from different sources going to the same target
+      //
+      // The sign is adjusted based on relative position to create proper nesting:
+      // - OUTER edges (further from target) should use midY CLOSER to target
+      const sourceCenter = source.canvas_x + (source.width || 200) / 2
+      const targetCenter = target.canvas_x + (target.width || 200) / 2
+      const sourceLeftOfTarget = sourceCenter < targetCenter
+
+      // Use whichever offset is larger (more edges sharing that endpoint)
+      const baseOffset = Math.abs(srcOffset) > Math.abs(tgtOffset) ? srcOffset : tgtOffset
+      const channelOffset = sourceLeftOfTarget ? -baseOffset : baseOffset
+
       routeResult = routeOrthogonal({
         startPort: sourcePort,
         startStandoff: sourceStandoff,
@@ -153,6 +176,7 @@ export function routeAllEdges(
         nodes,
         excludeIds,
         gridTracker,
+        channelOffset,
       })
     }
 

@@ -160,8 +160,9 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
     const side = sideStr as Side
     const isHorizontalSide = side === 'left' || side === 'right'
 
-    // Sort by perpendicular position of the other node
-    // For left/right sides: sort by Y, for top/bottom: sort by X
+    // Sort by perpendicular position of the other node to minimize crossings.
+    // For left/right sides: primary sort by Y, secondary by X (for same-Y sources)
+    // For top/bottom sides: primary sort by X, secondary by Y (for same-X sources)
     entries.sort((a, b) => {
       const posA = isHorizontalSide ? a.otherNodeY : a.otherNodeX
       const posB = isHorizontalSide ? b.otherNodeY : b.otherNodeX
@@ -169,7 +170,29 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
       if (Math.abs(posA - posB) > 1) {
         return posA - posB
       }
-      // Stable tie-breaker: edge ID
+
+      // Secondary sort: when primary positions are similar, sort by the OTHER axis.
+      // This creates a natural "fan" pattern for sources at the same level:
+      // - For LEFT side: sources further LEFT (smaller X) get HIGHER ports (smaller index)
+      // - For RIGHT side: sources further RIGHT (larger X) get HIGHER ports (smaller index)
+      // - For TOP side: sources further UP (smaller Y) get LEFT ports (smaller index)
+      // - For BOTTOM side: sources further DOWN (larger Y) get LEFT ports (smaller index)
+      const secondaryA = isHorizontalSide ? a.otherNodeX : a.otherNodeY
+      const secondaryB = isHorizontalSide ? b.otherNodeX : b.otherNodeY
+
+      // For RIGHT side, reverse the X ordering (larger X = smaller index)
+      // For BOTTOM side, reverse the Y ordering (larger Y = smaller index)
+      if (side === 'right' || side === 'bottom') {
+        if (Math.abs(secondaryA - secondaryB) > 1) {
+          return secondaryB - secondaryA  // Reversed
+        }
+      } else {
+        if (Math.abs(secondaryA - secondaryB) > 1) {
+          return secondaryA - secondaryB  // Normal
+        }
+      }
+
+      // Final tie-breaker: edge ID for stability
       return a.edgeId.localeCompare(b.edgeId)
     })
 

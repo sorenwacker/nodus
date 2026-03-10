@@ -15,7 +15,6 @@ import type { Point, NodeRect, Side } from './types'
 import { GridTracker } from './gridTracker'
 import {
   findObstacles,
-  findObstaclesInRegion,
   getObstacleBounds,
   OBSTACLE_MARGIN,
 } from './obstacleAvoider'
@@ -37,47 +36,17 @@ export interface OrthogonalRouteParams {
   excludeIds: Set<string>
   gridTracker: GridTracker
   arrowOffset?: number
+  skipGridCheck?: boolean
+  /** Offset for the middle channel to create parallel non-overlapping edges */
+  channelOffset?: number
 }
 
 /**
- * Check if all three segments of an orthogonal path are free
- */
-function checkOrthogonalPathAvailable(
-  startStandoff: Point,
-  mid1: Point,
-  mid2: Point,
-  endStandoff: Point,
-  isHorizontalStart: boolean,
-  gridTracker: GridTracker,
-  nodes: NodeRect[] | Map<string, NodeRect>,
-  excludeIds: Set<string>
-): boolean {
-  // Check all segments for obstacles FIRST (most important)
-  const seg1Obs = findObstacles(startStandoff.x, startStandoff.y, mid1.x, mid1.y, nodes, excludeIds)
-  if (seg1Obs.length > 0) return false
-
-  const seg2Obs = findObstacles(mid1.x, mid1.y, mid2.x, mid2.y, nodes, excludeIds)
-  if (seg2Obs.length > 0) return false
-
-  const seg3Obs = findObstacles(mid2.x, mid2.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
-  if (seg3Obs.length > 0) return false
-
-  // Grid placement checks
-  if (!gridTracker.canPlace(startStandoff.x, startStandoff.y, mid1.x, mid1.y)) {
-    return false
-  }
-  if (!gridTracker.canPlace(mid1.x, mid1.y, mid2.x, mid2.y)) {
-    return false
-  }
-  if (!gridTracker.canPlace(mid2.x, mid2.y, endStandoff.x, endStandoff.y)) {
-    return false
-  }
-
-  return true
-}
-
-/**
- * Route an orthogonal edge with obstacle avoidance and grid tracking
+ * Route an orthogonal edge with obstacle avoidance
+ *
+ * Uses ideal midpoint for the middle channel. Port spreading already
+ * separates edges from the same source, so grid-based offsets are not
+ * needed for symmetric fan-out.
  */
 export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteResult {
   const {
@@ -91,6 +60,7 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
     excludeIds,
     gridTracker,
     arrowOffset = 0,
+    channelOffset = 0,
   } = params
 
   const dx = endStandoff.x - startStandoff.x
@@ -107,17 +77,57 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
     else if (targetSide === 'bottom') endEdge.y -= arrowOffset
   }
 
-  const gridSize = gridTracker.getGridSize()
   let path: Point[]
   let svgPath: string
   let usedDetour = false
+
+  // ==========================================================================
+  // SPECIAL CASE: Adjacent nodes with crossing standoffs
+  // When nodes are close together, standoffs can cross over each other.
+  // In this case, use a simple direct connection with minimal jog.
+  // ==========================================================================
+
+  // Detect if standoffs have crossed (going the wrong direction)
+  const standoffsCrossedX = (sourceSide === 'right' && startStandoff.x > endStandoff.x) ||
+                            (sourceSide === 'left' && startStandoff.x < endStandoff.x)
+  const standoffsCrossedY = (sourceSide === 'bottom' && startStandoff.y > endStandoff.y) ||
+                            (sourceSide === 'top' && startStandoff.y < endStandoff.y)
+
+  if (standoffsCrossedX && isHorizontalStart && isHorizontalEnd) {
+    // Adjacent horizontal nodes - use simple jog between ports
+    const midX = (startPort.x + endPort.x) / 2
+    const mid1: Point = { x: midX, y: startPort.y }
+    const mid2: Point = { x: midX, y: endPort.y }
+
+    gridTracker.mark(startPort.x, startPort.y, mid1.x, mid1.y)
+    gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
+    gridTracker.mark(mid2.x, mid2.y, endEdge.x, endEdge.y)
+
+    path = [startPort, mid1, mid2, endEdge]
+    svgPath = `M${startPort.x},${startPort.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endEdge.x},${endEdge.y}`
+    return { path, svgPath, usedDetour: false }
+  }
+
+  if (standoffsCrossedY && !isHorizontalStart && !isHorizontalEnd) {
+    // Adjacent vertical nodes - use simple jog between ports
+    const midY = (startPort.y + endPort.y) / 2
+    const mid1: Point = { x: startPort.x, y: midY }
+    const mid2: Point = { x: endPort.x, y: midY }
+
+    gridTracker.mark(startPort.x, startPort.y, mid1.x, mid1.y)
+    gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
+    gridTracker.mark(mid2.x, mid2.y, endEdge.x, endEdge.y)
+
+    path = [startPort, mid1, mid2, endEdge]
+    svgPath = `M${startPort.x},${startPort.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endEdge.x},${endEdge.y}`
+    return { path, svgPath, usedDetour: false }
+  }
 
   // ==========================================================================
   // TRY SIMPLE PATHS FIRST (fewer segments = fewer crossings)
   // ==========================================================================
 
   // Case 1: STRAIGHT LINE - standoffs are aligned
-  // e.g., both exit bottom/top and have same X, or both exit left/right and have same Y
   const alignedX = Math.abs(startStandoff.x - endStandoff.x) < 5
   const alignedY = Math.abs(startStandoff.y - endStandoff.y) < 5
 
@@ -144,12 +154,10 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   }
 
   // Case 2: L-SHAPE (2 segments) - when source is horizontal and target is vertical (or vice versa)
-  // The corner point is where they naturally meet
   if (isHorizontalStart !== isHorizontalEnd) {
-    // One exits horizontal, one exits vertical - perfect for L-shape
     const corner: Point = isHorizontalStart
-      ? { x: endStandoff.x, y: startStandoff.y }  // horizontal first, then vertical
-      : { x: startStandoff.x, y: endStandoff.y }  // vertical first, then horizontal
+      ? { x: endStandoff.x, y: startStandoff.y }
+      : { x: startStandoff.x, y: endStandoff.y }
 
     const seg1Obs = findObstacles(startStandoff.x, startStandoff.y, corner.x, corner.y, nodes, excludeIds)
     const seg2Obs = findObstacles(corner.x, corner.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
@@ -171,98 +179,151 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   // ==========================================================================
   // FALLBACK: 3-segment path (U-shape or Z-shape)
   // ==========================================================================
+  //
+  // SIMPLIFIED APPROACH: Use ideal midpoint, only offset for obstacles.
+  // Port spreading already separates edges from the same source, so we don't
+  // need grid-based offsets for the middle channel. This produces symmetric
+  // fan-out patterns with minimal crossings.
+  // ==========================================================================
 
   if (isHorizontalStart) {
     // Start horizontal, then vertical, then horizontal
     // Path: startStandoff -> (midX, startStandoff.y) -> (midX, endStandoff.y) -> endStandoff
 
-    const idealMidX = startStandoff.x + dx / 2
-    let foundFreePath = false
-    let bestMidX = idealMidX
+    // Check if standoffs are at similar Y (nearly horizontal connection)
+    const nearlyAlignedY = Math.abs(startStandoff.y - endStandoff.y) < 30
 
-    // Try to find a free path with increasing offsets
-    for (let tryOffset = 0; tryOffset <= 20; tryOffset++) {
-      const offset =
-        tryOffset === 0
-          ? 0
-          : (tryOffset % 2 === 1 ? 1 : -1) * Math.ceil(tryOffset / 2) * gridSize
+    if (nearlyAlignedY) {
+      // For nearly horizontal connections, check for obstacles on direct path
+      const directObs = findObstacles(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
 
-      const midX = gridTracker.snap(idealMidX + offset)
-      const mid1: Point = { x: midX, y: startStandoff.y }
-      const mid2: Point = { x: midX, y: endStandoff.y }
+      if (directObs.length === 0) {
+        // No obstacles - use direct path (may have small jog if Y differs slightly)
+        const mid1: Point = { x: (startStandoff.x + endStandoff.x) / 2, y: startStandoff.y }
+        const mid2: Point = { x: mid1.x, y: endStandoff.y }
 
-      if (checkOrthogonalPathAvailable(startStandoff, mid1, mid2, endStandoff, true, gridTracker, nodes, excludeIds)) {
-        bestMidX = midX
-        foundFreePath = true
-        break
-      }
-    }
-
-    if (!foundFreePath) {
-      // Check if there are obstacles and route around them
-      const firstHorizObstacles = findObstacles(startStandoff.x, startStandoff.y, bestMidX, startStandoff.y, nodes, excludeIds)
-      const vertObstacles = findObstacles(bestMidX, startStandoff.y, bestMidX, endStandoff.y, nodes, excludeIds)
-      const lastHorizObstacles = findObstacles(bestMidX, endStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
-
-      if (firstHorizObstacles.length > 0 || vertObstacles.length > 0 || lastHorizObstacles.length > 0) {
-        const allObs = [...firstHorizObstacles, ...vertObstacles, ...lastHorizObstacles]
-        const { minX, maxX } = getObstacleBounds(allObs, OBSTACLE_MARGIN)
-        bestMidX = dx > 0 ? maxX + 20 : minX - 20
-        usedDetour = true
-      }
-    }
-
-    let mid1: Point = { x: bestMidX, y: startStandoff.y }
-    let mid2: Point = { x: bestMidX, y: endStandoff.y }
-
-    // FINAL VALIDATION: Check if the computed path still intersects obstacles
-    const finalSegments = [
-      [startStandoff, mid1],
-      [mid1, mid2],
-      [mid2, endStandoff]
-    ]
-    let hasObstacle = false
-    for (let i = 0; i < finalSegments.length; i++) {
-      const [p1, p2] = finalSegments[i]
-      const obs = findObstacles(p1.x, p1.y, p2.x, p2.y, nodes, excludeIds)
-      if (obs.length > 0) {
-        hasObstacle = true
-        break
-      }
-    }
-
-    if (hasObstacle) {
-      // Find the ACTUAL blocking obstacles on each segment
-      const blockingObstacles: NodeRect[] = []
-      for (const [p1, p2] of finalSegments) {
-        const obs = findObstacles(p1.x, p1.y, p2.x, p2.y, nodes, excludeIds)
-        for (const o of obs) {
-          if (!blockingObstacles.find(b => b.id === o.id)) {
-            blockingObstacles.push(o)
-          }
+        gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
+        if (Math.abs(mid1.y - mid2.y) > 1) {
+          gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
         }
+        gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
+
+        path = [startPort, startStandoff, mid1, mid2, endStandoff, endEdge]
+        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+        return { path, svgPath, usedDetour: false }
+      } else {
+        // Obstacles on horizontal path - route VERTICALLY around them
+        const bounds = getObstacleBounds(directObs, OBSTACLE_MARGIN + 20)
+        const avgY = (startStandoff.y + endStandoff.y) / 2
+
+        // Decide to go above or below based on distance
+        const distAbove = Math.abs(avgY - bounds.minY)
+        const distBelow = Math.abs(bounds.maxY - avgY)
+        const detourY = distAbove < distBelow ? bounds.minY : bounds.maxY
+
+        // Create path that routes around obstacles vertically
+        const corner1: Point = { x: startStandoff.x, y: detourY }
+        const corner2: Point = { x: endStandoff.x, y: detourY }
+
+        gridTracker.mark(startStandoff.x, startStandoff.y, corner1.x, corner1.y)
+        gridTracker.mark(corner1.x, corner1.y, corner2.x, corner2.y)
+        gridTracker.mark(corner2.x, corner2.y, endStandoff.x, endStandoff.y)
+
+        path = [startPort, startStandoff, corner1, corner2, endStandoff, endEdge]
+        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${corner1.x},${corner1.y} L${corner2.x},${corner2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+        return { path, svgPath, usedDetour: true }
       }
+    }
 
-      if (blockingObstacles.length > 0) {
-        const bounds = getObstacleBounds(blockingObstacles, OBSTACLE_MARGIN + 30)
+    // Standard case: significant Y difference
+    let bestMidX = gridTracker.snap(startStandoff.x + dx / 2)
 
-        // Calculate distances to go above or below
-        const distAbove = Math.abs(Math.min(startStandoff.y, endStandoff.y) - bounds.minY)
-        const distBelow = Math.abs(Math.max(startStandoff.y, endStandoff.y) - bounds.maxY)
+    // Check for obstacles on the ideal path and find clear route
+    const checkPath = (midX: number): NodeRect[] => {
+      return [
+        ...findObstacles(startStandoff.x, startStandoff.y, midX, startStandoff.y, nodes, excludeIds),
+        ...findObstacles(midX, startStandoff.y, midX, endStandoff.y, nodes, excludeIds),
+        ...findObstacles(midX, endStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
+      ]
+    }
 
-        // For horizontal-start paths, prefer going above or below
-        if (distAbove <= distBelow) {
-          mid1 = { x: startStandoff.x, y: bounds.minY }
-          mid2 = { x: endStandoff.x, y: bounds.minY }
+    let obstacles = checkPath(bestMidX)
+    if (obstacles.length > 0) {
+      // Try routing around obstacles by going further in the direction of travel
+      const allBounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + 20)
+      const tryMidX = dx > 0 ? allBounds.maxX : allBounds.minX
+      const newObs = checkPath(tryMidX)
+      if (newObs.length === 0) {
+        bestMidX = tryMidX
+        usedDetour = true
+      } else {
+        // Still have obstacles, try the opposite side
+        const altMidX = dx > 0 ? allBounds.minX : allBounds.maxX
+        const altObs = checkPath(altMidX)
+        if (altObs.length === 0) {
+          bestMidX = altMidX
+          usedDetour = true
         } else {
-          mid1 = { x: startStandoff.x, y: bounds.maxY }
-          mid2 = { x: endStandoff.x, y: bounds.maxY }
+          // Use the direction that clears most obstacles
+          bestMidX = newObs.length <= altObs.length ? tryMidX : altMidX
+          usedDetour = true
         }
+      }
+    }
+
+    // Apply channelOffset to create parallel non-overlapping paths.
+    // The offset is based on port assignment, so edges to the same target
+    // get different X values for their vertical segments.
+    let adjustedMidX = bestMidX + channelOffset
+
+    // Check if the adjusted path has obstacles BEFORE clamping
+    let adjustedObstacles = checkPath(adjustedMidX)
+
+    // Try to clamp midX to stay between source and target (prevents backwards paths)
+    // BUT only if clamping doesn't cause obstacle collision
+    const minX = Math.min(startStandoff.x, endStandoff.x)
+    const maxX = Math.max(startStandoff.x, endStandoff.x)
+    const clampedMidX = Math.max(minX, Math.min(maxX, adjustedMidX))
+
+    // Only use clamped value if it doesn't introduce obstacles
+    if (adjustedMidX !== clampedMidX) {
+      const clampedObstacles = checkPath(clampedMidX)
+      if (clampedObstacles.length === 0 || clampedObstacles.length <= adjustedObstacles.length) {
+        adjustedMidX = clampedMidX
+        adjustedObstacles = clampedObstacles
+      }
+      // Otherwise keep the unclamped midX to avoid obstacles
+    }
+
+    // If there are still obstacles, try to route around them
+    if (adjustedObstacles.length > 0) {
+      const bounds = getObstacleBounds(adjustedObstacles, OBSTACLE_MARGIN + 20)
+      // Try going around the obstacle - prefer the side that keeps us within bounds
+      const tryLeft = bounds.minX
+      const tryRight = bounds.maxX
+
+      const leftObs = checkPath(tryLeft)
+      const rightObs = checkPath(tryRight)
+
+      if (leftObs.length === 0) {
+        adjustedMidX = tryLeft
+        usedDetour = true
+      } else if (rightObs.length === 0) {
+        adjustedMidX = tryRight
+        usedDetour = true
+      } else if (leftObs.length < adjustedObstacles.length) {
+        adjustedMidX = tryLeft
+        usedDetour = true
+      } else if (rightObs.length < adjustedObstacles.length) {
+        adjustedMidX = tryRight
         usedDetour = true
       }
     }
 
-    // Mark all segments (after final calculation)
+    const mid1: Point = { x: adjustedMidX, y: startStandoff.y }
+    const mid2: Point = { x: adjustedMidX, y: endStandoff.y }
+
+    // Mark segments for grid tracking
     gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
     gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
     gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
@@ -274,95 +335,140 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
     // Start vertical, then horizontal, then vertical
     // Path: startStandoff -> (startStandoff.x, midY) -> (endStandoff.x, midY) -> endStandoff
 
-    const idealMidY = startStandoff.y + dy / 2
-    let foundFreePath = false
-    let bestMidY = idealMidY
+    // Check if standoffs are at similar X (nearly vertical connection)
+    const nearlyAlignedX = Math.abs(startStandoff.x - endStandoff.x) < 30
 
-    // Try to find a free path with increasing offsets
-    for (let tryOffset = 0; tryOffset <= 20; tryOffset++) {
-      const offset =
-        tryOffset === 0
-          ? 0
-          : (tryOffset % 2 === 1 ? 1 : -1) * Math.ceil(tryOffset / 2) * gridSize
+    if (nearlyAlignedX) {
+      // For nearly vertical connections, check for obstacles on direct path
+      const directObs = findObstacles(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
 
-      const midY = gridTracker.snap(idealMidY + offset)
-      const mid1: Point = { x: startStandoff.x, y: midY }
-      const mid2: Point = { x: endStandoff.x, y: midY }
+      if (directObs.length === 0) {
+        // No obstacles - use direct path (may have small jog if X differs slightly)
+        const mid1: Point = { x: startStandoff.x, y: (startStandoff.y + endStandoff.y) / 2 }
+        const mid2: Point = { x: endStandoff.x, y: mid1.y }
 
-      if (checkOrthogonalPathAvailable(startStandoff, mid1, mid2, endStandoff, false, gridTracker, nodes, excludeIds)) {
-        bestMidY = midY
-        foundFreePath = true
-        break
-      }
-    }
-
-    if (!foundFreePath) {
-      // Check if there are obstacles and route around them
-      const firstVertObstacles = findObstacles(startStandoff.x, startStandoff.y, startStandoff.x, bestMidY, nodes, excludeIds)
-      const horizObstacles = findObstacles(startStandoff.x, bestMidY, endStandoff.x, bestMidY, nodes, excludeIds)
-      const lastVertObstacles = findObstacles(endStandoff.x, bestMidY, endStandoff.x, endStandoff.y, nodes, excludeIds)
-
-      if (firstVertObstacles.length > 0 || horizObstacles.length > 0 || lastVertObstacles.length > 0) {
-        const allObs = [...firstVertObstacles, ...horizObstacles, ...lastVertObstacles]
-        const { minY, maxY } = getObstacleBounds(allObs, OBSTACLE_MARGIN)
-        bestMidY = dy > 0 ? maxY + 20 : minY - 20
-        usedDetour = true
-      }
-    }
-
-    let mid1: Point = { x: startStandoff.x, y: bestMidY }
-    let mid2: Point = { x: endStandoff.x, y: bestMidY }
-
-    // FINAL VALIDATION: Check if the computed path still intersects obstacles
-    const finalSegments = [
-      [startStandoff, mid1],
-      [mid1, mid2],
-      [mid2, endStandoff]
-    ]
-    let hasObstacle = false
-    for (let i = 0; i < finalSegments.length; i++) {
-      const [p1, p2] = finalSegments[i]
-      const obs = findObstacles(p1.x, p1.y, p2.x, p2.y, nodes, excludeIds)
-      if (obs.length > 0) {
-        hasObstacle = true
-        break
-      }
-    }
-
-    if (hasObstacle) {
-      // Find all obstacles in the region and route completely around
-      const allObstacles = findObstaclesInRegion(
-        Math.min(startStandoff.x, endStandoff.x, mid1.x, mid2.x) - 50,
-        Math.min(startStandoff.y, endStandoff.y, mid1.y, mid2.y) - 50,
-        Math.max(startStandoff.x, endStandoff.x, mid1.x, mid2.x) + 50,
-        Math.max(startStandoff.y, endStandoff.y, mid1.y, mid2.y) + 50,
-        nodes,
-        excludeIds
-      )
-      if (allObstacles.length > 0) {
-        const bounds = getObstacleBounds(allObstacles, OBSTACLE_MARGIN + 30)
-
-        // Decide whether to go around horizontally or vertically
-        const goLeftOrRight = bounds.minX > Math.min(startStandoff.x, endStandoff.x) ||
-                              bounds.maxX < Math.max(startStandoff.x, endStandoff.x)
-
-        if (goLeftOrRight) {
-          // Go left or right of the obstacle
-          const goLeft = Math.abs(startStandoff.x - bounds.minX) < Math.abs(startStandoff.x - bounds.maxX)
-          const detourX = goLeft ? bounds.minX : bounds.maxX
-          mid1 = { x: detourX, y: startStandoff.y }
-          mid2 = { x: detourX, y: endStandoff.y }
-        } else {
-          // Go above or below
-          bestMidY = dy > 0 ? bounds.maxY : bounds.minY
-          mid1 = { x: startStandoff.x, y: bestMidY }
-          mid2 = { x: endStandoff.x, y: bestMidY }
+        gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
+        if (Math.abs(mid1.x - mid2.x) > 1) {
+          gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
         }
+        gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
+
+        path = [startPort, startStandoff, mid1, mid2, endStandoff, endEdge]
+        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+        return { path, svgPath, usedDetour: false }
+      } else {
+        // Obstacles on vertical path - route HORIZONTALLY around them
+        const bounds = getObstacleBounds(directObs, OBSTACLE_MARGIN + 20)
+        const avgX = (startStandoff.x + endStandoff.x) / 2
+
+        // Decide to go left or right based on distance
+        const distLeft = Math.abs(avgX - bounds.minX)
+        const distRight = Math.abs(bounds.maxX - avgX)
+        const detourX = distLeft < distRight ? bounds.minX : bounds.maxX
+
+        // Create path that goes around horizontally
+        const corner1: Point = { x: detourX, y: startStandoff.y }
+        const corner2: Point = { x: detourX, y: endStandoff.y }
+
+        gridTracker.mark(startStandoff.x, startStandoff.y, corner1.x, corner1.y)
+        gridTracker.mark(corner1.x, corner1.y, corner2.x, corner2.y)
+        gridTracker.mark(corner2.x, corner2.y, endStandoff.x, endStandoff.y)
+
+        path = [startPort, startStandoff, corner1, corner2, endStandoff, endEdge]
+        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${corner1.x},${corner1.y} L${corner2.x},${corner2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+        return { path, svgPath, usedDetour: true }
+      }
+    }
+
+    // Standard case: significant X difference
+    let bestMidY = gridTracker.snap(startStandoff.y + dy / 2)
+
+    // Check for obstacles on the ideal path and find clear route
+    const checkPath = (midY: number): NodeRect[] => {
+      return [
+        ...findObstacles(startStandoff.x, startStandoff.y, startStandoff.x, midY, nodes, excludeIds),
+        ...findObstacles(startStandoff.x, midY, endStandoff.x, midY, nodes, excludeIds),
+        ...findObstacles(endStandoff.x, midY, endStandoff.x, endStandoff.y, nodes, excludeIds)
+      ]
+    }
+
+    let obstacles = checkPath(bestMidY)
+    if (obstacles.length > 0) {
+      // Try routing around obstacles by going further in the direction of travel
+      const allBounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + 20)
+      const tryMidY = dy > 0 ? allBounds.maxY : allBounds.minY
+      const newObs = checkPath(tryMidY)
+      if (newObs.length === 0) {
+        bestMidY = tryMidY
+        usedDetour = true
+      } else {
+        // Still have obstacles, try the opposite side
+        const altMidY = dy > 0 ? allBounds.minY : allBounds.maxY
+        const altObs = checkPath(altMidY)
+        if (altObs.length === 0) {
+          bestMidY = altMidY
+          usedDetour = true
+        } else {
+          // Use the direction that clears most obstacles
+          bestMidY = newObs.length <= altObs.length ? tryMidY : altMidY
+          usedDetour = true
+        }
+      }
+    }
+
+    // Apply channelOffset to create parallel non-overlapping paths.
+    // The offset is based on port assignment, so edges to the same target
+    // get different Y values for their horizontal segments.
+    let adjustedMidY = bestMidY + channelOffset
+
+    // Check if the adjusted path has obstacles BEFORE clamping
+    let adjustedObstacles = checkPath(adjustedMidY)
+
+    // Try to clamp midY to stay between source and target (prevents backwards paths)
+    // BUT only if clamping doesn't cause obstacle collision
+    const minY = Math.min(startStandoff.y, endStandoff.y)
+    const maxY = Math.max(startStandoff.y, endStandoff.y)
+    const clampedMidY = Math.max(minY, Math.min(maxY, adjustedMidY))
+
+    // Only use clamped value if it doesn't introduce obstacles
+    if (adjustedMidY !== clampedMidY) {
+      const clampedObstacles = checkPath(clampedMidY)
+      if (clampedObstacles.length === 0 || clampedObstacles.length <= adjustedObstacles.length) {
+        adjustedMidY = clampedMidY
+        adjustedObstacles = clampedObstacles
+      }
+      // Otherwise keep the unclamped midY to avoid obstacles
+    }
+
+    // If there are still obstacles, try to route around them
+    if (adjustedObstacles.length > 0) {
+      const bounds = getObstacleBounds(adjustedObstacles, OBSTACLE_MARGIN + 20)
+      // Try going around the obstacle - prefer the side that clears obstacles
+      const tryAbove = bounds.minY
+      const tryBelow = bounds.maxY
+
+      const aboveObs = checkPath(tryAbove)
+      const belowObs = checkPath(tryBelow)
+
+      if (aboveObs.length === 0) {
+        adjustedMidY = tryAbove
+        usedDetour = true
+      } else if (belowObs.length === 0) {
+        adjustedMidY = tryBelow
+        usedDetour = true
+      } else if (aboveObs.length < adjustedObstacles.length) {
+        adjustedMidY = tryAbove
+        usedDetour = true
+      } else if (belowObs.length < adjustedObstacles.length) {
+        adjustedMidY = tryBelow
         usedDetour = true
       }
     }
 
-    // Mark all segments
+    const mid1: Point = { x: startStandoff.x, y: adjustedMidY }
+    const mid2: Point = { x: endStandoff.x, y: adjustedMidY }
+
+    // Mark segments for grid tracking
     gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
     gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
     gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
