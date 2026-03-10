@@ -4295,6 +4295,7 @@ ${edges.map(e => `  - id: "${e.id}"
   border-radius: 6px;
   box-shadow: 0 2px 8px var(--shadow-sm);
   z-index: 1001;
+  pointer-events: auto;
 }
 
 .node-llm-mode {
