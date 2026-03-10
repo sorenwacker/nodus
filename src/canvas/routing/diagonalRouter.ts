@@ -39,7 +39,6 @@ export interface DiagonalRouteParams {
   excludeIds: Set<string>
   gridTracker: GridTracker
   arrowOffset?: number
-  skipGridCheck?: boolean
 }
 
 // Minimum diagonal distance for meaningful 45° segment
@@ -48,6 +47,48 @@ const MIN_DIAG_DIST = 10
 // Minimum orthogonal segment length before/after diagonal
 // Must be longer than arrow for clean entry/exit
 const MIN_ORTHO_SEGMENT = 40
+
+/** Build SVG path string from points */
+function buildSvgPath(path: Point[]): string {
+  if (path.length === 0) return ''
+  return `M${path[0].x},${path[0].y}` + path.slice(1).map(p => ` L${p.x},${p.y}`).join('')
+}
+
+/** Route around obstacles with orthogonal detour */
+function buildObstacleDetour(
+  startPort: Point,
+  startStandoff: Point,
+  endStandoff: Point,
+  endEdge: Point,
+  obstacles: NodeRect[],
+  isHorizDominant: boolean,
+  dx: number,
+  dy: number,
+  gridTracker: GridTracker,
+  margin: number = OBSTACLE_MARGIN + 20
+): DiagonalRouteResult {
+  const { minX, minY, maxX, maxY } = getObstacleBounds(obstacles, margin)
+  const signX = dx >= 0 ? 1 : -1
+  const signY = dy >= 0 ? 1 : -1
+
+  let path: Point[]
+
+  if (isHorizDominant) {
+    const midY = signY > 0 ? maxY : minY
+    path = [startPort, startStandoff, { x: startStandoff.x, y: midY }, { x: endStandoff.x, y: midY }, endStandoff, endEdge]
+    gridTracker.mark(startStandoff.x, startStandoff.y, startStandoff.x, midY)
+    gridTracker.mark(startStandoff.x, midY, endStandoff.x, midY)
+    gridTracker.mark(endStandoff.x, midY, endStandoff.x, endStandoff.y)
+  } else {
+    const midX = signX > 0 ? maxX : minX
+    path = [startPort, startStandoff, { x: midX, y: startStandoff.y }, { x: midX, y: endStandoff.y }, endStandoff, endEdge]
+    gridTracker.mark(startStandoff.x, startStandoff.y, midX, startStandoff.y)
+    gridTracker.mark(midX, startStandoff.y, midX, endStandoff.y)
+    gridTracker.mark(midX, endStandoff.y, endStandoff.x, endStandoff.y)
+  }
+
+  return { path, svgPath: buildSvgPath(path), usedDetour: true }
+}
 
 /**
  * Calculate diagonal path points with offset
@@ -381,34 +422,10 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
     }
 
     // Route around obstacles for nearly straight paths
-    const { minX, minY, maxX, maxY } = getObstacleBounds(directObstacles, OBSTACLE_MARGIN + 20)
-    const signX = dx >= 0 ? 1 : -1
-    const signY = dy >= 0 ? 1 : -1
-
-    let path: Point[]
-    let svgPath: string
-
-    if (absDx >= absDy) {
-      // More horizontal - jog vertically around obstacles
-      const midY = signY >= 0 ? maxY : minY
-      path = [startPort, startStandoff, { x: startStandoff.x, y: midY }, { x: endStandoff.x, y: midY }, endStandoff, endEdge]
-      svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${startStandoff.x},${midY} L${endStandoff.x},${midY} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-      gridTracker.mark(startStandoff.x, startStandoff.y, startStandoff.x, midY)
-      gridTracker.mark(startStandoff.x, midY, endStandoff.x, midY)
-      gridTracker.mark(endStandoff.x, midY, endStandoff.x, endStandoff.y)
-    } else {
-      // More vertical - jog horizontally around obstacles
-      const midX = signX >= 0 ? maxX : minX
-      path = [startPort, startStandoff, { x: midX, y: startStandoff.y }, { x: midX, y: endStandoff.y }, endStandoff, endEdge]
-      svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${midX},${startStandoff.y} L${midX},${endStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-      gridTracker.mark(startStandoff.x, startStandoff.y, midX, startStandoff.y)
-      gridTracker.mark(midX, startStandoff.y, midX, endStandoff.y)
-      gridTracker.mark(midX, endStandoff.y, endStandoff.x, endStandoff.y)
-    }
-
-    return { path, svgPath, usedDetour: true }
+    return buildObstacleDetour(
+      startPort, startStandoff, endStandoff, endEdge,
+      directObstacles, absDx >= absDy, dx, dy, gridTracker
+    )
   }
 
   // Normal diagonal routing
@@ -445,33 +462,10 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
     )
 
     if (allObstacles.length > 0) {
-      // Route around obstacles with orthogonal path
-      const { minX, minY, maxX, maxY } = getObstacleBounds(allObstacles, OBSTACLE_MARGIN + 20)
-      const signX = dx >= 0 ? 1 : -1
-      const signY = dy >= 0 ? 1 : -1
-
-      let path: Point[]
-      let svgPath: string
-
-      if (isHorizDominant) {
-        const midY = signY > 0 ? maxY : minY
-        path = [startPort, startStandoff, { x: startStandoff.x, y: midY }, { x: endStandoff.x, y: midY }, endStandoff, endEdge]
-        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${startStandoff.x},${midY} L${endStandoff.x},${midY} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-        gridTracker.mark(startStandoff.x, startStandoff.y, startStandoff.x, midY)
-        gridTracker.mark(startStandoff.x, midY, endStandoff.x, midY)
-        gridTracker.mark(endStandoff.x, midY, endStandoff.x, endStandoff.y)
-      } else {
-        const midX = signX > 0 ? maxX : minX
-        path = [startPort, startStandoff, { x: midX, y: startStandoff.y }, { x: midX, y: endStandoff.y }, endStandoff, endEdge]
-        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${midX},${startStandoff.y} L${midX},${endStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-        gridTracker.mark(startStandoff.x, startStandoff.y, midX, startStandoff.y)
-        gridTracker.mark(midX, startStandoff.y, midX, endStandoff.y)
-        gridTracker.mark(midX, endStandoff.y, endStandoff.x, endStandoff.y)
-      }
-
-      return { path, svgPath, usedDetour: true }
+      return buildObstacleDetour(
+        startPort, startStandoff, endStandoff, endEdge,
+        allObstacles, isHorizDominant, dx, dy, gridTracker
+      )
     }
 
     // No obstacles - use default position
@@ -507,32 +501,11 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
     )
 
     if (allObstacles.length > 0) {
-      const { minX, minY, maxX, maxY } = getObstacleBounds(allObstacles, OBSTACLE_MARGIN + 30)
-      const signX = dx >= 0 ? 1 : -1
-      const signY = dy >= 0 ? 1 : -1
-
-      let path: Point[]
-      let svgPath: string
-
-      if (isHorizDominant) {
-        const midY = signY > 0 ? maxY : minY
-        path = [startPort, startStandoff, { x: startStandoff.x, y: midY }, { x: endStandoff.x, y: midY }, endStandoff, endEdge]
-        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${startStandoff.x},${midY} L${endStandoff.x},${midY} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-        gridTracker.mark(startStandoff.x, startStandoff.y, startStandoff.x, midY)
-        gridTracker.mark(startStandoff.x, midY, endStandoff.x, midY)
-        gridTracker.mark(endStandoff.x, midY, endStandoff.x, endStandoff.y)
-      } else {
-        const midX = signX > 0 ? maxX : minX
-        path = [startPort, startStandoff, { x: midX, y: startStandoff.y }, { x: midX, y: endStandoff.y }, endStandoff, endEdge]
-        svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${midX},${startStandoff.y} L${midX},${endStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-        gridTracker.mark(startStandoff.x, startStandoff.y, midX, startStandoff.y)
-        gridTracker.mark(midX, startStandoff.y, midX, endStandoff.y)
-        gridTracker.mark(midX, endStandoff.y, endStandoff.x, endStandoff.y)
-      }
-
-      return { path, svgPath, usedDetour: true }
+      return buildObstacleDetour(
+        startPort, startStandoff, endStandoff, endEdge,
+        allObstacles, isHorizDominant, dx, dy, gridTracker,
+        OBSTACLE_MARGIN + 30
+      )
     }
   }
 
@@ -544,9 +517,7 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
   gridTracker.mark(bestP2.x, bestP2.y, endStandoff.x, endStandoff.y)
 
   const path = [startPort, startStandoff, bestP1, bestP2, endStandoff, endEdge]
-  const svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${bestP1.x},${bestP1.y} L${bestP2.x},${bestP2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-  return { path, svgPath, usedDetour: false }
+  return { path, svgPath: buildSvgPath(path), usedDetour: false }
 }
 
 /**

@@ -41,9 +41,16 @@ export interface OrthogonalRouteParams {
   excludeIds: Set<string>
   gridTracker: GridTracker
   arrowOffset?: number
-  skipGridCheck?: boolean
   /** Offset for the middle channel to create parallel non-overlapping edges */
   channelOffset?: number
+}
+
+/** Grouped endpoint data passed between routing functions */
+interface RouteEndpoints {
+  startPort: Point
+  startStandoff: Point
+  endStandoff: Point
+  endEdge: Point
 }
 
 // Axis abstraction for generic routing
@@ -52,6 +59,29 @@ const getAxis = (p: Point, axis: Axis): number => axis === 'x' ? p.x : p.y
 const setAxis = (p: Point, axis: Axis, value: number): Point =>
   axis === 'x' ? { x: value, y: p.y } : { x: p.x, y: value }
 const otherAxis = (axis: Axis): Axis => axis === 'x' ? 'y' : 'x'
+
+/** Build SVG path string from points */
+function buildSvgPath(path: Point[]): string {
+  if (path.length === 0) return ''
+  return `M${path[0].x},${path[0].y}` + path.slice(1).map(p => ` L${p.x},${p.y}`).join('')
+}
+
+/** Mark path segments in grid tracker */
+function markPathSegments(path: Point[], gridTracker: GridTracker): void {
+  for (let i = 0; i < path.length - 1; i++) {
+    gridTracker.mark(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y)
+  }
+}
+
+/** Build complete routing result */
+function buildResult(
+  path: Point[],
+  gridTracker: GridTracker,
+  usedDetour: boolean
+): OrthogonalRouteResult {
+  markPathSegments(path, gridTracker)
+  return { path, svgPath: buildSvgPath(path), usedDetour }
+}
 
 /**
  * Route an orthogonal edge with obstacle avoidance
@@ -92,9 +122,9 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   // ==========================================================================
   // SPECIAL CASE: Adjacent nodes with crossing standoffs
   // ==========================================================================
+  const endpoints: RouteEndpoints = { startPort, startStandoff, endStandoff, endEdge }
   const adjacentResult = tryAdjacentRoute(
-    startPort, startStandoff, endPort, endStandoff, endEdge,
-    sourceSide, isHorizontalStart, isHorizontalEnd, gridTracker
+    endpoints, endPort, sourceSide, isHorizontalStart, isHorizontalEnd, gridTracker
   )
   if (adjacentResult) return adjacentResult
 
@@ -102,8 +132,7 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   // TRY SIMPLE PATHS FIRST (fewer segments = fewer crossings)
   // ==========================================================================
   const simpleResult = trySimplePath(
-    startPort, startStandoff, endStandoff, endEdge,
-    isHorizontalStart, isHorizontalEnd, nodes, excludeIds, gridTracker
+    endpoints, isHorizontalStart, isHorizontalEnd, nodes, excludeIds, gridTracker
   )
   if (simpleResult) return simpleResult
 
@@ -115,8 +144,7 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   const delta = primaryAxis === 'x' ? dx : dy
 
   return routeThreeSegment(
-    startPort, startStandoff, endStandoff, endEdge,
-    primaryAxis, delta, channelOffset, nodes, excludeIds, gridTracker
+    endpoints, primaryAxis, delta, channelOffset, nodes, excludeIds, gridTracker
   )
 }
 
@@ -124,16 +152,15 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
  * Try routing adjacent nodes with crossed standoffs
  */
 function tryAdjacentRoute(
-  startPort: Point,
-  startStandoff: Point,
+  endpoints: RouteEndpoints,
   endPort: Point,
-  endStandoff: Point,
-  endEdge: Point,
   sourceSide: Side,
   isHorizontalStart: boolean,
   isHorizontalEnd: boolean,
   gridTracker: GridTracker
 ): OrthogonalRouteResult | null {
+  const { startPort, startStandoff, endStandoff, endEdge } = endpoints
+
   const standoffsCrossedX = (sourceSide === 'right' && startStandoff.x > endStandoff.x) ||
                             (sourceSide === 'left' && startStandoff.x < endStandoff.x)
   const standoffsCrossedY = (sourceSide === 'bottom' && startStandoff.y > endStandoff.y) ||
@@ -143,32 +170,14 @@ function tryAdjacentRoute(
     const midX = (startPort.x + endPort.x) / 2
     const mid1: Point = { x: midX, y: startPort.y }
     const mid2: Point = { x: midX, y: endPort.y }
-
-    gridTracker.mark(startPort.x, startPort.y, mid1.x, mid1.y)
-    gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
-    gridTracker.mark(mid2.x, mid2.y, endEdge.x, endEdge.y)
-
-    return {
-      path: [startPort, mid1, mid2, endEdge],
-      svgPath: `M${startPort.x},${startPort.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endEdge.x},${endEdge.y}`,
-      usedDetour: false,
-    }
+    return buildResult([startPort, mid1, mid2, endEdge], gridTracker, false)
   }
 
   if (standoffsCrossedY && !isHorizontalStart && !isHorizontalEnd) {
     const midY = (startPort.y + endPort.y) / 2
     const mid1: Point = { x: startPort.x, y: midY }
     const mid2: Point = { x: endPort.x, y: midY }
-
-    gridTracker.mark(startPort.x, startPort.y, mid1.x, mid1.y)
-    gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
-    gridTracker.mark(mid2.x, mid2.y, endEdge.x, endEdge.y)
-
-    return {
-      path: [startPort, mid1, mid2, endEdge],
-      svgPath: `M${startPort.x},${startPort.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endEdge.x},${endEdge.y}`,
-      usedDetour: false,
-    }
+    return buildResult([startPort, mid1, mid2, endEdge], gridTracker, false)
   }
 
   return null
@@ -178,41 +187,28 @@ function tryAdjacentRoute(
  * Try simple paths: straight line or L-shape
  */
 function trySimplePath(
-  startPort: Point,
-  startStandoff: Point,
-  endStandoff: Point,
-  endEdge: Point,
+  endpoints: RouteEndpoints,
   isHorizontalStart: boolean,
   isHorizontalEnd: boolean,
   nodes: NodeRect[] | Map<string, NodeRect>,
   excludeIds: Set<string>,
   gridTracker: GridTracker
 ): OrthogonalRouteResult | null {
+  const { startPort, startStandoff, endStandoff, endEdge } = endpoints
   const alignedX = Math.abs(startStandoff.x - endStandoff.x) < ALIGNMENT_THRESHOLD
   const alignedY = Math.abs(startStandoff.y - endStandoff.y) < ALIGNMENT_THRESHOLD
 
-  // Case 1: STRAIGHT LINE - standoffs are aligned
-  if (alignedX && !isHorizontalStart && !isHorizontalEnd) {
+  // Helper to check if straight path is clear
+  const canUseStraightPath = (): boolean => {
     const obs = findObstacles(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
-    if (obs.length === 0 && gridTracker.canPlace(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)) {
-      gridTracker.mark(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)
-      return {
-        path: [startPort, startStandoff, endStandoff, endEdge],
-        svgPath: `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`,
-        usedDetour: false,
-      }
-    }
+    return obs.length === 0 && gridTracker.canPlace(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)
   }
 
-  if (alignedY && isHorizontalStart && isHorizontalEnd) {
-    const obs = findObstacles(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
-    if (obs.length === 0 && gridTracker.canPlace(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)) {
-      gridTracker.mark(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y)
-      return {
-        path: [startPort, startStandoff, endStandoff, endEdge],
-        svgPath: `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`,
-        usedDetour: false,
-      }
+  // Case 1: STRAIGHT LINE - standoffs are aligned
+  if ((alignedX && !isHorizontalStart && !isHorizontalEnd) ||
+      (alignedY && isHorizontalStart && isHorizontalEnd)) {
+    if (canUseStraightPath()) {
+      return buildResult([startPort, startStandoff, endStandoff, endEdge], gridTracker, false)
     }
   }
 
@@ -230,13 +226,7 @@ function trySimplePath(
       const canPlace2 = gridTracker.canPlace(corner.x, corner.y, endStandoff.x, endStandoff.y)
 
       if (canPlace1 && canPlace2) {
-        gridTracker.mark(startStandoff.x, startStandoff.y, corner.x, corner.y)
-        gridTracker.mark(corner.x, corner.y, endStandoff.x, endStandoff.y)
-        return {
-          path: [startPort, startStandoff, corner, endStandoff, endEdge],
-          svgPath: `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${corner.x},${corner.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`,
-          usedDetour: false,
-        }
+        return buildResult([startPort, startStandoff, corner, endStandoff, endEdge], gridTracker, false)
       }
     }
   }
@@ -248,10 +238,7 @@ function trySimplePath(
  * Route with 3 segments - generic for both horizontal and vertical start
  */
 function routeThreeSegment(
-  startPort: Point,
-  startStandoff: Point,
-  endStandoff: Point,
-  endEdge: Point,
+  endpoints: RouteEndpoints,
   primaryAxis: Axis,
   delta: number,
   channelOffset: number,
@@ -259,6 +246,7 @@ function routeThreeSegment(
   excludeIds: Set<string>,
   gridTracker: GridTracker
 ): OrthogonalRouteResult {
+  const { startPort, startStandoff, endStandoff, endEdge } = endpoints
   const secondaryAxis = otherAxis(primaryAxis)
   let usedDetour = false
 
@@ -267,8 +255,7 @@ function routeThreeSegment(
 
   if (secondaryDiff < NEAR_ALIGNMENT_THRESHOLD) {
     const result = tryNearlyAlignedRoute(
-      startPort, startStandoff, endStandoff, endEdge,
-      primaryAxis, nodes, excludeIds, gridTracker
+      endpoints, primaryAxis, nodes, excludeIds, gridTracker
     )
     if (result) return result
   }
@@ -293,7 +280,7 @@ function routeThreeSegment(
 
   let obstacles = checkPath(bestMid)
   if (obstacles.length > 0) {
-    const result = findClearRoute(bestMid, delta, checkPath, obstacles)
+    const result = findClearRoute(bestMid, delta, primaryAxis, checkPath, obstacles)
     bestMid = result.mid
     usedDetour = result.usedDetour
   }
@@ -344,29 +331,26 @@ function routeThreeSegment(
   const mid1 = setAxis(startStandoff, primaryAxis, adjustedMid)
   const mid2 = setAxis(endStandoff, primaryAxis, adjustedMid)
 
+  // Mark only the middle segments (not the standoff-to-port connections)
   gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
   gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
   gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
 
   const path = [startPort, startStandoff, mid1, mid2, endStandoff, endEdge]
-  const svgPath = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-
-  return { path, svgPath, usedDetour }
+  return { path, svgPath: buildSvgPath(path), usedDetour }
 }
 
 /**
  * Try routing nearly-aligned connections with direct or detour path
  */
 function tryNearlyAlignedRoute(
-  startPort: Point,
-  startStandoff: Point,
-  endStandoff: Point,
-  endEdge: Point,
+  endpoints: RouteEndpoints,
   primaryAxis: Axis,
   nodes: NodeRect[] | Map<string, NodeRect>,
   excludeIds: Set<string>,
   gridTracker: GridTracker
 ): OrthogonalRouteResult | null {
+  const { startPort, startStandoff, endStandoff, endEdge } = endpoints
   const directObs = findObstacles(startStandoff.x, startStandoff.y, endStandoff.x, endStandoff.y, nodes, excludeIds)
 
   if (directObs.length === 0) {
@@ -374,43 +358,23 @@ function tryNearlyAlignedRoute(
     const midPrimary = (getAxis(startStandoff, primaryAxis) + getAxis(endStandoff, primaryAxis)) / 2
     const mid1 = setAxis(startStandoff, primaryAxis, midPrimary)
     const mid2 = setAxis(endStandoff, primaryAxis, midPrimary)
-
-    gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
-    if (Math.abs(getAxis(mid1, otherAxis(primaryAxis)) - getAxis(mid2, otherAxis(primaryAxis))) > 1) {
-      gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
-    }
-    gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
-
-    return {
-      path: [startPort, startStandoff, mid1, mid2, endStandoff, endEdge],
-      svgPath: `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${mid1.x},${mid1.y} L${mid2.x},${mid2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`,
-      usedDetour: false,
-    }
-  } else {
-    // Obstacles - route around on the secondary axis
-    const secondaryAxis = otherAxis(primaryAxis)
-    const bounds = getObstacleBounds(directObs, OBSTACLE_MARGIN + DETOUR_MARGIN)
-    const avgSecondary = (getAxis(startStandoff, secondaryAxis) + getAxis(endStandoff, secondaryAxis)) / 2
-
-    const lowBound = secondaryAxis === 'x' ? bounds.minX : bounds.minY
-    const highBound = secondaryAxis === 'x' ? bounds.maxX : bounds.maxY
-    const distLow = Math.abs(avgSecondary - lowBound)
-    const distHigh = Math.abs(highBound - avgSecondary)
-    const detourValue = distLow < distHigh ? lowBound : highBound
-
-    const corner1 = setAxis(startStandoff, secondaryAxis, detourValue)
-    const corner2 = setAxis(endStandoff, secondaryAxis, detourValue)
-
-    gridTracker.mark(startStandoff.x, startStandoff.y, corner1.x, corner1.y)
-    gridTracker.mark(corner1.x, corner1.y, corner2.x, corner2.y)
-    gridTracker.mark(corner2.x, corner2.y, endStandoff.x, endStandoff.y)
-
-    return {
-      path: [startPort, startStandoff, corner1, corner2, endStandoff, endEdge],
-      svgPath: `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${corner1.x},${corner1.y} L${corner2.x},${corner2.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`,
-      usedDetour: true,
-    }
+    return buildResult([startPort, startStandoff, mid1, mid2, endStandoff, endEdge], gridTracker, false)
   }
+
+  // Obstacles - route around on the secondary axis
+  const secondaryAxis = otherAxis(primaryAxis)
+  const bounds = getObstacleBounds(directObs, OBSTACLE_MARGIN + DETOUR_MARGIN)
+  const avgSecondary = (getAxis(startStandoff, secondaryAxis) + getAxis(endStandoff, secondaryAxis)) / 2
+
+  const lowBound = secondaryAxis === 'x' ? bounds.minX : bounds.minY
+  const highBound = secondaryAxis === 'x' ? bounds.maxX : bounds.maxY
+  const distLow = Math.abs(avgSecondary - lowBound)
+  const distHigh = Math.abs(highBound - avgSecondary)
+  const detourValue = distLow < distHigh ? lowBound : highBound
+
+  const corner1 = setAxis(startStandoff, secondaryAxis, detourValue)
+  const corner2 = setAxis(endStandoff, secondaryAxis, detourValue)
+  return buildResult([startPort, startStandoff, corner1, corner2, endStandoff, endEdge], gridTracker, true)
 }
 
 /**
@@ -419,18 +383,19 @@ function tryNearlyAlignedRoute(
 function findClearRoute(
   bestMid: number,
   delta: number,
+  primaryAxis: Axis,
   checkPath: (mid: number) => NodeRect[],
   obstacles: NodeRect[]
 ): { mid: number; usedDetour: boolean } {
   const allBounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + DETOUR_MARGIN)
 
+  // Use the correct axis bounds
+  const minBound = primaryAxis === 'x' ? allBounds.minX : allBounds.minY
+  const maxBound = primaryAxis === 'x' ? allBounds.maxX : allBounds.maxY
+
   // Try going further in the direction of travel
-  const tryFirst = delta > 0
-    ? (allBounds.maxX > allBounds.maxY ? allBounds.maxX : allBounds.maxY)
-    : (allBounds.minX < allBounds.minY ? allBounds.minX : allBounds.minY)
-  const trySecond = delta > 0
-    ? (allBounds.minX < allBounds.minY ? allBounds.minX : allBounds.minY)
-    : (allBounds.maxX > allBounds.maxY ? allBounds.maxX : allBounds.maxY)
+  const tryFirst = delta > 0 ? maxBound : minBound
+  const trySecond = delta > 0 ? minBound : maxBound
 
   const firstObs = checkPath(tryFirst)
   if (firstObs.length === 0) {
