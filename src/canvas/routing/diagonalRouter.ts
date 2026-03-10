@@ -372,6 +372,8 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
     excludeIds,
     gridTracker,
     arrowOffset = 0,
+    sourceSide,
+    targetSide,
   } = params
 
   const dx = endStandoff.x - startStandoff.x
@@ -383,10 +385,37 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
   // Adjust end port for arrow head
   let endEdge = { ...endPort }
   if (arrowOffset > 0) {
-    if (params.targetSide === 'left') endEdge.x += arrowOffset
-    else if (params.targetSide === 'right') endEdge.x -= arrowOffset
-    else if (params.targetSide === 'top') endEdge.y += arrowOffset
-    else if (params.targetSide === 'bottom') endEdge.y -= arrowOffset
+    if (targetSide === 'left') endEdge.x += arrowOffset
+    else if (targetSide === 'right') endEdge.x -= arrowOffset
+    else if (targetSide === 'top') endEdge.y += arrowOffset
+    else if (targetSide === 'bottom') endEdge.y -= arrowOffset
+  }
+
+  // Detect 180-degree turn situations (crossed standoffs)
+  // This happens when the standoff extends in the wrong direction
+  const crossedX = (sourceSide === 'right' && startStandoff.x > endStandoff.x) ||
+                   (sourceSide === 'left' && startStandoff.x < endStandoff.x)
+  const crossedY = (sourceSide === 'bottom' && startStandoff.y > endStandoff.y) ||
+                   (sourceSide === 'top' && startStandoff.y < endStandoff.y)
+
+  // If crossed, route directly between ports with a simple midpoint
+  if (crossedX || crossedY) {
+    const midX = (startPort.x + endPort.x) / 2
+    const midY = (startPort.y + endPort.y) / 2
+    let path: Point[]
+    let svgPath: string
+
+    if (crossedX) {
+      // Go vertical first, then horizontal
+      path = [startPort, { x: startPort.x, y: midY }, { x: endPort.x, y: midY }, endEdge]
+      svgPath = `M${startPort.x},${startPort.y} L${startPort.x},${midY} L${endPort.x},${midY} L${endEdge.x},${endEdge.y}`
+    } else {
+      // Go horizontal first, then vertical
+      path = [startPort, { x: midX, y: startPort.y }, { x: midX, y: endPort.y }, endEdge]
+      svgPath = `M${startPort.x},${startPort.y} L${midX},${startPort.y} L${midX},${endPort.y} L${endEdge.x},${endEdge.y}`
+    }
+
+    return { path, svgPath, usedDetour: false }
   }
 
   // Very short path - just draw a line
