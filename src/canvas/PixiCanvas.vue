@@ -1348,7 +1348,7 @@ const edgeLines = computed(() => {
       : { x: targetCx, y: targetCy }
 
     // Get standoff points with angled entry for natural flow
-    const STANDOFF_DIST = 40
+    const STANDOFF_DIST = 60
     const ANGLE_OFFSET = 12 // Perpendicular offset for angled entry
     const rawStartStandoff = getStandoff(startPort, sourceSide, STANDOFF_DIST)
     const rawEndStandoff = getStandoff(endPort, targetSide, STANDOFF_DIST)
