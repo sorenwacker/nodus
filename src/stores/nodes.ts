@@ -513,6 +513,10 @@ export const useNodesStore = defineStore('nodes', () => {
         storeLogger.info(`Frontend deduplication removed ${removed} duplicate edges`)
       }
 
+      // Start watching the vault for external changes
+      await watchVault(path)
+      storeLogger.info(`Started watching vault: ${path}`)
+
       return importedNodes
     } catch (e) {
       error.value = String(e)
