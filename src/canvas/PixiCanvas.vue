@@ -1069,14 +1069,12 @@ async function sendNodePrompt() {
       ? `\nCONNECTED NODES:\n${connectedNodes}\n`
       : ''
 
-    const nodeSystemPrompt = `${customSystemPrompt.value}
+    const nodeSystemPrompt = `You are editing a single note. REWRITE the note content based on the user's request.
 
----
-REWRITE the note based on the user's request. Return ONLY the new content.
+IMPORTANT: Return ONLY the new markdown content. Do NOT return JSON. Do NOT wrap in code blocks unless the content itself is code.
 ${neighborsContext}
 CURRENT NOTE CONTENT:
-${currentContent || '(empty)'}
----`
+${currentContent || '(empty)'}`
 
     const response = await callOllama(nodePrompt.value, nodeSystemPrompt)
     nodePrompt.value = ''
