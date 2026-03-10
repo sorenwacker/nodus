@@ -473,3 +473,9 @@ pub async fn delete_workspace(id: String) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Read file content from disk (for on-demand sync)
+#[tauri::command]
+pub async fn read_file_content(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
+}

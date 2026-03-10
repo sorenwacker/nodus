@@ -338,9 +338,9 @@ export const useNodesStore = defineStore('nodes', () => {
     }
 
     try {
-      console.log('[refresh] Node file_path:', JSON.stringify(node.file_path), 'length:', node.file_path.length)
-      const content = await readTextFile(node.file_path)
-      console.log('[refresh] File read, length:', content.length, 'stored length:', node.markdown_content?.length)
+      console.log('[refresh] Reading:', node.file_path)
+      const content = await invoke<string>('read_file_content', { path: node.file_path })
+      console.log('[refresh] File read, length:', content.length, 'stored:', node.markdown_content?.length)
       if (content !== node.markdown_content) {
         console.log('[refresh] Content changed, updating node')
         node.markdown_content = content
