@@ -4618,6 +4618,30 @@ ${edges.map(e => `  - id: "${e.id}"
   color: var(--text-muted);
 }
 
+/* Table styling */
+.node-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.node-content :deep(th),
+.node-content :deep(td) {
+  border: 1px solid var(--border-default);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.node-content :deep(th) {
+  background: var(--bg-elevated);
+  font-weight: 600;
+}
+
+.node-content :deep(tr:nth-child(even)) {
+  background: var(--bg-surface-alt, rgba(0,0,0,0.02));
+}
+
 .node-content :deep(.mermaid-wrapper) {
   margin: 8px 0;
   overflow-x: auto;
