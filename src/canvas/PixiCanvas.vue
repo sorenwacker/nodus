@@ -2049,14 +2049,48 @@ function pushOverlappingNodesAway(sourceId: string) {
   }
 }
 
-// Handle clicks in node content (for external links)
+// Navigate to a node by title (for wikilinks)
+function navigateToNode(title: string) {
+  // Find node by title (case-insensitive)
+  const targetNode = store.filteredNodes.find(
+    n => n.title.toLowerCase() === title.toLowerCase()
+  )
+
+  if (!targetNode) {
+    console.warn(`Node not found: ${title}`)
+    return
+  }
+
+  // Center view on node
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (rect) {
+    const nodeCenterX = targetNode.canvas_x + (targetNode.width || 200) / 2
+    const nodeCenterY = targetNode.canvas_y + (targetNode.height || 120) / 2
+    offsetX.value = rect.width / 2 - nodeCenterX * scale.value
+    offsetY.value = rect.height / 2 - nodeCenterY * scale.value
+  }
+
+  // Select the node
+  store.selectNode(targetNode.id)
+}
+
+// Handle clicks in node content (for external links and wikilinks)
 function handleContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   const link = target.closest('a')
-  if (link && link.href) {
+  if (link) {
     e.preventDefault()
     e.stopPropagation()
-    openExternal(link.href)
+    // Check if it's a wikilink
+    if (link.classList.contains('wikilink')) {
+      const linkTarget = link.dataset.target
+      if (linkTarget) {
+        navigateToNode(linkTarget)
+      }
+    } else if (link.href) {
+      // External link
+      openExternal(link.href)
+    }
   }
 }
 
@@ -2825,6 +2859,19 @@ function renderMarkdown(content: string | null): string {
   if (needsTypstRender) {
     setTimeout(renderTypstMath, 50)
   }
+
+  // Convert [[link]] and [[link|display]] wikilinks to clickable elements
+  const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
+  html = html.replace(wikilinkRegex, (match, target, display) => {
+    const displayText = display || target
+    const targetTrimmed = target.trim()
+    // Check if target node exists for styling
+    const targetExists = store.filteredNodes.some(
+      n => n.title.toLowerCase() === targetTrimmed.toLowerCase()
+    )
+    const missingClass = targetExists ? '' : ' missing'
+    return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
+  })
 
   // Cache the result (limit cache size)
   if (markdownCache.size > 100) {
@@ -4516,6 +4563,24 @@ ${edges.map(e => `  - id: "${e.id}"
 .node-content :deep(a) {
   color: var(--primary-color);
   text-decoration: none;
+}
+
+/* Wikilink styling */
+.node-content :deep(.wikilink) {
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--primary-color);
+}
+
+.node-content :deep(.wikilink:hover) {
+  border-bottom-style: solid;
+}
+
+/* Missing wikilink (target node doesn't exist) */
+.node-content :deep(.wikilink.missing) {
+  color: var(--text-muted);
+  border-color: var(--text-muted);
 }
 
 .node-content :deep(blockquote) {

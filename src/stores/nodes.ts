@@ -319,6 +319,12 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  // Find a node by title (case-insensitive)
+  function findNodeByTitle(title: string): Node | undefined {
+    const lowerTitle = title.toLowerCase()
+    return nodes.value.find(n => n.title.toLowerCase() === lowerTitle)
+  }
+
   async function updateNodeContent(id: string, content: string) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
@@ -332,6 +338,34 @@ export const useNodesStore = defineStore('nodes', () => {
         }
       } catch (e) {
         console.error('Failed to update content:', e)
+      }
+
+      // Extract wikilinks and create edges
+      const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
+      const links = new Set<string>()
+      let match
+      while ((match = wikilinkRegex.exec(content)) !== null) {
+        links.add(match[1].trim().toLowerCase())
+      }
+
+      // Create edges for each wikilink
+      for (const linkTitle of links) {
+        const targetNode = findNodeByTitle(linkTitle)
+        if (targetNode && targetNode.id !== id) {
+          // Check if edge already exists
+          const exists = edges.value.some(e =>
+            e.source_node_id === id &&
+            e.target_node_id === targetNode.id &&
+            e.link_type === 'wikilink'
+          )
+          if (!exists) {
+            await createEdge({
+              source_node_id: id,
+              target_node_id: targetNode.id,
+              link_type: 'wikilink',
+            })
+          }
+        }
       }
     }
   }
@@ -799,6 +833,7 @@ export const useNodesStore = defineStore('nodes', () => {
     currentWorkspaceId,
     initialize,
     getNode,
+    findNodeByTitle,
     updateNodePosition,
     updateNodeSize,
     updateNodeContent,
