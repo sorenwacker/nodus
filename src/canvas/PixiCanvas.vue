@@ -1588,8 +1588,8 @@ function onCanvasMouseDown(e: MouseEvent) {
   // Left click - start panning or lasso if not on a node
   if (e.button === 0) {
     const target = e.target as HTMLElement
-    // Don't pan if clicking on a node, edge, panel, or frame
-    if (target.closest('.node-card') || target.closest('.edge-line') || target.closest('.edge-panel') || target.closest('.canvas-frame')) {
+    // Don't pan if clicking on a node, edge, panel, frame, or node AI toolbar
+    if (target.closest('.node-card') || target.closest('.edge-line') || target.closest('.edge-panel') || target.closest('.canvas-frame') || target.closest('.node-llm-bar-floating')) {
       return
     }
     e.preventDefault()
