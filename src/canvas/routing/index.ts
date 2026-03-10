@@ -40,7 +40,7 @@ import { routeOrthogonal } from './orthogonalRouter'
 // Minimum orthogonal standoff distance from node edge
 // Must be longer than arrow (6px marker + 10px refX offset = ~16px) plus margin
 // Increased to 60px for better visual separation with default 200px node spacing
-const STANDOFF = 60
+const STANDOFF = 120
 
 /**
  * Route all edges with proper port spreading, grid tracking, and obstacle avoidance
