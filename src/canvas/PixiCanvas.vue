@@ -1071,8 +1071,7 @@ async function sendNodePrompt() {
 
     const nodeSystemPrompt = `You are editing a single note. REWRITE the note content based on the user's request.
 
-Return ONLY the new content. Do NOT wrap in code blocks unless the user asks for code or the content is code.
-Unless the user explicitly asks for JSON, return plain markdown text.
+Return ONLY the new content. Use the format the user requests (JSON, YAML, code, etc). Default to plain markdown if no format specified.
 ${neighborsContext}
 CURRENT NOTE CONTENT:
 ${currentContent || '(empty)'}`
