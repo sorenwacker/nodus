@@ -25,6 +25,7 @@ import { useLLM, executeTool, type ToolContext } from './llm'
 import { uiStorage } from '../lib/storage'
 import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
+import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 
 // Undo injection for position changes
@@ -664,81 +665,10 @@ function fitNodeToContent(nodeId: string) {
   const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`) as HTMLElement
   if (!cardEl) return
 
-  // Try to find content element (view mode) or inline-editor (edit mode)
-  const contentEl = cardEl.querySelector('.node-content') as HTMLElement
-  const editorEl = cardEl.querySelector('.inline-editor') as HTMLTextAreaElement
-  const headerEl = cardEl.querySelector('.node-header') as HTMLElement
+  const result = measureNodeContent(cardEl, node.width || 200)
+  if (!result) return
 
-  const minWidth = 180
-  const minHeight = 80
-  const maxHeight = 800  // Reasonable max - can scroll if content is longer
-  const currentWidth = node.width || 200
-
-  let width: number
-  let height: number
-
-  if (contentEl) {
-    // View mode: use scrollHeight which always returns full content height
-    const contentScrollHeight = contentEl.scrollHeight
-    const headerHeight = headerEl?.offsetHeight || 36
-    const border = 4  // 2px top + 2px bottom
-
-    // Check for fixed-size content that needs more width
-    let requiredWidth = currentWidth
-    const images = contentEl.querySelectorAll('img')
-    const mermaidSvgs = contentEl.querySelectorAll('.mermaid svg')
-
-    for (const img of images) {
-      const imgWidth = (img as HTMLImageElement).naturalWidth
-      if (imgWidth > 0) {
-        requiredWidth = Math.max(requiredWidth, Math.min(imgWidth + 24, 600))
-      }
-    }
-    for (const svg of mermaidSvgs) {
-      const svgWidth = (svg as SVGElement).getBoundingClientRect().width
-      if (svgWidth > 0) {
-        requiredWidth = Math.max(requiredWidth, Math.min(svgWidth + 24, 800))
-      }
-    }
-
-    width = Math.max(requiredWidth, minWidth)
-    height = Math.min(maxHeight, Math.max(contentScrollHeight + headerHeight + border, minHeight))
-
-    console.log('[FIT]', nodeId, {
-      contentScrollHeight,
-      headerHeight,
-      border,
-      calculatedHeight: contentScrollHeight + headerHeight + border,
-      finalHeight: height,
-      currentNodeHeight: node.height,
-      widthChanged: width !== currentWidth,
-    })
-  } else if (editorEl) {
-    // Edit mode: measure textarea content
-    // Save current style
-    const savedStyle = editorEl.style.cssText
-
-    // Temporarily auto-size
-    editorEl.style.height = 'auto'
-    editorEl.style.overflow = 'hidden'
-
-    // Force reflow and measure
-    void editorEl.offsetHeight
-    const scrollHeight = editorEl.scrollHeight
-
-    // Restore
-    editorEl.style.cssText = savedStyle
-
-    const headerHeight = headerEl?.offsetHeight || 36
-    const borderHeight = 4
-
-    width = currentWidth
-    height = Math.min(maxHeight, Math.max(scrollHeight + headerHeight + borderHeight, minHeight))
-  } else {
-    return
-  }
-
-  store.updateNodeSize(nodeId, width, height)
+  store.updateNodeSize(nodeId, result.width, result.height)
 
   // In neighborhood mode, re-layout to adapt to new sizes
   if (neighborhoodMode.value && focusNodeId.value) {

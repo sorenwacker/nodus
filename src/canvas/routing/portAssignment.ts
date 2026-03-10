@@ -50,53 +50,6 @@ export function analyzeEdges(
 }
 
 /**
- * Get the perpendicular sort value for a port side
- *
- * For left/right sides: returns Y position of the "other" node (perpendicular direction)
- * For top/bottom sides: returns X position of the "other" node
- *
- * This determines which port position minimizes crossings:
- * - Right side: edges to targets above should use top ports
- * - Left side: edges from sources above should enter top ports
- * etc.
- */
-function getPerpendicularPosition(info: EdgeInfo, side: Side, isSource: boolean): number {
-  const otherNode = isSource ? info.target : info.source
-  const otherCx = otherNode.canvas_x + (otherNode.width || 200) / 2
-  const otherCy = otherNode.canvas_y + (otherNode.height || 120) / 2
-
-  // For horizontal sides (left/right): sort by Y position of other node
-  // For vertical sides (top/bottom): sort by X position of other node
-  if (side === 'left' || side === 'right') {
-    return otherCy
-  } else {
-    return otherCx
-  }
-}
-
-/**
- * Compare two edges for port ordering
- *
- * CRITICAL for avoiding double crossings:
- * When edges share the same source AND target nodes, they MUST be in the same
- * relative order at both ends. We achieve this by using edge ID as a stable
- * tie-breaker that's consistent at both source and target.
- */
-function compareEdgesForPort(a: EdgeInfo, b: EdgeInfo, side: Side, isSource: boolean): number {
-  // Primary sort: by perpendicular position of the "other" node
-  const posA = getPerpendicularPosition(a, side, isSource)
-  const posB = getPerpendicularPosition(b, side, isSource)
-
-  if (Math.abs(posA - posB) > 1) {
-    return posA - posB
-  }
-
-  // Secondary sort: for edges to/from the same node, use edge ID for stable ordering
-  // This ensures consistent ordering at both source and target ends
-  return a.edge.id.localeCompare(b.edge.id)
-}
-
-/**
  * Unified edge entry for port assignment
  * Combines both outgoing (source) and incoming (target) edges at a node+side
  */
