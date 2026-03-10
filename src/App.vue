@@ -17,28 +17,41 @@ const isDark = ref(themeStorage.isDark())
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
 
-// Undo/Redo for position changes
-interface PositionSnapshot {
-  positions: Map<string, { x: number; y: number }>
+// Undo/Redo system - supports both position and content changes
+interface UndoSnapshot {
+  type: 'position' | 'content'
+  positions?: Map<string, { x: number; y: number }>
+  content?: { nodeId: string; oldContent: string | null; oldTitle: string }
 }
-const undoStack = ref<PositionSnapshot[]>([])
-const redoStack = ref<PositionSnapshot[]>([])
+const undoStack = ref<UndoSnapshot[]>([])
+const redoStack = ref<UndoSnapshot[]>([])
 const MAX_UNDO = 50
 
-function capturePositionSnapshot(): PositionSnapshot {
+function capturePositionSnapshot(): UndoSnapshot {
   const positions = new Map<string, { x: number; y: number }>()
   for (const node of store.filteredNodes) {
     positions.set(node.id, { x: node.canvas_x, y: node.canvas_y })
   }
-  return { positions }
+  return { type: 'position', positions }
 }
 
 function pushUndo() {
   const snapshot = capturePositionSnapshot()
-  if (snapshot.positions.size === 0) {
+  if (snapshot.positions?.size === 0) {
     return // Don't push empty snapshots
   }
   undoStack.value.push(snapshot)
+  if (undoStack.value.length > MAX_UNDO) {
+    undoStack.value.shift()
+  }
+  redoStack.value = []
+}
+
+function pushContentUndo(nodeId: string, oldContent: string | null, oldTitle: string) {
+  undoStack.value.push({
+    type: 'content',
+    content: { nodeId, oldContent, oldTitle }
+  })
   if (undoStack.value.length > MAX_UNDO) {
     undoStack.value.shift()
   }
@@ -50,26 +63,67 @@ async function undo() {
     showToast('Nothing to undo', 'info')
     return
   }
-  redoStack.value.push(capturePositionSnapshot())
   const snapshot = undoStack.value.pop()!
-  for (const [id, pos] of snapshot.positions) {
-    await store.updateNodePosition(id, pos.x, pos.y)
+
+  if (snapshot.type === 'position' && snapshot.positions) {
+    redoStack.value.push(capturePositionSnapshot())
+    for (const [id, pos] of snapshot.positions) {
+      await store.updateNodePosition(id, pos.x, pos.y)
+    }
+    showToast('Undo position', 'info')
+  } else if (snapshot.type === 'content' && snapshot.content) {
+    const node = store.getNode(snapshot.content.nodeId)
+    if (node) {
+      // Save current state for redo
+      redoStack.value.push({
+        type: 'content',
+        content: {
+          nodeId: node.id,
+          oldContent: node.markdown_content,
+          oldTitle: node.title
+        }
+      })
+      // Restore old content
+      await store.updateNodeContent(node.id, snapshot.content.oldContent || '')
+      await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
+      showToast('Undo content', 'info')
+    }
   }
-  showToast('Undo', 'info')
 }
 
 async function redo() {
   if (redoStack.value.length === 0) return
-  undoStack.value.push(capturePositionSnapshot())
   const snapshot = redoStack.value.pop()!
-  for (const [id, pos] of snapshot.positions) {
-    await store.updateNodePosition(id, pos.x, pos.y)
+
+  if (snapshot.type === 'position' && snapshot.positions) {
+    undoStack.value.push(capturePositionSnapshot())
+    for (const [id, pos] of snapshot.positions) {
+      await store.updateNodePosition(id, pos.x, pos.y)
+    }
+    showToast('Redo position', 'info')
+  } else if (snapshot.type === 'content' && snapshot.content) {
+    const node = store.getNode(snapshot.content.nodeId)
+    if (node) {
+      // Save current state for undo
+      undoStack.value.push({
+        type: 'content',
+        content: {
+          nodeId: node.id,
+          oldContent: node.markdown_content,
+          oldTitle: node.title
+        }
+      })
+      // Apply redo content
+      await store.updateNodeContent(node.id, snapshot.content.oldContent || '')
+      await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
+      showToast('Redo content', 'info')
+    }
   }
-  showToast('Redo', 'info')
 }
 
-// Expose pushUndo to child components
+// Expose undo functions to child components
 provide('pushUndo', pushUndo)
+provide('pushContentUndo', pushContentUndo)
 
 // Toast notifications
 interface Toast {

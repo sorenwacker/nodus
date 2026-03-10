@@ -28,13 +28,23 @@ import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 
-// Undo injection for position changes
+// Undo injection for position and content changes
 const injectedPushUndo = inject<(() => void) | undefined>('pushUndo')
+const injectedPushContentUndo = inject<((nodeId: string, oldContent: string | null, oldTitle: string) => void) | undefined>('pushContentUndo')
+
 const pushUndo = () => {
   if (injectedPushUndo) {
     injectedPushUndo()
   } else {
     console.warn('pushUndo not provided - undo will not work')
+  }
+}
+
+const pushContentUndo = (nodeId: string, oldContent: string | null, oldTitle: string) => {
+  if (injectedPushContentUndo) {
+    injectedPushContentUndo(nodeId, oldContent, oldTitle)
+  } else {
+    console.warn('pushContentUndo not provided - content undo will not work')
   }
 }
 
@@ -1039,6 +1049,9 @@ async function sendNodePrompt() {
   const isEditing = editingNodeId.value === nodeId
   // Get current content from editing buffer or store
   const currentContent = isEditing ? editContent.value : (node.markdown_content || '')
+
+  // Save undo state before AI modifies content (use current content, not stored)
+  pushContentUndo(nodeId, currentContent, node.title)
 
   isNodeLLMLoading.value = true
   try {
