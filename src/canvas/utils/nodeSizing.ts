@@ -18,7 +18,7 @@ export interface NodeSizingOptions {
 
 const DEFAULT_OPTIONS: Required<NodeSizingOptions> = {
   minWidth: 180,
-  minHeight: 80,
+  minHeight: 60,
   maxHeight: 800,
   maxImageWidth: 600,
   maxDiagramWidth: 800,

@@ -4495,8 +4495,8 @@ ${edges.map(e => `  - id: "${e.id}"
   overflow-y: auto;
   overflow-x: hidden;
   flex: 1;
-  padding: 12px;
-  padding-bottom: 20px;
+  padding: 8px 12px;
+  padding-bottom: 8px;
   border-radius: 0 0 7px 7px;
   cursor: inherit;
   overscroll-behavior: contain;
