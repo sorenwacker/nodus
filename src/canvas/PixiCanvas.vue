@@ -134,6 +134,13 @@ onMounted(() => {
   updateViewportSize()
   window.addEventListener('resize', updateViewportSize)
 
+  // Listen for zoom-to-node events from search
+  const handleZoomToNode = (e: Event) => {
+    const nodeId = (e as CustomEvent).detail?.nodeId
+    if (nodeId) zoomToNode(nodeId)
+  }
+  window.addEventListener('zoom-to-node', handleZoomToNode)
+
   // Keyboard handler for Delete/Backspace
   const handleKeydown = (e: KeyboardEvent) => {
     // Skip if user is typing in an input
@@ -203,6 +210,7 @@ onMounted(() => {
     observer.disconnect()
     window.removeEventListener('resize', updateViewportSize)
     window.removeEventListener('keydown', handleKeydown)
+    window.removeEventListener('zoom-to-node', handleZoomToNode)
     pdfDrop.cleanup()
   })
 

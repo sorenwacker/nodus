@@ -260,6 +260,8 @@ function selectSearchResult(nodeId: string) {
   store.selectNode(nodeId)
   showSearch.value = false
   searchQuery.value = ''
+  // Dispatch event for PixiCanvas to zoom to the node
+  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId } }))
 }
 
 function onKeydown(e: KeyboardEvent) {
