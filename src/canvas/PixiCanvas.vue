@@ -29,7 +29,7 @@ import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
-import { NODE_DEFAULTS, LAYOUT_GAPS, getNodeDimensions } from './constants'
+import { NODE_DEFAULTS } from './constants'
 
 // Undo injection for position and content changes
 const injectedPushUndo = inject<(() => void) | undefined>('pushUndo')
