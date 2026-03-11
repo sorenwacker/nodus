@@ -216,22 +216,26 @@ function toggleTheme() {
 // Apply saved theme on load
 document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light')
 
+// Normalize text for search: lowercase and remove diacritics (ö→o, é→e, etc.)
+function normalizeText(str: string): string {
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 const searchResults = computed(() => {
   if (!searchQuery.value.trim()) return []
-  const q = searchQuery.value.toLowerCase()
+  const q = normalizeText(searchQuery.value)
 
   // Search in filtered nodes (current workspace)
-  const matches = store.filteredNodes.filter(n =>
-    n.title.toLowerCase().includes(q) ||
-    n.markdown_content?.toLowerCase().includes(q)
-  )
+  const matches = store.filteredNodes.filter(n => {
+    const title = normalizeText(n.title)
+    const content = normalizeText(n.markdown_content || '')
+    return title.includes(q) || content.includes(q)
+  })
 
   // Sort by relevance: exact title match > title starts with > title contains > content only
   matches.sort((a, b) => {
-    const aTitle = a.title.toLowerCase()
-    const bTitle = b.title.toLowerCase()
-    const aContent = a.markdown_content?.toLowerCase() || ''
-    const bContent = b.markdown_content?.toLowerCase() || ''
+    const aTitle = normalizeText(a.title)
+    const bTitle = normalizeText(b.title)
 
     // Exact title match
     if (aTitle === q && bTitle !== q) return -1
