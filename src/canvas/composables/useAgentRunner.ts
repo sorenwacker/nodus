@@ -74,6 +74,7 @@ TOOLS:
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}]. YOU generate the values.
 - smart_move(instruction): Move nodes by semantic criteria. E.g., "car brands to left, animals to right".
 - smart_color(instruction): Color nodes by semantic criteria. E.g., "males blue, females pink" or "urgent red".
+- color_matching(pattern, color): Fast grep-style coloring. E.g., pattern="#department", color="#ef4444" (red). No LLM, instant.
 - smart_connect(groups): Connect nodes within groups. E.g., "animals, car brands" connects animals together and cars together.
 - web_search(query): Search web for information
 - done(summary): Call when finished

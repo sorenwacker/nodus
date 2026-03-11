@@ -963,6 +963,69 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
       return `Created ${edgeCount} edges in ${groupedNodes.size} groups`
     }
 
+    case 'smart_color': {
+      const nodes = store.filteredNodes
+      if (nodes.length === 0) return 'No nodes to color'
+      const instruction = args.instruction || ''
+      agentLog.value.push(`> Smart color: ${nodes.length} nodes`)
+
+      // Extract color mappings from instruction using LLM
+      let colorMappings: Array<{ category: string; color: string }> = []
+      try {
+        const resp = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: ollamaModel.value,
+            prompt: `Extract category-to-color mappings from: "${instruction}"
+Output as JSON array: [{"category":"name","color":"#hex"}]
+Available colors: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink), #6b7280 (gray)
+Example: "departments red, people blue" -> [{"category":"departments","color":"#ef4444"},{"category":"people","color":"#3b82f6"}]
+Output ONLY the JSON array:`,
+            stream: false,
+          }),
+        })
+        const data = await resp.json()
+        const match = (data.response || '').match(/\[[\s\S]*\]/)
+        if (match) colorMappings = JSON.parse(match[0])
+      } catch { /* ignore LLM errors */ }
+
+      if (colorMappings.length === 0) return 'Could not parse color instruction'
+
+      let colored = 0
+      for (const node of nodes) {
+        // Check each mapping - match against title and content
+        const nodeText = `${node.title} ${node.markdown_content || ''}`.toLowerCase()
+        for (const { category, color } of colorMappings) {
+          if (nodeText.includes(category.toLowerCase()) ||
+              nodeText.includes(`#${category.toLowerCase()}`)) {
+            await store.updateNodeColor(node.id, color)
+            colored++
+            break
+          }
+        }
+      }
+      return `Colored ${colored} nodes`
+    }
+
+    case 'color_matching': {
+      // Simple pattern-based coloring (grep style)
+      const pattern = (args.pattern || '').toLowerCase()
+      const color = args.color || '#ef4444'
+      if (!pattern) return 'Pattern required'
+
+      const nodes = store.filteredNodes
+      let colored = 0
+      for (const node of nodes) {
+        const nodeText = `${node.title} ${node.markdown_content || ''}`.toLowerCase()
+        if (nodeText.includes(pattern)) {
+          await store.updateNodeColor(node.id, color)
+          colored++
+        }
+      }
+      return `Colored ${colored} nodes matching "${pattern}"`
+    }
+
     case 'web_search': {
       const query = args.query || ''
       try {

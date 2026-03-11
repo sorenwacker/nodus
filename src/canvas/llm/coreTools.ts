@@ -630,8 +630,25 @@ export function registerCoreTools(): void {
       },
       required: ['instruction'],
     },
-    async (args, _ctx) => {
-      return `__SMART_COLOR__:${args.instruction}`
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:smart_color`
+    },
+    { category: 'smart' }
+  )
+
+  defineTool<{ pattern: string; color: string }>(
+    'color_matching',
+    'Color nodes matching a text pattern (grep-style). Fast, no LLM reasoning.',
+    {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string', description: 'Text pattern to match (e.g., "#department", "urgent", "2024")' },
+        color: { type: 'string', description: 'Color hex code: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink)' },
+      },
+      required: ['pattern', 'color'],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:color_matching`
     },
     { category: 'smart' }
   )
