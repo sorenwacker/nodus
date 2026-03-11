@@ -4,43 +4,16 @@
  */
 import { ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
-import { generate, chat } from './ollama'
+import { providerRegistry } from './providers'
 import { agentTools } from './tools'
 import { llmStorage } from '../../lib/storage'
-
-const DEFAULT_SYSTEM_PROMPT = `You are a terse note-taker for a knowledge graph canvas.
-
-FOR MULTIPLE NODES: When asked to create multiple nodes, output JSON array:
-USER: create 3 nodes about databases
-YOU:
-\`\`\`json
-[{"title":"SQL","content":"Structured query language for relational databases"},{"title":"NoSQL","content":"Document, key-value, graph databases"},{"title":"ACID","content":"Atomicity, Consistency, Isolation, Durability"}]
-\`\`\`
-
-FOR SINGLE CONTENT: Output directly without JSON.
-USER: flowchart of auth
-YOU:
-\`\`\`mermaid
-graph TD
-    A[Login] --> B{Valid?}
-    B -->|Yes| C[Home]
-    B -->|No| A
-\`\`\`
-
-RULES:
-- Multiple nodes = JSON array with title and content
-- Diagrams = mermaid code blocks
-- No ASCII art, no explanations`
+import { DEFAULT_SYSTEM_PROMPT } from './prompts'
 
 export function useLLM() {
-  // Settings (persisted via llmStorage)
-  const model = ref(llmStorage.getModel())
-  const contextLength = ref(llmStorage.getContextLength())
+  // System prompt (shared across providers)
   const systemPrompt = ref(llmStorage.getSystemPrompt(DEFAULT_SYSTEM_PROMPT))
 
-  // Persist settings
-  watch(model, (v) => llmStorage.setModel(v))
-  watch(contextLength, (v) => llmStorage.setContextLength(v))
+  // Persist system prompt
   watch(systemPrompt, (v) => llmStorage.setSystemPrompt(v))
 
   // Agent state
@@ -77,27 +50,49 @@ export function useLLM() {
   }
 
   /**
+   * Initialize provider from storage
+   */
+  function initProvider() {
+    const providerId = llmStorage.getProvider()
+    providerRegistry.setActiveProvider(providerId)
+
+    // Load provider config
+    const config = llmStorage.getProviderConfig(providerId)
+    if (Object.keys(config).length > 0) {
+      providerRegistry.configureProvider(providerId, config)
+    }
+  }
+
+  // Initialize on first use
+  initProvider()
+
+  /**
    * Simple generate (no tools)
    */
   async function simpleGenerate(prompt: string, customSystem?: string): Promise<string> {
-    return generate({
-      model: model.value,
+    const provider = providerRegistry.getActiveProvider()
+    const result = await provider.generate({
       prompt,
       system: customSystem || systemPrompt.value,
-      contextLength: contextLength.value,
     })
+    return result.content
   }
 
   /**
    * Chat with tool calling
    */
   async function chatWithTools(messages: ChatMessage[]): Promise<ChatMessage> {
-    return chat({
-      model: model.value,
-      messages,
+    const provider = providerRegistry.getActiveProvider()
+    const result = await provider.chat({
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        tool_calls: m.tool_calls,
+        tool_call_id: m.tool_call_id,
+      })),
       tools: agentTools,
-      contextLength: contextLength.value,
     })
+    return result.message as ChatMessage
   }
 
   /**
@@ -127,8 +122,6 @@ export function useLLM() {
 
   return {
     // Settings
-    model,
-    contextLength,
     systemPrompt,
     DEFAULT_SYSTEM_PROMPT,
 
@@ -150,5 +143,9 @@ export function useLLM() {
 
     // Re-export tools for convenience
     agentTools,
+
+    // Provider access
+    getActiveProvider: () => providerRegistry.getActiveProvider(),
+    getActiveProviderId: () => providerRegistry.getActiveProviderId(),
   }
 }

@@ -3,9 +3,16 @@
  * Handles communication with local Ollama instance
  */
 import type { AgentTool, ChatMessage } from './types'
+import { llmStorage } from '../../lib/storage'
 
-const OLLAMA_URL = 'http://localhost:11434'
-const TIMEOUT_MS = 60000
+// Get URL and timeout from storage (with defaults)
+function getOllamaUrl(): string {
+  return llmStorage.getUrl()
+}
+
+function getTimeout(): number {
+  return llmStorage.getTimeout()
+}
 
 export interface GenerateOptions {
   model: string
@@ -26,10 +33,10 @@ export interface ChatOptions {
  */
 export async function generate(options: GenerateOptions): Promise<string> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timeout = setTimeout(() => controller.abort(), getTimeout())
 
   try {
-    const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+    const response = await fetch(`${getOllamaUrl()}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -65,10 +72,10 @@ export async function generate(options: GenerateOptions): Promise<string> {
  */
 export async function chat(options: ChatOptions): Promise<ChatMessage> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timeout = setTimeout(() => controller.abort(), getTimeout())
 
   try {
-    const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    const response = await fetch(`${getOllamaUrl()}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -104,7 +111,7 @@ export async function chat(options: ChatOptions): Promise<ChatMessage> {
  */
 export async function isAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(`${OLLAMA_URL}/api/tags`, {
+    const response = await fetch(`${getOllamaUrl()}/api/tags`, {
       method: 'GET',
       signal: AbortSignal.timeout(2000),
     })

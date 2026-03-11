@@ -45,6 +45,7 @@ fn main() {
             commands::delete_workspace,
             commands::deduplicate_edges,
             commands::read_file_content,
+            commands::http_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

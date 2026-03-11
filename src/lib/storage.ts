@@ -14,6 +14,14 @@ const KEYS = {
   llmModel: 'nodus_llm_model',
   llmContext: 'nodus_llm_context',
   llmPrompt: 'nodus_llm_prompt',
+  llmAgentPrompt: 'nodus_llm_agent_prompt',
+  llmUrl: 'nodus_llm_url',
+  llmTimeout: 'nodus_llm_timeout',
+  llmProvider: 'nodus_llm_provider',
+  llmProviderConfigs: 'nodus_llm_provider_configs',
+  canvasGridSnap: 'nodus_canvas_grid_snap',
+  canvasGridSize: 'nodus_canvas_grid_size',
+  canvasEdgeStyle: 'nodus_canvas_edge_style',
 } as const
 
 /**
@@ -95,11 +103,78 @@ export const llmStorage = {
   setSystemPrompt(value: string): void {
     localStorage.setItem(KEYS.llmPrompt, value)
   },
+  getAgentPrompt(defaultPrompt: string): string {
+    return localStorage.getItem(KEYS.llmAgentPrompt) || defaultPrompt
+  },
+  setAgentPrompt(value: string): void {
+    localStorage.setItem(KEYS.llmAgentPrompt, value)
+  },
   getPromptHistory(): string[] {
     return parseJson<string[]>(localStorage.getItem(KEYS.promptHistory), [])
   },
   setPromptHistory(value: string[]): void {
     localStorage.setItem(KEYS.promptHistory, JSON.stringify(value))
+  },
+  getUrl(): string {
+    return localStorage.getItem(KEYS.llmUrl) || 'http://localhost:11434'
+  },
+  setUrl(value: string): void {
+    localStorage.setItem(KEYS.llmUrl, value)
+  },
+  getTimeout(): number {
+    return parseInt(localStorage.getItem(KEYS.llmTimeout) || '60000', 10)
+  },
+  setTimeout(value: number): void {
+    localStorage.setItem(KEYS.llmTimeout, String(value))
+  },
+  getProvider(): string {
+    return localStorage.getItem(KEYS.llmProvider) || 'ollama'
+  },
+  setProvider(value: string): void {
+    localStorage.setItem(KEYS.llmProvider, value)
+  },
+  getProviderConfigs(): Record<string, Record<string, unknown>> {
+    return parseJson<Record<string, Record<string, unknown>>>(
+      localStorage.getItem(KEYS.llmProviderConfigs),
+      {}
+    )
+  },
+  setProviderConfigs(value: Record<string, Record<string, unknown>>): void {
+    localStorage.setItem(KEYS.llmProviderConfigs, JSON.stringify(value))
+  },
+  getProviderConfig(providerId: string): Record<string, unknown> {
+    const configs = this.getProviderConfigs()
+    return configs[providerId] || {}
+  },
+  setProviderConfig(providerId: string, config: Record<string, unknown>): void {
+    const configs = this.getProviderConfigs()
+    configs[providerId] = config
+    this.setProviderConfigs(configs)
+  },
+}
+
+/**
+ * Canvas settings storage
+ */
+export const canvasStorage = {
+  getGridSnap(): boolean {
+    return localStorage.getItem(KEYS.canvasGridSnap) !== 'false'
+  },
+  setGridSnap(value: boolean): void {
+    localStorage.setItem(KEYS.canvasGridSnap, String(value))
+  },
+  getGridSize(): number {
+    return parseInt(localStorage.getItem(KEYS.canvasGridSize) || '20', 10)
+  },
+  setGridSize(value: number): void {
+    localStorage.setItem(KEYS.canvasGridSize, String(value))
+  },
+  getEdgeStyle(): 'orthogonal' | 'diagonal' {
+    const value = localStorage.getItem(KEYS.canvasEdgeStyle)
+    return value === 'diagonal' ? 'diagonal' : 'orthogonal'
+  },
+  setEdgeStyle(value: 'orthogonal' | 'diagonal'): void {
+    localStorage.setItem(KEYS.canvasEdgeStyle, value)
   },
 }
 

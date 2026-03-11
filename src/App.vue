@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, computed, provide } from 'vue'
 import { useNodesStore } from './stores/nodes'
 import PixiCanvas from './canvas/PixiCanvas.vue'
+import SettingsModal from './components/SettingsModal.vue'
 import { themeStorage } from './lib/storage'
 
 const store = useNodesStore()
@@ -13,6 +14,7 @@ const importTarget = ref<'current' | 'new'>('new')
 const importWorkspaceName = ref('')
 const searchQuery = ref('')
 const showSearch = ref(false)
+const showSettings = ref(false)
 const isDark = ref(themeStorage.isDark())
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
@@ -260,9 +262,16 @@ function onKeydown(e: KeyboardEvent) {
       }, 50)
     }
   }
-  // Escape: Close search or deselect
+  // Cmd/Ctrl + ,: Open settings
+  if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+    e.preventDefault()
+    showSettings.value = !showSettings.value
+  }
+  // Escape: Close dialogs or deselect
   if (e.key === 'Escape') {
-    if (showSearch.value) {
+    if (showSettings.value) {
+      showSettings.value = false
+    } else if (showSearch.value) {
       showSearch.value = false
       searchQuery.value = ''
     } else if (store.selectedNodeId) {
@@ -388,6 +397,12 @@ async function openFolderDialog() {
         <button class="icon-btn theme-btn" :title="isDark ? 'Light mode' : 'Dark mode'" @click="toggleTheme">
           <svg v-if="isDark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
           <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="icon-btn settings-btn" title="Settings (Cmd+,)" @click="showSettings = true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
         </button>
       </div>
     </header>
@@ -546,6 +561,9 @@ async function openFolderDialog() {
     </div>
 
     <!-- Toast notifications -->
+    <!-- Settings Modal -->
+    <SettingsModal v-if="showSettings" @close="showSettings = false" />
+
     <div class="toast-container">
       <div
         v-for="toast in toasts"

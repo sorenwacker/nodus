@@ -3,12 +3,12 @@
  */
 
 /**
- * Clean LLM-generated content: fix escape sequences, remove garbage
+ * Clean LLM-generated content: fix escape sequences
  */
 export function cleanContent(text: string): string {
   return (text || '')
-    .replace(/\\\\n/g, '\n')  // Double-escaped newlines
-    .replace(/\\n/g, '\n')     // Single-escaped newlines
+    .replace(/\\\\n/g, '\n')
+    .replace(/\\n/g, '\n')
     .replace(/\\\\t/g, '\t')
     .replace(/\\t/g, '\t')
     .replace(/direct\s*\.end/gi, '')

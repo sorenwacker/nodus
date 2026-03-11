@@ -44,6 +44,42 @@ export interface DiagonalRouteParams {
 // Minimum diagonal distance for meaningful 45° segment
 const MIN_DIAG_DIST = 10
 
+/**
+ * Check if a path contains any 180-degree turns (reversing direction)
+ */
+function has180DegreeTurn(path: Point[]): boolean {
+  for (let i = 0; i < path.length - 2; i++) {
+    const p1 = path[i]
+    const p2 = path[i + 1]
+    const p3 = path[i + 2]
+
+    const dx1 = p2.x - p1.x
+    const dy1 = p2.y - p1.y
+    const dx2 = p3.x - p2.x
+    const dy2 = p3.y - p2.y
+
+    // Skip zero-length segments
+    const len1 = Math.abs(dx1) + Math.abs(dy1)
+    const len2 = Math.abs(dx2) + Math.abs(dy2)
+    if (len1 < 1 || len2 < 1) continue
+
+    // Check for 180-degree turn (direction reversal)
+    // Horizontal reversal
+    if (Math.abs(dy1) < 1 && Math.abs(dy2) < 1) {
+      if ((dx1 > 0 && dx2 < 0) || (dx1 < 0 && dx2 > 0)) {
+        return true
+      }
+    }
+    // Vertical reversal
+    if (Math.abs(dx1) < 1 && Math.abs(dx2) < 1) {
+      if ((dy1 > 0 && dy2 < 0) || (dy1 < 0 && dy2 > 0)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
 // Minimum orthogonal segment length before/after diagonal
 // Must be longer than arrow for clean entry/exit
 const MIN_ORTHO_SEGMENT = 40
@@ -383,7 +419,7 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
   const isHorizDominant = absDx >= absDy
 
   // Adjust end port for arrow head
-  let endEdge = { ...endPort }
+  const endEdge = { ...endPort }
   if (arrowOffset > 0) {
     if (targetSide === 'left') endEdge.x += arrowOffset
     else if (targetSide === 'right') endEdge.x -= arrowOffset
@@ -546,6 +582,18 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
   gridTracker.mark(bestP2.x, bestP2.y, endStandoff.x, endStandoff.y)
 
   const path = [startPort, startStandoff, bestP1, bestP2, endStandoff, endEdge]
+
+  // Final check for 180-degree turns - if found, use simple direct path
+  if (has180DegreeTurn(path)) {
+    const midX = (startPort.x + endEdge.x) / 2
+    const midY = (startPort.y + endEdge.y) / 2
+    const isHorizontalStart = sourceSide === 'left' || sourceSide === 'right'
+    const directPath = isHorizontalStart
+      ? [startPort, { x: midX, y: startPort.y }, { x: midX, y: endEdge.y }, endEdge]
+      : [startPort, { x: startPort.x, y: midY }, { x: endEdge.x, y: midY }, endEdge]
+    return { path: directPath, svgPath: buildSvgPath(directPath), usedDetour: true }
+  }
+
   return { path, svgPath: buildSvgPath(path), usedDetour: false }
 }
 

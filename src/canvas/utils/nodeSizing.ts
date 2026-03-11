@@ -67,7 +67,28 @@ function measureViewModeContent(
   currentWidth: number,
   opts: Required<NodeSizingOptions>
 ): NodeSizeResult {
+  // Temporarily remove height constraints to measure true content size
+  const cardEl = contentEl.closest('.node-card') as HTMLElement
+  const savedCardStyle = cardEl?.style.cssText || ''
+  const savedContentStyle = contentEl.style.cssText
+
+  if (cardEl) {
+    cardEl.style.height = 'auto'
+  }
+  contentEl.style.height = 'auto'
+  contentEl.style.maxHeight = 'none'
+  contentEl.style.overflow = 'visible'
+
+  // Force reflow
+  void contentEl.offsetHeight
+
   const contentScrollHeight = contentEl.scrollHeight
+
+  // Restore styles
+  contentEl.style.cssText = savedContentStyle
+  if (cardEl) {
+    cardEl.style.cssText = savedCardStyle
+  }
 
   // Check for fixed-size content that needs more width
   let requiredWidth = currentWidth

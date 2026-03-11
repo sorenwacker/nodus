@@ -396,8 +396,8 @@ function layoutNeighborhood(focusId: string): boolean {
   const positions = new Map<string, { x: number; y: number }>()
   const focusWidth = focusNode.width || 200
   const focusHeight = focusNode.height || 120
-  const verticalGap = 200 // Vertical distance between rows
-  const horizontalGap = 50 // Horizontal gap between nodes in same row
+  const verticalGap = 300 // Vertical distance between rows (must be > 2*STANDOFF for edge routing)
+  const horizontalGap = 100 // Horizontal gap between nodes in same row
 
   // Focus node at center (position is top-left corner)
   positions.set(focusId, {
@@ -446,8 +446,8 @@ function layoutNeighborhood(focusId: string): boolean {
 
   // Layout siblings (bidirectional) on left and right of focus
   if (siblings.length > 0) {
-    const horizontalDistance = 350 // Distance from focus center to sibling center
-    const verticalSpacing = 30 // Vertical gap between stacked siblings
+    const horizontalDistance = 400 // Distance from focus center to sibling center
+    const verticalSpacing = 50 // Vertical gap between stacked siblings
 
     // Split siblings: odd indices left, even indices right
     const leftSiblings = siblings.filter((_, i) => i % 2 === 0)
@@ -706,7 +706,12 @@ function autoFitAllNodes() {
 }
 
 // Fit all visible nodes to their content (auto-expand to show all content)
-function fitAllNodesToContent() {
+async function fitAllNodesToContent() {
+  // Exit any active editing first
+  if (editingNodeId.value) {
+    saveEditing()
+    await nextTick()
+  }
   // Wait for DOM to render
   setTimeout(() => {
     for (const node of store.filteredNodes) {
@@ -714,7 +719,7 @@ function fitAllNodesToContent() {
     }
     // Trigger edge re-routing after sizes change
     store.nodeLayoutVersion++
-  }, 50)
+  }, 100)
 }
 
 // Reset all nodes to default size (200x120)
@@ -1069,11 +1074,12 @@ async function sendNodePrompt() {
       ? `\nCONNECTED NODES:\n${connectedNodes}\n`
       : ''
 
-    const nodeSystemPrompt = `You are editing a single note. REWRITE the note content based on the user's request.
+    const nodeSystemPrompt = `Rewrite the note based on the user's request. Output content directly.
 
-Return ONLY the new content. Use the format the user requests (JSON, YAML, code, etc). Default to plain markdown if no format specified.
+NO preamble ("Here is", "Sure", etc). NO code fences unless content IS code.
+Format: Obsidian markdown with [[wikilinks]], #tags, **bold**, lists.
 ${neighborsContext}
-CURRENT NOTE CONTENT:
+CURRENT:
 ${currentContent || '(empty)'}`
 
     const response = await callOllama(nodePrompt.value, nodeSystemPrompt)
@@ -3079,8 +3085,23 @@ function updateNodeColor(nodeId: string, color: string | null) {
 }
 
 // One-shot fit to content (does NOT enable auto_fit)
-function fitNodeNow(nodeId: string) {
-  setTimeout(() => fitNodeToContent(nodeId), 50)
+async function fitNodeNow(nodeId: string) {
+  // Exit edit mode first to measure rendered view, not textarea
+  if (editingNodeId.value === nodeId) {
+    // Save content directly
+    store.updateNodeContent(nodeId, editContent.value)
+    // Clear editing state
+    editingNodeId.value = null
+    editContent.value = ''
+    nodePrompt.value = ''
+  }
+  // Wait for Vue to render the view mode content
+  await nextTick()
+  // Additional delay for markdown rendering
+  setTimeout(() => {
+    renderMermaidDiagrams()
+    setTimeout(() => fitNodeToContent(nodeId), 150)
+  }, 50)
 }
 
 async function deleteSelectedNodes() {

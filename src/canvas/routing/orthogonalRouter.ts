@@ -111,7 +111,7 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   const isHorizontalEnd = targetSide === 'left' || targetSide === 'right'
 
   // Adjust end port for arrow head
-  let endEdge = { ...endPort }
+  const endEdge = { ...endPort }
   if (arrowOffset > 0) {
     if (targetSide === 'left') endEdge.x += arrowOffset
     else if (targetSide === 'right') endEdge.x -= arrowOffset
@@ -126,7 +126,12 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   const adjacentResult = tryAdjacentRoute(
     endpoints, endPort, sourceSide, isHorizontalStart, isHorizontalEnd, gridTracker
   )
-  if (adjacentResult) return adjacentResult
+  if (adjacentResult) {
+    // Validate no 180-degree turns
+    if (!has180DegreeTurn(adjacentResult.path)) {
+      return adjacentResult
+    }
+  }
 
   // ==========================================================================
   // TRY SIMPLE PATHS FIRST (fewer segments = fewer crossings)
@@ -134,7 +139,12 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   const simpleResult = trySimplePath(
     endpoints, isHorizontalStart, isHorizontalEnd, nodes, excludeIds, gridTracker
   )
-  if (simpleResult) return simpleResult
+  if (simpleResult) {
+    // Validate no 180-degree turns
+    if (!has180DegreeTurn(simpleResult.path)) {
+      return simpleResult
+    }
+  }
 
   // ==========================================================================
   // FALLBACK: 3-segment path (U-shape or Z-shape)
@@ -143,13 +153,21 @@ export function routeOrthogonal(params: OrthogonalRouteParams): OrthogonalRouteR
   const primaryAxis: Axis = isHorizontalStart ? 'x' : 'y'
   const delta = primaryAxis === 'x' ? dx : dy
 
-  return routeThreeSegment(
+  const threeSegResult = routeThreeSegment(
     endpoints, primaryAxis, delta, channelOffset, nodes, excludeIds, gridTracker
   )
+
+  // Final validation - if still has 180-degree turn, use direct path
+  if (has180DegreeTurn(threeSegResult.path)) {
+    return createDirectPath(startPort, endEdge, sourceSide, gridTracker)
+  }
+
+  return threeSegResult
 }
 
 /**
  * Try routing adjacent nodes with crossed standoffs
+ * Handles all cases where going to the standoff first would create a 180-degree turn
  */
 function tryAdjacentRoute(
   endpoints: RouteEndpoints,
@@ -166,17 +184,42 @@ function tryAdjacentRoute(
   const standoffsCrossedY = (sourceSide === 'bottom' && startStandoff.y > endStandoff.y) ||
                             (sourceSide === 'top' && startStandoff.y < endStandoff.y)
 
+  // No crossing - normal routing can proceed
+  if (!standoffsCrossedX && !standoffsCrossedY) {
+    return null
+  }
+
+  const midX = (startPort.x + endPort.x) / 2
+  const midY = (startPort.y + endPort.y) / 2
+
+  // Case 1: Both horizontal exits with X crossing
   if (standoffsCrossedX && isHorizontalStart && isHorizontalEnd) {
-    const midX = (startPort.x + endPort.x) / 2
     const mid1: Point = { x: midX, y: startPort.y }
     const mid2: Point = { x: midX, y: endPort.y }
     return buildResult([startPort, mid1, mid2, endEdge], gridTracker, false)
   }
 
+  // Case 2: Both vertical exits with Y crossing
   if (standoffsCrossedY && !isHorizontalStart && !isHorizontalEnd) {
-    const midY = (startPort.y + endPort.y) / 2
     const mid1: Point = { x: startPort.x, y: midY }
     const mid2: Point = { x: endPort.x, y: midY }
+    return buildResult([startPort, mid1, mid2, endEdge], gridTracker, false)
+  }
+
+  // Case 3: Horizontal start, vertical end with crossing
+  // Go perpendicular first to avoid 180-degree turn
+  if ((standoffsCrossedX || standoffsCrossedY) && isHorizontalStart && !isHorizontalEnd) {
+    // Start goes horizontal, so go vertical first to avoid backtracking
+    const mid1: Point = { x: startPort.x, y: midY }
+    const mid2: Point = { x: endPort.x, y: midY }
+    return buildResult([startPort, mid1, mid2, endEdge], gridTracker, false)
+  }
+
+  // Case 4: Vertical start, horizontal end with crossing
+  if ((standoffsCrossedX || standoffsCrossedY) && !isHorizontalStart && isHorizontalEnd) {
+    // Start goes vertical, so go horizontal first to avoid backtracking
+    const mid1: Point = { x: midX, y: startPort.y }
+    const mid2: Point = { x: midX, y: endPort.y }
     return buildResult([startPort, mid1, mid2, endEdge], gridTracker, false)
   }
 
@@ -278,7 +321,7 @@ function routeThreeSegment(
     ]
   }
 
-  let obstacles = checkPath(bestMid)
+  const obstacles = checkPath(bestMid)
   if (obstacles.length > 0) {
     const result = findClearRoute(bestMid, delta, primaryAxis, checkPath, obstacles)
     bestMid = result.mid
@@ -412,6 +455,69 @@ function findClearRoute(
     mid: firstObs.length <= secondObs.length ? tryFirst : trySecond,
     usedDetour: true,
   }
+}
+
+/**
+ * Check if a path contains any 180-degree turns (reversing direction)
+ */
+function has180DegreeTurn(path: Point[]): boolean {
+  for (let i = 0; i < path.length - 2; i++) {
+    const p1 = path[i]
+    const p2 = path[i + 1]
+    const p3 = path[i + 2]
+
+    const dx1 = p2.x - p1.x
+    const dy1 = p2.y - p1.y
+    const dx2 = p3.x - p2.x
+    const dy2 = p3.y - p2.y
+
+    // Skip zero-length segments
+    const len1 = Math.abs(dx1) + Math.abs(dy1)
+    const len2 = Math.abs(dx2) + Math.abs(dy2)
+    if (len1 < 1 || len2 < 1) continue
+
+    // Check for 180-degree turn (direction reversal)
+    // Horizontal reversal: both segments horizontal but opposite directions
+    if (Math.abs(dy1) < 1 && Math.abs(dy2) < 1) {
+      if ((dx1 > 0 && dx2 < 0) || (dx1 < 0 && dx2 > 0)) {
+        return true
+      }
+    }
+    // Vertical reversal: both segments vertical but opposite directions
+    if (Math.abs(dx1) < 1 && Math.abs(dx2) < 1) {
+      if ((dy1 > 0 && dy2 < 0) || (dy1 < 0 && dy2 > 0)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Create a simple direct path avoiding 180-degree turns
+ * Used as fallback when standard routing produces bad results
+ */
+function createDirectPath(
+  startPort: Point,
+  endEdge: Point,
+  sourceSide: Side,
+  gridTracker: GridTracker
+): OrthogonalRouteResult {
+  const midX = (startPort.x + endEdge.x) / 2
+  const midY = (startPort.y + endEdge.y) / 2
+  const isHorizontalStart = sourceSide === 'left' || sourceSide === 'right'
+
+  let path: Point[]
+  if (isHorizontalStart) {
+    // Start horizontal, then vertical
+    path = [startPort, { x: midX, y: startPort.y }, { x: midX, y: endEdge.y }, endEdge]
+  } else {
+    // Start vertical, then horizontal
+    path = [startPort, { x: startPort.x, y: midY }, { x: endEdge.x, y: midY }, endEdge]
+  }
+
+  markPathSegments(path, gridTracker)
+  return { path, svgPath: buildSvgPath(path), usedDetour: true }
 }
 
 /**

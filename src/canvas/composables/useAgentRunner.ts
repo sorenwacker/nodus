@@ -4,6 +4,8 @@
  */
 import type { Ref } from 'vue'
 import type { ChatMessage, AgentTask } from '../llm/types'
+import { llmStorage } from '../../lib/storage'
+import { DEFAULT_AGENT_PROMPT } from '../llm/prompts'
 
 export interface AgentContext {
   // Node store access
@@ -46,14 +48,11 @@ function buildSystemPrompt(nodes: Array<{ title: string; canvas_x: number; canva
     nodeList = nodes.slice(0, 20).map(n => n.title).join(', ') + `... (${nodes.length} total)`
   }
 
+  const customRules = llmStorage.getAgentPrompt(DEFAULT_AGENT_PROMPT)
+
   return {
     role: 'system',
     content: `You are a graph builder agent.
-
-RULES:
-- ONLY do what user asks. Do NOT add extra actions.
-- For SEMANTIC tasks (categories like "animals", "car brands"): USE smart_move, smart_color, or smart_connect.
-- After smart_move, smart_color, or smart_connect: call done() immediately. These tools are complete operations.
 
 CANVAS: x right, y down.
 
@@ -79,17 +78,7 @@ TOOLS:
 - web_search(query): Search web for information
 - done(summary): Call when finished
 
-CONTENT RULES:
-- Title = label, Content = substance
-- No meta-commentary ("This node contains...", "Here is...")
-- Be concise: data, definitions, or markdown only
-
-RULES:
-- Use create_nodes_batch for 3+ nodes
-- Do EXACTLY what user asks - no more, no less
-- Do NOT add extra operations (don't move nodes unless asked, don't connect unless asked)
-- ALWAYS call done() when finished
-- Never output plain text - only use tools`,
+${customRules}`,
   }
 }
 
