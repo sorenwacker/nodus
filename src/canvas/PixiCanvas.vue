@@ -28,6 +28,7 @@ import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
+import { NODE_DEFAULTS, LAYOUT_GAPS, getNodeDimensions } from './constants'
 
 // Undo injection for position and content changes
 const injectedPushUndo = inject<(() => void) | undefined>('pushUndo')
@@ -260,8 +261,8 @@ const visibleNodes = computed(() => {
 
   // Use displayNodes which respects neighborhood mode
   return displayNodes.value.filter(node => {
-    const nodeRight = node.canvas_x + (node.width || 200)
-    const nodeBottom = node.canvas_y + (node.height || 120)
+    const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
+    const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
     // Check if node intersects viewport
     return nodeRight >= viewLeft &&
            node.canvas_x <= viewRight &&
@@ -394,10 +395,10 @@ function layoutNeighborhood(focusId: string): boolean {
 
   // Hierarchical layout - focus in center, parents above, children below
   const positions = new Map<string, { x: number; y: number }>()
-  const focusWidth = focusNode.width || 200
-  const focusHeight = focusNode.height || 120
-  const verticalGap = 300 // Vertical distance between rows (must be > 2*STANDOFF for edge routing)
-  const horizontalGap = 150 // Horizontal gap between nodes in same row
+  const focusWidth = focusNode.width || NODE_DEFAULTS.WIDTH
+  const focusHeight = focusNode.height || NODE_DEFAULTS.HEIGHT
+  const verticalGap = LAYOUT_GAPS.VERTICAL
+  const horizontalGap = LAYOUT_GAPS.HORIZONTAL
 
   // Focus node at center (position is top-left corner)
   positions.set(focusId, {
@@ -409,14 +410,14 @@ function layoutNeighborhood(focusId: string): boolean {
   if (parents.length > 0) {
     const totalWidth = parents.reduce((sum, id) => {
       const n = store.getNode(id)
-      return sum + (n?.width || 200) + horizontalGap
+      return sum + (n?.width || NODE_DEFAULTS.WIDTH) + horizontalGap
     }, -horizontalGap)
     let xOffset = viewCenterX - totalWidth / 2
 
     parents.forEach(parentId => {
       const n = store.getNode(parentId)
-      const nodeWidth = n?.width || 200
-      const nodeHeight = n?.height || 120
+      const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
+      const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
       positions.set(parentId, {
         x: xOffset,
         y: viewCenterY - focusHeight / 2 - verticalGap - nodeHeight,
@@ -429,13 +430,13 @@ function layoutNeighborhood(focusId: string): boolean {
   if (children.length > 0) {
     const totalWidth = children.reduce((sum, id) => {
       const n = store.getNode(id)
-      return sum + (n?.width || 200) + horizontalGap
+      return sum + (n?.width || NODE_DEFAULTS.WIDTH) + horizontalGap
     }, -horizontalGap)
     let xOffset = viewCenterX - totalWidth / 2
 
     children.forEach(childId => {
       const n = store.getNode(childId)
-      const nodeWidth = n?.width || 200
+      const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
       positions.set(childId, {
         x: xOffset,
         y: viewCenterY + focusHeight / 2 + verticalGap,
@@ -446,8 +447,8 @@ function layoutNeighborhood(focusId: string): boolean {
 
   // Layout siblings (bidirectional) on left and right of focus
   if (siblings.length > 0) {
-    const siblingGap = 150 // Gap between focus and siblings
-    const verticalSpacing = 80 // Vertical gap between stacked siblings
+    const siblingGap = LAYOUT_GAPS.SIBLING_GAP
+    const verticalSpacing = LAYOUT_GAPS.SIBLING_VERTICAL
 
     // Split siblings: odd indices left, even indices right
     const leftSiblings = siblings.filter((_, i) => i % 2 === 0)
@@ -456,24 +457,24 @@ function layoutNeighborhood(focusId: string): boolean {
     // Calculate max width for each side to determine horizontal offset
     const maxLeftWidth = leftSiblings.reduce((max, id) => {
       const n = store.getNode(id)
-      return Math.max(max, n?.width || 200)
+      return Math.max(max, n?.width || NODE_DEFAULTS.WIDTH)
     }, 0)
     const maxRightWidth = rightSiblings.reduce((max, id) => {
       const n = store.getNode(id)
-      return Math.max(max, n?.width || 200)
+      return Math.max(max, n?.width || NODE_DEFAULTS.WIDTH)
     }, 0)
 
     // Layout left siblings - position based on focus left edge
     const leftTotalHeight = leftSiblings.reduce((sum, id) => {
       const n = store.getNode(id)
-      return sum + (n?.height || 120) + verticalSpacing
+      return sum + (n?.height || NODE_DEFAULTS.HEIGHT) + verticalSpacing
     }, -verticalSpacing)
     let yOffset = viewCenterY - leftTotalHeight / 2
 
     leftSiblings.forEach(sibId => {
       const n = store.getNode(sibId)
-      const nodeWidth = n?.width || 200
-      const nodeHeight = n?.height || 120
+      const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
+      const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
       // Position so right edge is siblingGap away from focus left edge
       positions.set(sibId, {
         x: viewCenterX - focusWidth / 2 - siblingGap - nodeWidth,
@@ -485,13 +486,13 @@ function layoutNeighborhood(focusId: string): boolean {
     // Layout right siblings - position based on focus right edge
     const rightTotalHeight = rightSiblings.reduce((sum, id) => {
       const n = store.getNode(id)
-      return sum + (n?.height || 120) + verticalSpacing
+      return sum + (n?.height || NODE_DEFAULTS.HEIGHT) + verticalSpacing
     }, -verticalSpacing)
     yOffset = viewCenterY - rightTotalHeight / 2
 
     rightSiblings.forEach(sibId => {
       const n = store.getNode(sibId)
-      const nodeHeight = n?.height || 120
+      const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
       // Position so left edge is siblingGap away from focus right edge
       positions.set(sibId, {
         x: viewCenterX + focusWidth / 2 + siblingGap,
@@ -507,8 +508,8 @@ function layoutNeighborhood(focusId: string): boolean {
   // Center view on the focus node
   const focusPos = positions.get(focusId)
   if (focusPos) {
-    const nodeCenterX = focusPos.x + (focusNode.width || 200) / 2
-    const nodeCenterY = focusPos.y + (focusNode.height || 120) / 2
+    const nodeCenterX = focusPos.x + (focusNode.width || NODE_DEFAULTS.WIDTH) / 2
+    const nodeCenterY = focusPos.y + (focusNode.height || NODE_DEFAULTS.HEIGHT) / 2
 
     // Set offset so node center is at viewport center
     offsetX.value = rect.width / 2 - nodeCenterX * scale.value
@@ -540,8 +541,8 @@ const magnifierVisibleNodes = computed(() => {
   const centerY = (magnifierPos.value.y - offsetY.value) / scale.value
 
   return store.filteredNodes.filter(node => {
-    const nodeRight = node.canvas_x + (node.width || 200)
-    const nodeBottom = node.canvas_y + (node.height || 120)
+    const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
+    const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
     // Check if node intersects with magnifier circle (use bounding box approximation)
     const closestX = Math.max(node.canvas_x, Math.min(centerX, nodeRight))
     const closestY = Math.max(node.canvas_y, Math.min(centerY, nodeBottom))
@@ -563,8 +564,8 @@ const minimap = useMinimap({
     id: n.id,
     canvas_x: n.canvas_x,
     canvas_y: n.canvas_y,
-    width: n.width || 200,
-    height: n.height || 120,
+    width: n.width || NODE_DEFAULTS.WIDTH,
+    height: n.height || NODE_DEFAULTS.HEIGHT,
     color_theme: n.color_theme,
   }))),
   selectedNodeIds: computed(() => store.selectedNodeIds),
@@ -694,7 +695,7 @@ function fitNodeToContent(nodeId: string) {
   const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`) as HTMLElement
   if (!cardEl) return
 
-  const result = measureNodeContent(cardEl, node.width || 200)
+  const result = measureNodeContent(cardEl, node.width || NODE_DEFAULTS.WIDTH)
   if (!result) return
 
   store.updateNodeSize(nodeId, result.width, result.height)
@@ -1166,10 +1167,10 @@ const edgeLines = computed(() => {
     return true
   })
 
-  // Filter edges for neighborhood mode - only show edges between visible neighbors
-  if (neighborhoodNodeIds.value) {
-    const neighborIds = neighborhoodNodeIds.value
-    edges = edges.filter(e => neighborIds.has(e.source_node_id) && neighborIds.has(e.target_node_id))
+  // Filter edges for neighborhood mode - only show edges connected to focus node
+  if (neighborhoodMode.value && focusNodeId.value) {
+    const focusId = focusNodeId.value
+    edges = edges.filter(e => e.source_node_id === focusId || e.target_node_id === focusId)
   }
 
   // MASSIVE GRAPH OPTIMIZATION: Skip all expensive routing, use simple center-to-center lines
@@ -1182,10 +1183,10 @@ const edgeLines = computed(() => {
       const target = nodeMap.get(edge.target_node_id)
       if (!source || !target) return null
 
-      const sw = source.width || 200
-      const sh = source.height || 120
-      const tw = target.width || 200
-      const th = target.height || 120
+      const sw = source.width || NODE_DEFAULTS.WIDTH
+      const sh = source.height || NODE_DEFAULTS.HEIGHT
+      const tw = target.width || NODE_DEFAULTS.WIDTH
+      const th = target.height || NODE_DEFAULTS.HEIGHT
 
       // Simple center-to-center coordinates
       const x1 = source.canvas_x + sw / 2
@@ -1230,7 +1231,7 @@ const edgeLines = computed(() => {
       id: node.id,
       canvas_x: node.canvas_x,
       canvas_y: node.canvas_y,
-      width: node.width || 200,
+      width: node.width || NODE_DEFAULTS.WIDTH,
       height: getNodeHeight(node, false),  // false = use real height for routing
     })
   }
@@ -1265,7 +1266,7 @@ const edgeLines = computed(() => {
     id: n.id,
     canvas_x: n.canvas_x,
     canvas_y: n.canvas_y,
-    width: n.width || 200,
+    width: n.width || NODE_DEFAULTS.WIDTH,
     height: getNodeHeight(n, false),  // false = ignore collapse, use real height
   }))
 
@@ -1282,10 +1283,10 @@ const edgeLines = computed(() => {
   for (const edge of edgeDefs) {
     const source = nodeMap.get(edge.source_node_id)!
     const target = nodeMap.get(edge.target_node_id)!
-    const targetCx = target.canvas_x + (target.width || 200) / 2
-    const targetCy = target.canvas_y + (target.height || 120) / 2
-    const sourceCx = source.canvas_x + (source.width || 200) / 2
-    const sourceCy = source.canvas_y + (source.height || 120) / 2
+    const targetCx = target.canvas_x + (target.width || NODE_DEFAULTS.WIDTH) / 2
+    const targetCy = target.canvas_y + (target.height || NODE_DEFAULTS.HEIGHT) / 2
+    const sourceCx = source.canvas_x + (source.width || NODE_DEFAULTS.WIDTH) / 2
+    const sourceCy = source.canvas_y + (source.height || NODE_DEFAULTS.HEIGHT) / 2
 
     const sourceSide = getSide(source, targetCx, targetCy)
     const targetSide = getSide(target, sourceCx, sourceCy)
@@ -1333,9 +1334,9 @@ const edgeLines = computed(() => {
     const target = store.getNode(edge.target_node_id)
     if (!source || !target) return null
 
-    const sw = source.width || 200
+    const sw = source.width || NODE_DEFAULTS.WIDTH
     const sh = getNodeHeight(source)
-    const tw = target.width || 200
+    const tw = target.width || NODE_DEFAULTS.WIDTH
     const th = getNodeHeight(target)
 
     // Center points
@@ -1788,15 +1789,15 @@ function onFrameMouseDown(e: MouseEvent, frameId: string) {
   // Find nodes inside the frame and store their initial positions
   frameContainedNodes.value.clear()
   for (const node of store.filteredNodes) {
-    const nodeRight = node.canvas_x + (node.width || 200)
-    const nodeBottom = node.canvas_y + (node.height || 120)
+    const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
+    const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
     const frameRight = frame.canvas_x + frame.width
     const frameBottom = frame.canvas_y + frame.height
 
     // Check if node overlaps with frame (at least 50% inside)
     const overlapX = Math.max(0, Math.min(nodeRight, frameRight) - Math.max(node.canvas_x, frame.canvas_x))
     const overlapY = Math.max(0, Math.min(nodeBottom, frameBottom) - Math.max(node.canvas_y, frame.canvas_y))
-    const nodeArea = (node.width || 200) * (node.height || 120)
+    const nodeArea = (node.width || NODE_DEFAULTS.WIDTH) * (node.height || NODE_DEFAULTS.HEIGHT)
     const overlapArea = overlapX * overlapY
 
     if (overlapArea > nodeArea * 0.5) {
@@ -1903,8 +1904,8 @@ function createFrameAtCenter() {
     for (const node of selectedNodes) {
       minX = Math.min(minX, node.canvas_x)
       minY = Math.min(minY, node.canvas_y)
-      maxX = Math.max(maxX, node.canvas_x + (node.width || 200))
-      maxY = Math.max(maxY, node.canvas_y + (node.height || 120))
+      maxX = Math.max(maxX, node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH))
+      maxY = Math.max(maxY, node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT))
     }
 
     const frameX = minX - padding
@@ -1944,10 +1945,10 @@ function onResizeMouseDown(e: MouseEvent, nodeId: string) {
   resizeStart.value = {
     x: e.clientX,
     y: e.clientY,
-    width: node.width || 200,
-    height: node.height || 120,
+    width: node.width || NODE_DEFAULTS.WIDTH,
+    height: node.height || NODE_DEFAULTS.HEIGHT,
   }
-  resizePreview.value = { width: node.width || 200, height: node.height || 120 }
+  resizePreview.value = { width: node.width || NODE_DEFAULTS.WIDTH, height: node.height || NODE_DEFAULTS.HEIGHT }
 
   // Store initial sizes of all selected nodes for multi-resize
   multiResizeInitial.value.clear()
@@ -1955,7 +1956,7 @@ function onResizeMouseDown(e: MouseEvent, nodeId: string) {
     for (const id of store.selectedNodeIds) {
       const n = store.getNode(id)
       if (n) {
-        multiResizeInitial.value.set(id, { width: n.width || 200, height: n.height || 120 })
+        multiResizeInitial.value.set(id, { width: n.width || NODE_DEFAULTS.WIDTH, height: n.height || NODE_DEFAULTS.HEIGHT })
       }
     }
   }
@@ -2011,7 +2012,7 @@ function stopResize() {
         if (id === nodeId) continue
         const n = store.getNode(id)
         if (n) {
-          store.updateNodeSize(id, n.width || 200, n.height || 120)
+          store.updateNodeSize(id, n.width || NODE_DEFAULTS.WIDTH, n.height || NODE_DEFAULTS.HEIGHT)
         }
       }
     }
@@ -2041,8 +2042,8 @@ function pushOverlappingNodesAway(sourceId: string) {
   const sourceNode = store.getNode(sourceId)
   if (!sourceNode) return
 
-  const sw = sourceNode.width || 200
-  const sh = sourceNode.height || 120
+  const sw = sourceNode.width || NODE_DEFAULTS.WIDTH
+  const sh = sourceNode.height || NODE_DEFAULTS.HEIGHT
   const sx = sourceNode.canvas_x
   const sy = sourceNode.canvas_y
   const scx = sx + sw / 2
@@ -2051,8 +2052,8 @@ function pushOverlappingNodesAway(sourceId: string) {
   for (const node of store.filteredNodes) {
     if (node.id === sourceId) continue
 
-    const nw = node.width || 200
-    const nh = node.height || 120
+    const nw = node.width || NODE_DEFAULTS.WIDTH
+    const nh = node.height || NODE_DEFAULTS.HEIGHT
     const nx = node.canvas_x
     const ny = node.canvas_y
 
@@ -2108,8 +2109,8 @@ function navigateToNode(title: string) {
   // Center view on node
   const rect = canvasRef.value?.getBoundingClientRect()
   if (rect) {
-    const nodeCenterX = targetNode.canvas_x + (targetNode.width || 200) / 2
-    const nodeCenterY = targetNode.canvas_y + (targetNode.height || 120) / 2
+    const nodeCenterX = targetNode.canvas_x + (targetNode.width || NODE_DEFAULTS.WIDTH) / 2
+    const nodeCenterY = targetNode.canvas_y + (targetNode.height || NODE_DEFAULTS.HEIGHT) / 2
     offsetX.value = rect.width / 2 - nodeCenterX * scale.value
     offsetY.value = rect.height / 2 - nodeCenterY * scale.value
   }
@@ -2473,8 +2474,8 @@ function tetrisGridLayout(
   let maxNodeWidth = 0
   let maxNodeHeight = 0
   for (const node of nodes) {
-    const w = node.width || 200
-    const h = node.height || 120
+    const w = node.width || NODE_DEFAULTS.WIDTH
+    const h = node.height || NODE_DEFAULTS.HEIGHT
     totalArea += (w + gap) * (h + gap)
     maxNodeWidth = Math.max(maxNodeWidth, w)
     maxNodeHeight = Math.max(maxNodeHeight, h)
@@ -2486,8 +2487,8 @@ function tetrisGridLayout(
 
   // Sort nodes by area (largest first) for better packing
   const sorted = [...nodes].sort((a, b) => {
-    const areaA = (a.width || 200) * (a.height || 120)
-    const areaB = (b.width || 200) * (b.height || 120)
+    const areaA = (a.width || NODE_DEFAULTS.WIDTH) * (a.height || NODE_DEFAULTS.HEIGHT)
+    const areaB = (b.width || NODE_DEFAULTS.WIDTH) * (b.height || NODE_DEFAULTS.HEIGHT)
     return areaB - areaA
   })
 
@@ -2570,8 +2571,8 @@ function tetrisGridLayout(
 
   // Place each node
   for (const node of sorted) {
-    const w = node.width || 200
-    const h = node.height || 120
+    const w = node.width || NODE_DEFAULTS.WIDTH
+    const h = node.height || NODE_DEFAULTS.HEIGHT
     const pos = findBestPosition(w, h)
     targets.set(node.id, pos)
     placed.push({ x: pos.x, y: pos.y, w, h })
@@ -2599,8 +2600,8 @@ async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' | 'for
   // Calculate current center of all nodes (this stays consistent across layouts)
   let sumX = 0, sumY = 0
   for (const node of nodes) {
-    sumX += node.canvas_x + (node.width || 200) / 2
-    sumY += node.canvas_y + (node.height || 120) / 2
+    sumX += node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2
+    sumY += node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2
   }
   const centerX = sumX / nodes.length
   const centerY = sumY / nodes.length
@@ -2631,8 +2632,8 @@ async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' | 'for
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const node of nodes) {
       const pos = trialTargets.get(node.id)!
-      const w = node.width || 200
-      const h = node.height || 120
+      const w = node.width || NODE_DEFAULTS.WIDTH
+      const h = node.height || NODE_DEFAULTS.HEIGHT
       minX = Math.min(minX, pos.x)
       minY = Math.min(minY, pos.y)
       maxX = Math.max(maxX, pos.x + w)
@@ -2653,27 +2654,27 @@ async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' | 'for
     // Horizontal and vertical layouts - use actual node sizes
     if (layout === 'horizontal') {
       // Sort by height for better alignment
-      const sorted = [...nodes].sort((a, b) => (b.height || 120) - (a.height || 120))
-      let totalWidth = sorted.reduce((sum, n) => sum + (n.width || 200) + gap, -gap)
+      const sorted = [...nodes].sort((a, b) => (b.height || NODE_DEFAULTS.HEIGHT) - (a.height || NODE_DEFAULTS.HEIGHT))
+      let totalWidth = sorted.reduce((sum, n) => sum + (n.width || NODE_DEFAULTS.WIDTH) + gap, -gap)
       let x = centerX - totalWidth / 2
-      const maxHeight = Math.max(...sorted.map(n => n.height || 120))
+      const maxHeight = Math.max(...sorted.map(n => n.height || NODE_DEFAULTS.HEIGHT))
 
       for (const node of sorted) {
-        const h = node.height || 120
+        const h = node.height || NODE_DEFAULTS.HEIGHT
         targets.set(node.id, { x, y: centerY - maxHeight / 2 + (maxHeight - h) / 2 })
-        x += (node.width || 200) + gap
+        x += (node.width || NODE_DEFAULTS.WIDTH) + gap
       }
     } else if (layout === 'vertical') {
       // Sort by width for better alignment
-      const sorted = [...nodes].sort((a, b) => (b.width || 200) - (a.width || 200))
-      let totalHeight = sorted.reduce((sum, n) => sum + (n.height || 120) + gap, -gap)
+      const sorted = [...nodes].sort((a, b) => (b.width || NODE_DEFAULTS.WIDTH) - (a.width || NODE_DEFAULTS.WIDTH))
+      let totalHeight = sorted.reduce((sum, n) => sum + (n.height || NODE_DEFAULTS.HEIGHT) + gap, -gap)
       let y = centerY - totalHeight / 2
-      const maxWidth = Math.max(...sorted.map(n => n.width || 200))
+      const maxWidth = Math.max(...sorted.map(n => n.width || NODE_DEFAULTS.WIDTH))
 
       for (const node of sorted) {
-        const w = node.width || 200
+        const w = node.width || NODE_DEFAULTS.WIDTH
         targets.set(node.id, { x: centerX - maxWidth / 2 + (maxWidth - w) / 2, y })
-        y += (node.height || 120) + gap
+        y += (node.height || NODE_DEFAULTS.HEIGHT) + gap
       }
     }
   }
@@ -2688,8 +2689,8 @@ function fitToContent() {
   for (const node of store.filteredNodes) {
     minX = Math.min(minX, node.canvas_x)
     minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + (node.width || 200))
-    maxY = Math.max(maxY, node.canvas_y + (node.height || 120))
+    maxX = Math.max(maxX, node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH))
+    maxY = Math.max(maxY, node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT))
   }
 
   const rect = canvasRef.value?.getBoundingClientRect()
@@ -3183,8 +3184,8 @@ function exportGraphAsYaml() {
     title: n.title,
     x: n.canvas_x,
     y: n.canvas_y,
-    width: n.width || 200,
-    height: n.height || 120,
+    width: n.width || NODE_DEFAULTS.WIDTH,
+    height: n.height || NODE_DEFAULTS.HEIGHT,
   }))
 
   const edges = edgeLines.value.map(e => ({
@@ -3468,8 +3469,8 @@ ${edges.map(e => `  - id: "${e.id}"
         }"
         :style="{
           transform: `translate3d(${node.canvas_x}px, ${node.canvas_y}px, 0)`,
-          width: (resizingNode === node.id ? resizePreview.width : (node.width || 200)) + 'px',
-          height: (resizingNode === node.id ? resizePreview.height : (node.height || 120)) + 'px',
+          width: (resizingNode === node.id ? resizePreview.width : (node.width || NODE_DEFAULTS.WIDTH)) + 'px',
+          height: (resizingNode === node.id ? resizePreview.height : (node.height || NODE_DEFAULTS.HEIGHT)) + 'px',
           ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
         }"
         @mousedown="onNodeMouseDown($event, node.id)"
@@ -3544,7 +3545,7 @@ ${edges.map(e => `  - id: "${e.id}"
         class="node-llm-bar-floating"
         :style="{
           transform: `translate(${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x}px, ${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y - 40}px)`,
-          width: (getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || 200) + 'px'
+          width: (getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || NODE_DEFAULTS.WIDTH) + 'px'
         }"
         @mousedown.stop
         @click.stop
@@ -3753,8 +3754,8 @@ ${edges.map(e => `  - id: "${e.id}"
           :style="{
             left: ((node.canvas_x - (magnifierPos.x - offsetX) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
             top: ((node.canvas_y - (magnifierPos.y - offsetY) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
-            width: ((node.width || 200) * MAGNIFIER_ZOOM) + 'px',
-            height: ((node.height || 120) * MAGNIFIER_ZOOM) + 'px',
+            width: ((node.width || NODE_DEFAULTS.WIDTH) * MAGNIFIER_ZOOM) + 'px',
+            height: ((node.height || NODE_DEFAULTS.HEIGHT) * MAGNIFIER_ZOOM) + 'px',
             background: node.color_theme || '#ffffff',
           }"
         >
