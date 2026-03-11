@@ -269,10 +269,13 @@ const viewportHeight = ref(window.innerHeight)
 
 // Only render nodes visible in viewport (with margin for smooth scrolling)
 const visibleNodes = computed(() => {
-  const margin = 500 // Large margin to prevent edge flickering during pan/zoom
   const s = scale.value
   const ox = offsetX.value
   const oy = offsetY.value
+  // Scale margin inversely with zoom to maintain consistent screen-space buffer
+  // At zoom 1.0: 500px margin. At zoom 0.2: 2500px margin in canvas coords
+  const baseMargin = 500
+  const margin = baseMargin / Math.max(s, 0.1)
 
   // Viewport bounds in canvas coordinates
   const viewLeft = -ox / s - margin
@@ -1459,8 +1462,10 @@ const edgeLines = computed(() => {
 const visibleEdgeLines = computed(() => {
   let edges = edgeLines.value
 
-  // Filter for large graphs when zoomed out
-  if (isLargeGraph.value && !isZooming.value && scale.value <= 0.8) {
+  // Filter for large graphs when zoomed out, but NOT when zoomed out very far
+  // At low zoom levels, all content fits on screen anyway so filtering is unnecessary
+  // Only filter in the "medium zoom" range (0.3 to 0.8) where culling helps
+  if (isLargeGraph.value && !isZooming.value && scale.value <= 0.8 && scale.value >= 0.3) {
     const visIds = visibleNodeIds.value
     edges = edges.filter(e =>
       visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
