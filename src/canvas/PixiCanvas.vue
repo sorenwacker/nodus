@@ -24,6 +24,7 @@ import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
+import { useLasso } from './composables/useLasso'
 import { NODE_DEFAULTS } from './constants'
 
 // Undo injection for position and content changes
@@ -276,6 +277,16 @@ const visibleNodeIds = computed(() => new Set(visibleNodes.value.map(n => n.id))
 // Canvas element ref (needed early for layout functions)
 const canvasRef = ref<HTMLElement | null>(null)
 
+// Screen to canvas coordinate conversion
+function screenToCanvas(screenX: number, screenY: number) {
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (!rect) return { x: 0, y: 0 }
+  return {
+    x: (screenX - rect.left - offsetX.value) / scale.value,
+    y: (screenY - rect.top - offsetY.value) / scale.value,
+  }
+}
+
 // Neighborhood mode composable
 const neighborhood = useNeighborhoodMode({
   store: {
@@ -305,6 +316,19 @@ function layoutNeighborhood(focusId: string) {
 function getVisualNode(nodeId: string) {
   return neighborhood.getVisualNode(nodeId)
 }
+
+// Lasso selection composable
+const lasso = useLasso({
+  store: {
+    filteredNodes: store.filteredNodes,
+    selectedNodeIds: store.selectedNodeIds,
+  },
+  screenToCanvas,
+})
+const { isLassoSelecting, lassoPoints } = lasso
+function startLasso(e: MouseEvent) { lasso.start(e) }
+function updateLasso(e: MouseEvent) { lasso.update(e) }
+function endLasso() { lasso.end() }
 
 // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
 // In neighborhood mode, always use full routing since we have few nodes
@@ -424,55 +448,6 @@ const editFrameTitle = ref('')
 
 // Gridlock (snap to grid)
 const gridLockEnabled = ref(false)
-
-// Lasso selection
-const isLassoSelecting = ref(false)
-const lassoPoints = ref<{ x: number; y: number }[]>([])
-
-function startLasso(e: MouseEvent) {
-  isLassoSelecting.value = true
-  lassoPoints.value = [screenToCanvas(e.clientX, e.clientY)]
-}
-
-function updateLasso(e: MouseEvent) {
-  if (!isLassoSelecting.value) return
-  lassoPoints.value.push(screenToCanvas(e.clientX, e.clientY))
-}
-
-function endLasso() {
-  if (!isLassoSelecting.value || lassoPoints.value.length < 3) {
-    isLassoSelecting.value = false
-    lassoPoints.value = []
-    return
-  }
-
-  // Find nodes inside lasso polygon
-  const selected: string[] = []
-  for (const node of store.filteredNodes) {
-    const cx = node.canvas_x + node.width / 2
-    const cy = node.canvas_y + node.height / 2
-    if (pointInPolygon(cx, cy, lassoPoints.value)) {
-      selected.push(node.id)
-    }
-  }
-
-  store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...selected)
-  isLassoSelecting.value = false
-  lassoPoints.value = []
-}
-
-function pointInPolygon(x: number, y: number, polygon: { x: number; y: number }[]): boolean {
-  let inside = false
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y
-    const xj = polygon[j].x, yj = polygon[j].y
-    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-      inside = !inside
-    }
-  }
-  return inside
-}
-
 const gridSize = 20 // Snap to 20px grid
 
 function snapToGrid(value: number): number {
@@ -1291,16 +1266,6 @@ const transform = computed(() => {
   // Use translate3d for GPU acceleration
   return `translate3d(${offsetX.value}px, ${offsetY.value}px, 0) scale(${scale.value})`
 })
-
-// Screen to canvas coordinates
-function screenToCanvas(screenX: number, screenY: number) {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return { x: 0, y: 0 }
-  return {
-    x: (screenX - rect.left - offsetX.value) / scale.value,
-    y: (screenY - rect.top - offsetY.value) / scale.value,
-  }
-}
 
 // Zoom centered on mouse position
 function onWheel(e: WheelEvent) {
