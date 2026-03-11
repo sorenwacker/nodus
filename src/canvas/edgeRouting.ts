@@ -42,6 +42,12 @@ export {
   findObstaclesInRegion,
   OBSTACLE_MARGIN,
 
+  // Spatial indexing
+  SpatialIndex,
+  getSpatialIndex,
+  invalidateSpatialIndex,
+  setRoutingSpatialIndex,
+
   // Constants
   PORT_SPACING,
   CORNER_MARGIN,

@@ -66,7 +66,6 @@ export function applyForceLayout(
     centerY = 0,
     chargeStrength = -100,
     linkDistance = 150,
-    collisionMultiplier = 1.0,  // Not used anymore - collision uses actual node sizes
     iterations = 300,
     gravityStrength = 0.6,
     onTick,
@@ -104,10 +103,6 @@ export function applyForceLayout(
   }
   const disconnectedIds = new Set(simNodes.filter(n => !connectedIds.has(n.id)).map(n => n.id))
   console.log('[FORCE] total nodes:', simNodes.length, 'connected:', connectedIds.size, 'disconnected:', disconnectedIds.size, 'center:', centerX, centerY)
-
-  // Calculate average node diagonal for base spacing
-  const avgDiagonal = simNodes.reduce((sum, n) =>
-    sum + Math.sqrt(n.width ** 2 + n.height ** 2), 0) / simNodes.length
 
   // Create simulation - keep nodes close together
   const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(simNodes)

@@ -5,7 +5,7 @@
  * Plugins can register additional tools using the same API.
  */
 
-import { defineTool, toolRegistry, type ToolContext } from './registry'
+import { defineTool, toolRegistry } from './registry'
 import { cleanContent } from './utils'
 import { applyForceLayout } from '../layout'
 
@@ -678,13 +678,13 @@ export function registerCoreTools(): void {
 
   defineTool<{ filter?: string; action: string; template: string }>(
     'for_each_node',
-    'Set/append CONTENT using math templates. For unique values or titles use batch_update.',
+    'Process nodes: set/append content with templates, or use LLM to transform content.',
     {
       type: 'object',
       properties: {
         filter: { type: 'string', description: '"all", "empty", "has_content", or search term' },
-        action: { type: 'string', description: '"set" or "append" (content only, NOT titles)' },
-        template: { type: 'string', description: 'Math template: {title}, {n}, {n^2}, {n+1}' },
+        action: { type: 'string', description: '"set", "append", or "llm" (LLM transforms each node)' },
+        template: { type: 'string', description: 'For set/append: math template with {title}, {n}. For llm: instruction like "clean up this text"' },
       },
       required: ['action', 'template'],
     },
@@ -706,6 +706,36 @@ export function registerCoreTools(): void {
       const template = args.template
       const action = args.action
 
+      // LLM action - use LLM to transform each node's content
+      if (action === 'llm') {
+        const { providerRegistry } = await import('./providers')
+        const provider = providerRegistry.getActiveProvider()
+        let processed = 0
+
+        for (const node of nodes) {
+          if (!node.markdown_content?.trim()) continue
+
+          ctx.log(`> Processing "${node.title}"...`)
+
+          try {
+            const result = await provider.generate({
+              prompt: `${template}\n\nContent:\n${node.markdown_content}`,
+              system: 'You are a text processor. Follow the instruction exactly. Output only the processed text, no explanations.',
+            })
+
+            if (result.content?.trim()) {
+              await ctx.store.updateNodeContent(node.id, cleanContent(result.content))
+              processed++
+            }
+          } catch (err) {
+            ctx.log(`> Error processing "${node.title}": ${err}`)
+          }
+        }
+
+        return `Processed ${processed}/${nodes.length} nodes with LLM`
+      }
+
+      // Template-based actions (set/append)
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i]
         const n = i + 1
@@ -713,6 +743,7 @@ export function registerCoreTools(): void {
         // Evaluate template
         let content = template
           .replace(/\{title\}/g, node.title)
+          .replace(/\{content\}/g, node.markdown_content || '')
           .replace(/\{n\}/g, String(n))
           .replace(/\{n\^2\}/g, String(n * n))
           .replace(/\{n\+1\}/g, String(n + 1))

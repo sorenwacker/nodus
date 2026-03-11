@@ -20,10 +20,10 @@ interface Edge {
 }
 
 interface Store {
-  filteredNodes: Node[]
-  filteredEdges: Edge[]
+  getFilteredNodes: () => Node[]
+  getFilteredEdges: () => Edge[]
   getNode: (id: string) => Node | undefined
-  selectedNodeIds: string[]
+  getSelectedNodeIds: () => string[]
 }
 
 interface ViewState {
@@ -51,7 +51,7 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     if (!neighborhoodMode.value || !focusNodeId.value) return null
 
     const neighbors = new Set<string>([focusNodeId.value])
-    for (const edge of store.filteredEdges) {
+    for (const edge of store.getFilteredEdges()) {
       if (edge.source_node_id === focusNodeId.value) {
         neighbors.add(edge.target_node_id)
       }
@@ -64,9 +64,10 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
 
   // Nodes to display (filtered by neighborhood if active, with local positions)
   const displayNodes = computed(() => {
+    const nodes = store.getFilteredNodes()
     if (neighborhoodNodeIds.value) {
       const positions = neighborhoodPositions.value
-      return store.filteredNodes
+      return nodes
         .filter(n => neighborhoodNodeIds.value!.has(n.id))
         .map(n => {
           const pos = positions.get(n.id)
@@ -76,7 +77,7 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
           return n
         })
     }
-    return store.filteredNodes
+    return nodes
   })
 
   // Get visual node (with correct position accounting for neighborhood mode)
@@ -86,7 +87,7 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
 
   // Toggle neighborhood mode for a node
   function toggle(nodeId?: string) {
-    const targetId = nodeId || store.selectedNodeIds[0] || focusNodeId.value
+    const targetId = nodeId || store.getSelectedNodeIds()[0] || focusNodeId.value
 
     // If already in neighborhood mode and clicking the same node (or no node specified), exit
     if (neighborhoodMode.value && (!nodeId || focusNodeId.value === targetId)) {
@@ -113,7 +114,7 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     const incomingFrom = new Set<string>()
     const outgoingTo = new Set<string>()
 
-    for (const edge of store.filteredEdges) {
+    for (const edge of store.getFilteredEdges()) {
       if (edge.target_node_id === focusId && edge.source_node_id !== focusId) {
         incomingFrom.add(edge.source_node_id)
       }
@@ -262,6 +263,12 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     }
   }
 
+  // Exit neighborhood mode (e.g., when workspace changes)
+  function exit() {
+    neighborhoodMode.value = false
+    focusNodeId.value = null
+  }
+
   return {
     // State
     neighborhoodMode,
@@ -275,5 +282,6 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     layout,
     navigateTo,
     getVisualNode,
+    exit,
   }
 }

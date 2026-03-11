@@ -62,3 +62,11 @@ export async function readTextFile(path: string): Promise<string> {
     throw new Error(`Cannot read file: ${path}`)
   }
 }
+
+export async function extractPdfText(path: string): Promise<string> {
+  return invoke<string>('extract_pdf_text', { path })
+}
+
+export async function refreshWorkspace(workspaceId: string | null): Promise<number> {
+  return invoke<number>('refresh_workspace', { workspaceId })
+}

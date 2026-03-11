@@ -4,7 +4,6 @@ import {
   findObstacles,
   findObstaclesInRegion,
   getObstacleBounds,
-  OBSTACLE_MARGIN,
 } from '../canvas/routing/obstacleAvoider'
 import { routeDiagonal, validateDiagonalPath } from '../canvas/routing/diagonalRouter'
 import { routeOrthogonal, validateOrthogonalPath } from '../canvas/routing/orthogonalRouter'

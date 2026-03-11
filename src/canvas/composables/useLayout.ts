@@ -14,9 +14,9 @@ interface Node {
 }
 
 interface Store {
-  nodes: Node[]
-  filteredNodes: Node[]
-  selectedNodeIds: string[]
+  getNodes: () => Node[]
+  getFilteredNodes: () => Node[]
+  getSelectedNodeIds: () => string[]
   updateNodePosition: (id: string, x: number, y: number) => void
   layoutNodes: (nodeIds?: string[], options?: { centerX: number; centerY: number }) => Promise<void>
 }
@@ -53,7 +53,7 @@ export function useLayout(options: UseLayoutOptions) {
     const startPositions = new Map<string, { x: number; y: number }>()
 
     for (const [id] of targets) {
-      const node = store.nodes.find(n => n.id === id)
+      const node = store.getNodes().find(n => n.id === id)
       if (node) {
         startPositions.set(id, { x: node.canvas_x, y: node.canvas_y })
       }
@@ -197,8 +197,8 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
-    const selectedIds = store.selectedNodeIds
-    const allNodes = store.filteredNodes
+    const selectedIds = store.getSelectedNodeIds()
+    const allNodes = store.getFilteredNodes()
     const nodes = selectedIds.length > 0
       ? allNodes.filter(n => selectedIds.includes(n.id))
       : allNodes
@@ -277,10 +277,11 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   function fitToContent() {
-    if (store.filteredNodes.length === 0) return
+    const nodes = store.getFilteredNodes()
+    if (nodes.length === 0) return
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const node of store.filteredNodes) {
+    for (const node of nodes) {
       minX = Math.min(minX, node.canvas_x)
       minY = Math.min(minY, node.canvas_y)
       maxX = Math.max(maxX, node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH))

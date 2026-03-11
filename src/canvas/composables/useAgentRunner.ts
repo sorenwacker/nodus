@@ -70,7 +70,7 @@ TOOLS:
 - delete_matching(filter): Delete multiple nodes. filter="all"|"even"|"odd"|"empty"|term
 - auto_layout("grid"|"horizontal"|"vertical"|"circle"|"clock"|"star"): Arrange all nodes
 - query_nodes(filter): Query DB. filter="all"|"empty"|"has_content"|"search term". Returns node list.
-- for_each_node(action, template, filter?): action="set"|"append"|"search"|"llm". {title}, {n}. llm=ask LLM to generate content per node.
+- for_each_node(action, template, filter?): action="set"|"append"|"llm". For "llm": template is the instruction (e.g., "clean up this text, remove references"), content is passed automatically. ALWAYS use this for bulk content processing/cleanup.
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}]. YOU generate the values.
 - smart_move(instruction): Move nodes by semantic criteria. E.g., "car brands to left, animals to right".
 - smart_color(instruction): Color nodes by semantic criteria. E.g., "males blue, females pink" or "urgent red".

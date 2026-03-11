@@ -77,13 +77,24 @@ const selectedModel = computed({
 })
 
 const timeout = computed({
-  get: () => (currentConfig.value.timeout as number) || 60000,
+  get: () => (currentConfig.value.timeout as number) || 300000,  // 5 min default for large context
   set: (value: number) => setConfigValue('timeout', value)
 })
 
 const maxTokens = computed({
   get: () => (currentConfig.value.maxTokens as number) || 4096,
   set: (value: number) => setConfigValue('maxTokens', value)
+})
+
+const contextWindow = computed({
+  get: () => (currentConfig.value.contextLength as number) || 4096,
+  set: (value: number) => setConfigValue('contextLength', value)
+})
+
+// Chain context limit (how much content from connected nodes to include)
+const chainContextLimit = ref(llmStorage.getChainContextLimit())
+watch(chainContextLimit, (value) => {
+  llmStorage.setChainContextLimit(value)
 })
 
 // System prompt (shared across providers)
@@ -129,6 +140,7 @@ async function fetchModels() {
     model: selectedModel.value,
     timeout: timeout.value,
     maxTokens: maxTokens.value,
+    contextLength: contextWindow.value,
   }
   provider.configure(config)
 
@@ -158,6 +170,7 @@ function saveProviderConfig() {
     model: selectedModel.value,
     timeout: timeout.value,
     maxTokens: maxTokens.value,
+    contextLength: contextWindow.value,
   }
 
   llmStorage.setProviderConfig(selectedProvider.value, config)
@@ -204,6 +217,7 @@ async function validateApiKey() {
     model: selectedModel.value,
     timeout: timeout.value,
     maxTokens: maxTokens.value,
+    contextLength: contextWindow.value,
   })
 
   try {
@@ -250,6 +264,7 @@ watch(llmSystemPrompt, saveSystemPrompt)
 watch(llmAgentPrompt, saveAgentPrompt)
 watch([gridSnap, gridSize, edgeStyle], saveCanvasSettings)
 watch(theme, saveGeneralSettings)
+watch([maxTokens, contextWindow, timeout, selectedModel], saveProviderConfig)
 
 // Refresh models when URL changes
 let fetchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -432,6 +447,31 @@ const timeoutSeconds = computed({
             <span class="hint">Maximum tokens in response</span>
           </div>
 
+          <!-- Context Window (num_ctx for Ollama) -->
+          <div class="setting-group">
+            <label>Context Window</label>
+            <div class="input-with-presets">
+              <input
+                v-model.number="contextWindow"
+                type="number"
+                min="2048"
+                max="131072"
+                step="1024"
+              />
+              <div class="preset-buttons">
+                <button
+                  v-for="preset in [4096, 8192, 32768, 65536, 131072]"
+                  :key="preset"
+                  :class="{ active: contextWindow === preset }"
+                  @click="contextWindow = preset"
+                >
+                  {{ preset >= 1024 ? (preset / 1024) + 'k' : preset }}
+                </button>
+              </div>
+            </div>
+            <span class="hint">Model context size in tokens (Llama 3.1: up to 131072)</span>
+          </div>
+
           <!-- Timeout -->
           <div class="setting-group">
             <label>Timeout (seconds)</label>
@@ -442,6 +482,23 @@ const timeoutSeconds = computed({
               max="300"
               step="10"
             />
+          </div>
+
+          <!-- Chain Context Limit -->
+          <div class="setting-group">
+            <label>Neighbor Context</label>
+            <div class="slider-group">
+              <input
+                v-model.number="chainContextLimit"
+                type="range"
+                min="0"
+                max="200000"
+                step="10000"
+                class="slider"
+              />
+              <span class="slider-value">{{ chainContextLimit === 0 ? 'Off' : (chainContextLimit / 1000) + 'k' }}</span>
+            </div>
+            <span class="hint">Include content from linked nodes when asking LLM</span>
           </div>
 
           <!-- System Prompt -->
@@ -937,5 +994,99 @@ const timeoutSeconds = computed({
 .about-info .version {
   color: var(--text-muted, #71717a);
   margin-top: 4px;
+}
+
+.input-with-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-with-presets input {
+  width: 100%;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.preset-buttons button {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--bg-canvas, #f4f4f5);
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-main, #18181b);
+  transition: all 0.15s;
+}
+
+[data-theme='dark'] .preset-buttons button {
+  background: #18181b;
+  border-color: #3f3f46;
+  color: #f4f4f5;
+}
+
+.preset-buttons button:hover {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.preset-buttons button.active {
+  background: var(--primary-color, #3b82f6);
+  border-color: var(--primary-color, #3b82f6);
+  color: white;
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-group .slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border-node, #e4e4e7);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+[data-theme='dark'] .slider-group .slider {
+  background: #3f3f46;
+}
+
+.slider-group .slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--primary-color, #3b82f6);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-group .slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--primary-color, #3b82f6);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-group .slider-value {
+  min-width: 48px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main, #18181b);
+}
+
+[data-theme='dark'] .slider-group .slider-value {
+  color: #f4f4f5;
 }
 </style>

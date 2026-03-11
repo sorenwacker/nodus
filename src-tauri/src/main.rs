@@ -46,6 +46,8 @@ fn main() {
             commands::deduplicate_edges,
             commands::read_file_content,
             commands::http_request,
+            commands::extract_pdf_text,
+            commands::refresh_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

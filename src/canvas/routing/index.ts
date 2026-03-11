@@ -23,16 +23,17 @@ export {
   findBestDetour,
   routeAroundObstacles,
   getObstacleBounds,
+  setRoutingSpatialIndex,
   OBSTACLE_MARGIN,
 } from './obstacleAvoider'
+export { SpatialIndex, getSpatialIndex, invalidateSpatialIndex } from './spatialIndex'
 export { routeDiagonal, validateDiagonalPath, type DiagonalRouteParams, type DiagonalRouteResult } from './diagonalRouter'
 export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, type OrthogonalRouteResult } from './orthogonalRouter'
 
 // Internal imports
-import type { NodeRect, EdgeDef, RoutedEdge, Side, Point, EdgeStyle } from './types'
-import { getPortPoint, getStandoff, getSide, getNodeCenter } from './geometry'
+import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle } from './types'
+import { getPortPoint, getStandoff } from './geometry'
 import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING } from './portAssignment'
-import { pathToSvg } from './svgPath'
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'

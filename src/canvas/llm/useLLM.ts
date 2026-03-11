@@ -16,6 +16,15 @@ export function useLLM() {
   // Persist system prompt
   watch(systemPrompt, (v) => llmStorage.setSystemPrompt(v))
 
+  // Model and context length from provider config
+  const getProviderConfig = () => {
+    const provider = providerRegistry.getActiveProvider()
+    return provider.getConfig()
+  }
+
+  const model = ref((getProviderConfig().model as string) || 'llama3.2')
+  const contextLength = ref((getProviderConfig().contextLength as number) || 4096)
+
   // Agent state
   const isRunning = ref(false)
   const tasks = ref<AgentTask[]>([])
@@ -123,6 +132,8 @@ export function useLLM() {
   return {
     // Settings
     systemPrompt,
+    model,
+    contextLength,
     DEFAULT_SYSTEM_PROMPT,
 
     // State

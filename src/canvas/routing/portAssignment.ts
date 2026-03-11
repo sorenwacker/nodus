@@ -109,7 +109,7 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
 
   // Assign ports for each node+side, considering ALL edges (both directions)
   for (const [key, entries] of unifiedGroups) {
-    const [nodeId, sideStr] = key.split(':')
+    const [, sideStr] = key.split(':')
     const side = sideStr as Side
     const isHorizontalSide = side === 'left' || side === 'right'
 

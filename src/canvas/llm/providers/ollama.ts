@@ -21,7 +21,7 @@ export class OllamaProvider implements ILLMProvider {
   private baseUrl = 'http://localhost:11434'
   private model = 'llama3.2'
   private contextLength = 4096
-  private timeout = 60000
+  private timeout = 300000  // 5 minutes for large context
 
   configure(config: Record<string, unknown>): void {
     if (config.baseUrl) this.baseUrl = config.baseUrl as string

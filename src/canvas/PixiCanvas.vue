@@ -14,11 +14,13 @@ import {
   getAngledStandoff,
   GridTracker,
   PORT_SPACING,
+  SpatialIndex,
+  setRoutingSpatialIndex,
   type NodeRect,
   type EdgeStyle,
 } from './edgeRouting'
 import { useLLM, executeTool, type ToolContext } from './llm'
-import { uiStorage } from '../lib/storage'
+import { uiStorage, llmStorage } from '../lib/storage'
 import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
@@ -27,6 +29,7 @@ import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
 import { useLasso } from './composables/useLasso'
 import { useFrames } from './composables/useFrames'
 import { useLayout } from './composables/useLayout'
+import { usePdfDrop } from './composables/usePdfDrop'
 import { NODE_DEFAULTS } from './constants'
 
 // Undo injection for position and content changes
@@ -53,6 +56,7 @@ const pushContentUndo = (nodeId: string, oldContent: string | null, oldTitle: st
 marked.use({
   gfm: true,
   breaks: true,
+  async: false,
 })
 
 const store = useNodesStore()
@@ -175,13 +179,29 @@ onMounted(() => {
       e.preventDefault()
       exportGraphAsYaml()
     }
+
+    // F key fits to content
+    if (e.key === 'f' || e.key === 'F') {
+      e.preventDefault()
+      fitToContent()
+    }
+
+    // Ctrl+Shift+R refreshes workspace from files
+    if ((e.key === 'R' || e.key === 'r') && e.ctrlKey && e.shiftKey) {
+      e.preventDefault()
+      refreshFromFiles()
+    }
   }
   window.addEventListener('keydown', handleKeydown)
+
+  // Setup PDF drop listener
+  pdfDrop.setup()
 
   onUnmounted(() => {
     observer.disconnect()
     window.removeEventListener('resize', updateViewportSize)
     window.removeEventListener('keydown', handleKeydown)
+    pdfDrop.cleanup()
   })
 
   // Only center if no saved view state
@@ -239,6 +259,8 @@ watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
 watch(() => store.currentWorkspaceId, () => {
   // Don't auto-reset view on workspace change - let user control it
   hasInitiallyCentered = store.filteredNodes.length > 0
+  // Exit neighborhood mode when workspace changes
+  neighborhood.exit()
 })
 
 // Viewport size for culling (updated on resize)
@@ -292,10 +314,10 @@ function screenToCanvas(screenX: number, screenY: number) {
 // Neighborhood mode composable
 const neighborhood = useNeighborhoodMode({
   store: {
-    filteredNodes: store.filteredNodes,
-    filteredEdges: store.filteredEdges,
+    getFilteredNodes: () => [...store.filteredNodes],
+    getFilteredEdges: () => [...store.filteredEdges],
     getNode: store.getNode,
-    selectedNodeIds: store.selectedNodeIds,
+    getSelectedNodeIds: () => [...store.selectedNodeIds],
   },
   viewState: {
     scale,
@@ -322,8 +344,8 @@ function getVisualNode(nodeId: string) {
 // Lasso selection composable
 const lasso = useLasso({
   store: {
-    filteredNodes: store.filteredNodes,
-    selectedNodeIds: store.selectedNodeIds,
+    getFilteredNodes: () => [...store.filteredNodes],
+    setSelectedNodeIds: (ids: string[]) => { store.selectedNodeIds = ids },
   },
   screenToCanvas,
 })
@@ -416,13 +438,35 @@ const panStart = ref({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
 const selectedEdge = ref<string | null>(null)
 const hoveredNodeId = ref<string | null>(null)
 
+// Cached active node IDs for highlight detection (avoids recreating Set on every edge)
+const activeNodeIds = computed(() => {
+  const ids = new Set<string>()
+  if (hoveredNodeId.value) ids.add(hoveredNodeId.value)
+  for (const id of store.selectedNodeIds) ids.add(id)
+  return ids
+})
+
+// Pre-computed set of highlighted edge IDs for O(1) lookup in template
+const highlightedEdgeIds = computed(() => {
+  const ids = new Set<string>()
+  const active = activeNodeIds.value
+  if (active.size === 0) return ids
+  for (const edge of store.filteredEdges) {
+    if (active.has(edge.source_node_id) || active.has(edge.target_node_id)) {
+      ids.add(edge.id)
+    }
+  }
+  return ids
+})
+
 // Check if an edge is connected to a hovered or selected node
-function isEdgeHighlighted(edge: { source_node_id: string, target_node_id: string }): boolean {
-  const activeNodes = new Set<string>()
-  if (hoveredNodeId.value) activeNodes.add(hoveredNodeId.value)
-  for (const id of store.selectedNodeIds) activeNodes.add(id)
-  if (activeNodes.size === 0) return false
-  return activeNodes.has(edge.source_node_id) || activeNodes.has(edge.target_node_id)
+function isEdgeHighlighted(edge: { id?: string; source_node_id: string; target_node_id: string }): boolean {
+  // Fast path: use pre-computed set if edge has ID
+  if (edge.id) return highlightedEdgeIds.value.has(edge.id)
+  // Fallback for edges without ID
+  const active = activeNodeIds.value
+  if (active.size === 0) return false
+  return active.has(edge.source_node_id) || active.has(edge.target_node_id)
 }
 
 // Edge creation
@@ -485,9 +529,9 @@ function deleteSelectedFrame() { frames.deleteSelected() }
 // Layout composable
 const layout = useLayout({
   store: {
-    nodes: store.nodes,
-    filteredNodes: store.filteredNodes,
-    selectedNodeIds: store.selectedNodeIds,
+    getNodes: () => [...store.nodes],
+    getFilteredNodes: () => [...store.filteredNodes],
+    getSelectedNodeIds: () => [...store.selectedNodeIds],
     updateNodePosition: store.updateNodePosition,
     layoutNodes: store.layoutNodes,
   },
@@ -549,6 +593,16 @@ async function resetAllNodeSizes() {
   store.nodeLayoutVersion++
 }
 
+// Refresh all nodes from their source files
+async function refreshFromFiles() {
+  try {
+    const updated = await store.refreshWorkspace()
+    console.log(`Refreshed ${updated} nodes from files`)
+  } catch (e) {
+    console.error('Failed to refresh workspace:', e)
+  }
+}
+
 // Inline editing
 const editingNodeId = ref<string | null>(null)
 const editContent = ref('')
@@ -601,6 +655,39 @@ const nodePrompt = ref('')
 const isGraphLLMLoading = ref(false)
 const isNodeLLMLoading = ref(false)
 const showLLMSettings = ref(false)
+const lastContextSize = ref(0) // Track context size of last request
+let nodeLLMAbortController: AbortController | null = null
+
+function stopNodeLLM() {
+  if (nodeLLMAbortController) {
+    nodeLLMAbortController.abort()
+    nodeLLMAbortController = null
+  }
+  isNodeLLMLoading.value = false
+}
+
+// PDF drop composable
+const pdfDrop = usePdfDrop({
+  store: {
+    createNode: store.createNode,
+    updateNodeContent: store.updateNodeContent,
+    updateNodeTitle: store.updateNodeTitle,
+    createEdge: store.createEdge,
+  },
+  viewState: {
+    getViewportCenter: () => {
+      const rect = canvasRef.value?.getBoundingClientRect()
+      if (!rect) return { x: 0, y: 0 }
+      return {
+        x: (rect.width / 2 - offsetX.value) / scale.value,
+        y: (rect.height / 2 - offsetY.value) / scale.value,
+      }
+    },
+  },
+  llm: {
+    simpleGenerate: callOllama,
+  },
+})
 
 function onPromptKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowUp') {
@@ -671,28 +758,39 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
         let query = (args.template || '').replace(/\{title\}/g, node.title).replace(/\{([^}]+)\}/g, (_: string, expr: string) => evalExpr(expr, num))
 
         if (args.action === 'set') {
+          pushContentUndo(node.id, node.markdown_content, node.title)
           await store.updateNodeContent(node.id, query)
           results.push(`${node.title}: set`)
         } else if (args.action === 'append') {
+          pushContentUndo(node.id, node.markdown_content, node.title)
           await store.updateNodeContent(node.id, (node.markdown_content || '') + '\n\n' + query)
           results.push(`${node.title}: appended`)
         } else if (args.action === 'llm') {
+          // Skip empty nodes
+          if (!node.markdown_content?.trim()) {
+            results.push(`${node.title}: skipped (empty)`)
+            continue
+          }
+          // Save undo state before modifying
+          pushContentUndo(node.id, node.markdown_content, node.title)
           try {
-            const resp = await fetch('http://localhost:11434/api/chat', {
+            const resp = await fetch('http://localhost:11434/api/generate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 model: ollamaModel.value,
-                messages: [{ role: 'system', content: 'Provide concise, factual information.' }, { role: 'user', content: query }],
+                prompt: `${query}\n\nContent to process:\n${node.markdown_content}`,
+                system: 'You are a text processor. Apply the instruction to the content. Output ONLY the processed text, nothing else.',
                 stream: false,
+                options: { num_ctx: ollamaContextLength.value },
               }),
             })
             const data = await resp.json()
-            if (data.message?.content) {
-              await store.updateNodeContent(node.id, data.message.content.trim())
-              results.push(`${node.title}: generated`)
+            if (data.response?.trim()) {
+              await store.updateNodeContent(node.id, data.response.trim())
+              results.push(`${node.title}: processed`)
             }
-          } catch { results.push(`${node.title}: llm failed`) }
+          } catch (e) { results.push(`${node.title}: llm failed - ${e}`) }
         }
       }
       return `Processed ${nodes.length} nodes`
@@ -880,26 +978,76 @@ async function sendNodePrompt() {
 
   isNodeLLMLoading.value = true
   try {
-    // Get connected nodes for context
-    const connectedNodes = store.filteredEdges
-      .filter(e => e.source_node_id === nodeId || e.target_node_id === nodeId)
-      .map(e => e.source_node_id === nodeId ? e.target_node_id : e.source_node_id)
-      .map(id => store.getNode(id))
-      .filter(Boolean)
-      .map(n => `[${n!.title || 'Untitled'}]: ${(n!.markdown_content || '').slice(0, 200)}`)
-      .join('\n')
+    // Traverse full chain of connected nodes (BFS)
+    const visited = new Set<string>([nodeId])
+    const queue = [nodeId]
+    const chainNodes: { id: string; title: string; content: string }[] = []
 
-    const neighborsContext = connectedNodes
-      ? `\nCONNECTED NODES:\n${connectedNodes}\n`
-      : ''
+    console.log(`Starting BFS from node ${nodeId}, total edges: ${store.filteredEdges.length}`)
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!
+      for (const edge of store.filteredEdges) {
+        let neighborId: string | null = null
+        if (edge.source_node_id === currentId && !visited.has(edge.target_node_id)) {
+          neighborId = edge.target_node_id
+        } else if (edge.target_node_id === currentId && !visited.has(edge.source_node_id)) {
+          neighborId = edge.source_node_id
+        }
+        if (neighborId) {
+          visited.add(neighborId)
+          queue.push(neighborId)
+          const n = store.getNode(neighborId)
+          if (n) {
+            chainNodes.push({
+              id: neighborId,
+              title: n.title || 'Untitled',
+              content: n.markdown_content || '',
+            })
+            console.log(`Found connected node: ${n.title}, content length: ${(n.markdown_content || '').length}`)
+          }
+        }
+      }
+    }
+
+    console.log(`BFS complete: found ${chainNodes.length} connected nodes`)
+
+    // Build context with content from chain (respecting limit)
+    const contextLimit = llmStorage.getChainContextLimit()
+    console.log(`Chain context limit: ${contextLimit}`)
+    let chainContext = ''
+    if (chainNodes.length > 0 && contextLimit > 0) {
+      let totalChars = 0
+      const includedNodes: string[] = []
+      for (const n of chainNodes) {
+        if (totalChars + n.content.length > contextLimit) {
+          // Truncate this node's content to fit
+          const remaining = contextLimit - totalChars
+          if (remaining > 100) {
+            includedNodes.push(`--- ${n.title} ---\n${n.content.slice(0, remaining)}...(truncated)`)
+          }
+          break
+        }
+        includedNodes.push(`--- ${n.title} ---\n${n.content}`)
+        totalChars += n.content.length
+      }
+      if (includedNodes.length > 0) {
+        chainContext = `\nCONTEXT FROM ${includedNodes.length}/${chainNodes.length} CONNECTED NODES:\n` +
+          includedNodes.join('\n\n') + '\n'
+      }
+    }
 
     const nodeSystemPrompt = `Rewrite the note based on the user's request. Output content directly.
 
 NO preamble ("Here is", "Sure", etc). NO code fences unless content IS code.
 Format: Obsidian markdown with [[wikilinks]], #tags, **bold**, lists.
-${neighborsContext}
-CURRENT:
+${chainContext}
+CURRENT NODE:
 ${currentContent || '(empty)'}`
+
+    // Track context size
+    lastContextSize.value = nodeSystemPrompt.length + nodePrompt.value.length
+    console.log(`LLM request: ${(lastContextSize.value / 1000).toFixed(1)}k chars, ${chainNodes.length} connected nodes`)
 
     const response = await callOllama(nodePrompt.value, nodeSystemPrompt)
     nodePrompt.value = ''
@@ -1108,10 +1256,20 @@ const edgeLines = computed(() => {
   const effectiveStyle: EdgeStyle = style === 'curved' ? 'orthogonal' : style
   let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; bundleSize?: number; path?: Array<{x: number; y: number}>; debugInfo?: { srcOffset: number; tgtOffset: number; srcSide: string; tgtSide: string } }> | null = null
 
-  if (edgeBundling.value) {
-    routedEdges = routeEdgesWithBundling(edgeDefs, nodeRects, nodeMap, effectiveStyle)
-  } else {
-    routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
+  // Build spatial index for fast obstacle detection (O(log n) instead of O(n))
+  const spatialIndex = new SpatialIndex()
+  spatialIndex.build(nodeMap)
+  setRoutingSpatialIndex(spatialIndex)
+
+  try {
+    if (edgeBundling.value) {
+      routedEdges = routeEdgesWithBundling(edgeDefs, nodeRects, nodeMap, effectiveStyle)
+    } else {
+      routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
+    }
+  } finally {
+    // Clear spatial index after routing
+    setRoutingSpatialIndex(null)
   }
 
   // Grid tracker for curved edges (which still need manual routing)
@@ -1119,11 +1277,12 @@ const edgeLines = computed(() => {
 
   // Sort edges to minimize crossings
   // Edges are sorted by their midpoint position so parallel edges don't cross
+  // Use nodeMap for O(1) lookups instead of store.getNode()
   const sortedEdges = [...edges].sort((a, b) => {
-    const sourceA = store.getNode(a.source_node_id)
-    const targetA = store.getNode(a.target_node_id)
-    const sourceB = store.getNode(b.source_node_id)
-    const targetB = store.getNode(b.target_node_id)
+    const sourceA = nodeMap.get(a.source_node_id)
+    const targetA = nodeMap.get(a.target_node_id)
+    const sourceB = nodeMap.get(b.source_node_id)
+    const targetB = nodeMap.get(b.target_node_id)
     if (!sourceA || !targetA || !sourceB || !targetB) return 0
 
     const midAx = (sourceA.canvas_x + targetA.canvas_x) / 2
@@ -1137,14 +1296,15 @@ const edgeLines = computed(() => {
   })
 
   return sortedEdges.map(edge => {
-    const source = store.getNode(edge.source_node_id)
-    const target = store.getNode(edge.target_node_id)
+    const source = nodeMap.get(edge.source_node_id)
+    const target = nodeMap.get(edge.target_node_id)
     if (!source || !target) return null
 
-    const sw = source.width || NODE_DEFAULTS.WIDTH
-    const sh = getNodeHeight(source)
-    const tw = target.width || NODE_DEFAULTS.WIDTH
-    const th = getNodeHeight(target)
+    // Use pre-computed dimensions from nodeMap
+    const sw = source.width
+    const sh = source.height
+    const tw = target.width
+    const th = target.height
 
     // Center points
     const sourceCx = source.canvas_x + sw / 2
@@ -1295,19 +1455,41 @@ const edgeLines = computed(() => {
   }).filter(Boolean)
 })
 
-// Visible edges - filtered for large graphs (cheap filter, runs on pan/zoom)
+// Visible edges - filtered for large graphs with pre-computed rendering properties
 const visibleEdgeLines = computed(() => {
-  // Don't filter during zoom to prevent flickering
-  if (!isLargeGraph.value || isZooming.value) return edgeLines.value
+  let edges = edgeLines.value
 
-  // Don't filter when zoomed in - edges can extend far and user expects to see them
-  if (scale.value > 0.8) return edgeLines.value
+  // Filter for large graphs when zoomed out
+  if (isLargeGraph.value && !isZooming.value && scale.value <= 0.8) {
+    const visIds = visibleNodeIds.value
+    edges = edges.filter(e =>
+      visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
+    )
+  }
 
-  // For large graphs when zoomed out, only render edges where at least one node is visible
-  const visIds = visibleNodeIds.value
-  return edgeLines.value.filter(e =>
-    visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
-  )
+  // Pre-compute rendering properties to avoid repeated function calls in template
+  const highlighted = highlightedEdgeIds.value
+  const selected = selectedEdge.value
+  const bundling = edgeBundling.value
+  const baseStrokeWidth = edgeStrokeWidth.value
+
+  return edges.map(e => {
+    const isHighlighted = highlighted.has(e.id)
+    const isSelected = selected === e.id
+    const color = e.link_type?.startsWith('#') ? e.link_type : '#94a3b8'
+    const effectiveStrokeWidth = bundling ? e.strokeWidth * baseStrokeWidth : baseStrokeWidth
+    const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth + 2 : effectiveStrokeWidth
+
+    return {
+      ...e,
+      isHighlighted,
+      isSelected,
+      color,
+      renderStrokeWidth,
+      glowStrokeWidth: effectiveStrokeWidth + 6,
+      arrowMarkerId: isHighlighted ? 'arrow-selected' : `arrow-${color.replace('#', '')}`,
+    }
+  })
 })
 
 // Transform for the canvas content
@@ -1614,16 +1796,14 @@ function onResizeMove(e: MouseEvent) {
 
   resizePreview.value = { width, height }
 
-  // Update all selected nodes in real-time during resize
+  // Update all selected nodes to SAME size as primary node
   if (multiResizeInitial.value.size > 0) {
-    for (const [id, initial] of multiResizeInitial.value) {
-      if (id === resizingNode.value) continue // Primary node uses resizePreview
-      const newWidth = Math.max(120, initial.width + dx)
-      const newHeight = Math.max(60, initial.height + dy)
+    for (const [id] of multiResizeInitial.value) {
+      if (id === resizingNode.value) continue
       const n = store.getNode(id)
       if (n) {
-        n.width = gridLockEnabled.value ? snapToGrid(newWidth) : newWidth
-        n.height = gridLockEnabled.value ? snapToGrid(newHeight) : newHeight
+        n.width = width
+        n.height = height
       }
     }
   }
@@ -1638,14 +1818,11 @@ function stopResize() {
     // Update primary node size
     store.updateNodeSize(nodeId, width, height)
 
-    // Update all other selected nodes
+    // Update all other selected nodes to SAME size
     if (multiResizeInitial.value.size > 0) {
       for (const [id] of multiResizeInitial.value) {
         if (id === nodeId) continue
-        const n = store.getNode(id)
-        if (n) {
-          store.updateNodeSize(id, n.width || NODE_DEFAULTS.WIDTH, n.height || NODE_DEFAULTS.HEIGHT)
-        }
+        store.updateNodeSize(id, width, height)
       }
     }
 
@@ -2257,17 +2434,56 @@ function renderMarkdown(content: string | null): string {
 
 // Pre-rendered HTML cache for each node (avoids re-renders during drag)
 const nodeRenderedContent = ref<Record<string, string>>({})
+const nodeContentHashes = new Map<string, string>() // Track content for change detection
 
-// Update rendered content when node content changes
-watch(
-  () => store.filteredNodes.map(n => `${n.id}:${n.markdown_content}`).join('|'),
-  () => {
-    const result: Record<string, string> = {}
+// Debounced markdown rendering - only re-render changed nodes
+let markdownRenderTimer: ReturnType<typeof setTimeout> | null = null
+function updateRenderedContent() {
+  if (markdownRenderTimer) clearTimeout(markdownRenderTimer)
+  markdownRenderTimer = setTimeout(() => {
+    const result = { ...nodeRenderedContent.value }
+    let changed = false
+
+    // Track which nodes still exist
+    const currentIds = new Set<string>()
+
     for (const node of store.filteredNodes) {
-      result[node.id] = renderMarkdown(node.markdown_content)
+      currentIds.add(node.id)
+      const contentKey = node.markdown_content || ''
+      const prevHash = nodeContentHashes.get(node.id)
+
+      // Only re-render if content actually changed
+      if (prevHash !== contentKey) {
+        result[node.id] = renderMarkdown(node.markdown_content)
+        nodeContentHashes.set(node.id, contentKey)
+        changed = true
+      } else if (!result[node.id]) {
+        // New node, render it
+        result[node.id] = renderMarkdown(node.markdown_content)
+        nodeContentHashes.set(node.id, contentKey)
+        changed = true
+      }
     }
-    nodeRenderedContent.value = result
-  },
+
+    // Clean up removed nodes
+    for (const id of nodeContentHashes.keys()) {
+      if (!currentIds.has(id)) {
+        nodeContentHashes.delete(id)
+        delete result[id]
+        changed = true
+      }
+    }
+
+    if (changed) {
+      nodeRenderedContent.value = result
+    }
+  }, 50) // 50ms debounce
+}
+
+// Watch for node changes with shallow comparison
+watch(
+  () => store.filteredNodes.length + store.filteredNodes.reduce((sum, n) => sum + (n.markdown_content?.length || 0), 0),
+  updateRenderedContent,
   { immediate: true }
 )
 
@@ -2593,11 +2809,14 @@ ${edges.map(e => `  - id: "${e.id}"
             <option value="gemma2">gemma2</option>
             <option value="qwen2">qwen2</option>
           </select>
-          <label>Context</label>
+          <label>Model Context</label>
           <div class="slider-row">
-            <input v-model.number="ollamaContextLength" type="range" min="1024" max="32768" step="1024" class="settings-slider" />
+            <input v-model.number="ollamaContextLength" type="range" min="1024" max="131072" step="1024" class="settings-slider" />
             <span class="slider-value">{{ (ollamaContextLength / 1024).toFixed(0) }}k</span>
           </div>
+        </div>
+        <div v-if="lastContextSize > 0" class="context-info">
+          Last request: {{ (lastContextSize / 1000).toFixed(1) }}k chars
         </div>
         <label class="settings-label">System Prompt</label>
         <textarea v-model="customSystemPrompt" class="settings-textarea" rows="8" placeholder="Instructions for the LLM..."></textarea>
@@ -2647,11 +2866,11 @@ ${edges.map(e => `  - id: "${e.id}"
             v-for="edge in visibleEdgeLines"
             :key="edge.id"
             :d="edge.path"
-            :stroke="isEdgeHighlighted(edge) ? '#3b82f6' : getEdgeColor(edge)"
-            :stroke-width="isEdgeHighlighted(edge) ? 2.5 : 1"
+            :stroke="edge.isHighlighted ? '#3b82f6' : edge.color"
+            :stroke-width="edge.isHighlighted ? 2.5 : 1"
             fill="none"
             class="edge-line-fast"
-            :class="{ 'edge-highlighted': isEdgeHighlighted(edge) }"
+            :class="{ 'edge-highlighted': edge.isHighlighted }"
           />
         </template>
         <template v-else>
@@ -2669,7 +2888,7 @@ ${edges.map(e => `  - id: "${e.id}"
             <path
               v-if="edgeBundling && edge.isTrunkOwner && edge.trunkPath"
               :d="edge.trunkPath"
-              :stroke="getEdgeColor(edge)"
+              :stroke="edge.color"
               :stroke-width="edge.trunkStrokeWidth * edgeStrokeWidth"
               stroke-linecap="round"
               fill="none"
@@ -2678,10 +2897,10 @@ ${edges.map(e => `  - id: "${e.id}"
             />
             <!-- Glow effect for selected edge -->
             <path
-              v-if="selectedEdge === edge.id"
+              v-if="edge.isSelected"
               :d="edge.path"
-              :stroke="getEdgeColor(edge)"
-              :stroke-width="(edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth) + 6"
+              :stroke="edge.color"
+              :stroke-width="edge.glowStrokeWidth"
               stroke-linecap="round"
               fill="none"
               class="edge-glow"
@@ -2691,13 +2910,13 @@ ${edges.map(e => `  - id: "${e.id}"
             <!-- Visible edge path (branch for bundled, full path for unbundled) -->
             <path
               :d="edge.path"
-              :stroke="isEdgeHighlighted(edge) ? '#3b82f6' : getEdgeColor(edge)"
-              :stroke-width="selectedEdge === edge.id || isEdgeHighlighted(edge) ? (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth) + 2 : (edgeBundling ? edge.strokeWidth * edgeStrokeWidth : edgeStrokeWidth)"
-              :marker-end="edge.isBidirectional || edge.isShortEdge ? undefined : `url(#${isEdgeHighlighted(edge) ? 'arrow-selected' : getArrowMarkerId(getEdgeColor(edge))})`"
+              :stroke="edge.isHighlighted ? '#3b82f6' : edge.color"
+              :stroke-width="edge.renderStrokeWidth"
+              :marker-end="edge.isBidirectional || edge.isShortEdge ? undefined : `url(#${edge.arrowMarkerId})`"
               stroke-linecap="round"
               fill="none"
               class="edge-line-visible"
-              :class="{ 'edge-selected': selectedEdge === edge.id, 'edge-highlighted': isEdgeHighlighted(edge) }"
+              :class="{ 'edge-selected': edge.isSelected, 'edge-highlighted': edge.isHighlighted }"
               pointer-events="none"
             />
             <text
@@ -2880,8 +3099,9 @@ ${edges.map(e => `  - id: "${e.id}"
         <input
           v-model="nodePrompt"
           type="text"
-          placeholder="Ask AI to update this note..."
+          :placeholder="isNodeLLMLoading ? 'Processing...' : 'Ask AI to update this note...'"
           class="node-llm-input"
+          :class="{ loading: isNodeLLMLoading }"
           tabindex="0"
           :disabled="isNodeLLMLoading"
           @mousedown.stop
@@ -2889,13 +3109,23 @@ ${edges.map(e => `  - id: "${e.id}"
           @keydown.stop
         />
         <button
+          v-if="!isNodeLLMLoading"
           class="node-llm-send"
           tabindex="0"
-          :disabled="isNodeLLMLoading || !nodePrompt.trim()"
+          :disabled="!nodePrompt.trim()"
           @mousedown.stop
           @click.stop="sendNodePrompt"
         >
-          {{ isNodeLLMLoading ? '...' : 'AI' }}
+          AI
+        </button>
+        <button
+          v-else
+          class="node-llm-stop"
+          tabindex="0"
+          @mousedown.stop
+          @click.stop="stopNodeLLM"
+        >
+          Stop
         </button>
       </div>
     </div>
@@ -3037,6 +3267,11 @@ ${edges.map(e => `  - id: "${e.id}"
     </div>
 
     <div class="status-bar">
+      <span v-if="pdfDrop.isProcessing.value" class="pdf-processing">
+        PDF: {{ pdfDrop.processingStatus.value }}
+        <button class="stop-btn" @click="pdfDrop.stop()">Stop</button>
+      </span>
+      <span v-if="pdfDrop.isProcessing.value" class="sep">|</span>
       <span v-if="isLargeGraph" class="perf-mode">PERF</span>
       <span>{{ visibleNodes.length }}/{{ store.filteredNodes.length }} nodes</span>
       <span class="sep">|</span>

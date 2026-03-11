@@ -480,6 +480,54 @@ pub async fn read_file_content(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
 }
 
+/// Refresh all nodes in a workspace from their source files
+#[tauri::command]
+pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Get all nodes in workspace
+    let nodes = database::nodes::get_all(pool).await.map_err(|e| e.to_string())?;
+
+    let mut updated = 0u32;
+
+    for node in nodes {
+        // Skip nodes not in this workspace
+        if node.workspace_id != workspace_id {
+            continue;
+        }
+
+        // Skip nodes without a file path
+        let file_path = match &node.file_path {
+            Some(p) if !p.is_empty() => p,
+            _ => continue,
+        };
+
+        // Try to read the file
+        let content = match std::fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(_) => continue, // File doesn't exist or can't be read
+        };
+
+        // Compute new checksum
+        let new_checksum = crate::checksum::compute_string(&content);
+
+        // Skip if content hasn't changed
+        if node.checksum.as_ref() == Some(&new_checksum) {
+            continue;
+        }
+
+        // Update the node
+        if let Err(e) = database::nodes::update_content(pool, &node.id, &content).await {
+            eprintln!("Failed to update node {}: {}", node.id, e);
+            continue;
+        }
+
+        updated += 1;
+    }
+
+    Ok(updated)
+}
+
 // ============================================================================
 // HTTP Commands (for LLM API calls)
 // ============================================================================
@@ -530,4 +578,16 @@ pub async fn http_request(input: HttpRequestInput) -> Result<HttpResponse, Strin
     let body = response.text().await.map_err(|e| e.to_string())?;
 
     Ok(HttpResponse { status, body })
+}
+
+// ============================================================================
+// PDF Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn extract_pdf_text(path: String) -> Result<String, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read PDF: {}", e))?;
+    let text = pdf_extract::extract_text_from_mem(&bytes)
+        .map_err(|e| format!("PDF extraction failed: {}", e))?;
+    Ok(text)
 }

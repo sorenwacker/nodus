@@ -11,17 +11,14 @@ const KEYS = {
   currentWorkspace: 'nodus-current-workspace',
   magnifier: 'nodus-magnifier',
   promptHistory: 'nodus-prompt-history',
-  llmModel: 'nodus_llm_model',
-  llmContext: 'nodus_llm_context',
   llmPrompt: 'nodus_llm_prompt',
   llmAgentPrompt: 'nodus_llm_agent_prompt',
-  llmUrl: 'nodus_llm_url',
-  llmTimeout: 'nodus_llm_timeout',
   llmProvider: 'nodus_llm_provider',
   llmProviderConfigs: 'nodus_llm_provider_configs',
   canvasGridSnap: 'nodus_canvas_grid_snap',
   canvasGridSize: 'nodus_canvas_grid_size',
   canvasEdgeStyle: 'nodus_canvas_edge_style',
+  chainContextLimit: 'nodus_chain_context_limit',
 } as const
 
 /**
@@ -85,18 +82,6 @@ export const uiStorage = {
  * LLM settings storage
  */
 export const llmStorage = {
-  getModel(): string {
-    return localStorage.getItem(KEYS.llmModel) || 'llama3.2'
-  },
-  setModel(value: string): void {
-    localStorage.setItem(KEYS.llmModel, value)
-  },
-  getContextLength(): number {
-    return parseInt(localStorage.getItem(KEYS.llmContext) || '4096', 10)
-  },
-  setContextLength(value: number): void {
-    localStorage.setItem(KEYS.llmContext, String(value))
-  },
   getSystemPrompt(defaultPrompt: string): string {
     return localStorage.getItem(KEYS.llmPrompt) || defaultPrompt
   },
@@ -114,18 +99,6 @@ export const llmStorage = {
   },
   setPromptHistory(value: string[]): void {
     localStorage.setItem(KEYS.promptHistory, JSON.stringify(value))
-  },
-  getUrl(): string {
-    return localStorage.getItem(KEYS.llmUrl) || 'http://localhost:11434'
-  },
-  setUrl(value: string): void {
-    localStorage.setItem(KEYS.llmUrl, value)
-  },
-  getTimeout(): number {
-    return parseInt(localStorage.getItem(KEYS.llmTimeout) || '60000', 10)
-  },
-  setTimeout(value: number): void {
-    localStorage.setItem(KEYS.llmTimeout, String(value))
   },
   getProvider(): string {
     return localStorage.getItem(KEYS.llmProvider) || 'ollama'
@@ -150,6 +123,12 @@ export const llmStorage = {
     const configs = this.getProviderConfigs()
     configs[providerId] = config
     this.setProviderConfigs(configs)
+  },
+  getChainContextLimit(): number {
+    return parseInt(localStorage.getItem(KEYS.chainContextLimit) || '50000', 10)
+  },
+  setChainContextLimit(value: number): void {
+    localStorage.setItem(KEYS.chainContextLimit, String(value))
   },
 }
 

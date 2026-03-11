@@ -6,9 +6,21 @@
  */
 
 import type { Point, NodeRect } from './types'
+import { SpatialIndex } from './spatialIndex'
 
 // Increased margin to account for node height estimation inaccuracies
 export const OBSTACLE_MARGIN = 25
+
+// Cached spatial index for the current routing pass
+let currentSpatialIndex: SpatialIndex | null = null
+
+/**
+ * Set the spatial index for the current routing pass
+ * Call this once before routing multiple edges
+ */
+export function setRoutingSpatialIndex(index: SpatialIndex | null): void {
+  currentSpatialIndex = index
+}
 
 /**
  * Check if a line segment intersects a node rectangle
@@ -61,6 +73,7 @@ export function segmentIntersectsNode(
 
 /**
  * Find all obstacles that a segment passes through
+ * Uses spatial index for O(log n) lookups when available
  */
 export function findObstacles(
   x1: number,
@@ -72,6 +85,18 @@ export function findObstacles(
 ): NodeRect[] {
   const obstacles: NodeRect[] = []
 
+  // Use spatial index if available for faster lookups
+  if (currentSpatialIndex) {
+    const candidates = currentSpatialIndex.querySegment(x1, y1, x2, y2, excludeIds)
+    for (const node of candidates) {
+      if (segmentIntersectsNode(x1, y1, x2, y2, node)) {
+        obstacles.push(node)
+      }
+    }
+    return obstacles
+  }
+
+  // Fallback to linear scan
   const nodeList = nodes instanceof Map ? Array.from(nodes.values()) : nodes
 
   for (const node of nodeList) {
@@ -86,6 +111,7 @@ export function findObstacles(
 
 /**
  * Find obstacles in a bounding box region
+ * Uses spatial index for O(log n) lookups when available
  */
 export function findObstaclesInRegion(
   minX: number,
@@ -96,13 +122,19 @@ export function findObstaclesInRegion(
   excludeIds: Set<string>,
   padding: number = 50
 ): NodeRect[] {
-  const obstacles: NodeRect[] = []
-  const nodeList = nodes instanceof Map ? Array.from(nodes.values()) : nodes
-
   const searchMinX = minX - padding
   const searchMinY = minY - padding
   const searchMaxX = maxX + padding
   const searchMaxY = maxY + padding
+
+  // Use spatial index if available
+  if (currentSpatialIndex) {
+    return currentSpatialIndex.queryRegion(searchMinX, searchMinY, searchMaxX, searchMaxY, excludeIds)
+  }
+
+  // Fallback to linear scan
+  const obstacles: NodeRect[] = []
+  const nodeList = nodes instanceof Map ? Array.from(nodes.values()) : nodes
 
   for (const node of nodeList) {
     if (node.id && excludeIds.has(node.id)) continue

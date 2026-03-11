@@ -25,12 +25,6 @@ export interface AgentTask {
   status: 'pending' | 'running' | 'done' | 'error'
 }
 
-export interface OllamaSettings {
-  model: string
-  contextLength: number
-  systemPrompt: string
-}
-
 export interface ToolCall {
   name: string
   arguments: Record<string, unknown>

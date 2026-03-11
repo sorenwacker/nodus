@@ -18,8 +18,8 @@ interface Node {
 }
 
 interface Store {
-  filteredNodes: Node[]
-  selectedNodeIds: string[]
+  getFilteredNodes: () => Node[]
+  setSelectedNodeIds: (ids: string[]) => void
 }
 
 export interface UseLassoOptions {
@@ -44,25 +44,28 @@ export function useLasso(options: UseLassoOptions) {
   }
 
   function end() {
-    if (!isLassoSelecting.value || lassoPoints.value.length < 3) {
+    try {
+      if (!isLassoSelecting.value || lassoPoints.value.length < 3) {
+        return
+      }
+
+      // Find nodes inside lasso polygon
+      const selected: string[] = []
+      const points = lassoPoints.value
+      for (const node of store.getFilteredNodes()) {
+        const cx = node.canvas_x + node.width / 2
+        const cy = node.canvas_y + node.height / 2
+        if (pointInPolygon(cx, cy, points)) {
+          selected.push(node.id)
+        }
+      }
+
+      store.setSelectedNodeIds(selected)
+    } finally {
+      // Always reset state
       isLassoSelecting.value = false
       lassoPoints.value = []
-      return
     }
-
-    // Find nodes inside lasso polygon
-    const selected: string[] = []
-    for (const node of store.filteredNodes) {
-      const cx = node.canvas_x + node.width / 2
-      const cy = node.canvas_y + node.height / 2
-      if (pointInPolygon(cx, cy, lassoPoints.value)) {
-        selected.push(node.id)
-      }
-    }
-
-    store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...selected)
-    isLassoSelecting.value = false
-    lassoPoints.value = []
   }
 
   return {

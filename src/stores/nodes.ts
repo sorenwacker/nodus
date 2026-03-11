@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { invoke, listen, readTextFile } from '../lib/tauri'
+import { invoke, listen, readTextFile, refreshWorkspace as refreshWorkspaceApi } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { workspaceStorage } from '../lib/storage'
 import { storeLogger } from '../lib/logger'
@@ -562,6 +562,30 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  async function refreshWorkspace(): Promise<number> {
+    loading.value = true
+    try {
+      storeLogger.info(`Refreshing workspace: ${currentWorkspaceId.value || 'default'}`)
+
+      const updated = await refreshWorkspaceApi(currentWorkspaceId.value)
+
+      if (updated > 0) {
+        // Reload nodes to get updated content
+        const fetchedNodes = await invoke<Node[]>('get_nodes')
+        nodes.value = fetchedNodes
+        storeLogger.info(`Refreshed ${updated} nodes from files`)
+      }
+
+      return updated
+    } catch (e) {
+      error.value = String(e)
+      storeLogger.error('Refresh failed:', e)
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   let watcherUnlisten: (() => void) | null = null
 
   async function watchVault(path: string): Promise<void> {
@@ -893,6 +917,7 @@ export const useNodesStore = defineStore('nodes', () => {
     selectFrame,
     assignNodesToFrame,
     importVault,
+    refreshWorkspace,
     watchVault,
     stopWatching,
     createWorkspace,
