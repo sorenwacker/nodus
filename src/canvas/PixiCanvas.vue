@@ -65,7 +65,8 @@ const store = useNodesStore()
 const isDarkMode = ref(false)
 
 function updateTheme() {
-  const theme = document.documentElement.getAttribute('data-theme')
+  const theme = document.documentElement.getAttribute('data-theme') || 'light'
+  currentTheme.value = theme
   isDarkMode.value = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
 }
 
@@ -1483,7 +1484,7 @@ const visibleEdgeLines = computed(() => {
   return edges.map(e => {
     const isHighlighted = highlighted.has(e.id)
     const isSelected = selected === e.id
-    const color = e.link_type?.startsWith('#') ? e.link_type : '#94a3b8'
+    const color = e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value
     const effectiveStrokeWidth = bundling ? e.strokeWidth * baseStrokeWidth : baseStrokeWidth
     const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth + 2 : effectiveStrokeWidth
 
@@ -2219,8 +2220,8 @@ async function onCanvasDoubleClick(e: MouseEvent) {
   })
 }
 
-// Edge color palette
-const edgeColorPalette = [
+// Edge color palettes per theme
+const defaultEdgeColors = [
   { value: '#94a3b8' }, // gray (default)
   { value: '#3b82f6' }, // blue
   { value: '#22c55e' }, // green
@@ -2229,6 +2230,27 @@ const edgeColorPalette = [
   { value: '#8b5cf6' }, // purple
   { value: '#ec4899' }, // pink
 ]
+
+const cyberEdgeColors = [
+  { value: '#00ffcc' }, // neon cyan (default)
+  { value: '#ff00ff' }, // neon magenta
+  { value: '#00ccff' }, // neon blue
+  { value: '#ffff00' }, // neon yellow
+  { value: '#ff3366' }, // neon red
+  { value: '#9933ff' }, // neon purple
+  { value: '#00ff66' }, // neon green
+]
+
+// Track current theme name for reactive palette switching
+const currentTheme = ref(document.documentElement.getAttribute('data-theme') || 'light')
+
+// Reactive edge color palette based on theme
+const edgeColorPalette = computed(() => {
+  return currentTheme.value === 'cyber' ? cyberEdgeColors : defaultEdgeColors
+})
+
+// Default edge color (first in palette)
+const defaultEdgeColor = computed(() => edgeColorPalette.value[0].value)
 
 // Edge style types
 const edgeStyles = [

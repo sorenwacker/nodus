@@ -94,12 +94,17 @@
   border-color: #ff00ff;
 }
 
-[data-theme='cyber'] .edge-line-visible {
-  filter: drop-shadow(0 0 3px rgba(0, 255, 204, 0.6));
+[data-theme='cyber'] .edge-line-visible,
+[data-theme='cyber'] .edge-line-fast {
+  filter: drop-shadow(0 0 4px currentColor);
 }
 
 [data-theme='cyber'] .edge-highlighted {
-  filter: drop-shadow(0 0 6px rgba(255, 0, 255, 0.8));
+  filter: drop-shadow(0 0 8px rgba(255, 0, 255, 0.9));
+}
+
+[data-theme='cyber'] .edge-selected {
+  filter: drop-shadow(0 0 12px rgba(255, 0, 255, 1));
 }
 
 * {
