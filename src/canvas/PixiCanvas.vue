@@ -26,6 +26,7 @@ import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
 import { useLasso } from './composables/useLasso'
 import { useFrames } from './composables/useFrames'
+import { useLayout } from './composables/useLayout'
 import { NODE_DEFAULTS } from './constants'
 
 // Undo injection for position and content changes
@@ -480,6 +481,28 @@ function saveFrameTitleEditing() { frames.saveTitle() }
 function cancelFrameTitleEditing() { frames.cancelTitleEditing() }
 function createFrameAtCenter() { frames.createAtCenter() }
 function deleteSelectedFrame() { frames.deleteSelected() }
+
+// Layout composable
+const layout = useLayout({
+  store: {
+    nodes: store.nodes,
+    filteredNodes: store.filteredNodes,
+    selectedNodeIds: store.selectedNodeIds,
+    updateNodePosition: store.updateNodePosition,
+    layoutNodes: store.layoutNodes,
+  },
+  viewState: {
+    scale,
+    offsetX,
+    offsetY,
+    canvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
+  },
+  pushUndo,
+})
+async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
+  await layout.autoLayout(type)
+}
+function fitToContent() { layout.fitToContent() }
 
 // Auto-fit is per-node (stored on node.auto_fit)
 
@@ -2010,311 +2033,6 @@ async function onCanvasDoubleClick(e: MouseEvent) {
     canvas_x: snapToGrid(pos.x),
     canvas_y: snapToGrid(pos.y),
   })
-}
-
-// Animation state for layout
-let layoutAnimationId: number | null = null
-
-function stopLayoutAnimation() {
-  if (layoutAnimationId) {
-    cancelAnimationFrame(layoutAnimationId)
-    layoutAnimationId = null
-  }
-}
-
-// Animate nodes from current positions to target positions
-function animateToPositions(targets: Map<string, { x: number, y: number }>, duration = 400) {
-  stopLayoutAnimation()
-
-  const startTime = performance.now()
-  const startPositions = new Map<string, { x: number, y: number }>()
-
-  for (const [id] of targets) {
-    const node = store.nodes.find(n => n.id === id)
-    if (node) {
-      startPositions.set(id, { x: node.canvas_x, y: node.canvas_y })
-    }
-  }
-
-  function easeOutCubic(t: number): number {
-    return 1 - Math.pow(1 - t, 3)
-  }
-
-  function animate() {
-    const elapsed = performance.now() - startTime
-    const progress = Math.min(elapsed / duration, 1)
-    const eased = easeOutCubic(progress)
-
-    for (const [id, target] of targets) {
-      const start = startPositions.get(id)
-      if (start) {
-        const x = start.x + (target.x - start.x) * eased
-        const y = start.y + (target.y - start.y) * eased
-        store.updateNodePosition(id, x, y)
-      }
-    }
-
-    if (progress < 1) {
-      layoutAnimationId = requestAnimationFrame(animate)
-    } else {
-      layoutAnimationId = null
-    }
-  }
-
-  layoutAnimationId = requestAnimationFrame(animate)
-}
-
-/**
- * Tetris-style bin packing for grid layout using maximal rectangles algorithm
- * Places larger nodes first, then fills gaps with smaller nodes
- */
-function tetrisGridLayout(
-  nodes: typeof store.filteredNodes,
-  startX: number,
-  startY: number,
-  gap: number
-): Map<string, { x: number; y: number }> {
-  const targets = new Map<string, { x: number; y: number }>()
-
-  if (nodes.length === 0) return targets
-
-  // Calculate total area to estimate ideal dimensions
-  let totalArea = 0
-  let maxNodeWidth = 0
-  let maxNodeHeight = 0
-  for (const node of nodes) {
-    const w = node.width || NODE_DEFAULTS.WIDTH
-    const h = node.height || NODE_DEFAULTS.HEIGHT
-    totalArea += (w + gap) * (h + gap)
-    maxNodeWidth = Math.max(maxNodeWidth, w)
-    maxNodeHeight = Math.max(maxNodeHeight, h)
-  }
-
-  // Target a roughly square layout
-  const idealSide = Math.sqrt(totalArea) * 1.2
-  const maxWidth = Math.max(idealSide, maxNodeWidth + gap)
-
-  // Sort nodes by area (largest first) for better packing
-  const sorted = [...nodes].sort((a, b) => {
-    const areaA = (a.width || NODE_DEFAULTS.WIDTH) * (a.height || NODE_DEFAULTS.HEIGHT)
-    const areaB = (b.width || NODE_DEFAULTS.WIDTH) * (b.height || NODE_DEFAULTS.HEIGHT)
-    return areaB - areaA
-  })
-
-  // Track placed rectangles
-  const placed: { x: number; y: number; w: number; h: number }[] = []
-
-  // Check if rectangle overlaps with any placed node
-  function overlaps(x: number, y: number, w: number, h: number): boolean {
-    for (const rect of placed) {
-      if (x < rect.x + rect.w + gap &&
-          x + w + gap > rect.x &&
-          y < rect.y + rect.h + gap &&
-          y + h + gap > rect.y) {
-        return true
-      }
-    }
-    return false
-  }
-
-  // Find best position using bottom-left with maxWidth constraint
-  function findBestPosition(w: number, h: number): { x: number; y: number } {
-    // Generate candidate positions from corners of placed rectangles
-    const candidates: { x: number; y: number; score: number }[] = []
-
-    // Always try origin
-    candidates.push({ x: startX, y: startY, score: 0 })
-
-    // Add positions at corners of placed rectangles
-    for (const rect of placed) {
-      // Right of this rect
-      const rightX = rect.x + rect.w + gap
-      if (rightX + w <= startX + maxWidth) {
-        candidates.push({ x: rightX, y: rect.y, score: rect.y * 10000 + rightX })
-      }
-
-      // Below this rect
-      candidates.push({ x: rect.x, y: rect.y + rect.h + gap, score: (rect.y + rect.h + gap) * 10000 + rect.x })
-
-      // Below this rect, at start
-      candidates.push({ x: startX, y: rect.y + rect.h + gap, score: (rect.y + rect.h + gap) * 10000 })
-
-      // Right of this rect, at top of layout
-      if (rightX + w <= startX + maxWidth) {
-        candidates.push({ x: rightX, y: startY, score: startY * 10000 + rightX })
-      }
-
-      // Try to fit in vertical gaps next to tall nodes
-      for (const other of placed) {
-        if (other === rect) continue
-        // Gap between rect bottom and other top
-        if (other.y > rect.y + rect.h + gap) {
-          const gapTop = rect.y + rect.h + gap
-          const gapHeight = other.y - gapTop - gap
-          if (gapHeight >= h) {
-            candidates.push({ x: rect.x, y: gapTop, score: gapTop * 10000 + rect.x })
-          }
-        }
-      }
-    }
-
-    // Sort by score (prefer top-left: lower y first, then lower x)
-    candidates.sort((a, b) => a.score - b.score)
-
-    // Find first valid position
-    for (const cand of candidates) {
-      if (cand.x >= startX && cand.y >= startY &&
-          cand.x + w <= startX + maxWidth &&
-          !overlaps(cand.x, cand.y, w, h)) {
-        return { x: cand.x, y: cand.y }
-      }
-    }
-
-    // Fallback: place below everything
-    let maxBottom = startY
-    for (const rect of placed) {
-      maxBottom = Math.max(maxBottom, rect.y + rect.h + gap)
-    }
-    return { x: startX, y: maxBottom }
-  }
-
-  // Place each node
-  for (const node of sorted) {
-    const w = node.width || NODE_DEFAULTS.WIDTH
-    const h = node.height || NODE_DEFAULTS.HEIGHT
-    const pos = findBestPosition(w, h)
-    targets.set(node.id, pos)
-    placed.push({ x: pos.x, y: pos.y, w, h })
-  }
-
-  return targets
-}
-
-async function autoLayoutNodes(layout: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
-  // Use selected nodes if any, otherwise all filtered nodes
-  const selectedIds = store.selectedNodeIds
-  const allNodes = store.filteredNodes
-  const nodes = selectedIds.length > 0
-    ? allNodes.filter(n => selectedIds.includes(n.id))
-    : allNodes
-
-  if (nodes.length === 0) return
-
-  // Push undo state before layout change
-  pushUndo()
-
-  // Stop any running animation
-  stopLayoutAnimation()
-
-  // Calculate current center of all nodes (this stays consistent across layouts)
-  let sumX = 0, sumY = 0
-  for (const node of nodes) {
-    sumX += node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2
-    sumY += node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2
-  }
-  const centerX = sumX / nodes.length
-  const centerY = sumY / nodes.length
-
-  // Gap between nodes - enough for edge routing (standoff + arrow + margin)
-  // Needs ~50px standoff on each side + space for edge labels
-  const gap = 150
-
-  if (layout === 'force') {
-    // Use centralized force layout from store
-    const nodeIds = selectedIds.length > 0 ? selectedIds : undefined
-    await store.layoutNodes(nodeIds, {
-      centerX,
-      centerY,
-    })
-    return
-  }
-
-  // For grid/horizontal/vertical layouts, calculate targets centered on current center
-  const targets = new Map<string, { x: number, y: number }>()
-
-  if (layout === 'grid') {
-    // Use tetris-style bin packing
-    // First, do a trial layout to get dimensions
-    const trialTargets = tetrisGridLayout(nodes, 0, 0, gap)
-
-    // Calculate bounding box of trial layout
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const node of nodes) {
-      const pos = trialTargets.get(node.id)!
-      const w = node.width || NODE_DEFAULTS.WIDTH
-      const h = node.height || NODE_DEFAULTS.HEIGHT
-      minX = Math.min(minX, pos.x)
-      minY = Math.min(minY, pos.y)
-      maxX = Math.max(maxX, pos.x + w)
-      maxY = Math.max(maxY, pos.y + h)
-    }
-
-    // Center the layout on current center
-    const layoutCenterX = (minX + maxX) / 2
-    const layoutCenterY = (minY + maxY) / 2
-    const offsetX = centerX - layoutCenterX
-    const offsetY = centerY - layoutCenterY
-
-    // Apply offset to all positions
-    for (const [id, pos] of trialTargets) {
-      targets.set(id, { x: pos.x + offsetX, y: pos.y + offsetY })
-    }
-  } else {
-    // Horizontal and vertical layouts - use actual node sizes
-    if (layout === 'horizontal') {
-      // Sort by height for better alignment
-      const sorted = [...nodes].sort((a, b) => (b.height || NODE_DEFAULTS.HEIGHT) - (a.height || NODE_DEFAULTS.HEIGHT))
-      let totalWidth = sorted.reduce((sum, n) => sum + (n.width || NODE_DEFAULTS.WIDTH) + gap, -gap)
-      let x = centerX - totalWidth / 2
-      const maxHeight = Math.max(...sorted.map(n => n.height || NODE_DEFAULTS.HEIGHT))
-
-      for (const node of sorted) {
-        const h = node.height || NODE_DEFAULTS.HEIGHT
-        targets.set(node.id, { x, y: centerY - maxHeight / 2 + (maxHeight - h) / 2 })
-        x += (node.width || NODE_DEFAULTS.WIDTH) + gap
-      }
-    } else if (layout === 'vertical') {
-      // Sort by width for better alignment
-      const sorted = [...nodes].sort((a, b) => (b.width || NODE_DEFAULTS.WIDTH) - (a.width || NODE_DEFAULTS.WIDTH))
-      let totalHeight = sorted.reduce((sum, n) => sum + (n.height || NODE_DEFAULTS.HEIGHT) + gap, -gap)
-      let y = centerY - totalHeight / 2
-      const maxWidth = Math.max(...sorted.map(n => n.width || NODE_DEFAULTS.WIDTH))
-
-      for (const node of sorted) {
-        const w = node.width || NODE_DEFAULTS.WIDTH
-        targets.set(node.id, { x: centerX - maxWidth / 2 + (maxWidth - w) / 2, y })
-        y += (node.height || NODE_DEFAULTS.HEIGHT) + gap
-      }
-    }
-  }
-
-  animateToPositions(targets, 500)
-}
-
-function fitToContent() {
-  if (store.filteredNodes.length === 0) return
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const node of store.filteredNodes) {
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH))
-    maxY = Math.max(maxY, node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT))
-  }
-
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return
-
-  const padding = 50
-  const contentWidth = maxX - minX + padding * 2
-  const contentHeight = maxY - minY + padding * 2
-
-  const scaleX = rect.width / contentWidth
-  const scaleY = rect.height / contentHeight
-  scale.value = Math.min(scaleX, scaleY, 1)
-
-  offsetX.value = (rect.width - contentWidth * scale.value) / 2 - minX * scale.value + padding * scale.value
-  offsetY.value = (rect.height - contentHeight * scale.value) / 2 - minY * scale.value + padding * scale.value
 }
 
 // Edge color palette
