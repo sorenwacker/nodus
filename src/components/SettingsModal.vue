@@ -597,6 +597,26 @@ const timeoutSeconds = computed({
                 </span>
                 Dark
               </label>
+              <label class="radio-label">
+                <input v-model="theme" type="radio" value="pitch-black" />
+                <span class="theme-icon pitch-black">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <circle cx="12" cy="12" r="10" />
+                  </svg>
+                </span>
+                Pitch Black
+              </label>
+              <label class="radio-label">
+                <input v-model="theme" type="radio" value="cyber" />
+                <span class="theme-icon cyber">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+                    <line x1="12" y1="22" x2="12" y2="15.5" />
+                    <polyline points="22 8.5 12 15.5 2 8.5" />
+                  </svg>
+                </span>
+                Cyber
+              </label>
             </div>
           </div>
 
@@ -636,7 +656,7 @@ const timeoutSeconds = computed({
   border: 1px solid var(--border-node, #e4e4e7);
 }
 
-[data-theme='dark'] .settings-modal {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .settings-modal {
   background: #27272a;
   border-color: #3f3f46;
 }
@@ -657,7 +677,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
-[data-theme='dark'] .settings-header h2 {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .settings-header h2 {
   color: #f4f4f5;
 }
 
@@ -675,7 +695,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
-[data-theme='dark'] .close-btn:hover {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .close-btn:hover {
   background: #3f3f46;
   color: #f4f4f5;
 }
@@ -704,7 +724,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
-[data-theme='dark'] .settings-tabs button:hover {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .settings-tabs button:hover {
   background: #3f3f46;
   color: #f4f4f5;
 }
@@ -742,7 +762,7 @@ const timeoutSeconds = computed({
   justify-content: space-between;
 }
 
-[data-theme='dark'] .setting-group > label {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .setting-group > label {
   color: #f4f4f5;
 }
 
@@ -759,11 +779,11 @@ const timeoutSeconds = computed({
   font-size: 14px;
 }
 
-[data-theme='dark'] .setting-group input[type="text"],
-[data-theme='dark'] .setting-group input[type="password"],
-[data-theme='dark'] .setting-group input[type="number"],
-[data-theme='dark'] .setting-group select,
-[data-theme='dark'] .setting-group textarea {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .setting-group input[type="text"],
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .setting-group input[type="password"],
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .setting-group input[type="number"],
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .setting-group select,
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .setting-group textarea {
   background: #18181b;
   border-color: #3f3f46;
   color: #f4f4f5;
@@ -843,7 +863,7 @@ const timeoutSeconds = computed({
   justify-content: center;
 }
 
-[data-theme='dark'] .validate-btn {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .validate-btn {
   background: #3f3f46;
   color: #f4f4f5;
 }
@@ -876,7 +896,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
-[data-theme='dark'] .refresh-btn {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .refresh-btn {
   background: #3f3f46;
   color: #f4f4f5;
 }
@@ -945,7 +965,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
-[data-theme='dark'] .radio-label {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .radio-label {
   background: #18181b;
   border-color: #3f3f46;
   color: #f4f4f5;
@@ -971,13 +991,29 @@ const timeoutSeconds = computed({
   justify-content: center;
 }
 
+.theme-icon.light svg {
+  color: #f59e0b;
+}
+
+.theme-icon.dark svg {
+  color: #6366f1;
+}
+
+.theme-icon.pitch-black svg {
+  color: #000000;
+}
+
+.theme-icon.cyber svg {
+  color: #00ffcc;
+}
+
 .about-info {
   padding: 12px;
   background: var(--bg-canvas, #f4f4f5);
   border-radius: 6px;
 }
 
-[data-theme='dark'] .about-info {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .about-info {
   background: #18181b;
 }
 
@@ -987,7 +1023,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
-[data-theme='dark'] .about-info p {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .about-info p {
   color: #f4f4f5;
 }
 
@@ -1023,7 +1059,7 @@ const timeoutSeconds = computed({
   transition: all 0.15s;
 }
 
-[data-theme='dark'] .preset-buttons button {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .preset-buttons button {
   background: #18181b;
   border-color: #3f3f46;
   color: #f4f4f5;
@@ -1055,7 +1091,7 @@ const timeoutSeconds = computed({
   cursor: pointer;
 }
 
-[data-theme='dark'] .slider-group .slider {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-group .slider {
   background: #3f3f46;
 }
 
@@ -1086,7 +1122,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
-[data-theme='dark'] .slider-group .slider-value {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-group .slider-value {
   color: #f4f4f5;
 }
 </style>

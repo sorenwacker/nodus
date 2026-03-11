@@ -65,7 +65,8 @@ const store = useNodesStore()
 const isDarkMode = ref(false)
 
 function updateTheme() {
-  isDarkMode.value = document.documentElement.getAttribute('data-theme') === 'dark'
+  const theme = document.documentElement.getAttribute('data-theme')
+  isDarkMode.value = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
 }
 
 // Track if we've centered the view initially

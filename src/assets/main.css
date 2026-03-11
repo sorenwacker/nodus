@@ -34,6 +34,74 @@
   --shadow-md: rgba(0, 0, 0, 0.4);
 }
 
+/* Pitch Black - OLED optimized */
+[data-theme='pitch-black'] {
+  --bg-canvas: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-surface-alt: #111111;
+  --bg-elevated: #1a1a1a;
+  --text-main: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-muted: #707070;
+  --border-default: #333333;
+  --border-subtle: #222222;
+  --primary-color: #60a5fa;
+  --danger-bg: #1a0000;
+  --danger-border: #500000;
+  --dot-color: #0a0a0a;
+  --shadow-sm: rgba(255, 255, 255, 0.03);
+  --shadow-md: rgba(255, 255, 255, 0.05);
+}
+
+/* Cyber - Hologram/Laser/Steampunk fusion */
+[data-theme='cyber'] {
+  --bg-canvas: #0a0a12;
+  --bg-surface: #0d1117;
+  --bg-surface-alt: #161b22;
+  --bg-elevated: #21262d;
+  --text-main: #00ffcc;
+  --text-secondary: #7ee8fa;
+  --text-muted: #58a6ff;
+  --border-default: #00ffcc40;
+  --border-subtle: #30363d;
+  --primary-color: #ff00ff;
+  --danger-color: #ff3366;
+  --danger-bg: #1a0011;
+  --danger-border: #ff006640;
+  --dot-color: #00ffcc15;
+  --shadow-sm: rgba(0, 255, 204, 0.1);
+  --shadow-md: rgba(255, 0, 255, 0.15);
+  /* Cyber-specific extras */
+  --accent-glow: #00ffcc;
+  --accent-secondary: #ff00ff;
+  --neon-pink: #ff00ff;
+  --neon-cyan: #00ffcc;
+  --neon-blue: #00ccff;
+}
+
+/* Cyber theme special effects */
+[data-theme='cyber'] .node-card {
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3), 0 0 20px rgba(0, 255, 204, 0.1);
+  border-color: rgba(0, 255, 204, 0.4);
+}
+
+[data-theme='cyber'] .node-card:hover {
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.5), 0 0 30px rgba(255, 0, 255, 0.2);
+}
+
+[data-theme='cyber'] .node-card.selected {
+  box-shadow: 0 0 20px rgba(255, 0, 255, 0.6), 0 0 40px rgba(255, 0, 255, 0.3);
+  border-color: #ff00ff;
+}
+
+[data-theme='cyber'] .edge-line-visible {
+  filter: drop-shadow(0 0 3px rgba(0, 255, 204, 0.6));
+}
+
+[data-theme='cyber'] .edge-highlighted {
+  filter: drop-shadow(0 0 6px rgba(255, 0, 255, 0.8));
+}
+
 * {
   margin: 0;
   padding: 0;

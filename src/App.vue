@@ -1038,17 +1038,17 @@ async function openFolderDialog() {
   border-left: 4px solid #3b82f6;
 }
 
-[data-theme='dark'] .toast.error {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .toast.error {
   background: #450a0a;
   color: #fecaca;
 }
 
-[data-theme='dark'] .toast.success {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .toast.success {
   background: #052e16;
   color: #bbf7d0;
 }
 
-[data-theme='dark'] .toast.info {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .toast.info {
   background: #172554;
   color: #bfdbfe;
 }
