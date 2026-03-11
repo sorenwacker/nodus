@@ -13,12 +13,7 @@ import {
   getStandoff,
   getAngledStandoff,
   GridTracker,
-  routeDiagonal,
-  routeOrthogonal,
-  findObstacles,
-  findObstaclesInRegion,
   PORT_SPACING,
-  OBSTACLE_MARGIN,
   type NodeRect,
   type EdgeStyle,
 } from './edgeRouting'
@@ -314,7 +309,6 @@ function getVisualNode(nodeId: string) {
 // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
 // In neighborhood mode, always use full routing since we have few nodes
 const isLargeGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 200 || store.filteredEdges.length > 500))
-const isVeryLargeGraph = computed(() => !neighborhoodMode.value && displayNodes.value.length > 500)
 const isHugeGraph = computed(() => !neighborhoodMode.value && displayNodes.value.length > 350)
 const isMassiveGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 300 || store.filteredEdges.length > 800))
 
@@ -504,17 +498,6 @@ function fitNodeToContent(nodeId: string) {
   if (neighborhoodMode.value && focusNodeId.value) {
     setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
   }
-}
-
-// Auto-fit after mermaid renders (only for nodes with auto_fit enabled)
-function autoFitAllNodes() {
-  setTimeout(() => {
-    for (const node of store.filteredNodes) {
-      if (node.auto_fit && node.markdown_content?.includes('```mermaid')) {
-        fitNodeToContent(node.id)
-      }
-    }
-  }, 100)
 }
 
 // Fit all visible nodes to their content (auto-expand to show all content)
