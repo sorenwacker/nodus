@@ -397,7 +397,7 @@ function layoutNeighborhood(focusId: string): boolean {
   const focusWidth = focusNode.width || 200
   const focusHeight = focusNode.height || 120
   const verticalGap = 300 // Vertical distance between rows (must be > 2*STANDOFF for edge routing)
-  const horizontalGap = 100 // Horizontal gap between nodes in same row
+  const horizontalGap = 150 // Horizontal gap between nodes in same row
 
   // Focus node at center (position is top-left corner)
   positions.set(focusId, {
@@ -446,14 +446,24 @@ function layoutNeighborhood(focusId: string): boolean {
 
   // Layout siblings (bidirectional) on left and right of focus
   if (siblings.length > 0) {
-    const horizontalDistance = 400 // Distance from focus center to sibling center
-    const verticalSpacing = 50 // Vertical gap between stacked siblings
+    const siblingGap = 150 // Gap between focus and siblings
+    const verticalSpacing = 80 // Vertical gap between stacked siblings
 
     // Split siblings: odd indices left, even indices right
     const leftSiblings = siblings.filter((_, i) => i % 2 === 0)
     const rightSiblings = siblings.filter((_, i) => i % 2 === 1)
 
-    // Layout left siblings
+    // Calculate max width for each side to determine horizontal offset
+    const maxLeftWidth = leftSiblings.reduce((max, id) => {
+      const n = store.getNode(id)
+      return Math.max(max, n?.width || 200)
+    }, 0)
+    const maxRightWidth = rightSiblings.reduce((max, id) => {
+      const n = store.getNode(id)
+      return Math.max(max, n?.width || 200)
+    }, 0)
+
+    // Layout left siblings - position based on focus left edge
     const leftTotalHeight = leftSiblings.reduce((sum, id) => {
       const n = store.getNode(id)
       return sum + (n?.height || 120) + verticalSpacing
@@ -464,14 +474,15 @@ function layoutNeighborhood(focusId: string): boolean {
       const n = store.getNode(sibId)
       const nodeWidth = n?.width || 200
       const nodeHeight = n?.height || 120
+      // Position so right edge is siblingGap away from focus left edge
       positions.set(sibId, {
-        x: viewCenterX - horizontalDistance - nodeWidth / 2,
+        x: viewCenterX - focusWidth / 2 - siblingGap - nodeWidth,
         y: yOffset,
       })
       yOffset += nodeHeight + verticalSpacing
     })
 
-    // Layout right siblings
+    // Layout right siblings - position based on focus right edge
     const rightTotalHeight = rightSiblings.reduce((sum, id) => {
       const n = store.getNode(id)
       return sum + (n?.height || 120) + verticalSpacing
@@ -480,10 +491,10 @@ function layoutNeighborhood(focusId: string): boolean {
 
     rightSiblings.forEach(sibId => {
       const n = store.getNode(sibId)
-      const nodeWidth = n?.width || 200
       const nodeHeight = n?.height || 120
+      // Position so left edge is siblingGap away from focus right edge
       positions.set(sibId, {
-        x: viewCenterX + horizontalDistance - nodeWidth / 2,
+        x: viewCenterX + focusWidth / 2 + siblingGap,
         y: yOffset,
       })
       yOffset += nodeHeight + verticalSpacing
@@ -3087,7 +3098,8 @@ function updateNodeColor(nodeId: string, color: string | null) {
 // One-shot fit to content (does NOT enable auto_fit)
 async function fitNodeNow(nodeId: string) {
   // Exit edit mode first to measure rendered view, not textarea
-  if (editingNodeId.value === nodeId) {
+  const wasEditing = editingNodeId.value === nodeId
+  if (wasEditing) {
     // Save content directly
     store.updateNodeContent(nodeId, editContent.value)
     // Clear editing state
@@ -3095,13 +3107,39 @@ async function fitNodeNow(nodeId: string) {
     editContent.value = ''
     nodePrompt.value = ''
   }
+
+  // Force update rendered content for this node
+  const node = store.getNode(nodeId)
+  if (node) {
+    nodeRenderedContent.value = {
+      ...nodeRenderedContent.value,
+      [nodeId]: renderMarkdown(node.markdown_content)
+    }
+  }
+
   // Wait for Vue to render the view mode content
   await nextTick()
-  // Additional delay for markdown rendering
-  setTimeout(() => {
-    renderMermaidDiagrams()
-    setTimeout(() => fitNodeToContent(nodeId), 150)
-  }, 50)
+  await nextTick()
+
+  // Poll until .node-content exists (max 500ms)
+  const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`)
+  if (!cardEl) return
+
+  let attempts = 0
+  const waitForContent = () => {
+    const contentEl = cardEl.querySelector('.node-content')
+    const editorEl = cardEl.querySelector('.inline-editor')
+
+    if (contentEl && !editorEl) {
+      // Content element exists, editor gone - safe to measure
+      renderMermaidDiagrams()
+      setTimeout(() => fitNodeToContent(nodeId), 100)
+    } else if (attempts < 10) {
+      attempts++
+      setTimeout(waitForContent, 50)
+    }
+  }
+  waitForContent()
 }
 
 async function deleteSelectedNodes() {
