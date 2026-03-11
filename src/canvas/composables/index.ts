@@ -4,3 +4,4 @@
  */
 export { useMinimap, type MinimapNode, type MinimapOptions } from './useMinimap'
 export { useAgentRunner, type AgentContext } from './useAgentRunner'
+export { useNeighborhoodMode, type UseNeighborhoodModeOptions } from './useNeighborhoodMode'

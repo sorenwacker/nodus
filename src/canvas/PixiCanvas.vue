@@ -28,6 +28,7 @@ import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
+import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
 import { NODE_DEFAULTS, LAYOUT_GAPS, getNodeDimensions } from './constants'
 
 // Undo injection for position and content changes
@@ -280,44 +281,35 @@ const visibleNodeIds = computed(() => new Set(visibleNodes.value.map(n => n.id))
 // Canvas element ref (needed early for layout functions)
 const canvasRef = ref<HTMLElement | null>(null)
 
-// Neighborhood view mode - show only focus node and its direct neighbors
-const neighborhoodMode = ref(false)
-const focusNodeId = ref<string | null>(null)
-// Local positions for neighborhood view (independent from global positions)
-const neighborhoodPositions = ref<Map<string, { x: number; y: number }>>(new Map())
-
-// Get IDs of nodes directly connected to focus node
-const neighborhoodNodeIds = computed(() => {
-  if (!neighborhoodMode.value || !focusNodeId.value) return null
-
-  const neighbors = new Set<string>([focusNodeId.value])
-  for (const edge of store.filteredEdges) {
-    if (edge.source_node_id === focusNodeId.value) {
-      neighbors.add(edge.target_node_id)
-    }
-    if (edge.target_node_id === focusNodeId.value) {
-      neighbors.add(edge.source_node_id)
-    }
-  }
-  return neighbors
+// Neighborhood mode composable
+const neighborhood = useNeighborhoodMode({
+  store: {
+    filteredNodes: store.filteredNodes,
+    filteredEdges: store.filteredEdges,
+    getNode: store.getNode,
+    selectedNodeIds: store.selectedNodeIds,
+  },
+  viewState: {
+    scale,
+    offsetX,
+    offsetY,
+    canvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
+  },
 })
 
-// Nodes to display (filtered by neighborhood if active, with local positions)
-const displayNodes = computed(() => {
-  if (neighborhoodNodeIds.value) {
-    const positions = neighborhoodPositions.value
-    return store.filteredNodes
-      .filter(n => neighborhoodNodeIds.value!.has(n.id))
-      .map(n => {
-        const pos = positions.get(n.id)
-        if (pos) {
-          return { ...n, canvas_x: pos.x, canvas_y: pos.y }
-        }
-        return n
-      })
-  }
-  return store.filteredNodes
-})
+// Destructure for convenience
+const { neighborhoodMode, focusNodeId, displayNodes } = neighborhood
+
+// Expose functions with original names for compatibility
+function toggleNeighborhoodMode(nodeId?: string) {
+  neighborhood.toggle(nodeId)
+}
+function layoutNeighborhood(focusId: string) {
+  return neighborhood.layout(focusId)
+}
+function getVisualNode(nodeId: string) {
+  return neighborhood.getVisualNode(nodeId)
+}
 
 // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
 // In neighborhood mode, always use full routing since we have few nodes
@@ -325,198 +317,6 @@ const isLargeGraph = computed(() => !neighborhoodMode.value && (displayNodes.val
 const isVeryLargeGraph = computed(() => !neighborhoodMode.value && displayNodes.value.length > 500)
 const isHugeGraph = computed(() => !neighborhoodMode.value && displayNodes.value.length > 350)
 const isMassiveGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 300 || store.filteredEdges.length > 800))
-
-// Get visual node (with correct position accounting for neighborhood mode)
-function getVisualNode(nodeId: string) {
-  return displayNodes.value.find(n => n.id === nodeId)
-}
-
-// Toggle neighborhood mode for a node
-function toggleNeighborhoodMode(nodeId?: string) {
-  const targetId = nodeId || store.selectedNodeIds[0] || focusNodeId.value
-
-  // If already in neighborhood mode and clicking the same node (or no node specified), exit
-  if (neighborhoodMode.value && (!nodeId || focusNodeId.value === targetId)) {
-    neighborhoodMode.value = false
-    focusNodeId.value = null
-    neighborhoodPositions.value = new Map()
-  } else if (targetId) {
-    // Enter or navigate to new focus
-    focusNodeId.value = targetId
-    layoutNeighborhood(targetId)
-    neighborhoodMode.value = true
-  }
-}
-
-// Layout neighborhood nodes with focus node centered (uses local positions, not store)
-function layoutNeighborhood(focusId: string): boolean {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return false
-
-  const focusNode = store.getNode(focusId)
-  if (!focusNode) return false
-
-  // Categorize neighbors:
-  // - Parents (top): nodes that ONLY link TO focus
-  // - Siblings (left/right): nodes with bidirectional edges
-  // - Children (bottom): nodes that focus ONLY links TO
-  const incomingFrom = new Set<string>() // nodes that link TO focus
-  const outgoingTo = new Set<string>()   // nodes that focus links TO
-
-  for (const edge of store.filteredEdges) {
-    if (edge.target_node_id === focusId && edge.source_node_id !== focusId) {
-      incomingFrom.add(edge.source_node_id)
-    }
-    if (edge.source_node_id === focusId && edge.target_node_id !== focusId) {
-      outgoingTo.add(edge.target_node_id)
-    }
-  }
-
-  const parents: string[] = []   // only incoming
-  const children: string[] = []  // only outgoing
-  const siblings: string[] = []  // both directions
-
-  for (const id of incomingFrom) {
-    if (outgoingTo.has(id)) {
-      siblings.push(id)
-    } else {
-      parents.push(id)
-    }
-  }
-  for (const id of outgoingTo) {
-    if (!incomingFrom.has(id)) {
-      children.push(id)
-    }
-  }
-
-  // Calculate center of viewport in canvas coordinates
-  const viewCenterX = (rect.width / 2 - offsetX.value) / scale.value
-  const viewCenterY = (rect.height / 2 - offsetY.value) / scale.value
-
-  // Hierarchical layout - focus in center, parents above, children below
-  const positions = new Map<string, { x: number; y: number }>()
-  const focusWidth = focusNode.width || NODE_DEFAULTS.WIDTH
-  const focusHeight = focusNode.height || NODE_DEFAULTS.HEIGHT
-  const verticalGap = LAYOUT_GAPS.VERTICAL
-  const horizontalGap = LAYOUT_GAPS.HORIZONTAL
-
-  // Focus node at center (position is top-left corner)
-  positions.set(focusId, {
-    x: viewCenterX - focusWidth / 2,
-    y: viewCenterY - focusHeight / 2,
-  })
-
-  // Layout parents in a row above the focus node
-  if (parents.length > 0) {
-    const totalWidth = parents.reduce((sum, id) => {
-      const n = store.getNode(id)
-      return sum + (n?.width || NODE_DEFAULTS.WIDTH) + horizontalGap
-    }, -horizontalGap)
-    let xOffset = viewCenterX - totalWidth / 2
-
-    parents.forEach(parentId => {
-      const n = store.getNode(parentId)
-      const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
-      const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
-      positions.set(parentId, {
-        x: xOffset,
-        y: viewCenterY - focusHeight / 2 - verticalGap - nodeHeight,
-      })
-      xOffset += nodeWidth + horizontalGap
-    })
-  }
-
-  // Layout children in a row below the focus node
-  if (children.length > 0) {
-    const totalWidth = children.reduce((sum, id) => {
-      const n = store.getNode(id)
-      return sum + (n?.width || NODE_DEFAULTS.WIDTH) + horizontalGap
-    }, -horizontalGap)
-    let xOffset = viewCenterX - totalWidth / 2
-
-    children.forEach(childId => {
-      const n = store.getNode(childId)
-      const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
-      positions.set(childId, {
-        x: xOffset,
-        y: viewCenterY + focusHeight / 2 + verticalGap,
-      })
-      xOffset += nodeWidth + horizontalGap
-    })
-  }
-
-  // Layout siblings (bidirectional) on left and right of focus
-  if (siblings.length > 0) {
-    const siblingGap = LAYOUT_GAPS.SIBLING_GAP
-    const verticalSpacing = LAYOUT_GAPS.SIBLING_VERTICAL
-
-    // Split siblings: odd indices left, even indices right
-    const leftSiblings = siblings.filter((_, i) => i % 2 === 0)
-    const rightSiblings = siblings.filter((_, i) => i % 2 === 1)
-
-    // Calculate max width for each side to determine horizontal offset
-    const maxLeftWidth = leftSiblings.reduce((max, id) => {
-      const n = store.getNode(id)
-      return Math.max(max, n?.width || NODE_DEFAULTS.WIDTH)
-    }, 0)
-    const maxRightWidth = rightSiblings.reduce((max, id) => {
-      const n = store.getNode(id)
-      return Math.max(max, n?.width || NODE_DEFAULTS.WIDTH)
-    }, 0)
-
-    // Layout left siblings - position based on focus left edge
-    const leftTotalHeight = leftSiblings.reduce((sum, id) => {
-      const n = store.getNode(id)
-      return sum + (n?.height || NODE_DEFAULTS.HEIGHT) + verticalSpacing
-    }, -verticalSpacing)
-    let yOffset = viewCenterY - leftTotalHeight / 2
-
-    leftSiblings.forEach(sibId => {
-      const n = store.getNode(sibId)
-      const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
-      const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
-      // Position so right edge is siblingGap away from focus left edge
-      positions.set(sibId, {
-        x: viewCenterX - focusWidth / 2 - siblingGap - nodeWidth,
-        y: yOffset,
-      })
-      yOffset += nodeHeight + verticalSpacing
-    })
-
-    // Layout right siblings - position based on focus right edge
-    const rightTotalHeight = rightSiblings.reduce((sum, id) => {
-      const n = store.getNode(id)
-      return sum + (n?.height || NODE_DEFAULTS.HEIGHT) + verticalSpacing
-    }, -verticalSpacing)
-    yOffset = viewCenterY - rightTotalHeight / 2
-
-    rightSiblings.forEach(sibId => {
-      const n = store.getNode(sibId)
-      const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
-      // Position so left edge is siblingGap away from focus right edge
-      positions.set(sibId, {
-        x: viewCenterX + focusWidth / 2 + siblingGap,
-        y: yOffset,
-      })
-      yOffset += nodeHeight + verticalSpacing
-    })
-  }
-
-  // Store positions locally (not in store)
-  neighborhoodPositions.value = positions
-
-  // Center view on the focus node
-  const focusPos = positions.get(focusId)
-  if (focusPos) {
-    const nodeCenterX = focusPos.x + (focusNode.width || NODE_DEFAULTS.WIDTH) / 2
-    const nodeCenterY = focusPos.y + (focusNode.height || NODE_DEFAULTS.HEIGHT) / 2
-
-    // Set offset so node center is at viewport center
-    offsetX.value = rect.width / 2 - nodeCenterX * scale.value
-    offsetY.value = rect.height / 2 - nodeCenterY * scale.value
-  }
-  return true
-}
 
 // Semantic zoom collapse - hide content for massive graphs when zoomed out
 const isSemanticZoomCollapsed = computed(() => isMassiveGraph.value && scale.value < 0.6)
