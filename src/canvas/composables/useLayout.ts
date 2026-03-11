@@ -13,9 +13,16 @@ interface Node {
   height?: number
 }
 
+interface Edge {
+  id: string
+  source_node_id: string
+  target_node_id: string
+}
+
 interface Store {
   getNodes: () => Node[]
   getFilteredNodes: () => Node[]
+  getFilteredEdges: () => Edge[]
   getSelectedNodeIds: () => string[]
   updateNodePosition: (id: string, x: number, y: number) => void
   layoutNodes: (nodeIds?: string[], options?: { centerX: number; centerY: number }) => Promise<void>
@@ -88,10 +95,12 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   /**
-   * Tetris-style bin packing for grid layout using maximal rectangles algorithm
+   * Tetris-style bin packing for grid layout with edge-aware placement
+   * Places connected nodes closer together to minimize total edge length
    */
   function tetrisGridLayout(
     nodes: Node[],
+    edges: Edge[],
     startX: number,
     startY: number,
     gap: number
@@ -99,6 +108,19 @@ export function useLayout(options: UseLayoutOptions) {
     const targets = new Map<string, { x: number; y: number }>()
 
     if (nodes.length === 0) return targets
+
+    // Build adjacency map for edge-aware placement
+    const nodeIds = new Set(nodes.map(n => n.id))
+    const adjacency = new Map<string, Set<string>>()
+    for (const node of nodes) {
+      adjacency.set(node.id, new Set())
+    }
+    for (const edge of edges) {
+      if (nodeIds.has(edge.source_node_id) && nodeIds.has(edge.target_node_id)) {
+        adjacency.get(edge.source_node_id)?.add(edge.target_node_id)
+        adjacency.get(edge.target_node_id)?.add(edge.source_node_id)
+      }
+    }
 
     // Calculate total area to estimate ideal dimensions
     let totalArea = 0
@@ -116,15 +138,18 @@ export function useLayout(options: UseLayoutOptions) {
     const idealSide = Math.sqrt(totalArea) * 1.2
     const maxWidth = Math.max(idealSide, maxNodeWidth + gap)
 
-    // Sort nodes by area (largest first) for better packing
+    // Sort nodes: prioritize by connectivity (most connected first), then by area
     const sorted = [...nodes].sort((a, b) => {
+      const connA = adjacency.get(a.id)?.size || 0
+      const connB = adjacency.get(b.id)?.size || 0
+      if (connA !== connB) return connB - connA // Most connected first
       const areaA = (a.width || NODE_DEFAULTS.WIDTH) * (a.height || NODE_DEFAULTS.HEIGHT)
       const areaB = (b.width || NODE_DEFAULTS.WIDTH) * (b.height || NODE_DEFAULTS.HEIGHT)
-      return areaB - areaA
+      return areaB - areaA // Then largest first
     })
 
-    // Track placed rectangles
-    const placed: { x: number; y: number; w: number; h: number }[] = []
+    // Track placed rectangles with node IDs
+    const placed: { id: string; x: number; y: number; w: number; h: number }[] = []
 
     function overlaps(x: number, y: number, w: number, h: number): boolean {
       for (const rect of placed) {
@@ -138,22 +163,44 @@ export function useLayout(options: UseLayoutOptions) {
       return false
     }
 
-    function findBestPosition(w: number, h: number): { x: number; y: number } {
-      const candidates: { x: number; y: number; score: number }[] = []
+    // Calculate distance to center of connected placed nodes
+    function distanceToConnected(nodeId: string, x: number, y: number, w: number, h: number): number {
+      const connected = adjacency.get(nodeId)
+      if (!connected || connected.size === 0) return 0
 
-      candidates.push({ x: startX, y: startY, score: 0 })
+      let totalDist = 0
+      let count = 0
+      const cx = x + w / 2
+      const cy = y + h / 2
+
+      for (const rect of placed) {
+        if (connected.has(rect.id)) {
+          const rcx = rect.x + rect.w / 2
+          const rcy = rect.y + rect.h / 2
+          totalDist += Math.sqrt((cx - rcx) ** 2 + (cy - rcy) ** 2)
+          count++
+        }
+      }
+
+      return count > 0 ? totalDist / count : 0
+    }
+
+    function findBestPosition(nodeId: string, w: number, h: number): { x: number; y: number } {
+      const candidates: { x: number; y: number; packScore: number; edgeScore: number }[] = []
+
+      candidates.push({ x: startX, y: startY, packScore: 0, edgeScore: 0 })
 
       for (const rect of placed) {
         const rightX = rect.x + rect.w + gap
         if (rightX + w <= startX + maxWidth) {
-          candidates.push({ x: rightX, y: rect.y, score: rect.y * 10000 + rightX })
+          candidates.push({ x: rightX, y: rect.y, packScore: rect.y * 10000 + rightX, edgeScore: 0 })
         }
 
-        candidates.push({ x: rect.x, y: rect.y + rect.h + gap, score: (rect.y + rect.h + gap) * 10000 + rect.x })
-        candidates.push({ x: startX, y: rect.y + rect.h + gap, score: (rect.y + rect.h + gap) * 10000 })
+        candidates.push({ x: rect.x, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rect.x, edgeScore: 0 })
+        candidates.push({ x: startX, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000, edgeScore: 0 })
 
         if (rightX + w <= startX + maxWidth) {
-          candidates.push({ x: rightX, y: startY, score: startY * 10000 + rightX })
+          candidates.push({ x: rightX, y: startY, packScore: startY * 10000 + rightX, edgeScore: 0 })
         }
 
         for (const other of placed) {
@@ -162,35 +209,52 @@ export function useLayout(options: UseLayoutOptions) {
             const gapTop = rect.y + rect.h + gap
             const gapHeight = other.y - gapTop - gap
             if (gapHeight >= h) {
-              candidates.push({ x: rect.x, y: gapTop, score: gapTop * 10000 + rect.x })
+              candidates.push({ x: rect.x, y: gapTop, packScore: gapTop * 10000 + rect.x, edgeScore: 0 })
             }
           }
         }
       }
 
-      candidates.sort((a, b) => a.score - b.score)
-
+      // Calculate edge distance scores for valid candidates
+      const validCandidates: typeof candidates = []
       for (const cand of candidates) {
         if (cand.x >= startX && cand.y >= startY &&
             cand.x + w <= startX + maxWidth &&
             !overlaps(cand.x, cand.y, w, h)) {
-          return { x: cand.x, y: cand.y }
+          cand.edgeScore = distanceToConnected(nodeId, cand.x, cand.y, w, h)
+          validCandidates.push(cand)
         }
       }
 
-      let maxBottom = startY
-      for (const rect of placed) {
-        maxBottom = Math.max(maxBottom, rect.y + rect.h + gap)
+      if (validCandidates.length === 0) {
+        let maxBottom = startY
+        for (const rect of placed) {
+          maxBottom = Math.max(maxBottom, rect.y + rect.h + gap)
+        }
+        return { x: startX, y: maxBottom }
       }
-      return { x: startX, y: maxBottom }
+
+      // Sort by edge distance first (to minimize edge length), then by packing score
+      // Weight edge proximity heavily for connected nodes
+      validCandidates.sort((a, b) => {
+        // If both have edge connections, prioritize closer to connected nodes
+        if (a.edgeScore > 0 || b.edgeScore > 0) {
+          const edgeDiff = a.edgeScore - b.edgeScore
+          if (Math.abs(edgeDiff) > 50) return edgeDiff // Significant edge distance difference
+        }
+        // Otherwise use packing score
+        return a.packScore - b.packScore
+      })
+
+      return { x: validCandidates[0].x, y: validCandidates[0].y }
     }
 
     for (const node of sorted) {
       const w = node.width || NODE_DEFAULTS.WIDTH
       const h = node.height || NODE_DEFAULTS.HEIGHT
-      const pos = findBestPosition(w, h)
+      const pos = findBestPosition(node.id, w, h)
       targets.set(node.id, pos)
-      placed.push({ x: pos.x, y: pos.y, w, h })
+      placed.push({ id: node.id, x: pos.x, y: pos.y, w, h })
     }
 
     return targets
@@ -228,7 +292,8 @@ export function useLayout(options: UseLayoutOptions) {
     const targets = new Map<string, { x: number; y: number }>()
 
     if (layout === 'grid') {
-      const trialTargets = tetrisGridLayout(nodes, 0, 0, gap)
+      const edges = store.getFilteredEdges()
+      const trialTargets = tetrisGridLayout(nodes, edges, 0, 0, gap)
 
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
       for (const node of nodes) {
