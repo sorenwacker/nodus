@@ -219,10 +219,41 @@ document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'lig
 const searchResults = computed(() => {
   if (!searchQuery.value.trim()) return []
   const q = searchQuery.value.toLowerCase()
-  return store.nodes.filter(n =>
+
+  // Search in filtered nodes (current workspace)
+  const matches = store.filteredNodes.filter(n =>
     n.title.toLowerCase().includes(q) ||
     n.markdown_content?.toLowerCase().includes(q)
-  ).slice(0, 8)
+  )
+
+  // Sort by relevance: exact title match > title starts with > title contains > content only
+  matches.sort((a, b) => {
+    const aTitle = a.title.toLowerCase()
+    const bTitle = b.title.toLowerCase()
+    const aContent = a.markdown_content?.toLowerCase() || ''
+    const bContent = b.markdown_content?.toLowerCase() || ''
+
+    // Exact title match
+    if (aTitle === q && bTitle !== q) return -1
+    if (bTitle === q && aTitle !== q) return 1
+
+    // Title starts with query
+    const aStarts = aTitle.startsWith(q)
+    const bStarts = bTitle.startsWith(q)
+    if (aStarts && !bStarts) return -1
+    if (bStarts && !aStarts) return 1
+
+    // Title contains query
+    const aTitleMatch = aTitle.includes(q)
+    const bTitleMatch = bTitle.includes(q)
+    if (aTitleMatch && !bTitleMatch) return -1
+    if (bTitleMatch && !aTitleMatch) return 1
+
+    // Both in content only - sort alphabetically
+    return aTitle.localeCompare(bTitle)
+  })
+
+  return matches.slice(0, 10)
 })
 
 function selectSearchResult(nodeId: string) {
