@@ -599,6 +599,55 @@ async function resetAllNodeSizes() {
   store.nodeLayoutVersion++
 }
 
+// Zoom to node - animate view to center on node and zoom in
+function zoomToNode(nodeId: string, targetScale = 1.0) {
+  const node = store.getNode(nodeId)
+  if (!node) return
+
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (!rect) return
+
+  // Calculate node center
+  const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+  const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+  const nodeCenterX = node.canvas_x + nodeWidth / 2
+  const nodeCenterY = node.canvas_y + nodeHeight / 2
+
+  // Calculate target offset to center the node
+  const targetOffsetX = rect.width / 2 - nodeCenterX * targetScale
+  const targetOffsetY = rect.height / 2 - nodeCenterY * targetScale
+
+  // Animate to the target position
+  const startScale = scale.value
+  const startOffsetX = offsetX.value
+  const startOffsetY = offsetY.value
+  const duration = 300
+  const startTime = performance.now()
+
+  function easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3)
+  }
+
+  function animate() {
+    const elapsed = performance.now() - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    const eased = easeOutCubic(progress)
+
+    scale.value = startScale + (targetScale - startScale) * eased
+    offsetX.value = startOffsetX + (targetOffsetX - startOffsetX) * eased
+    offsetY.value = startOffsetY + (targetOffsetY - startOffsetY) * eased
+
+    if (progress < 1) {
+      requestAnimationFrame(animate)
+    } else {
+      // Select the node after zoom completes
+      store.selectNode(nodeId, false)
+    }
+  }
+
+  requestAnimationFrame(animate)
+}
+
 // Refresh all nodes from their source files
 async function refreshFromFiles() {
   try {
@@ -1684,6 +1733,12 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
 
   // Don't start drag if editing this node
   if (editingNodeId.value === nodeId) {
+    return
+  }
+
+  // Cmd+click to zoom to node
+  if (e.metaKey && !e.shiftKey && !e.altKey) {
+    zoomToNode(nodeId)
     return
   }
 
