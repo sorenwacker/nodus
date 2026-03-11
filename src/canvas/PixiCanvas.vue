@@ -25,6 +25,7 @@ import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
 import { useLasso } from './composables/useLasso'
+import { useFrames } from './composables/useFrames'
 import { NODE_DEFAULTS } from './constants'
 
 // Undo injection for position and content changes
@@ -437,15 +438,6 @@ const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
 const resizePreview = ref({ width: 0, height: 0 })
 const multiResizeInitial = ref<Map<string, { width: number, height: number }>>(new Map())
 
-// Frame interaction
-const draggingFrame = ref<string | null>(null)
-const frameDragStart = ref({ x: 0, y: 0, frameX: 0, frameY: 0 })
-const frameContainedNodes = ref<Map<string, { x: number, y: number }>>(new Map())
-const resizingFrame = ref<string | null>(null)
-const frameResizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
-const editingFrameId = ref<string | null>(null)
-const editFrameTitle = ref('')
-
 // Gridlock (snap to grid)
 const gridLockEnabled = ref(false)
 const gridSize = 20 // Snap to 20px grid
@@ -454,6 +446,40 @@ function snapToGrid(value: number): number {
   if (!gridLockEnabled.value) return value
   return Math.round(value / gridSize) * gridSize
 }
+
+// Frame operations composable
+const frames = useFrames({
+  store: {
+    frames: store.frames,
+    filteredNodes: store.filteredNodes,
+    selectedNodeIds: store.selectedNodeIds,
+    selectedFrameId: store.selectedFrameId,
+    selectFrame: store.selectFrame,
+    selectNode: store.selectNode,
+    createFrame: store.createFrame,
+    deleteFrame: store.deleteFrame,
+    updateFramePosition: store.updateFramePosition,
+    updateFrameSize: store.updateFrameSize,
+    updateFrameTitle: store.updateFrameTitle,
+    updateNodePosition: store.updateNodePosition,
+  },
+  viewState: {
+    scale,
+    offsetX,
+    offsetY,
+    canvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
+  },
+  screenToCanvas,
+  snapToGrid,
+})
+const { editingFrameId, editFrameTitle } = frames
+function onFrameMouseDown(e: MouseEvent, frameId: string) { frames.onMouseDown(e, frameId) }
+function startFrameResize(e: MouseEvent, frameId: string) { frames.startResize(e, frameId) }
+function startEditingFrameTitle(frameId: string) { frames.startEditingTitle(frameId) }
+function saveFrameTitleEditing() { frames.saveTitle() }
+function cancelFrameTitleEditing() { frames.cancelTitleEditing() }
+function createFrameAtCenter() { frames.createAtCenter() }
+function deleteSelectedFrame() { frames.deleteSelected() }
 
 // Auto-fit is per-node (stored on node.auto_fit)
 
@@ -1514,171 +1540,6 @@ function stopNodeDrag() {
   lastDragEndTime = Date.now()
   document.removeEventListener('mousemove', onNodeDrag)
   document.removeEventListener('mouseup', stopNodeDrag)
-}
-
-// Frame interaction
-function onFrameMouseDown(e: MouseEvent, frameId: string) {
-  e.preventDefault()
-  store.selectFrame(frameId)
-  store.selectNode(null)
-
-  const frame = store.frames.find(f => f.id === frameId)
-  if (!frame) return
-
-  draggingFrame.value = frameId
-  const pos = screenToCanvas(e.clientX, e.clientY)
-  frameDragStart.value = {
-    x: pos.x,
-    y: pos.y,
-    frameX: frame.canvas_x,
-    frameY: frame.canvas_y,
-  }
-
-  // Find nodes inside the frame and store their initial positions
-  frameContainedNodes.value.clear()
-  for (const node of store.filteredNodes) {
-    const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
-    const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
-    const frameRight = frame.canvas_x + frame.width
-    const frameBottom = frame.canvas_y + frame.height
-
-    // Check if node overlaps with frame (at least 50% inside)
-    const overlapX = Math.max(0, Math.min(nodeRight, frameRight) - Math.max(node.canvas_x, frame.canvas_x))
-    const overlapY = Math.max(0, Math.min(nodeBottom, frameBottom) - Math.max(node.canvas_y, frame.canvas_y))
-    const nodeArea = (node.width || NODE_DEFAULTS.WIDTH) * (node.height || NODE_DEFAULTS.HEIGHT)
-    const overlapArea = overlapX * overlapY
-
-    if (overlapArea > nodeArea * 0.5) {
-      frameContainedNodes.value.set(node.id, { x: node.canvas_x, y: node.canvas_y })
-    }
-  }
-
-  document.addEventListener('mousemove', onFrameDrag)
-  document.addEventListener('mouseup', stopFrameDrag)
-}
-
-function onFrameDrag(e: MouseEvent) {
-  if (!draggingFrame.value) return
-  const pos = screenToCanvas(e.clientX, e.clientY)
-  const dx = pos.x - frameDragStart.value.x
-  const dy = pos.y - frameDragStart.value.y
-  const newX = snapToGrid(frameDragStart.value.frameX + dx)
-  const newY = snapToGrid(frameDragStart.value.frameY + dy)
-  store.updateFramePosition(draggingFrame.value, newX, newY)
-
-  // Move contained nodes with the frame
-  for (const [nodeId, initialPos] of frameContainedNodes.value) {
-    const newNodeX = snapToGrid(initialPos.x + dx)
-    const newNodeY = snapToGrid(initialPos.y + dy)
-    store.updateNodePosition(nodeId, newNodeX, newNodeY)
-  }
-}
-
-function stopFrameDrag() {
-  draggingFrame.value = null
-  frameContainedNodes.value.clear()
-  document.removeEventListener('mousemove', onFrameDrag)
-  document.removeEventListener('mouseup', stopFrameDrag)
-}
-
-function startFrameResize(e: MouseEvent, frameId: string) {
-  e.preventDefault()
-  const frame = store.frames.find(f => f.id === frameId)
-  if (!frame) return
-
-  resizingFrame.value = frameId
-  frameResizeStart.value = {
-    x: e.clientX,
-    y: e.clientY,
-    width: frame.width,
-    height: frame.height,
-  }
-
-  document.addEventListener('mousemove', onFrameResize)
-  document.addEventListener('mouseup', stopFrameResize)
-}
-
-function onFrameResize(e: MouseEvent) {
-  if (!resizingFrame.value) return
-  const dx = (e.clientX - frameResizeStart.value.x) / scale.value
-  const dy = (e.clientY - frameResizeStart.value.y) / scale.value
-  const newWidth = Math.max(200, frameResizeStart.value.width + dx)
-  const newHeight = Math.max(100, frameResizeStart.value.height + dy)
-  store.updateFrameSize(resizingFrame.value, newWidth, newHeight)
-}
-
-function stopFrameResize() {
-  resizingFrame.value = null
-  document.removeEventListener('mousemove', onFrameResize)
-  document.removeEventListener('mouseup', stopFrameResize)
-}
-
-function startEditingFrameTitle(frameId: string) {
-  const frame = store.frames.find(f => f.id === frameId)
-  if (!frame) return
-  editingFrameId.value = frameId
-  editFrameTitle.value = frame.title
-  nextTick(() => {
-    const input = document.querySelector('.frame-title-editor') as HTMLInputElement
-    input?.focus()
-    input?.select()
-  })
-}
-
-function saveFrameTitleEditing() {
-  if (editingFrameId.value && editFrameTitle.value.trim()) {
-    store.updateFrameTitle(editingFrameId.value, editFrameTitle.value.trim())
-  }
-  editingFrameId.value = null
-}
-
-function cancelFrameTitleEditing() {
-  editingFrameId.value = null
-}
-
-function createFrameAtCenter() {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) {
-    console.error('createFrameAtCenter: canvasRef not available')
-    return
-  }
-
-  // If nodes are selected, create frame around them
-  if (store.selectedNodeIds.length > 0) {
-    const selectedNodes = store.filteredNodes.filter(n => store.selectedNodeIds.includes(n.id))
-    const padding = 40
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const node of selectedNodes) {
-      minX = Math.min(minX, node.canvas_x)
-      minY = Math.min(minY, node.canvas_y)
-      maxX = Math.max(maxX, node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH))
-      maxY = Math.max(maxY, node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT))
-    }
-
-    const frameX = minX - padding
-    const frameY = minY - padding
-    const frameWidth = maxX - minX + padding * 2
-    const frameHeight = maxY - minY + padding * 2
-
-    const frame = store.createFrame(frameX, frameY, frameWidth, frameHeight, 'Frame')
-    store.selectFrame(frame.id)
-    store.selectNode(null)
-    return
-  }
-
-  // No selection - create frame at viewport center
-  const centerX = (rect.width / 2 - offsetX.value) / scale.value
-  const centerY = (rect.height / 2 - offsetY.value) / scale.value
-  const frame = store.createFrame(centerX - 200, centerY - 150, 400, 300, 'New Frame')
-  store.selectFrame(frame.id)
-}
-
-function deleteSelectedFrame() {
-  if (store.selectedFrameId) {
-    store.deleteFrame(store.selectedFrameId)
-    store.selectFrame(null)
-  }
 }
 
 // Node resizing (supports multiple selected nodes)
