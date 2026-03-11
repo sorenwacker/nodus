@@ -450,6 +450,17 @@ const isPanning = ref(false)
 const panStart = ref({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
 const selectedEdge = ref<string | null>(null)
 const hoveredNodeId = ref<string | null>(null)
+const hoverMousePos = ref({ x: 0, y: 0 })
+
+// Tooltip for zoomed-out hover - shows node info when scale is low
+const showHoverTooltip = computed(() => {
+  return hoveredNodeId.value && scale.value < 0.5
+})
+
+const hoveredNode = computed(() => {
+  if (!hoveredNodeId.value) return null
+  return store.getNode(hoveredNodeId.value)
+})
 
 // Cached active node IDs for highlight detection (avoids recreating Set on every edge)
 const activeNodeIds = computed(() => {
@@ -1733,6 +1744,16 @@ function stopPan() {
   isPanning.value = false
   document.removeEventListener('mousemove', onPanMove)
   document.removeEventListener('mouseup', stopPan)
+}
+
+// Node hover handlers for tooltip
+function onNodeMouseEnter(e: MouseEvent, nodeId: string) {
+  hoveredNodeId.value = nodeId
+  hoverMousePos.value = { x: e.clientX, y: e.clientY }
+}
+
+function onNodeMouseMove(e: MouseEvent) {
+  hoverMousePos.value = { x: e.clientX, y: e.clientY }
 }
 
 // Node dragging
@@ -3112,7 +3133,8 @@ ${edges.map(e => `  - id: "${e.id}"
           ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
         }"
         @mousedown="onNodeMouseDown($event, node.id)"
-        @mouseenter="hoveredNodeId = node.id"
+        @mouseenter="onNodeMouseEnter($event, node.id)"
+        @mousemove="onNodeMouseMove($event)"
         @mouseleave="hoveredNodeId = null"
         @dblclick.stop="startEditing(node.id)"
       >
@@ -3415,6 +3437,21 @@ ${edges.map(e => `  - id: "${e.id}"
         >
           <span class="magnifier-node-title">{{ node.title || 'Untitled' }}</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Hover tooltip (when zoomed out) -->
+    <div
+      v-if="showHoverTooltip && hoveredNode"
+      class="hover-tooltip"
+      :style="{
+        left: (hoverMousePos.x + 16) + 'px',
+        top: (hoverMousePos.y + 16) + 'px',
+      }"
+    >
+      <div class="hover-tooltip-title">{{ hoveredNode.title || 'Untitled' }}</div>
+      <div v-if="hoveredNode.markdown_content" class="hover-tooltip-content">
+        {{ hoveredNode.markdown_content.slice(0, 200) }}{{ hoveredNode.markdown_content.length > 200 ? '...' : '' }}
       </div>
     </div>
 
