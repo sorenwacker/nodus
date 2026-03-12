@@ -671,8 +671,8 @@ async function resetAllNodeSizes() {
   store.nodeLayoutVersion++
 }
 
-// Zoom to node - animate view to center on node and zoom in
-function zoomToNode(nodeId: string, targetScale = 1.0) {
+// Zoom to node - animate view to center on node and fit it in viewport
+function zoomToNode(nodeId: string, requestedScale?: number) {
   // Use visual node position (accounts for neighborhood mode)
   const node = neighborhoodMode.value
     ? neighborhood.getVisualNode(nodeId)
@@ -682,11 +682,20 @@ function zoomToNode(nodeId: string, targetScale = 1.0) {
   const rect = canvasRef.value?.getBoundingClientRect()
   if (!rect) return
 
-  // Calculate node center
+  // Calculate node dimensions
   const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
   const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
   const nodeCenterX = node.canvas_x + nodeWidth / 2
   const nodeCenterY = node.canvas_y + nodeHeight / 2
+
+  // Calculate scale to fit node with padding (80% of viewport)
+  const padding = 0.8
+  const scaleToFitWidth = (rect.width * padding) / nodeWidth
+  const scaleToFitHeight = (rect.height * padding) / nodeHeight
+  const fitScale = Math.min(scaleToFitWidth, scaleToFitHeight, 2.0) // Cap at 2x zoom
+
+  // Use requested scale if provided, otherwise calculate based on node size
+  const targetScale = requestedScale ?? Math.max(0.5, Math.min(fitScale, 1.5))
 
   // Calculate target offset to center the node
   const targetOffsetX = rect.width / 2 - nodeCenterX * targetScale
