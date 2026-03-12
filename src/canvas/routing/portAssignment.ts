@@ -6,7 +6,8 @@
 import type { NodeRect, EdgeDef, Side, PortAssignment } from './types'
 import { getSide, getNodeCenter } from './geometry'
 
-export const PORT_SPACING = 20
+// Spacing between ports on the same node side (like PCB trace spacing)
+export const PORT_SPACING = 25
 
 interface EdgeInfo {
   edge: EdgeDef

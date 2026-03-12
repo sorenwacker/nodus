@@ -60,8 +60,9 @@ export function routeAllEdges(
   // Assign port indices for spreading
   const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
 
-  // Create grid tracker for edge overlap prevention
-  const gridTracker = new GridTracker(PORT_SPACING)
+  // Create grid tracker for edge overlap prevention (PCB-style lane routing)
+  // Use larger grid size for cleaner lane separation
+  const gridTracker = new GridTracker(PORT_SPACING + 5)
 
   // Sort edges to minimize crossings
   // Strategy: Group edges by direction (down, up, right, left), then by position

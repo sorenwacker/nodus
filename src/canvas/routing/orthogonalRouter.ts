@@ -279,6 +279,7 @@ function trySimplePath(
 
 /**
  * Route with 3 segments - generic for both horizontal and vertical start
+ * Uses lane-based routing to prevent edge overlaps (like PCB traces)
  */
 function routeThreeSegment(
   endpoints: RouteEndpoints,
@@ -306,9 +307,11 @@ function routeThreeSegment(
   // Standard 3-segment routing
   const startPrimary = getAxis(startStandoff, primaryAxis)
   const endPrimary = getAxis(endStandoff, primaryAxis)
+  const startSecondary = getAxis(startStandoff, secondaryAxis)
+  const endSecondary = getAxis(endStandoff, secondaryAxis)
 
   // Ideal midpoint on primary axis
-  let bestMid = gridTracker.snap(startPrimary + delta / 2)
+  let idealMid = gridTracker.snap(startPrimary + delta / 2 + channelOffset)
 
   // Check for obstacles and find clear route
   const checkPath = (mid: number): NodeRect[] => {
@@ -321,60 +324,54 @@ function routeThreeSegment(
     ]
   }
 
-  const obstacles = checkPath(bestMid)
+  // Find a free channel using the grid tracker (lane-based routing)
+  // This prevents edges from overlapping by finding unused "lanes"
+  const isHorizontalMid = primaryAxis === 'y' // Middle segment is horizontal if we're moving in Y first
+  const rangeStart = Math.min(startSecondary, endSecondary)
+  const rangeEnd = Math.max(startSecondary, endSecondary)
+
+  // Use grid tracker to find a free channel for the middle segment
+  let adjustedMid = gridTracker.findFreeChannel(
+    idealMid,
+    isHorizontalMid,
+    rangeStart,
+    rangeEnd,
+    15 // Try up to 15 alternative lanes
+  )
+
+  // Check for obstacles at the chosen channel
+  let obstacles = checkPath(adjustedMid)
+
+  // If obstacles found, try to route around them
   if (obstacles.length > 0) {
-    const result = findClearRoute(bestMid, delta, primaryAxis, checkPath, obstacles)
-    bestMid = result.mid
-    usedDetour = result.usedDetour
-  }
-
-  // Apply channel offset for parallel non-overlapping paths
-  let adjustedMid = bestMid + channelOffset
-  let adjustedObstacles = checkPath(adjustedMid)
-
-  // Clamp to stay between source and target (prevents backwards paths)
-  // But only if clamping doesn't cause obstacle collision
-  const minBound = Math.min(startPrimary, endPrimary)
-  const maxBound = Math.max(startPrimary, endPrimary)
-  const clampedMid = Math.max(minBound, Math.min(maxBound, adjustedMid))
-
-  if (adjustedMid !== clampedMid) {
-    const clampedObstacles = checkPath(clampedMid)
-    if (clampedObstacles.length === 0 || clampedObstacles.length <= adjustedObstacles.length) {
-      adjustedMid = clampedMid
-      adjustedObstacles = clampedObstacles
-    }
-  }
-
-  // Try to route around remaining obstacles
-  if (adjustedObstacles.length > 0) {
-    const bounds = getObstacleBounds(adjustedObstacles, OBSTACLE_MARGIN + DETOUR_MARGIN)
+    const bounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + DETOUR_MARGIN)
     const tryLow = primaryAxis === 'x' ? bounds.minX : bounds.minY
     const tryHigh = primaryAxis === 'x' ? bounds.maxX : bounds.maxY
 
+    // Try both sides and pick the one that's clearer
     const lowObs = checkPath(tryLow)
     const highObs = checkPath(tryHigh)
 
     if (lowObs.length === 0) {
-      adjustedMid = tryLow
+      adjustedMid = gridTracker.findFreeChannel(tryLow, isHorizontalMid, rangeStart, rangeEnd, 10)
       usedDetour = true
     } else if (highObs.length === 0) {
-      adjustedMid = tryHigh
+      adjustedMid = gridTracker.findFreeChannel(tryHigh, isHorizontalMid, rangeStart, rangeEnd, 10)
       usedDetour = true
-    } else if (lowObs.length < adjustedObstacles.length) {
-      adjustedMid = tryLow
+    } else if (lowObs.length < obstacles.length) {
+      adjustedMid = gridTracker.findFreeChannel(tryLow, isHorizontalMid, rangeStart, rangeEnd, 10)
       usedDetour = true
-    } else if (highObs.length < adjustedObstacles.length) {
-      adjustedMid = tryHigh
+    } else if (highObs.length < obstacles.length) {
+      adjustedMid = gridTracker.findFreeChannel(tryHigh, isHorizontalMid, rangeStart, rangeEnd, 10)
       usedDetour = true
     }
   }
 
-  // Build the path
+  // Build the path with the final channel
   const mid1 = setAxis(startStandoff, primaryAxis, adjustedMid)
   const mid2 = setAxis(endStandoff, primaryAxis, adjustedMid)
 
-  // Mark only the middle segments (not the standoff-to-port connections)
+  // Mark all segments in the grid tracker to prevent future overlaps
   gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
   gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
   gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
