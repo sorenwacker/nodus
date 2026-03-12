@@ -346,8 +346,8 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
   let bestP1: Point = { x: 0, y: 0 }
   let bestP2: Point = { x: 0, y: 0 }
 
-  // Try to find a free path with increasing offsets
-  for (let tryOffset = 0; tryOffset <= 20; tryOffset++) {
+  // Try to find a free path with increasing offsets (more aggressive search)
+  for (let tryOffset = 0; tryOffset <= 30; tryOffset++) {
     const offset =
       tryOffset === 0
         ? 0

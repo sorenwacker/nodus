@@ -39,9 +39,11 @@ import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
 
 // Minimum orthogonal standoff distance from node edge
-// Must be longer than arrow (6px marker + 10px refX offset = ~16px) plus margin
-// Increased to 60px for better visual separation with default 200px node spacing
-const STANDOFF = 120
+// Larger standoff = more room for edge routing lanes
+const STANDOFF = 80
+
+// Lane width for edge separation (like PCB trace spacing)
+const LANE_WIDTH = 12
 
 /**
  * Route all edges with proper port spreading, grid tracking, and obstacle avoidance
@@ -61,8 +63,8 @@ export function routeAllEdges(
   const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
 
   // Create grid tracker for edge overlap prevention (PCB-style lane routing)
-  // Use larger grid size for cleaner lane separation
-  const gridTracker = new GridTracker(PORT_SPACING + 5)
+  // Grid size determines minimum spacing between parallel edges
+  const gridTracker = new GridTracker(LANE_WIDTH)
 
   // Sort edges to minimize crossings
   // Strategy: Group edges by direction (down, up, right, left), then by position
@@ -153,20 +155,17 @@ export function routeAllEdges(
       })
     } else {
       // Calculate channel offset to create non-crossing parallel paths.
-      //
-      // Use the LARGER of srcOffset or tgtOffset to spread channels:
-      // - srcOffset spreads edges from the same source going to different targets
-      // - tgtOffset spreads edges from different sources going to the same target
-      //
-      // The sign is adjusted based on relative position to create proper nesting:
-      // - OUTER edges (further from target) should use midY CLOSER to target
+      // Each edge gets assigned to a different "lane" based on port offsets.
+      // Multiply by LANE_WIDTH to ensure proper visual separation.
       const sourceCenter = source.canvas_x + (source.width || 200) / 2
       const targetCenter = target.canvas_x + (target.width || 200) / 2
       const sourceLeftOfTarget = sourceCenter < targetCenter
 
       // Use whichever offset is larger (more edges sharing that endpoint)
+      // Scale by lane width for proper visual separation
       const baseOffset = Math.abs(srcOffset) > Math.abs(tgtOffset) ? srcOffset : tgtOffset
-      const channelOffset = sourceLeftOfTarget ? -baseOffset : baseOffset
+      const scaledOffset = (baseOffset / PORT_SPACING) * LANE_WIDTH
+      const channelOffset = sourceLeftOfTarget ? -scaledOffset : scaledOffset
 
       routeResult = routeOrthogonal({
         startPort: sourcePort,
