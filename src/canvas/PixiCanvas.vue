@@ -555,9 +555,10 @@ let lastDragEndTime = 0
 
 // Node resizing (supports multiple selected nodes)
 const resizingNode = ref<string | null>(null)
-const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
-const resizePreview = ref({ width: 0, height: 0 })
-const multiResizeInitial = ref<Map<string, { width: number, height: number }>>(new Map())
+const resizeDirection = ref<string>('se') // n, s, e, w, nw, ne, se, sw
+const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0, nodeX: 0, nodeY: 0 })
+const resizePreview = ref({ width: 0, height: 0, x: 0, y: 0 })
+const multiResizeInitial = ref<Map<string, { width: number, height: number, x: number, y: number }>>(new Map())
 
 // Gridlock (snap to grid)
 const gridLockEnabled = ref(false)
@@ -1943,8 +1944,8 @@ function stopNodeDrag() {
   document.removeEventListener('mouseup', stopNodeDrag)
 }
 
-// Node resizing (supports multiple selected nodes)
-function onResizeMouseDown(e: MouseEvent, nodeId: string) {
+// Node resizing (supports multiple selected nodes, all directions)
+function onResizeMouseDown(e: MouseEvent, nodeId: string, direction: string = 'se') {
   e.stopPropagation()
   e.preventDefault()
 
@@ -1952,13 +1953,21 @@ function onResizeMouseDown(e: MouseEvent, nodeId: string) {
   if (!node) return
 
   resizingNode.value = nodeId
+  resizeDirection.value = direction
   resizeStart.value = {
     x: e.clientX,
     y: e.clientY,
     width: node.width || NODE_DEFAULTS.WIDTH,
     height: node.height || NODE_DEFAULTS.HEIGHT,
+    nodeX: node.canvas_x,
+    nodeY: node.canvas_y,
   }
-  resizePreview.value = { width: node.width || NODE_DEFAULTS.WIDTH, height: node.height || NODE_DEFAULTS.HEIGHT }
+  resizePreview.value = {
+    width: node.width || NODE_DEFAULTS.WIDTH,
+    height: node.height || NODE_DEFAULTS.HEIGHT,
+    x: node.canvas_x,
+    y: node.canvas_y,
+  }
 
   // Store initial sizes of all selected nodes for multi-resize
   multiResizeInitial.value.clear()
@@ -1966,7 +1975,12 @@ function onResizeMouseDown(e: MouseEvent, nodeId: string) {
     for (const id of store.selectedNodeIds) {
       const n = store.getNode(id)
       if (n) {
-        multiResizeInitial.value.set(id, { width: n.width || NODE_DEFAULTS.WIDTH, height: n.height || NODE_DEFAULTS.HEIGHT })
+        multiResizeInitial.value.set(id, {
+          width: n.width || NODE_DEFAULTS.WIDTH,
+          height: n.height || NODE_DEFAULTS.HEIGHT,
+          x: n.canvas_x,
+          y: n.canvas_y,
+        })
       }
     }
   }
@@ -1980,26 +1994,56 @@ function onResizeMove(e: MouseEvent) {
 
   const dx = (e.clientX - resizeStart.value.x) / scale.value
   const dy = (e.clientY - resizeStart.value.y) / scale.value
+  const dir = resizeDirection.value
 
-  let width = Math.max(120, resizeStart.value.width + dx)
-  let height = Math.max(60, resizeStart.value.height + dy)
+  let width = resizeStart.value.width
+  let height = resizeStart.value.height
+  let x = resizeStart.value.nodeX
+  let y = resizeStart.value.nodeY
+
+  // Handle horizontal resize
+  if (dir.includes('e')) {
+    width = Math.max(120, resizeStart.value.width + dx)
+  } else if (dir.includes('w')) {
+    const newWidth = Math.max(120, resizeStart.value.width - dx)
+    x = resizeStart.value.nodeX + (resizeStart.value.width - newWidth)
+    width = newWidth
+  }
+
+  // Handle vertical resize
+  if (dir.includes('s')) {
+    height = Math.max(60, resizeStart.value.height + dy)
+  } else if (dir.includes('n')) {
+    const newHeight = Math.max(60, resizeStart.value.height - dy)
+    y = resizeStart.value.nodeY + (resizeStart.value.height - newHeight)
+    height = newHeight
+  }
 
   // Apply grid snap if enabled
   if (gridLockEnabled.value) {
     width = snapToGrid(width)
     height = snapToGrid(height)
+    x = snapToGrid(x)
+    y = snapToGrid(y)
   }
 
-  resizePreview.value = { width, height }
+  resizePreview.value = { width, height, x, y }
 
-  // Update all selected nodes to SAME size as primary node
+  // Update all selected nodes proportionally
   if (multiResizeInitial.value.size > 0) {
-    for (const [id] of multiResizeInitial.value) {
+    const widthDelta = width - resizeStart.value.width
+    const heightDelta = height - resizeStart.value.height
+    const xDelta = x - resizeStart.value.nodeX
+    const yDelta = y - resizeStart.value.nodeY
+
+    for (const [id, initial] of multiResizeInitial.value) {
       if (id === resizingNode.value) continue
       const n = store.getNode(id)
       if (n) {
-        n.width = width
-        n.height = height
+        n.width = Math.max(120, initial.width + widthDelta)
+        n.height = Math.max(60, initial.height + heightDelta)
+        n.canvas_x = initial.x + xDelta
+        n.canvas_y = initial.y + yDelta
       }
     }
   }
@@ -2008,26 +2052,30 @@ function onResizeMove(e: MouseEvent) {
 function stopResize() {
   if (resizingNode.value) {
     const nodeId = resizingNode.value
-    const width = resizePreview.value.width
-    const height = resizePreview.value.height
+    const { width, height, x, y } = resizePreview.value
 
-    // Update primary node size
+    // Update primary node size and position
     store.updateNodeSize(nodeId, width, height)
+    store.updateNodePosition(nodeId, x, y)
 
-    // Update all other selected nodes to SAME size
+    // Update all other selected nodes
     if (multiResizeInitial.value.size > 0) {
-      for (const [id] of multiResizeInitial.value) {
+      const widthDelta = width - resizeStart.value.width
+      const heightDelta = height - resizeStart.value.height
+      const xDelta = x - resizeStart.value.nodeX
+      const yDelta = y - resizeStart.value.nodeY
+
+      for (const [id, initial] of multiResizeInitial.value) {
         if (id === nodeId) continue
-        store.updateNodeSize(id, width, height)
+        store.updateNodeSize(id, Math.max(120, initial.width + widthDelta), Math.max(60, initial.height + heightDelta))
+        store.updateNodePosition(id, initial.x + xDelta, initial.y + yDelta)
       }
     }
 
     // In neighborhood mode, re-layout to adapt to new sizes
     if (neighborhoodMode.value && focusNodeId.value) {
-      // Small delay to ensure store is updated
       setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
     } else {
-      // Push overlapping nodes away (only in normal mode)
       pushOverlappingNodesAway(nodeId)
     }
   }
@@ -3310,7 +3358,7 @@ ${edges.map(e => `  - id: "${e.id}"
           'neighborhood-focus': neighborhoodMode && node.id === focusNodeId
         }"
         :style="{
-          transform: `translate3d(${node.canvas_x}px, ${node.canvas_y}px, 0)`,
+          transform: `translate3d(${resizingNode === node.id ? resizePreview.x : node.canvas_x}px, ${resizingNode === node.id ? resizePreview.y : node.canvas_y}px, 0)`,
           width: (resizingNode === node.id ? resizePreview.width : (node.width || NODE_DEFAULTS.WIDTH)) + 'px',
           height: (resizingNode === node.id ? resizePreview.height : (node.height || NODE_DEFAULTS.HEIGHT)) + 'px',
           ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
@@ -3384,7 +3432,16 @@ ${edges.map(e => `  - id: "${e.id}"
           @mousedown.stop="deleteSelectedNodes"
         >x</button>
 
-        <div class="resize-handle" @mousedown.stop="onResizeMouseDown($event, node.id)"></div>
+        <!-- Resize handles - edges -->
+        <div class="resize-edge resize-edge-n" @mousedown.stop="onResizeMouseDown($event, node.id, 'n')"></div>
+        <div class="resize-edge resize-edge-s" @mousedown.stop="onResizeMouseDown($event, node.id, 's')"></div>
+        <div class="resize-edge resize-edge-e" @mousedown.stop="onResizeMouseDown($event, node.id, 'e')"></div>
+        <div class="resize-edge resize-edge-w" @mousedown.stop="onResizeMouseDown($event, node.id, 'w')"></div>
+        <!-- Resize handles - corners -->
+        <div class="resize-corner resize-corner-nw" @mousedown.stop="onResizeMouseDown($event, node.id, 'nw')"></div>
+        <div class="resize-corner resize-corner-ne" @mousedown.stop="onResizeMouseDown($event, node.id, 'ne')"></div>
+        <div class="resize-corner resize-corner-se" @mousedown.stop="onResizeMouseDown($event, node.id, 'se')"></div>
+        <div class="resize-corner resize-corner-sw" @mousedown.stop="onResizeMouseDown($event, node.id, 'sw')"></div>
       </div>
 
       <!-- Empty state (positioned in viewport, not canvas) -->

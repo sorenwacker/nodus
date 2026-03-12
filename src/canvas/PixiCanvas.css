@@ -537,46 +537,80 @@
   z-index: 1000;
 }
 
-.resize-handle {
+/* Resize handles - edges and corners */
+.resize-edge,
+.resize-corner {
   position: absolute;
-  bottom: 3px;
-  right: 3px;
-  width: 8px;
-  height: 8px;
-  cursor: nwse-resize;
   z-index: 9999;
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-.resize-handle::before,
-.resize-handle::after {
+.node-card:hover .resize-edge,
+.node-card:hover .resize-corner {
+  opacity: 0.3;
+}
+
+.resize-edge:hover,
+.resize-corner:hover {
+  opacity: 1 !important;
+}
+
+/* Edge handles */
+.resize-edge-n,
+.resize-edge-s {
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.resize-edge-n { top: -3px; }
+.resize-edge-s { bottom: -3px; }
+
+.resize-edge-e,
+.resize-edge-w {
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.resize-edge-e { right: -3px; }
+.resize-edge-w { left: -3px; }
+
+/* Corner handles */
+.resize-corner {
+  width: 10px;
+  height: 10px;
+}
+
+.resize-corner-nw { top: -3px; left: -3px; cursor: nwse-resize; }
+.resize-corner-ne { top: -3px; right: -3px; cursor: nesw-resize; }
+.resize-corner-se { bottom: -3px; right: -3px; cursor: nwse-resize; }
+.resize-corner-sw { bottom: -3px; left: -3px; cursor: nesw-resize; }
+
+/* Visual indicator for SE corner (most common) */
+.resize-corner-se::before,
+.resize-corner-se::after {
   content: '';
   position: absolute;
   background: var(--text-muted);
   border-radius: 1px;
 }
 
-.resize-handle::before {
-  bottom: 0;
-  right: 0;
-  width: 8px;
+.resize-corner-se::before {
+  bottom: 3px;
+  right: 3px;
+  width: 6px;
   height: 2px;
 }
 
-.resize-handle::after {
-  bottom: 0;
-  right: 0;
+.resize-corner-se::after {
+  bottom: 3px;
+  right: 3px;
   width: 2px;
-  height: 8px;
-}
-
-.node-card:hover .resize-handle {
-  opacity: 0.4;
-}
-
-.resize-handle:hover {
-  opacity: 1 !important;
+  height: 6px;
 }
 
 .node-card.editing {
