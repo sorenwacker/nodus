@@ -26,6 +26,7 @@ pub enum WatcherError {
 }
 
 /// File lock handle for safe concurrent file access
+#[allow(dead_code)]
 pub struct FileLock {
     file: File,
     path: PathBuf,

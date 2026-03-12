@@ -19,7 +19,7 @@ import {
   type NodeRect,
   type EdgeStyle,
 } from './edgeRouting'
-import { useLLM, executeTool, type ToolContext } from './llm'
+import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
 import { uiStorage, llmStorage } from '../lib/storage'
 import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
@@ -462,6 +462,22 @@ const hoveredNode = computed(() => {
   return store.getNode(hoveredNodeId.value)
 })
 
+// Strip markdown for tooltip preview
+const tooltipContent = computed(() => {
+  const content = hoveredNode.value?.markdown_content
+  if (!content) return ''
+  return content
+    .replace(/!\[.*?\]\(.*?\)/g, '[image]')  // Replace images with [image]
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Links -> just text
+    .replace(/#{1,6}\s*/g, '')               // Remove headings
+    .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1') // Bold/italic -> plain
+    .replace(/`{1,3}[^`]*`{1,3}/g, '')       // Remove code blocks
+    .replace(/^\s*[-*+]\s+/gm, '- ')         // Normalize lists
+    .replace(/\n{2,}/g, '\n')                // Collapse multiple newlines
+    .trim()
+    .slice(0, 200)
+})
+
 // Cached active node IDs for highlight detection (avoids recreating Set on every edge)
 const activeNodeIds = computed(() => {
   const ids = new Set<string>()
@@ -848,20 +864,11 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
           // Save undo state before modifying
           pushContentUndo(node.id, node.markdown_content, node.title)
           try {
-            const resp = await fetch('http://localhost:11434/api/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: ollamaModel.value,
-                prompt: `${query}\n\nContent to process:\n${node.markdown_content}`,
-                system: 'You are a text processor. Apply the instruction to the content. Output ONLY the processed text, nothing else.',
-                stream: false,
-                options: { num_ctx: ollamaContextLength.value },
-              }),
-            })
-            const data = await resp.json()
-            if (data.response?.trim()) {
-              await store.updateNodeContent(node.id, data.response.trim())
+            const prompt = `${query}\n\nContent to process:\n${node.markdown_content}`
+            const system = 'You are a text processor. Apply the instruction to the content. Output ONLY the processed text, nothing else.'
+            const result = await callOllama(prompt, system)
+            if (result?.trim()) {
+              await store.updateNodeContent(node.id, result.trim())
               results.push(`${node.title}: processed`)
             }
           } catch (e) { results.push(`${node.title}: llm failed - ${e}`) }
@@ -878,34 +885,18 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
 
       let categories: string[] = []
       try {
-        const resp = await fetch('http://localhost:11434/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: ollamaModel.value,
-            prompt: `Extract category names from: "${instruction}"\nList ONLY categories separated by comma:`,
-            stream: false,
-          }),
-        })
-        const data = await resp.json()
-        categories = (data.response || '').toLowerCase().split(/[,\n]+/).map((c: string) => c.trim()).filter((c: string) => c.length > 1)
+        const prompt = `Extract category names from: "${instruction}"\nList ONLY categories separated by comma:`
+        const response = await llmQueue.generate(prompt)
+        categories = (response || '').toLowerCase().split(/[,\n]+/).map((c: string) => c.trim()).filter((c: string) => c.length > 1)
       } catch { /* ignore LLM errors, use fallback categories */ }
       if (categories.length < 2) categories = ['left', 'right']
 
       const groups: Map<string, typeof nodes> = new Map()
       for (const node of nodes) {
         try {
-          const resp = await fetch('http://localhost:11434/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: ollamaModel.value,
-              prompt: `Classify "${node.title}" into ONE of: ${categories.join(', ')}\nAnswer with ONLY the category:`,
-              stream: false,
-            }),
-          })
-          const data = await resp.json()
-          const group = (data.response || 'other').toLowerCase().trim().split(/\s+/)[0]
+          const prompt = `Classify "${node.title}" into ONE of: ${categories.join(', ')}\nAnswer with ONLY the category:`
+          const response = await llmQueue.generate(prompt)
+          const group = (response || 'other').toLowerCase().trim().split(/\s+/)[0]
           if (!groups.has(group)) groups.set(group, [])
           groups.get(group)!.push(node)
         } catch { /* ignore classification errors */ }
@@ -933,17 +924,9 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
       const nodeGroups: Map<string, string> = new Map()
       for (const node of nodes) {
         try {
-          const resp = await fetch('http://localhost:11434/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: ollamaModel.value,
-              prompt: `Classify "${node.title}" into ONE of: ${groupsArg}\nAnswer with ONLY the group name:`,
-              stream: false,
-            }),
-          })
-          const data = await resp.json()
-          nodeGroups.set(node.id, (data.response || 'other').toLowerCase().trim().split(/\s+/)[0])
+          const prompt = `Classify "${node.title}" into ONE of: ${groupsArg}\nAnswer with ONLY the group name:`
+          const response = await llmQueue.generate(prompt)
+          nodeGroups.set(node.id, (response || 'other').toLowerCase().trim().split(/\s+/)[0])
         } catch { /* ignore classification errors */ }
       }
 
@@ -972,21 +955,13 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
       // Extract color mappings from instruction using LLM
       let colorMappings: Array<{ category: string; color: string }> = []
       try {
-        const resp = await fetch('http://localhost:11434/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: ollamaModel.value,
-            prompt: `Extract category-to-color mappings from: "${instruction}"
+        const prompt = `Extract category-to-color mappings from: "${instruction}"
 Output as JSON array: [{"category":"name","color":"#hex"}]
 Available colors: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink), #6b7280 (gray)
 Example: "departments red, people blue" -> [{"category":"departments","color":"#ef4444"},{"category":"people","color":"#3b82f6"}]
-Output ONLY the JSON array:`,
-            stream: false,
-          }),
-        })
-        const data = await resp.json()
-        const match = (data.response || '').match(/\[[\s\S]*\]/)
+Output ONLY the JSON array:`
+        const response = await llmQueue.generate(prompt)
+        const match = (response || '').match(/\[[\s\S]*\]/)
         if (match) colorMappings = JSON.parse(match[0])
       } catch { /* ignore LLM errors */ }
 
@@ -1016,14 +991,18 @@ Output ONLY the JSON array:`,
 
       const nodes = store.filteredNodes
       let colored = 0
+      const matchedTitles: string[] = []
       for (const node of nodes) {
-        const nodeText = `${node.title} ${node.markdown_content || ''}`.toLowerCase()
+        // Search in title, content, and tags
+        const nodeText = `${node.title} ${node.markdown_content || ''} ${node.tags || ''}`.toLowerCase()
         if (nodeText.includes(pattern)) {
           await store.updateNodeColor(node.id, color)
           colored++
+          matchedTitles.push(node.title)
         }
       }
-      return `Colored ${colored} nodes matching "${pattern}"`
+      const preview = matchedTitles.slice(0, 5).join(', ')
+      return `Colored ${colored}/${nodes.length} nodes matching "${pattern}": ${preview}${colored > 5 ? '...' : ''}`
     }
 
     case 'web_search': {
@@ -3513,8 +3492,8 @@ ${edges.map(e => `  - id: "${e.id}"
       }"
     >
       <div class="hover-tooltip-title">{{ hoveredNode.title || 'Untitled' }}</div>
-      <div v-if="hoveredNode.markdown_content" class="hover-tooltip-content">
-        {{ hoveredNode.markdown_content.slice(0, 200) }}{{ hoveredNode.markdown_content.length > 200 ? '...' : '' }}
+      <div v-if="tooltipContent" class="hover-tooltip-content">
+        {{ tooltipContent }}{{ tooltipContent.length >= 200 ? '...' : '' }}
       </div>
     </div>
 

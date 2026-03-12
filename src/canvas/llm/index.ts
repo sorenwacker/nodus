@@ -12,3 +12,6 @@ export type { AgentTool, AgentTask, ToolCall, ChatMessage } from './types'
 // Registry exports for plugin development
 export { toolRegistry, defineTool, type ToolDefinition, type ToolHandler, type INodeStore } from './registry'
 export { registerCoreTools } from './coreTools'
+
+// LLM Queue - all LLM calls MUST go through this
+export { llmQueue, useLLMQueue } from './queue'

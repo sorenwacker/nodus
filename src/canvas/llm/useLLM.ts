@@ -1,6 +1,7 @@
 /**
  * LLM composable
  * Manages LLM settings, state, and provides API access
+ * ALL LLM calls go through the queue
  */
 import { ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
@@ -8,6 +9,7 @@ import { providerRegistry } from './providers'
 import { agentTools } from './tools'
 import { llmStorage } from '../../lib/storage'
 import { DEFAULT_SYSTEM_PROMPT } from './prompts'
+import { llmQueue } from './queue'
 
 export function useLLM() {
   // System prompt (shared across providers)
@@ -76,31 +78,17 @@ export function useLLM() {
   initProvider()
 
   /**
-   * Simple generate (no tools)
+   * Simple generate (no tools) - goes through queue
    */
   async function simpleGenerate(prompt: string, customSystem?: string): Promise<string> {
-    const provider = providerRegistry.getActiveProvider()
-    const result = await provider.generate({
-      prompt,
-      system: customSystem || systemPrompt.value,
-    })
-    return result.content
+    return llmQueue.generate(prompt, customSystem || systemPrompt.value)
   }
 
   /**
-   * Chat with tool calling
+   * Chat with tool calling - goes through queue
    */
   async function chatWithTools(messages: ChatMessage[]): Promise<ChatMessage> {
-    const provider = providerRegistry.getActiveProvider()
-    const result = await provider.chat({
-      messages: messages.map(m => ({
-        role: m.role,
-        content: m.content,
-        tool_calls: m.tool_calls,
-        tool_call_id: m.tool_call_id,
-      })),
-      tools: agentTools,
-    })
+    const result = await llmQueue.chat(messages, agentTools)
     return result.message as ChatMessage
   }
 

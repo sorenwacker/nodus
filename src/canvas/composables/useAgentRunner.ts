@@ -1,11 +1,13 @@
 /**
  * Agent runner composable
  * Handles the LLM agent loop for graph building
+ * ALL LLM calls go through the queue
  */
 import type { Ref } from 'vue'
 import type { ChatMessage, AgentTask } from '../llm/types'
 import { llmStorage } from '../../lib/storage'
 import { DEFAULT_AGENT_PROMPT } from '../llm/prompts'
+import { llmQueue } from '../llm/queue'
 
 export interface AgentContext {
   // Node store access
@@ -103,16 +105,11 @@ function pruneMessages(messages: ChatMessage[], keepRecent: number = 6): ChatMes
 }
 
 export function useAgentRunner(ctx: AgentContext) {
-  let abortController: AbortController | null = null
-
   /**
    * Stop the running agent
    */
   function stop() {
-    if (abortController) {
-      abortController.abort()
-      abortController = null
-    }
+    llmQueue.cancelCurrent()
     ctx.isRunning.value = false
     ctx.log.value.push('> Stopped by user')
   }
@@ -129,7 +126,6 @@ export function useAgentRunner(ctx: AgentContext) {
     // Auto-cleanup orphan edges
     ctx.cleanupOrphanEdges()
 
-    abortController = new AbortController()
     ctx.isRunning.value = true
     ctx.tasks.value = []
 
@@ -156,21 +152,8 @@ export function useAgentRunner(ctx: AgentContext) {
       }
 
       try {
-        const response = await fetch('http://localhost:11434/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: ctx.model.value,
-            messages,
-            tools: ctx.agentTools,
-            stream: false,
-            options: { num_ctx: ctx.contextLength.value },
-          }),
-          signal: abortController?.signal,
-        })
-
-        if (!response.ok) throw new Error(`Ollama error: ${response.status}`)
-        const data = await response.json()
+        // Use the queue for all LLM calls
+        const data = await llmQueue.chat(messages as ChatMessage[], ctx.agentTools)
         const msg = data.message
 
         messages.push(msg)
@@ -187,7 +170,6 @@ export function useAgentRunner(ctx: AgentContext) {
                 content: result.replace('AGENT_DONE:', '').trim()
               })
               ctx.isRunning.value = false
-              abortController = null
               return result.replace('AGENT_DONE:', '').trim()
             }
           }
@@ -240,7 +222,6 @@ export function useAgentRunner(ctx: AgentContext) {
           const looksComplete = /now shows|complete|finished|created|done|successfully/i.test(msg.content)
           if (looksComplete) {
             ctx.isRunning.value = false
-            abortController = null
             return 'Done'
           }
 
@@ -249,10 +230,9 @@ export function useAgentRunner(ctx: AgentContext) {
           continue
         }
       } catch (e: any) {
-        if (e.name === 'AbortError') {
+        if (e.name === 'AbortError' || e.message === 'Cancelled') {
           ctx.log.value.push('> Agent stopped')
           ctx.isRunning.value = false
-          abortController = null
           return 'Agent stopped by user'
         }
         console.error('Agent error:', e)
@@ -262,7 +242,6 @@ export function useAgentRunner(ctx: AgentContext) {
     }
 
     ctx.isRunning.value = false
-    abortController = null
     return 'Agent reached max iterations'
   }
 
