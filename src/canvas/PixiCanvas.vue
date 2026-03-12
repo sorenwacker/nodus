@@ -1618,6 +1618,7 @@ const visibleEdgeLines = computed(() => {
   const selected = selectedEdge.value
   const bundling = edgeBundling.value
   const baseStrokeWidth = edgeStrokeWidth.value
+  const activeIds = activeNodeIds.value
 
   return edges.map(e => {
     const isHighlighted = highlighted.has(e.id)
@@ -1626,14 +1627,27 @@ const visibleEdgeLines = computed(() => {
     const effectiveStrokeWidth = bundling ? e.strokeWidth * baseStrokeWidth : baseStrokeWidth
     const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth + 2 : effectiveStrokeWidth
 
+    // Get highlight color from connected active node's color_theme
+    let edgeHighlightColor = highlightColor.value
+    if (isHighlighted) {
+      // Find the connected node that is active (hovered/selected)
+      const activeSourceNode = activeIds.has(e.source_node_id) ? store.getNode(e.source_node_id) : null
+      const activeTargetNode = activeIds.has(e.target_node_id) ? store.getNode(e.target_node_id) : null
+      const activeNode = activeSourceNode || activeTargetNode
+      if (activeNode?.color_theme) {
+        edgeHighlightColor = activeNode.color_theme
+      }
+    }
+
     return {
       ...e,
       isHighlighted,
       isSelected,
       color,
+      edgeHighlightColor,
       renderStrokeWidth,
       glowStrokeWidth: effectiveStrokeWidth + 6,
-      arrowMarkerId: isHighlighted ? 'arrow-selected' : `arrow-${color.replace('#', '')}`,
+      arrowMarkerId: isHighlighted ? `arrow-${edgeHighlightColor.replace('#', '')}` : `arrow-${color.replace('#', '')}`,
     }
   })
 })
@@ -2807,6 +2821,22 @@ const nodeColors = [
   { value: '#fce7f3' },
 ]
 
+// All colors that need arrow markers (edge colors + node colors + highlight)
+const allMarkerColors = computed(() => {
+  const colors = new Set<string>()
+  // Edge colors
+  for (const c of edgeColorPalette.value) {
+    if (c.value) colors.add(c.value)
+  }
+  // Node colors (for highlighted edges)
+  for (const c of nodeColors) {
+    if (c.value) colors.add(c.value)
+  }
+  // Highlight color
+  colors.add(highlightColor.value)
+  return Array.from(colors).map(v => ({ value: v }))
+})
+
 // Frame border colors (more saturated for visibility)
 const frameColors = [
   { value: null },
@@ -3045,11 +3075,8 @@ ${edges.map(e => `  - id: "${e.id}"
       <!-- SVG for edges -->
       <svg class="edges-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;">
         <defs>
-          <marker v-for="color in edgeColorPalette" :id="getArrowMarkerId(color.value)" :key="color.value" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="10" refY="5" orient="auto">
+          <marker v-for="color in allMarkerColors" :id="getArrowMarkerId(color.value)" :key="color.value" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="10" refY="5" orient="auto">
             <path d="M0,0 L10,5 L0,10 z" :fill="color.value" />
-          </marker>
-          <marker id="arrow-selected" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="10" refY="5" orient="auto">
-            <path d="M0,0 L10,5 L0,10 z" :fill="highlightColor" />
           </marker>
         </defs>
 
@@ -3060,7 +3087,7 @@ ${edges.map(e => `  - id: "${e.id}"
             v-for="edge in visibleEdgeLines"
             :key="edge.id"
             :d="edge.path"
-            :stroke="edge.isHighlighted ? highlightColor : edge.color"
+            :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
             :stroke-width="edge.isHighlighted ? 2.5 : 1"
             fill="none"
             class="edge-line-fast"
@@ -3104,7 +3131,7 @@ ${edges.map(e => `  - id: "${e.id}"
             <!-- Visible edge path (branch for bundled, full path for unbundled) -->
             <path
               :d="edge.path"
-              :stroke="edge.isHighlighted ? highlightColor : edge.color"
+              :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
               :stroke-width="edge.renderStrokeWidth"
               :marker-end="edge.isBidirectional || edge.isShortEdge ? undefined : `url(#${edge.arrowMarkerId})`"
               stroke-linecap="round"
