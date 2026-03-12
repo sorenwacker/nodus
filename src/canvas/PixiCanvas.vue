@@ -655,7 +655,10 @@ async function resetAllNodeSizes() {
 
 // Zoom to node - animate view to center on node and zoom in
 function zoomToNode(nodeId: string, targetScale = 1.0) {
-  const node = store.getNode(nodeId)
+  // Use visual node position (accounts for neighborhood mode)
+  const node = neighborhoodMode.value
+    ? neighborhood.getVisualNode(nodeId)
+    : store.getNode(nodeId)
   if (!node) return
 
   const rect = canvasRef.value?.getBoundingClientRect()
