@@ -2827,17 +2827,32 @@ watch(() => {
   }
 })
 
-// Node colors for the color picker
-const nodeColors = [
+// Node colors for the color picker (pastel for light/dark, neon for cyber)
+const defaultNodeColors = [
   { value: null },
-  { value: '#fee2e2' },
-  { value: '#ffedd5' },
-  { value: '#fef9c3' },
-  { value: '#dcfce7' },
-  { value: '#dbeafe' },
-  { value: '#f3e8ff' },
-  { value: '#fce7f3' },
+  { value: '#fee2e2' }, // red
+  { value: '#ffedd5' }, // orange
+  { value: '#fef9c3' }, // yellow
+  { value: '#dcfce7' }, // green
+  { value: '#dbeafe' }, // blue
+  { value: '#f3e8ff' }, // purple
+  { value: '#fce7f3' }, // pink
 ]
+
+const cyberNodeColors = [
+  { value: null },
+  { value: '#ff3366' }, // neon red
+  { value: '#ffaa00' }, // neon orange
+  { value: '#ffff00' }, // neon yellow
+  { value: '#00ff66' }, // neon green
+  { value: '#00ccff' }, // neon blue
+  { value: '#9933ff' }, // neon purple
+  { value: '#ff00ff' }, // neon magenta
+]
+
+const nodeColors = computed(() => {
+  return currentTheme.value === 'cyber' ? cyberNodeColors : defaultNodeColors
+})
 
 // All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
 const allMarkerColors = computed(() => {
@@ -2846,11 +2861,14 @@ const allMarkerColors = computed(() => {
   for (const c of edgeColorPalette.value) {
     if (c.value) colors.add(c.value)
   }
-  // Node colors (for highlighted edges)
-  for (const c of nodeColors) {
+  // Node colors (both default and cyber for highlighted edges)
+  for (const c of defaultNodeColors) {
     if (c.value) colors.add(c.value)
   }
-  // Cyber highlight colors (neon equivalents)
+  for (const c of cyberNodeColors) {
+    if (c.value) colors.add(c.value)
+  }
+  // Cyber highlight colors (neon equivalents of pastels)
   for (const neon of Object.values(cyberHighlightColors)) {
     colors.add(neon)
   }
