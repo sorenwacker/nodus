@@ -2599,8 +2599,9 @@ async function initTypstRenderer() {
 
   typstInitPromise = (async () => {
     try {
-      const { createTypstRenderer } = await import('@myriaddreamin/typst.ts')
-      typstRenderer = await createTypstRenderer()
+      // Use the simplified $typst API
+      const module = await import('@myriaddreamin/typst.ts')
+      typstRenderer = module.$typst
       canvasLogger.info('Typst renderer initialized')
     } catch (e) {
       canvasLogger.warn('Typst renderer failed to load:', e)
@@ -2631,9 +2632,10 @@ async function renderTypstMath() {
 
     try {
       const typstCode = isDisplay ? `$ ${math} $` : `$${math}$`
-      const svg = await typstRenderer.runWithSession(async (session: any) => {
-        return await session.svg({ mainContent: typstCode })
-      })
+      const mainContent = `#set page(width: auto, height: auto, margin: 0.3em)
+#set text(size: 14pt)
+${typstCode}`
+      const svg = await typstRenderer.svg({ mainContent })
       typstCache.set(cacheKey, svg)
       el.innerHTML = svg
       el.classList.remove('typst-pending')
