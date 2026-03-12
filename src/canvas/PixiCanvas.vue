@@ -195,6 +195,12 @@ onMounted(() => {
       fitToContent()
     }
 
+    // Cmd+A / Ctrl+A selects all nodes
+    if ((e.key === 'a' || e.key === 'A') && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      selectAllNodes()
+    }
+
     // Ctrl+Shift+R refreshes workspace from files
     if ((e.key === 'R' || e.key === 'r') && e.ctrlKey && e.shiftKey) {
       e.preventDefault()
@@ -2861,6 +2867,12 @@ async function fitNodeNow(nodeId: string) {
     }
   }
   waitForContent()
+}
+
+function selectAllNodes() {
+  // Select all visible nodes (respects neighborhood mode)
+  const nodeIds = displayNodes.value.map(n => n.id)
+  store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...nodeIds)
 }
 
 async function deleteSelectedNodes() {
