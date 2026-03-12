@@ -269,4 +269,148 @@ describe('Canvas Performance', () => {
       expect(store.nodes.length).toBe(1000)
     })
   })
+
+  // ==========================================================================
+  // Performance Baselines - These define our performance targets
+  // ==========================================================================
+  describe('Performance Baselines', () => {
+    const baselines = {
+      nodes500: {
+        loadTime: 100,      // ms to load 500 nodes
+        updateTime: 16.67,  // ms per frame (60fps)
+        filterTime: 10,     // ms to filter workspace
+      },
+      nodes1000: {
+        loadTime: 200,      // ms to load 1000 nodes
+        updateTime: 16.67,  // ms per frame (60fps)
+        filterTime: 20,     // ms to filter workspace
+      },
+      nodes2000: {
+        loadTime: 400,      // ms to load 2000 nodes
+        updateTime: 33,     // ms per frame (30fps minimum)
+        filterTime: 40,     // ms to filter workspace
+      },
+    }
+
+    it('BASELINE: 500 nodes - load time', () => {
+      const store = useNodesStore()
+      const mockNodes = generateMockNodes(500)
+
+      const start = performance.now()
+      store.nodes.push(...mockNodes)
+      const elapsed = performance.now() - start
+
+      console.log(`[BASELINE] 500 nodes load: ${elapsed.toFixed(2)}ms (target: <${baselines.nodes500.loadTime}ms)`)
+      expect(elapsed).toBeLessThan(baselines.nodes500.loadTime)
+    })
+
+    it('BASELINE: 1000 nodes - load time', () => {
+      const store = useNodesStore()
+      const mockNodes = generateMockNodes(1000)
+
+      const start = performance.now()
+      store.nodes.push(...mockNodes)
+      const elapsed = performance.now() - start
+
+      console.log(`[BASELINE] 1000 nodes load: ${elapsed.toFixed(2)}ms (target: <${baselines.nodes1000.loadTime}ms)`)
+      expect(elapsed).toBeLessThan(baselines.nodes1000.loadTime)
+    })
+
+    it('BASELINE: 2000 nodes - load time', () => {
+      const store = useNodesStore()
+      const mockNodes = generateMockNodes(2000)
+
+      const start = performance.now()
+      store.nodes.push(...mockNodes)
+      const elapsed = performance.now() - start
+
+      console.log(`[BASELINE] 2000 nodes load: ${elapsed.toFixed(2)}ms (target: <${baselines.nodes2000.loadTime}ms)`)
+      expect(elapsed).toBeLessThan(baselines.nodes2000.loadTime)
+    })
+
+    it('BASELINE: 500 nodes - 60fps update cycle', () => {
+      const store = useNodesStore()
+      store.nodes.push(...generateMockNodes(500))
+
+      const frames = 60
+      const timings: number[] = []
+
+      for (let i = 0; i < frames; i++) {
+        const start = performance.now()
+        store.nodes.forEach(n => { n.canvas_x += 1; n.canvas_y += 0.5 })
+        timings.push(performance.now() - start)
+      }
+
+      const avg = timings.reduce((a, b) => a + b, 0) / timings.length
+      const max = Math.max(...timings)
+      const p95 = timings.sort((a, b) => a - b)[Math.floor(frames * 0.95)]
+
+      console.log(`[BASELINE] 500 nodes update: avg=${avg.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, max=${max.toFixed(2)}ms`)
+      expect(avg).toBeLessThan(baselines.nodes500.updateTime)
+    })
+
+    it('BASELINE: 1000 nodes - 60fps update cycle', () => {
+      const store = useNodesStore()
+      store.nodes.push(...generateMockNodes(1000))
+
+      const frames = 60
+      const timings: number[] = []
+
+      for (let i = 0; i < frames; i++) {
+        const start = performance.now()
+        store.nodes.forEach(n => { n.canvas_x += 1; n.canvas_y += 0.5 })
+        timings.push(performance.now() - start)
+      }
+
+      const avg = timings.reduce((a, b) => a + b, 0) / timings.length
+      const max = Math.max(...timings)
+      const p95 = timings.sort((a, b) => a - b)[Math.floor(frames * 0.95)]
+
+      console.log(`[BASELINE] 1000 nodes update: avg=${avg.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, max=${max.toFixed(2)}ms`)
+      expect(avg).toBeLessThan(baselines.nodes1000.updateTime)
+    })
+
+    it('BASELINE: 2000 nodes - 30fps minimum update cycle', () => {
+      const store = useNodesStore()
+      store.nodes.push(...generateMockNodes(2000))
+
+      const frames = 30
+      const timings: number[] = []
+
+      for (let i = 0; i < frames; i++) {
+        const start = performance.now()
+        store.nodes.forEach(n => { n.canvas_x += 1; n.canvas_y += 0.5 })
+        timings.push(performance.now() - start)
+      }
+
+      const avg = timings.reduce((a, b) => a + b, 0) / timings.length
+      const max = Math.max(...timings)
+      const p95 = timings.sort((a, b) => a - b)[Math.floor(frames * 0.95)]
+
+      console.log(`[BASELINE] 2000 nodes update: avg=${avg.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, max=${max.toFixed(2)}ms`)
+      expect(avg).toBeLessThan(baselines.nodes2000.updateTime)
+    })
+
+    it('BASELINE: Edge creation - 2000 edges', () => {
+      const store = useNodesStore()
+      store.nodes.push(...generateMockNodes(500))
+
+      const start = performance.now()
+      for (let i = 0; i < 2000; i++) {
+        store.edges.push({
+          id: `edge-${i}`,
+          source_node_id: `node-${i % 500}`,
+          target_node_id: `node-${(i + 1) % 500}`,
+          label: null,
+          link_type: 'related',
+          weight: 1,
+          created_at: Date.now(),
+        })
+      }
+      const elapsed = performance.now() - start
+
+      console.log(`[BASELINE] 2000 edges create: ${elapsed.toFixed(2)}ms (target: <200ms)`)
+      expect(elapsed).toBeLessThan(200)
+    })
+  })
 })
