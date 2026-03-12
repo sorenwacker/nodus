@@ -213,8 +213,8 @@ function toggleTheme() {
   themeStorage.set(theme)
 }
 
-// Apply saved theme on load
-document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light')
+// Apply saved theme on load (supports all theme variants)
+document.documentElement.setAttribute('data-theme', themeStorage.get())
 
 // Normalize text for search: lowercase and remove diacritics (ö→o, é→e, etc.)
 function normalizeText(str: string): string {

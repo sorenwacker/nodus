@@ -2907,11 +2907,8 @@ const frameColors = [
 ]
 
 function updateNodeColor(nodeId: string, color: string | null) {
-  const node = store.nodes.find(n => n.id === nodeId)
-  if (node) {
-    node.color_theme = color
-    node.updated_at = Date.now()
-  }
+  // Use store method to persist to database
+  store.updateNodeColor(nodeId, color)
 }
 
 // One-shot fit to content (does NOT enable auto_fit)

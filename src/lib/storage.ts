@@ -34,17 +34,29 @@ function parseJson<T>(value: string | null, fallback: T): T {
 }
 
 /**
+ * Theme types
+ */
+export type Theme = 'light' | 'dark' | 'pitch-black' | 'cyber'
+
+const VALID_THEMES: Theme[] = ['light', 'dark', 'pitch-black', 'cyber']
+
+/**
  * Theme storage
  */
 export const themeStorage = {
-  get(): 'light' | 'dark' {
-    return localStorage.getItem(KEYS.theme) === 'dark' ? 'dark' : 'light'
+  get(): Theme {
+    const stored = localStorage.getItem(KEYS.theme)
+    if (stored && VALID_THEMES.includes(stored as Theme)) {
+      return stored as Theme
+    }
+    return 'light'
   },
-  set(value: 'light' | 'dark'): void {
+  set(value: Theme): void {
     localStorage.setItem(KEYS.theme, value)
   },
   isDark(): boolean {
-    return this.get() === 'dark'
+    const theme = this.get()
+    return theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
   },
 }
 
