@@ -12,6 +12,7 @@ import {
 import { applyForceLayout } from '../canvas/layout'
 import { workspaceStorage } from '../lib/storage'
 import { storeLogger } from '../lib/logger'
+import { notifications$ } from '../composables/useNotifications'
 import type {
   Node,
   Edge,
@@ -131,7 +132,8 @@ export const useNodesStore = defineStore('nodes', () => {
       }
     } catch (e) {
       error.value = String(e)
-      console.error('Failed to load nodes:', e)
+      storeLogger.error('Failed to load nodes:', e)
+      notifications$.error('Failed to load data', 'Using offline mode with sample data')
       // Fallback to mock data for development
       nodes.value = [
         {
@@ -605,6 +607,7 @@ export const useNodesStore = defineStore('nodes', () => {
     } catch (e) {
       error.value = String(e)
       storeLogger.error('Import failed:', e)
+      notifications$.error('Import failed', String(e))
       throw e
     } finally {
       loading.value = false
@@ -945,22 +948,29 @@ export const useNodesStore = defineStore('nodes', () => {
 
   /**
    * Acquire an edit lock for a node before editing
-   * Throws an error if the file is locked by another application
+   * Shows notification if the file is locked by another application
+   * Returns false if lock could not be acquired
    */
-  async function startEditing(nodeId: string): Promise<void> {
+  async function startEditing(nodeId: string): Promise<boolean> {
     const node = nodes.value.find(n => n.id === nodeId)
-    if (!node?.file_path) return // No file to lock
+    if (!node?.file_path) return true // No file to lock
 
     try {
       await acquireEditLock(nodeId)
       lockedNodeIds.value.add(nodeId)
       storeLogger.debug(`Acquired edit lock for node: ${node.title}`)
+      return true
     } catch (e) {
       const errorMsg = String(e)
       if (errorMsg.includes('being edited')) {
-        throw new Error(`Cannot edit "${node.title}": file is open in another application`)
+        notifications$.error(
+          `Cannot edit "${node.title}"`,
+          'File is open in another application'
+        )
+        return false
       }
-      throw e
+      notifications$.error('Failed to acquire edit lock', String(e))
+      return false
     }
   }
 

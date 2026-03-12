@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, computed, provide } from 'vue'
 import { useNodesStore } from './stores/nodes'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
+import NotificationToast from './components/NotificationToast.vue'
 import { themeStorage } from './lib/storage'
 
 const store = useNodesStore()
@@ -629,9 +630,11 @@ async function openFolderDialog() {
       </div>
     </div>
 
-    <!-- Toast notifications -->
     <!-- Settings Modal -->
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+
+    <!-- Global notifications (for critical errors) -->
+    <NotificationToast />
 
     <div class="toast-container">
       <div
