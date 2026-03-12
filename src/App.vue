@@ -19,11 +19,14 @@ const isDark = ref(themeStorage.isDark())
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
 
-// Undo/Redo system - supports both position and content changes
+// Undo/Redo system - supports position, content, and deletion changes
+import type { Node, Edge } from './types'
+
 interface UndoSnapshot {
-  type: 'position' | 'content'
+  type: 'position' | 'content' | 'deletion'
   positions?: Map<string, { x: number; y: number }>
   content?: { nodeId: string; oldContent: string | null; oldTitle: string }
+  deletion?: { node: Node; edges: Edge[] }
 }
 const undoStack = ref<UndoSnapshot[]>([])
 const redoStack = ref<UndoSnapshot[]>([])
@@ -53,6 +56,17 @@ function pushContentUndo(nodeId: string, oldContent: string | null, oldTitle: st
   undoStack.value.push({
     type: 'content',
     content: { nodeId, oldContent, oldTitle }
+  })
+  if (undoStack.value.length > MAX_UNDO) {
+    undoStack.value.shift()
+  }
+  redoStack.value = []
+}
+
+function pushDeletionUndo(node: Node, edges: Edge[]) {
+  undoStack.value.push({
+    type: 'deletion',
+    deletion: { node: { ...node }, edges: edges.map(e => ({ ...e })) }
   })
   if (undoStack.value.length > MAX_UNDO) {
     undoStack.value.shift()
@@ -90,6 +104,15 @@ async function undo() {
       await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
       showToast('Undo content', 'info')
     }
+  } else if (snapshot.type === 'deletion' && snapshot.deletion) {
+    // Restore deleted node
+    const { node, edges } = snapshot.deletion
+    await store.restoreNode(node)
+    // Restore connected edges
+    for (const edge of edges) {
+      await store.restoreEdge(edge)
+    }
+    showToast('Undo deletion', 'info')
   }
 }
 
@@ -126,6 +149,7 @@ async function redo() {
 // Expose undo functions to child components
 provide('pushUndo', pushUndo)
 provide('pushContentUndo', pushContentUndo)
+provide('pushDeletionUndo', pushDeletionUndo)
 
 // Toast notifications
 interface Toast {
@@ -325,6 +349,14 @@ function onKeydown(e: KeyboardEvent) {
     if (store.selectedNodeIds.length > 0) {
       e.preventDefault()
       for (const id of [...store.selectedNodeIds]) {
+        const node = store.getNode(id)
+        if (node) {
+          // Capture connected edges before deletion
+          const connectedEdges = store.filteredEdges.filter(
+            e => e.source_node_id === id || e.target_node_id === id
+          )
+          pushDeletionUndo(node, connectedEdges)
+        }
         store.deleteNode(id)
       }
     } else if (store.selectedFrameId) {

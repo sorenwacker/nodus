@@ -32,9 +32,12 @@ import { useLayout } from './composables/useLayout'
 import { usePdfDrop } from './composables/usePdfDrop'
 import { NODE_DEFAULTS } from './constants'
 
-// Undo injection for position and content changes
+// Undo injection for position, content, and deletion changes
+import type { Node, Edge } from '../types'
+
 const injectedPushUndo = inject<(() => void) | undefined>('pushUndo')
 const injectedPushContentUndo = inject<((nodeId: string, oldContent: string | null, oldTitle: string) => void) | undefined>('pushContentUndo')
+const injectedPushDeletionUndo = inject<((node: Node, edges: Edge[]) => void) | undefined>('pushDeletionUndo')
 
 const pushUndo = () => {
   if (injectedPushUndo) {
@@ -49,6 +52,14 @@ const pushContentUndo = (nodeId: string, oldContent: string | null, oldTitle: st
     injectedPushContentUndo(nodeId, oldContent, oldTitle)
   } else {
     console.warn('pushContentUndo not provided - content undo will not work')
+  }
+}
+
+const pushDeletionUndo = (node: Node, edges: Edge[]) => {
+  if (injectedPushDeletionUndo) {
+    injectedPushDeletionUndo(node, edges)
+  } else {
+    console.warn('pushDeletionUndo not provided - deletion undo will not work')
   }
 }
 
@@ -2969,6 +2980,15 @@ async function deleteSelectedNodes() {
   if (count === 0) return
   // Delete without confirm to avoid Tauri permission issues
   for (const id of [...store.selectedNodeIds]) {
+    const node = store.getNode(id)
+    if (node) {
+      // Capture connected edges before deletion
+      const connectedEdges = store.filteredEdges.filter(
+        e => e.source_node_id === id || e.target_node_id === id
+      )
+      // Save for undo
+      pushDeletionUndo(node, connectedEdges)
+    }
     await store.deleteNode(id)
   }
 }

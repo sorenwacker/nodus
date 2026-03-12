@@ -518,6 +518,32 @@ export const useNodesStore = defineStore('nodes', () => {
     edges.value = edges.value.filter(e => e.id !== id)
   }
 
+  // Restore a deleted node (for undo)
+  async function restoreNode(node: Node) {
+    try {
+      await invoke('restore_node', { node })
+    } catch (e) {
+      console.error('Failed to restore node:', e)
+    }
+    // Add back to local state if not already present
+    if (!nodes.value.find(n => n.id === node.id)) {
+      nodes.value.push(node)
+    }
+  }
+
+  // Restore a deleted edge (for undo)
+  async function restoreEdge(edge: Edge) {
+    try {
+      await invoke('restore_edge', { edge })
+    } catch (e) {
+      console.error('Failed to restore edge:', e)
+    }
+    // Add back to local state if not already present
+    if (!edges.value.find(e => e.id === edge.id)) {
+      edges.value.push(edge)
+    }
+  }
+
   function updateEdgeLinkType(id: string, linkType: string) {
     const idx = edges.value.findIndex(e => e.id === id)
     if (idx !== -1) {
@@ -919,8 +945,10 @@ export const useNodesStore = defineStore('nodes', () => {
     refreshNodeFromFile,
     createNode,
     deleteNode,
+    restoreNode,
     createEdge,
     deleteEdge,
+    restoreEdge,
     updateEdgeLinkType,
     createFrame,
     updateFramePosition,

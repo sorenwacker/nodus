@@ -193,6 +193,14 @@ pub mod nodes {
         Ok(())
     }
 
+    pub async fn restore(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
+        sqlx::query("UPDATE nodes SET deleted_at = NULL WHERE id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn update_content(
         pool: &DbPool,
         id: &str,

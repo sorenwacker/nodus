@@ -113,6 +113,14 @@ pub async fn delete_node(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn restore_node(node: Node) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::restore(pool, &node.id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn update_node_position(id: String, x: f64, y: f64) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_position(pool, &id, x, y)
@@ -165,6 +173,14 @@ pub async fn create_edge(input: CreateEdgeInput) -> Result<Edge, String> {
 pub async fn delete_edge(id: String) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::edges::delete(pool, &id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn restore_edge(edge: Edge) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::edges::create(pool, &edge)
         .await
         .map_err(|e| e.to_string())
 }

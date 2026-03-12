@@ -164,6 +164,37 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     const focusNode = store.getNode(focusId)
     if (!focusNode) return false
 
+    // Categorize direct neighbors (depth 1) by relationship
+    const edges = store.getFilteredEdges()
+    const incomingFrom = new Set<string>()
+    const outgoingTo = new Set<string>()
+
+    for (const edge of edges) {
+      if (edge.target_node_id === focusId && edge.source_node_id !== focusId) {
+        incomingFrom.add(edge.source_node_id)
+      }
+      if (edge.source_node_id === focusId && edge.target_node_id !== focusId) {
+        outgoingTo.add(edge.target_node_id)
+      }
+    }
+
+    const parents: string[] = []
+    const children: string[] = []
+    const siblings: string[] = []
+
+    for (const id of incomingFrom) {
+      if (outgoingTo.has(id)) {
+        siblings.push(id)
+      } else {
+        parents.push(id)
+      }
+    }
+    for (const id of outgoingTo) {
+      if (!incomingFrom.has(id)) {
+        children.push(id)
+      }
+    }
+
     // Calculate center of viewport in canvas coordinates
     const viewCenterX = (rect.width / 2 - viewState.offsetX.value) / viewState.scale.value
     const viewCenterY = (rect.height / 2 - viewState.offsetY.value) / viewState.scale.value
@@ -172,6 +203,8 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     const positions = new Map<string, { x: number; y: number }>()
     const focusWidth = focusNode.width || NODE_DEFAULTS.WIDTH
     const focusHeight = focusNode.height || NODE_DEFAULTS.HEIGHT
+    const verticalGap = LAYOUT_GAPS.VERTICAL
+    const horizontalGap = LAYOUT_GAPS.HORIZONTAL
 
     // Focus node at center
     positions.set(focusId, {
@@ -179,31 +212,121 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
       y: viewCenterY - focusHeight / 2,
     })
 
-    // Get nodes organized by depth
-    const nodesByDepth = computeNodesByDepth(focusId)
+    // Track positioned depth-1 nodes for ring layout of deeper nodes
+    const positionedDepth1 = new Set<string>()
 
-    // Layout each depth level in concentric rings
-    const ringSpacing = 250 // Distance between rings
+    // Layout parents above
+    if (parents.length > 0) {
+      const totalWidth = parents.reduce((sum, id) => {
+        const n = store.getNode(id)
+        return sum + (n?.width || NODE_DEFAULTS.WIDTH) + horizontalGap
+      }, -horizontalGap)
+      let xOffset = viewCenterX - totalWidth / 2
 
-    for (let depth = 1; depth <= neighborhoodDepth.value; depth++) {
-      const nodesAtDepth = nodesByDepth.get(depth)
-      if (!nodesAtDepth || nodesAtDepth.length === 0) continue
-
-      const radius = depth * ringSpacing
-      const angleStep = (2 * Math.PI) / nodesAtDepth.length
-      const startAngle = -Math.PI / 2 // Start from top
-
-      nodesAtDepth.forEach((nodeId, index) => {
-        const n = store.getNode(nodeId)
+      parents.forEach(parentId => {
+        const n = store.getNode(parentId)
         const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
         const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
-        const angle = startAngle + index * angleStep
-
-        positions.set(nodeId, {
-          x: viewCenterX + radius * Math.cos(angle) - nodeWidth / 2,
-          y: viewCenterY + radius * Math.sin(angle) - nodeHeight / 2,
+        positions.set(parentId, {
+          x: xOffset,
+          y: viewCenterY - focusHeight / 2 - verticalGap - nodeHeight,
         })
+        xOffset += nodeWidth + horizontalGap
+        positionedDepth1.add(parentId)
       })
+    }
+
+    // Layout children below
+    if (children.length > 0) {
+      const totalWidth = children.reduce((sum, id) => {
+        const n = store.getNode(id)
+        return sum + (n?.width || NODE_DEFAULTS.WIDTH) + horizontalGap
+      }, -horizontalGap)
+      let xOffset = viewCenterX - totalWidth / 2
+
+      children.forEach(childId => {
+        const n = store.getNode(childId)
+        const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
+        positions.set(childId, {
+          x: xOffset,
+          y: viewCenterY + focusHeight / 2 + verticalGap,
+        })
+        xOffset += nodeWidth + horizontalGap
+        positionedDepth1.add(childId)
+      })
+    }
+
+    // Layout siblings on left and right
+    if (siblings.length > 0) {
+      const siblingGap = LAYOUT_GAPS.SIBLING_GAP
+      const verticalSpacing = LAYOUT_GAPS.SIBLING_VERTICAL
+
+      const leftSiblings = siblings.filter((_, i) => i % 2 === 0)
+      const rightSiblings = siblings.filter((_, i) => i % 2 === 1)
+
+      // Left siblings
+      const leftTotalHeight = leftSiblings.reduce((sum, id) => {
+        const n = store.getNode(id)
+        return sum + (n?.height || NODE_DEFAULTS.HEIGHT) + verticalSpacing
+      }, -verticalSpacing)
+      let yOffset = viewCenterY - leftTotalHeight / 2
+
+      leftSiblings.forEach(sibId => {
+        const n = store.getNode(sibId)
+        const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
+        const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
+        positions.set(sibId, {
+          x: viewCenterX - focusWidth / 2 - siblingGap - nodeWidth,
+          y: yOffset,
+        })
+        yOffset += nodeHeight + verticalSpacing
+        positionedDepth1.add(sibId)
+      })
+
+      // Right siblings
+      const rightTotalHeight = rightSiblings.reduce((sum, id) => {
+        const n = store.getNode(id)
+        return sum + (n?.height || NODE_DEFAULTS.HEIGHT) + verticalSpacing
+      }, -verticalSpacing)
+      yOffset = viewCenterY - rightTotalHeight / 2
+
+      rightSiblings.forEach(sibId => {
+        const n = store.getNode(sibId)
+        const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
+        positions.set(sibId, {
+          x: viewCenterX + focusWidth / 2 + siblingGap,
+          y: yOffset,
+        })
+        yOffset += nodeHeight + verticalSpacing
+        positionedDepth1.add(sibId)
+      })
+    }
+
+    // Layout deeper nodes (depth 2+) in concentric rings
+    if (neighborhoodDepth.value > 1) {
+      const nodesByDepth = computeNodesByDepth(focusId)
+      const ringSpacing = 300
+
+      for (let depth = 2; depth <= neighborhoodDepth.value; depth++) {
+        const nodesAtDepth = nodesByDepth.get(depth)
+        if (!nodesAtDepth || nodesAtDepth.length === 0) continue
+
+        const radius = (depth - 1) * ringSpacing + 350 // Start beyond depth-1 nodes
+        const angleStep = (2 * Math.PI) / nodesAtDepth.length
+        const startAngle = -Math.PI / 2
+
+        nodesAtDepth.forEach((nodeId, index) => {
+          const n = store.getNode(nodeId)
+          const nodeWidth = n?.width || NODE_DEFAULTS.WIDTH
+          const nodeHeight = n?.height || NODE_DEFAULTS.HEIGHT
+          const angle = startAngle + index * angleStep
+
+          positions.set(nodeId, {
+            x: viewCenterX + radius * Math.cos(angle) - nodeWidth / 2,
+            y: viewCenterY + radius * Math.sin(angle) - nodeHeight / 2,
+          })
+        })
+      }
     }
 
     // Store positions
