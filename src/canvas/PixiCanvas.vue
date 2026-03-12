@@ -2406,6 +2406,11 @@ const edgeColorPalette = computed(() => {
 // Default edge color (first in palette)
 const defaultEdgeColor = computed(() => edgeColorPalette.value[0].value)
 
+// Highlight/selected color - matches theme accent
+const highlightColor = computed(() => {
+  return currentTheme.value === 'cyber' ? '#00ffcc' : '#3b82f6'
+})
+
 // Edge style types
 const edgeStyles = [
   { value: 'diagonal', label: '/' },
@@ -3044,7 +3049,7 @@ ${edges.map(e => `  - id: "${e.id}"
             <path d="M0,0 L10,5 L0,10 z" :fill="color.value" />
           </marker>
           <marker id="arrow-selected" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="10" refY="5" orient="auto">
-            <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6" />
+            <path d="M0,0 L10,5 L0,10 z" :fill="highlightColor" />
           </marker>
         </defs>
 
@@ -3055,7 +3060,7 @@ ${edges.map(e => `  - id: "${e.id}"
             v-for="edge in visibleEdgeLines"
             :key="edge.id"
             :d="edge.path"
-            :stroke="edge.isHighlighted ? '#3b82f6' : edge.color"
+            :stroke="edge.isHighlighted ? highlightColor : edge.color"
             :stroke-width="edge.isHighlighted ? 2.5 : 1"
             fill="none"
             class="edge-line-fast"
@@ -3099,7 +3104,7 @@ ${edges.map(e => `  - id: "${e.id}"
             <!-- Visible edge path (branch for bundled, full path for unbundled) -->
             <path
               :d="edge.path"
-              :stroke="edge.isHighlighted ? '#3b82f6' : edge.color"
+              :stroke="edge.isHighlighted ? highlightColor : edge.color"
               :stroke-width="edge.renderStrokeWidth"
               :marker-end="edge.isBidirectional || edge.isShortEdge ? undefined : `url(#${edge.arrowMarkerId})`"
               stroke-linecap="round"
@@ -3121,8 +3126,8 @@ ${edges.map(e => `  - id: "${e.id}"
         <polygon
           v-if="isLassoSelecting && lassoPoints.length > 2"
           :points="lassoPoints.map(p => `${p.x},${p.y}`).join(' ')"
-          fill="rgba(59, 130, 246, 0.1)"
-          stroke="#3b82f6"
+          :fill="currentTheme === 'cyber' ? 'rgba(0, 255, 204, 0.1)' : 'rgba(59, 130, 246, 0.1)'"
+          :stroke="highlightColor"
           stroke-width="2"
           stroke-dasharray="4,4"
         />
@@ -3134,7 +3139,7 @@ ${edges.map(e => `  - id: "${e.id}"
           :y1="(store.getNode(edgeStartNode)?.canvas_y || 0) + 40"
           :x2="edgePreviewEnd.x"
           :y2="edgePreviewEnd.y"
-          stroke="#3b82f6"
+          :stroke="highlightColor"
           stroke-width="2"
           stroke-dasharray="8,4"
         />

@@ -401,6 +401,10 @@
   filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
 }
 
+:is([data-theme='cyber']) .edge-highlighted {
+  filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.8));
+}
+
 .edge-line-visible:not(.edge-highlighted) {
   opacity: 1;
   transition: opacity 0.15s ease;
