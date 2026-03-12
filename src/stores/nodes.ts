@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { invoke, listen, readTextFile, refreshWorkspace as refreshWorkspaceApi } from '../lib/tauri'
+import {
+  invoke,
+  listen,
+  readTextFile,
+  refreshWorkspace as refreshWorkspaceApi,
+  acquireEditLock,
+  releaseEditLock,
+  checkFileAvailable,
+} from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { workspaceStorage } from '../lib/storage'
 import { storeLogger } from '../lib/logger'
@@ -29,6 +37,8 @@ export const useNodesStore = defineStore('nodes', () => {
   const error = ref<string | null>(null)
   // Version counter to trigger edge re-routing when node positions/sizes change
   const nodeLayoutVersion = ref(0)
+  // Track which nodes have edit locks held by this session
+  const lockedNodeIds = ref<Set<string>>(new Set())
 
   // For backwards compatibility
   const selectedNodeId = computed(() => selectedNodeIds.value[0] || null)
@@ -917,6 +927,65 @@ export const useNodesStore = defineStore('nodes', () => {
     nodeLayoutVersion.value++
   }
 
+  /**
+   * Check if a node's file is available for editing
+   * Returns true if available, false if locked by another process
+   */
+  async function isNodeEditable(nodeId: string): Promise<boolean> {
+    const node = nodes.value.find(n => n.id === nodeId)
+    if (!node?.file_path) return true // No file = always editable
+
+    try {
+      return await checkFileAvailable(node.file_path)
+    } catch (e) {
+      storeLogger.error('Failed to check file availability:', e)
+      return true // Assume editable on error
+    }
+  }
+
+  /**
+   * Acquire an edit lock for a node before editing
+   * Throws an error if the file is locked by another application
+   */
+  async function startEditing(nodeId: string): Promise<void> {
+    const node = nodes.value.find(n => n.id === nodeId)
+    if (!node?.file_path) return // No file to lock
+
+    try {
+      await acquireEditLock(nodeId)
+      lockedNodeIds.value.add(nodeId)
+      storeLogger.debug(`Acquired edit lock for node: ${node.title}`)
+    } catch (e) {
+      const errorMsg = String(e)
+      if (errorMsg.includes('being edited')) {
+        throw new Error(`Cannot edit "${node.title}": file is open in another application`)
+      }
+      throw e
+    }
+  }
+
+  /**
+   * Release an edit lock after editing is complete
+   */
+  async function stopEditing(nodeId: string): Promise<void> {
+    if (!lockedNodeIds.value.has(nodeId)) return
+
+    try {
+      await releaseEditLock(nodeId)
+      lockedNodeIds.value.delete(nodeId)
+      storeLogger.debug(`Released edit lock for node: ${nodeId}`)
+    } catch (e) {
+      storeLogger.error('Failed to release edit lock:', e)
+    }
+  }
+
+  /**
+   * Check if we currently hold an edit lock for a node
+   */
+  function hasEditLock(nodeId: string): boolean {
+    return lockedNodeIds.value.has(nodeId)
+  }
+
   return {
     nodes,
     edges,
@@ -970,5 +1039,9 @@ export const useNodesStore = defineStore('nodes', () => {
     cleanupOrphanEdges,
     deduplicateEdges,
     layoutNodes,
+    isNodeEditable,
+    startEditing,
+    stopEditing,
+    hasEditLock,
   }
 })

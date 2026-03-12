@@ -13,6 +13,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::WatcherState(Mutex::new(None)))
+        .manage(commands::LocksState(Mutex::new(std::collections::HashMap::new())))
         .setup(|app| {
             // Initialize database
             let app_handle = app.handle().clone();
@@ -51,6 +52,10 @@ fn main() {
             commands::extract_pdf_text,
             commands::refresh_workspace,
             commands::update_node_color,
+            commands::check_file_available,
+            commands::acquire_edit_lock,
+            commands::release_edit_lock,
+            commands::get_locked_nodes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

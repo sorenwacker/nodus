@@ -535,4 +535,155 @@ mod tests {
         // 100 change detections should complete in under 500ms
         assert!(elapsed < Duration::from_millis(500), "Detection too slow: {:?}", elapsed);
     }
+
+    // ========================================================================
+    // Integrity Tests - Simulate Real-World Concurrent Edit Scenarios
+    // ========================================================================
+
+    #[test]
+    fn test_integrity_nodus_write_blocks_external() {
+        // Scenario: Nodus acquires exclusive lock, external app cannot write
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("conflict.md");
+        fs::write(&file_path, "initial content").unwrap();
+
+        // Nodus acquires exclusive lock
+        let nodus_lock = FileLock::exclusive(&file_path).unwrap();
+
+        // Simulate external app trying to write (would fail in real scenario)
+        // In tests, we verify the lock blocks another exclusive acquisition
+        let external_attempt = FileLock::exclusive(&file_path);
+        assert!(matches!(external_attempt, Err(WatcherError::FileLocked)));
+
+        // Nodus writes content
+        drop(nodus_lock);
+    }
+
+    #[test]
+    fn test_integrity_graceful_lock_failure() {
+        // Scenario: External app has file open, Nodus shows user-friendly error
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("external_open.md");
+        fs::write(&file_path, "content").unwrap();
+
+        // External app has exclusive lock
+        let _external_lock = FileLock::exclusive(&file_path).unwrap();
+
+        // Nodus tries to edit - should fail gracefully
+        let result = FileLock::exclusive(&file_path);
+        assert!(result.is_err());
+
+        if let Err(WatcherError::FileLocked) = result {
+            // This is the expected error that triggers user notification
+        } else {
+            panic!("Expected FileLocked error");
+        }
+    }
+
+    #[test]
+    fn test_integrity_write_file_locked_function() {
+        // Test the high-level write_file_locked function
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("write_test.md");
+        fs::write(&file_path, "original").unwrap();
+
+        // Write with lock
+        let checksum = super::write_file_locked(&file_path, "new content").unwrap();
+
+        // Verify content was written
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "new content");
+
+        // Verify checksum is valid
+        assert!(!checksum.is_empty());
+        assert_eq!(checksum.len(), 64); // SHA-256 hex length
+    }
+
+    #[test]
+    fn test_integrity_write_blocked_by_reader() {
+        // Scenario: File has shared reader, write should fail
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("read_block.md");
+        fs::write(&file_path, "content").unwrap();
+
+        // Reader has shared lock
+        let _reader = FileLock::shared(&file_path).unwrap();
+
+        // Writer tries exclusive lock - should fail
+        let writer = FileLock::exclusive(&file_path);
+        assert!(matches!(writer, Err(WatcherError::FileLocked)));
+    }
+
+    #[test]
+    fn test_integrity_rapid_lock_acquire_release() {
+        // Stress test: rapid lock/unlock cycles
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("stress.md");
+        fs::write(&file_path, "content").unwrap();
+
+        for i in 0..50 {
+            let lock = FileLock::exclusive(&file_path).unwrap();
+            // Simulate brief edit
+            std::thread::sleep(Duration::from_micros(100));
+            drop(lock);
+
+            // Another process could acquire here
+            let lock2 = FileLock::exclusive(&file_path).unwrap();
+            drop(lock2);
+        }
+    }
+
+    #[test]
+    fn test_integrity_checksum_detects_external_change() {
+        // Verify checksum correctly detects when file changed externally
+        let checksums: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("external_edit.md");
+
+        // Nodus creates and tracks file
+        fs::write(&file_path, "# Note\nOriginal content").unwrap();
+        let event = detect_change(&file_path, &checksums);
+        assert_eq!(event.unwrap().change_type, ChangeType::Created);
+
+        let original_checksum = {
+            let cs = checksums.lock().unwrap();
+            cs.get(&file_path).cloned().unwrap()
+        };
+
+        // External app (Obsidian) modifies file
+        fs::write(&file_path, "# Note\nOriginal content\n\n## Added by Obsidian").unwrap();
+
+        // Nodus detects change via checksum
+        let event = detect_change(&file_path, &checksums);
+        assert!(event.is_some());
+        assert_eq!(event.as_ref().unwrap().change_type, ChangeType::Modified);
+
+        // Checksum should be different
+        let new_checksum = event.unwrap().new_checksum.unwrap();
+        assert_ne!(original_checksum, new_checksum);
+    }
+
+    #[test]
+    fn test_integrity_file_deleted_while_tracked() {
+        // Verify proper handling when external app deletes file
+        let checksums: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("to_delete.md");
+
+        // Create and track
+        fs::write(&file_path, "content").unwrap();
+        let _ = detect_change(&file_path, &checksums);
+
+        // External deletion
+        fs::remove_file(&file_path).unwrap();
+
+        // Nodus detects deletion
+        let event = detect_change(&file_path, &checksums);
+        assert!(event.is_some());
+        assert_eq!(event.unwrap().change_type, ChangeType::Deleted);
+
+        // File should be removed from tracking
+        let cs = checksums.lock().unwrap();
+        assert!(!cs.contains_key(&file_path));
+    }
 }

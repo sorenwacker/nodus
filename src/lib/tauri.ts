@@ -78,3 +78,20 @@ export async function extractPdfText(path: string): Promise<string> {
 export async function refreshWorkspace(workspaceId: string | null): Promise<number> {
   return invoke<number>('refresh_workspace', { workspaceId })
 }
+
+// File locking for safe concurrent editing
+export async function checkFileAvailable(path: string): Promise<boolean> {
+  return invoke<boolean>('check_file_available', { path })
+}
+
+export async function acquireEditLock(nodeId: string): Promise<void> {
+  return invoke<void>('acquire_edit_lock', { nodeId })
+}
+
+export async function releaseEditLock(nodeId: string): Promise<void> {
+  return invoke<void>('release_edit_lock', { nodeId })
+}
+
+export async function getLockedNodes(): Promise<string[]> {
+  return invoke<string[]>('get_locked_nodes')
+}
