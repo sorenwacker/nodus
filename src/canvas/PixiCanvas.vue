@@ -1627,14 +1627,25 @@ const visibleEdgeLines = computed(() => {
     const effectiveStrokeWidth = bundling ? e.strokeWidth * baseStrokeWidth : baseStrokeWidth
     const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth + 2 : effectiveStrokeWidth
 
-    // Get highlight color from connected active node's color_theme
+    // Get highlight color based on whether connected node is selected or just hovered
     let edgeHighlightColor = highlightColor.value
     if (isHighlighted) {
-      // Find the connected node that is active (hovered/selected)
-      const activeSourceNode = activeIds.has(e.source_node_id) ? store.getNode(e.source_node_id) : null
-      const activeTargetNode = activeIds.has(e.target_node_id) ? store.getNode(e.target_node_id) : null
-      const activeNode = activeSourceNode || activeTargetNode
-      edgeHighlightColor = getEdgeHighlightColor(activeNode?.color_theme || null)
+      // Check if connected to a selected node (not just hovered)
+      const isConnectedToSelected =
+        store.selectedNodeIds.includes(e.source_node_id) ||
+        store.selectedNodeIds.includes(e.target_node_id)
+
+      if (isConnectedToSelected) {
+        // Use selected color (matches selected node border)
+        edgeHighlightColor = selectedColor.value
+      } else {
+        // Just hovered - use node's color or default highlight
+        const hoveredNode = hoveredNodeId.value
+        if (hoveredNode) {
+          const node = store.getNode(hoveredNode)
+          edgeHighlightColor = getEdgeHighlightColor(node?.color_theme || null)
+        }
+      }
     }
 
     return {
@@ -2418,9 +2429,14 @@ const edgeColorPalette = computed(() => {
 // Default edge color (first in palette)
 const defaultEdgeColor = computed(() => edgeColorPalette.value[0].value)
 
-// Highlight/selected color - matches theme accent
+// Highlight color for hover - matches theme accent
 const highlightColor = computed(() => {
   return currentTheme.value === 'cyber' ? '#00ffcc' : '#3b82f6'
+})
+
+// Selected color - matches selected node border
+const selectedColor = computed(() => {
+  return currentTheme.value === 'cyber' ? '#ff00ff' : '#3b82f6'
 })
 
 // Map pastel node colors to neon equivalents for cyber theme edge highlights
@@ -2872,8 +2888,9 @@ const allMarkerColors = computed(() => {
   for (const neon of Object.values(cyberHighlightColors)) {
     colors.add(neon)
   }
-  // Highlight color
+  // Highlight and selected colors
   colors.add(highlightColor.value)
+  colors.add(selectedColor.value)
   return Array.from(colors).map(v => ({ value: v }))
 })
 
