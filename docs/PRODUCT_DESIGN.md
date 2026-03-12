@@ -1,8 +1,8 @@
 # Nodus - Product Design Document
 
-Version: 0.10.0
-Date: 2026-03-01
-Status: Ready for Implementation
+Version: 0.11.0
+Date: 2026-03-12
+Status: Active Development
 
 ---
 
@@ -369,9 +369,55 @@ Users want the node on the canvas to be the "source of truth." They dislike clic
 - Double-click node → inline edit
 - Drag between nodes → create connection
 - Node auto-resizes to fit content
+- **Multi-directional resize:** All edges and corners (8 handles)
 - Minimap navigation
 - Frames/areas for grouping
 - Keyboard shortcuts (n=new, e=edit, del=delete, /=command palette)
+- **Undo/Redo system:** Full support including node deletion with edge restoration
+- **Cmd/Ctrl+Click:** Zoom-to-fit on specific node (auto-scales based on node size)
+- **External links:** Open in default system browser
+
+### Neighborhood Mode
+
+Focus view that isolates a node and its connected neighbors:
+
+- **Depth control:** Configurable 1-5 hops (edges away from focus node)
+- **BFS traversal:** Finds all nodes within specified depth
+- **Layout modes:**
+  - Depth 1: Hierarchical layout (parents above, children below, siblings aside)
+  - Depth 2+: Concentric ring layout around focus node
+- **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
+
+### Edge Routing (PCB-Style)
+
+Edges are routed using a motherboard/PCB-inspired lane system:
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| `STANDOFF` | 80px | Minimum distance from node edge before routing |
+| `LANE_WIDTH` | 12px | Spacing between parallel edge lanes |
+| `PORT_SPACING` | 25px | Spacing between connection ports on same side |
+
+**Routing algorithm:**
+1. Analyze edges and determine exit/entry sides based on relative positions
+2. Assign ports on each node side, sorted to minimize crossings
+3. Route each edge through dedicated lanes using GridTracker
+4. Obstacle avoidance via spatial indexing
+
+**Edge styles:**
+- `orthogonal`: 90-degree turns only (default)
+- `diagonal`: Angled routing with obstacle avoidance
+
+### Themes
+
+Four built-in themes with localStorage persistence:
+
+| Theme | Background | Use Case |
+|-------|------------|----------|
+| `light` | Light gray | Default daytime |
+| `dark` | Dark zinc | Evening work |
+| `pitch-black` | True black | OLED displays |
+| `cyber` | Neon accents | Aesthetic preference |
 
 ---
 
@@ -543,18 +589,23 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 
 **Goal:** "Living Documentation" foundation
 
-- [ ] Infinite canvas with pan/zoom
-- [ ] Semantic zooming (aggregate on zoom-out)
-- [ ] Node CRUD on canvas
-- [ ] Visual connections (drag to link)
-- [ ] Inline editing
-- [ ] Frames for grouping
-- [ ] Obsidian vault import
-- [ ] Auto-layout algorithm
+- [x] Infinite canvas with pan/zoom
+- [x] Semantic zooming (aggregate on zoom-out)
+- [x] Node CRUD on canvas
+- [x] Visual connections (drag to link)
+- [x] Inline editing
+- [x] Frames for grouping
+- [x] Obsidian vault import
+- [x] Auto-layout algorithm (D3-force)
 - [ ] Bi-directional vault sync
-- [ ] Wikilink → link parsing
-- [ ] Minimap
-- [ ] Keyboard shortcuts
+- [x] Wikilink → link parsing
+- [x] Minimap
+- [x] Keyboard shortcuts
+- [x] Undo/redo system with deletion support
+- [x] Multi-directional node resize
+- [x] PCB-style edge routing
+- [x] Neighborhood mode with depth control
+- [x] Theme system (4 themes)
 
 ### Phase 2: Modern Researcher
 
@@ -619,6 +670,7 @@ The canvas includes a built-in agent that can build and modify knowledge graphs 
 - Tool calling with native support + fallback JSON parsing
 - Stateless requests (no history bleeding between requests)
 - System prompt includes current canvas state (existing nodes)
+- **Queue manager:** Sequential request processing to prevent race conditions
 
 **Agent Tools:**
 
@@ -741,6 +793,7 @@ tools:
 | Math | **@myriaddreamin/typst.ts** | Typst WASM, sub-second rendering |
 | Editor | TipTap/ProseMirror | Markdown + inline Typst extensions |
 | Layout | D3-force | Force-directed auto-layout on import |
+| Edge Routing | Custom PCB-style | Lane-based routing with GridTracker, obstacle avoidance |
 | File Watch | Rust `notify` crate + **file locking** | Prevent corruption with Obsidian |
 | Sync | **Yjs** (CRDTs) | **Canvas positions only**, NOT text content |
 | Backend | Rust (Axum) | Sync server, performance |
@@ -1139,41 +1192,37 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 
 ## Next Steps
 
-### Immediate (Week 1) — Data Integrity First
+### Completed (Weeks 1-8)
 
 1. [x] Finalize product name → **Nodus**
-2. [ ] Initialize Tauri v2 + Vue project
-3. [ ] Set up LibSQL database with schema
-4. [ ] Implement Rust file-watcher (notify crate)
-5. [ ] Implement file locking mechanism (fs2 crate)
-6. [ ] Write checksum function (SHA-256)
-7. [ ] **Create integrity test suite** — intentionally edit file in Nodus AND Obsidian simultaneously, verify lock mechanism works
+2. [x] Initialize Tauri v2 + Vue project
+3. [x] Set up LibSQL database with schema
+4. [x] Implement Rust file-watcher (notify crate)
+5. [x] Write checksum function (SHA-256)
+6. [x] PixiJS canvas with hybrid rendering (WebGL + DOM overlay)
+7. [x] DOM overlay for text editing
+8. [x] Draggable nodes at 60fps
+9. [x] Connect canvas to SQLite
+10. [x] Inline node editing (DOM layer)
+11. [x] Obsidian vault import
+12. [x] Wikilink → edge parsing
+13. [x] D3-force auto-layout
+14. [x] Draw connections between nodes
+15. [x] Semantic zooming
+16. [x] PCB-style edge routing with lane separation
+17. [x] Undo/redo system with node deletion support
+18. [x] Multi-directional node resize (8 handles)
+19. [x] Neighborhood mode with configurable depth (1-5 hops)
+20. [x] Theme system with 4 themes and persistence
+21. [x] External links open in system browser
+22. [x] LLM agent with tool calling and queue manager
 
-**Week 1 Success Metrics:**
+### In Progress
 
-| Task | Component | Success Metric |
-|------|-----------|----------------|
-| Integrity | `watcher.rs` | Nodus detects file changes from Obsidian in <200ms |
-| Locking | `commands.rs` | Nodus fails gracefully when file locked by other app |
-| Performance | `Canvas.vue` | 500 nodes render and drag at 60fps |
-
-### Short-term (Weeks 2-4)
-
-8. [ ] PixiJS canvas with mock nodes (hybrid rendering)
-9. [ ] DOM overlay for text editing
-10. [ ] Draggable nodes at 60fps
-11. [ ] Typst WASM integration (@myriaddreamin/typst.ts)
-12. [ ] Connect canvas to SQLite (positions only)
-13. [ ] Inline node editing (DOM layer)
-
-### Medium-term (Weeks 5-8)
-
-14. [ ] Obsidian vault import
-15. [ ] Wikilink → edge parsing
-16. [ ] D3-force auto-layout
-17. [ ] Draw connections between nodes
-18. [ ] Semantic zooming (DOM hide → texture)
-19. [ ] Folder → Frame mapping
+- [ ] Implement file locking mechanism (fs2 crate)
+- [ ] Create integrity test suite
+- [ ] Folder → Frame mapping
+- [ ] Typst WASM integration (@myriaddreamin/typst.ts)
 
 ### Future
 
@@ -1202,4 +1251,4 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 ---
 
 *Document: `/docs/PRODUCT_DESIGN.md`*
-*Version: 0.10.0 — Added LLM Agent section with tool calling, iterator pattern, query/execute workflow, thinking layer for web search, upsert behavior.*
+*Version: 0.11.0 — Added implemented features: PCB-style edge routing with lane separation, undo/redo with node deletion support, multi-directional node resize, neighborhood mode with depth control (1-5 hops), theme system (4 themes with persistence), external link handling, LLM queue manager. Updated roadmap to reflect current state.*
