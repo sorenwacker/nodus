@@ -499,6 +499,21 @@
   margin: 0;
 }
 
+/* Image thumbnail for zoomed-out view */
+.node-thumbnail {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 7px;
+}
+
+.node-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
 .node-card:hover {
   border-color: var(--text-muted);
 }

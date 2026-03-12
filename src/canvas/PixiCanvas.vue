@@ -376,6 +376,25 @@ const isMassiveGraph = computed(() => !neighborhoodMode.value && (displayNodes.v
 // Semantic zoom collapse - hide content for massive graphs when zoomed out
 const isSemanticZoomCollapsed = computed(() => isMassiveGraph.value && scale.value < 0.6)
 
+// Extract first image URL from node content for zoomed-out thumbnail display
+const nodeFirstImage = computed(() => {
+  const imageMap: Record<string, string | null> = {}
+  for (const node of store.filteredNodes) {
+    if (!node.markdown_content) {
+      imageMap[node.id] = null
+      continue
+    }
+    // Match markdown image: ![alt](url) or HTML img: <img src="url">
+    const mdMatch = node.markdown_content.match(/!\[.*?\]\(([^)]+)\)/)
+    const htmlMatch = node.markdown_content.match(/<img[^>]+src=["']([^"']+)["']/)
+    imageMap[node.id] = mdMatch?.[1] || htmlMatch?.[1] || null
+  }
+  return imageMap
+})
+
+// Show image thumbnail when zoomed out (scale < 0.5) and node has an image
+const showImageThumbnail = computed(() => scale.value < 0.5)
+
 // Magnifying lens - shows when zoomed out far
 const MAGNIFIER_THRESHOLD = 0.4
 const MAGNIFIER_SIZE = 200
@@ -3180,8 +3199,15 @@ ${edges.map(e => `  - id: "${e.id}"
         @mouseleave="hoveredNodeId = null"
         @dblclick.stop="startEditing(node.id)"
       >
-        <!-- Node title header -->
-        <div class="node-header" @dblclick.stop="startEditingTitle(node.id)">
+        <!-- Image thumbnail when zoomed out -->
+        <div
+          v-if="showImageThumbnail && nodeFirstImage[node.id]"
+          class="node-thumbnail"
+        >
+          <img :src="nodeFirstImage[node.id]!" :alt="node.title" />
+        </div>
+        <!-- Node title header (hidden when showing thumbnail) -->
+        <div v-else class="node-header" @dblclick.stop="startEditingTitle(node.id)">
           <input
             v-if="editingTitleId === node.id"
             v-model="editTitle"
