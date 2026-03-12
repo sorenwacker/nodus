@@ -1634,9 +1634,7 @@ const visibleEdgeLines = computed(() => {
       const activeSourceNode = activeIds.has(e.source_node_id) ? store.getNode(e.source_node_id) : null
       const activeTargetNode = activeIds.has(e.target_node_id) ? store.getNode(e.target_node_id) : null
       const activeNode = activeSourceNode || activeTargetNode
-      if (activeNode?.color_theme) {
-        edgeHighlightColor = activeNode.color_theme
-      }
+      edgeHighlightColor = getEdgeHighlightColor(activeNode?.color_theme || null)
     }
 
     return {
@@ -2425,6 +2423,26 @@ const highlightColor = computed(() => {
   return currentTheme.value === 'cyber' ? '#00ffcc' : '#3b82f6'
 })
 
+// Map pastel node colors to neon equivalents for cyber theme edge highlights
+const cyberHighlightColors: Record<string, string> = {
+  '#fee2e2': '#ff3366', // red pastel -> neon red
+  '#ffedd5': '#ffaa00', // orange pastel -> neon orange
+  '#fef9c3': '#ffff00', // yellow pastel -> neon yellow
+  '#dcfce7': '#00ff66', // green pastel -> neon green
+  '#dbeafe': '#00ccff', // blue pastel -> neon blue
+  '#f3e8ff': '#9933ff', // purple pastel -> neon purple
+  '#fce7f3': '#ff00ff', // pink pastel -> neon magenta
+}
+
+// Get edge highlight color, mapping to cyber neon if needed
+function getEdgeHighlightColor(nodeColor: string | null): string {
+  if (!nodeColor) return highlightColor.value
+  if (currentTheme.value === 'cyber' && cyberHighlightColors[nodeColor]) {
+    return cyberHighlightColors[nodeColor]
+  }
+  return nodeColor
+}
+
 // Edge style types
 const edgeStyles = [
   { value: 'diagonal', label: '/' },
@@ -2821,7 +2839,7 @@ const nodeColors = [
   { value: '#fce7f3' },
 ]
 
-// All colors that need arrow markers (edge colors + node colors + highlight)
+// All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
 const allMarkerColors = computed(() => {
   const colors = new Set<string>()
   // Edge colors
@@ -2831,6 +2849,10 @@ const allMarkerColors = computed(() => {
   // Node colors (for highlighted edges)
   for (const c of nodeColors) {
     if (c.value) colors.add(c.value)
+  }
+  // Cyber highlight colors (neon equivalents)
+  for (const neon of Object.values(cyberHighlightColors)) {
+    colors.add(neon)
   }
   // Highlight color
   colors.add(highlightColor.value)
