@@ -230,6 +230,14 @@ pub async fn update_node_size(id: String, width: f64, height: f64) -> Result<(),
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn update_node_color(id: String, color: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_color(pool, &id, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ============================================================================
 // Vault Watcher Commands
 // ============================================================================

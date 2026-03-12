@@ -418,6 +418,19 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  async function updateNodeColor(id: string, color: string | null) {
+    const node = nodes.value.find(n => n.id === id)
+    if (node) {
+      node.color_theme = color
+      node.updated_at = Date.now()
+      try {
+        await invoke('update_node_color', { id, color })
+      } catch (e) {
+        console.error('Failed to update color:', e)
+      }
+    }
+  }
+
   async function createNode(data: CreateNodeInput): Promise<Node> {
     // Only use workspace_id if it exists in known workspaces, otherwise use null
     const validWorkspaceId = data.workspace_id
@@ -901,6 +914,7 @@ export const useNodesStore = defineStore('nodes', () => {
     updateNodeSize,
     updateNodeContent,
     updateNodeTitle,
+    updateNodeColor,
     selectNode,
     refreshNodeFromFile,
     createNode,

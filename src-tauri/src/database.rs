@@ -258,6 +258,21 @@ pub mod nodes {
         .await?;
         Ok(())
     }
+
+    pub async fn update_color(
+        pool: &DbPool,
+        id: &str,
+        color: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET color_theme = ?, updated_at = ? WHERE id = ?")
+            .bind(color)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
 }
 
 // Edge CRUD operations

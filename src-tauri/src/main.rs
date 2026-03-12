@@ -48,6 +48,7 @@ fn main() {
             commands::http_request,
             commands::extract_pdf_text,
             commands::refresh_workspace,
+            commands::update_node_color,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
