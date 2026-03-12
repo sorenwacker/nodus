@@ -41,8 +41,16 @@ export function isTauri(): boolean {
 }
 
 export async function openExternal(url: string): Promise<void> {
-  // Use window.open - works in both browser and Tauri webview
-  // For full native shell integration, install @tauri-apps/plugin-shell
+  if (isTauri()) {
+    try {
+      const { open } = await import('@tauri-apps/plugin-shell')
+      await open(url)
+      return
+    } catch {
+      // Fallback if plugin fails
+    }
+  }
+  // Fallback for browser or if plugin unavailable
   window.open(url, '_blank')
 }
 

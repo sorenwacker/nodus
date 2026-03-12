@@ -1281,6 +1281,20 @@
   border-color: var(--primary-color);
 }
 
+.zoom-controls .depth-select {
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.zoom-controls .depth-select:hover {
+  border-color: var(--primary-color);
+}
+
 .zoom-controls span {
   font-size: 11px;
   color: var(--text-muted);

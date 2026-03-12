@@ -347,7 +347,7 @@ const neighborhood = useNeighborhoodMode({
 })
 
 // Destructure for convenience
-const { neighborhoodMode, focusNodeId, displayNodes } = neighborhood
+const { neighborhoodMode, focusNodeId, displayNodes, neighborhoodDepth, setDepth } = neighborhood
 
 // Expose functions with original names for compatibility
 function toggleNeighborhoodMode(nodeId?: string) {
@@ -3136,13 +3136,14 @@ ${edges.map(e => `  - id: "${e.id}"
 
         <!-- Existing edges (simplified for large graphs) -->
         <template v-if="isLargeGraph">
-          <!-- Fast rendering: paths without hit areas or markers -->
+          <!-- Fast rendering: paths without hit areas, markers only for highlighted -->
           <path
             v-for="edge in visibleEdgeLines"
             :key="edge.id"
             :d="edge.path"
             :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
             :stroke-width="edge.isHighlighted ? 2.5 : 1"
+            :marker-end="edge.isHighlighted && !edge.isBidirectional && !edge.isShortEdge ? `url(#${edge.arrowMarkerId})` : undefined"
             fill="none"
             class="edge-line-fast"
             :class="{ 'edge-highlighted': edge.isHighlighted }"
@@ -3529,7 +3530,7 @@ ${edges.map(e => `  - id: "${e.id}"
       </button>
       <button
         :class="{ active: neighborhoodMode }"
-        data-tooltip="Neighborhood View - Show only selected node and direct neighbors (N)"
+        data-tooltip="Neighborhood View - Show only selected node and neighbors (N)"
         @mousedown.stop.prevent="toggleNeighborhoodMode()"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3544,6 +3545,19 @@ ${edges.map(e => `  - id: "${e.id}"
           <line x1="16" y1="14" x2="18" y2="15"/>
         </svg>
       </button>
+      <select
+        v-if="neighborhoodMode"
+        class="depth-select"
+        :value="neighborhoodDepth"
+        @change="setDepth(Number(($event.target as HTMLSelectElement).value))"
+        data-tooltip="Neighborhood depth (hops)"
+      >
+        <option value="1">1 hop</option>
+        <option value="2">2 hops</option>
+        <option value="3">3 hops</option>
+        <option value="4">4 hops</option>
+        <option value="5">5 hops</option>
+      </select>
       <button data-tooltip="Add Frame - Group selected nodes" @click="createFrameAtCenter">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
       </button>
