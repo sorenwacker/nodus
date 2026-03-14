@@ -490,15 +490,7 @@ const selectedEdge = ref<string | null>(null)
 const hoveredNodeId = ref<string | null>(null)
 const hoverMousePos = ref({ x: 0, y: 0 })
 
-// Multi-drag state - stores initial positions of all selected nodes
-const multiDragInitial = ref<Map<string, { x: number; y: number }>>(new Map())
-
-// Node agent mode (Simple vs Agent)
-const nodeAgentMode = ref<'simple' | 'agent'>('simple')
-const showNodeAgentLog = ref(false)
-const nodeAgent = useNodeAgent()
-
-// Node agent mode (Simple prompt vs Agent with tools)
+// Node agent mode (Simple vs Agent with tools)
 const nodeAgentMode = ref<'simple' | 'agent'>('simple')
 const showNodeAgentLog = ref(false)
 const nodeAgent = useNodeAgent()
@@ -3696,7 +3688,40 @@ ${edges.map(e => `  - id: "${e.id}"
       <span class="sep">|</span>
       <span>{{ edgeLines.length }}/{{ store.filteredEdges.length }} edges</span>
       <span class="sep">|</span>
+      <!-- Node agent mode toggle -->
+      <button
+        class="agent-mode-toggle"
+        :class="{ active: nodeAgentMode === 'agent' }"
+        @click="nodeAgentMode = nodeAgentMode === 'simple' ? 'agent' : 'simple'"
+        :title="nodeAgentMode === 'simple' ? 'Simple mode: direct LLM responses' : 'Agent mode: LLM with tools (web search, edit)'"
+      >
+        {{ nodeAgentMode === 'simple' ? 'Simple' : 'Agent' }}
+      </button>
+      <button
+        v-if="nodeAgent.log.value.length > 0"
+        class="agent-log-toggle"
+        @click="showNodeAgentLog = !showNodeAgentLog"
+        :title="showNodeAgentLog ? 'Hide agent log' : 'Show agent log'"
+      >
+        Log ({{ nodeAgent.log.value.length }})
+      </button>
+      <span class="sep">|</span>
       <span class="hint">Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new</span>
+    </div>
+
+    <!-- Node agent log panel (fixed position) -->
+    <div
+      v-if="showNodeAgentLog && nodeAgent.log.value.length > 0"
+      class="node-agent-log-panel"
+      @mousedown.stop
+    >
+      <div class="log-header">
+        <span>Agent Log</span>
+        <button @click="showNodeAgentLog = false">x</button>
+      </div>
+      <div class="log-content">
+        <div v-for="(line, i) in nodeAgent.log.value" :key="i" class="log-line">{{ line }}</div>
+      </div>
     </div>
 
     <!-- SVG filter for fisheye warp effect -->
