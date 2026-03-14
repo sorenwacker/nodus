@@ -30,6 +30,7 @@ import { useLasso } from './composables/useLasso'
 import { useFrames } from './composables/useFrames'
 import { useLayout } from './composables/useLayout'
 import { usePdfDrop } from './composables/usePdfDrop'
+import { useNodeAgent, type NodeAgentContext } from './composables/useNodeAgent'
 import { NODE_DEFAULTS } from './constants'
 
 // Undo injection for position, content, and deletion changes
@@ -482,11 +483,25 @@ function onMinimapClick(e: MouseEvent) {
 // Interaction state
 const draggingNode = ref<string | null>(null)
 const dragStart = ref({ x: 0, y: 0, nodeX: 0, nodeY: 0 })
+const multiDragInitial = ref<Map<string, { x: number; y: number }>>(new Map())
 const isPanning = ref(false)
 const panStart = ref({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
 const selectedEdge = ref<string | null>(null)
 const hoveredNodeId = ref<string | null>(null)
 const hoverMousePos = ref({ x: 0, y: 0 })
+
+// Multi-drag state - stores initial positions of all selected nodes
+const multiDragInitial = ref<Map<string, { x: number; y: number }>>(new Map())
+
+// Node agent mode (Simple vs Agent)
+const nodeAgentMode = ref<'simple' | 'agent'>('simple')
+const showNodeAgentLog = ref(false)
+const nodeAgent = useNodeAgent()
+
+// Node agent mode (Simple prompt vs Agent with tools)
+const nodeAgentMode = ref<'simple' | 'agent'>('simple')
+const showNodeAgentLog = ref(false)
+const nodeAgent = useNodeAgent()
 
 // Tooltip for zoomed-out hover - shows node info when scale is low
 const showHoverTooltip = computed(() => {
@@ -1909,7 +1924,12 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   pushUndo()
 
   draggingNode.value = nodeId
-  store.selectNode(nodeId, e.shiftKey || e.metaKey)
+
+  // If node is already selected, don't change selection (allows multi-drag)
+  // Only select if not already selected
+  if (!store.selectedNodeIds.includes(nodeId)) {
+    store.selectNode(nodeId, e.shiftKey || e.metaKey)
+  }
   selectedEdge.value = null
 
   // In neighborhood mode, clicking a neighbor navigates to its neighborhood
@@ -1927,6 +1947,17 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
     nodeY: node.canvas_y,
   }
 
+  // Store initial positions for all selected nodes (multi-drag)
+  multiDragInitial.value.clear()
+  if (store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(nodeId)) {
+    for (const id of store.selectedNodeIds) {
+      const n = store.getNode(id)
+      if (n) {
+        multiDragInitial.value.set(id, { x: n.canvas_x, y: n.canvas_y })
+      }
+    }
+  }
+
   document.addEventListener('mousemove', onNodeDrag)
   document.addEventListener('mouseup', stopNodeDrag)
 }
@@ -1936,18 +1967,34 @@ function onNodeDrag(e: MouseEvent) {
   const pos = screenToCanvas(e.clientX, e.clientY)
   const dx = pos.x - dragStart.value.x
   const dy = pos.y - dragStart.value.y
-  const newX = snapToGrid(dragStart.value.nodeX + dx)
-  const newY = snapToGrid(dragStart.value.nodeY + dy)
-  store.updateNodePosition(draggingNode.value, newX, newY)
+
+  // Move all selected nodes if multi-dragging
+  if (multiDragInitial.value.size > 0) {
+    for (const [id, initial] of multiDragInitial.value) {
+      const newX = snapToGrid(initial.x + dx)
+      const newY = snapToGrid(initial.y + dy)
+      store.updateNodePosition(id, newX, newY)
+    }
+  } else {
+    const newX = snapToGrid(dragStart.value.nodeX + dx)
+    const newY = snapToGrid(dragStart.value.nodeY + dy)
+    store.updateNodePosition(draggingNode.value, newX, newY)
+  }
 }
 
 function stopNodeDrag() {
   // Push overlapping nodes away after drag
-  if (draggingNode.value) {
+  if (multiDragInitial.value.size > 0) {
+    // Push away for all dragged nodes
+    for (const id of multiDragInitial.value.keys()) {
+      pushOverlappingNodesAway(id)
+    }
+  } else if (draggingNode.value) {
     pushOverlappingNodesAway(draggingNode.value)
   }
 
   draggingNode.value = null
+  multiDragInitial.value.clear()
   lastDragEndTime = Date.now()
   document.removeEventListener('mousemove', onNodeDrag)
   document.removeEventListener('mouseup', stopNodeDrag)
