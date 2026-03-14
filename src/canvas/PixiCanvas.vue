@@ -805,6 +805,10 @@ const lastContextSize = ref(0) // Track context size of last request
 let nodeLLMAbortController: AbortController | null = null
 
 function stopNodeLLM() {
+  // Stop agent if in agent mode
+  if (nodeAgentMode.value === 'agent') {
+    nodeAgent.stop()
+  }
   if (nodeLLMAbortController) {
     nodeLLMAbortController.abort()
     nodeLLMAbortController = null
