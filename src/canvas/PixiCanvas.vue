@@ -3252,7 +3252,7 @@ ${edges.map(e => `  - id: "${e.id}"
           <!-- Fast rendering: paths without hit areas, markers only for highlighted -->
           <path
             v-for="edge in visibleEdgeLines"
-            :key="edge.id"
+            :key="edge.id + '-' + edge.arrowMarkerId"
             :d="edge.path"
             :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
             :stroke-width="edge.isHighlighted ? 2.5 : 1"
@@ -3263,7 +3263,7 @@ ${edges.map(e => `  - id: "${e.id}"
           />
         </template>
         <template v-else>
-          <g v-for="edge in visibleEdgeLines" :key="edge.id">
+          <g v-for="edge in visibleEdgeLines" :key="edge.id + '-' + edge.arrowMarkerId">
             <!-- Invisible wider hit area -->
             <path
               :d="edge.path"
