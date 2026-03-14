@@ -2085,21 +2085,14 @@ function onResizeMove(e: MouseEvent) {
 
   resizePreview.value = { width, height, x, y }
 
-  // Update all selected nodes proportionally
+  // Update all selected nodes to the SAME size (not proportional)
   if (multiResizeInitial.value.size > 0) {
-    const widthDelta = width - resizeStart.value.width
-    const heightDelta = height - resizeStart.value.height
-    const xDelta = x - resizeStart.value.nodeX
-    const yDelta = y - resizeStart.value.nodeY
-
-    for (const [id, initial] of multiResizeInitial.value) {
+    for (const [id, _initial] of multiResizeInitial.value) {
       if (id === resizingNode.value) continue
       const n = store.getNode(id)
       if (n) {
-        n.width = Math.max(120, initial.width + widthDelta)
-        n.height = Math.max(60, initial.height + heightDelta)
-        n.canvas_x = initial.x + xDelta
-        n.canvas_y = initial.y + yDelta
+        n.width = width
+        n.height = height
       }
     }
   }
@@ -2114,17 +2107,11 @@ function stopResize() {
     store.updateNodeSize(nodeId, width, height)
     store.updateNodePosition(nodeId, x, y)
 
-    // Update all other selected nodes
+    // Update all other selected nodes to the SAME size
     if (multiResizeInitial.value.size > 0) {
-      const widthDelta = width - resizeStart.value.width
-      const heightDelta = height - resizeStart.value.height
-      const xDelta = x - resizeStart.value.nodeX
-      const yDelta = y - resizeStart.value.nodeY
-
-      for (const [id, initial] of multiResizeInitial.value) {
+      for (const [id, _initial] of multiResizeInitial.value) {
         if (id === nodeId) continue
-        store.updateNodeSize(id, Math.max(120, initial.width + widthDelta), Math.max(60, initial.height + heightDelta))
-        store.updateNodePosition(id, initial.x + xDelta, initial.y + yDelta)
+        store.updateNodeSize(id, width, height)
       }
     }
 
