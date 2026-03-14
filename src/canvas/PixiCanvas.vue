@@ -1149,7 +1149,56 @@ async function sendNodePrompt() {
   pushContentUndo(nodeId, currentContent, node.title)
 
   isNodeLLMLoading.value = true
+  const prompt = nodePrompt.value
+  nodePrompt.value = ''
+
   try {
+    // Use agent mode if enabled
+    if (nodeAgentMode.value === 'agent') {
+      // Get connected nodes for agent context
+      const connectedNodes: Array<{ title: string; content: string }> = []
+      for (const edge of store.filteredEdges) {
+        let neighborId: string | null = null
+        if (edge.source_node_id === nodeId) neighborId = edge.target_node_id
+        else if (edge.target_node_id === nodeId) neighborId = edge.source_node_id
+        if (neighborId) {
+          const n = store.getNode(neighborId)
+          if (n) connectedNodes.push({ title: n.title || 'Untitled', content: n.markdown_content || '' })
+        }
+      }
+
+      const ctx: NodeAgentContext = {
+        nodeId,
+        nodeTitle: node.title || 'Untitled',
+        nodeContent: currentContent,
+        connectedNodes,
+        updateContent: async (content: string) => {
+          if (isEditing) {
+            editContent.value = content
+          } else {
+            await store.updateNodeContent(nodeId, content)
+          }
+        },
+        updateTitle: async (title: string) => {
+          await store.updateNodeTitle(nodeId, title)
+        },
+      }
+
+      showNodeAgentLog.value = true
+      await nodeAgent.run(prompt, ctx)
+      setTimeout(renderMermaidDiagrams, 100)
+
+      // Auto-fit after agent updates
+      if (node.auto_fit) {
+        setTimeout(() => {
+          renderMermaidDiagrams()
+          setTimeout(() => fitNodeToContent(nodeId), 100)
+        }, 50)
+      }
+      return
+    }
+
+    // Simple mode: direct LLM call
     // Traverse full chain of connected nodes (BFS)
     const visited = new Set<string>([nodeId])
     const queue = [nodeId]
@@ -1218,11 +1267,10 @@ CURRENT NODE:
 ${currentContent || '(empty)'}`
 
     // Track context size
-    lastContextSize.value = nodeSystemPrompt.length + nodePrompt.value.length
+    lastContextSize.value = nodeSystemPrompt.length + prompt.length
     console.log(`LLM request: ${(lastContextSize.value / 1000).toFixed(1)}k chars, ${chainNodes.length} connected nodes`)
 
-    const response = await callOllama(nodePrompt.value, nodeSystemPrompt)
-    nodePrompt.value = ''
+    const response = await callOllama(prompt, nodeSystemPrompt)
 
     if (isEditing) {
       // Update the editing buffer
