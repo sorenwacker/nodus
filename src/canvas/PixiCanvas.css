@@ -958,22 +958,47 @@
   border-collapse: collapse;
   margin: 8px 0;
   font-size: 12px;
+  background: transparent;
 }
 
 .node-content :deep(th),
 .node-content :deep(td) {
   border: 1px solid var(--border-default);
-  padding: 6px 8px;
+  padding: 8px 12px;
   text-align: left;
+  vertical-align: middle;
+  background: transparent;
+  color: var(--text-main);
+  height: auto;
+  line-height: 1.6;
 }
 
 .node-content :deep(th) {
   background: var(--bg-elevated);
   font-weight: 600;
+  color: var(--text-main);
+}
+
+.node-content :deep(tr) {
+  background: transparent;
 }
 
 .node-content :deep(tr:nth-child(even)) {
-  background: var(--bg-surface-alt, rgba(0,0,0,0.02));
+  background: var(--bg-surface-alt, transparent);
+}
+
+/* Math inside tables needs more space */
+.node-content :deep(td .typst-inline),
+.node-content :deep(td .typst-display) {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.node-content :deep(td svg) {
+  vertical-align: middle;
+  height: auto;
+  max-height: none;
 }
 
 .node-content :deep(.mermaid-wrapper) {
@@ -1032,10 +1057,17 @@
   border-radius: 3px;
 }
 
-.node-content :deep(.typst-math svg) {
+.node-content :deep(.typst-display svg),
+.node-content :deep(.typst-inline svg) {
   max-width: 100%;
   height: auto;
   vertical-align: middle;
+}
+
+/* Make Typst SVG adapt to dark theme */
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-display svg),
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-inline svg) {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 .empty-state-overlay {
@@ -1446,19 +1478,31 @@
 
 .magnifier-node {
   position: absolute;
-  border: 3px solid #333;
+  border: 2px solid var(--border-default);
   border-radius: 8px;
   padding: 8px 12px;
   box-sizing: border-box;
-  background: #fff !important;
+  background: var(--bg-surface);
+  overflow: hidden;
 }
 
 .magnifier-node-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #000 !important;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main, #18181b);
   line-height: 1.3;
   display: block;
+  margin-bottom: 4px;
+}
+
+.magnifier-node-body {
+  font-size: 12px;
+  color: var(--text-secondary, #71717a);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
 }
 
 .minimap {

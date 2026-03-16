@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { marked } from 'marked'
-import { openExternal } from '../lib/tauri'
+import { invoke, isTauri, openExternal } from '../lib/tauri'
 import {
   routeAllEdges,
   routeEdgesWithBundling,
@@ -2666,33 +2666,11 @@ const markdownCache = new Map<string, string>()
 let mermaidCounter = 0
 let typstCounter = 0
 
-// Typst math cache: math expression -> rendered SVG
-const typstCache = new Map<string, string>()
-let typstRenderer: any = null
-let typstInitPromise: Promise<void> | null = null
-
-async function initTypstRenderer() {
-  if (typstRenderer) return
-  if (typstInitPromise) return typstInitPromise
-
-  typstInitPromise = (async () => {
-    try {
-      // Use the simplified $typst API
-      const module = await import('@myriaddreamin/typst.ts')
-      typstRenderer = module.$typst
-      canvasLogger.info('Typst renderer initialized')
-    } catch (e) {
-      canvasLogger.warn('Typst renderer failed to load:', e)
-    }
-  })()
-  return typstInitPromise
-}
+// Math cache: math expression -> rendered HTML
+const mathCache = new Map<string, string>()
 
 async function renderTypstMath() {
-  if (!typstRenderer) {
-    await initTypstRenderer()
-    if (!typstRenderer) return
-  }
+  if (!isTauri()) return
 
   const elements = document.querySelectorAll('.typst-pending')
   for (const el of elements) {
@@ -2702,23 +2680,22 @@ async function renderTypstMath() {
 
     // Check cache
     const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
-    if (typstCache.has(cacheKey)) {
-      el.innerHTML = typstCache.get(cacheKey)!
+    if (mathCache.has(cacheKey)) {
+      el.innerHTML = mathCache.get(cacheKey)!
       el.classList.remove('typst-pending')
       continue
     }
 
     try {
-      const typstCode = isDisplay ? `$ ${math} $` : `$${math}$`
-      const mainContent = `#set page(width: auto, height: auto, margin: 0.3em)
-#set text(size: 14pt)
-${typstCode}`
-      const svg = await typstRenderer.svg({ mainContent })
-      typstCache.set(cacheKey, svg)
+      const svg = await invoke<string>('render_typst_math', {
+        math,
+        displayMode: isDisplay,
+      })
+      mathCache.set(cacheKey, svg)
       el.innerHTML = svg
       el.classList.remove('typst-pending')
     } catch (e) {
-      console.warn('Typst render error:', e)
+      console.warn('Math render error:', e)
       el.textContent = math // Fallback to raw math
       el.classList.remove('typst-pending')
       el.classList.add('typst-error')
@@ -2729,13 +2706,56 @@ ${typstCode}`
 function renderMarkdown(content: string | null): string {
   if (!content) return ''
 
-  // Check cache first
-  if (markdownCache.has(content)) {
+  // Don't cache content with math - render inline instead
+  const hasMath = /\$[^$]+\$/.test(content)
+
+  // Check cache first (only for non-math content)
+  if (!hasMath && markdownCache.has(content)) {
     return markdownCache.get(content)!
   }
 
-  // Render full content (no truncation)
-  let html = marked.parse(content) as string
+  // Extract math blocks BEFORE markdown processing to preserve backslashes
+  const mathPlaceholders: Map<string, string> = new Map()
+  let processedContent = content
+
+  // Extract display math first ($$...$$)
+  processedContent = processedContent.replace(/\$\$([^$]+)\$\$/g, (match, math) => {
+    const id = `MATH_DISPLAY_${mathPlaceholders.size}`
+    mathPlaceholders.set(id, math.trim())
+    return id
+  })
+
+  // Extract inline math ($...$)
+  processedContent = processedContent.replace(/(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g, (match, math) => {
+    const id = `MATH_INLINE_${mathPlaceholders.size}`
+    mathPlaceholders.set(id, math.trim())
+    return id
+  })
+
+  // Render markdown (without math blocks)
+  let html = marked.parse(processedContent) as string
+
+  // Restore math blocks - use cached SVG or create pending placeholders
+  for (const [id, math] of mathPlaceholders) {
+    const isDisplay = id.startsWith('MATH_DISPLAY_')
+    const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
+
+    let wrapper: string
+    if (mathCache.has(cacheKey)) {
+      // Use cached SVG
+      const rendered = mathCache.get(cacheKey)!
+      wrapper = isDisplay
+        ? `<div class="typst-display">${rendered}</div>`
+        : `<span class="typst-inline">${rendered}</span>`
+    } else {
+      // Create placeholder for async rendering
+      const escapedMath = math.replace(/"/g, '&quot;')
+      wrapper = isDisplay
+        ? `<div class="typst-display typst-pending" data-math="${escapedMath}">${math}</div>`
+        : `<span class="typst-inline typst-pending" data-math="${escapedMath}">${math}</span>`
+    }
+    html = html.replace(id, wrapper)
+  }
 
   // Post-process to handle mermaid code blocks
   const mermaidRegex = /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g
@@ -2759,38 +2779,9 @@ function renderMarkdown(content: string | null): string {
     return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${decoded}</pre></div>`
   })
 
-  // Post-process to handle math expressions ($...$ and $$...$$)
-  // Display math: $$...$$
-  let needsTypstRender = false
-  html = html.replace(/\$\$([^$]+)\$\$/g, (match, math) => {
-    const id = `typst-${typstCounter++}`
-    const cacheKey = `d:${math.trim()}`
-    if (typstCache.has(cacheKey)) {
-      return `<div class="typst-math typst-display">${typstCache.get(cacheKey)}</div>`
-    }
-    needsTypstRender = true
-    return `<div class="typst-math typst-display typst-pending" id="${id}" data-math="${math.trim()}">${math}</div>`
-  })
-
-  // Inline math: $...$  (but not $$)
-  html = html.replace(/(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g, (match, math) => {
-    const id = `typst-${typstCounter++}`
-    const cacheKey = `i:${math.trim()}`
-    if (typstCache.has(cacheKey)) {
-      return `<span class="typst-math typst-inline">${typstCache.get(cacheKey)}</span>`
-    }
-    needsTypstRender = true
-    return `<span class="typst-math typst-inline typst-pending" id="${id}" data-math="${math.trim()}">${math}</span>`
-  })
-
   // Only schedule mermaid render if there are uncached diagrams
   if (needsMermaidRender) {
     setTimeout(() => renderMermaidDiagrams?.(), 50)
-  }
-
-  // Schedule Typst render if needed
-  if (needsTypstRender) {
-    setTimeout(renderTypstMath, 50)
   }
 
   // Convert [[link]] and [[link|display]] wikilinks to clickable elements
@@ -2860,6 +2851,8 @@ function updateRenderedContent() {
 
     if (changed) {
       nodeRenderedContent.value = result
+      // Render Typst math after DOM updates
+      nextTick(() => renderTypstMath())
     }
   }, 50) // 50ms debounce
 }
@@ -3081,8 +3074,9 @@ async function fitNodeNow(nodeId: string) {
     }
   }
 
-  // Wait for Vue to render the view mode content
+  // Wait for Vue to render the view mode content and render math
   await nextTick()
+  await renderTypstMath()
   await nextTick()
 
   // Poll until .node-content exists (max 500ms)
@@ -3809,15 +3803,18 @@ ${edges.map(e => `  - id: "${e.id}"
           v-for="node in magnifierVisibleNodes"
           :key="'mag-' + node.id"
           class="magnifier-node"
-          :style="{
-            left: ((node.canvas_x - (magnifierPos.x - offsetX) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
-            top: ((node.canvas_y - (magnifierPos.y - offsetY) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
-            width: ((node.width || NODE_DEFAULTS.WIDTH) * MAGNIFIER_ZOOM) + 'px',
-            height: ((node.height || NODE_DEFAULTS.HEIGHT) * MAGNIFIER_ZOOM) + 'px',
-            background: node.color_theme || '#ffffff',
-          }"
+          :style="[
+            {
+              left: ((node.canvas_x - (magnifierPos.x - offsetX) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
+              top: ((node.canvas_y - (magnifierPos.y - offsetY) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
+              width: ((node.width || NODE_DEFAULTS.WIDTH) * MAGNIFIER_ZOOM) + 'px',
+              height: ((node.height || NODE_DEFAULTS.HEIGHT) * MAGNIFIER_ZOOM) + 'px',
+            },
+            node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}
+          ]"
         >
           <span class="magnifier-node-title">{{ node.title || 'Untitled' }}</span>
+          <span v-if="node.markdown_content" class="magnifier-node-body">{{ node.markdown_content }}</span>
         </div>
       </div>
     </div>

@@ -1,18 +1,12 @@
 /**
- * Typst WASM rendering service
- * Provides instant math rendering with caching for performance
- *
- * Uses @myriaddreamin/typst.ts for WASM-based Typst compilation
- * See: https://github.com/Myriad-Dreamin/typst.ts
+ * Math rendering service using native Typst via Tauri backend
+ * Provides Typst math rendering with caching for performance
  */
 import { ref, shallowRef } from 'vue'
-
-// Typst instance (lazy loaded)
-let $typst: any = null
-let initPromise: Promise<void> | null = null
+import { invoke, isTauri } from '@/lib/tauri'
 
 // SVG cache: hash -> rendered SVG
-const svgCache = new Map<string, string>()
+const mathCache = new Map<string, string>()
 const MAX_CACHE_SIZE = 500
 
 // Simple hash function for cache keys
@@ -27,73 +21,68 @@ function hashCode(str: string): string {
 }
 
 /**
- * Initialize the Typst compiler (lazy load WASM)
+ * Initialize (check Tauri availability)
  */
 async function initTypst(): Promise<void> {
-  if ($typst) return
-  if (initPromise) return initPromise
+  if (isTauri()) {
+    console.log('[Math] Typst renderer ready (via Tauri)')
+  } else {
+    console.log('[Math] Running in browser mode (Typst unavailable)')
+  }
+}
 
-  initPromise = (async () => {
-    try {
-      // Use the simplified $typst API
-      const module = await import('@myriaddreamin/typst.ts')
-      $typst = module.$typst
-      console.log('[Typst] Compiler initialized')
-    } catch (e) {
-      console.error('[Typst] Failed to initialize:', e)
-      throw e
+/**
+ * Render math to SVG using native Typst via Tauri
+ */
+async function renderMathToSvg(math: string, displayMode: boolean): Promise<string> {
+  const cacheKey = hashCode(math + displayMode)
+  const cached = mathCache.get(cacheKey)
+  if (cached) return cached
+
+  if (!isTauri()) {
+    // Fallback for browser mode - show the raw math
+    return `<span class="math-fallback">${math}</span>`
+  }
+
+  try {
+    const svg = await invoke<string>('render_typst_math', {
+      math,
+      displayMode,
+    })
+
+    // Cache the result
+    if (mathCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = mathCache.keys().next().value
+      if (firstKey) mathCache.delete(firstKey)
     }
-  })()
+    mathCache.set(cacheKey, svg)
 
-  return initPromise
+    return svg
+  } catch (e) {
+    console.error('[Math] Render error:', e)
+    throw e
+  }
 }
 
 /**
  * Render Typst code to SVG
  */
 async function renderToSvg(code: string): Promise<string> {
-  // Check cache first
-  const cacheKey = hashCode(code)
-  const cached = svgCache.get(cacheKey)
-  if (cached) return cached
+  // Extract math content (remove $ delimiters)
+  const isDisplay = code.startsWith('$$') && code.endsWith('$$')
+  const content = isDisplay
+    ? code.slice(2, -2).trim()
+    : code.startsWith('$') && code.endsWith('$')
+      ? code.slice(1, -1).trim()
+      : code.trim()
 
-  // Ensure compiler is initialized
-  await initTypst()
-  if (!$typst) {
-    throw new Error('Typst compiler not available')
-  }
-
-  try {
-    // Wrap in document template for standalone rendering
-    const mainContent = `#set page(width: auto, height: auto, margin: 0.5em)
-#set text(size: 14pt)
-${code}`
-
-    const svg = await $typst.svg({ mainContent })
-
-    if (!svg) {
-      throw new Error('No SVG output')
-    }
-
-    // Cache the result
-    if (svgCache.size >= MAX_CACHE_SIZE) {
-      const firstKey = svgCache.keys().next().value
-      if (firstKey) svgCache.delete(firstKey)
-    }
-    svgCache.set(cacheKey, svg)
-
-    return svg
-  } catch (e) {
-    console.error('[Typst] Render error:', e)
-    throw e
-  }
+  return renderMathToSvg(content, isDisplay)
 }
 
 /**
  * Render math expression ($ ... $ syntax)
  */
 async function renderMath(math: string): Promise<string> {
-  // Typst uses $ for inline math, $$ for display math (centered)
   const isDisplay = math.startsWith('$$') && math.endsWith('$$')
   const content = isDisplay
     ? math.slice(2, -2).trim()
@@ -101,19 +90,14 @@ async function renderMath(math: string): Promise<string> {
       ? math.slice(1, -1).trim()
       : math.trim()
 
-  // For display math, use equation block
-  const typstCode = isDisplay
-    ? `$ ${content} $`
-    : `$${content}$`
-
-  return renderToSvg(typstCode)
+  return renderMathToSvg(content, isDisplay)
 }
 
 /**
- * Render a Typst code block (```typst ... ```)
+ * Render a code block (```math ... ```)
  */
 async function renderCodeBlock(code: string): Promise<string> {
-  return renderToSvg(code)
+  return renderMathToSvg(code.trim(), true)
 }
 
 /**
@@ -132,42 +116,30 @@ async function renderMathInContent(content: string): Promise<{
   let html = content
   const matches = [...content.matchAll(mathRegex)]
 
-  // Process in parallel for speed
-  const results = await Promise.allSettled(
-    matches.map(async (match) => {
-      const original = match[0]
-      try {
-        const svg = await renderMath(original)
-        return { original, svg, index: match.index }
-      } catch (e) {
-        return { original, svg: '', error: String(e), index: match.index }
-      }
-    })
-  )
+  // Process in reverse order to preserve indices
+  const sortedMatches = [...matches].sort((a, b) => (b.index || 0) - (a.index || 0))
 
-  // Replace in reverse order to preserve indices
-  const sortedResults = results
-    .map((r, i) => ({ result: r, match: matches[i] }))
-    .sort((a, b) => (b.match.index || 0) - (a.match.index || 0))
+  for (const match of sortedMatches) {
+    const original = match[0]
+    const isDisplay = original.startsWith('$$')
 
-  for (const { result, match } of sortedResults) {
-    if (result.status === 'fulfilled') {
-      const { original, svg, error } = result.value
-      mathBlocks.push({ original, svg, error })
+    try {
+      const rendered = await renderMath(original)
+      mathBlocks.push({ original, svg: rendered })
 
-      const isDisplay = original.startsWith('$$')
-      if (error) {
-        html = html.slice(0, match.index) +
-          `<span class="typst-error" title="${error}">${original}</span>` +
-          html.slice((match.index || 0) + original.length)
-      } else {
-        const wrapper = isDisplay
-          ? `<div class="typst-math typst-display">${svg}</div>`
-          : `<span class="typst-math typst-inline">${svg}</span>`
-        html = html.slice(0, match.index) +
-          wrapper +
-          html.slice((match.index || 0) + original.length)
-      }
+      const wrapper = isDisplay
+        ? `<div class="typst-display">${rendered}</div>`
+        : `<span class="typst-inline">${rendered}</span>`
+
+      html = html.slice(0, match.index) +
+        wrapper +
+        html.slice((match.index || 0) + original.length)
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e)
+      mathBlocks.push({ original, svg: '', error })
+      html = html.slice(0, match.index) +
+        `<span class="math-error" title="${error}">${original}</span>` +
+        html.slice((match.index || 0) + original.length)
     }
   }
 
@@ -182,46 +154,35 @@ function hasMath(content: string): boolean {
 }
 
 /**
- * Check if content contains Typst code blocks
+ * Check if content contains math code blocks
  */
 function hasTypstBlock(content: string): boolean {
-  return /```typst[\s\S]*?```/.test(content)
+  return /```(?:math|typst)[\s\S]*?```/.test(content)
 }
 
 /**
- * Clear the SVG cache
+ * Clear the cache
  */
 function clearCache(): void {
-  svgCache.clear()
+  mathCache.clear()
 }
 
 /**
  * Get cache statistics
  */
 function getCacheStats(): { size: number; maxSize: number } {
-  return { size: svgCache.size, maxSize: MAX_CACHE_SIZE }
+  return { size: mathCache.size, maxSize: MAX_CACHE_SIZE }
 }
 
 // Reactive state for UI
-const isInitialized = ref(false)
+const isInitialized = ref(true)
 const isInitializing = ref(false)
 const initError = shallowRef<Error | null>(null)
 
 export function useTypst() {
   async function init() {
-    if (isInitialized.value || isInitializing.value) return
-
-    isInitializing.value = true
-    initError.value = null
-
-    try {
-      await initTypst()
-      isInitialized.value = true
-    } catch (e) {
-      initError.value = e as Error
-    } finally {
-      isInitializing.value = false
-    }
+    await initTypst()
+    isInitialized.value = true
   }
 
   return {

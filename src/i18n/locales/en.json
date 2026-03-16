@@ -1,0 +1,123 @@
+{
+  "app": {
+    "name": "Nodus"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Welcome to Nodus",
+      "description": "A local-first knowledge graph for visual thinking. Your data stays on your device."
+    },
+    "nodes": {
+      "title": "Create Nodes",
+      "description": "Double-click anywhere on the canvas to create a new note. Drag nodes to arrange them."
+    },
+    "edges": {
+      "title": "Connect Ideas",
+      "description": "Click a node, then Shift+click another to create a connection. Use [[wikilinks]] in your notes."
+    },
+    "import": {
+      "title": "Import Your Research",
+      "description": "Drop .bib files from Zotero, .md files, or PDFs directly onto the canvas."
+    },
+    "math": {
+      "title": "Math & Equations",
+      "description": "Use $...$ for inline math and $$...$$ for display equations. Powered by Typst."
+    },
+    "buttons": {
+      "next": "Next",
+      "back": "Back",
+      "skip": "Skip",
+      "getStarted": "Get Started"
+    }
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "search": "Search shortcuts...",
+    "toggle": "Press ? to toggle this help",
+    "categories": {
+      "navigation": "Navigation",
+      "selection": "Selection",
+      "editing": "Editing",
+      "layout": "Layout",
+      "data": "Data",
+      "math": "Math"
+    },
+    "keys": {
+      "scroll": "Scroll",
+      "pinchZoom": "Pinch / Ctrl+Scroll",
+      "fit": "F",
+      "neighborhood": "N",
+      "click": "Click",
+      "shiftClick": "Shift+Click",
+      "selectAll": "Cmd/Ctrl+A",
+      "escape": "Escape",
+      "doubleClick": "Double-click",
+      "delete": "Delete / Backspace",
+      "undo": "Cmd/Ctrl+Z",
+      "redo": "Cmd/Ctrl+Shift+Z",
+      "layout": "L",
+      "resetSizes": "Shift+R",
+      "dropFiles": "Drop files",
+      "export": "Shift+E",
+      "refresh": "Ctrl+Shift+R",
+      "inlineMath": "$...$",
+      "displayMath": "$$...$$"
+    },
+    "descriptions": {
+      "panCanvas": "Pan canvas",
+      "zoomInOut": "Zoom in/out",
+      "fitToView": "Fit all nodes to view",
+      "toggleNeighborhood": "Toggle neighborhood mode",
+      "selectNode": "Select node",
+      "addToSelection": "Add to selection",
+      "selectAll": "Select all nodes",
+      "clearSelection": "Clear selection",
+      "editCreate": "Edit node / Create node",
+      "deleteSelected": "Delete selected",
+      "undo": "Undo",
+      "redo": "Redo",
+      "autoLayout": "Auto-layout nodes",
+      "resetSizes": "Reset all node sizes",
+      "importFiles": "Import .bib .md .pdf",
+      "exportYaml": "Export graph as YAML",
+      "refreshFiles": "Refresh from files",
+      "inlineMath": "Inline math (Typst)",
+      "displayMath": "Display math (Typst)"
+    }
+  },
+  "emptyState": {
+    "title": "Start your knowledge graph",
+    "doubleClick": "Double-click",
+    "createNote": "Create a note",
+    "dropFiles": "Drop files",
+    "fileTypes": ".bib .md .pdf",
+    "paste": "Cmd+V",
+    "pasteText": "Paste text",
+    "mathHint": "Use $...$ for math equations"
+  },
+  "dropZone": {
+    "title": "Drop files to import",
+    "fileTypes": ".bib, .json, .md, .pdf"
+  },
+  "notifications": {
+    "citationsImported": "Citations imported",
+    "citationsCount": "{count} citation | {count} citations added to canvas",
+    "notesImported": "Notes imported",
+    "notesCount": "{count} note | {count} notes added to canvas",
+    "noCitations": "No citations found",
+    "noCitationsDesc": "The file did not contain any valid BibTeX or CSL-JSON entries",
+    "importFailed": "Import failed",
+    "unsupportedFile": "Unsupported file"
+  },
+  "node": {
+    "untitled": "Untitled",
+    "processing": "Processing..."
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit"
+  }
+}

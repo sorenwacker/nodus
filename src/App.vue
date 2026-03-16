@@ -4,6 +4,7 @@ import { useNodesStore } from './stores/nodes'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
+import OnboardingFlow from './components/OnboardingFlow.vue'
 import { themeStorage } from './lib/storage'
 
 const store = useNodesStore()
@@ -400,6 +401,35 @@ async function importVault() {
   }
 }
 
+async function onOnboardingComplete() {
+  // Create a welcome node with Typst math reference if canvas is empty
+  if (store.filteredNodes.length === 0) {
+    const mathReference = `# Typst Math Reference
+
+| Symbol | Syntax |
+|--------|--------|
+| Arrow over letter | $arrow(x)$ |
+| Hat over letter | $hat(x)$ |
+| Bar over letter | $overline(x)$ |
+| Subscript | $x_1$ or $x_(i+1)$ |
+| Superscript | $x^2$ or $x^(n+1)$ |
+| Fraction | $a/b$ or $frac(a, b)$ |
+| Square root | $sqrt(x)$ |
+| Greek letters | $alpha, beta, gamma$ |
+
+Use \`$...$\` for inline and \`$$...$$\` for display math.
+
+Full reference: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`
+
+    await store.createNode({
+      title: 'Typst Math Reference',
+      markdown_content: mathReference,
+      canvas_x: 100,
+      canvas_y: 100,
+    })
+  }
+}
+
 async function openFolderDialog() {
   try {
     const { open } = await import('@tauri-apps/plugin-dialog')
@@ -632,6 +662,9 @@ async function openFolderDialog() {
 
     <!-- Settings Modal -->
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+
+    <!-- Onboarding Flow -->
+    <OnboardingFlow @complete="onOnboardingComplete" />
 
     <!-- Global notifications (for critical errors) -->
     <NotificationToast />

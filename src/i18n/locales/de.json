@@ -1,0 +1,123 @@
+{
+  "app": {
+    "name": "Nodus"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Willkommen bei Nodus",
+      "description": "Ein lokaler Wissensgraph zum visuellen Denken. Ihre Daten bleiben auf Ihrem Geraet."
+    },
+    "nodes": {
+      "title": "Knoten erstellen",
+      "description": "Doppelklicken Sie irgendwo auf die Leinwand, um eine neue Notiz zu erstellen. Ziehen Sie Knoten, um sie anzuordnen."
+    },
+    "edges": {
+      "title": "Ideen verbinden",
+      "description": "Klicken Sie auf einen Knoten, dann Shift+Klick auf einen anderen, um eine Verbindung herzustellen. Verwenden Sie [[Wikilinks]] in Ihren Notizen."
+    },
+    "import": {
+      "title": "Forschung importieren",
+      "description": "Legen Sie .bib-Dateien von Zotero, .md-Dateien oder PDFs direkt auf die Leinwand."
+    },
+    "math": {
+      "title": "Mathematik & Gleichungen",
+      "description": "Verwenden Sie $...$ fuer Inline-Mathematik und $$...$$ fuer Anzeigegleichungen. Unterstuetzt von Typst."
+    },
+    "buttons": {
+      "next": "Weiter",
+      "back": "Zurueck",
+      "skip": "Ueberspringen",
+      "getStarted": "Loslegen"
+    }
+  },
+  "shortcuts": {
+    "title": "Tastaturkuerzel",
+    "search": "Kuerzel suchen...",
+    "toggle": "Druecken Sie ? um diese Hilfe umzuschalten",
+    "categories": {
+      "navigation": "Navigation",
+      "selection": "Auswahl",
+      "editing": "Bearbeitung",
+      "layout": "Layout",
+      "data": "Daten",
+      "math": "Mathematik"
+    },
+    "keys": {
+      "scroll": "Scrollen",
+      "pinchZoom": "Pinch / Strg+Scrollen",
+      "fit": "F",
+      "neighborhood": "N",
+      "click": "Klick",
+      "shiftClick": "Shift+Klick",
+      "selectAll": "Cmd/Strg+A",
+      "escape": "Escape",
+      "doubleClick": "Doppelklick",
+      "delete": "Entf / Ruecktaste",
+      "undo": "Cmd/Strg+Z",
+      "redo": "Cmd/Strg+Shift+Z",
+      "layout": "L",
+      "resetSizes": "Shift+R",
+      "dropFiles": "Dateien ablegen",
+      "export": "Shift+E",
+      "refresh": "Strg+Shift+R",
+      "inlineMath": "$...$",
+      "displayMath": "$$...$$"
+    },
+    "descriptions": {
+      "panCanvas": "Leinwand verschieben",
+      "zoomInOut": "Vergroessern/Verkleinern",
+      "fitToView": "Alle Knoten einpassen",
+      "toggleNeighborhood": "Nachbarschaftsmodus umschalten",
+      "selectNode": "Knoten auswaehlen",
+      "addToSelection": "Zur Auswahl hinzufuegen",
+      "selectAll": "Alle Knoten auswaehlen",
+      "clearSelection": "Auswahl aufheben",
+      "editCreate": "Knoten bearbeiten / erstellen",
+      "deleteSelected": "Ausgewaehlte loeschen",
+      "undo": "Rueckgaengig",
+      "redo": "Wiederholen",
+      "autoLayout": "Knoten automatisch anordnen",
+      "resetSizes": "Alle Knotengroessen zuruecksetzen",
+      "importFiles": ".bib .md .pdf importieren",
+      "exportYaml": "Graph als YAML exportieren",
+      "refreshFiles": "Von Dateien aktualisieren",
+      "inlineMath": "Inline-Mathematik (Typst)",
+      "displayMath": "Anzeigemathematik (Typst)"
+    }
+  },
+  "emptyState": {
+    "title": "Starten Sie Ihren Wissensgraph",
+    "doubleClick": "Doppelklick",
+    "createNote": "Notiz erstellen",
+    "dropFiles": "Dateien ablegen",
+    "fileTypes": ".bib .md .pdf",
+    "paste": "Cmd+V",
+    "pasteText": "Text einfuegen",
+    "mathHint": "Verwenden Sie $...$ fuer Gleichungen"
+  },
+  "dropZone": {
+    "title": "Dateien zum Importieren ablegen",
+    "fileTypes": ".bib, .json, .md, .pdf"
+  },
+  "notifications": {
+    "citationsImported": "Zitate importiert",
+    "citationsCount": "{count} Zitat zur Leinwand hinzugefuegt | {count} Zitate zur Leinwand hinzugefuegt",
+    "notesImported": "Notizen importiert",
+    "notesCount": "{count} Notiz zur Leinwand hinzugefuegt | {count} Notizen zur Leinwand hinzugefuegt",
+    "noCitations": "Keine Zitate gefunden",
+    "noCitationsDesc": "Die Datei enthielt keine gueltigen BibTeX- oder CSL-JSON-Eintraege",
+    "importFailed": "Import fehlgeschlagen",
+    "unsupportedFile": "Nicht unterstuetzte Datei"
+  },
+  "node": {
+    "untitled": "Ohne Titel",
+    "processing": "Verarbeitung..."
+  },
+  "common": {
+    "close": "Schliessen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "delete": "Loeschen",
+    "edit": "Bearbeiten"
+  }
+}

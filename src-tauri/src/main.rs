@@ -3,9 +3,16 @@
 mod checksum;
 mod commands;
 mod database;
+mod pdf;
+mod typst_render;
 mod watcher;
 
 use std::sync::Mutex;
+
+#[tauri::command]
+fn render_typst_math(math: String, display_mode: bool) -> Result<String, String> {
+    typst_render::render_math_to_svg(&math, display_mode)
+}
 
 fn main() {
     tauri::Builder::default()
@@ -50,12 +57,14 @@ fn main() {
             commands::read_file_content,
             commands::http_request,
             commands::extract_pdf_text,
+            commands::extract_pdf_annotations,
             commands::refresh_workspace,
             commands::update_node_color,
             commands::check_file_available,
             commands::acquire_edit_lock,
             commands::release_edit_lock,
             commands::get_locked_nodes,
+            render_typst_math,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
