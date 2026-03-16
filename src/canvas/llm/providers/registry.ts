@@ -6,6 +6,7 @@
 import type { ILLMProvider, ProviderConfig } from './types'
 import { OllamaProvider } from './ollama'
 import { OpenAIProvider } from './openai'
+import { OpenAICompatibleProvider } from './openai-compatible'
 import { AnthropicProvider } from './anthropic'
 
 class ProviderRegistry {
@@ -16,6 +17,7 @@ class ProviderRegistry {
   constructor() {
     // Register built-in providers
     this.register(new OllamaProvider())
+    this.register(new OpenAICompatibleProvider())
     this.register(new OpenAIProvider())
     this.register(new AnthropicProvider())
   }

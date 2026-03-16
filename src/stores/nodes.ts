@@ -9,6 +9,7 @@ import {
   releaseEditLock,
   checkFileAvailable,
 } from '../lib/tauri'
+import { parseReferences, citationToMarkdown, type BibEntry } from '../lib/bibtex'
 import { applyForceLayout } from '../canvas/layout'
 import { workspaceStorage } from '../lib/storage'
 import { storeLogger } from '../lib/logger'
@@ -70,8 +71,7 @@ export const useNodesStore = defineStore('nodes', () => {
     )
   })
 
-  // Sync localStorage workspaces to the database
-  // This ensures foreign key constraints are satisfied
+  // Sync workspaces between localStorage and database (bidirectional)
   async function syncWorkspacesToDatabase() {
     interface DbWorkspace {
       id: string
@@ -84,6 +84,7 @@ export const useNodesStore = defineStore('nodes', () => {
 
     const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
     const dbIds = new Set(dbWorkspaces.map(w => w.id))
+    const localIds = new Set(workspaces.value.map(w => w.id))
 
     // Create any localStorage workspaces that don't exist in the database
     for (const ws of workspaces.value) {
@@ -99,6 +100,20 @@ export const useNodesStore = defineStore('nodes', () => {
         })
       }
     }
+
+    // Load any database workspaces that don't exist in localStorage
+    for (const dbWs of dbWorkspaces) {
+      if (!localIds.has(dbWs.id)) {
+        storeLogger.info(`Loading workspace from database: ${dbWs.name} (${dbWs.id})`)
+        workspaces.value.push({
+          id: dbWs.id,
+          name: dbWs.name,
+        })
+      }
+    }
+
+    // Persist updated workspaces to localStorage
+    workspaceStorage.setAll(workspaces.value)
   }
 
   async function initialize() {
@@ -614,6 +629,68 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  /**
+   * Import citations from BibTeX or CSL-JSON file
+   * Creates citation nodes with formatted markdown content
+   */
+  async function importCitations(filePath: string): Promise<Node[]> {
+    loading.value = true
+    try {
+      storeLogger.info(`Importing citations from: ${filePath}`)
+
+      const content = await readTextFile(filePath)
+      const entries = parseReferences(content)
+
+      if (entries.length === 0) {
+        notifications$.warning('No citations found', 'The file did not contain any valid BibTeX or CSL-JSON entries')
+        return []
+      }
+
+      storeLogger.info(`Parsed ${entries.length} citation entries`)
+
+      // Create nodes for each citation entry
+      const createdNodes: Node[] = []
+      const startX = 100
+      const startY = 100
+      const nodeSpacing = 250
+      const nodesPerRow = 4
+
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i]
+        const row = Math.floor(i / nodesPerRow)
+        const col = i % nodesPerRow
+
+        const node = await createNode({
+          title: entry.title || entry.key,
+          markdown_content: citationToMarkdown(entry),
+          node_type: 'citation',
+          canvas_x: startX + col * nodeSpacing,
+          canvas_y: startY + row * nodeSpacing,
+          width: 220,
+          height: 180,
+          tags: entry.keywords ? entry.keywords.split(',').map(k => k.trim()) : undefined,
+        })
+
+        createdNodes.push(node)
+      }
+
+      storeLogger.info(`Created ${createdNodes.length} citation nodes`)
+      notifications$.success(
+        'Citations imported',
+        `${createdNodes.length} citation${createdNodes.length === 1 ? '' : 's'} added to canvas`
+      )
+
+      return createdNodes
+    } catch (e) {
+      error.value = String(e)
+      storeLogger.error('Citation import failed:', e)
+      notifications$.error('Import failed', String(e))
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function refreshWorkspace(): Promise<number> {
     loading.value = true
     try {
@@ -1038,6 +1115,7 @@ export const useNodesStore = defineStore('nodes', () => {
     selectFrame,
     assignNodesToFrame,
     importVault,
+    importCitations,
     refreshWorkspace,
     watchVault,
     stopWatching,

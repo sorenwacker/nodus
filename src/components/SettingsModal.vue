@@ -56,7 +56,8 @@ const baseUrl = computed({
     if (config.baseUrl) return config.baseUrl as string
     // Default URLs per provider
     if (selectedProvider.value === 'ollama') return 'http://localhost:11434'
-    if (selectedProvider.value === 'openai') return 'https://api.openai.com'
+    if (selectedProvider.value === 'openai-compatible') return 'http://localhost:1234/v1'
+    if (selectedProvider.value === 'openai') return 'https://api.openai.com/v1'
     if (selectedProvider.value === 'anthropic') return 'https://api.anthropic.com'
     return ''
   },
@@ -69,6 +70,7 @@ const selectedModel = computed({
     if (config.model) return config.model as string
     // Default models per provider
     if (selectedProvider.value === 'ollama') return 'llama3.2'
+    if (selectedProvider.value === 'openai-compatible') return ''  // User must select/enter
     if (selectedProvider.value === 'openai') return 'gpt-4o'
     if (selectedProvider.value === 'anthropic') return 'claude-3-5-sonnet-20241022'
     return ''
@@ -190,14 +192,16 @@ function saveActiveProvider() {
   fetchModels()
 }
 
-// Validate API key
+// Validate API key (or just test connection for optional key providers)
 async function validateApiKey() {
-  if (!requiresApiKey.value) {
+  // For providers that don't require API key, skip if no key provided
+  if (!requiresApiKey.value && !apiKey.value) {
     apiKeyStatus.value = 'idle'
     return
   }
 
-  if (!apiKey.value) {
+  // For providers that require API key, must have one
+  if (requiresApiKey.value && !apiKey.value) {
     apiKeyStatus.value = 'idle'
     return
   }
@@ -359,14 +363,14 @@ const timeoutSeconds = computed({
             </div>
           </div>
 
-          <!-- API Key (for providers that need it) -->
-          <div v-if="requiresApiKey" class="setting-group">
-            <label>API Key</label>
+          <!-- API Key (for providers that need or support it) -->
+          <div v-if="requiresApiKey || selectedProvider === 'openai-compatible'" class="setting-group">
+            <label>API Key {{ !requiresApiKey ? '(optional)' : '' }}</label>
             <div class="input-with-status">
               <input
                 v-model="apiKey"
                 type="password"
-                placeholder="Enter your API key"
+                :placeholder="requiresApiKey ? 'Enter your API key' : 'Optional - leave empty if not required'"
               />
               <button
                 v-if="apiKey && apiKeyStatus !== 'validating'"
@@ -386,7 +390,7 @@ const timeoutSeconds = computed({
               />
             </div>
             <span class="hint">
-              {{ selectedProvider === 'openai' ? 'Get your key at platform.openai.com' : 'Get your key at console.anthropic.com' }}
+              {{ selectedProvider === 'openai' ? 'Get your key at platform.openai.com' : selectedProvider === 'openai-compatible' ? 'Required by some endpoints (e.g., hosted APIs)' : 'Get your key at console.anthropic.com' }}
             </span>
           </div>
 
@@ -404,18 +408,24 @@ const timeoutSeconds = computed({
           <div class="setting-group">
             <label>Model</label>
             <div class="model-select">
-              <select v-model="selectedModel" :disabled="loadingModels">
-                <option v-if="availableModels.length === 0" :value="selectedModel">
-                  {{ selectedModel }}
-                </option>
-                <option v-for="model in availableModels" :key="model.id" :value="model.id">
-                  {{ model.name || model.id }}
-                </option>
-              </select>
+              <div class="model-input-wrapper">
+                <input
+                  v-model="selectedModel"
+                  type="text"
+                  list="model-list"
+                  placeholder="Enter model name or select from list"
+                  :disabled="loadingModels"
+                />
+                <datalist id="model-list">
+                  <option v-for="model in availableModels" :key="model.id" :value="model.id">
+                    {{ model.name || model.id }}
+                  </option>
+                </datalist>
+              </div>
               <button
                 class="refresh-btn"
                 :disabled="loadingModels"
-                title="Refresh models"
+                title="Fetch available models"
                 @click="fetchModels"
               >
                 <svg
@@ -432,18 +442,38 @@ const timeoutSeconds = computed({
                 </svg>
               </button>
             </div>
+            <span v-if="availableModels.length > 0" class="hint">
+              {{ availableModels.length }} models available
+            </span>
+            <span v-else class="hint">
+              Type model name or click refresh to fetch available models
+            </span>
           </div>
 
           <!-- Max Tokens -->
           <div class="setting-group">
             <label>Max Tokens</label>
-            <input
-              v-model.number="maxTokens"
-              type="number"
-              min="256"
-              max="128000"
-              step="256"
-            />
+            <div class="slider-with-value">
+              <input
+                v-model.number="maxTokens"
+                type="range"
+                min="256"
+                max="32768"
+                step="256"
+                class="slider"
+              />
+              <span class="slider-value">{{ maxTokens >= 1024 ? (maxTokens / 1024).toFixed(1) + 'k' : maxTokens }}</span>
+            </div>
+            <div class="preset-buttons">
+              <button
+                v-for="preset in [512, 1024, 2048, 4096, 8192, 16384, 32768]"
+                :key="preset"
+                :class="{ active: maxTokens === preset }"
+                @click="maxTokens = preset"
+              >
+                {{ preset >= 1024 ? (preset / 1024) + 'k' : preset }}
+              </button>
+            </div>
             <span class="hint">Maximum tokens in response</span>
           </div>
 
@@ -624,7 +654,7 @@ const timeoutSeconds = computed({
             <label>About</label>
             <div class="about-info">
               <p><strong>Nodus</strong> - Local-first knowledge graph</p>
-              <p class="version">Version 0.1.0</p>
+              <p class="version">Version 0.2.0</p>
             </div>
           </div>
         </div>
@@ -883,8 +913,13 @@ const timeoutSeconds = computed({
   gap: 8px;
 }
 
-.model-select select {
+.model-input-wrapper {
   flex: 1;
+  position: relative;
+}
+
+.model-input-wrapper input {
+  width: 100%;
 }
 
 .refresh-btn {
@@ -1075,12 +1110,14 @@ const timeoutSeconds = computed({
   color: white;
 }
 
+.slider-with-value,
 .slider-group {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
+.slider-with-value .slider,
 .slider-group .slider {
   flex: 1;
   height: 4px;
@@ -1091,10 +1128,12 @@ const timeoutSeconds = computed({
   cursor: pointer;
 }
 
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-with-value .slider,
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-group .slider {
   background: #3f3f46;
 }
 
+.slider-with-value .slider::-webkit-slider-thumb,
 .slider-group .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -1105,6 +1144,7 @@ const timeoutSeconds = computed({
   cursor: pointer;
 }
 
+.slider-with-value .slider::-moz-range-thumb,
 .slider-group .slider::-moz-range-thumb {
   width: 16px;
   height: 16px;
@@ -1114,6 +1154,7 @@ const timeoutSeconds = computed({
   cursor: pointer;
 }
 
+.slider-with-value .slider-value,
 .slider-group .slider-value {
   min-width: 48px;
   text-align: right;
@@ -1122,6 +1163,7 @@ const timeoutSeconds = computed({
   color: var(--text-main, #18181b);
 }
 
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-with-value .slider-value,
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-group .slider-value {
   color: #f4f4f5;
 }

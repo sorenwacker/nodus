@@ -75,6 +75,19 @@ export async function extractPdfText(path: string): Promise<string> {
   return invoke<string>('extract_pdf_text', { path })
 }
 
+export interface PdfAnnotation {
+  annotation_type: string
+  content: string
+  comment: string | null
+  page: number
+  color: string | null
+  created_at: string | null
+}
+
+export async function extractPdfAnnotations(path: string): Promise<PdfAnnotation[]> {
+  return invoke<PdfAnnotation[]>('extract_pdf_annotations', { path })
+}
+
 export async function refreshWorkspace(workspaceId: string | null): Promise<number> {
   return invoke<number>('refresh_workspace', { workspaceId })
 }

@@ -604,16 +604,17 @@ describe('Edge Routing Rules', () => {
     })
 
     it('calculates port offsets correctly', () => {
+      // PORT_SPACING is 25 in the implementation
       // 3 edges: indices 0, 1, 2
-      // Offsets should be: -20, 0, +20 (centered around 0)
-      expect(calculatePortOffset(0, 3)).toBe(-20)
+      // Offsets should be: -25, 0, +25 (centered around 0)
+      expect(calculatePortOffset(0, 3)).toBe(-25)
       expect(calculatePortOffset(1, 3)).toBe(0)
-      expect(calculatePortOffset(2, 3)).toBe(20)
+      expect(calculatePortOffset(2, 3)).toBe(25)
 
       // 2 edges: indices 0, 1
-      // Offsets should be: -10, +10
-      expect(calculatePortOffset(0, 2)).toBe(-10)
-      expect(calculatePortOffset(1, 2)).toBe(10)
+      // Offsets should be: -12.5, +12.5
+      expect(calculatePortOffset(0, 2)).toBe(-12.5)
+      expect(calculatePortOffset(1, 2)).toBe(12.5)
 
       // 1 edge: no offset
       expect(calculatePortOffset(0, 1)).toBe(0)

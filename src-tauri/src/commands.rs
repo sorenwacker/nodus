@@ -615,6 +615,12 @@ pub async fn extract_pdf_text(path: String) -> Result<String, String> {
     Ok(text)
 }
 
+#[tauri::command]
+pub async fn extract_pdf_annotations(path: String) -> Result<Vec<crate::pdf::PdfAnnotation>, String> {
+    let path = std::path::Path::new(&path);
+    crate::pdf::extract_annotations(path)
+}
+
 // ============================================================================
 // File Lock Commands
 // ============================================================================

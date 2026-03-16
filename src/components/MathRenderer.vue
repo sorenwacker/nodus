@@ -98,6 +98,18 @@ onMounted(render)
   height: auto;
 }
 
+/* Make SVG inherit text color for theme compatibility */
+.rendered-content :deep(.typst-math svg path),
+.rendered-content :deep(.typst-math svg text),
+.rendered-content :deep(.typst-math svg use) {
+  fill: currentColor;
+}
+
+.rendered-content :deep(.typst-math svg line),
+.rendered-content :deep(.typst-math svg rect:not([fill])) {
+  stroke: currentColor;
+}
+
 .rendered-content :deep(.typst-error) {
   color: var(--color-error, #ef4444);
   background: var(--color-error-bg, #fef2f2);
