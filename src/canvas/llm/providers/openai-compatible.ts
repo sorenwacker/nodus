@@ -166,6 +166,7 @@ export class OpenAICompatibleProvider implements ILLMProvider {
         function: { name: string; arguments: string }
       }) => ({
         id: tc.id,
+        type: 'function' as const,
         function: {
           name: tc.function.name,
           arguments: tc.function.arguments,

@@ -2,17 +2,20 @@
  * Force-directed layout using d3-force
  * Arranges nodes based on their connections for natural visualization
  */
-import {
-  forceSimulation,
-  forceLink,
-  forceManyBody,
-  forceCollide,
-  forceX,
-  forceY,
-  type Simulation,
-  type SimulationNodeDatum,
-  type SimulationLinkDatum,
+import type {
+  Simulation,
+  SimulationNodeDatum,
+  SimulationLinkDatum,
 } from 'd3-force'
+
+// Dynamic import to avoid bundling issues
+let d3Force: typeof import('d3-force') | null = null
+async function getD3Force() {
+  if (!d3Force) {
+    d3Force = await import('d3-force')
+  }
+  return d3Force
+}
 
 export interface LayoutNode {
   id: string
@@ -56,11 +59,11 @@ interface SimNode extends SimulationNodeDatum {
  * Apply force-directed layout to nodes
  * Returns new positions for each node
  */
-export function applyForceLayout(
+export async function applyForceLayout(
   nodes: LayoutNode[],
   edges: LayoutEdge[],
   options: ForceLayoutOptions = {}
-): Map<string, { x: number; y: number }> {
+): Promise<Map<string, { x: number; y: number }>> {
   const {
     centerX = 0,
     centerY = 0,
@@ -74,6 +77,16 @@ export function applyForceLayout(
   if (nodes.length === 0) {
     return new Map()
   }
+
+  // Dynamic import to avoid bundling issues with d3-timer
+  const {
+    forceSimulation,
+    forceLink,
+    forceManyBody,
+    forceCollide,
+    forceX,
+    forceY,
+  } = await getD3Force()
 
   // Create simulation nodes with initial positions
   const simNodes: SimNode[] = nodes.map(n => ({
@@ -177,7 +190,7 @@ export async function layoutNodesWithForce(
   updatePosition: (id: string, x: number, y: number) => Promise<void>,
   options: ForceLayoutOptions = {}
 ): Promise<void> {
-  const positions = applyForceLayout(nodes, edges, options)
+  const positions = await applyForceLayout(nodes, edges, options)
 
   // Update all positions
   const updates = Array.from(positions.entries()).map(([id, pos]) =>

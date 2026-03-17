@@ -108,3 +108,31 @@ export async function releaseEditLock(nodeId: string): Promise<void> {
 export async function getLockedNodes(): Promise<string[]> {
   return invoke<string[]>('get_locked_nodes')
 }
+
+// Convert local file path to URL that webview can access
+let convertFileSrcFunc: ((path: string) => string) | null = null
+
+export async function getConvertFileSrc(): Promise<(path: string) => string> {
+  if (convertFileSrcFunc) return convertFileSrcFunc
+
+  if (isTauri()) {
+    try {
+      const { convertFileSrc } = await import('@tauri-apps/api/core')
+      convertFileSrcFunc = convertFileSrc
+      return convertFileSrc
+    } catch {
+      // Fallback
+    }
+  }
+  // Return identity function for browser
+  convertFileSrcFunc = (path: string) => path
+  return convertFileSrcFunc
+}
+
+export function convertLocalPath(path: string): string {
+  // Synchronous version - requires getConvertFileSrc to be called first
+  if (convertFileSrcFunc) {
+    return convertFileSrcFunc(path)
+  }
+  return path
+}

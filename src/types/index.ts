@@ -35,6 +35,8 @@ export interface Edge {
   label: string | null
   link_type: string
   weight: number
+  color: string | null
+  storyline_id: string | null
   created_at: number
 }
 
@@ -90,6 +92,8 @@ export interface CreateEdgeInput {
   target_node_id: string
   label?: string
   link_type?: string
+  color?: string
+  storyline_id?: string
 }
 
 // Event types
@@ -98,4 +102,30 @@ export interface FileChangeEvent {
   path: string
   change_type: 'Created' | 'Modified' | 'Deleted'
   new_checksum: string | null
+}
+
+// Storyline types
+
+export interface Storyline {
+  id: string
+  title: string
+  description: string | null
+  color: string | null
+  workspace_id: string | null
+  created_at: number
+  updated_at: number
+}
+
+export interface StorylineNode {
+  id: string
+  storyline_id: string
+  node_id: string
+  sequence_order: number
+}
+
+export interface CreateStorylineInput {
+  title: string
+  description?: string
+  color?: string
+  workspace_id?: string
 }

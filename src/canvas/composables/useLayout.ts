@@ -4,6 +4,7 @@
  */
 import { type Ref } from 'vue'
 import { NODE_DEFAULTS } from '../constants'
+import { applyForceLayout } from '../layout'
 
 interface Node {
   id: string
@@ -261,12 +262,14 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
+    console.log('autoLayout called with:', layout)
     const selectedIds = store.getSelectedNodeIds()
     const allNodes = store.getFilteredNodes()
     const nodes = selectedIds.length > 0
       ? allNodes.filter(n => selectedIds.includes(n.id))
       : allNodes
 
+    console.log('autoLayout nodes:', nodes.length, 'selected:', selectedIds.length)
     if (nodes.length === 0) return
 
     pushUndo()
@@ -284,8 +287,37 @@ export function useLayout(options: UseLayoutOptions) {
     const gap = 150
 
     if (layout === 'force') {
-      const nodeIds = selectedIds.length > 0 ? selectedIds : undefined
-      await store.layoutNodes(nodeIds, { centerX, centerY })
+      // Get edges for force layout
+      const edges = store.getFilteredEdges()
+      const layoutNodes = nodes.map(n => ({
+        id: n.id,
+        x: n.canvas_x,
+        y: n.canvas_y,
+        width: n.width || NODE_DEFAULTS.WIDTH,
+        height: n.height || NODE_DEFAULTS.HEIGHT,
+      }))
+      const layoutEdges = edges
+        .filter(e => {
+          const nodeIdSet = new Set(nodes.map(n => n.id))
+          return nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
+        })
+        .map(e => ({
+          source: e.source_node_id,
+          target: e.target_node_id,
+        }))
+
+      const positions = await applyForceLayout(layoutNodes, layoutEdges, {
+        centerX,
+        centerY,
+        iterations: nodes.length > 100 ? 200 : 400,
+      })
+
+      // Convert to targets map and animate
+      const targets = new Map<string, { x: number; y: number }>()
+      for (const [id, pos] of positions) {
+        targets.set(id, pos)
+      }
+      animateToPositions(targets, 800)
       return
     }
 
@@ -295,9 +327,15 @@ export function useLayout(options: UseLayoutOptions) {
       const edges = store.getFilteredEdges()
       const trialTargets = tetrisGridLayout(nodes, edges, 0, 0, gap)
 
+      if (trialTargets.size === 0) {
+        console.warn('Grid layout: no positions generated')
+        return
+      }
+
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
       for (const node of nodes) {
-        const pos = trialTargets.get(node.id)!
+        const pos = trialTargets.get(node.id)
+        if (!pos) continue
         const w = node.width || NODE_DEFAULTS.WIDTH
         const h = node.height || NODE_DEFAULTS.HEIGHT
         minX = Math.min(minX, pos.x)
@@ -314,6 +352,7 @@ export function useLayout(options: UseLayoutOptions) {
       for (const [id, pos] of trialTargets) {
         targets.set(id, { x: pos.x + offsetX, y: pos.y + offsetY })
       }
+      console.log('Grid layout targets:', targets.size)
     } else if (layout === 'horizontal') {
       const sorted = [...nodes].sort((a, b) => (b.height || NODE_DEFAULTS.HEIGHT) - (a.height || NODE_DEFAULTS.HEIGHT))
       const totalWidth = sorted.reduce((sum, n) => sum + (n.width || NODE_DEFAULTS.WIDTH) + gap, -gap)
@@ -338,6 +377,7 @@ export function useLayout(options: UseLayoutOptions) {
       }
     }
 
+    console.log('Calling animateToPositions with', targets.size, 'targets')
     animateToPositions(targets, 500)
   }
 

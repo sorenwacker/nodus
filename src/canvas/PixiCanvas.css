@@ -1,5 +1,6 @@
 .canvas-wrapper {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -153,23 +154,6 @@
   background: #b91c1c;
 }
 
-.llm-settings-btn {
-  padding: 8px 12px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.llm-settings-btn:hover,
-.llm-settings-btn.active {
-  background: var(--bg-elevated);
-  border-color: var(--primary-color);
-}
-
 .llm-clear-btn {
   padding: 8px 12px;
   border: 1px solid var(--border-default);
@@ -193,13 +177,28 @@
   border-color: var(--warning-color, #f59e0b);
 }
 
-.llm-settings-panel {
-  margin-top: 12px;
-  padding: 16px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px var(--shadow-sm);
+/* LLM bar button tooltips */
+.llm-clear-btn[data-tooltip] {
+  position: relative;
+}
+
+.llm-clear-btn[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow-md);
+  z-index: 1000;
+  pointer-events: none;
 }
 
 .settings-grid {
@@ -989,16 +988,42 @@
 
 /* Math inside tables needs more space */
 .node-content :deep(td .typst-inline),
-.node-content :deep(td .typst-display) {
+.node-content :deep(th .typst-inline) {
   display: inline-flex;
   align-items: center;
+  vertical-align: middle;
+  min-height: 1.2em;
+}
+
+.node-content :deep(td .typst-display),
+.node-content :deep(th .typst-display) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 4px 0;
 }
 
-.node-content :deep(td svg) {
+.node-content :deep(td svg),
+.node-content :deep(th svg) {
+  display: inline-block;
   vertical-align: middle;
-  height: auto;
-  max-height: none;
+  height: auto !important;
+  max-height: none !important;
+  width: auto;
+  max-width: 100%;
+}
+
+/* Table fits within node boundary with text wrapping */
+.node-content :deep(table) {
+  table-layout: fixed;
+  word-wrap: break-word;
+}
+
+.node-content :deep(td),
+.node-content :deep(th) {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .node-content :deep(.mermaid-wrapper) {
@@ -1789,4 +1814,102 @@
 
 .node-agent-log-panel .log-line:nth-child(odd) {
   background: var(--bg-surface-alt);
+}
+
+/* Context Menu */
+.context-menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px var(--shadow-md);
+  padding: 4px 0;
+  animation: context-menu-appear 0.1s ease-out;
+}
+
+@keyframes context-menu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-main);
+  cursor: pointer;
+  position: relative;
+}
+
+.context-menu-item:hover {
+  background: var(--bg-elevated);
+}
+
+.context-menu-item.danger {
+  color: var(--danger-color);
+}
+
+.context-menu-item.danger:hover {
+  background: var(--danger-bg);
+}
+
+.context-menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.context-menu-item.danger svg {
+  color: var(--danger-color);
+}
+
+.context-menu-item span {
+  flex: 1;
+}
+
+.context-menu-item.has-submenu {
+  padding-right: 28px;
+}
+
+.submenu-arrow {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.context-submenu {
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  min-width: 160px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px var(--shadow-md);
+  padding: 4px 0;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border-default);
+  margin: 4px 0;
 }

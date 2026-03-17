@@ -2,7 +2,7 @@
 //!
 //! All commands are async and return Results for proper error handling.
 
-use crate::database::{self, edges::Edge, nodes::Node};
+use crate::database::{self, edges::Edge, nodes::Node, storylines::{Storyline, StorylineNode}};
 use crate::watcher::{write_file_locked, FileChangeEvent, FileLock, VaultWatcher};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -145,6 +145,8 @@ pub struct CreateEdgeInput {
     pub target_node_id: String,
     pub label: Option<String>,
     pub link_type: Option<String>,
+    pub color: Option<String>,
+    pub storyline_id: Option<String>,
 }
 
 #[tauri::command]
@@ -158,6 +160,8 @@ pub async fn create_edge(input: CreateEdgeInput) -> Result<Edge, String> {
         label: input.label,
         link_type: input.link_type.unwrap_or_else(|| "related".to_string()),
         weight: 1.0,
+        color: input.color,
+        storyline_id: input.storyline_id,
         created_at: chrono::Utc::now().timestamp(),
     };
 
@@ -172,6 +176,22 @@ pub async fn create_edge(input: CreateEdgeInput) -> Result<Edge, String> {
 pub async fn delete_edge(id: String) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::edges::delete(pool, &id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_edge_color(id: String, color: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::edges::update_color(pool, &id, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_edge_storyline(id: String, storyline_id: Option<String>, color: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::edges::update_storyline_and_color(pool, &id, storyline_id.as_deref(), color.as_deref())
         .await
         .map_err(|e| e.to_string())
 }
@@ -429,6 +449,8 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
                         label: None,
                         link_type: "wikilink".to_string(),
                         weight: 1.0,
+                        color: None,
+                        storyline_id: None,
                         created_at: now,
                     };
                     if database::edges::create(pool, &edge).await.is_ok() {
@@ -699,4 +721,238 @@ pub async fn get_locked_nodes(
 ) -> Result<Vec<String>, String> {
     let locks = locks_state.0.lock().unwrap();
     Ok(locks.keys().cloned().collect())
+}
+
+// ============================================================================
+// Storyline Commands
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct CreateStorylineInput {
+    pub title: String,
+    pub description: Option<String>,
+    pub color: Option<String>,
+    pub workspace_id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn create_storyline(input: CreateStorylineInput) -> Result<Storyline, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    let now = chrono::Utc::now().timestamp();
+    let storyline = Storyline {
+        id: uuid::Uuid::new_v4().to_string(),
+        title: input.title,
+        description: input.description,
+        color: input.color,
+        workspace_id: input.workspace_id,
+        created_at: now,
+        updated_at: now,
+    };
+
+    database::storylines::create(pool, &storyline)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(storyline)
+}
+
+#[tauri::command]
+pub async fn get_storylines(workspace_id: Option<String>) -> Result<Vec<Storyline>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::get_by_workspace(pool, workspace_id.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_storyline(id: String) -> Result<Option<Storyline>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::get_by_id(pool, &id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_storyline(id: String, title: String, description: Option<String>, color: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::update(pool, &id, &title, description.as_deref(), color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_storyline(id: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::delete(pool, &id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_node_to_storyline(storyline_id: String, node_id: String, position: Option<i32>) -> Result<StorylineNode, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::add_node(pool, &storyline_id, &node_id, position)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_node_from_storyline(storyline_id: String, node_id: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::remove_node(pool, &storyline_id, &node_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reorder_storyline_nodes(storyline_id: String, node_ids: Vec<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::reorder_nodes(pool, &storyline_id, &node_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_storyline_nodes(storyline_id: String) -> Result<Vec<Node>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::get_nodes_with_data(pool, &storyline_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ============================================================================
+// Web Search Commands
+// ============================================================================
+
+#[derive(Debug, serde::Serialize)]
+pub struct SearchResult {
+    pub title: String,
+    pub url: String,
+    pub content: String,
+}
+
+/// Search the web using Tavily API
+/// Requires a Tavily API key (free tier: 1000 credits/month, no credit card)
+/// Get your key at: https://tavily.com/
+#[tauri::command]
+pub async fn web_search(query: String, api_key: Option<String>) -> Result<Vec<SearchResult>, String> {
+    let api_key = api_key.filter(|k| !k.is_empty())
+        .ok_or_else(|| "No search API key configured. Get a free Tavily API key at https://tavily.com/ and add it in Settings.".to_string())?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let body = serde_json::json!({
+        "api_key": api_key,
+        "query": query,
+        "max_results": 5,
+        "include_answer": false
+    });
+
+    let response = client.post("https://api.tavily.com/search")
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Search request failed: {}", e))?;
+
+    if response.status() == 401 || response.status() == 403 {
+        return Err("Invalid Tavily API key. Check your key in Settings.".to_string());
+    }
+
+    if response.status() == 429 {
+        return Err("Tavily rate limit exceeded. Try again later.".to_string());
+    }
+
+    if !response.status().is_success() {
+        return Err(format!("Search returned status: {}", response.status()));
+    }
+
+    let json: serde_json::Value = response.json().await
+        .map_err(|e| format!("Failed to parse search results: {}", e))?;
+
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    if let Some(search_results) = json.get("results").and_then(|r| r.as_array()) {
+        for item in search_results.iter().take(5) {
+            let title = item.get("title").and_then(|t| t.as_str()).unwrap_or("").to_string();
+            let url = item.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
+            let content = item.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+
+            if !title.is_empty() && !url.is_empty() {
+                results.push(SearchResult { title, url, content });
+            }
+        }
+    }
+
+    if results.is_empty() {
+        return Err("No search results found".to_string());
+    }
+
+    Ok(results)
+}
+
+/// Fetch and extract content from a URL (handles JavaScript via Jina Reader)
+#[tauri::command]
+pub async fn fetch_url(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    // Use Jina Reader to fetch and extract content (handles JS rendering)
+    // This service renders the page and returns clean markdown
+    let jina_url = format!("https://r.jina.ai/{}", url);
+
+    let response = client.get(&jina_url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .header("Accept", "text/plain")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch URL: {}", e))?;
+
+    if !response.status().is_success() {
+        // Fallback to direct fetch if Jina fails
+        return fetch_url_direct(&client, &url).await;
+    }
+
+    let content = response.text().await
+        .map_err(|e| format!("Failed to read content: {}", e))?;
+
+    Ok(content)
+}
+
+/// Direct fetch fallback (for when Jina is unavailable)
+async fn fetch_url_direct(client: &reqwest::Client, url: &str) -> Result<String, String> {
+    let response = client.get(url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch URL: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("URL returned status: {}", response.status()));
+    }
+
+    let html = response.text().await
+        .map_err(|e| format!("Failed to read content: {}", e))?;
+
+    // Basic HTML to text conversion
+    // Remove script and style tags first
+    let script_re = regex::Regex::new(r"(?is)<script[^>]*>.*?</script>").unwrap();
+    let style_re = regex::Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap();
+    let tag_re = regex::Regex::new(r"<[^>]+>").unwrap();
+    let whitespace_re = regex::Regex::new(r"\s+").unwrap();
+
+    let text = script_re.replace_all(&html, "");
+    let text = style_re.replace_all(&text, "");
+    let text = tag_re.replace_all(&text, " ");
+    let text = html_escape::decode_html_entities(&text);
+    let text = whitespace_re.replace_all(&text, " ");
+    let text = text.trim().to_string();
+
+    Ok(text)
 }

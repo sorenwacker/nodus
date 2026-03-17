@@ -22,10 +22,13 @@ import type {
   CreateNodeInput,
   CreateEdgeInput,
   FileChangeEvent,
+  Storyline,
+  StorylineNode,
+  CreateStorylineInput,
 } from '../types'
 
 // Re-export types for consumers
-export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent }
+export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
 
 export const useNodesStore = defineStore('nodes', () => {
   const nodes = ref<Node[]>([])
@@ -41,6 +44,9 @@ export const useNodesStore = defineStore('nodes', () => {
   const nodeLayoutVersion = ref(0)
   // Track which nodes have edit locks held by this session
   const lockedNodeIds = ref<Set<string>>(new Set())
+  // Storylines
+  const storylines = ref<Storyline[]>([])
+  const storylineNodes = ref<Map<string, string[]>>(new Map()) // storyline_id -> node_ids[]
 
   // For backwards compatibility
   const selectedNodeId = computed(() => selectedNodeIds.value[0] || null)
@@ -69,6 +75,13 @@ export const useNodesStore = defineStore('nodes', () => {
     return edges.value.filter(e =>
       nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
     )
+  })
+
+  const filteredStorylines = computed(() => {
+    if (!currentWorkspaceId.value) {
+      return storylines.value.filter(s => !s.workspace_id)
+    }
+    return storylines.value.filter(s => s.workspace_id === currentWorkspaceId.value)
   })
 
   // Sync workspaces between localStorage and database (bidirectional)
@@ -128,6 +141,15 @@ export const useNodesStore = defineStore('nodes', () => {
         invoke<Edge[]>('get_edges'),
       ])
       nodes.value = fetchedNodes
+
+      // Load storylines separately (may fail if migration hasn't run)
+      try {
+        const fetchedStorylines = await invoke<Storyline[]>('get_storylines', { workspaceId: currentWorkspaceId.value })
+        storylines.value = fetchedStorylines
+      } catch (e) {
+        storeLogger.warn('Failed to load storylines (migration may not have run yet):', e)
+        storylines.value = []
+      }
 
       // Deduplicate edges (keep first occurrence of each source-target pair)
       // Also handles bidirectional duplicates (A->B and B->A count as same pair)
@@ -518,7 +540,9 @@ export const useNodesStore = defineStore('nodes', () => {
   async function createEdge(data: CreateEdgeInput): Promise<Edge> {
     try {
       const edge = await invoke<Edge>('create_edge', { input: data })
-      edges.value.push(edge)
+      // Create new array to trigger Vue reactivity
+      edges.value = [...edges.value, edge]
+      storeLogger.debug(`Created edge: ${edge.source_node_id} -> ${edge.target_node_id}`)
       return edge
     } catch (e) {
       console.error('Failed to create edge:', e)
@@ -531,7 +555,7 @@ export const useNodesStore = defineStore('nodes', () => {
         weight: 1,
         created_at: Date.now(),
       }
-      edges.value.push(edge)
+      edges.value = [...edges.value, edge]
       return edge
     }
   }
@@ -577,6 +601,41 @@ export const useNodesStore = defineStore('nodes', () => {
       edges.value = edges.value.map(e =>
         e.id === id ? { ...e, link_type: linkType } : e
       )
+    }
+  }
+
+  async function updateEdgeColor(id: string, color: string | null): Promise<void> {
+    await invoke('update_edge_color', { id, color })
+    edges.value = edges.value.map(e =>
+      e.id === id ? { ...e, color } : e
+    )
+  }
+
+  /**
+   * Update colors of all edges belonging to a storyline.
+   * Also claims unclaimed edges between consecutive storyline nodes.
+   */
+  async function updateStorylineEdgeColors(storylineId: string, color: string | null): Promise<void> {
+    const nodeIds = storylineNodes.value.get(storylineId) || []
+
+    // Find edges between consecutive storyline nodes and update them
+    for (let i = 0; i < nodeIds.length - 1; i++) {
+      const sourceId = nodeIds[i]
+      const targetId = nodeIds[i + 1]
+
+      // Find edge in either direction
+      const edge = edges.value.find(
+        e => (e.source_node_id === sourceId && e.target_node_id === targetId) ||
+             (e.source_node_id === targetId && e.target_node_id === sourceId)
+      )
+
+      if (edge) {
+        // Update edge with storyline_id and color
+        await invoke('update_edge_storyline', { id: edge.id, storylineId, color })
+        edges.value = edges.value.map(e =>
+          e.id === edge.id ? { ...e, storyline_id: storylineId, color } : e
+        )
+      }
     }
   }
 
@@ -989,7 +1048,7 @@ export const useNodesStore = defineStore('nodes', () => {
     const nodeCount = layoutNodes.length
     const iterations = nodeCount > 300 ? 150 : nodeCount > 100 ? 250 : 400
 
-    const positions = applyForceLayout(layoutNodes, layoutEdges, {
+    const positions = await applyForceLayout(layoutNodes, layoutEdges, {
       centerX: options?.centerX ?? centroidX,
       centerY: options?.centerY ?? centroidY,
       chargeStrength: options?.chargeStrength,
@@ -1073,6 +1132,310 @@ export const useNodesStore = defineStore('nodes', () => {
     return lockedNodeIds.value.has(nodeId)
   }
 
+  // ============================================================================
+  // Storyline Management
+  // ============================================================================
+
+  /**
+   * Load storylines for the current workspace
+   */
+  async function loadStorylines(): Promise<void> {
+    try {
+      const fetched = await invoke<Storyline[]>('get_storylines', {
+        workspaceId: currentWorkspaceId.value
+      })
+      storylines.value = fetched
+      storeLogger.debug(`Loaded ${fetched.length} storylines`)
+    } catch (e) {
+      storeLogger.error('Failed to load storylines:', e)
+    }
+  }
+
+  /**
+   * Create a new storyline
+   */
+  async function createStoryline(title: string, description?: string, color?: string): Promise<Storyline> {
+    const input: CreateStorylineInput = {
+      title,
+      description,
+      color,
+      workspace_id: currentWorkspaceId.value || undefined,
+    }
+
+    try {
+      const storyline = await invoke<Storyline>('create_storyline', { input })
+      storylines.value.push(storyline)
+      storylineNodes.value.set(storyline.id, [])
+      storeLogger.info(`Created storyline: ${title}`)
+      return storyline
+    } catch (e) {
+      storeLogger.error('Failed to create storyline:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Update storyline title, description, and color
+   */
+  async function updateStoryline(id: string, title: string, description?: string, color?: string): Promise<void> {
+    try {
+      await invoke('update_storyline', { id, title, description, color })
+      const storyline = storylines.value.find(s => s.id === id)
+      if (storyline) {
+        storyline.title = title
+        storyline.description = description || null
+        storyline.color = color || null
+        storyline.updated_at = Date.now()
+      }
+    } catch (e) {
+      storeLogger.error('Failed to update storyline:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Delete a storyline
+   */
+  async function deleteStoryline(id: string): Promise<void> {
+    try {
+      await invoke('delete_storyline', { id })
+      storylines.value = storylines.value.filter(s => s.id !== id)
+      storylineNodes.value.delete(id)
+      storeLogger.info(`Deleted storyline: ${id}`)
+    } catch (e) {
+      storeLogger.error('Failed to delete storyline:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Add a node to a storyline and create edge to previous node in reading order
+   */
+  async function addNodeToStoryline(storylineId: string, nodeId: string, position?: number): Promise<void> {
+    try {
+      await invoke('add_node_to_storyline', { storylineId, nodeId, position })
+
+      // Get storyline color for edges
+      const storyline = storylines.value.find(s => s.id === storylineId)
+      const edgeColor = storyline?.color || undefined
+
+      const nodeIds = [...(storylineNodes.value.get(storylineId) || [])]
+      const insertPosition = position ?? nodeIds.length
+
+      // If inserting in middle, delete old edge between prev and next (if it belongs to this storyline)
+      if (position !== undefined && position > 0 && position < nodeIds.length) {
+        const prevNodeId = nodeIds[position - 1]
+        const nextNodeId = nodeIds[position]
+        const oldEdge = edges.value.find(
+          e => e.storyline_id === storylineId &&
+               ((e.source_node_id === prevNodeId && e.target_node_id === nextNodeId) ||
+                (e.source_node_id === nextNodeId && e.target_node_id === prevNodeId))
+        )
+        if (oldEdge) {
+          await deleteEdge(oldEdge.id)
+        }
+      }
+
+      // Create directed edge from previous node to this node (reading order)
+      if (insertPosition > 0) {
+        const prevNodeId = nodeIds[insertPosition - 1]
+        const edgeExists = edges.value.some(
+          e => (e.source_node_id === prevNodeId && e.target_node_id === nodeId) ||
+               (e.source_node_id === nodeId && e.target_node_id === prevNodeId)
+        )
+        if (!edgeExists) {
+          await createEdge({ source_node_id: prevNodeId, target_node_id: nodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+        }
+      }
+
+      // If inserting in middle, create edge to next node
+      if (position !== undefined && position < nodeIds.length) {
+        const nextNodeId = nodeIds[position]
+        const edgeExists = edges.value.some(
+          e => (e.source_node_id === nodeId && e.target_node_id === nextNodeId) ||
+               (e.source_node_id === nextNodeId && e.target_node_id === nodeId)
+        )
+        if (!edgeExists) {
+          await createEdge({ source_node_id: nodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+        }
+      }
+
+      // Update local cache
+      if (position !== undefined) {
+        nodeIds.splice(position, 0, nodeId)
+      } else {
+        nodeIds.push(nodeId)
+      }
+
+      const newMap = new Map(storylineNodes.value)
+      newMap.set(storylineId, nodeIds)
+      storylineNodes.value = newMap
+      storeLogger.debug(`Added node ${nodeId} to storyline ${storylineId}`)
+    } catch (e) {
+      storeLogger.error('Failed to add node to storyline:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Remove a node from a storyline and clean up edges
+   */
+  async function removeNodeFromStoryline(storylineId: string, nodeId: string): Promise<void> {
+    try {
+      const nodeIds = storylineNodes.value.get(storylineId) || []
+      const nodeIndex = nodeIds.indexOf(nodeId)
+
+      // Get storyline color for potential new edge
+      const storyline = storylines.value.find(s => s.id === storylineId)
+      const edgeColor = storyline?.color || undefined
+
+      // Delete edges belonging to this storyline that involve this node
+      const storylineEdges = edges.value.filter(
+        e => e.storyline_id === storylineId &&
+             (e.source_node_id === nodeId || e.target_node_id === nodeId)
+      )
+      for (const edge of storylineEdges) {
+        await deleteEdge(edge.id)
+      }
+
+      // If node was in the middle, reconnect prev and next
+      if (nodeIndex > 0 && nodeIndex < nodeIds.length - 1) {
+        const prevNodeId = nodeIds[nodeIndex - 1]
+        const nextNodeId = nodeIds[nodeIndex + 1]
+        const edgeExists = edges.value.some(
+          e => (e.source_node_id === prevNodeId && e.target_node_id === nextNodeId) ||
+               (e.source_node_id === nextNodeId && e.target_node_id === prevNodeId)
+        )
+        if (!edgeExists) {
+          await createEdge({ source_node_id: prevNodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+        }
+      }
+
+      await invoke('remove_node_from_storyline', { storylineId, nodeId })
+
+      // Update local cache with new Map for reactivity
+      const newMap = new Map(storylineNodes.value)
+      newMap.set(storylineId, nodeIds.filter(id => id !== nodeId))
+      storylineNodes.value = newMap
+      storeLogger.debug(`Removed node ${nodeId} from storyline ${storylineId}`)
+    } catch (e) {
+      storeLogger.error('Failed to remove node from storyline:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Reorder nodes in a storyline and update edges
+   */
+  async function reorderStorylineNodes(storylineId: string, nodeIds: string[]): Promise<void> {
+    try {
+      await invoke('reorder_storyline_nodes', { storylineId, nodeIds })
+
+      // Get storyline color for edges
+      const storyline = storylines.value.find(s => s.id === storylineId)
+      const edgeColor = storyline?.color || undefined
+
+      // Delete all old edges belonging to this storyline
+      const oldStorylineEdges = edges.value.filter(e => e.storyline_id === storylineId)
+      for (const edge of oldStorylineEdges) {
+        await deleteEdge(edge.id)
+      }
+
+      // Create edges between consecutive nodes in new order
+      for (let i = 0; i < nodeIds.length - 1; i++) {
+        const sourceId = nodeIds[i]
+        const targetId = nodeIds[i + 1]
+        await createEdge({ source_node_id: sourceId, target_node_id: targetId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+      }
+
+      // Create new Map for Vue reactivity
+      const newMap = new Map(storylineNodes.value)
+      newMap.set(storylineId, [...nodeIds])
+      storylineNodes.value = newMap
+      storeLogger.debug(`Reordered nodes in storyline ${storylineId}`)
+    } catch (e) {
+      storeLogger.error('Failed to reorder storyline nodes:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Get full node data for a storyline, ordered by sequence
+   */
+  async function getStorylineNodes(storylineId: string): Promise<Node[]> {
+    try {
+      const nodeData = await invoke<Node[]>('get_storyline_nodes', { storylineId })
+      // Update cache with reactivity
+      const newMap = new Map(storylineNodes.value)
+      newMap.set(storylineId, nodeData.map(n => n.id))
+      storylineNodes.value = newMap
+      // Auto-repair edges to ensure consistency
+      await repairStorylineEdges(storylineId)
+      return nodeData
+    } catch (e) {
+      storeLogger.error('Failed to get storyline nodes:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Get storylines that contain a specific node
+   */
+  function getStorylinesForNode(nodeId: string): Storyline[] {
+    return storylines.value.filter(s => {
+      const nodeIds = storylineNodes.value.get(s.id)
+      return nodeIds?.includes(nodeId)
+    })
+  }
+
+  /**
+   * Auto-repair storyline edges to ensure they match the node sequence.
+   * Removes orphan edges and creates missing edges.
+   */
+  async function repairStorylineEdges(storylineId: string): Promise<void> {
+    try {
+      const nodeIds = storylineNodes.value.get(storylineId) || []
+      if (nodeIds.length < 2) return
+
+      const storyline = storylines.value.find(s => s.id === storylineId)
+      const edgeColor = storyline?.color || undefined
+
+      // Build set of expected edge pairs (consecutive nodes)
+      const expectedPairs = new Set<string>()
+      for (let i = 0; i < nodeIds.length - 1; i++) {
+        const pair = [nodeIds[i], nodeIds[i + 1]].sort().join(':')
+        expectedPairs.add(pair)
+      }
+
+      // Find and delete orphan edges (storyline edges that don't connect consecutive nodes)
+      const storylineEdges = edges.value.filter(e => e.storyline_id === storylineId)
+      for (const edge of storylineEdges) {
+        const pair = [edge.source_node_id, edge.target_node_id].sort().join(':')
+        if (!expectedPairs.has(pair)) {
+          await deleteEdge(edge.id)
+          storeLogger.debug(`Deleted orphan storyline edge ${edge.id}`)
+        }
+      }
+
+      // Create missing edges
+      for (let i = 0; i < nodeIds.length - 1; i++) {
+        const sourceId = nodeIds[i]
+        const targetId = nodeIds[i + 1]
+        const edgeExists = edges.value.some(
+          e => e.storyline_id === storylineId &&
+               ((e.source_node_id === sourceId && e.target_node_id === targetId) ||
+                (e.source_node_id === targetId && e.target_node_id === sourceId))
+        )
+        if (!edgeExists) {
+          await createEdge({ source_node_id: sourceId, target_node_id: targetId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+          storeLogger.debug(`Created missing storyline edge ${sourceId} -> ${targetId}`)
+        }
+      }
+    } catch (e) {
+      storeLogger.error('Failed to repair storyline edges:', e)
+    }
+  }
+
   return {
     nodes,
     edges,
@@ -1089,6 +1452,9 @@ export const useNodesStore = defineStore('nodes', () => {
     error,
     workspaces,
     currentWorkspaceId,
+    storylines,
+    filteredStorylines,
+    storylineNodes,
     initialize,
     getNode,
     findNodeByTitle,
@@ -1106,6 +1472,8 @@ export const useNodesStore = defineStore('nodes', () => {
     deleteEdge,
     restoreEdge,
     updateEdgeLinkType,
+    updateEdgeColor,
+    updateStorylineEdgeColors,
     createFrame,
     updateFramePosition,
     updateFrameSize,
@@ -1131,5 +1499,15 @@ export const useNodesStore = defineStore('nodes', () => {
     startEditing,
     stopEditing,
     hasEditLock,
+    loadStorylines,
+    createStoryline,
+    updateStoryline,
+    deleteStoryline,
+    addNodeToStoryline,
+    removeNodeFromStoryline,
+    reorderStorylineNodes,
+    getStorylineNodes,
+    getStorylinesForNode,
+    repairStorylineEdges,
   }
 })

@@ -5,7 +5,9 @@ import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import OnboardingFlow from './components/OnboardingFlow.vue'
-import { themeStorage } from './lib/storage'
+import StorylinePanel from './components/StorylinePanel.vue'
+import StorylineReader from './components/StorylineReader.vue'
+import { themeStorage, type Theme } from './lib/storage'
 
 const store = useNodesStore()
 const showImportDialog = ref(false)
@@ -17,7 +19,10 @@ const importWorkspaceName = ref('')
 const searchQuery = ref('')
 const showSearch = ref(false)
 const showSettings = ref(false)
-const isDark = ref(themeStorage.isDark())
+const currentTheme = ref<Theme>(themeStorage.get())
+const isDark = computed(() => currentTheme.value !== 'light')
+const showStorylinePanel = ref(false)
+const readerStorylineId = ref<string | null>(null)
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
 
@@ -232,11 +237,12 @@ function deleteCurrentWorkspace() {
   showToast(`Deleted workspace "${name}"`, 'info')
 }
 
-function toggleTheme() {
-  isDark.value = !isDark.value
-  const theme = isDark.value ? 'dark' : 'light'
-  document.documentElement.setAttribute('data-theme', theme)
-  themeStorage.set(theme)
+function cycleTheme() {
+  const themes: Theme[] = ['light', 'dark', 'pitch-black', 'cyber']
+  const idx = themes.indexOf(currentTheme.value)
+  currentTheme.value = themes[(idx + 1) % themes.length]
+  document.documentElement.setAttribute('data-theme', currentTheme.value)
+  themeStorage.set(currentTheme.value)
 }
 
 // Apply saved theme on load (supports all theme variants)
@@ -468,18 +474,18 @@ async function openFolderDialog() {
               {{ ws.name }}
             </option>
           </select>
-          <button class="icon-btn" title="Edit Workspace" @click="openWorkspaceEditor">
+          <button class="icon-btn" data-tooltip="Edit Workspace" @click="openWorkspaceEditor">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="icon-btn" title="New Workspace" @click="showWorkspaceDialog = true">
+          <button class="icon-btn" data-tooltip="New Workspace" @click="showWorkspaceDialog = true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
         <div class="toolbar-divider"></div>
-        <button class="icon-btn" :disabled="undoStack.length === 0" title="Undo (Cmd+Z)" @click="undo">
+        <button class="icon-btn" :disabled="undoStack.length === 0" data-tooltip="Undo (Cmd+Z)" @click="undo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
         </button>
-        <button class="icon-btn" :disabled="redoStack.length === 0" title="Redo (Cmd+Shift+Z)" @click="redo">
+        <button class="icon-btn" :disabled="redoStack.length === 0" data-tooltip="Redo (Cmd+Shift+Z)" @click="redo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
       </div>
@@ -491,14 +497,27 @@ async function openFolderDialog() {
         </button>
       </div>
       <div class="toolbar-actions">
-        <button class="icon-btn" title="Import Vault" @click="showImportDialog = true">
+        <button
+          class="icon-btn"
+          :class="{ active: showStorylinePanel }"
+          data-tooltip="Storylines"
+          @click="showStorylinePanel = !showStorylinePanel"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" data-tooltip="Import Vault" @click="showImportDialog = true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
-        <button class="icon-btn theme-btn" :title="isDark ? 'Light mode' : 'Dark mode'" @click="toggleTheme">
-          <svg v-if="isDark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <button class="icon-btn theme-btn" :data-tooltip="`Theme: ${currentTheme}`" @click="cycleTheme">
+          <svg v-if="currentTheme === 'light'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg v-else-if="currentTheme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg v-else-if="currentTheme === 'pitch-black'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20"/></svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </button>
-        <button class="icon-btn settings-btn" title="Settings (Cmd+,)" @click="showSettings = true">
+        <button class="icon-btn settings-btn" data-tooltip="Settings (Cmd+,)" @click="showSettings = true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
             <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
@@ -540,8 +559,19 @@ async function openFolderDialog() {
     </div>
 
     <main class="main-content">
+      <StorylinePanel
+        v-if="showStorylinePanel"
+        @open-reader="(id) => readerStorylineId = id"
+      />
       <PixiCanvas />
     </main>
+
+    <!-- Storyline Reader (fullscreen) -->
+    <StorylineReader
+      v-if="readerStorylineId"
+      :storyline-id="readerStorylineId"
+      @close="readerStorylineId = null"
+    />
 
     <!-- Import Dialog -->
     <div v-if="showImportDialog" class="dialog-overlay" @click.self="showImportDialog = false">
@@ -762,8 +792,38 @@ async function openFolderDialog() {
   cursor: not-allowed;
 }
 
+.icon-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
 .icon-btn svg {
   flex-shrink: 0;
+}
+
+/* Tooltip styles for top bar buttons */
+.icon-btn[data-tooltip] {
+  position: relative;
+}
+
+.icon-btn[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow-md);
+  z-index: 1000;
+  pointer-events: none;
 }
 
 .toolbar-divider {
@@ -953,8 +1013,9 @@ async function openFolderDialog() {
 
 .main-content {
   flex: 1;
+  display: flex;
   position: relative;
-  overflow: auto;
+  overflow: hidden;
 }
 
 /* Dialog styles */

@@ -5,14 +5,14 @@ import { describe, it, expect } from 'vitest'
 import { applyForceLayout } from '../canvas/layout'
 
 describe('Force Layout', () => {
-  it('should return empty map for empty nodes', () => {
-    const result = applyForceLayout([], [])
+  it('should return empty map for empty nodes', async () => {
+    const result = await applyForceLayout([], [])
     expect(result.size).toBe(0)
   })
 
-  it('should position single node at center', () => {
+  it('should position single node at center', async () => {
     const nodes = [{ id: '1', x: 0, y: 0, width: 200, height: 120 }]
-    const result = applyForceLayout(nodes, [], { centerX: 400, centerY: 300 })
+    const result = await applyForceLayout(nodes, [], { centerX: 400, centerY: 300 })
 
     const pos = result.get('1')
     expect(pos).toBeDefined()
@@ -21,13 +21,13 @@ describe('Force Layout', () => {
     expect(pos!.y).toBeCloseTo(300, -1)
   })
 
-  it('should separate connected nodes', () => {
+  it('should separate connected nodes', async () => {
     const nodes = [
       { id: '1', x: 0, y: 0, width: 200, height: 120 },
       { id: '2', x: 0, y: 0, width: 200, height: 120 },
     ]
     const edges = [{ source: '1', target: '2' }]
-    const result = applyForceLayout(nodes, edges, {
+    const result = await applyForceLayout(nodes, edges, {
       centerX: 0,
       centerY: 0,
       linkDistance: 200,
@@ -41,7 +41,7 @@ describe('Force Layout', () => {
     expect(distance).toBeGreaterThan(100)
   })
 
-  it('should handle multiple connected nodes', () => {
+  it('should handle multiple connected nodes', async () => {
     const nodes = [
       { id: '1', x: 0, y: 0, width: 200, height: 120 },
       { id: '2', x: 0, y: 0, width: 200, height: 120 },
@@ -51,7 +51,7 @@ describe('Force Layout', () => {
       { source: '1', target: '2' },
       { source: '2', target: '3' },
     ]
-    const result = applyForceLayout(nodes, edges, {
+    const result = await applyForceLayout(nodes, edges, {
       centerX: 400,
       centerY: 300,
       iterations: 300,
@@ -68,7 +68,7 @@ describe('Force Layout', () => {
     }
   })
 
-  it('should cluster connected components separately', () => {
+  it('should cluster connected components separately', async () => {
     const nodes = [
       { id: '1', x: 0, y: 0, width: 200, height: 120 },
       { id: '2', x: 0, y: 0, width: 200, height: 120 },
@@ -79,7 +79,7 @@ describe('Force Layout', () => {
       { source: '1', target: '2' },
       { source: '3', target: '4' },
     ]
-    const result = applyForceLayout(nodes, edges, {
+    const result = await applyForceLayout(nodes, edges, {
       centerX: 400,
       centerY: 300,
       iterations: 300,
@@ -88,13 +88,13 @@ describe('Force Layout', () => {
     expect(result.size).toBe(4)
   })
 
-  it('should handle nodes with no edges', () => {
+  it('should handle nodes with no edges', async () => {
     const nodes = [
       { id: '1', x: 100, y: 100, width: 200, height: 120 },
       { id: '2', x: 200, y: 200, width: 200, height: 120 },
       { id: '3', x: 300, y: 300, width: 200, height: 120 },
     ]
-    const result = applyForceLayout(nodes, [], {
+    const result = await applyForceLayout(nodes, [], {
       centerX: 400,
       centerY: 300,
     })

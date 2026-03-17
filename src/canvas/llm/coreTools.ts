@@ -488,7 +488,7 @@ export function registerCoreTools(): void {
           source: e.source_node_id,
           target: e.target_node_id,
         }))
-        const positions = applyForceLayout(layoutNodes, layoutEdges, {
+        const positions = await applyForceLayout(layoutNodes, layoutEdges, {
           centerX,
           centerY,
           iterations: 300,

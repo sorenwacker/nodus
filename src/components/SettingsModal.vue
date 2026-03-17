@@ -99,6 +99,26 @@ watch(chainContextLimit, (value) => {
   llmStorage.setChainContextLimit(value)
 })
 
+// Search API key (Tavily)
+const searchApiKey = ref(llmStorage.getSearchApiKey())
+const searchKeyStatus = ref<'idle' | 'testing' | 'valid' | 'invalid'>('idle')
+watch(searchApiKey, (value) => {
+  llmStorage.setSearchApiKey(value)
+  searchKeyStatus.value = 'idle'
+})
+
+async function testSearchKey() {
+  if (!searchApiKey.value) return
+  searchKeyStatus.value = 'testing'
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('web_search', { query: 'test', apiKey: searchApiKey.value })
+    searchKeyStatus.value = 'valid'
+  } catch {
+    searchKeyStatus.value = 'invalid'
+  }
+}
+
 // System prompt (shared across providers)
 const llmSystemPrompt = ref(llmStorage.getSystemPrompt(''))
 
@@ -108,7 +128,7 @@ const llmAgentPrompt = ref(llmStorage.getAgentPrompt(''))
 // Canvas Settings
 const gridSnap = ref(canvasStorage.getGridSnap())
 const gridSize = ref(canvasStorage.getGridSize())
-const edgeStyle = ref(canvasStorage.getEdgeStyle())
+const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'straight'>(canvasStorage.getEdgeStyle())
 
 // General Settings
 const theme = ref(themeStorage.get())
@@ -531,6 +551,38 @@ const timeoutSeconds = computed({
             <span class="hint">Include content from linked nodes when asking LLM</span>
           </div>
 
+          <!-- Search API Key -->
+          <div class="setting-group">
+            <label>Web Search API Key (Tavily)</label>
+            <div class="input-with-status">
+              <input
+                v-model="searchApiKey"
+                type="password"
+                placeholder="Enter your Tavily API key"
+              />
+              <button
+                v-if="searchApiKey && searchKeyStatus !== 'testing'"
+                class="validate-btn"
+                title="Test API key"
+                @click="testSearchKey"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </button>
+              <span
+                v-if="searchKeyStatus !== 'idle'"
+                class="status-indicator"
+                :class="searchKeyStatus === 'testing' ? 'validating' : searchKeyStatus"
+                :title="searchKeyStatus === 'valid' ? 'Valid' : searchKeyStatus === 'invalid' ? 'Invalid' : 'Testing...'"
+              />
+            </div>
+            <span class="hint">
+              Free: 1000 searches/month, no credit card. Get key at
+              <a href="https://tavily.com/" target="_blank" rel="noopener">tavily.com</a>
+            </span>
+          </div>
+
           <!-- System Prompt -->
           <div class="setting-group">
             <label>
@@ -580,24 +632,34 @@ const timeoutSeconds = computed({
 
           <div class="setting-group">
             <label>Edge Style</label>
-            <div class="radio-group">
-              <label class="radio-label">
+            <div class="edge-style-grid">
+              <label class="edge-style-option">
                 <input v-model="edgeStyle" type="radio" value="orthogonal" />
-                <span class="radio-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 20 L4 12 L20 12 L20 4" />
-                  </svg>
-                </span>
-                Orthogonal
+                <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 20 L4 12 L28 12 L28 4" />
+                </svg>
+                <span>Orthogonal</span>
               </label>
-              <label class="radio-label">
+              <label class="edge-style-option">
                 <input v-model="edgeStyle" type="radio" value="diagonal" />
-                <span class="radio-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 20 L12 12 L20 12 L20 4" />
-                  </svg>
-                </span>
-                Diagonal
+                <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 20 L16 12 L28 4" />
+                </svg>
+                <span>Diagonal</span>
+              </label>
+              <label class="edge-style-option">
+                <input v-model="edgeStyle" type="radio" value="curved" />
+                <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 20 C4 12, 28 12, 28 4" />
+                </svg>
+                <span>Curved</span>
+              </label>
+              <label class="edge-style-option">
+                <input v-model="edgeStyle" type="radio" value="straight" />
+                <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 20 L28 4" />
+                </svg>
+                <span>Straight</span>
               </label>
             </div>
           </div>
@@ -654,7 +716,7 @@ const timeoutSeconds = computed({
             <label>About</label>
             <div class="about-info">
               <p><strong>Nodus</strong> - Local-first knowledge graph</p>
-              <p class="version">Version 0.2.0</p>
+              <p class="version">Version 0.2.2</p>
             </div>
           </div>
         </div>
@@ -835,6 +897,15 @@ const timeoutSeconds = computed({
 .hint {
   font-size: 11px;
   color: var(--text-muted, #71717a);
+}
+
+.hint a {
+  color: var(--primary-color, #3b82f6);
+  text-decoration: none;
+}
+
+.hint a:hover {
+  text-decoration: underline;
 }
 
 .input-with-status {
@@ -1166,5 +1237,54 @@ const timeoutSeconds = computed({
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-with-value .slider-value,
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-group .slider-value {
   color: #f4f4f5;
+}
+
+.edge-style-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.edge-style-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  background: var(--bg-canvas, #f4f4f5);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .edge-style-option {
+  background: #18181b;
+  border-color: #3f3f46;
+}
+
+.edge-style-option:hover {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.edge-style-option:has(input:checked) {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.edge-style-option input {
+  display: none;
+}
+
+.edge-style-option svg {
+  color: var(--text-muted, #71717a);
+}
+
+.edge-style-option:has(input:checked) svg {
+  color: var(--primary-color, #3b82f6);
+}
+
+.edge-style-option span {
+  font-size: 11px;
+  color: var(--text-muted, #71717a);
 }
 </style>

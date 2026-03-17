@@ -1,6 +1,6 @@
 [package]
 name = "nodus"
-version = "0.2.0"
+version = "0.2.2"
 description = "Local-first knowledge graph"
 authors = ["Nodus Team"]
 edition = "2021"
@@ -37,6 +37,8 @@ thiserror = "1.0"
 walkdir = "2.4"
 hex = "0.4"
 regex = "1.10"
+urlencoding = "2.1"
+html-escape = "0.2"
 
 # Typst for math rendering
 typst = "0.12"

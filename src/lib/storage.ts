@@ -19,6 +19,7 @@ const KEYS = {
   canvasGridSize: 'nodus_canvas_grid_size',
   canvasEdgeStyle: 'nodus_canvas_edge_style',
   chainContextLimit: 'nodus_chain_context_limit',
+  searchApiKey: 'nodus_search_api_key',
 } as const
 
 /**
@@ -142,6 +143,12 @@ export const llmStorage = {
   setChainContextLimit(value: number): void {
     localStorage.setItem(KEYS.chainContextLimit, String(value))
   },
+  getSearchApiKey(): string {
+    return localStorage.getItem(KEYS.searchApiKey) || ''
+  },
+  setSearchApiKey(value: string): void {
+    localStorage.setItem(KEYS.searchApiKey, value)
+  },
 }
 
 /**
@@ -160,11 +167,14 @@ export const canvasStorage = {
   setGridSize(value: number): void {
     localStorage.setItem(KEYS.canvasGridSize, String(value))
   },
-  getEdgeStyle(): 'orthogonal' | 'diagonal' {
+  getEdgeStyle(): 'orthogonal' | 'diagonal' | 'curved' | 'straight' {
     const value = localStorage.getItem(KEYS.canvasEdgeStyle)
-    return value === 'diagonal' ? 'diagonal' : 'orthogonal'
+    if (value === 'diagonal' || value === 'curved' || value === 'straight') {
+      return value
+    }
+    return 'orthogonal'
   },
-  setEdgeStyle(value: 'orthogonal' | 'diagonal'): void {
+  setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'straight'): void {
     localStorage.setItem(KEYS.canvasEdgeStyle, value)
   },
 }

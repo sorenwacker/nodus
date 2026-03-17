@@ -3,9 +3,17 @@
  * Agent runner focused on a single node with web search and editing tools
  */
 import { ref, type Ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import type { ChatMessage } from '../llm/types'
 import { llmQueue } from '../llm/queue'
 import { notifications$ } from '../../composables/useNotifications'
+import { llmStorage } from '../../lib/storage'
+
+interface SearchResult {
+  title: string
+  url: string
+  content: string
+}
 
 export interface NodeAgentContext {
   nodeId: string
@@ -24,7 +32,35 @@ const nodeTools = [
     type: 'function' as const,
     function: {
       name: 'web_search',
-      description: 'Search the web for information to include in the note',
+      description: 'Search the web for any information - news, facts, organizations, people, current events, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'fetch_url',
+      description: 'Fetch and read the content of a web page. Use this after web_search to read full articles.',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'The URL to fetch' },
+        },
+        required: ['url'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'wikipedia_search',
+      description: 'Search Wikipedia for encyclopedic information and definitions',
       parameters: {
         type: 'object',
         properties: {
@@ -93,40 +129,70 @@ const nodeTools = [
 ]
 
 async function executeWebSearch(query: string): Promise<string> {
-  // Try Wikipedia API (reliable, no CORS issues)
   try {
-    const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/ /g, '_'))}`
-    const wikiResp = await fetch(wikiUrl)
-    if (wikiResp.ok) {
-      const wikiData = await wikiResp.json()
-      if (wikiData.extract) {
-        return `Wikipedia: ${wikiData.extract}`
-      }
+    const apiKey = llmStorage.getSearchApiKey()
+    const results = await invoke<SearchResult[]>('web_search', { query, apiKey })
+    if (results.length === 0) {
+      throw new Error('No results found')
     }
+    return results
+      .map(r => `**${r.title}**\n${r.content}\nSource: ${r.url}`)
+      .join('\n\n---\n\n')
   } catch (e) {
-    // Wikipedia direct lookup failed
+    throw new Error(`Web search failed: ${e instanceof Error ? e.message : String(e)}`)
   }
+}
 
-  // Try Wikipedia search
+async function executeFetchUrl(url: string): Promise<string> {
   try {
-    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=3`
+    let content = await invoke<string>('fetch_url', { url })
+    // Apply context limit from settings
+    const maxChars = llmStorage.getChainContextLimit()
+    if (maxChars > 0 && content.length > maxChars) {
+      content = content.slice(0, maxChars) + '...\n\n[Content truncated]'
+    }
+    return content
+  } catch (e) {
+    throw new Error(`Failed to fetch URL: ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
+async function executeWikipediaSearch(query: string): Promise<string> {
+  // First, search for the article
+  try {
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`
     const searchResp = await fetch(searchUrl)
     if (searchResp.ok) {
       const searchData = await searchResp.json()
       if (searchData.query?.search?.length > 0) {
-        const results = searchData.query.search.map((item: { title: string; snippet: string }) => {
-          const snippet = item.snippet.replace(/<[^>]*>/g, '')
-          return `${item.title}: ${snippet}`
-        })
-        return `Search results:\n${results.join('\n\n')}`
+        const title = searchData.query.search[0].title
+
+        // Fetch the full article content using TextExtracts API
+        const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&explaintext=1&exsectionformat=plain&format=json&origin=*`
+        const contentResp = await fetch(contentUrl)
+        if (contentResp.ok) {
+          const contentData = await contentResp.json()
+          const pages = contentData.query?.pages
+          if (pages) {
+            const pageId = Object.keys(pages)[0]
+            const extract = pages[pageId]?.extract
+            if (extract) {
+              // Use the context limit from settings (default 50k)
+              const maxChars = llmStorage.getChainContextLimit()
+              const content = maxChars > 0 && extract.length > maxChars
+                ? extract.slice(0, maxChars) + '...\n\n[Content truncated]'
+                : extract
+              return `# ${title}\n\n${content}\n\nSource: https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
+            }
+          }
+        }
       }
     }
   } catch (e) {
     // Wikipedia search failed
   }
 
-  // All search methods failed
-  throw new Error(`Web search failed for "${query}". Wikipedia API may be unavailable.`)
+  throw new Error(`Wikipedia search failed for "${query}". Try a different query.`)
 }
 
 export function useNodeAgent() {
@@ -148,17 +214,20 @@ ${ctx.nodeContent || '(empty)'}
 ${connectedContext}
 
 TOOLS:
-- web_search(query): Search web for information
+- web_search(query): Search the web, returns titles + snippets + URLs
+- fetch_url(url): Read the full content of a web page (use after web_search to get details)
+- wikipedia_search(query): Search Wikipedia for encyclopedic definitions
 - update_content(content): Replace note content
 - append_content(text): Add text to end of note
 - update_title(title): Change note title
 - done(summary): Signal completion
 
 RULES:
-1. Use web_search to research before writing
-2. Use update_content to save changes
-3. Format in Obsidian markdown ([[wikilinks]], #tags, etc.)
-4. Call done() when finished`
+1. Use web_search to find relevant pages, then fetch_url to read the content
+2. Use update_content to save your findings
+3. Format in markdown. For references, use REAL URLs as markdown links: [Source Name](https://actual-url.com)
+4. Do NOT invent fake wikilinks like [[Wikipedia:X]] - use actual URLs from your search results
+5. Call done() when finished`
   }
 
   async function run(prompt: string, ctx: NodeAgentContext): Promise<string> {
@@ -186,6 +255,7 @@ RULES:
         if (msg.tool_calls && msg.tool_calls.length > 0) {
           for (const tc of msg.tool_calls) {
             const name = tc.function.name
+            const toolCallId = tc.id
             let args: Record<string, unknown>
             try {
               args = typeof tc.function.arguments === 'string'
@@ -208,6 +278,32 @@ RULES:
                   const errorMsg = e instanceof Error ? e.message : 'Search failed'
                   log.value.push(`  ERROR: ${errorMsg}`)
                   notifications$.error('Web search failed', errorMsg)
+                  result = `Error: ${errorMsg}`
+                }
+                break
+
+              case 'fetch_url':
+                log.value.push(`  Fetching: ${args.url}`)
+                try {
+                  result = await executeFetchUrl(args.url as string)
+                  log.value.push(`  Got content (${result.length} chars)`)
+                } catch (e) {
+                  const errorMsg = e instanceof Error ? e.message : 'Fetch failed'
+                  log.value.push(`  ERROR: ${errorMsg}`)
+                  notifications$.error('URL fetch failed', errorMsg)
+                  result = `Error: ${errorMsg}`
+                }
+                break
+
+              case 'wikipedia_search':
+                log.value.push(`  Wikipedia: ${args.query}`)
+                try {
+                  result = await executeWikipediaSearch(args.query as string)
+                  log.value.push(`  Found results`)
+                } catch (e) {
+                  const errorMsg = e instanceof Error ? e.message : 'Search failed'
+                  log.value.push(`  ERROR: ${errorMsg}`)
+                  notifications$.error('Wikipedia search failed', errorMsg)
                   result = `Error: ${errorMsg}`
                 }
                 break
@@ -236,9 +332,13 @@ RULES:
                 log.value.push(`> Done: ${args.summary}`)
                 isRunning.value = false
                 return args.summary as string
+
+              default:
+                log.value.push(`  Unknown tool: ${name}`)
+                result = `Error: Unknown tool "${name}". Available tools: web_search, wikipedia_search, update_content, append_content, update_title, done`
             }
 
-            messages.push({ role: 'tool', content: result })
+            messages.push({ role: 'tool', content: result, tool_call_id: toolCallId })
           }
         } else if (msg.content) {
           // Check for completion signals

@@ -141,7 +141,36 @@ export function routeAllEdges(
 
     let routeResult: { path: Point[]; svgPath: string }
 
-    if (style === 'diagonal') {
+    if (style === 'straight') {
+      // Direct line from port to port
+      const path = [sourcePort, targetPort]
+      const svgPath = `M ${sourcePort.x} ${sourcePort.y} L ${targetPort.x} ${targetPort.y}`
+      routeResult = { path, svgPath }
+    } else if (style === 'curved') {
+      // Bezier curve with control points based on distance
+      const dx = targetPort.x - sourcePort.x
+      const dy = targetPort.y - sourcePort.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const curvature = Math.min(dist * 0.4, 100)
+
+      // Control points extend in the direction of the port's side
+      let cp1x = sourcePort.x, cp1y = sourcePort.y
+      let cp2x = targetPort.x, cp2y = targetPort.y
+
+      if (sourceSide === 'right') cp1x += curvature
+      else if (sourceSide === 'left') cp1x -= curvature
+      else if (sourceSide === 'bottom') cp1y += curvature
+      else if (sourceSide === 'top') cp1y -= curvature
+
+      if (targetSide === 'right') cp2x += curvature
+      else if (targetSide === 'left') cp2x -= curvature
+      else if (targetSide === 'bottom') cp2y += curvature
+      else if (targetSide === 'top') cp2y -= curvature
+
+      const path = [sourcePort, { x: cp1x, y: cp1y }, { x: cp2x, y: cp2y }, targetPort]
+      const svgPath = `M ${sourcePort.x} ${sourcePort.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetPort.x} ${targetPort.y}`
+      routeResult = { path, svgPath }
+    } else if (style === 'diagonal') {
       routeResult = routeDiagonal({
         startPort: sourcePort,
         startStandoff: sourceStandoff,
@@ -154,6 +183,7 @@ export function routeAllEdges(
         gridTracker,
       })
     } else {
+      // orthogonal (default)
       // Calculate channel offset to create non-crossing parallel paths.
       // Each edge gets assigned to a different "lane" based on port offsets.
       // Multiply by LANE_WIDTH to ensure proper visual separation.

@@ -20,7 +20,7 @@ import {
   type EdgeStyle,
 } from './edgeRouting'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
-import { uiStorage, llmStorage } from '../lib/storage'
+import { uiStorage, llmStorage, canvasStorage } from '../lib/storage'
 import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
@@ -72,6 +72,7 @@ marked.use({
 })
 
 const store = useNodesStore()
+const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
 
 // Reactive theme tracking
 const isDarkMode = ref(false)
@@ -490,10 +491,18 @@ const selectedEdge = ref<string | null>(null)
 const hoveredNodeId = ref<string | null>(null)
 const hoverMousePos = ref({ x: 0, y: 0 })
 
+// Context menu state
+const contextMenuVisible = ref(false)
+const contextMenuPosition = ref({ x: 0, y: 0 })
+const contextMenuNodeId = ref<string | null>(null)
+const contextMenuStorylineSubmenu = ref(false)
+
 // Node agent mode (Simple vs Agent with tools)
 const nodeAgentMode = ref<'simple' | 'agent'>('simple')
 const showNodeAgentLog = ref(false)
 const nodeAgent = useNodeAgent()
+// Computed for proper reactivity tracking of agent log
+const nodeAgentLog = computed(() => nodeAgent.log.value)
 
 // Tooltip for zoomed-out hover - shows node info when scale is low
 const showHoverTooltip = computed(() => {
@@ -800,7 +809,6 @@ const graphPrompt = ref('')
 const nodePrompt = ref('')
 const isGraphLLMLoading = ref(false)
 const isNodeLLMLoading = ref(false)
-const showLLMSettings = ref(false)
 const lastContextSize = ref(0) // Track context size of last request
 let nodeLLMAbortController: AbortController | null = null
 
@@ -1475,9 +1483,9 @@ const edgeLines = computed(() => {
 
   const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
 
-  // Use batch routing for both diagonal and orthogonal styles
+  // Use batch routing for all edge styles
   // The routing modules handle grid tracking, obstacle avoidance, and path generation
-  const effectiveStyle: EdgeStyle = style === 'curved' ? 'orthogonal' : style
+  const effectiveStyle: EdgeStyle = style
   let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; bundleSize?: number; path?: Array<{x: number; y: number}>; debugInfo?: { srcOffset: number; tgtOffset: number; srcSide: string; tgtSide: string } }> | null = null
 
   // Build spatial index for fast obstacle detection (O(log n) instead of O(n))
@@ -1496,7 +1504,7 @@ const edgeLines = computed(() => {
     setRoutingSpatialIndex(null)
   }
 
-  // Grid tracker for curved edges (which still need manual routing)
+  // Grid tracker for edge overlap prevention
   const gridTracker = new GridTracker(PORT_SPACING)
 
   // Sort edges to minimize crossings
@@ -1599,7 +1607,7 @@ const edgeLines = computed(() => {
     const edgeStyle = edgeStyleMap.value[edge.id] || style
 
     // Generate path based on style
-    // Use pre-routed paths for diagonal/orthogonal, manual routing only for curved
+    // Pre-routed paths for diagonal/orthogonal/straight, manual routing for curved
     let path = ''
     const routed = routedEdges?.get(edge.id)
 
@@ -1670,6 +1678,7 @@ const edgeLines = computed(() => {
       hitX2: endPort.x,
       hitY2: endPort.y,
       link_type: edge.link_type,
+      color: edge.color,
       label: edge.label,
       isBidirectional,
       isShortEdge,
@@ -1703,7 +1712,9 @@ const visibleEdgeLines = computed(() => {
   return edges.map(e => {
     const isHighlighted = highlighted.has(e.id)
     const isSelected = selected === e.id
-    const color = e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value
+    // Use explicit color field first, then link_type as fallback, then default
+    const color = (e.color && e.color.startsWith('#')) ? e.color
+      : (e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value)
     const effectiveStrokeWidth = bundling ? e.strokeWidth * baseStrokeWidth : baseStrokeWidth
     const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth + 2 : effectiveStrokeWidth
 
@@ -1800,7 +1811,7 @@ function onWheel(e: WheelEvent) {
 
     const zoomIntensity = 0.003
     const delta = Math.exp(-e.deltaY * zoomIntensity)
-    const newScale = Math.min(Math.max(scale.value * delta, 0.1), 3)
+    const newScale = Math.min(Math.max(scale.value * delta, 0.05), 3)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
@@ -1968,6 +1979,7 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   pushUndo()
 
   draggingNode.value = nodeId
+  document.body.classList.add('node-dragging')
 
   // If node is already selected, don't change selection (allows multi-drag)
   // Only select if not already selected
@@ -2026,20 +2038,50 @@ function onNodeDrag(e: MouseEvent) {
   }
 }
 
-function stopNodeDrag() {
-  // Push overlapping nodes away after drag
-  if (multiDragInitial.value.size > 0) {
-    // Push away for all dragged nodes
-    for (const id of multiDragInitial.value.keys()) {
-      pushOverlappingNodesAway(id)
+function stopNodeDrag(e: MouseEvent) {
+  const draggedNodeId = draggingNode.value
+  const draggedNodeIds = multiDragInitial.value.size > 0
+    ? [...multiDragInitial.value.keys()]
+    : (draggedNodeId ? [draggedNodeId] : [])
+
+  // Check if drag ended over storyline panel
+  const storylinePanel = document.querySelector('.storyline-panel')
+  let droppedOnStoryline = false
+  if (storylinePanel && draggedNodeIds.length > 0) {
+    const rect = storylinePanel.getBoundingClientRect()
+    if (e.clientX >= rect.left && e.clientX <= rect.right &&
+        e.clientY >= rect.top && e.clientY <= rect.bottom) {
+      droppedOnStoryline = true
+      // Reset nodes to original positions (don't move them on canvas)
+      if (multiDragInitial.value.size > 0) {
+        for (const [id, initial] of multiDragInitial.value) {
+          store.updateNodePosition(id, initial.x, initial.y)
+        }
+      } else if (draggedNodeId) {
+        store.updateNodePosition(draggedNodeId, dragStart.value.nodeX, dragStart.value.nodeY)
+      }
+      // Emit event for storyline panel to handle
+      window.dispatchEvent(new CustomEvent('node-dropped-on-storyline', {
+        detail: { nodeIds: draggedNodeIds, x: e.clientX, y: e.clientY }
+      }))
     }
-  } else if (draggingNode.value) {
-    pushOverlappingNodesAway(draggingNode.value)
+  }
+
+  // Push overlapping nodes away after drag (only if not dropped on storyline)
+  if (!droppedOnStoryline) {
+    if (multiDragInitial.value.size > 0) {
+      for (const id of multiDragInitial.value.keys()) {
+        pushOverlappingNodesAway(id)
+      }
+    } else if (draggingNode.value) {
+      pushOverlappingNodesAway(draggingNode.value)
+    }
   }
 
   draggingNode.value = null
   multiDragInitial.value.clear()
   lastDragEndTime = Date.now()
+  document.body.classList.remove('node-dragging')
   document.removeEventListener('mousemove', onNodeDrag)
   document.removeEventListener('mouseup', stopNodeDrag)
 }
@@ -2606,14 +2648,17 @@ function getEdgeHighlightColor(nodeColor: string | null): string {
 }
 
 // Edge style types
-const edgeStyles = [
-  { value: 'diagonal', label: '/' },
+type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'straight'
+const edgeStyles: { value: EdgeStyleType; label: string }[] = [
   { value: 'orthogonal', label: '⌐' },
+  { value: 'diagonal', label: '∠' },
+  { value: 'curved', label: '∿' },
+  { value: 'straight', label: '/' },
 ]
 
 // Store edge styles (edgeId -> style)
 const edgeStyleMap = ref<Record<string, string>>({})
-const globalEdgeStyle = ref<'diagonal' | 'orthogonal'>('orthogonal')
+const globalEdgeStyle = ref<EdgeStyleType>(canvasStorage.getEdgeStyle())
 
 // Edge bundling - merge edges with shared endpoints
 const edgeBundling = ref(false)
@@ -2628,9 +2673,10 @@ function toggleMagnifier() {
 }
 
 function cycleEdgeStyle() {
-  const styles: typeof globalEdgeStyle.value[] = ['diagonal', 'orthogonal']
+  const styles: EdgeStyleType[] = ['orthogonal', 'diagonal', 'curved', 'straight']
   const idx = styles.indexOf(globalEdgeStyle.value)
   globalEdgeStyle.value = styles[(idx + 1) % styles.length]
+  canvasStorage.setEdgeStyle(globalEdgeStyle.value)
 }
 
 function getEdgeStyle(edgeId: string): string {
@@ -2643,10 +2689,10 @@ function setEdgeStyle(style: string) {
   }
 }
 
-function getEdgeColor(edge: { link_type: string; debugInfo?: { srcOffset: number } }): string {
-  // link_type stores the color directly, or defaults to gray
-  const color = edge.link_type
-  if (color && color.startsWith('#')) return color
+function getEdgeColor(edge: { link_type: string; color?: string | null; debugInfo?: { srcOffset: number } }): string {
+  // Prefer explicit color field, then check link_type, then default to gray
+  if (edge.color && edge.color.startsWith('#')) return edge.color
+  if (edge.link_type && edge.link_type.startsWith('#')) return edge.link_type
   return '#94a3b8'
 }
 
@@ -3144,10 +3190,95 @@ function getNodeBackground(colorTheme: string | null): string | undefined {
   return colorTheme
 }
 
-// Prevent context menu
+// Context menu handler
 function onContextMenu(e: MouseEvent) {
   e.preventDefault()
+
+  // Check if clicking on a node
+  const target = e.target as HTMLElement
+  const nodeCard = target.closest('.node-card') as HTMLElement | null
+
+  if (nodeCard) {
+    const nodeId = nodeCard.dataset.nodeId
+    if (nodeId) {
+      contextMenuNodeId.value = nodeId
+      contextMenuPosition.value = { x: e.clientX, y: e.clientY }
+      contextMenuVisible.value = true
+      contextMenuStorylineSubmenu.value = false
+
+      // Select the node if not already selected
+      if (!store.selectedNodeIds.includes(nodeId)) {
+        store.selectNode(nodeId)
+      }
+      return
+    }
+  }
+
+  // Hide context menu if clicking elsewhere
+  contextMenuVisible.value = false
 }
+
+function closeContextMenu() {
+  contextMenuVisible.value = false
+  contextMenuStorylineSubmenu.value = false
+  contextMenuNodeId.value = null
+}
+
+async function addNodeToStoryline(storylineId: string) {
+  if (!contextMenuNodeId.value) return
+
+  // Get all nodes to add (selected nodes if multi-select, otherwise just the context menu node)
+  const nodeIds = store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)
+    ? [...store.selectedNodeIds]
+    : [contextMenuNodeId.value]
+
+  try {
+    for (const nodeId of nodeIds) {
+      await store.addNodeToStoryline(storylineId, nodeId)
+    }
+    showToast?.(`Added ${nodeIds.length} node(s) to storyline`, 'success')
+    closeContextMenu()
+  } catch (e) {
+    console.error('Failed to add nodes to storyline:', e)
+    showToast?.(`Failed to add: ${e}`, 'error')
+  }
+}
+
+async function createStorylineFromNode() {
+  if (!contextMenuNodeId.value) return
+
+  // Get all nodes to add (selected nodes if multi-select, otherwise just the context menu node)
+  const nodeIds = store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)
+    ? [...store.selectedNodeIds]
+    : [contextMenuNodeId.value]
+
+  const firstNode = store.getNode(nodeIds[0])
+  if (!firstNode) return
+
+  try {
+    const title = nodeIds.length > 1
+      ? `Story: ${nodeIds.length} nodes`
+      : `Story: ${firstNode.title}`
+    const storyline = await store.createStoryline(title)
+    for (const nodeId of nodeIds) {
+      await store.addNodeToStoryline(storyline.id, nodeId)
+    }
+    showToast?.(`Created storyline with ${nodeIds.length} node(s)`, 'success')
+    closeContextMenu()
+  } catch (e) {
+    console.error('Failed to create storyline:', e)
+    showToast?.(`Failed: ${e}`, 'error')
+  }
+}
+
+// Computed: number of selected nodes for context menu display
+const contextMenuNodeCount = computed(() => {
+  if (!contextMenuNodeId.value) return 0
+  if (store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)) {
+    return store.selectedNodeIds.length
+  }
+  return 1
+})
 
 // Export current graph/subgraph as YAML for debugging
 function exportGraphAsYaml() {
@@ -3213,42 +3344,13 @@ ${edges.map(e => `  - id: "${e.id}"
           @keydown.up="onPromptKeydown"
           @keydown.down="onPromptKeydown"
         />
-        <button class="llm-settings-btn" :class="{ active: showLLMSettings }" title="Settings" @click="showLLMSettings = !showLLMSettings">
-          S
-        </button>
-        <button class="llm-clear-btn" title="Clear conversation memory" :class="{ active: conversationHistory.length > 0 }" @click="clearConversation">
+        <button class="llm-clear-btn" data-tooltip="Clear conversation memory" :class="{ active: conversationHistory.length > 0 }" @click="clearConversation">
           {{ conversationHistory.length || 'C' }}
         </button>
         <button v-if="!agentRunning" class="llm-send" :disabled="isGraphLLMLoading || !graphPrompt.trim()" @click="sendGraphPrompt">
           {{ isGraphLLMLoading ? '...' : 'Go' }}
         </button>
         <button v-else class="llm-stop" @click="stopAgent">Stop</button>
-      </div>
-      <!-- LLM Settings Panel -->
-      <div v-if="showLLMSettings" class="llm-settings-panel">
-        <div class="settings-grid">
-          <label>Model</label>
-          <select v-model="ollamaModel" class="settings-select">
-            <option value="llama3.2">llama3.2</option>
-            <option value="llama3.1">llama3.1</option>
-            <option value="mistral">mistral</option>
-            <option value="mistral:7b-instruct">mistral:7b-instruct</option>
-            <option value="codellama">codellama</option>
-            <option value="phi3">phi3</option>
-            <option value="gemma2">gemma2</option>
-            <option value="qwen2">qwen2</option>
-          </select>
-          <label>Model Context</label>
-          <div class="slider-row">
-            <input v-model.number="ollamaContextLength" type="range" min="1024" max="131072" step="1024" class="settings-slider" />
-            <span class="slider-value">{{ (ollamaContextLength / 1024).toFixed(0) }}k</span>
-          </div>
-        </div>
-        <div v-if="lastContextSize > 0" class="context-info">
-          Last request: {{ (lastContextSize / 1000).toFixed(1) }}k chars
-        </div>
-        <label class="settings-label">System Prompt</label>
-        <textarea v-model="customSystemPrompt" class="settings-textarea" rows="8" placeholder="Instructions for the LLM..."></textarea>
       </div>
       <!-- Agent Task List -->
       <div v-if="agentTasks.length > 0" class="agent-tasks">
@@ -3635,7 +3737,7 @@ ${edges.map(e => `  - id: "${e.id}"
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
       <span>{{ Math.round(scale * 100) }}%</span>
-      <button data-tooltip="Zoom Out" @click="scale = Math.max(scale * 0.8, 0.1)">
+      <button data-tooltip="Zoom Out" @click="scale = Math.max(scale * 0.8, 0.05)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
       <button data-tooltip="Fit to Content - Show all nodes" @click="fitToContent">
@@ -3658,14 +3760,14 @@ ${edges.map(e => `  - id: "${e.id}"
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>
       </button>
       <button
-        :class="{ active: true }"
         :disabled="isLargeGraph"
-        :data-tooltip="`Edge Style: ${globalEdgeStyle} - Click to cycle (diagonal → orthogonal)`"
+        :data-tooltip="`Edge Style: ${globalEdgeStyle}`"
         @click="cycleEdgeStyle"
       >
-        <svg v-if="globalEdgeStyle === 'diagonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L12 12 L20 12 L20 4"/></svg>
-        <svg v-else-if="globalEdgeStyle === 'orthogonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L4 12 L20 12 L20 4"/></svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 Q4 12 12 12 Q20 12 20 4"/></svg>
+        <svg v-if="globalEdgeStyle === 'orthogonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L4 12 L20 12 L20 4"/></svg>
+        <svg v-else-if="globalEdgeStyle === 'diagonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L12 12 L20 12 L20 4"/></svg>
+        <svg v-else-if="globalEdgeStyle === 'curved'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 C4 12 20 12 20 4"/></svg>
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L20 4"/></svg>
       </button>
       <button
         :class="{ active: edgeBundling }"
@@ -3744,12 +3846,12 @@ ${edges.map(e => `  - id: "${e.id}"
         {{ nodeAgentMode === 'simple' ? 'Simple' : 'Agent' }}
       </button>
       <button
-        v-if="nodeAgent.log.value.length > 0"
+        v-if="nodeAgentLog.length > 0"
         class="agent-log-toggle"
         @click="showNodeAgentLog = !showNodeAgentLog"
         :title="showNodeAgentLog ? 'Hide agent log' : 'Show agent log'"
       >
-        Log ({{ nodeAgent.log.value.length }})
+        Log ({{ nodeAgentLog.length }})
       </button>
       <span class="sep">|</span>
       <span class="hint">Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new</span>
@@ -3757,7 +3859,7 @@ ${edges.map(e => `  - id: "${e.id}"
 
     <!-- Node agent log panel (fixed position) -->
     <div
-      v-if="showNodeAgentLog && nodeAgent.log.value.length > 0"
+      v-if="showNodeAgentLog && nodeAgentLog.length > 0"
       class="node-agent-log-panel"
       @mousedown.stop
     >
@@ -3766,7 +3868,7 @@ ${edges.map(e => `  - id: "${e.id}"
         <button @click="showNodeAgentLog = false">x</button>
       </div>
       <div class="log-content">
-        <div v-for="(line, i) in nodeAgent.log.value" :key="i" class="log-line">{{ line }}</div>
+        <div v-for="(line, i) in nodeAgentLog" :key="i" class="log-line">{{ line }}</div>
       </div>
     </div>
 
@@ -3866,6 +3968,76 @@ ${edges.map(e => `  - id: "${e.id}"
         />
       </svg>
     </div>
+
+    <!-- Context Menu -->
+    <div
+      v-if="contextMenuVisible"
+      class="context-menu"
+      :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
+      @click.stop
+    >
+      <div class="context-menu-item" @click="fitNodeNow(contextMenuNodeId!); closeContextMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+        </svg>
+        <span>Fit to Content</span>
+      </div>
+
+      <div class="context-menu-divider"></div>
+
+      <div
+        class="context-menu-item has-submenu"
+        @mouseenter="contextMenuStorylineSubmenu = true"
+        @mouseleave="contextMenuStorylineSubmenu = false"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+        <span>Add to Storyline{{ contextMenuNodeCount > 1 ? ` (${contextMenuNodeCount})` : '' }}</span>
+        <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+
+        <!-- Storyline submenu -->
+        <div v-if="contextMenuStorylineSubmenu" class="context-submenu">
+          <div
+            v-for="storyline in store.filteredStorylines"
+            :key="storyline.id"
+            class="context-menu-item"
+            @click="addNodeToStoryline(storyline.id)"
+          >
+            <span>{{ storyline.title }}</span>
+          </div>
+          <div v-if="store.filteredStorylines.length > 0" class="context-menu-divider"></div>
+          <div class="context-menu-item" @click="createStorylineFromNode">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>New Storyline...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="context-menu-divider"></div>
+
+      <div class="context-menu-item danger" @click="deleteSelectedNodes(); closeContextMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        <span>Delete</span>
+      </div>
+    </div>
+
+    <!-- Click outside to close context menu -->
+    <div
+      v-if="contextMenuVisible"
+      class="context-menu-backdrop"
+      @click="closeContextMenu"
+      @contextmenu.prevent="closeContextMenu"
+    ></div>
 
     <!-- Empty state overlay -->
     <div v-if="store.filteredNodes.length === 0" class="empty-state-overlay">

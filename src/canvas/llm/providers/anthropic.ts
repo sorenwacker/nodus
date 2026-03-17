@@ -203,6 +203,7 @@ export class AnthropicProvider implements ILLMProvider {
         if (!message.tool_calls) message.tool_calls = []
         message.tool_calls.push({
           id: block.id,
+          type: 'function' as const,
           function: {
             name: block.name,
             arguments: JSON.stringify(block.input),
