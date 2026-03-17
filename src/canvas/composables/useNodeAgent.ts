@@ -146,10 +146,16 @@ async function executeWebSearch(query: string): Promise<string> {
 async function executeFetchUrl(url: string): Promise<string> {
   try {
     let content = await invoke<string>('fetch_url', { url })
-    // Apply context limit from settings
-    const maxChars = llmStorage.getChainContextLimit()
-    if (maxChars > 0 && content.length > maxChars) {
-      content = content.slice(0, maxChars) + '...\n\n[Content truncated]'
+    // Apply context limit from settings, with hard cap for model safety
+    const userLimit = llmStorage.getChainContextLimit()
+    const maxChars = Math.min(userLimit, 30000) // Hard cap at 30k chars (~7.5k tokens)
+    if (content.length > maxChars) {
+      // Keep start and end for better context
+      const keepStart = Math.floor(maxChars * 0.8)
+      const keepEnd = Math.floor(maxChars * 0.15)
+      content = content.slice(0, keepStart) +
+        '\n\n[... content truncated ...]\n\n' +
+        content.slice(-keepEnd)
     }
     return content
   } catch (e) {

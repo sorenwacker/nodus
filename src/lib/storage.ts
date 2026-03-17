@@ -138,7 +138,7 @@ export const llmStorage = {
     this.setProviderConfigs(configs)
   },
   getChainContextLimit(): number {
-    return parseInt(localStorage.getItem(KEYS.chainContextLimit) || '50000', 10)
+    return parseInt(localStorage.getItem(KEYS.chainContextLimit) || '25000', 10)
   },
   setChainContextLimit(value: number): void {
     localStorage.setItem(KEYS.chainContextLimit, String(value))

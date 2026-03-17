@@ -1428,8 +1428,11 @@ const edgeLines = computed(() => {
 
   // Deduplicate edges by source-target pair (keep first occurrence)
   // Also handles bidirectional duplicates (A->B and B->A count as same pair)
+  // Exception: storyline edges are never deduplicated (they have storyline_id)
   const seenPairs = new Set<string>()
   edges = edges.filter(e => {
+    // Storyline edges are always kept - they need to show even if another edge exists
+    if (e.storyline_id) return true
     const ids = [e.source_node_id, e.target_node_id].sort()
     const key = `${ids[0]}:${ids[1]}`
     if (seenPairs.has(key)) return false
