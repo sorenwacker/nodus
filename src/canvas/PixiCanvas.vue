@@ -4,7 +4,7 @@ import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 import { marked } from 'marked'
 import { invoke, isTauri, openExternal } from '../lib/tauri'
-import { writeText as writeClipboard, readText as readClipboard } from '@tauri-apps/plugin-clipboard-manager'
+import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import {
   routeAllEdges,
   routeEdgesWithBundling,
@@ -23,7 +23,6 @@ import {
 } from './edgeRouting'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
 import { uiStorage, llmStorage, canvasStorage, memoryStorage } from '../lib/storage'
-import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
@@ -34,7 +33,7 @@ import { useLayout } from './composables/useLayout'
 import { usePdfDrop } from './composables/usePdfDrop'
 import { useNodeAgent, type NodeAgentContext } from './composables/useNodeAgent'
 import { useViewState } from './composables/useViewState'
-import { useNodeVisibility } from './composables/useNodeVisibility'
+import { useNodeClipboard } from './composables/useNodeClipboard'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
@@ -109,7 +108,7 @@ const canvasRef = ref<HTMLElement | null>(null)
 const viewState = useViewState({
   getCanvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
 })
-const { scale, offsetX, offsetY, isZooming, hasSavedView: savedView, scheduleSaveViewState, centerGrid, screenToCanvas } = viewState
+const { scale, offsetX, offsetY, isZooming, hasSavedView: savedView, scheduleSaveViewState, centerGrid, screenToCanvas, startZooming } = viewState
 
 onMounted(() => {
 
@@ -388,6 +387,22 @@ const { isLassoSelecting, lassoPoints } = lasso
 function startLasso(e: MouseEvent) { lasso.start(e) }
 function updateLasso(e: MouseEvent) { lasso.update(e) }
 function endLasso() { lasso.end() }
+
+// Node clipboard composable
+const clipboard = useNodeClipboard({
+  store: {
+    selectedNodeIds: store.selectedNodeIds,
+    getNode: store.getNode,
+    getFilteredEdges: () => store.filteredEdges,
+    createNode: store.createNode,
+    createEdge: store.createEdge,
+    setSelectedNodeIds: (ids: string[]) => { store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...ids) },
+  },
+  screenToCanvas,
+  getViewportSize: () => ({ width: viewportWidth.value, height: viewportHeight.value }),
+  showToast,
+})
+const { copySelectedNodes, pasteNodes } = clipboard
 
 // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
 // In neighborhood mode, always use full routing since we have few nodes
@@ -2105,9 +2120,7 @@ function onWheel(e: WheelEvent) {
     offsetY.value -= e.deltaY
   } else {
     // Smooth zoom - use deltaY magnitude for proportional zooming
-    isZooming.value = true
-    if (zoomTimeout) clearTimeout(zoomTimeout)
-    zoomTimeout = window.setTimeout(() => { isZooming.value = false }, 150)
+    startZooming()
 
     const zoomIntensity = 0.003
     const delta = Math.exp(-e.deltaY * zoomIntensity)
@@ -3508,153 +3521,6 @@ function selectAllNodes() {
   // Select all visible nodes (respects neighborhood mode)
   const nodeIds = displayNodes.value.map(n => n.id)
   store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...nodeIds)
-}
-
-// Clipboard data type for Nodus nodes
-interface ClipboardNodeData {
-  type: 'nodus-nodes'
-  nodes: Array<{
-    title: string
-    markdown_content: string
-    canvas_x: number
-    canvas_y: number
-    width: number
-    height: number
-    color_theme: string | null
-    _index?: number // Used to map edges during paste
-  }>
-  edges?: Array<{
-    source_index: number // Index into nodes array
-    target_index: number
-    label: string | null
-    link_type: string
-    color: string | null
-  }>
-}
-
-async function copySelectedNodes() {
-  const selectedNodes = store.selectedNodeIds
-    .map(id => store.getNode(id))
-    .filter((n): n is NonNullable<typeof n> => n !== undefined)
-
-  if (selectedNodes.length === 0) return
-
-  // Find bounding box to compute relative positions
-  const minX = Math.min(...selectedNodes.map(n => n.canvas_x))
-  const minY = Math.min(...selectedNodes.map(n => n.canvas_y))
-
-  // Create index map for edge references
-  const nodeIdToIndex = new Map(selectedNodes.map((n, i) => [n.id, i]))
-  const selectedIdSet = new Set(store.selectedNodeIds)
-
-  // Find edges where both endpoints are in the selection
-  const allEdges = store.getFilteredEdges()
-  const selectedEdges = allEdges.filter(e =>
-    selectedIdSet.has(e.source_node_id) && selectedIdSet.has(e.target_node_id)
-  )
-
-  const clipboardData: ClipboardNodeData = {
-    type: 'nodus-nodes',
-    nodes: selectedNodes.map(n => ({
-      title: n.title,
-      markdown_content: n.markdown_content || '',
-      canvas_x: n.canvas_x - minX, // Relative to selection origin
-      canvas_y: n.canvas_y - minY,
-      width: n.width,
-      height: n.height,
-      color_theme: n.color_theme,
-    })),
-    edges: selectedEdges.map(e => ({
-      source_index: nodeIdToIndex.get(e.source_node_id)!,
-      target_index: nodeIdToIndex.get(e.target_node_id)!,
-      label: e.label,
-      link_type: e.link_type,
-      color: e.color,
-    }))
-  }
-
-  try {
-    await writeClipboard(JSON.stringify(clipboardData, null, 2))
-    const edgeCount = selectedEdges.length
-    const msg = edgeCount > 0
-      ? `Copied ${selectedNodes.length} node(s) and ${edgeCount} edge(s)`
-      : `Copied ${selectedNodes.length} node(s)`
-    showToast?.(msg, 'success')
-  } catch (e) {
-    console.error('Failed to copy to clipboard:', e)
-    showToast?.('Failed to copy to clipboard', 'error')
-  }
-}
-
-async function pasteNodes() {
-  try {
-    const text = await readClipboard()
-    let data: ClipboardNodeData
-
-    try {
-      data = JSON.parse(text)
-    } catch {
-      // Not JSON, ignore (could be regular text)
-      return
-    }
-
-    if (data.type !== 'nodus-nodes' || !Array.isArray(data.nodes)) {
-      return
-    }
-
-    // Calculate paste position (center of viewport with offset based on existing nodes)
-    const viewportCenter = screenToCanvas(
-      (viewportWidth.value || 800) / 2,
-      (viewportHeight.value || 600) / 2
-    )
-
-    // Offset slightly from center to avoid exact overlap if pasting multiple times
-    const offset = (Math.random() * 50) + 20
-
-    const newNodeIds: string[] = []
-
-    for (const nodeData of data.nodes) {
-      const newNode = await store.createNode({
-        title: nodeData.title,
-        markdown_content: nodeData.markdown_content,
-        canvas_x: viewportCenter.x + nodeData.canvas_x + offset,
-        canvas_y: viewportCenter.y + nodeData.canvas_y + offset,
-        width: nodeData.width,
-        height: nodeData.height,
-        color_theme: nodeData.color_theme,
-      })
-      newNodeIds.push(newNode.id)
-    }
-
-    // Create edges between the pasted nodes
-    let edgesCreated = 0
-    if (data.edges && data.edges.length > 0) {
-      for (const edgeData of data.edges) {
-        const sourceId = newNodeIds[edgeData.source_index]
-        const targetId = newNodeIds[edgeData.target_index]
-        if (sourceId && targetId) {
-          await store.createEdge({
-            source_node_id: sourceId,
-            target_node_id: targetId,
-            label: edgeData.label,
-            link_type: edgeData.link_type,
-            color: edgeData.color,
-          })
-          edgesCreated++
-        }
-      }
-    }
-
-    // Select the newly pasted nodes
-    store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...newNodeIds)
-    const msg = edgesCreated > 0
-      ? `Pasted ${data.nodes.length} node(s) and ${edgesCreated} edge(s)`
-      : `Pasted ${data.nodes.length} node(s)`
-    showToast?.(msg, 'success')
-  } catch (e) {
-    // Clipboard read may fail due to permissions, just ignore
-    console.debug('Paste failed:', e)
-  }
 }
 
 async function deleteSelectedNodes() {
