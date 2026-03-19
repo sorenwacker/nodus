@@ -4,7 +4,9 @@
  */
 import { type Ref } from 'vue'
 import { NODE_DEFAULTS } from '../constants'
-import { applyForceLayout } from '../layout'
+import { applyForceLayout, applyHierarchicalLayout, layoutRegistry } from '../layout'
+import { fastGridLayout, batchUpdatePositions } from '../layout/fastGrid'
+import type { LayoutNode as StrategyLayoutNode, LayoutEdge as StrategyLayoutEdge } from '../layout/types'
 
 interface Node {
   id: string
@@ -272,7 +274,7 @@ export function useLayout(options: UseLayoutOptions) {
     return targets
   }
 
-  async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
+  async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid') {
     console.log('autoLayout called with:', layout)
     const selectedIds = store.getSelectedNodeIds()
     const allNodes = store.getFilteredNodes()
@@ -284,8 +286,49 @@ export function useLayout(options: UseLayoutOptions) {
     console.log('autoLayout nodes:', nodes.length, 'selected:', selectedIds.length, 'frames:', allFrames.length)
     if (nodes.length === 0) return
 
+    // Thresholds for layout performance
+    const FAST_GRID_THRESHOLD = 500  // Use fast grid algorithm above this
+    const HUGE_THRESHOLD = 5000      // Warn but still try for huge graphs
+
     pushUndo()
     stopAnimation()
+
+    // Fast path for grid layout with large node sets
+    if (layout === 'grid' && nodes.length > FAST_GRID_THRESHOLD) {
+      console.log(`Fast grid layout for ${nodes.length} nodes using optimized algorithm`)
+
+      // Calculate center of current positions
+      let sumX = 0, sumY = 0
+      for (const node of nodes) {
+        sumX += node.canvas_x
+        sumY += node.canvas_y
+      }
+      const centerX = sumX / nodes.length
+      const centerY = sumY / nodes.length
+
+      // Use optimized fast grid with typed arrays
+      const fastNodes = nodes.map(n => ({
+        id: n.id,
+        width: n.width || NODE_DEFAULTS.WIDTH,
+        height: n.height || NODE_DEFAULTS.HEIGHT,
+      }))
+
+      const positions = fastGridLayout(fastNodes, {
+        centerX,
+        centerY,
+        gap: 30,
+      })
+
+      // Batch update positions to avoid blocking UI
+      await batchUpdatePositions(positions, store.updateNodePosition, 200)
+      console.log(`Fast layout complete for ${nodes.length} nodes`)
+      return
+    }
+
+    // Warn for huge graphs but still allow force/hierarchical
+    if (nodes.length > HUGE_THRESHOLD) {
+      console.warn(`Very large graph (${nodes.length} nodes) - ${layout} layout may be slow`)
+    }
 
     // Group nodes by frame
     const frameNodes = new Map<string, Node[]>() // frame_id -> nodes in that frame
@@ -386,10 +429,77 @@ export function useLayout(options: UseLayoutOptions) {
           target: e.target_node_id,
         }))
 
+      // Scale iterations based on node count (fewer for huge graphs)
+      const n = virtualNodes.length
+      const iterations = n > 2000 ? 30 : n > 1000 ? 50 : n > 500 ? 80 : n > 200 ? 100 : n > 100 ? 200 : 400
       const positions = await applyForceLayout(layoutNodes, layoutEdges, {
         centerX,
         centerY,
-        iterations: virtualNodes.length > 100 ? 200 : 400,
+        iterations,
+      })
+
+      // Convert to targets map, expanding frames
+      const virtualTargets = new Map<string, { x: number; y: number }>()
+      for (const [id, pos] of positions) {
+        virtualTargets.set(id, pos)
+      }
+      const realTargets = expandToRealTargets(virtualTargets)
+
+      // Apply frame movements
+      for (const [id, delta] of realTargets) {
+        if (id.startsWith('__frame_move__')) {
+          const frameId = id.replace('__frame_move__', '')
+          const frame = frameMap.get(frameId)
+          if (frame) {
+            store.updateFramePosition(frameId, frame.x + delta.x, frame.y + delta.y)
+          }
+        }
+      }
+
+      // Remove frame move markers and apply positions
+      const nodeTargets = new Map<string, { x: number; y: number }>()
+      for (const [id, pos] of realTargets) {
+        if (!id.startsWith('__frame_move__')) {
+          nodeTargets.set(id, pos)
+        }
+      }
+
+      // For large graphs, use batch updates instead of animation (much faster)
+      if (virtualNodes.length > 500) {
+        console.log(`Batch updating ${nodeTargets.size} node positions (skipping animation)`)
+        await batchUpdatePositions(nodeTargets, store.updateNodePosition, 200)
+      } else {
+        animateToPositions(nodeTargets, 800)
+      }
+      return
+    }
+
+    if (layout === 'hierarchical') {
+      // Get edges for hierarchical layout
+      const edges = store.getFilteredEdges()
+      const layoutNodes = virtualNodes.map(n => ({
+        id: n.id,
+        x: n.canvas_x,
+        y: n.canvas_y,
+        width: n.width || NODE_DEFAULTS.WIDTH,
+        height: n.height || NODE_DEFAULTS.HEIGHT,
+      }))
+      const layoutEdges = edges
+        .filter(e => {
+          const nodeIdSet = new Set(virtualNodes.map(n => n.id))
+          return nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
+        })
+        .map(e => ({
+          source: e.source_node_id,
+          target: e.target_node_id,
+        }))
+
+      const positions = applyHierarchicalLayout(layoutNodes, layoutEdges, {
+        direction: 'TB',
+        nodeSpacingX: 50,
+        nodeSpacingY: 120,
+        centerX,
+        centerY,
       })
 
       // Convert to targets map, expanding frames
@@ -417,7 +527,7 @@ export function useLayout(options: UseLayoutOptions) {
           nodeTargets.set(id, pos)
         }
       }
-      animateToPositions(nodeTargets, 800)
+      animateToPositions(nodeTargets, 600)
       return
     }
 
@@ -562,10 +672,98 @@ export function useLayout(options: UseLayoutOptions) {
     viewState.offsetY.value = (rect.height - contentHeight * viewState.scale.value) / 2 - minY * viewState.scale.value + padding * viewState.scale.value
   }
 
+  /**
+   * Get available layout strategies from the registry
+   */
+  function getAvailableLayouts(): string[] {
+    return layoutRegistry.names()
+  }
+
+  /**
+   * Execute a registered layout strategy by name
+   * This is an alternative to autoLayout that uses the strategy pattern
+   */
+  async function executeStrategy(
+    strategyName: string,
+    options?: { animate?: boolean; duration?: number }
+  ): Promise<void> {
+    const strategy = layoutRegistry.get(strategyName)
+    if (!strategy) {
+      console.warn(`Layout strategy '${strategyName}' not found, falling back to autoLayout`)
+      // Fallback to autoLayout for unregistered strategies
+      const layoutMap: Record<string, 'grid' | 'force' | 'hierarchical'> = {
+        grid: 'grid',
+        force: 'force',
+        hierarchical: 'hierarchical',
+      }
+      if (layoutMap[strategyName]) {
+        await autoLayout(layoutMap[strategyName])
+      }
+      return
+    }
+
+    const selectedIds = store.getSelectedNodeIds()
+    const allNodes = store.getFilteredNodes()
+    const nodes = selectedIds.length > 0
+      ? allNodes.filter(n => selectedIds.includes(n.id))
+      : allNodes
+
+    if (nodes.length === 0) return
+
+    pushUndo()
+    stopAnimation()
+
+    // Calculate center
+    let sumX = 0, sumY = 0
+    for (const node of nodes) {
+      sumX += node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2
+      sumY += node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2
+    }
+    const centerX = sumX / nodes.length
+    const centerY = sumY / nodes.length
+
+    // Prepare nodes and edges for strategy
+    const layoutNodes: StrategyLayoutNode[] = nodes.map(n => ({
+      id: n.id,
+      x: n.canvas_x,
+      y: n.canvas_y,
+      width: n.width || NODE_DEFAULTS.WIDTH,
+      height: n.height || NODE_DEFAULTS.HEIGHT,
+    }))
+
+    const edges = store.getFilteredEdges()
+    const nodeIdSet = new Set(nodes.map(n => n.id))
+    const layoutEdges: StrategyLayoutEdge[] = edges
+      .filter(e => nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id))
+      .map(e => ({
+        source: e.source_node_id,
+        target: e.target_node_id,
+      }))
+
+    // Execute strategy
+    const positions = await strategy.calculate(layoutNodes, layoutEdges, {
+      centerX,
+      centerY,
+    })
+
+    // Apply positions
+    const animate = options?.animate !== false
+    const duration = options?.duration ?? 500
+
+    if (animate && nodes.length <= 500) {
+      animateToPositions(positions, duration)
+    } else {
+      await batchUpdatePositions(positions, store.updateNodePosition, 200)
+    }
+  }
+
   return {
     stopAnimation,
     animateToPositions,
     autoLayout,
     fitToContent,
+    // Strategy pattern methods
+    getAvailableLayouts,
+    executeStrategy,
   }
 }
