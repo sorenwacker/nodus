@@ -309,6 +309,21 @@ pub mod nodes {
             .await?;
         Ok(())
     }
+
+    pub async fn update_workspace(
+        pool: &DbPool,
+        id: &str,
+        workspace_id: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET workspace_id = ?, updated_at = ? WHERE id = ?")
+            .bind(workspace_id)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
 }
 
 // Edge CRUD operations

@@ -63,6 +63,7 @@ fn main() {
             commands::extract_pdf_annotations,
             commands::refresh_workspace,
             commands::update_node_color,
+            commands::update_node_workspace,
             commands::check_file_available,
             commands::acquire_edit_lock,
             commands::release_edit_lock,

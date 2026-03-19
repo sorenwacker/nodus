@@ -480,6 +480,21 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  async function moveNodesToWorkspace(nodeIds: string[], workspaceId: string | null) {
+    for (const id of nodeIds) {
+      const node = nodes.value.find(n => n.id === id)
+      if (node) {
+        node.workspace_id = workspaceId
+        node.updated_at = Date.now()
+        try {
+          await invoke('update_node_workspace', { id, workspaceId })
+        } catch (e) {
+          console.error('Failed to move node to workspace:', e)
+        }
+      }
+    }
+  }
+
   async function createNode(data: CreateNodeInput): Promise<Node> {
     // Only use workspace_id if it exists in known workspaces, otherwise use null
     const validWorkspaceId = data.workspace_id
@@ -504,14 +519,14 @@ export const useNodesStore = defineStore('nodes', () => {
         title: data.title,
         file_path: data.file_path || null,
         markdown_content: data.markdown_content || null,
-        node_type: data.node_type,
+        node_type: data.node_type || 'note',
         canvas_x: data.canvas_x,
         canvas_y: data.canvas_y,
         width: data.width || 200,
         height: data.height || 120,
         z_index: 0,
         frame_id: null,
-        color_theme: null,
+        color_theme: data.color_theme ?? null,
         is_collapsed: false,
         tags: data.tags ? JSON.stringify(data.tags) : null,
         workspace_id: validWorkspaceId,
@@ -1526,6 +1541,7 @@ export const useNodesStore = defineStore('nodes', () => {
     updateNodeContent,
     updateNodeTitle,
     updateNodeColor,
+    moveNodesToWorkspace,
     selectNode,
     refreshNodeFromFile,
     createNode,

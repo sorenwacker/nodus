@@ -41,13 +41,14 @@ pub struct CreateNodeInput {
     pub title: String,
     pub file_path: Option<String>,
     pub markdown_content: Option<String>,
-    pub node_type: String,
+    pub node_type: Option<String>,
     pub canvas_x: f64,
     pub canvas_y: f64,
     pub width: Option<f64>,
     pub height: Option<f64>,
     pub tags: Option<Vec<String>>,
     pub workspace_id: Option<String>,
+    pub color_theme: Option<String>,
 }
 
 #[tauri::command]
@@ -60,14 +61,14 @@ pub async fn create_node(input: CreateNodeInput) -> Result<Node, String> {
         title: input.title,
         file_path: input.file_path,
         markdown_content: input.markdown_content,
-        node_type: input.node_type,
+        node_type: input.node_type.unwrap_or_else(|| "note".to_string()),
         canvas_x: input.canvas_x,
         canvas_y: input.canvas_y,
         width: input.width.unwrap_or(200.0),
         height: input.height.unwrap_or(120.0),
         z_index: 0,
         frame_id: None,
-        color_theme: None,
+        color_theme: input.color_theme,
         is_collapsed: false,
         tags: input.tags.map(|t| serde_json::to_string(&t).unwrap()),
         workspace_id: input.workspace_id,
@@ -270,6 +271,14 @@ pub async fn update_node_size(id: String, width: f64, height: f64) -> Result<(),
 pub async fn update_node_color(id: String, color: Option<String>) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_color(pool, &id, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_node_workspace(id: String, workspace_id: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_workspace(pool, &id, workspace_id.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

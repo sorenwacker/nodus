@@ -1922,6 +1922,12 @@
   flex: 1;
 }
 
+.context-menu-item.disabled {
+  color: var(--text-muted);
+  cursor: default;
+  pointer-events: none;
+}
+
 .context-menu-item.has-submenu {
   padding-right: 28px;
 }

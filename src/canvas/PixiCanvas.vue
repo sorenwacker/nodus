@@ -216,6 +216,20 @@ onMounted(() => {
       selectAllNodes()
     }
 
+    // Cmd+C / Ctrl+C copies selected nodes as JSON
+    if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      if (store.selectedNodeIds.length > 0) {
+        e.preventDefault()
+        copySelectedNodes()
+      }
+    }
+
+    // Cmd+V / Ctrl+V pastes nodes from clipboard
+    if ((e.key === 'v' || e.key === 'V') && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      pasteNodes()
+    }
+
     // Ctrl+Shift+R refreshes workspace from files
     if ((e.key === 'R' || e.key === 'r') && e.ctrlKey && e.shiftKey) {
       e.preventDefault()
@@ -511,6 +525,7 @@ const contextMenuVisible = ref(false)
 const contextMenuPosition = ref({ x: 0, y: 0 })
 const contextMenuNodeId = ref<string | null>(null)
 const contextMenuStorylineSubmenu = ref(false)
+const contextMenuWorkspaceSubmenu = ref(false)
 
 // Node agent mode - always agent (tools enabled)
 const nodeAgentMode = ref<'simple' | 'agent'>('agent')
@@ -3390,6 +3405,102 @@ function selectAllNodes() {
   store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...nodeIds)
 }
 
+// Clipboard data type for Nodus nodes
+interface ClipboardNodeData {
+  type: 'nodus-nodes'
+  nodes: Array<{
+    title: string
+    markdown_content: string
+    canvas_x: number
+    canvas_y: number
+    width: number
+    height: number
+    color_theme: string | null
+  }>
+}
+
+async function copySelectedNodes() {
+  const selectedNodes = store.selectedNodeIds
+    .map(id => store.getNode(id))
+    .filter((n): n is NonNullable<typeof n> => n !== undefined)
+
+  if (selectedNodes.length === 0) return
+
+  // Find bounding box to compute relative positions
+  const minX = Math.min(...selectedNodes.map(n => n.canvas_x))
+  const minY = Math.min(...selectedNodes.map(n => n.canvas_y))
+
+  const clipboardData: ClipboardNodeData = {
+    type: 'nodus-nodes',
+    nodes: selectedNodes.map(n => ({
+      title: n.title,
+      markdown_content: n.markdown_content || '',
+      canvas_x: n.canvas_x - minX, // Relative to selection origin
+      canvas_y: n.canvas_y - minY,
+      width: n.width,
+      height: n.height,
+      color_theme: n.color_theme,
+    }))
+  }
+
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(clipboardData, null, 2))
+    showToast?.(`Copied ${selectedNodes.length} node(s)`, 'success')
+  } catch (e) {
+    console.error('Failed to copy to clipboard:', e)
+    showToast?.('Failed to copy to clipboard', 'error')
+  }
+}
+
+async function pasteNodes() {
+  try {
+    const text = await navigator.clipboard.readText()
+    let data: ClipboardNodeData
+
+    try {
+      data = JSON.parse(text)
+    } catch {
+      // Not JSON, ignore (could be regular text)
+      return
+    }
+
+    if (data.type !== 'nodus-nodes' || !Array.isArray(data.nodes)) {
+      return
+    }
+
+    // Calculate paste position (center of viewport with offset based on existing nodes)
+    const viewportCenter = screenToCanvas(
+      (viewportWidth.value || 800) / 2,
+      (viewportHeight.value || 600) / 2
+    )
+
+    // Offset slightly from center to avoid exact overlap if pasting multiple times
+    const offset = (Math.random() * 50) + 20
+
+    const newNodeIds: string[] = []
+
+    for (const nodeData of data.nodes) {
+      const newNode = await store.createNode({
+        title: nodeData.title,
+        markdown_content: nodeData.markdown_content,
+        canvas_x: viewportCenter.x + nodeData.canvas_x + offset,
+        canvas_y: viewportCenter.y + nodeData.canvas_y + offset,
+        width: nodeData.width,
+        height: nodeData.height,
+        color_theme: nodeData.color_theme,
+      })
+      newNodeIds.push(newNode.id)
+    }
+
+    // Select the newly pasted nodes
+    store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...newNodeIds)
+    showToast?.(`Pasted ${data.nodes.length} node(s)`, 'success')
+  } catch (e) {
+    // Clipboard read may fail due to permissions, just ignore
+    console.debug('Paste failed:', e)
+  }
+}
+
 async function deleteSelectedNodes() {
   const count = store.selectedNodeIds.length
   if (count === 0) return
@@ -3459,6 +3570,7 @@ function onContextMenu(e: MouseEvent) {
 function closeContextMenu() {
   contextMenuVisible.value = false
   contextMenuStorylineSubmenu.value = false
+  contextMenuWorkspaceSubmenu.value = false
   contextMenuNodeId.value = null
 }
 
@@ -3509,7 +3621,7 @@ async function createStorylineFromNode() {
   }
 }
 
-// Computed: number of selected nodes for context menu display
+/// Computed: number of selected nodes for context menu display
 const contextMenuNodeCount = computed(() => {
   if (!contextMenuNodeId.value) return 0
   if (store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)) {
@@ -3517,6 +3629,33 @@ const contextMenuNodeCount = computed(() => {
   }
   return 1
 })
+
+// Computed: workspaces other than the current one (for "Send to Workspace" menu)
+const otherWorkspaces = computed(() => {
+  return store.workspaces.filter(w => w.id !== store.currentWorkspaceId)
+})
+
+// Move selected nodes to a different workspace
+async function moveNodesToWorkspace(workspaceId: string | null) {
+  if (!contextMenuNodeId.value) return
+
+  // Get all nodes to move (selected nodes if multi-select, otherwise just the context menu node)
+  const nodeIds = store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)
+    ? [...store.selectedNodeIds]
+    : [contextMenuNodeId.value]
+
+  try {
+    await store.moveNodesToWorkspace(nodeIds, workspaceId)
+    const targetName = workspaceId
+      ? store.workspaces.find(w => w.id === workspaceId)?.name || 'workspace'
+      : 'Default Workspace'
+    showToast?.(`Moved ${nodeIds.length} node(s) to ${targetName}`, 'success')
+    closeContextMenu()
+  } catch (e) {
+    console.error('Failed to move nodes:', e)
+    showToast?.(`Failed: ${e}`, 'error')
+  }
+}
 
 // Export current graph/subgraph as YAML for debugging
 function exportGraphAsYaml() {
@@ -4251,6 +4390,43 @@ ${edges.map(e => `  - id: "${e.id}"
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             <span>New Storyline...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Send to Workspace submenu -->
+      <div
+        class="context-menu-item has-submenu"
+        @mouseenter="contextMenuWorkspaceSubmenu = true"
+        @mouseleave="contextMenuWorkspaceSubmenu = false"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>Send to Workspace{{ contextMenuNodeCount > 1 ? ` (${contextMenuNodeCount})` : '' }}</span>
+        <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+
+        <!-- Workspace submenu -->
+        <div v-if="contextMenuWorkspaceSubmenu" class="context-submenu">
+          <div
+            v-if="store.currentWorkspaceId !== null"
+            class="context-menu-item"
+            @click="moveNodesToWorkspace(null)"
+          >
+            <span>Default Workspace</span>
+          </div>
+          <div
+            v-for="workspace in otherWorkspaces"
+            :key="workspace.id"
+            class="context-menu-item"
+            @click="moveNodesToWorkspace(workspace.id)"
+          >
+            <span>{{ workspace.name }}</span>
+          </div>
+          <div v-if="otherWorkspaces.length === 0 && store.currentWorkspaceId === null" class="context-menu-item disabled">
+            <span>No other workspaces</span>
           </div>
         </div>
       </div>

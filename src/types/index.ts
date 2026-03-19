@@ -78,13 +78,14 @@ export interface CreateNodeInput {
   title: string
   file_path?: string
   markdown_content?: string
-  node_type: string
+  node_type?: string
   canvas_x: number
   canvas_y: number
   width?: number
   height?: number
   tags?: string[]
   workspace_id?: string
+  color_theme?: string | null
 }
 
 export interface CreateEdgeInput {
