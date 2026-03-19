@@ -1,0 +1,244 @@
+/**
+ * Edges store
+ * Manages edge CRUD operations, deduplication, and cleanup
+ */
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { invoke } from '../lib/tauri'
+import { storeLogger } from '../lib/logger'
+import type { Edge, CreateEdgeInput } from '../types'
+
+export const useEdgesStore = defineStore('edges', () => {
+  const edges = ref<Edge[]>([])
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+
+  /**
+   * Initialize edges from database
+   */
+  async function initialize(): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      const fetchedEdges = await invoke<Edge[]>('get_edges')
+      // Deduplicate edges on load
+      edges.value = deduplicateEdgesLocal(fetchedEdges)
+    } catch (e) {
+      error.value = String(e)
+      storeLogger.error('Failed to load edges:', e)
+      edges.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Filter edges to only include those where both nodes exist
+   */
+  function getEdgesForNodes(nodeIds: Set<string>): Edge[] {
+    return edges.value.filter(
+      (e) => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
+    )
+  }
+
+  /**
+   * Create a new edge
+   */
+  async function createEdge(data: CreateEdgeInput): Promise<Edge> {
+    try {
+      const edge = await invoke<Edge>('create_edge', { input: data })
+      // Create new array to trigger Vue reactivity
+      edges.value = [...edges.value, edge]
+      storeLogger.debug(`Created edge: ${edge.source_node_id} -> ${edge.target_node_id}`)
+      return edge
+    } catch (e) {
+      storeLogger.error('Failed to create edge:', e)
+      // Fallback for development
+      const edge: Edge = {
+        id: crypto.randomUUID(),
+        source_node_id: data.source_node_id,
+        target_node_id: data.target_node_id,
+        label: data.label || null,
+        link_type: data.link_type || 'related',
+        weight: 1,
+        created_at: Date.now(),
+      }
+      edges.value = [...edges.value, edge]
+      return edge
+    }
+  }
+
+  /**
+   * Delete an edge
+   */
+  async function deleteEdge(id: string): Promise<void> {
+    try {
+      await invoke('delete_edge', { id })
+    } catch (e) {
+      storeLogger.error('Failed to delete edge:', e)
+    }
+    edges.value = edges.value.filter((e) => e.id !== id)
+  }
+
+  /**
+   * Restore a deleted edge (for undo)
+   */
+  async function restoreEdge(edge: Edge): Promise<void> {
+    try {
+      await invoke('restore_edge', { edge })
+    } catch (e) {
+      storeLogger.error('Failed to restore edge:', e)
+    }
+    // Add back to local state if not already present
+    if (!edges.value.find((e) => e.id === edge.id)) {
+      edges.value.push(edge)
+    }
+  }
+
+  /**
+   * Update edge link type
+   */
+  function updateEdgeLinkType(id: string, linkType: string): void {
+    const idx = edges.value.findIndex((e) => e.id === id)
+    if (idx !== -1) {
+      edges.value = edges.value.map((e) => (e.id === id ? { ...e, link_type: linkType } : e))
+    }
+  }
+
+  /**
+   * Update edge color
+   */
+  async function updateEdgeColor(id: string, color: string | null): Promise<void> {
+    await invoke('update_edge_color', { id, color })
+    edges.value = edges.value.map((e) => (e.id === id ? { ...e, color } : e))
+  }
+
+  /**
+   * Update edge label
+   */
+  async function updateEdgeLabel(id: string, label: string | null): Promise<void> {
+    try {
+      await invoke('update_edge_label', { id, label })
+    } catch (e) {
+      storeLogger.error('Failed to update edge label:', e)
+    }
+    edges.value = edges.value.map((e) => (e.id === id ? { ...e, label } : e))
+  }
+
+  /**
+   * Update edge storyline assignment
+   */
+  async function updateEdgeStoryline(
+    id: string,
+    storylineId: string | null,
+    color?: string | null
+  ): Promise<void> {
+    await invoke('update_edge_storyline', { id, storylineId, color })
+    edges.value = edges.value.map((e) =>
+      e.id === id ? { ...e, storyline_id: storylineId, color: color ?? e.color } : e
+    )
+  }
+
+  /**
+   * Remove orphaned edges (edges pointing to non-existent nodes)
+   */
+  function cleanupOrphanEdges(nodeIds: Set<string>): number {
+    const before = edges.value.length
+    edges.value = edges.value.filter(
+      (e) => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
+    )
+    return before - edges.value.length
+  }
+
+  /**
+   * Local edge deduplication (handles bidirectional duplicates)
+   */
+  function deduplicateEdgesLocal(edgeList: Edge[]): Edge[] {
+    const seenPairs = new Set<string>()
+    const beforeCount = edgeList.length
+    const result = edgeList.filter((e) => {
+      // Create canonical key (smaller ID first) to catch bidirectional duplicates
+      const ids = [e.source_node_id, e.target_node_id].sort()
+      const key = `${ids[0]}:${ids[1]}`
+      if (seenPairs.has(key)) return false
+      seenPairs.add(key)
+      return true
+    })
+    const removed = beforeCount - result.length
+    if (removed > 0) {
+      storeLogger.info(`Deduplication removed ${removed} edges (${beforeCount} -> ${result.length})`)
+    }
+    return result
+  }
+
+  /**
+   * Deduplicate edges both in frontend and backend database
+   */
+  async function deduplicateEdges(): Promise<number> {
+    // Backend deduplication
+    let backendRemoved = 0
+    try {
+      backendRemoved = await invoke<number>('deduplicate_edges')
+      storeLogger.info(`Backend deduplication removed ${backendRemoved} edges`)
+    } catch (e) {
+      storeLogger.error('Backend deduplication failed:', e)
+    }
+
+    // Frontend deduplication
+    const beforeCount = edges.value.length
+    edges.value = deduplicateEdgesLocal(edges.value)
+    const frontendRemoved = beforeCount - edges.value.length
+
+    return backendRemoved + frontendRemoved
+  }
+
+  /**
+   * Get edge by ID
+   */
+  function getEdge(id: string): Edge | undefined {
+    return edges.value.find((e) => e.id === id)
+  }
+
+  /**
+   * Find edge between two nodes
+   */
+  function findEdgeBetween(sourceId: string, targetId: string): Edge | undefined {
+    return edges.value.find(
+      (e) =>
+        (e.source_node_id === sourceId && e.target_node_id === targetId) ||
+        (e.source_node_id === targetId && e.target_node_id === sourceId)
+    )
+  }
+
+  /**
+   * Check if edge exists between two nodes
+   */
+  function edgeExists(sourceId: string, targetId: string): boolean {
+    return findEdgeBetween(sourceId, targetId) !== undefined
+  }
+
+  return {
+    // State
+    edges,
+    loading,
+    error,
+
+    // Methods
+    initialize,
+    getEdgesForNodes,
+    createEdge,
+    deleteEdge,
+    restoreEdge,
+    updateEdgeLinkType,
+    updateEdgeColor,
+    updateEdgeLabel,
+    updateEdgeStoryline,
+    cleanupOrphanEdges,
+    deduplicateEdges,
+    getEdge,
+    findEdgeBetween,
+    edgeExists,
+  }
+})
+
+export type { Edge, CreateEdgeInput }

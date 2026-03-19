@@ -8,3 +8,7 @@ export { useNeighborhoodMode, type UseNeighborhoodModeOptions } from './useNeigh
 export { useLasso, pointInPolygon, type UseLassoOptions } from './useLasso'
 export { useFrames, type UseFramesOptions } from './useFrames'
 export { useLayout, type UseLayoutOptions } from './useLayout'
+export { useNodeAgent, type NodeAgentContext } from './useNodeAgent'
+export { usePdfDrop } from './usePdfDrop'
+export { useViewState, type UseViewStateOptions, type ViewState, type UseViewStateReturn } from './useViewState'
+export { useNodeVisibility, type UseNodeVisibilityOptions, type UseNodeVisibilityReturn } from './useNodeVisibility'

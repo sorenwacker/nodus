@@ -4,6 +4,7 @@ import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 import { marked } from 'marked'
 import { invoke, isTauri, openExternal } from '../lib/tauri'
+import { writeText as writeClipboard, readText as readClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import {
   routeAllEdges,
   routeEdgesWithBundling,
@@ -32,7 +33,11 @@ import { useFrames } from './composables/useFrames'
 import { useLayout } from './composables/useLayout'
 import { usePdfDrop } from './composables/usePdfDrop'
 import { useNodeAgent, type NodeAgentContext } from './composables/useNodeAgent'
+import { useViewState } from './composables/useViewState'
+import { useNodeVisibility } from './composables/useNodeVisibility'
 import { NODE_DEFAULTS } from './constants'
+import CanvasStatusBar from './components/CanvasStatusBar.vue'
+import CanvasControls from './components/CanvasControls.vue'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -40,6 +45,7 @@ import type { Node, Edge } from '../types'
 const injectedPushUndo = inject<(() => void) | undefined>('pushUndo')
 const injectedPushContentUndo = inject<((nodeId: string, oldContent: string | null, oldTitle: string) => void) | undefined>('pushContentUndo')
 const injectedPushDeletionUndo = inject<((node: Node, edges: Edge[]) => void) | undefined>('pushDeletionUndo')
+const injectedPushCreationUndo = inject<((nodeIds: string[]) => void) | undefined>('pushCreationUndo')
 
 const pushUndo = () => {
   if (injectedPushUndo) {
@@ -62,6 +68,14 @@ const pushDeletionUndo = (node: Node, edges: Edge[]) => {
     injectedPushDeletionUndo(node, edges)
   } else {
     console.warn('pushDeletionUndo not provided - deletion undo will not work')
+  }
+}
+
+const pushCreationUndo = (nodeIds: string[]) => {
+  if (injectedPushCreationUndo) {
+    injectedPushCreationUndo(nodeIds)
+  } else {
+    console.warn('pushCreationUndo not provided - creation undo will not work')
   }
 }
 
@@ -88,45 +102,14 @@ function updateTheme() {
 // Track if we've centered the view initially
 let hasInitiallyCentered = false
 
-// Canvas transform state - restored from localStorage if available
-// MUST be defined before onMounted and watchers that reference it
-const VIEW_STORAGE_KEY = 'nodus-canvas-view'
+// Canvas element ref (needed early for view state and layout functions)
+const canvasRef = ref<HTMLElement | null>(null)
 
-function loadViewState(): { scale: number; offsetX: number; offsetY: number } | null {
-  try {
-    const stored = localStorage.getItem(VIEW_STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      if (typeof parsed.scale === 'number' && typeof parsed.offsetX === 'number' && typeof parsed.offsetY === 'number') {
-        return parsed
-      }
-    }
-  } catch { /* ignore */ }
-  return null
-}
-
-const savedView = loadViewState()
-const scale = ref(savedView?.scale ?? 1)
-const offsetX = ref(savedView?.offsetX ?? 0)
-const offsetY = ref(savedView?.offsetY ?? 0)
-const isZooming = ref(false)
-let zoomTimeout: number | null = null
-let viewSaveTimeout: number | null = null
-
-function saveViewState() {
-  try {
-    localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify({
-      scale: scale.value,
-      offsetX: offsetX.value,
-      offsetY: offsetY.value,
-    }))
-  } catch { /* ignore */ }
-}
-
-function scheduleSaveViewState() {
-  if (viewSaveTimeout) clearTimeout(viewSaveTimeout)
-  viewSaveTimeout = window.setTimeout(saveViewState, 500)
-}
+// View state composable - handles scale, offset, persistence
+const viewState = useViewState({
+  getCanvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
+})
+const { scale, offsetX, offsetY, isZooming, hasSavedView: savedView, scheduleSaveViewState, centerGrid, screenToCanvas } = viewState
 
 onMounted(() => {
 
@@ -158,7 +141,21 @@ onMounted(() => {
 
   // Keyboard handler for Delete/Backspace
   const handleKeydown = (e: KeyboardEvent) => {
-    // Skip if user is typing in an input
+    // Escape cancels frame placement mode
+    if (e.key === 'Escape' && frames.pendingFramePlacement.value) {
+      e.preventDefault()
+      cancelFramePlacement()
+      return
+    }
+
+    // Cmd+E exports graph as YAML (works even in inputs)
+    if ((e.key === 'e' || e.key === 'E') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      e.preventDefault()
+      exportGraphAsYaml()
+      return
+    }
+
+    // Skip other shortcuts if user is typing in an input
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
       return
@@ -198,12 +195,6 @@ onMounted(() => {
       resetAllNodeSizes()
     }
 
-    // Shift+E exports graph as YAML
-    if ((e.key === 'E' || e.key === 'e') && e.shiftKey) {
-      e.preventDefault()
-      exportGraphAsYaml()
-    }
-
     // F key fits to content
     if (e.key === 'f' || e.key === 'F') {
       e.preventDefault()
@@ -218,6 +209,7 @@ onMounted(() => {
 
     // Cmd+C / Ctrl+C copies selected nodes as JSON
     if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      console.log('[KEYDOWN] Cmd+C detected, selected nodes:', store.selectedNodeIds.length)
       if (store.selectedNodeIds.length > 0) {
         e.preventDefault()
         copySelectedNodes()
@@ -279,14 +271,7 @@ onMounted(() => {
   })
 })
 
-// Center the grid so origin (0,0) is in the middle of the viewport
-function centerGrid() {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (rect) {
-    offsetX.value = rect.width / 2
-    offsetY.value = rect.height / 2
-  }
-}
+// centerGrid is provided by useViewState composable
 
 // Center view when nodes are first loaded, or center grid when empty
 // But only if there's no saved view state
@@ -359,18 +344,7 @@ const visibleNodeIds = computed(() => new Set(visibleNodes.value.map(n => n.id))
 // Graph size thresholds - defined after displayNodes so they use actual displayed count
 // (moved below displayNodes definition)
 
-// Canvas element ref (needed early for layout functions)
-const canvasRef = ref<HTMLElement | null>(null)
-
-// Screen to canvas coordinate conversion
-function screenToCanvas(screenX: number, screenY: number) {
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return { x: 0, y: 0 }
-  return {
-    x: (screenX - rect.left - offsetX.value) / scale.value,
-    y: (screenY - rect.top - offsetY.value) / scale.value,
-  }
-}
+// screenToCanvas is provided by useViewState composable
 
 // Neighborhood mode composable
 const neighborhood = useNeighborhoodMode({
@@ -424,6 +398,30 @@ const isMassiveGraph = computed(() => !neighborhoodMode.value && (displayNodes.v
 // Semantic zoom collapse - hide content for massive graphs when zoomed out
 const isSemanticZoomCollapsed = computed(() => isMassiveGraph.value && scale.value < 0.6)
 
+// LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
+const LOD_THRESHOLD = 500
+const isLODMode = computed(() => visibleNodes.value.length > LOD_THRESHOLD)
+
+// Node degree (edge count) for LOD circle sizing
+const nodeDegree = computed(() => {
+  const degree: Record<string, number> = {}
+  for (const node of store.filteredNodes) {
+    degree[node.id] = 0
+  }
+  for (const edge of store.filteredEdges) {
+    if (degree[edge.source_node_id] !== undefined) degree[edge.source_node_id]++
+    if (degree[edge.target_node_id] !== undefined) degree[edge.target_node_id]++
+  }
+  return degree
+})
+
+// Calculate LOD circle radius based on degree (min 8px, max 40px)
+function getLODRadius(nodeId: string): number {
+  const deg = nodeDegree.value[nodeId] || 0
+  // Log scale for better distribution: radius = 8 + log2(degree + 1) * 6
+  return Math.min(40, 8 + Math.log2(deg + 1) * 6)
+}
+
 // Extract first image URL from node content for zoomed-out thumbnail display
 const nodeFirstImage = computed(() => {
   const imageMap: Record<string, string | null> = {}
@@ -474,10 +472,20 @@ const magnifierVisibleNodes = computed(() => {
   })
 })
 
-// Edge stroke width - slight scaling to stay visible at low zoom
+// Edge stroke width - scale inversely to maintain constant visual width
+// Minimum 0.5px to keep edges visible at high zoom
 const edgeStrokeWidth = computed(() => {
-  if (scale.value >= 1) return 2
-  return Math.min(2 / Math.sqrt(scale.value), 4)
+  return Math.max(0.5, 1 / scale.value)
+})
+
+// Node border width - scale inversely to maintain constant visual width
+const nodeBorderWidth = computed(() => {
+  return 1 / scale.value
+})
+
+// Frame border width - scale inversely to maintain constant visual width
+const frameBorderWidth = computed(() => {
+  return 1 / scale.value
 })
 
 // Minimap - using composable
@@ -534,9 +542,9 @@ const nodeAgent = useNodeAgent()
 // Computed for proper reactivity tracking of agent log
 const nodeAgentLog = computed(() => nodeAgent.log.value)
 
-// Tooltip for zoomed-out hover - shows node info when scale is low
+// Tooltip for zoomed-out hover - shows node info when scale is low or in LOD mode
 const showHoverTooltip = computed(() => {
-  return hoveredNodeId.value && scale.value < 0.5
+  return hoveredNodeId.value && (scale.value < 0.5 || isLODMode.value)
 })
 
 const hoveredNode = computed(() => {
@@ -618,10 +626,10 @@ function snapToGrid(value: number): number {
 // Frame operations composable
 const frames = useFrames({
   store: {
-    frames: store.frames,
-    filteredNodes: store.filteredNodes,
-    selectedNodeIds: store.selectedNodeIds,
-    selectedFrameId: store.selectedFrameId,
+    get frames() { return store.frames },
+    get filteredNodes() { return store.filteredNodes },
+    get selectedNodeIds() { return store.selectedNodeIds },
+    get selectedFrameId() { return store.selectedFrameId },
     selectFrame: store.selectFrame,
     selectNode: store.selectNode,
     createFrame: store.createFrame,
@@ -647,6 +655,8 @@ function startEditingFrameTitle(frameId: string) { frames.startEditingTitle(fram
 function saveFrameTitleEditing() { frames.saveTitle() }
 function cancelFrameTitleEditing() { frames.cancelTitleEditing() }
 function createFrameAtCenter() { frames.createAtCenter() }
+function createFrameAtPosition(x: number, y: number) { frames.createAtPosition(x, y) }
+function cancelFramePlacement() { frames.cancelPlacement() }
 function deleteSelectedFrame() { frames.deleteSelected() }
 
 // Layout composable
@@ -669,8 +679,16 @@ const layout = useLayout({
   },
   pushUndo,
 })
-async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force' = 'grid') {
-  await layout.autoLayout(type)
+const isLayouting = ref(false)
+async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid') {
+  isLayouting.value = true
+  console.log(`[LAYOUT] Starting ${type} layout...`)
+  try {
+    await layout.autoLayout(type)
+    console.log(`[LAYOUT] ${type} layout complete`)
+  } finally {
+    isLayouting.value = false
+  }
 }
 function fitToContent() { layout.fitToContent() }
 
@@ -863,6 +881,7 @@ const pdfDrop = usePdfDrop({
     createNode: store.createNode,
     updateNodeContent: store.updateNodeContent,
     updateNodeTitle: store.updateNodeTitle,
+    deleteNode: store.deleteNode,
     createEdge: store.createEdge,
   },
   viewState: {
@@ -874,10 +893,19 @@ const pdfDrop = usePdfDrop({
         y: (rect.height / 2 - offsetY.value) / scale.value,
       }
     },
+    screenToCanvas: (screenX: number, screenY: number) => {
+      const rect = canvasRef.value?.getBoundingClientRect()
+      if (!rect) return { x: 0, y: 0 }
+      return {
+        x: (screenX - rect.left - offsetX.value) / scale.value,
+        y: (screenY - rect.top - offsetY.value) / scale.value,
+      }
+    },
   },
   llm: {
     simpleGenerate: callOllama,
   },
+  pushCreationUndo,
 })
 
 function onPromptKeydown(e: KeyboardEvent) {
@@ -1941,18 +1969,36 @@ const edgeLines = computed(() => {
   }).filter(Boolean)
 })
 
+// Threshold for "edges on hover only" mode (based on visible edges, not total)
+const EDGE_HOVER_ONLY_THRESHOLD = 1000
+
 // Visible edges - filtered for large graphs with pre-computed rendering properties
 const visibleEdgeLines = computed(() => {
   let edges = edgeLines.value
+  const visIds = visibleNodeIds.value
+  const hovered = hoveredNodeId.value
+  const selectedNodes = store.selectedNodeIds
 
-  // Filter for large graphs when zoomed out, but NOT when zoomed out very far
-  // At low zoom levels, all content fits on screen anyway so filtering is unnecessary
-  // Only filter in the "medium zoom" range (0.3 to 0.8) where culling helps
-  if (isLargeGraph.value && !isZooming.value && scale.value <= 0.8 && scale.value >= 0.3) {
-    const visIds = visibleNodeIds.value
-    edges = edges.filter(e =>
-      visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
-    )
+  // Filter to edges that should be rendered:
+  // 1. Edges connected to hovered/selected nodes (always show, even if other endpoint is off-screen)
+  // 2. Edges where BOTH endpoints are visible
+  edges = edges.filter(e => {
+    const connectedToActive = hovered === e.source_node_id || hovered === e.target_node_id ||
+      selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
+    if (connectedToActive) return true
+    return visIds.has(e.source_node_id) && visIds.has(e.target_node_id)
+  })
+
+  // For very large visible edge counts (1000+), only show edges on hover/select
+  if (edges.length > EDGE_HOVER_ONLY_THRESHOLD) {
+    if (hovered || selectedNodes.length > 0) {
+      edges = edges.filter(e =>
+        e.source_node_id === hovered || e.target_node_id === hovered ||
+        selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
+      )
+    } else {
+      edges = []
+    }
   }
 
   // Pre-compute rendering properties to avoid repeated function calls in template
@@ -1969,7 +2015,8 @@ const visibleEdgeLines = computed(() => {
     const color = (e.color && e.color.startsWith('#')) ? e.color
       : (e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value)
     const effectiveStrokeWidth = bundling ? e.strokeWidth * baseStrokeWidth : baseStrokeWidth
-    const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth + 2 : effectiveStrokeWidth
+    // Use multiplier for highlight to scale properly with zoom
+    const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth * 2 : effectiveStrokeWidth
 
     // Get highlight color based on whether connected node is selected or just hovered
     let edgeHighlightColor = highlightColor.value
@@ -1999,7 +2046,7 @@ const visibleEdgeLines = computed(() => {
       color,
       edgeHighlightColor,
       renderStrokeWidth,
-      glowStrokeWidth: effectiveStrokeWidth + 6,
+      glowStrokeWidth: effectiveStrokeWidth * 4,
       arrowMarkerId: isHighlighted ? `arrow-${edgeHighlightColor.replace('#', '')}` : `arrow-${color.replace('#', '')}`,
     }
   })
@@ -2119,6 +2166,18 @@ function onCanvasMouseLeave() {
 
 // Pan with left mouse drag on empty canvas space
 function onCanvasMouseDown(e: MouseEvent) {
+  // Handle frame placement mode
+  if (frames.pendingFramePlacement.value && e.button === 0) {
+    e.preventDefault()
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (rect) {
+      const canvasX = (e.clientX - rect.left - offsetX.value) / scale.value
+      const canvasY = (e.clientY - rect.top - offsetY.value) / scale.value
+      createFrameAtPosition(canvasX, canvasY)
+    }
+    return
+  }
+
   // Left click - start panning or lasso if not on a node
   if (e.button === 0) {
     const target = e.target as HTMLElement
@@ -2196,6 +2255,11 @@ function onNodeMouseMove(e: MouseEvent) {
 // Node dragging
 function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   e.stopPropagation()
+
+  // Prevent text selection on shift+click or alt+click
+  if (e.shiftKey || e.altKey) {
+    e.preventDefault()
+  }
 
   // Don't start drag if editing this node
   if (editingNodeId.value === nodeId) {
@@ -2321,13 +2385,41 @@ function stopNodeDrag(e: MouseEvent) {
   }
 
   // Push overlapping nodes away after drag (only if not dropped on storyline)
-  if (!droppedOnStoryline) {
+  // Skip in LOD mode - circles are small, pushing based on full node size doesn't make sense
+  if (!droppedOnStoryline && !isLODMode.value) {
     if (multiDragInitial.value.size > 0) {
       for (const id of multiDragInitial.value.keys()) {
         pushOverlappingNodesAway(id)
       }
     } else if (draggingNode.value) {
       pushOverlappingNodesAway(draggingNode.value)
+    }
+
+    // Assign nodes to frame if dropped inside one
+    for (const nodeId of draggedNodeIds) {
+      const node = store.getNode(nodeId)
+      if (!node) continue
+
+      const nodeWidth = node.width || 200
+      const nodeHeight = node.height || 120
+      const nodeArea = nodeWidth * nodeHeight
+      let assignedFrameId: string | null = null
+
+      for (const frame of store.frames) {
+        const overlapX = Math.max(0, Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) - Math.max(node.canvas_x, frame.canvas_x))
+        const overlapY = Math.max(0, Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) - Math.max(node.canvas_y, frame.canvas_y))
+        const overlapArea = overlapX * overlapY
+
+        if (overlapArea > nodeArea * 0.5) {
+          assignedFrameId = frame.id
+          break
+        }
+      }
+
+      // Update frame assignment (null removes from frame)
+      if (node.frame_id !== assignedFrameId) {
+        store.assignNodesToFrame([nodeId], assignedFrameId)
+      }
     }
   }
 
@@ -2576,8 +2668,12 @@ function handleContentClick(e: MouseEvent) {
 
 // Inline editing
 function startEditing(nodeId: string) {
+  // Already editing this node - don't reset content (preserves unsaved edits)
+  if (editingNodeId.value === nodeId) {
+    return
+  }
   // Save any current editing first
-  if (editingNodeId.value && editingNodeId.value !== nodeId) {
+  if (editingNodeId.value) {
     saveEditing()
   }
   const node = store.getNode(nodeId)
@@ -2609,11 +2705,19 @@ function startEditingTitle(nodeId: string) {
 }
 
 function saveTitleEditing() {
-  if (editingTitleId.value) {
+  if (editingTitleId.value && editTitle.value.trim()) {
+    // Clear any pending autosave timer
+    if (autosaveTitleTimer) {
+      clearTimeout(autosaveTitleTimer)
+      autosaveTitleTimer = null
+    }
+    // Update local state
     const node = store.getNode(editingTitleId.value)
     if (node) {
       node.title = editTitle.value
     }
+    // Persist to database
+    store.updateNodeTitle(editingTitleId.value, editTitle.value)
   }
   editingTitleId.value = null
   editTitle.value = ''
@@ -2634,6 +2738,7 @@ function saveEditing(e?: FocusEvent) {
       return
     }
   }
+
   const nodeId = editingNodeId.value
   if (nodeId) {
     store.updateNodeContent(nodeId, editContent.value)
@@ -3283,27 +3388,27 @@ watch(() => {
   }
 })
 
-// Node colors for the color picker (pastel for light/dark, neon for cyber)
+// Node colors for the color picker (transparent tints layered over solid bg)
 const defaultNodeColors = [
-  { value: null },
-  { value: '#fee2e2' }, // red
-  { value: '#ffedd5' }, // orange
-  { value: '#fef9c3' }, // yellow
-  { value: '#dcfce7' }, // green
-  { value: '#dbeafe' }, // blue
-  { value: '#f3e8ff' }, // purple
-  { value: '#fce7f3' }, // pink
+  { value: null, display: null },
+  { value: 'rgba(239, 68, 68, 0.08)', display: '#fecaca' }, // red
+  { value: 'rgba(249, 115, 22, 0.08)', display: '#fed7aa' }, // orange
+  { value: 'rgba(234, 179, 8, 0.08)', display: '#fef08a' }, // yellow
+  { value: 'rgba(34, 197, 94, 0.08)', display: '#bbf7d0' }, // green
+  { value: 'rgba(59, 130, 246, 0.08)', display: '#bfdbfe' }, // blue
+  { value: 'rgba(168, 85, 247, 0.08)', display: '#e9d5ff' }, // purple
+  { value: 'rgba(236, 72, 153, 0.08)', display: '#fbcfe8' }, // pink
 ]
 
 const cyberNodeColors = [
-  { value: null },
-  { value: '#ff3366' }, // neon red
-  { value: '#ffaa00' }, // neon orange
-  { value: '#ffff00' }, // neon yellow
-  { value: '#00ff66' }, // neon green
-  { value: '#00ccff' }, // neon blue
-  { value: '#9933ff' }, // neon purple
-  { value: '#ff00ff' }, // neon magenta
+  { value: null, display: null },
+  { value: '#4d1f30', display: '#ff3366' }, // neon red (dark bg)
+  { value: '#4d3300', display: '#ffaa00' }, // neon orange
+  { value: '#4d4d00', display: '#ffff00' }, // neon yellow
+  { value: '#004d20', display: '#00ff66' }, // neon green
+  { value: '#003d4d', display: '#00ccff' }, // neon blue
+  { value: '#2e194d', display: '#9933ff' }, // neon purple
+  { value: '#4d004d', display: '#ff00ff' }, // neon magenta
 ]
 
 const nodeColors = computed(() => {
@@ -3416,6 +3521,14 @@ interface ClipboardNodeData {
     width: number
     height: number
     color_theme: string | null
+    _index?: number // Used to map edges during paste
+  }>
+  edges?: Array<{
+    source_index: number // Index into nodes array
+    target_index: number
+    label: string | null
+    link_type: string
+    color: string | null
   }>
 }
 
@@ -3430,6 +3543,16 @@ async function copySelectedNodes() {
   const minX = Math.min(...selectedNodes.map(n => n.canvas_x))
   const minY = Math.min(...selectedNodes.map(n => n.canvas_y))
 
+  // Create index map for edge references
+  const nodeIdToIndex = new Map(selectedNodes.map((n, i) => [n.id, i]))
+  const selectedIdSet = new Set(store.selectedNodeIds)
+
+  // Find edges where both endpoints are in the selection
+  const allEdges = store.getFilteredEdges()
+  const selectedEdges = allEdges.filter(e =>
+    selectedIdSet.has(e.source_node_id) && selectedIdSet.has(e.target_node_id)
+  )
+
   const clipboardData: ClipboardNodeData = {
     type: 'nodus-nodes',
     nodes: selectedNodes.map(n => ({
@@ -3440,12 +3563,23 @@ async function copySelectedNodes() {
       width: n.width,
       height: n.height,
       color_theme: n.color_theme,
+    })),
+    edges: selectedEdges.map(e => ({
+      source_index: nodeIdToIndex.get(e.source_node_id)!,
+      target_index: nodeIdToIndex.get(e.target_node_id)!,
+      label: e.label,
+      link_type: e.link_type,
+      color: e.color,
     }))
   }
 
   try {
-    await navigator.clipboard.writeText(JSON.stringify(clipboardData, null, 2))
-    showToast?.(`Copied ${selectedNodes.length} node(s)`, 'success')
+    await writeClipboard(JSON.stringify(clipboardData, null, 2))
+    const edgeCount = selectedEdges.length
+    const msg = edgeCount > 0
+      ? `Copied ${selectedNodes.length} node(s) and ${edgeCount} edge(s)`
+      : `Copied ${selectedNodes.length} node(s)`
+    showToast?.(msg, 'success')
   } catch (e) {
     console.error('Failed to copy to clipboard:', e)
     showToast?.('Failed to copy to clipboard', 'error')
@@ -3454,7 +3588,7 @@ async function copySelectedNodes() {
 
 async function pasteNodes() {
   try {
-    const text = await navigator.clipboard.readText()
+    const text = await readClipboard()
     let data: ClipboardNodeData
 
     try {
@@ -3492,9 +3626,31 @@ async function pasteNodes() {
       newNodeIds.push(newNode.id)
     }
 
+    // Create edges between the pasted nodes
+    let edgesCreated = 0
+    if (data.edges && data.edges.length > 0) {
+      for (const edgeData of data.edges) {
+        const sourceId = newNodeIds[edgeData.source_index]
+        const targetId = newNodeIds[edgeData.target_index]
+        if (sourceId && targetId) {
+          await store.createEdge({
+            source_node_id: sourceId,
+            target_node_id: targetId,
+            label: edgeData.label,
+            link_type: edgeData.link_type,
+            color: edgeData.color,
+          })
+          edgesCreated++
+        }
+      }
+    }
+
     // Select the newly pasted nodes
     store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...newNodeIds)
-    showToast?.(`Pasted ${data.nodes.length} node(s)`, 'success')
+    const msg = edgesCreated > 0
+      ? `Pasted ${data.nodes.length} node(s) and ${edgesCreated} edge(s)`
+      : `Pasted ${data.nodes.length} node(s)`
+    showToast?.(msg, 'success')
   } catch (e) {
     // Clipboard read may fail due to permissions, just ignore
     console.debug('Paste failed:', e)
@@ -3519,24 +3675,41 @@ async function deleteSelectedNodes() {
   }
 }
 
-// Map light colors to dark mode equivalents (subtle tints on dark background)
-const darkModeColors: Record<string, string> = {
-  '#fee2e2': '#3f2a2a', // red tint
-  '#ffedd5': '#3d3328', // orange tint
-  '#fef9c3': '#3a3826', // yellow tint
-  '#dcfce7': '#2a3d2e', // green tint
-  '#dbeafe': '#2a3041', // blue tint
-  '#f3e8ff': '#352a41', // purple tint
-  '#fce7f3': '#3d2a38', // pink tint
+// Map legacy color values to current colors
+const legacyColorMap: Record<string, string> = {
+  // Old solid pastels
+  '#fecaca': 'rgba(239, 68, 68, 0.08)',
+  '#fed7aa': 'rgba(249, 115, 22, 0.08)',
+  '#fef08a': 'rgba(234, 179, 8, 0.08)',
+  '#bbf7d0': 'rgba(34, 197, 94, 0.08)',
+  '#bfdbfe': 'rgba(59, 130, 246, 0.08)',
+  '#e9d5ff': 'rgba(168, 85, 247, 0.08)',
+  '#fbcfe8': 'rgba(236, 72, 153, 0.08)',
+  // Old very light pastels
+  '#fef2f2': 'rgba(239, 68, 68, 0.08)',
+  '#fff7ed': 'rgba(249, 115, 22, 0.08)',
+  '#fefce8': 'rgba(234, 179, 8, 0.08)',
+  '#f0fdf4': 'rgba(34, 197, 94, 0.08)',
+  '#eff6ff': 'rgba(59, 130, 246, 0.08)',
+  '#faf5ff': 'rgba(168, 85, 247, 0.08)',
+  '#fdf2f8': 'rgba(236, 72, 153, 0.08)',
+  // Old rgba values with different alphas
+  'rgba(239, 68, 68, 0.15)': 'rgba(239, 68, 68, 0.08)',
+  'rgba(249, 115, 22, 0.15)': 'rgba(249, 115, 22, 0.08)',
+  'rgba(234, 179, 8, 0.15)': 'rgba(234, 179, 8, 0.08)',
+  'rgba(34, 197, 94, 0.15)': 'rgba(34, 197, 94, 0.08)',
+  'rgba(59, 130, 246, 0.15)': 'rgba(59, 130, 246, 0.08)',
+  'rgba(168, 85, 247, 0.15)': 'rgba(168, 85, 247, 0.08)',
+  'rgba(236, 72, 153, 0.15)': 'rgba(236, 72, 153, 0.08)',
 }
 
-// Get appropriate node background color for current theme
+// Get node background - layers transparent color over solid base
 function getNodeBackground(colorTheme: string | null): string | undefined {
   if (!colorTheme) return undefined
-  if (isDarkMode.value && darkModeColors[colorTheme]) {
-    return darkModeColors[colorTheme]
-  }
-  return colorTheme
+  // Normalize legacy colors to current format
+  const normalizedColor = legacyColorMap[colorTheme] || colorTheme
+  // Use linear-gradient to layer transparent color over solid background
+  return `linear-gradient(${normalizedColor}, ${normalizedColor}), var(--bg-surface)`
 }
 
 // Context menu handler
@@ -3659,7 +3832,16 @@ async function moveNodesToWorkspace(workspaceId: string | null) {
 
 // Export current graph/subgraph as YAML for debugging
 function exportGraphAsYaml() {
-  const nodes = displayNodes.value.map(n => ({
+  const selectedIds = store.getSelectedNodeIds()
+  const selectedSet = new Set(selectedIds)
+  const hasSelection = selectedIds.length > 0
+
+  // Export selected nodes only, or all if no selection
+  const nodesToExport = hasSelection
+    ? displayNodes.value.filter(n => selectedSet.has(n.id))
+    : displayNodes.value
+
+  const nodes = nodesToExport.map(n => ({
     id: n.id,
     title: n.title,
     x: n.canvas_x,
@@ -3668,16 +3850,21 @@ function exportGraphAsYaml() {
     height: n.height || NODE_DEFAULTS.HEIGHT,
   }))
 
-  const edges = edgeLines.value.map(e => ({
-    id: e.id,
-    source: e.source_node_id,
-    target: e.target_node_id,
-    path: e.path,
-    style: e.style,
-  }))
+  // Export edges where both endpoints are in the export set
+  const nodeIdSet = new Set(nodesToExport.map(n => n.id))
+  const edges = edgeLines.value
+    .filter(e => nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id))
+    .map(e => ({
+      id: e.id,
+      source: e.source_node_id,
+      target: e.target_node_id,
+      path: e.path,
+      style: e.style,
+    }))
 
   const yaml = `# Graph Export - ${new Date().toISOString()}
 # Nodes: ${nodes.length}, Edges: ${edges.length}
+# Selection: ${hasSelection ? 'subgraph' : 'all'}
 # Neighborhood mode: ${neighborhoodMode.value}
 
 nodes:
@@ -3697,8 +3884,11 @@ ${edges.map(e => `  - id: "${e.id}"
 `
 
   // Copy to clipboard
-  navigator.clipboard.writeText(yaml).then(() => {
-    console.log('[EXPORT] Graph YAML copied to clipboard')
+  writeClipboard(yaml).then(() => {
+    showToast?.(`Copied ${nodes.length} nodes, ${edges.length} edges as YAML`, 'success')
+  }).catch(err => {
+    console.error('[EXPORT] Clipboard failed:', err)
+    showToast?.('Failed to copy to clipboard', 'error')
   })
 }
 
@@ -3750,8 +3940,8 @@ ${edges.map(e => `  - id: "${e.id}"
     <div
       ref="canvasRef"
       class="canvas-viewport"
-      :class="{ panning: isPanning }"
-      :style="{ backgroundPosition: offsetX + 'px ' + offsetY + 'px', backgroundSize: (24 * scale) + 'px ' + (24 * scale) + 'px' }"
+      :class="{ panning: isPanning, 'frame-placement': frames.pendingFramePlacement.value }"
+      :style="{ backgroundPosition: offsetX + 'px ' + offsetY + 'px' }"
       @wheel="onWheel"
       @mousedown="onCanvasMouseDown"
       @mousemove="onCanvasMouseMove"
@@ -3777,11 +3967,11 @@ ${edges.map(e => `  - id: "${e.id}"
             :key="edge.id + '-' + edge.arrowMarkerId"
             :d="edge.path"
             :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
-            :stroke-width="edge.isHighlighted ? 2.5 : 1"
+            :stroke-width="edge.isHighlighted ? edgeStrokeWidth * 2 : edgeStrokeWidth"
             :marker-end="edge.isHighlighted && !edge.isBidirectional && !edge.isShortEdge ? `url(#${edge.arrowMarkerId})` : undefined"
             fill="none"
             class="edge-line-fast"
-            :class="{ 'edge-highlighted': edge.isHighlighted }"
+            :class="{ 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged' }"
           />
         </template>
         <template v-else>
@@ -3827,7 +4017,7 @@ ${edges.map(e => `  - id: "${e.id}"
               stroke-linecap="round"
               fill="none"
               class="edge-line-visible"
-              :class="{ 'edge-selected': edge.isSelected, 'edge-highlighted': edge.isHighlighted }"
+              :class="{ 'edge-selected': edge.isSelected, 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged' }"
               pointer-events="none"
             />
             <text
@@ -3873,11 +4063,12 @@ ${edges.map(e => `  - id: "${e.id}"
           width: frame.width + 'px',
           height: frame.height + 'px',
           borderColor: frame.color || 'var(--border-default)',
+          borderWidth: frameBorderWidth + 'px',
         }"
         @mousedown.stop="onFrameMouseDown($event, frame.id)"
         @dblclick.stop="startEditingFrameTitle(frame.id)"
       >
-        <div class="frame-header">
+        <div class="frame-header" :style="{ transform: `scale(${1/scale})`, transformOrigin: 'left center' }">
           <input
             v-if="editingFrameId === frame.id"
             v-model="editFrameTitle"
@@ -3909,11 +4100,34 @@ ${edges.map(e => `  - id: "${e.id}"
         <div class="frame-resize-handle" @mousedown.stop="startFrameResize($event, frame.id)"></div>
       </div>
 
-      <!-- Node cards (viewport culled for performance) -->
+      <!-- LOD Mode: Render non-selected nodes as circles -->
+      <template v-if="isLODMode">
+        <div
+          v-for="node in visibleNodes.filter(n => !store.selectedNodeIds.includes(n.id) && n.id !== editingNodeId)"
+          :key="node.id"
+          :data-node-id="node.id"
+          class="node-circle"
+          :class="{ dragging: draggingNode === node.id }"
+          :style="{
+            transform: `translate3d(${node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2 - getLODRadius(node.id)}px, ${node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2 - getLODRadius(node.id)}px, 0)`,
+            width: getLODRadius(node.id) * 2 + 'px',
+            height: getLODRadius(node.id) * 2 + 'px',
+            background: node.color_theme || 'var(--primary-color)',
+          }"
+          :title="node.title + ' (' + (nodeDegree[node.id] || 0) + ' connections)'"
+          @mousedown="onNodeMouseDown($event, node.id)"
+          @mouseenter="hoveredNodeId = node.id"
+          @mouseleave="hoveredNodeId = null"
+          @dblclick.stop="startEditing(node.id)"
+        ></div>
+      </template>
+
+      <!-- Node cards - shown for all nodes in normal mode, or selected/editing nodes in LOD mode -->
       <div
-        v-for="node in visibleNodes"
+        v-for="node in isLODMode ? visibleNodes.filter(n => store.selectedNodeIds.includes(n.id) || n.id === editingNodeId) : visibleNodes"
         :key="node.id"
         :data-node-id="node.id"
+        :data-node-type="node.node_type"
         class="node-card"
         :class="{
           selected: store.selectedNodeIds.includes(node.id),
@@ -3928,6 +4142,7 @@ ${edges.map(e => `  - id: "${e.id}"
           transform: `translate3d(${resizingNode === node.id ? resizePreview.x : node.canvas_x}px, ${resizingNode === node.id ? resizePreview.y : node.canvas_y}px, 0)`,
           width: (resizingNode === node.id ? resizePreview.width : (node.width || NODE_DEFAULTS.WIDTH)) + 'px',
           height: (resizingNode === node.id ? resizePreview.height : (node.height || NODE_DEFAULTS.HEIGHT)) + 'px',
+          borderWidth: nodeBorderWidth + 'px',
           ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
         }"
         @mousedown="onNodeMouseDown($event, node.id)"
@@ -3954,6 +4169,7 @@ ${edges.map(e => `  - id: "${e.id}"
             @keydown.escape="cancelTitleEditing"
             @click.stop
             @mousedown.stop
+            @mouseup.stop
           />
           <span v-else>{{ node.title || 'Untitled' }}</span>
         </div>
@@ -3963,6 +4179,11 @@ ${edges.map(e => `  - id: "${e.id}"
           v-model="editContent"
           class="inline-editor"
           placeholder="Write markdown..."
+          spellcheck="false"
+          autocorrect="off"
+          autocapitalize="off"
+          @mousedown.stop
+          @mouseup.stop
           @blur="saveEditing($event)"
           @keydown="onEditorKeydown"
         ></textarea>
@@ -3981,7 +4202,7 @@ ${edges.map(e => `  - id: "${e.id}"
             :key="color.value || 'default'"
             class="color-dot"
             :class="{ active: node.color_theme === color.value }"
-            :style="{ background: color.value || 'var(--bg-surface)' }"
+            :style="{ background: color.display || 'var(--bg-surface)' }"
             @click.stop="updateNodeColor(node.id, color.value)"
           ></button>
           <span class="color-bar-sep"></span>
@@ -3997,7 +4218,7 @@ ${edges.map(e => `  - id: "${e.id}"
           v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id"
           class="delete-node-btn"
           @mousedown.stop="deleteSelectedNodes"
-        >x</button>
+        ></button>
 
         <!-- Resize handles - edges -->
         <div class="resize-edge resize-edge-n" @mousedown.stop="onResizeMouseDown($event, node.id, 'n')"></div>
@@ -4116,120 +4337,45 @@ ${edges.map(e => `  - id: "${e.id}"
     </div>
 
     <!-- Controls -->
-    <div class="zoom-controls" @mousedown.stop>
-      <button data-tooltip="Zoom In" @click="scale = Math.min(scale * 1.25, 3)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      </button>
-      <span>{{ Math.round(scale * 100) }}%</span>
-      <button data-tooltip="Zoom Out" @click="scale = Math.max(scale * 0.8, 0.05)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      </button>
-      <button data-tooltip="Fit to Content - Show all nodes" @click="fitToContent">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-      </button>
-      <button
-        :class="{ active: gridLockEnabled }"
-        data-tooltip="Snap to Grid - Align nodes to grid when dragging"
-        @click="gridLockEnabled = !gridLockEnabled"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      </button>
-      <button data-tooltip="Grid Layout - Arrange nodes in a grid" @click="autoLayoutNodes('grid')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="10" y="3" width="5" height="5"/><rect x="17" y="3" width="5" height="5"/><rect x="3" y="10" width="5" height="5"/><rect x="10" y="10" width="5" height="5"/><rect x="17" y="10" width="5" height="5"/></svg>
-      </button>
-      <button data-tooltip="Force Layout - Arrange by connections" @click="autoLayoutNodes('force')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><line x1="8" y1="8" x2="10" y2="16"/><line x1="16" y1="8" x2="14" y2="16"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
-      </button>
-      <button data-tooltip="Fit Nodes to Content - Resize all nodes to show full content" @click="fitAllNodesToContent">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>
-      </button>
-      <button
-        :disabled="isLargeGraph"
-        :data-tooltip="`Edge Style: ${globalEdgeStyle}`"
-        @click="cycleEdgeStyle"
-      >
-        <svg v-if="globalEdgeStyle === 'orthogonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L4 12 L20 12 L20 4"/></svg>
-        <svg v-else-if="globalEdgeStyle === 'diagonal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L12 12 L20 12 L20 4"/></svg>
-        <svg v-else-if="globalEdgeStyle === 'curved'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 C4 12 20 12 20 4"/></svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20 L20 4"/></svg>
-      </button>
-      <button
-        :class="{ active: edgeBundling }"
-        data-tooltip="Edge Bundling - Merge edges with shared endpoints"
-        @click="toggleEdgeBundling"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 4 L12 12 L4 20"/>
-          <path d="M8 4 L12 12 L8 20"/>
-          <line x1="12" y1="12" x2="20" y2="12" stroke-width="3"/>
-        </svg>
-      </button>
-      <button
-        :class="{ active: magnifierEnabled }"
-        data-tooltip="Magnifier - Show magnified view when zoomed out"
-        @click="toggleMagnifier"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="10" cy="10" r="7"/>
-          <line x1="15" y1="15" x2="21" y2="21"/>
-        </svg>
-      </button>
-      <button
-        :class="{ active: neighborhoodMode }"
-        data-tooltip="Neighborhood View - Show only selected node and neighbors (N)"
-        @mousedown.stop.prevent="toggleNeighborhoodMode()"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="4"/>
-          <circle cx="4" cy="8" r="2"/>
-          <circle cx="20" cy="8" r="2"/>
-          <circle cx="4" cy="16" r="2"/>
-          <circle cx="20" cy="16" r="2"/>
-          <line x1="8" y1="10" x2="6" y2="9"/>
-          <line x1="16" y1="10" x2="18" y2="9"/>
-          <line x1="8" y1="14" x2="6" y2="15"/>
-          <line x1="16" y1="14" x2="18" y2="15"/>
-        </svg>
-      </button>
-      <select
-        v-if="neighborhoodMode"
-        class="depth-select"
-        :value="neighborhoodDepth"
-        @change="setDepth(Number(($event.target as HTMLSelectElement).value))"
-        data-tooltip="Neighborhood depth (hops)"
-      >
-        <option value="1">1 hop</option>
-        <option value="2">2 hops</option>
-        <option value="3">3 hops</option>
-        <option value="4">4 hops</option>
-        <option value="5">5 hops</option>
-      </select>
-      <button data-tooltip="Add Frame - Group selected nodes" @click="createFrameAtCenter">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-      </button>
-    </div>
+    <CanvasControls
+      :scale="scale"
+      :grid-lock-enabled="gridLockEnabled"
+      :is-large-graph="isLargeGraph"
+      :global-edge-style="globalEdgeStyle"
+      :edge-bundling="edgeBundling"
+      :magnifier-enabled="magnifierEnabled"
+      :neighborhood-mode="neighborhoodMode"
+      :neighborhood-depth="neighborhoodDepth"
+      :pending-frame-placement="frames.pendingFramePlacement.value"
+      @zoom-in="scale = Math.min(scale * 1.25, 3)"
+      @zoom-out="scale = Math.max(scale * 0.8, 0.05)"
+      @fit-to-content="fitToContent"
+      @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
+      @layout="autoLayoutNodes"
+      @fit-nodes-to-content="fitAllNodesToContent"
+      @cycle-edge-style="cycleEdgeStyle"
+      @toggle-edge-bundling="toggleEdgeBundling"
+      @toggle-magnifier="toggleMagnifier"
+      @toggle-neighborhood-mode="toggleNeighborhoodMode()"
+      @set-neighborhood-depth="setDepth"
+      @create-frame="createFrameAtCenter"
+    />
 
-    <div class="status-bar">
-      <span v-if="pdfDrop.isProcessing.value" class="pdf-processing">
-        PDF: {{ pdfDrop.processingStatus.value }}
-        <button class="stop-btn" @click="pdfDrop.stop()">Stop</button>
-      </span>
-      <span v-if="pdfDrop.isProcessing.value" class="sep">|</span>
-      <span v-if="isLargeGraph" class="perf-mode">PERF</span>
-      <span>{{ visibleNodes.length }}/{{ store.filteredNodes.length }} nodes</span>
-      <span class="sep">|</span>
-      <span>{{ edgeLines.length }}/{{ store.filteredEdges.length }} edges</span>
-      <button
-        v-if="nodeAgentLog.length > 0"
-        class="agent-log-toggle"
-        @click="showNodeAgentLog = !showNodeAgentLog"
-        :title="showNodeAgentLog ? 'Hide agent log' : 'Show agent log'"
-      >
-        Log ({{ nodeAgentLog.length }})
-      </button>
-      <span class="sep">|</span>
-      <span class="hint">Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new</span>
-    </div>
+    <!-- Status Bar -->
+    <CanvasStatusBar
+      :visible-node-count="visibleNodes.length"
+      :total-node-count="store.filteredNodes.length"
+      :visible-edge-count="edgeLines.length"
+      :total-edge-count="store.filteredEdges.length"
+      :is-layouting="isLayouting"
+      :is-large-graph="isLargeGraph"
+      :is-pdf-processing="pdfDrop.isProcessing.value"
+      :pdf-status="pdfDrop.processingStatus.value"
+      :agent-log="nodeAgentLog"
+      :show-agent-log="showNodeAgentLog"
+      @stop-pdf="pdfDrop.stop()"
+      @toggle-agent-log="showNodeAgentLog = !showNodeAgentLog"
+    />
 
     <!-- Node agent log panel (fixed position) -->
     <div
@@ -4355,6 +4501,14 @@ ${edges.map(e => `  - id: "${e.id}"
           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
         </svg>
         <span>Fit to Content</span>
+      </div>
+
+      <div class="context-menu-item" @click="zoomToNode(contextMenuNodeId!); closeContextMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <span>Find on Canvas</span>
       </div>
 
       <div class="context-menu-divider"></div>
