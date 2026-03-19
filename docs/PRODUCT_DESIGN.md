@@ -1,6 +1,6 @@
 # Nodus - Product Design Document
 
-Version: 0.12.0
+Version: 0.13.0
 Date: 2026-03-19
 Status: Active Development
 
@@ -372,10 +372,39 @@ Users want the node on the canvas to be the "source of truth." They dislike clic
 - **Multi-directional resize:** All edges and corners (8 handles)
 - Minimap navigation
 - Frames/areas for grouping
-- Keyboard shortcuts (n=new, e=edit, del=delete, /=command palette)
 - **Undo/Redo system:** Full support including node deletion with edge restoration
 - **Cmd/Ctrl+Click:** Zoom-to-fit on specific node (auto-scales based on node size)
 - **External links:** Open in default system browser
+- **Context menu:** Right-click for node actions (fit, storyline, send to workspace, delete)
+- **Copy/Paste nodes:** Cmd+C/Cmd+V to copy and paste nodes (preserves layout)
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Delete` / `Backspace` | Delete selected nodes/edges/frames |
+| `L` | Force layout (D3-force) |
+| `N` | Toggle neighborhood mode |
+| `F` | Fit to content |
+| `Shift+R` | Reset all node sizes to default |
+| `Shift+E` | Export graph as YAML (debug) |
+| `Cmd/Ctrl+A` | Select all nodes |
+| `Cmd/Ctrl+C` | Copy selected nodes as JSON |
+| `Cmd/Ctrl+V` | Paste nodes from clipboard |
+| `Ctrl+Shift+R` | Refresh workspace from files |
+
+### Context Menu
+
+Right-click on a node to access:
+
+| Action | Description |
+|--------|-------------|
+| **Fit to Content** | Auto-resize node to fit its content |
+| **Add to Storyline** | Add node(s) to existing or new storyline |
+| **Send to Workspace** | Move node(s) to a different workspace |
+| **Delete** | Remove node(s) from canvas |
+
+Multi-selection: All context menu actions work on multiple selected nodes.
 
 ### Neighborhood Mode
 
@@ -749,7 +778,7 @@ Settings modal with four tabs: General, Themes, Canvas, LLM.
 
 **General:**
 - LLM Features toggle (show/hide AI prompts)
-- Workspace diagnostics (scan for orphaned nodes, recovery)
+- Workspace diagnostics (scan for node counts per workspace, recovery)
 
 **Themes:**
 - Theme selection grid (built-in + custom)

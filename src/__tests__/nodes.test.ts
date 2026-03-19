@@ -18,9 +18,19 @@ const localStorageMock = {
 }
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
 
-// Mock Tauri invoke
+// Mock Tauri invoke with smart responses
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn().mockRejectedValue(new Error('Mock: No backend')),
+  invoke: vi.fn().mockImplementation((command: string, args?: unknown) => {
+    // Allow workspace operations to succeed
+    if (command === 'create_workspace') {
+      return Promise.resolve()
+    }
+    if (command === 'update_node_workspace') {
+      return Promise.resolve()
+    }
+    // Reject other commands to trigger fallbacks
+    return Promise.reject(new Error('Mock: No backend'))
+  }),
 }))
 
 // Mock Tauri event
@@ -175,5 +185,169 @@ describe('Nodes Store', () => {
       expect(typeof store.watchVault).toBe('function')
       expect(typeof store.stopWatching).toBe('function')
     })
+  })
+
+  describe('moveNodesToWorkspace', () => {
+    it('should move nodes to a different workspace', async () => {
+      const store = useNodesStore()
+      await store.initialize()
+
+      // Create a workspace
+      const workspace = await store.createWorkspace('Test Workspace')
+      expect(workspace.id).toBeDefined()
+
+      // Move node to workspace
+      await store.moveNodesToWorkspace(['1'], workspace.id)
+
+      const node = store.getNode('1')
+      expect(node?.workspace_id).toBe(workspace.id)
+    })
+
+    it('should move multiple nodes at once', async () => {
+      const store = useNodesStore()
+      await store.initialize()
+
+      const workspace = await store.createWorkspace('Target Workspace')
+      await store.moveNodesToWorkspace(['1', '2'], workspace.id)
+
+      expect(store.getNode('1')?.workspace_id).toBe(workspace.id)
+      expect(store.getNode('2')?.workspace_id).toBe(workspace.id)
+    })
+
+    it('should move nodes to default workspace (null)', async () => {
+      const store = useNodesStore()
+      await store.initialize()
+
+      const workspace = await store.createWorkspace('Temp Workspace')
+      await store.moveNodesToWorkspace(['1'], workspace.id)
+      expect(store.getNode('1')?.workspace_id).toBe(workspace.id)
+
+      // Move back to default
+      await store.moveNodesToWorkspace(['1'], null)
+      expect(store.getNode('1')?.workspace_id).toBeNull()
+    })
+  })
+
+  describe('workspace management', () => {
+    it('should create and switch workspaces', async () => {
+      const store = useNodesStore()
+      await store.initialize()
+
+      const workspace = await store.createWorkspace('My Workspace')
+      expect(workspace.name).toBe('My Workspace')
+      expect(store.workspaces).toContainEqual(workspace)
+
+      store.switchWorkspace(workspace.id)
+      expect(store.currentWorkspaceId).toBe(workspace.id)
+    })
+
+    it('should filter nodes by current workspace', async () => {
+      const store = useNodesStore()
+      await store.initialize()
+
+      // Initially in default workspace (null)
+      expect(store.filteredNodes.length).toBe(2)
+
+      // Create workspace and move one node
+      const workspace = await store.createWorkspace('Work')
+      await store.moveNodesToWorkspace(['1'], workspace.id)
+
+      // Default workspace should now only have 1 node
+      expect(store.filteredNodes.length).toBe(1)
+
+      // Switch to new workspace
+      store.switchWorkspace(workspace.id)
+      expect(store.filteredNodes.length).toBe(1)
+      expect(store.filteredNodes[0].id).toBe('1')
+    })
+
+    it('should delete workspace', async () => {
+      const store = useNodesStore()
+      await store.initialize()
+
+      const workspace = await store.createWorkspace('To Delete')
+      store.switchWorkspace(workspace.id)
+      expect(store.currentWorkspaceId).toBe(workspace.id)
+
+      store.deleteWorkspace(workspace.id)
+      expect(store.workspaces).not.toContainEqual(workspace)
+      expect(store.currentWorkspaceId).toBeNull() // Should switch to default
+    })
+  })
+})
+
+describe('Clipboard Node Data', () => {
+  it('should have correct structure for copy/paste', () => {
+    interface ClipboardNodeData {
+      type: 'nodus-nodes'
+      nodes: Array<{
+        title: string
+        markdown_content: string
+        canvas_x: number
+        canvas_y: number
+        width: number
+        height: number
+        color_theme: string | null
+      }>
+    }
+
+    const clipboardData: ClipboardNodeData = {
+      type: 'nodus-nodes',
+      nodes: [
+        {
+          title: 'Test Node',
+          markdown_content: '# Test\n\nContent here',
+          canvas_x: 0, // Relative position
+          canvas_y: 0,
+          width: 200,
+          height: 120,
+          color_theme: 'blue',
+        },
+        {
+          title: 'Second Node',
+          markdown_content: 'More content',
+          canvas_x: 250, // Offset from first node
+          canvas_y: 0,
+          width: 200,
+          height: 120,
+          color_theme: null,
+        },
+      ],
+    }
+
+    // Validate structure
+    expect(clipboardData.type).toBe('nodus-nodes')
+    expect(clipboardData.nodes).toHaveLength(2)
+    expect(clipboardData.nodes[0].title).toBe('Test Node')
+    expect(clipboardData.nodes[1].canvas_x).toBe(250)
+
+    // Should be JSON serializable
+    const json = JSON.stringify(clipboardData)
+    const parsed = JSON.parse(json) as ClipboardNodeData
+    expect(parsed.type).toBe('nodus-nodes')
+    expect(parsed.nodes).toHaveLength(2)
+  })
+
+  it('should preserve relative positions when copying multiple nodes', () => {
+    // Simulate nodes at different positions
+    const nodes = [
+      { canvas_x: 100, canvas_y: 200 },
+      { canvas_x: 350, canvas_y: 200 },
+      { canvas_x: 100, canvas_y: 400 },
+    ]
+
+    // Find bounding box origin
+    const minX = Math.min(...nodes.map(n => n.canvas_x))
+    const minY = Math.min(...nodes.map(n => n.canvas_y))
+
+    // Convert to relative positions
+    const relative = nodes.map(n => ({
+      canvas_x: n.canvas_x - minX,
+      canvas_y: n.canvas_y - minY,
+    }))
+
+    expect(relative[0]).toEqual({ canvas_x: 0, canvas_y: 0 })
+    expect(relative[1]).toEqual({ canvas_x: 250, canvas_y: 0 })
+    expect(relative[2]).toEqual({ canvas_x: 0, canvas_y: 200 })
   })
 })
