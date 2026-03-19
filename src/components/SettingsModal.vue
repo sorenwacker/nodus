@@ -4,17 +4,26 @@
  * Unified settings interface for LLM, Canvas, and general preferences
  */
 import { ref, watch, onMounted, computed } from 'vue'
-import { llmStorage, canvasStorage, themeStorage } from '../lib/storage'
+import { llmStorage, canvasStorage } from '../lib/storage'
 import { providerRegistry } from '../canvas/llm/providers'
 import type { ProviderModel } from '../canvas/llm/providers'
 import { DEFAULT_SYSTEM_PROMPT, DEFAULT_AGENT_PROMPT } from '../canvas/llm/prompts'
+import { useThemesStore } from '../stores/themes'
+import { useNodesStore } from '../stores/nodes'
+
+const themesStore = useThemesStore()
+const nodesStore = useNodesStore()
 
 const emit = defineEmits<{
   close: []
 }>()
 
 // Active tab
-const activeTab = ref<'llm' | 'canvas' | 'general'>('llm')
+const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general'>('general')
+
+// LLM enabled toggle
+const llmEnabled = ref(llmStorage.getLLMEnabled())
+const llmStreaming = ref(llmStorage.getLLMStreaming())
 
 // Provider settings
 const providers = providerRegistry.getProviders()
@@ -130,8 +139,11 @@ const gridSnap = ref(canvasStorage.getGridSnap())
 const gridSize = ref(canvasStorage.getGridSize())
 const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'straight'>(canvasStorage.getEdgeStyle())
 
-// General Settings
-const theme = ref(themeStorage.get())
+// Theme is handled by themes store
+const selectedTheme = computed({
+  get: () => themesStore.currentThemeName,
+  set: (name: string) => themesStore.setTheme(name),
+})
 
 // Set config value for current provider
 function setConfigValue(key: string, value: unknown) {
@@ -276,18 +288,13 @@ function saveCanvasSettings() {
   canvasStorage.setEdgeStyle(edgeStyle.value)
 }
 
-// Save General settings
-function saveGeneralSettings() {
-  themeStorage.set(theme.value)
-  document.documentElement.setAttribute('data-theme', theme.value)
-}
+// Theme changes are handled automatically by the themes store
 
 // Auto-save on changes
 watch(selectedProvider, saveActiveProvider)
 watch(llmSystemPrompt, saveSystemPrompt)
 watch(llmAgentPrompt, saveAgentPrompt)
 watch([gridSnap, gridSize, edgeStyle], saveCanvasSettings)
-watch(theme, saveGeneralSettings)
 watch([maxTokens, contextWindow, timeout, selectedModel], saveProviderConfig)
 
 // Refresh models when URL changes
@@ -304,9 +311,27 @@ watch(apiKey, () => {
   validateDebounceTimer = setTimeout(() => validateApiKey(), 800)
 })
 
-onMounted(() => {
+onMounted(async () => {
   loadStoredConfigs()
   fetchModels()
+  // Refresh themes from database
+  await themesStore.initialize()
+})
+
+// Watch LLM enabled toggle
+watch(llmEnabled, (value) => {
+  llmStorage.setLLMEnabled(value)
+  // Emit custom event so other components can react
+  window.dispatchEvent(new CustomEvent('nodus-llm-enabled-change', { detail: value }))
+  // Switch away from LLM tab if disabled
+  if (!value && activeTab.value === 'llm') {
+    activeTab.value = 'general'
+  }
+})
+
+// Watch LLM streaming toggle
+watch(llmStreaming, (value) => {
+  llmStorage.setLLMStreaming(value)
 })
 
 function handleClose() {
@@ -328,6 +353,113 @@ const timeoutSeconds = computed({
   get: () => Math.round(timeout.value / 1000),
   set: (value: number) => { timeout.value = value * 1000 }
 })
+
+// Delete custom theme
+async function deleteCustomTheme(id: string) {
+  if (confirm('Delete this custom theme?')) {
+    await themesStore.deleteTheme(id)
+  }
+}
+
+// Workspace diagnostics
+interface WorkspaceStats {
+  id: string
+  name: string
+  nodeCount: number
+}
+const workspaceStats = ref<WorkspaceStats[]>([])
+const scanningWorkspaces = ref(false)
+
+async function scanWorkspaces() {
+  scanningWorkspaces.value = true
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+
+    // Get all nodes from database
+    interface NodeWithWorkspace { workspace_id: string | null }
+    const allNodes = await invoke<NodeWithWorkspace[]>('get_nodes')
+
+    // Count nodes per workspace
+    const counts = new Map<string, number>()
+    for (const node of allNodes) {
+      const wsId = node.workspace_id || '(none)'
+      counts.set(wsId, (counts.get(wsId) || 0) + 1)
+    }
+
+    // Build stats with workspace names
+    const stats: WorkspaceStats[] = []
+
+    // Add known workspaces
+    for (const ws of nodesStore.workspaces) {
+      stats.push({
+        id: ws.id,
+        name: ws.name,
+        nodeCount: counts.get(ws.id) || 0
+      })
+      counts.delete(ws.id)
+    }
+
+    // Add orphaned workspace IDs (nodes exist but workspace not in list)
+    for (const [wsId, count] of counts) {
+      if (wsId !== '(none)') {
+        stats.push({
+          id: wsId,
+          name: '(deleted)',
+          nodeCount: count
+        })
+      }
+    }
+
+    // Add nodes with no workspace
+    const noWorkspaceCount = counts.get('(none)') || 0
+    if (noWorkspaceCount > 0) {
+      stats.push({
+        id: '',
+        name: '(no workspace)',
+        nodeCount: noWorkspaceCount
+      })
+    }
+
+    // Sort by node count descending
+    stats.sort((a, b) => b.nodeCount - a.nodeCount)
+    workspaceStats.value = stats
+
+    console.log('[Settings] Workspace stats:', stats)
+  } catch (e) {
+    console.error('[Settings] Failed to scan workspaces:', e)
+  } finally {
+    scanningWorkspaces.value = false
+  }
+}
+
+async function switchToWorkspace(id: string) {
+  if (id === '') {
+    nodesStore.switchWorkspace(null)
+  } else {
+    // Check if workspace exists in list, if not try to recover it
+    const exists = nodesStore.workspaces.some(w => w.id === id)
+    if (!exists) {
+      await nodesStore.recoverWorkspace(id)
+    }
+    nodesStore.switchWorkspace(id)
+  }
+  emit('close')
+}
+
+async function recoverOrphanedWorkspace(id: string) {
+  recoveringWorkspace.value = id
+  try {
+    const recovered = await nodesStore.recoverWorkspace(id)
+    if (recovered) {
+      // Remove from orphaned list
+      orphanedWorkspaceIds.value = orphanedWorkspaceIds.value.filter(wsId => wsId !== id)
+      // Switch to the recovered workspace
+      nodesStore.switchWorkspace(recovered.id)
+    }
+  } finally {
+    recoveringWorkspace.value = null
+  }
+}
 </script>
 
 <template>
@@ -344,10 +476,16 @@ const timeoutSeconds = computed({
 
       <nav class="settings-tabs">
         <button
-          :class="{ active: activeTab === 'llm' }"
-          @click="activeTab = 'llm'"
+          :class="{ active: activeTab === 'general' }"
+          @click="activeTab = 'general'"
         >
-          LLM
+          General
+        </button>
+        <button
+          :class="{ active: activeTab === 'themes' }"
+          @click="activeTab = 'themes'"
+        >
+          Themes
         </button>
         <button
           :class="{ active: activeTab === 'canvas' }"
@@ -356,10 +494,11 @@ const timeoutSeconds = computed({
           Canvas
         </button>
         <button
-          :class="{ active: activeTab === 'general' }"
-          @click="activeTab = 'general'"
+          v-if="llmEnabled"
+          :class="{ active: activeTab === 'llm' }"
+          @click="activeTab = 'llm'"
         >
-          General
+          LLM
         </button>
       </nav>
 
@@ -381,6 +520,15 @@ const timeoutSeconds = computed({
                 :title="providerStatus === 'online' ? 'Connected' : providerStatus === 'offline' ? 'Not connected' : 'Checking...'"
               />
             </div>
+          </div>
+
+          <!-- Streaming toggle -->
+          <div class="setting-group">
+            <label class="checkbox-label">
+              <input v-model="llmStreaming" type="checkbox" />
+              Enable Streaming
+            </label>
+            <span class="hint">Stream responses token-by-token (requires provider support)</span>
           </div>
 
           <!-- API Key (for providers that need or support it) -->
@@ -668,48 +816,56 @@ const timeoutSeconds = computed({
         <!-- General Settings -->
         <div v-if="activeTab === 'general'" class="settings-section">
           <div class="setting-group">
-            <label>Theme</label>
-            <div class="radio-group">
-              <label class="radio-label">
-                <input v-model="theme" type="radio" value="light" />
-                <span class="theme-icon light">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="5" />
-                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                  </svg>
-                </span>
-                Light
-              </label>
-              <label class="radio-label">
-                <input v-model="theme" type="radio" value="dark" />
-                <span class="theme-icon dark">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-                  </svg>
-                </span>
-                Dark
-              </label>
-              <label class="radio-label">
-                <input v-model="theme" type="radio" value="pitch-black" />
-                <span class="theme-icon pitch-black">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <circle cx="12" cy="12" r="10" />
-                  </svg>
-                </span>
-                Pitch Black
-              </label>
-              <label class="radio-label">
-                <input v-model="theme" type="radio" value="cyber" />
-                <span class="theme-icon cyber">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
-                    <line x1="12" y1="22" x2="12" y2="15.5" />
-                    <polyline points="22 8.5 12 15.5 2 8.5" />
-                  </svg>
-                </span>
-                Cyber
-              </label>
+            <label class="checkbox-label">
+              <input v-model="llmEnabled" type="checkbox" />
+              LLM Features
+            </label>
+            <span class="hint">Show AI prompt bars for graph and nodes</span>
+          </div>
+
+          <!-- Workspace Diagnostics -->
+          <div class="setting-group">
+            <label>Workspace Diagnostics</label>
+            <button
+              class="scan-btn"
+              :disabled="scanningWorkspaces"
+              @click="scanWorkspaces"
+            >
+              {{ scanningWorkspaces ? 'Scanning...' : 'Scan workspaces' }}
+            </button>
+            <div v-if="workspaceStats.length > 0" class="workspace-stats">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Workspace</th>
+                    <th>Nodes</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="ws in workspaceStats"
+                    :key="ws.id"
+                    :class="{ deleted: ws.name === '(deleted)' }"
+                  >
+                    <td :title="ws.id">{{ ws.name }}</td>
+                    <td>{{ ws.nodeCount }}</td>
+                    <td>
+                      <button
+                        v-if="ws.nodeCount > 0"
+                        class="switch-btn"
+                        @click="switchToWorkspace(ws.id)"
+                      >
+                        {{ ws.name === '(deleted)' ? 'Recover' : 'Switch' }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            <span class="hint">
+              Scan to see node counts per workspace and find missing nodes.
+            </span>
           </div>
 
           <div class="setting-group">
@@ -718,6 +874,44 @@ const timeoutSeconds = computed({
               <p><strong>Nodus</strong> - Local-first knowledge graph</p>
               <p class="version">Version 0.2.2</p>
             </div>
+          </div>
+        </div>
+
+        <!-- Themes Settings -->
+        <div v-if="activeTab === 'themes'" class="settings-section">
+          <div class="setting-group">
+            <label>Theme ({{ themesStore.themes.length }} available)</label>
+            <div class="theme-grid">
+              <label
+                v-for="theme in themesStore.themes"
+                :key="theme.id"
+                class="theme-option"
+                :class="{ selected: selectedTheme === theme.name }"
+              >
+                <input
+                  v-model="selectedTheme"
+                  type="radio"
+                  :value="theme.name"
+                />
+                <span class="theme-preview" :data-theme-preview="theme.name">
+                  <span class="preview-dot"></span>
+                </span>
+                <span class="theme-name">{{ theme.display_name }}</span>
+                <button
+                  v-if="theme.is_builtin === 0"
+                  class="delete-theme-btn"
+                  title="Delete theme"
+                  @click.prevent.stop="deleteCustomTheme(theme.id)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </label>
+            </div>
+            <span class="hint">
+              Use the AI agent to create custom themes: "create a crazy bananas theme"
+            </span>
           </div>
         </div>
       </div>
@@ -1042,6 +1236,7 @@ const timeoutSeconds = computed({
 .checkbox-label {
   display: flex !important;
   align-items: center;
+  justify-content: flex-start !important;
   gap: 8px;
   cursor: pointer;
   font-weight: normal !important;
@@ -1286,5 +1481,223 @@ const timeoutSeconds = computed({
 .edge-style-option span {
   font-size: 11px;
   color: var(--text-muted, #71717a);
+}
+
+/* Theme Grid Styles */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--bg-canvas, #f4f4f5);
+  position: relative;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .theme-option {
+  background: #18181b;
+  border-color: #3f3f46;
+}
+
+.theme-option:hover {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.theme-option.selected {
+  border-color: var(--primary-color, #3b82f6);
+  background: color-mix(in srgb, var(--primary-color, #3b82f6) 10%, transparent);
+}
+
+.theme-option input {
+  display: none;
+}
+
+.theme-preview {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Theme preview backgrounds */
+.theme-preview[data-theme-preview="light"] {
+  background: linear-gradient(135deg, #f0f4f8 50%, #ffffff 50%);
+}
+
+.theme-preview[data-theme-preview="dark"] {
+  background: linear-gradient(135deg, #0f0f12 50%, #1e1e22 50%);
+}
+
+.theme-preview[data-theme-preview="pitch-black"] {
+  background: linear-gradient(135deg, #000000 50%, #0a0a0a 50%);
+}
+
+.theme-preview[data-theme-preview="cyber"] {
+  background: linear-gradient(135deg, #0a0a12 50%, #0d1117 50%);
+  border-color: rgba(0, 255, 204, 0.3);
+}
+
+/* Custom theme previews show a generic gradient */
+.theme-preview:not([data-theme-preview="light"]):not([data-theme-preview="dark"]):not([data-theme-preview="pitch-black"]):not([data-theme-preview="cyber"]) {
+  background: linear-gradient(135deg, var(--bg-canvas) 50%, var(--bg-surface) 50%);
+}
+
+.preview-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.theme-preview[data-theme-preview="light"] .preview-dot {
+  background: #3b82f6;
+}
+
+.theme-preview[data-theme-preview="dark"] .preview-dot {
+  background: #3b82f6;
+}
+
+.theme-preview[data-theme-preview="pitch-black"] .preview-dot {
+  background: #60a5fa;
+}
+
+.theme-preview[data-theme-preview="cyber"] .preview-dot {
+  background: #00ffcc;
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+}
+
+.theme-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-main, #18181b);
+  text-align: center;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .theme-name {
+  color: #f4f4f5;
+}
+
+.delete-theme-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--danger-bg, #fef2f2);
+  color: var(--danger-color, #dc2626);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.theme-option:hover .delete-theme-btn {
+  opacity: 1;
+}
+
+.delete-theme-btn:hover {
+  background: var(--danger-color, #dc2626);
+  color: white;
+}
+
+/* Orphaned Workspaces Recovery */
+.scan-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  background: var(--bg-canvas, #f4f4f5);
+  color: var(--text-main, #18181b);
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .scan-btn {
+  background: #18181b;
+  border-color: #3f3f46;
+  color: #f4f4f5;
+}
+
+.scan-btn:hover {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.scan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.workspace-stats {
+  margin-top: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.workspace-stats table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.workspace-stats th,
+.workspace-stats td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-node, #e4e4e7);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .workspace-stats th,
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .workspace-stats td {
+  border-color: #3f3f46;
+}
+
+.workspace-stats th {
+  font-weight: 500;
+  color: var(--text-muted, #71717a);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.workspace-stats td:first-child {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-stats tr.deleted td:first-child {
+  color: #ef4444;
+}
+
+.switch-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.switch-btn:hover {
+  opacity: 0.9;
 }
 </style>

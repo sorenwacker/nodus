@@ -44,19 +44,28 @@ export function registerCoreTools(): void {
       required: ['title'],
     },
     async (args, ctx) => {
-      const pos = ctx.screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
-      const offsetX = (nodePositionCounter % 4) * 250
-      const offsetY = Math.floor(nodePositionCounter / 4) * 180
-      nodePositionCounter++
+      try {
+        const pos = ctx.screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
+        const offsetX = (nodePositionCounter % 4) * 250
+        const offsetY = Math.floor(nodePositionCounter / 4) * 180
+        nodePositionCounter++
 
-      const node = await ctx.store.createNode({
-        title: args.title || '',
-        node_type: 'note',
-        markdown_content: cleanContent(args.content),
-        canvas_x: ctx.snapToGrid(args.x ?? pos.x + offsetX),
-        canvas_y: ctx.snapToGrid(args.y ?? pos.y + offsetY),
-      })
-      return `Created node "${args.title}" with id ${node.id}`
+        console.log('[create_node] Creating:', args.title, 'at', pos.x + offsetX, pos.y + offsetY)
+
+        const node = await ctx.store.createNode({
+          title: args.title || '',
+          node_type: 'note',
+          markdown_content: cleanContent(args.content),
+          canvas_x: ctx.snapToGrid(args.x ?? pos.x + offsetX),
+          canvas_y: ctx.snapToGrid(args.y ?? pos.y + offsetY),
+        })
+
+        console.log('[create_node] Created node:', node.id)
+        return `Created node "${args.title}" with id ${node.id}`
+      } catch (e) {
+        console.error('[create_node] Error:', e)
+        return `Error creating node: ${e}`
+      }
     },
     { category: 'crud' }
   )
@@ -687,6 +696,155 @@ export function registerCoreTools(): void {
       return `AGENT_DONE: ${args.summary || 'completed'}`
     },
     { category: 'utility' }
+  )
+
+  // ============================================================
+  // THINKING & PLANNING TOOLS
+  // ============================================================
+
+  defineTool<{ thought: string }>(
+    'think',
+    'Express your reasoning or thinking process. Use this to plan before acting.',
+    {
+      type: 'object',
+      properties: {
+        thought: { type: 'string', description: 'Your thought or reasoning' },
+      },
+      required: ['thought'],
+    },
+    async (args, ctx) => {
+      ctx.log(`[think] ${args.thought}`)
+      return 'Thought recorded'
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<{ tasks: string[] }>(
+    'plan',
+    'Create a task list for a complex operation. Each task will be shown in the log.',
+    {
+      type: 'object',
+      properties: {
+        tasks: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of task descriptions'
+        },
+      },
+      required: ['tasks'],
+    },
+    async (_args, _ctx) => {
+      // Return unhandled so PixiCanvas.vue handles it with task state
+      return `__UNHANDLED__:plan`
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<{ task_index: number; status: string }>(
+    'update_task',
+    'Update the status of a task in the current plan.',
+    {
+      type: 'object',
+      properties: {
+        task_index: { type: 'number', description: 'Task index (0-based)' },
+        status: { type: 'string', description: 'New status: "done", "in_progress", "failed", or custom text' },
+      },
+      required: ['task_index', 'status'],
+    },
+    async (_args, _ctx) => {
+      // Return unhandled so PixiCanvas.vue handles it with task state
+      return `__UNHANDLED__:update_task`
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<{ message: string }>(
+    'remember',
+    'Store important information for future reference in this conversation.',
+    {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Information to remember' },
+      },
+      required: ['message'],
+    },
+    async (_args, _ctx) => {
+      // Return unhandled so PixiCanvas.vue handles it with memory state
+      return `__UNHANDLED__:remember`
+    },
+    { category: 'planning' }
+  )
+
+  // ============================================================
+  // THEME TOOLS
+  // ============================================================
+
+  defineTool<{ name: string; description: string }>(
+    'create_theme',
+    'Create a new custom theme. LLM generates YAML based on description.',
+    {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Theme name (kebab-case, e.g., "crazy-bananas")' },
+        description: { type: 'string', description: 'Description of desired colors and style' },
+      },
+      required: ['name', 'description'],
+    },
+    async (_args, _ctx) => {
+      // Return unhandled so PixiCanvas.vue switch handles it with LLM access
+      return `__UNHANDLED__:create_theme`
+    },
+    { category: 'theme' }
+  )
+
+  defineTool<{ name: string; changes: string }>(
+    'update_theme',
+    'Update an existing custom theme based on changes description.',
+    {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Theme name to update' },
+        changes: { type: 'string', description: 'Description of changes to make' },
+      },
+      required: ['name', 'changes'],
+    },
+    async (_args, _ctx) => {
+      // Return unhandled so PixiCanvas.vue switch handles it with LLM access
+      return `__UNHANDLED__:update_theme`
+    },
+    { category: 'theme' }
+  )
+
+  defineTool<{ name: string }>(
+    'apply_theme',
+    'Switch to a named theme',
+    {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Theme name to apply' },
+      },
+      required: ['name'],
+    },
+    async (_args, _ctx) => {
+      // Return unhandled so PixiCanvas.vue switch handles it
+      return `__UNHANDLED__:apply_theme`
+    },
+    { category: 'theme' }
+  )
+
+  defineTool<Record<string, never>>(
+    'list_themes',
+    'List available themes',
+    {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    async (_args, _ctx) => {
+      // Return unhandled so PixiCanvas.vue switch handles it
+      return `__UNHANDLED__:list_themes`
+    },
+    { category: 'theme' }
   )
 
   // ============================================================

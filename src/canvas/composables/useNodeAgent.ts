@@ -8,6 +8,7 @@ import type { ChatMessage } from '../llm/types'
 import { llmQueue } from '../llm/queue'
 import { notifications$ } from '../../composables/useNotifications'
 import { llmStorage } from '../../lib/storage'
+import { convertLatexDocument } from '../../lib/latex-to-typst'
 
 interface SearchResult {
   title: string
@@ -220,20 +221,26 @@ ${ctx.nodeContent || '(empty)'}
 ${connectedContext}
 
 TOOLS:
-- web_search(query): Search the web, returns titles + snippets + URLs
-- fetch_url(url): Read the full content of a web page (use after web_search to get details)
-- wikipedia_search(query): Search Wikipedia for encyclopedic definitions
-- update_content(content): Replace note content
+- web_search(query): Search the web for current information (OPTIONAL)
+- fetch_url(url): Read full web page content (OPTIONAL)
+- wikipedia_search(query): Search Wikipedia (OPTIONAL)
+- update_content(content): Replace note content - THIS SAVES YOUR WORK
 - append_content(text): Add text to end of note
 - update_title(title): Change note title
 - done(summary): Signal completion
 
-RULES:
-1. Use web_search to find relevant pages, then fetch_url to read the content
-2. Use update_content to save your findings
-3. Format in markdown. For references, use REAL URLs as markdown links: [Source Name](https://actual-url.com)
-4. Do NOT invent fake wikilinks like [[Wikipedia:X]] - use actual URLs from your search results
-5. Call done() when finished`
+CRITICAL RULES:
+1. You can answer from your own knowledge OR use search tools - searching is OPTIONAL
+2. You MUST call update_content(content) to save your answer to the note
+3. The done() tool does NOT save anything - it only signals you're finished
+4. Always call update_content() BEFORE done()
+
+Example workflow:
+- User asks "What is pi?"
+- You write: update_content("# Pi\\n\\nPi is the ratio of a circle's circumference...")
+- Then: done("Added explanation of pi")
+
+DO NOT call done() without first calling update_content(). Your response will be lost.`
   }
 
   async function run(prompt: string, ctx: NodeAgentContext): Promise<string> {
@@ -244,6 +251,7 @@ RULES:
     isRunning.value = true
     log.value = [`> ${prompt}`]
     currentContent.value = ctx.nodeContent
+    let contentWasUpdated = false // Track if update_content was called
 
     const messages: ChatMessage[] = [
       { role: 'system', content: buildSystemPrompt(ctx) },
@@ -314,19 +322,30 @@ RULES:
                 }
                 break
 
-              case 'update_content':
-                currentContent.value = args.content as string
-                await ctx.updateContent(args.content as string)
-                result = 'Content updated'
-                log.value.push(`  Updated content (${(args.content as string).length} chars)`)
+              case 'update_content': {
+                // Convert LaTeX math to Typst format
+                const rawContent = args.content as string
+                const convertedContent = convertLatexDocument(rawContent)
+                currentContent.value = convertedContent
+                await ctx.updateContent(convertedContent)
+                contentWasUpdated = true
+                result = 'Content updated and saved'
+                const mathConverted = rawContent !== convertedContent ? ' (math converted to Typst)' : ''
+                log.value.push(`  Updated content (${convertedContent.length} chars)${mathConverted}`)
                 break
+              }
 
-              case 'append_content':
-                currentContent.value += '\n' + (args.text as string)
+              case 'append_content': {
+                // Convert LaTeX math to Typst format
+                const rawText = args.text as string
+                const convertedText = convertLatexDocument(rawText)
+                currentContent.value += '\n' + convertedText
                 await ctx.updateContent(currentContent.value)
-                result = 'Text appended'
+                contentWasUpdated = true
+                result = 'Text appended and saved'
                 log.value.push(`  Appended text`)
                 break
+              }
 
               case 'update_title':
                 await ctx.updateTitle(args.title as string)
@@ -335,6 +354,17 @@ RULES:
                 break
 
               case 'done':
+                // Check if content was actually updated
+                if (!contentWasUpdated) {
+                  log.value.push(`  WARNING: No content saved yet!`)
+                  result = `REJECTED: You cannot call done() yet because you have not saved any content to the note.
+
+YOUR NEXT STEP: Call update_content with your answer. Example:
+update_content("# Pi\\n\\nPi (π) is a mathematical constant equal to approximately 3.14159...")
+
+After update_content succeeds, then you may call done().`
+                  break
+                }
                 log.value.push(`> Done: ${args.summary}`)
                 isRunning.value = false
                 return args.summary as string
@@ -386,8 +416,13 @@ RULES:
     }
 
     isRunning.value = false
-    log.value.push('> Max iterations reached')
-    notifications$.warning('Agent stopped', 'Maximum iterations reached without completion.')
+    if (!contentWasUpdated) {
+      log.value.push('> Failed: Agent did not save any content')
+      notifications$.error('Agent failed', 'The AI model failed to use update_content(). Try a different model or rephrase your request.')
+    } else {
+      log.value.push('> Max iterations reached')
+      notifications$.warning('Agent stopped', 'Maximum iterations reached.')
+    }
     return 'Max iterations reached'
   }
 

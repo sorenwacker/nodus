@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
 import { useNodesStore } from '../stores/nodes'
+import { useThemesStore } from '../stores/themes'
 import { marked } from 'marked'
 import { invoke, isTauri, openExternal } from '../lib/tauri'
 import {
@@ -20,7 +21,7 @@ import {
   type EdgeStyle,
 } from './edgeRouting'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
-import { uiStorage, llmStorage, canvasStorage } from '../lib/storage'
+import { uiStorage, llmStorage, canvasStorage, memoryStorage } from '../lib/storage'
 import { canvasLogger } from '../lib/logger'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
@@ -72,6 +73,7 @@ marked.use({
 })
 
 const store = useNodesStore()
+const themesStore = useThemesStore()
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
 
 // Reactive theme tracking
@@ -222,6 +224,12 @@ onMounted(() => {
   }
   window.addEventListener('keydown', handleKeydown)
 
+  // Listen for LLM enabled setting changes
+  const handleLLMEnabledChange = (e: Event) => {
+    llmEnabled.value = (e as CustomEvent).detail
+  }
+  window.addEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
+
   // Setup PDF drop listener
   pdfDrop.setup()
 
@@ -230,6 +238,7 @@ onMounted(() => {
     window.removeEventListener('resize', updateViewportSize)
     window.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('zoom-to-node', handleZoomToNode)
+    window.removeEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
     pdfDrop.cleanup()
   })
 
@@ -284,12 +293,18 @@ watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
   }
 }, { immediate: true })
 
-// Re-center when workspace changes - but preserve view if user has panned/zoomed
+// Re-center when workspace changes - auto-fit so nodes are visible
 watch(() => store.currentWorkspaceId, () => {
-  // Don't auto-reset view on workspace change - let user control it
-  hasInitiallyCentered = store.filteredNodes.length > 0
   // Exit neighborhood mode when workspace changes
   neighborhood.exit()
+  // Auto-fit to content when switching workspaces (so nodes are visible)
+  hasInitiallyCentered = false
+  if (store.filteredNodes.length > 0) {
+    setTimeout(() => {
+      fitToContent()
+      hasInitiallyCentered = true
+    }, 100)
+  }
 })
 
 // Viewport size for culling (updated on resize)
@@ -497,8 +512,8 @@ const contextMenuPosition = ref({ x: 0, y: 0 })
 const contextMenuNodeId = ref<string | null>(null)
 const contextMenuStorylineSubmenu = ref(false)
 
-// Node agent mode (Simple vs Agent with tools)
-const nodeAgentMode = ref<'simple' | 'agent'>('simple')
+// Node agent mode - always agent (tools enabled)
+const nodeAgentMode = ref<'simple' | 'agent'>('agent')
 const showNodeAgentLog = ref(false)
 const nodeAgent = useNodeAgent()
 // Computed for proper reactivity tracking of agent log
@@ -625,8 +640,10 @@ const layout = useLayout({
     getNodes: () => [...store.nodes],
     getFilteredNodes: () => [...store.filteredNodes],
     getFilteredEdges: () => [...store.filteredEdges],
+    getFilteredFrames: () => [...store.filteredFrames],
     getSelectedNodeIds: () => [...store.selectedNodeIds],
     updateNodePosition: store.updateNodePosition,
+    updateFramePosition: store.updateFramePosition,
     layoutNodes: store.layoutNodes,
   },
   viewState: {
@@ -810,6 +827,7 @@ const nodePrompt = ref('')
 const isGraphLLMLoading = ref(false)
 const isNodeLLMLoading = ref(false)
 const lastContextSize = ref(0) // Track context size of last request
+const llmEnabled = ref(llmStorage.getLLMEnabled())
 let nodeLLMAbortController: AbortController | null = null
 
 function stopNodeLLM() {
@@ -859,6 +877,18 @@ function onPromptKeydown(e: KeyboardEvent) {
   }
 }
 
+function onNodePromptKeydown(e: KeyboardEvent) {
+  if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    const prev = navigateHistory('up')
+    if (prev !== null) nodePrompt.value = prev
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    const next = navigateHistory('down')
+    if (next !== null) nodePrompt.value = next
+  }
+}
+
 async function executeAgentTool(name: string, args: any): Promise<string> {
   // Create tool context for the extracted executor
   const toolCtx: ToolContext = {
@@ -882,9 +912,11 @@ async function executeAgentTool(name: string, args: any): Promise<string> {
 
   // Try extracted executor (handles simple tools)
   const result = await executeTool(name, args, toolCtx)
+  console.log(`[Tool] ${name} -> executeTool returned:`, result.slice(0, 100))
   if (!result.startsWith('__UNHANDLED__:')) {
     return result
   }
+  console.log(`[Tool] ${name} falling through to switch`)
 
   // Handle LLM-dependent tools inline
   switch (name) {
@@ -1093,6 +1125,207 @@ Output ONLY the JSON array:`
       }
     }
 
+    case 'create_theme': {
+      // Parse args if it's a string
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const themeName = parsedArgs.name || 'custom-theme'
+      const description = parsedArgs.description || ''
+      agentLog.value.push(`> Creating theme: ${themeName}`)
+      console.log('[Theme] CASE HIT - Creating theme:', themeName, description, 'raw args:', args)
+
+      try {
+        // Generate theme YAML using LLM
+        const prompt = `Create a YAML theme configuration based on this description: "${description}"
+
+The theme should have this structure:
+name: "${themeName}"
+display_name: "${themeName.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}"
+description: "${description}"
+is_dark: false (or true if it's a dark theme)
+variables:
+  bg_canvas: "#hex"
+  bg_surface: "#hex"
+  bg_surface_alt: "#hex"
+  bg_elevated: "#hex"
+  text_main: "#hex"
+  text_secondary: "#hex"
+  text_muted: "#hex"
+  border_default: "#hex"
+  border_subtle: "#hex"
+  primary_color: "#hex"
+  danger_color: "#hex"
+  danger_bg: "#hex"
+  danger_border: "#hex"
+  dot_color: "#hex"
+  shadow_sm: "rgba(...)"
+  shadow_md: "rgba(...)"
+
+Make colors match the description. Be creative! Output ONLY the YAML, no explanations.`
+
+        const yamlContent = await llmQueue.generate(prompt)
+        console.log('[Theme] Generated YAML:', yamlContent?.slice(0, 200))
+        if (!yamlContent) return 'Failed to generate theme'
+
+        // Clean up YAML (remove markdown code blocks if present)
+        let cleanYaml = yamlContent.trim()
+        if (cleanYaml.startsWith('```')) {
+          cleanYaml = cleanYaml.replace(/^```(yaml)?\n?/, '').replace(/\n?```$/, '')
+        }
+        console.log('[Theme] Clean YAML:', cleanYaml.slice(0, 200))
+
+        // Create the theme
+        console.log('[Theme] Calling createTheme...')
+        const newTheme = await themesStore.createTheme({
+          name: themeName,
+          display_name: themeName.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          yaml_content: cleanYaml,
+        })
+        console.log('[Theme] Created theme:', newTheme)
+        console.log('[Theme] Themes in store:', themesStore.themes.length)
+
+        // Apply the new theme
+        themesStore.setTheme(newTheme.name)
+        return `Created and applied theme "${themeName}"`
+      } catch (e) {
+        console.error('[Theme] Error creating theme:', e)
+        return `Failed to create theme: ${e}`
+      }
+    }
+
+    case 'update_theme': {
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const themeName = parsedArgs.name || ''
+      const changes = parsedArgs.changes || ''
+      if (!themeName) return 'Theme name required'
+      agentLog.value.push(`> Updating theme: ${themeName}`)
+
+      try {
+        // Find the theme
+        const theme = themesStore.themes.find(t => t.name === themeName)
+        if (!theme) return `Theme "${themeName}" not found`
+        if (theme.is_builtin === 1) return 'Cannot modify built-in themes'
+
+        // Generate updated YAML using LLM
+        const prompt = `Update this theme YAML based on the instruction: "${changes}"
+
+Current theme YAML:
+${theme.yaml_content}
+
+Apply the changes and output the complete updated YAML. Output ONLY the YAML, no explanations.`
+
+        const yamlContent = await llmQueue.generate(prompt)
+        if (!yamlContent) return 'Failed to generate updated theme'
+
+        // Clean up YAML
+        let cleanYaml = yamlContent.trim()
+        if (cleanYaml.startsWith('```')) {
+          cleanYaml = cleanYaml.replace(/^```(yaml)?\n?/, '').replace(/\n?```$/, '')
+        }
+
+        // Update the theme
+        await themesStore.updateTheme({
+          id: theme.id,
+          yaml_content: cleanYaml,
+          display_name: theme.display_name,
+        })
+
+        return `Updated theme "${themeName}"`
+      } catch (e) {
+        return `Failed to update theme: ${e}`
+      }
+    }
+
+    case 'apply_theme': {
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const themeName = parsedArgs.name || ''
+      if (!themeName) return 'Theme name required'
+
+      const theme = themesStore.themes.find(t => t.name === themeName)
+      if (!theme) return `Theme "${themeName}" not found. Available: ${themesStore.themes.map(t => t.name).join(', ')}`
+
+      themesStore.setTheme(themeName)
+      return `Applied theme "${themeName}"`
+    }
+
+    case 'list_themes': {
+      const builtin = themesStore.builtinThemes.map(t => t.name)
+      const custom = themesStore.customThemes.map(t => t.name)
+      return `Built-in themes: ${builtin.join(', ')}\nCustom themes: ${custom.length > 0 ? custom.join(', ') : '(none)'}\nCurrent: ${themesStore.currentThemeName}`
+    }
+
+    case 'plan': {
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const tasks = parsedArgs.tasks || []
+      if (!Array.isArray(tasks) || tasks.length === 0) return 'No tasks provided'
+
+      // Clear previous tasks and set new ones
+      agentTasks.value = tasks.map((t: string, i: number) => ({
+        id: `task-${i}`,
+        description: t,
+        status: 'pending' as const
+      }))
+
+      // Log the plan
+      agentLog.value.push('--- PLAN ---')
+      tasks.forEach((t: string, i: number) => {
+        agentLog.value.push(`[ ] ${i + 1}. ${t}`)
+      })
+      agentLog.value.push('------------')
+
+      return `Created plan with ${tasks.length} tasks`
+    }
+
+    case 'update_task': {
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const taskIndex = parsedArgs.task_index ?? -1
+      const status = parsedArgs.status || 'done'
+
+      if (taskIndex < 0 || taskIndex >= agentTasks.value.length) {
+        return `Invalid task index: ${taskIndex}`
+      }
+
+      const task = agentTasks.value[taskIndex]
+      const oldStatus = task.status
+      task.status = status === 'done' ? 'done' : status === 'failed' ? 'error' : 'running'
+
+      // Update log with status
+      const statusIcon = status === 'done' ? '[x]' : status === 'failed' ? '[!]' : '[>]'
+      agentLog.value.push(`${statusIcon} Task ${taskIndex + 1}: ${task.description} -> ${status}`)
+
+      return `Task ${taskIndex + 1} updated: ${oldStatus} -> ${status}`
+    }
+
+    case 'remember': {
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const message = parsedArgs.message || ''
+      if (!message) return 'Nothing to remember'
+
+      // Store in per-workspace memory
+      const workspaceId = store.currentWorkspaceId || 'default'
+      memoryStorage.addMemory(workspaceId, message)
+
+      agentLog.value.push(`[memory] ${message}`)
+      return `Remembered for this workspace: ${message}`
+    }
+
     default:
       return `Unknown tool: ${name}`
   }
@@ -1112,6 +1345,7 @@ const agentContext: AgentContext = {
       : store.filteredNodes
   },
   cleanupOrphanEdges: () => store.cleanupOrphanEdges(),
+  workspaceId: () => store.currentWorkspaceId || 'default',
   model: ollamaModel,
   contextLength: ollamaContextLength,
   isRunning: agentRunning,
@@ -1163,6 +1397,7 @@ async function sendNodePrompt() {
   isNodeLLMLoading.value = true
   const prompt = nodePrompt.value
   nodePrompt.value = ''
+  savePromptToHistory(prompt)
 
   try {
     // Use agent mode if enabled
@@ -3335,7 +3570,7 @@ ${edges.map(e => `  - id: "${e.id}"
 <template>
   <div class="canvas-wrapper">
     <!-- Graph-level LLM prompt bar -->
-    <div class="graph-llm-bar">
+    <div v-if="llmEnabled" class="graph-llm-bar">
       <div class="llm-input-row">
         <input
           v-model="graphPrompt"
@@ -3364,6 +3599,11 @@ ${edges.map(e => `  - id: "${e.id}"
       </div>
       <!-- Agent activity log -->
       <div v-if="agentLog.length > 0" class="agent-log">
+        <button class="clear-log-btn" title="Clear log" @click="agentLog.length = 0">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
         <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
       </div>
     </div>
@@ -3636,7 +3876,7 @@ ${edges.map(e => `  - id: "${e.id}"
 
       <!-- Floating Node LLM bar (above selected/editing node) -->
       <div
-        v-if="(store.selectedNodeIds.length === 1 || editingNodeId) && getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
+        v-if="llmEnabled && (store.selectedNodeIds.length === 1 || editingNodeId) && getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
         class="node-llm-bar-floating"
         :style="{
           transform: `translate(${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x}px, ${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y - 40}px)`,
@@ -3655,6 +3895,8 @@ ${edges.map(e => `  - id: "${e.id}"
           :disabled="isNodeLLMLoading"
           @mousedown.stop
           @keydown.enter.stop="sendNodePrompt"
+          @keydown.up.prevent="onNodePromptKeydown($event)"
+          @keydown.down.prevent="onNodePromptKeydown($event)"
           @keydown.stop
         />
         <button
@@ -3838,16 +4080,6 @@ ${edges.map(e => `  - id: "${e.id}"
       <span>{{ visibleNodes.length }}/{{ store.filteredNodes.length }} nodes</span>
       <span class="sep">|</span>
       <span>{{ edgeLines.length }}/{{ store.filteredEdges.length }} edges</span>
-      <span class="sep">|</span>
-      <!-- Node agent mode toggle -->
-      <button
-        class="agent-mode-toggle"
-        :class="{ active: nodeAgentMode === 'agent' }"
-        @click="nodeAgentMode = nodeAgentMode === 'simple' ? 'agent' : 'simple'"
-        :title="nodeAgentMode === 'simple' ? 'Simple mode: direct LLM responses' : 'Agent mode: LLM with tools (web search, edit)'"
-      >
-        {{ nodeAgentMode === 'simple' ? 'Simple' : 'Agent' }}
-      </button>
       <button
         v-if="nodeAgentLog.length > 0"
         class="agent-log-toggle"

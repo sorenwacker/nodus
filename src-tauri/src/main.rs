@@ -4,6 +4,7 @@ mod checksum;
 mod commands;
 mod database;
 mod pdf;
+mod themes;
 mod typst_render;
 mod watcher;
 
@@ -77,6 +78,12 @@ fn main() {
             commands::get_storyline_nodes,
             commands::web_search,
             commands::fetch_url,
+            commands::get_themes,
+            commands::get_theme,
+            commands::create_theme,
+            commands::update_theme,
+            commands::delete_theme,
+            commands::validate_theme_yaml,
             render_typst_math,
         ])
         .run(tauri::generate_context!())

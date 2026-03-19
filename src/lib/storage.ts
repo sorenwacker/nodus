@@ -15,6 +15,8 @@ const KEYS = {
   llmAgentPrompt: 'nodus_llm_agent_prompt',
   llmProvider: 'nodus_llm_provider',
   llmProviderConfigs: 'nodus_llm_provider_configs',
+  llmEnabled: 'nodus_llm_enabled',
+  llmStreaming: 'nodus_llm_streaming',
   canvasGridSnap: 'nodus_canvas_grid_snap',
   canvasGridSize: 'nodus_canvas_grid_size',
   canvasEdgeStyle: 'nodus_canvas_edge_style',
@@ -35,29 +37,15 @@ function parseJson<T>(value: string | null, fallback: T): T {
 }
 
 /**
- * Theme types
- */
-export type Theme = 'light' | 'dark' | 'pitch-black' | 'cyber'
-
-const VALID_THEMES: Theme[] = ['light', 'dark', 'pitch-black', 'cyber']
-
-/**
- * Theme storage
+ * Theme storage (simplified - only stores theme name)
+ * Full theme management is handled by the themes store
  */
 export const themeStorage = {
-  get(): Theme {
-    const stored = localStorage.getItem(KEYS.theme)
-    if (stored && VALID_THEMES.includes(stored as Theme)) {
-      return stored as Theme
-    }
-    return 'light'
+  get(): string {
+    return localStorage.getItem(KEYS.theme) || 'light'
   },
-  set(value: Theme): void {
+  set(value: string): void {
     localStorage.setItem(KEYS.theme, value)
-  },
-  isDark(): boolean {
-    const theme = this.get()
-    return theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
   },
 }
 
@@ -149,6 +137,18 @@ export const llmStorage = {
   setSearchApiKey(value: string): void {
     localStorage.setItem(KEYS.searchApiKey, value)
   },
+  getLLMEnabled(): boolean {
+    return localStorage.getItem(KEYS.llmEnabled) !== 'false'
+  },
+  setLLMEnabled(value: boolean): void {
+    localStorage.setItem(KEYS.llmEnabled, String(value))
+  },
+  getLLMStreaming(): boolean {
+    return localStorage.getItem(KEYS.llmStreaming) === 'true'
+  },
+  setLLMStreaming(value: boolean): void {
+    localStorage.setItem(KEYS.llmStreaming, String(value))
+  },
 }
 
 /**
@@ -176,6 +176,32 @@ export const canvasStorage = {
   },
   setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'straight'): void {
     localStorage.setItem(KEYS.canvasEdgeStyle, value)
+  },
+}
+
+/**
+ * Per-workspace memory storage for agent
+ */
+export const memoryStorage = {
+  getMemories(workspaceId: string): string[] {
+    const key = `nodus_memories_${workspaceId}`
+    const data = localStorage.getItem(key)
+    if (!data) return []
+    try {
+      return JSON.parse(data) as string[]
+    } catch {
+      return []
+    }
+  },
+  addMemory(workspaceId: string, memory: string): void {
+    const memories = this.getMemories(workspaceId)
+    memories.push(memory)
+    // Keep last 50 memories
+    const trimmed = memories.slice(-50)
+    localStorage.setItem(`nodus_memories_${workspaceId}`, JSON.stringify(trimmed))
+  },
+  clearMemories(workspaceId: string): void {
+    localStorage.removeItem(`nodus_memories_${workspaceId}`)
   },
 }
 

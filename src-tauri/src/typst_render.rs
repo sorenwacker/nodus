@@ -95,12 +95,14 @@ pub fn render_math_to_svg(math: &str, display_mode: bool) -> Result<String, Stri
     }
 
     // Build Typst document
+    // Use generous margins to prevent clipping of tall elements (fractions, sums, etc.)
+    // Use fill: none for transparent background
     let typst_code = if display_mode {
-        format!(r#"#set page(width: auto, height: auto, margin: 0.3em)
+        format!(r#"#set page(width: auto, height: auto, margin: (x: 0.3em, y: 0.5em), fill: none)
 #set text(size: 14pt)
 $ {} $"#, math)
     } else {
-        format!(r#"#set page(width: auto, height: auto, margin: 0.2em)
+        format!(r#"#set page(width: auto, height: auto, margin: (x: 0.2em, y: 0.3em), fill: none)
 #set text(size: 14pt)
 ${}$"#, math)
     };

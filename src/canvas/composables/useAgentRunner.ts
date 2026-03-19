@@ -5,7 +5,7 @@
  */
 import type { Ref } from 'vue'
 import type { ChatMessage, AgentTask } from '../llm/types'
-import { llmStorage } from '../../lib/storage'
+import { llmStorage, memoryStorage } from '../../lib/storage'
 import { DEFAULT_AGENT_PROMPT } from '../llm/prompts'
 import { llmQueue } from '../llm/queue'
 
@@ -13,6 +13,7 @@ export interface AgentContext {
   // Node store access
   filteredNodes: () => Array<{ id: string; title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>
   cleanupOrphanEdges: () => void
+  workspaceId: () => string
 
   // LLM settings
   model: Ref<string>
@@ -37,9 +38,12 @@ interface SystemPromptMessage {
 }
 
 /**
- * Generate system prompt with current node state
+ * Generate system prompt with current node state and memories
  */
-function buildSystemPrompt(nodes: Array<{ title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>): SystemPromptMessage {
+function buildSystemPrompt(
+  nodes: Array<{ title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>,
+  workspaceId: string
+): SystemPromptMessage {
   let nodeList = 'No nodes yet. Canvas is empty.'
 
   if (nodes.length > 0 && nodes.length <= 30) {
@@ -52,12 +56,18 @@ function buildSystemPrompt(nodes: Array<{ title: string; canvas_x: number; canva
 
   const customRules = llmStorage.getAgentPrompt(DEFAULT_AGENT_PROMPT)
 
+  // Load workspace memories
+  const memories = memoryStorage.getMemories(workspaceId)
+  const memorySection = memories.length > 0
+    ? `\nMEMORY (from previous sessions):\n${memories.map(m => `- ${m}`).join('\n')}\n`
+    : ''
+
   return {
     role: 'system',
     content: `You are a graph builder agent.
 
 CANVAS: x right, y down.
-
+${memorySection}
 NODES (${nodes.length}):
 ${nodeList}
 
@@ -79,7 +89,17 @@ TOOLS:
 - color_matching(pattern, color): Fast grep-style coloring. E.g., pattern="#department", color="#ef4444" (red). No LLM, instant.
 - smart_connect(groups): Connect nodes within groups. E.g., "animals, car brands" connects animals together and cars together.
 - web_search(query): Search web for information
+- think(thought): Express your reasoning before acting. Use for complex tasks.
+- plan(tasks): Create a task list for multi-step operations. tasks=["step 1", "step 2", ...]
+- update_task(task_index, status): Update task status. status="done"|"in_progress"|"failed"
+- remember(message): Store important info for this workspace's memory
+- create_theme(name, description): Create a custom theme. E.g., "crazy-bananas", "bright tropical colors with yellow background"
+- update_theme(name, changes): Modify a custom theme. E.g., "crazy-bananas", "make it darker"
+- apply_theme(name): Switch to a theme. E.g., "light", "dark", "cyber", or custom theme name
+- list_themes(): List available themes
 - done(summary): Call when finished
+
+WORKFLOW: For complex tasks, use think() to reason, then plan() to create steps, then execute each step and update_task() when done.
 
 ${customRules}`,
   }
@@ -135,9 +155,9 @@ export function useAgentRunner(ctx: AgentContext) {
     }
     ctx.log.value.push(`User: ${userRequest}`)
 
-    // Build initial messages with current node state
+    // Build initial messages with current node state and memories
     let messages: ChatMessage[] = [
-      buildSystemPrompt(ctx.filteredNodes()),
+      buildSystemPrompt(ctx.filteredNodes(), ctx.workspaceId()),
       { role: 'user', content: userRequest },
     ]
 
@@ -162,7 +182,7 @@ export function useAgentRunner(ctx: AgentContext) {
         if (msg.tool_calls && msg.tool_calls.length > 0) {
           for (const tc of msg.tool_calls) {
             const result = await ctx.executeAgentTool(tc.function.name, tc.function.arguments)
-            messages.push({ role: 'tool', content: result })
+            messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
 
             if (result.startsWith('AGENT_DONE:')) {
               ctx.conversationHistory.value.push({

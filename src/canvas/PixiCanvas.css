@@ -45,6 +45,28 @@
   text-overflow: ellipsis;
 }
 
+.agent-log {
+  position: relative;
+}
+
+.clear-log-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.clear-log-btn:hover {
+  opacity: 1;
+  color: #ef4444;
+}
+
 .agent-task {
   display: flex;
   align-items: center;
@@ -1058,8 +1080,11 @@
 .node-content :deep(.typst-display) {
   display: block;
   text-align: center;
-  margin: 12px 0;
-  overflow-x: auto;
+  margin: 16px 0;
+  padding: 12px 4px;
+  overflow: visible;
+  /* Ensure enough space for fractions, sums, integrals */
+  min-height: 2.5em;
 }
 
 .node-content :deep(.typst-inline) {
@@ -1087,12 +1112,24 @@
   max-width: 100%;
   height: auto;
   vertical-align: middle;
+  overflow: visible;
+}
+
+.node-content :deep(.typst-display svg) {
+  display: block;
+  margin: 0 auto;
 }
 
 /* Make Typst SVG adapt to dark theme */
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-display svg),
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-inline svg) {
-  filter: invert(1) hue-rotate(180deg);
+  filter: invert(1);
+}
+
+/* Ensure SVG background is transparent */
+.node-content :deep(.typst-display svg),
+.node-content :deep(.typst-inline svg) {
+  background: transparent;
 }
 
 .empty-state-overlay {

@@ -1,7 +1,7 @@
 # Nodus - Product Design Document
 
-Version: 0.11.0
-Date: 2026-03-12
+Version: 0.12.0
+Date: 2026-03-19
 Status: Active Development
 
 ---
@@ -410,7 +410,7 @@ Edges are routed using a motherboard/PCB-inspired lane system:
 
 ### Themes
 
-Four built-in themes with localStorage persistence:
+YAML-based theme system with SQLite storage. Four built-in themes, plus LLM-generated custom themes.
 
 | Theme | Background | Use Case |
 |-------|------------|----------|
@@ -418,6 +418,23 @@ Four built-in themes with localStorage persistence:
 | `dark` | Dark zinc | Evening work |
 | `pitch-black` | True black | OLED displays |
 | `cyber` | Neon accents | Aesthetic preference |
+
+**Custom Themes:** Users can ask the graph agent to create themes:
+- "Create a crazy bananas theme" generates YAML with custom colors
+- Themes stored in `themes` table with workspace association
+- Theme YAML defines CSS variables, effects, and metadata
+
+**Theme Schema (YAML):**
+```yaml
+name: "custom-theme"
+display_name: "Custom Theme"
+is_dark: false
+variables:
+  bg_canvas: "#f4f4f5"
+  bg_surface: "#ffffff"
+  text_main: "#18181b"
+  primary_color: "#3b82f6"
+```
 
 ---
 
@@ -672,7 +689,7 @@ The canvas includes a built-in agent that can build and modify knowledge graphs 
 - System prompt includes current canvas state (existing nodes)
 - **Queue manager:** Sequential request processing to prevent race conditions
 
-**Agent Tools:**
+**Graph Agent Tools:**
 
 | Tool | Description |
 |------|-------------|
@@ -684,8 +701,25 @@ The canvas includes a built-in agent that can build and modify knowledge graphs 
 | `query_nodes(filter)` | Query DB: "all", "empty", "has_content", or search term |
 | `for_each_node(filter, action, template)` | Iterator: action="search"\|"set"\|"append", uses {title} |
 | `web_search(query)` | Search web with thinking layer (query refinement) |
-| `auto_layout(layout)` | Arrange nodes: "grid", "horizontal", "vertical" |
+| `auto_layout(layout)` | Arrange nodes: "grid", "horizontal", "vertical", "force" |
+| `think(thought)` | Express reasoning before acting |
+| `plan(tasks)` | Create task list for complex operations |
+| `remember(memory)` | Save information to per-workspace memory |
+| `create_theme(name, description)` | Generate custom YAML theme |
+| `update_theme(name, changes)` | Modify existing theme |
 | `done(summary)` | Signal completion |
+
+**Node Agent Tools (per-node AI):**
+
+| Tool | Description |
+|------|-------------|
+| `web_search(query)` | Search the web (optional) |
+| `fetch_url(url)` | Read full web page content |
+| `wikipedia_search(query)` | Search Wikipedia |
+| `update_content(content)` | Replace note content (auto-converts LaTeX to Typst) |
+| `append_content(text)` | Add text to note |
+| `update_title(title)` | Change note title |
+| `done(summary)` | Signal completion (requires prior update_content) |
 
 **Key Design Decisions:**
 
@@ -702,6 +736,38 @@ The canvas includes a built-in agent that can build and modify knowledge graphs 
 5. **No Clear Canvas:** Removed from agent tools to prevent accidental deletion.
 
 6. **Stateless Requests:** Each request starts fresh with current canvas state in system prompt. No conversation history pollution.
+
+7. **LaTeX to Typst Conversion:** Node agent auto-converts LaTeX math (`\[...\]`, `$$...$$`) to Typst format when saving content.
+
+8. **Per-Workspace Memory:** `remember` tool saves information to localStorage, persists across sessions.
+
+9. **Content Enforcement:** Node agent must call `update_content()` before `done()` or request is rejected.
+
+### Settings
+
+Settings modal with four tabs: General, Themes, Canvas, LLM.
+
+**General:**
+- LLM Features toggle (show/hide AI prompts)
+- Workspace diagnostics (scan for orphaned nodes, recovery)
+
+**Themes:**
+- Theme selection grid (built-in + custom)
+- Delete custom themes
+
+**Canvas:**
+- Snap to grid toggle
+- Grid size (px)
+- Edge style (orthogonal, diagonal, curved, straight)
+
+**LLM:**
+- Provider selection (Ollama, OpenAI, Anthropic, OpenAI-compatible)
+- Streaming toggle (optional)
+- API key, base URL, model selection
+- Max tokens, context window, timeout
+- Neighbor context limit
+- Web search API key (Tavily)
+- System prompt customization
 
 **Content Rules (System Prompt):**
 - Title = label, Content = substance

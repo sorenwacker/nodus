@@ -877,6 +877,66 @@ export const useNodesStore = defineStore('nodes', () => {
     saveWorkspacesToStorage()
   }
 
+  /**
+   * Recover a workspace that was deleted from localStorage but still exists in DB.
+   * Useful when workspace was accidentally deleted but nodes still reference it.
+   */
+  async function recoverWorkspace(id: string): Promise<Workspace | null> {
+    // Check if already in local list
+    if (workspaces.value.some(w => w.id === id)) {
+      storeLogger.debug('[Store] Workspace already exists locally:', id)
+      return workspaces.value.find(w => w.id === id) || null
+    }
+
+    // Fetch from database
+    interface DbWorkspace {
+      id: string
+      name: string
+      color: string | null
+      vault_path: string | null
+      created_at: number
+      updated_at: number
+    }
+
+    const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
+    const dbWorkspace = dbWorkspaces.find(w => w.id === id)
+
+    if (!dbWorkspace) {
+      storeLogger.debug('[Store] Workspace not found in database:', id)
+      return null
+    }
+
+    // Add to local list
+    const workspace: Workspace = {
+      id: dbWorkspace.id,
+      name: dbWorkspace.name,
+      created_at: dbWorkspace.created_at,
+      vault_path: dbWorkspace.vault_path || undefined,
+    }
+
+    workspaces.value.push(workspace)
+    saveWorkspacesToStorage()
+    storeLogger.debug('[Store] Recovered workspace:', workspace.name)
+
+    return workspace
+  }
+
+  /**
+   * Find orphaned workspace IDs (nodes reference workspaces not in local list)
+   */
+  function getOrphanedWorkspaceIds(): string[] {
+    const localIds = new Set(workspaces.value.map(w => w.id))
+    const referencedIds = new Set<string>()
+
+    for (const node of nodes.value) {
+      if (node.workspace_id && !localIds.has(node.workspace_id)) {
+        referencedIds.add(node.workspace_id)
+      }
+    }
+
+    return Array.from(referencedIds)
+  }
+
   function renameWorkspace(id: string, newName: string) {
     const workspace = workspaces.value.find(w => w.id === id)
     if (workspace) {
@@ -977,13 +1037,16 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   function deleteFrame(id: string) {
+    console.log('[Store] deleteFrame called with id:', id)
     // Unassign nodes from this frame
     for (const node of nodes.value) {
       if (node.frame_id === id) {
         node.frame_id = null
       }
     }
+    const before = frames.value.length
     frames.value = frames.value.filter(f => f.id !== id)
+    console.log('[Store] Frames before:', before, 'after:', frames.value.length)
     if (selectedFrameId.value === id) {
       selectedFrameId.value = null
     }
@@ -1490,6 +1553,8 @@ export const useNodesStore = defineStore('nodes', () => {
     createWorkspace,
     switchWorkspace,
     deleteWorkspace,
+    recoverWorkspace,
+    getOrphanedWorkspaceIds,
     renameWorkspace,
     clearCanvas,
     cleanupOrphanEdges,

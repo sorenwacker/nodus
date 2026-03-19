@@ -1,0 +1,42 @@
+name: "cyber"
+display_name: "Cyber"
+description: "Neon cyberpunk theme with glowing accents"
+is_dark: true
+variables:
+  bg_canvas: "#0a0a12"
+  bg_surface: "#0d1117"
+  bg_surface_alt: "#161b22"
+  bg_elevated: "#21262d"
+  text_main: "#00ffcc"
+  text_secondary: "#7ee8fa"
+  text_muted: "#58a6ff"
+  border_default: "rgba(0, 255, 204, 0.25)"
+  border_subtle: "#30363d"
+  primary_color: "#ff00ff"
+  danger_color: "#ff3366"
+  danger_bg: "#1a0011"
+  danger_border: "rgba(255, 0, 102, 0.25)"
+  dot_color: "rgba(0, 255, 204, 0.08)"
+  shadow_sm: "rgba(0, 255, 204, 0.1)"
+  shadow_md: "rgba(255, 0, 255, 0.15)"
+extras:
+  accent_glow: "#00ffcc"
+  accent_secondary: "#ff00ff"
+  neon_pink: "#ff00ff"
+  neon_cyan: "#00ffcc"
+  neon_blue: "#00ccff"
+effects:
+  node_card:
+    box_shadow: "0 0 10px rgba(0, 255, 204, 0.3), 0 0 20px rgba(0, 255, 204, 0.1)"
+    border_color: "rgba(0, 255, 204, 0.4)"
+  node_card_hover:
+    box_shadow: "0 0 15px rgba(0, 255, 204, 0.5), 0 0 30px rgba(255, 0, 255, 0.2)"
+  node_card_selected:
+    box_shadow: "0 0 20px rgba(255, 0, 255, 0.6), 0 0 40px rgba(255, 0, 255, 0.3)"
+    border_color: "#ff00ff"
+  edge_glow:
+    filter: "drop-shadow(0 0 4px currentColor)"
+  edge_highlighted:
+    filter: "drop-shadow(0 0 8px rgba(255, 0, 255, 0.9))"
+  edge_selected:
+    filter: "drop-shadow(0 0 12px rgba(255, 0, 255, 1))"

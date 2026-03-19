@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed, provide } from 'vue'
 import { useNodesStore } from './stores/nodes'
+import { useThemesStore } from './stores/themes'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import OnboardingFlow from './components/OnboardingFlow.vue'
 import StorylinePanel from './components/StorylinePanel.vue'
 import StorylineReader from './components/StorylineReader.vue'
-import { themeStorage, type Theme } from './lib/storage'
 
 const store = useNodesStore()
+const themesStore = useThemesStore()
 const showImportDialog = ref(false)
 const showWorkspaceDialog = ref(false)
 const showWorkspaceEditor = ref(false)
@@ -19,8 +20,7 @@ const importWorkspaceName = ref('')
 const searchQuery = ref('')
 const showSearch = ref(false)
 const showSettings = ref(false)
-const currentTheme = ref<Theme>(themeStorage.get())
-const isDark = computed(() => currentTheme.value !== 'light')
+const currentTheme = computed(() => themesStore.currentThemeName)
 const showStorylinePanel = ref(false)
 const readerStorylineId = ref<string | null>(null)
 const newWorkspaceName = ref('')
@@ -238,15 +238,8 @@ function deleteCurrentWorkspace() {
 }
 
 function cycleTheme() {
-  const themes: Theme[] = ['light', 'dark', 'pitch-black', 'cyber']
-  const idx = themes.indexOf(currentTheme.value)
-  currentTheme.value = themes[(idx + 1) % themes.length]
-  document.documentElement.setAttribute('data-theme', currentTheme.value)
-  themeStorage.set(currentTheme.value)
+  themesStore.cycleTheme()
 }
-
-// Apply saved theme on load (supports all theme variants)
-document.documentElement.setAttribute('data-theme', themeStorage.get())
 
 // Normalize text for search: lowercase and remove diacritics (ö→o, é→e, etc.)
 function normalizeText(str: string): string {
@@ -375,7 +368,10 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Initialize themes first to apply visual styling
+  await themesStore.initialize()
+  // Then initialize data
   store.initialize()
   window.addEventListener('keydown', onKeydown)
 })

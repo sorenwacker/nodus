@@ -226,7 +226,9 @@ export function useFrames(options: UseFramesOptions) {
   }
 
   function deleteSelected() {
+    console.log('[Frame] deleteSelected called, selectedFrameId:', store.selectedFrameId)
     if (store.selectedFrameId) {
+      console.log('[Frame] Deleting frame:', store.selectedFrameId)
       store.deleteFrame(store.selectedFrameId)
       store.selectFrame(null)
     }

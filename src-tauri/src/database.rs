@@ -84,6 +84,14 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         .execute(pool)
         .await;
 
+    // Themes table
+    sqlx::query(include_str!("../migrations/006_themes.sql"))
+        .execute(pool)
+        .await?;
+
+    // Seed built-in themes
+    themes::seed_builtin_themes(pool).await?;
+
     Ok(())
 }
 
@@ -692,5 +700,129 @@ pub mod storylines {
         .fetch_all(pool)
         .await?;
         Ok(nodes)
+    }
+}
+
+// Theme CRUD operations
+pub mod themes {
+    use super::*;
+    use crate::themes as theme_module;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+    pub struct Theme {
+        pub id: String,
+        pub name: String,
+        pub display_name: String,
+        pub yaml_content: String,
+        pub is_builtin: i32,
+        pub workspace_id: Option<String>,
+        pub created_at: i64,
+        pub updated_at: i64,
+    }
+
+    pub async fn get_all(pool: &DbPool) -> Result<Vec<Theme>, DatabaseError> {
+        let themes = sqlx::query_as::<_, Theme>(
+            "SELECT * FROM themes ORDER BY is_builtin DESC, name"
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(themes)
+    }
+
+    pub async fn get_by_name(pool: &DbPool, name: &str) -> Result<Option<Theme>, DatabaseError> {
+        let theme = sqlx::query_as::<_, Theme>(
+            "SELECT * FROM themes WHERE name = ?"
+        )
+        .bind(name)
+        .fetch_optional(pool)
+        .await?;
+        Ok(theme)
+    }
+
+    pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Theme>, DatabaseError> {
+        let theme = sqlx::query_as::<_, Theme>(
+            "SELECT * FROM themes WHERE id = ?"
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+        Ok(theme)
+    }
+
+    pub async fn create(pool: &DbPool, theme: &Theme) -> Result<(), DatabaseError> {
+        sqlx::query(
+            r#"
+            INSERT INTO themes (id, name, display_name, yaml_content, is_builtin, workspace_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            "#
+        )
+        .bind(&theme.id)
+        .bind(&theme.name)
+        .bind(&theme.display_name)
+        .bind(&theme.yaml_content)
+        .bind(theme.is_builtin)
+        .bind(&theme.workspace_id)
+        .bind(theme.created_at)
+        .bind(theme.updated_at)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update(pool: &DbPool, id: &str, yaml_content: &str, display_name: &str) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query(
+            "UPDATE themes SET yaml_content = ?, display_name = ?, updated_at = ? WHERE id = ? AND is_builtin = 0"
+        )
+        .bind(yaml_content)
+        .bind(display_name)
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete(pool: &DbPool, id: &str) -> Result<bool, DatabaseError> {
+        // Only allow deleting non-builtin themes
+        let result = sqlx::query("DELETE FROM themes WHERE id = ? AND is_builtin = 0")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Seed built-in themes from YAML files
+    pub async fn seed_builtin_themes(pool: &DbPool) -> Result<(), DatabaseError> {
+        let builtin_themes = theme_module::load_builtin_themes();
+        let now = chrono::Utc::now().timestamp();
+
+        for (name, theme_yaml) in builtin_themes {
+            // Check if theme already exists
+            let existing = get_by_name(pool, &name).await?;
+            if existing.is_some() {
+                continue; // Don't overwrite existing themes
+            }
+
+            // Serialize back to YAML for storage
+            let yaml_content = serde_yaml::to_string(&theme_yaml)
+                .map_err(|e| DatabaseError::Migration(e.to_string()))?;
+
+            let theme = Theme {
+                id: uuid::Uuid::new_v4().to_string(),
+                name,
+                display_name: theme_yaml.display_name,
+                yaml_content,
+                is_builtin: 1,
+                workspace_id: None,
+                created_at: now,
+                updated_at: now,
+            };
+
+            create(pool, &theme).await?;
+        }
+
+        Ok(())
     }
 }
