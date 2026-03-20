@@ -1371,10 +1371,12 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 27. [x] Integrity test suite (concurrent edit tests, checksum validation)
 28. [x] Typst backend rendering (Rust-side typst crate for math compilation)
 29. [x] Folder → Frame mapping (auto-create frames from Obsidian folders on import)
+30. [x] Typst WASM frontend integration (browser mode fallback via @myriaddreamin/typst.ts)
 
 ### In Progress
 
-- [ ] Typst WASM frontend integration (render math in browser via @myriaddreamin/typst.ts)
+- [ ] Bi-directional vault sync (write changes back to .md files)
+- [ ] Obsidian Plugin (sync x,y coordinates with Obsidian Canvas)
 
 ### Future
 

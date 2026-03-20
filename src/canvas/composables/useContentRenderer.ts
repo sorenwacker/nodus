@@ -1,10 +1,12 @@
 /**
  * Content renderer composable
  * Manages markdown, Typst math, and Mermaid diagram rendering with caching
+ * Uses Tauri backend when available, falls back to WASM in browser mode
  */
 import { ref, watch, nextTick } from 'vue'
 import { marked } from 'marked'
 import { invoke, isTauri } from '../../lib/tauri'
+import { renderMath as renderMathWasm, initTypst as initTypstWasm, isTypstReady } from '../../lib/typst'
 import type { Node } from '../../types'
 
 export interface UseContentRendererOptions {
@@ -46,9 +48,18 @@ export function useContentRenderer(options: UseContentRendererOptions) {
   let markdownRenderTimer: ReturnType<typeof setTimeout> | null = null
 
   async function renderTypstMath() {
-    if (!isTauri()) return
-
     const elements = document.querySelectorAll('.typst-pending')
+    if (elements.length === 0) return
+
+    // Initialize WASM renderer if needed (for browser mode)
+    if (!isTauri() && !isTypstReady()) {
+      try {
+        await initTypstWasm()
+      } catch (e) {
+        console.warn('WASM Typst init failed:', e)
+      }
+    }
+
     for (const el of elements) {
       const math = el.getAttribute('data-math')
       const isDisplay = el.classList.contains('typst-display')
@@ -63,13 +74,28 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       }
 
       try {
-        const svg = await invoke<string>('render_typst_math', {
-          math,
-          displayMode: isDisplay,
-        })
-        mathCache.set(cacheKey, svg)
-        el.innerHTML = svg
-        el.classList.remove('typst-pending')
+        let svg: string | null = null
+
+        if (isTauri()) {
+          // Use Tauri backend for native performance
+          svg = await invoke<string>('render_typst_math', {
+            math,
+            displayMode: isDisplay,
+          })
+        } else if (isTypstReady()) {
+          // Use WASM renderer in browser mode
+          svg = await renderMathWasm(math, isDisplay)
+        }
+
+        if (svg) {
+          mathCache.set(cacheKey, svg)
+          el.innerHTML = svg
+          el.classList.remove('typst-pending')
+        } else {
+          // No renderer available - show raw math
+          el.classList.remove('typst-pending')
+          el.classList.add('typst-fallback')
+        }
       } catch (e) {
         console.warn('Math render error:', e)
         el.textContent = math // Fallback to raw math
