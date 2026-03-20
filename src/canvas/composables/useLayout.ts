@@ -703,7 +703,6 @@ export function useLayout(options: UseLayoutOptions) {
 
   function fitToContent() {
     const nodes = store.getFilteredNodes()
-    console.log('[fitToContent] nodes:', nodes.length)
     if (nodes.length === 0) return
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -715,10 +714,7 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     const rect = viewState.canvasRect()
-    if (!rect) {
-      console.log('[fitToContent] No canvas rect')
-      return
-    }
+    if (!rect) return
 
     const padding = 50
     const contentWidth = maxX - minX + padding * 2
@@ -728,7 +724,6 @@ export function useLayout(options: UseLayoutOptions) {
     const scaleY = rect.height / contentHeight
     // Minimum scale of 0.02 to keep nodes visible, max of 1 to not zoom in beyond 100%
     viewState.scale.value = Math.max(0.02, Math.min(scaleX, scaleY, 1))
-    console.log('[fitToContent] bounds:', { minX, minY, maxX, maxY, scale: viewState.scale.value })
 
     viewState.offsetX.value = (rect.width - contentWidth * viewState.scale.value) / 2 - minX * viewState.scale.value + padding * viewState.scale.value
     viewState.offsetY.value = (rect.height - contentHeight * viewState.scale.value) / 2 - minY * viewState.scale.value + padding * viewState.scale.value
