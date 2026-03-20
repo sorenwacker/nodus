@@ -45,7 +45,6 @@ data/
 
 # Tauri build
 src-tauri/WixTools/
-src-tauri/icons/
 
 # Docker
 .docker/

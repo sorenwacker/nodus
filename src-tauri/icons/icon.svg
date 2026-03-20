@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Cyan glow -->
+    <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Magenta glow -->
+    <filter id="glow-magenta" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Edge glow -->
+    <filter id="glow-edge" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0a0a12"/>
+
+  <!-- Subtle grid pattern -->
+  <g stroke="#00ffcc" stroke-opacity="0.08" stroke-width="1">
+    <line x1="128" y1="0" x2="128" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="384" y1="0" x2="384" y2="512"/>
+    <line x1="0" y1="128" x2="512" y2="128"/>
+    <line x1="0" y1="256" x2="512" y2="256"/>
+    <line x1="0" y1="384" x2="512" y2="384"/>
+  </g>
+
+  <!-- Edges (connections between nodes) -->
+  <g filter="url(#glow-edge)" stroke-width="4" stroke-linecap="round" fill="none">
+    <!-- Center to top-right -->
+    <line x1="256" y1="256" x2="380" y2="140" stroke="#00ffcc"/>
+    <!-- Center to bottom-left -->
+    <line x1="256" y1="256" x2="140" y2="360" stroke="#00ffcc"/>
+    <!-- Center to left -->
+    <line x1="256" y1="256" x2="120" y2="200" stroke="#00ccff"/>
+    <!-- Center to bottom-right -->
+    <line x1="256" y1="256" x2="370" y2="340" stroke="#ff00ff"/>
+  </g>
+
+  <!-- Outer nodes (smaller) -->
+  <g filter="url(#glow-cyan)">
+    <circle cx="380" cy="140" r="28" fill="#0a0a12" stroke="#00ffcc" stroke-width="3"/>
+    <circle cx="140" cy="360" r="28" fill="#0a0a12" stroke="#00ffcc" stroke-width="3"/>
+    <circle cx="120" cy="200" r="24" fill="#0a0a12" stroke="#00ccff" stroke-width="3"/>
+  </g>
+
+  <!-- Magenta node -->
+  <g filter="url(#glow-magenta)">
+    <circle cx="370" cy="340" r="26" fill="#0a0a12" stroke="#ff00ff" stroke-width="3"/>
+  </g>
+
+  <!-- Center node (main, larger) -->
+  <g filter="url(#glow-magenta)">
+    <circle cx="256" cy="256" r="52" fill="#0a0a12" stroke="#ff00ff" stroke-width="4"/>
+    <circle cx="256" cy="256" r="20" fill="#ff00ff" fill-opacity="0.8"/>
+  </g>
+
+  <!-- Inner node highlights -->
+  <circle cx="380" cy="140" r="10" fill="#00ffcc" fill-opacity="0.7"/>
+  <circle cx="140" cy="360" r="10" fill="#00ffcc" fill-opacity="0.7"/>
+  <circle cx="120" cy="200" r="8" fill="#00ccff" fill-opacity="0.7"/>
+  <circle cx="370" cy="340" r="9" fill="#ff00ff" fill-opacity="0.7"/>
+</svg>
