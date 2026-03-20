@@ -1,6 +1,6 @@
 # Nodus - Product Design Document
 
-Version: 0.15.0
+Version: 0.16.0
 Date: 2026-03-20
 Status: Active Development
 
@@ -388,7 +388,7 @@ Drag and drop files directly onto the canvas to import them. Supported formats:
 | **PDF** | `.pdf` | Extract text, clean up with AI, create note node(s) |
 | **Markdown** | `.md` | Create note node with content |
 | **BibTeX** | `.bib` | Parse citations, create citation nodes |
-| **CSL-JSON** | `.json` | Parse citations, create citation nodes |
+| **CSL-JSON** | `.json` | Parse citations, create citation nodes (Zotero export) |
 | **Ontology** | `.ttl`, `.rdf`, `.owl`, `.jsonld` | Import RDF graph as nodes and edges |
 
 **PDF Import:**
@@ -403,6 +403,33 @@ Drag and drop files directly onto the canvas to import them. Supported formats:
   - Create nodes for individuals/instances
 - Nodes are auto-laid out after import
 - RDF properties become edges between nodes
+
+### Zotero Integration
+
+Two methods for importing citations from Zotero:
+
+**Method 1: File Drop (Export/Import)**
+1. In Zotero: Right-click collection → Export Collection → CSL-JSON (Better BibTeX recommended)
+2. Drop the `.json` file onto the Nodus canvas
+3. If collection metadata detected, ImportOptionsModal appears with options:
+   - Create frame for collection (auto-named from Zotero collection)
+   - Import attached PDFs (future)
+   - Layout choice (grid/force)
+4. Citation nodes created inside frame
+
+**Method 2: Direct Library Access (Settings)**
+1. Settings → Zotero → Detect (auto-detects local Zotero installation)
+2. Browse collections with item counts
+3. (Future: Click to import collection directly)
+
+**Supported Formats:**
+- CSL-JSON (Zotero native, Better BibTeX extended)
+- BibTeX (.bib)
+
+**Better BibTeX Extensions:**
+- `citation-key` field for custom citation keys
+- `collections` array for collection names
+- `attachments` array for linked PDFs
 
 ### Keyboard Shortcuts
 
@@ -686,13 +713,15 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 
 **Goal:** Zotero-to-Canvas as the "Aha!" moment
 
-- [ ] Zotero integration (core pillar)
-- [ ] Citation node type
-- [ ] Drag citation → create linked node
+- [x] Zotero integration (core pillar)
+- [x] Citation node type
+- [x] Drag citation → create linked node (BibTeX/CSL-JSON drop)
+- [x] Zotero collection → Frame mapping
+- [x] Direct Zotero library access (Settings > Zotero)
 - [ ] PDF import with highlights
 - [ ] PDF highlight → canvas node
-- [ ] Typst math rendering (WASM)
-- [ ] Live-rendered equations
+- [x] Typst math rendering (WASM)
+- [x] Live-rendered equations
 - [ ] "Modernize My Math" import
 - [ ] Export to Typst
 - [ ] Export to PDF (journal-quality)
@@ -1373,20 +1402,19 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 29. [x] Folder → Frame mapping (auto-create frames from Obsidian folders on import)
 30. [x] Typst WASM frontend integration (browser mode fallback via @myriaddreamin/typst.ts)
 31. [x] Bi-directional vault sync (file watcher + write-back with checksum tracking)
+32. [x] Zotero integration (BibTeX/CSL-JSON import, collection-to-frame mapping, direct library access)
 
 ### In Progress
 
 - [ ] Obsidian Plugin (sync x,y coordinates with Obsidian Canvas)
-- [ ] Zotero integration (citation import, drag to canvas)
 
 ### Future
 
 20. [ ] **Obsidian Plugin** — sync x,y coordinates between Nodus and Obsidian Canvas
-21. [ ] Zotero-to-Canvas workflow
-22. [ ] PDF import + highlights
-23. [ ] EU sync service (Yjs for positions + Hetzner)
-24. [ ] Mobile PWA capture app
-25. [ ] User interviews with PhD students
+21. [ ] PDF import + highlights
+22. [ ] EU sync service (Yjs for positions + Hetzner)
+23. [ ] Mobile PWA capture app
+24. [ ] User interviews with PhD students
 
 ---
 
@@ -1406,4 +1434,4 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 ---
 
 *Document: `/docs/PRODUCT_DESIGN.md`*
-*Version: 0.15.0 — Added: file locking mechanism (fs2 crate), integrity test suite, Typst backend rendering, hyperbolic edge style, multi-language support (en/de/fr/es/it), language selector UI. Updated roadmap to reflect current state.*
+*Version: 0.16.0 — Added: Zotero integration (BibTeX/CSL-JSON import with collection-to-frame mapping, direct Zotero library access via Settings, ImportOptionsModal). Updated Phase 2 roadmap to reflect Zotero completion.*
