@@ -92,6 +92,16 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     // Seed built-in themes
     themes::seed_builtin_themes(pool).await?;
 
+    // Frames table
+    sqlx::query(include_str!("../migrations/007_frames.sql"))
+        .execute(pool)
+        .await?;
+
+    // Allow multiple edges with different link_types between same nodes
+    let _ = sqlx::query(include_str!("../migrations/008_edge_multi_type.sql"))
+        .execute(pool)
+        .await;
+
     Ok(())
 }
 
@@ -324,6 +334,38 @@ pub mod nodes {
             .await?;
         Ok(())
     }
+
+    pub async fn update_tags(
+        pool: &DbPool,
+        id: &str,
+        tags: &[String],
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        let tags_json = serde_json::to_string(tags)
+            .map_err(|e| DatabaseError::Migration(e.to_string()))?;
+        sqlx::query("UPDATE nodes SET tags = ?, updated_at = ? WHERE id = ?")
+            .bind(&tags_json)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_frame_id(
+        pool: &DbPool,
+        id: &str,
+        frame_id: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET frame_id = ?, updated_at = ? WHERE id = ?")
+            .bind(frame_id)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
 }
 
 // Edge CRUD operations
@@ -441,16 +483,6 @@ pub mod workspaces {
         Ok(workspaces)
     }
 
-    pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Workspace>, DatabaseError> {
-        let workspace = sqlx::query_as::<_, Workspace>(
-            "SELECT * FROM workspaces WHERE id = ?"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
-        Ok(workspace)
-    }
-
     pub async fn create(pool: &DbPool, workspace: &Workspace) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
@@ -500,15 +532,6 @@ pub mod storylines {
         pub storyline_id: String,
         pub node_id: String,
         pub sequence_order: i32,
-    }
-
-    pub async fn get_all(pool: &DbPool) -> Result<Vec<Storyline>, DatabaseError> {
-        let storylines = sqlx::query_as::<_, Storyline>(
-            "SELECT * FROM storylines ORDER BY created_at"
-        )
-        .fetch_all(pool)
-        .await?;
-        Ok(storylines)
     }
 
     pub async fn get_by_workspace(pool: &DbPool, workspace_id: Option<&str>) -> Result<Vec<Storyline>, DatabaseError> {
@@ -585,16 +608,6 @@ pub mod storylines {
     }
 
     // Storyline nodes management
-
-    pub async fn get_nodes(pool: &DbPool, storyline_id: &str) -> Result<Vec<StorylineNode>, DatabaseError> {
-        let nodes = sqlx::query_as::<_, StorylineNode>(
-            "SELECT * FROM storyline_nodes WHERE storyline_id = ? ORDER BY sequence_order"
-        )
-        .bind(storyline_id)
-        .fetch_all(pool)
-        .await?;
-        Ok(nodes)
-    }
 
     pub async fn add_node(pool: &DbPool, storyline_id: &str, node_id: &str, position: Option<i32>) -> Result<StorylineNode, DatabaseError> {
         // Get the current max sequence_order
@@ -839,5 +852,137 @@ pub mod themes {
         }
 
         Ok(())
+    }
+}
+
+// Frame CRUD operations
+pub mod frames {
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+    pub struct Frame {
+        pub id: String,
+        pub title: String,
+        pub canvas_x: f64,
+        pub canvas_y: f64,
+        pub width: f64,
+        pub height: f64,
+        pub color: Option<String>,
+        pub workspace_id: Option<String>,
+        pub created_at: i64,
+        pub updated_at: i64,
+    }
+
+    pub async fn get_all(pool: &DbPool) -> Result<Vec<Frame>, DatabaseError> {
+        let frames = sqlx::query_as::<_, Frame>(
+            "SELECT * FROM frames ORDER BY created_at"
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(frames)
+    }
+
+    pub async fn create(pool: &DbPool, frame: &Frame) -> Result<(), DatabaseError> {
+        sqlx::query(
+            r#"
+            INSERT INTO frames (id, title, canvas_x, canvas_y, width, height, color, workspace_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#
+        )
+        .bind(&frame.id)
+        .bind(&frame.title)
+        .bind(frame.canvas_x)
+        .bind(frame.canvas_y)
+        .bind(frame.width)
+        .bind(frame.height)
+        .bind(&frame.color)
+        .bind(&frame.workspace_id)
+        .bind(frame.created_at)
+        .bind(frame.updated_at)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_position(pool: &DbPool, id: &str, x: f64, y: f64) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE frames SET canvas_x = ?, canvas_y = ?, updated_at = ? WHERE id = ?")
+            .bind(x)
+            .bind(y)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_size(pool: &DbPool, id: &str, width: f64, height: f64) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE frames SET width = ?, height = ?, updated_at = ? WHERE id = ?")
+            .bind(width)
+            .bind(height)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_title(pool: &DbPool, id: &str, title: &str) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE frames SET title = ?, updated_at = ? WHERE id = ?")
+            .bind(title)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_color(pool: &DbPool, id: &str, color: Option<&str>) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE frames SET color = ?, updated_at = ? WHERE id = ?")
+            .bind(color)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
+        sqlx::query("DELETE FROM frames WHERE id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_by_title_and_workspace(
+        pool: &DbPool,
+        title: &str,
+        workspace_id: Option<&str>,
+    ) -> Result<Option<Frame>, DatabaseError> {
+        let frame = match workspace_id {
+            Some(ws_id) => {
+                sqlx::query_as::<_, Frame>(
+                    "SELECT * FROM frames WHERE title = ? AND workspace_id = ?"
+                )
+                .bind(title)
+                .bind(ws_id)
+                .fetch_optional(pool)
+                .await?
+            }
+            None => {
+                sqlx::query_as::<_, Frame>(
+                    "SELECT * FROM frames WHERE title = ? AND workspace_id IS NULL"
+                )
+                .bind(title)
+                .fetch_optional(pool)
+                .await?
+            }
+        };
+        Ok(frame)
     }
 }

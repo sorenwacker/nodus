@@ -2,7 +2,7 @@
 //!
 //! All commands are async and return Results for proper error handling.
 
-use crate::database::{self, edges::Edge, nodes::Node, storylines::{Storyline, StorylineNode}, themes::Theme};
+use crate::database::{self, edges::Edge, frames::Frame, nodes::Node, storylines::{Storyline, StorylineNode}, themes::Theme};
 use crate::themes as theme_module;
 use crate::watcher::{write_file_locked, FileChangeEvent, FileLock, VaultWatcher};
 use serde::Deserialize;
@@ -108,6 +108,31 @@ pub async fn update_node(_input: UpdateNodeInput) -> Result<(), String> {
 #[tauri::command]
 pub async fn delete_node(id: String) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Get the node first to check for file_path
+    if let Ok(Some(node)) = database::nodes::get_by_id(pool, &id).await {
+        if let Some(file_path) = &node.file_path {
+            let path = std::path::Path::new(file_path);
+            if path.exists() {
+                // Create .nodus-trash directory next to the file
+                if let Some(parent) = path.parent() {
+                    let trash_dir = parent.join(".nodus-trash");
+                    if !trash_dir.exists() {
+                        std::fs::create_dir_all(&trash_dir)
+                            .map_err(|e| format!("Failed to create trash dir: {}", e))?;
+                    }
+
+                    // Move file to trash with original filename
+                    if let Some(filename) = path.file_name() {
+                        let trash_path = trash_dir.join(filename);
+                        std::fs::rename(path, &trash_path)
+                            .map_err(|e| format!("Failed to move file to trash: {}", e))?;
+                    }
+                }
+            }
+        }
+    }
+
     database::nodes::soft_delete(pool, &id)
         .await
         .map_err(|e| e.to_string())
@@ -116,6 +141,22 @@ pub async fn delete_node(id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn restore_node(node: Node) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Restore file from trash if it exists
+    if let Some(file_path) = &node.file_path {
+        let path = std::path::Path::new(file_path);
+        if let Some(parent) = path.parent() {
+            let trash_dir = parent.join(".nodus-trash");
+            if let Some(filename) = path.file_name() {
+                let trash_path = trash_dir.join(filename);
+                if trash_path.exists() && !path.exists() {
+                    std::fs::rename(&trash_path, path)
+                        .map_err(|e| format!("Failed to restore file from trash: {}", e))?;
+                }
+            }
+        }
+    }
+
     database::nodes::restore(pool, &node.id)
         .await
         .map_err(|e| e.to_string())
@@ -283,6 +324,14 @@ pub async fn update_node_workspace(id: String, workspace_id: Option<String>) -> 
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn update_node_tags(id: String, tags: Vec<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_tags(pool, &id, &tags)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ============================================================================
 // Vault Watcher Commands
 // ============================================================================
@@ -334,6 +383,15 @@ fn extract_wikilinks(content: &str) -> Vec<String> {
         .collect()
 }
 
+/// Get relative folder path from vault root (empty string for root)
+fn get_relative_folder(file_path: &std::path::Path, vault_root: &std::path::Path) -> Option<String> {
+    file_path.parent().and_then(|parent| {
+        parent.strip_prefix(vault_root).ok().map(|rel| {
+            rel.to_string_lossy().to_string()
+        })
+    })
+}
+
 #[tauri::command]
 pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<Vec<Node>, String> {
     let path = PathBuf::from(&path);
@@ -350,7 +408,16 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
     let mut node_links: Vec<(String, Vec<String>)> = Vec::new();
     let mut skipped = 0;
 
-    // Walk directory and import .md files
+    // Track folders and their frames
+    // Key: relative folder path, Value: (frame_id, nodes_in_folder count)
+    let mut folder_frames: std::collections::HashMap<String, (String, usize)> = std::collections::HashMap::new();
+    // Track which node belongs to which folder
+    let mut node_folders: Vec<(String, String)> = Vec::new(); // (node_id, folder_path)
+
+    // First pass: collect all files and create frames for folders
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut files_to_import: Vec<(PathBuf, String)> = Vec::new(); // (file_path, folder)
+
     for entry in walkdir::WalkDir::new(&path)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -358,77 +425,163 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         let file_path = entry.path();
 
         if file_path.extension().map_or(false, |ext| ext == "md") {
-            let file_path_str = file_path.to_string_lossy().to_string();
+            let folder = get_relative_folder(file_path, &path).unwrap_or_default();
+            files_to_import.push((file_path.to_path_buf(), folder.clone()));
 
-            // Check if this file is already imported
-            if let Ok(Some(existing)) = database::nodes::get_by_file_path(pool, &file_path_str).await {
-                if existing.deleted_at.is_some() {
-                    // Node was soft-deleted, hard delete it so we can re-import
-                    let _ = database::nodes::hard_delete(pool, &existing.id).await;
-                } else {
-                    // Node exists and is active, skip it
-                    skipped += 1;
-                    continue;
-                }
+            // Track folder for frame creation
+            folder_frames.entry(folder).or_insert_with(|| {
+                (String::new(), 0) // frame_id will be set later
+            }).1 += 1;
+        }
+    }
+
+    // Create frames for non-root folders with multiple files
+    let frame_spacing = 800.0;
+    let mut frame_count = 0;
+    for (folder, (frame_id_slot, count)) in folder_frames.iter_mut() {
+        // Skip root folder (empty string) and single-file folders
+        if folder.is_empty() || *count < 2 {
+            continue;
+        }
+
+        // Check if frame already exists
+        let frame_title = folder.split('/').last().unwrap_or(folder);
+        if let Ok(Some(existing)) = database::frames::get_by_title_and_workspace(
+            pool,
+            frame_title,
+            workspace_id.as_deref()
+        ).await {
+            *frame_id_slot = existing.id;
+            continue;
+        }
+
+        // Create new frame
+        let frame_id = uuid::Uuid::new_v4().to_string();
+        let frame_x = (frame_count % 3) as f64 * frame_spacing + 50.0;
+        let frame_y = (frame_count / 3) as f64 * frame_spacing + 50.0;
+
+        let frame = database::frames::Frame {
+            id: frame_id.clone(),
+            title: frame_title.to_string(),
+            canvas_x: frame_x,
+            canvas_y: frame_y,
+            width: 600.0,
+            height: 400.0,
+            color: None,
+            workspace_id: workspace_id.clone(),
+            created_at: now,
+            updated_at: now,
+        };
+
+        if database::frames::create(pool, &frame).await.is_ok() {
+            *frame_id_slot = frame_id;
+            frame_count += 1;
+        }
+    }
+
+    // Second pass: import files and assign to frames
+    let mut folder_node_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for (file_path, folder) in files_to_import {
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        // Check if this file is already imported
+        if let Ok(Some(existing)) = database::nodes::get_by_file_path(pool, &file_path_str).await {
+            if existing.deleted_at.is_some() {
+                let _ = database::nodes::hard_delete(pool, &existing.id).await;
+            } else {
+                skipped += 1;
+                continue;
             }
+        }
 
-            // Read file content
-            let content = std::fs::read_to_string(file_path).map_err(|e| e.to_string())?;
+        // Read file content
+        let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
 
-            // Extract title from filename
-            let title = file_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Untitled")
-                .to_string();
+        // Extract title from filename
+        let title = file_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Untitled")
+            .to_string();
 
-            // Extract wikilinks
-            let links = extract_wikilinks(&content);
+        // Extract wikilinks
+        let links = extract_wikilinks(&content);
 
-            // Compute checksum
-            let checksum = crate::checksum::compute_string(&content);
+        // Compute checksum
+        let checksum = crate::checksum::compute_string(&content);
 
-            // Create node with random initial position (will be adjusted by d3-force)
-            let now = chrono::Utc::now().timestamp();
-            let node_id = uuid::Uuid::new_v4().to_string();
+        // Get frame info for this folder
+        let frame_id = folder_frames.get(&folder).and_then(|(fid, _)| {
+            if fid.is_empty() { None } else { Some(fid.clone()) }
+        });
 
-            // Random initial positions in a grid-like pattern
-            let idx = nodes.len();
+        // Calculate position within frame or on canvas
+        let node_idx = folder_node_counts.entry(folder.clone()).or_insert(0);
+        let (initial_x, initial_y) = if frame_id.is_some() {
+            // Position within frame
+            let cols = 3;
+            let spacing = 180.0;
+            let frame_info = folder_frames.get(&folder);
+            let (frame_x, frame_y) = if let Some((_, _)) = frame_info {
+                // Find frame position
+                let fi = folder_frames.keys().position(|k| k == &folder).unwrap_or(0);
+                let fx = (fi % 3) as f64 * 800.0 + 50.0;
+                let fy = (fi / 3) as f64 * 800.0 + 50.0;
+                (fx, fy)
+            } else {
+                (50.0, 50.0)
+            };
+            let x = frame_x + 30.0 + (*node_idx % cols) as f64 * spacing;
+            let y = frame_y + 60.0 + (*node_idx / cols) as f64 * 140.0;
+            (x, y)
+        } else {
+            // Root folder nodes - grid layout
             let cols = 5;
             let spacing = 250.0;
-            let initial_x = (idx % cols) as f64 * spacing + 100.0;
-            let initial_y = (idx / cols) as f64 * spacing + 100.0;
+            let idx = nodes.len();
+            let x = (idx % cols) as f64 * spacing + 100.0;
+            let y = (idx / cols) as f64 * spacing + 100.0;
+            (x, y)
+        };
+        *node_idx += 1;
 
-            let node = Node {
-                id: node_id.clone(),
-                title: title.clone(),
-                file_path: Some(file_path_str),
-                markdown_content: Some(content),
-                node_type: "note".to_string(),
-                canvas_x: initial_x,
-                canvas_y: initial_y,
-                width: 200.0,
-                height: 120.0,
-                z_index: 0,
-                frame_id: None,
-                color_theme: None,
-                is_collapsed: false,
-                tags: None,
-                workspace_id: workspace_id.clone(),
-                checksum: Some(checksum),
-                created_at: now,
-                updated_at: now,
-                deleted_at: None,
-            };
+        let now_ts = chrono::Utc::now().timestamp();
+        let node_id = uuid::Uuid::new_v4().to_string();
 
-            database::nodes::create(pool, &node)
-                .await
-                .map_err(|e| e.to_string())?;
+        let node = Node {
+            id: node_id.clone(),
+            title: title.clone(),
+            file_path: Some(file_path_str),
+            markdown_content: Some(content),
+            node_type: "note".to_string(),
+            canvas_x: initial_x,
+            canvas_y: initial_y,
+            width: 200.0,
+            height: 120.0,
+            z_index: 0,
+            frame_id: frame_id.clone(),
+            color_theme: None,
+            is_collapsed: false,
+            tags: None,
+            workspace_id: workspace_id.clone(),
+            checksum: Some(checksum),
+            created_at: now_ts,
+            updated_at: now_ts,
+            deleted_at: None,
+        };
 
-            title_to_id.insert(title.to_lowercase(), node_id.clone());
-            node_links.push((node_id, links));
-            nodes.push(node);
+        database::nodes::create(pool, &node)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if let Some(fid) = &frame_id {
+            node_folders.push((node_id.clone(), fid.clone()));
         }
+
+        title_to_id.insert(title.to_lowercase(), node_id.clone());
+        node_links.push((node_id, links));
+        nodes.push(node);
     }
 
     // Create edges for wikilinks (deduplicated)
@@ -437,7 +590,6 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
     let mut seen_edges: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
 
     for (source_id, links) in node_links {
-        // Deduplicate links within the same source node
         let unique_links: std::collections::HashSet<String> = links.into_iter()
             .map(|l| l.to_lowercase())
             .collect();
@@ -445,7 +597,6 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         for link in unique_links {
             if let Some(target_id) = title_to_id.get(&link) {
                 if source_id != *target_id {
-                    // Skip if we've already created this edge
                     let edge_key = (source_id.clone(), target_id.clone());
                     if seen_edges.contains(&edge_key) {
                         continue;
@@ -471,11 +622,11 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         }
     }
 
-    // Clean up any duplicate edges (from previous imports or database issues)
+    // Clean up duplicate edges
     let duplicates_removed = database::edges::deduplicate(pool).await.unwrap_or(0);
 
-    println!("Import complete: {} nodes imported, {} skipped, {} edges created, {} duplicates removed",
-             nodes.len(), skipped, edge_count, duplicates_removed);
+    println!("Import complete: {} nodes imported, {} skipped, {} edges created, {} frames created, {} duplicates removed",
+             nodes.len(), skipped, edge_count, frame_count, duplicates_removed);
 
     Ok(nodes)
 }
@@ -1071,4 +1222,232 @@ pub async fn validate_theme_yaml(yaml_content: String) -> Result<bool, String> {
         Ok(_) => Ok(true),
         Err(e) => Err(e.to_string()),
     }
+}
+
+// ============================================================================
+// Frame Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn get_frames() -> Result<Vec<Frame>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::frames::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFrameInput {
+    pub id: String,
+    pub title: String,
+    pub canvas_x: f64,
+    pub canvas_y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub color: Option<String>,
+    pub workspace_id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn create_frame(input: CreateFrameInput) -> Result<Frame, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let now = chrono::Utc::now().timestamp_millis();
+
+    let frame = Frame {
+        id: input.id,
+        title: input.title,
+        canvas_x: input.canvas_x,
+        canvas_y: input.canvas_y,
+        width: input.width,
+        height: input.height,
+        color: input.color,
+        workspace_id: input.workspace_id,
+        created_at: now,
+        updated_at: now,
+    };
+
+    database::frames::create(pool, &frame)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(frame)
+}
+
+#[tauri::command]
+pub async fn update_frame_position(id: String, x: f64, y: f64) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::frames::update_position(pool, &id, x, y)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_frame_size(id: String, width: f64, height: f64) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::frames::update_size(pool, &id, width, height)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_frame_title(id: String, title: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::frames::update_title(pool, &id, &title)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_frame_color(id: String, color: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::frames::update_color(pool, &id, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_frame(id: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::frames::delete(pool, &id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ============================================================================
+// Ontology Import Commands
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportOntologyInput {
+    pub file_path: String,
+    pub workspace_id: Option<String>,
+    #[serde(default = "default_true")]
+    pub create_class_nodes: bool,
+    #[serde(default)]
+    pub create_individual_nodes: bool,
+    #[serde(default)]
+    pub layout: crate::ontology::OntologyLayout,
+}
+
+fn default_true() -> bool { true }
+
+#[tauri::command]
+pub async fn import_ontology(
+    input: ImportOntologyInput,
+) -> Result<crate::ontology::OntologyImportResult, String> {
+    use crate::ontology::{parse_ontology, transform_to_nodus, transformer::TransformOptions, types::OntologyData};
+    use std::path::Path;
+
+    let path = Path::new(&input.file_path);
+
+    if !path.exists() {
+        return Err("Ontology file/directory does not exist".to_string());
+    }
+
+    // Parse the ontology - either a single file or all files in a directory
+    let ontology_data = if path.is_dir() {
+        // Parse all ontology files in the directory
+        let mut combined = OntologyData {
+            individuals: Vec::new(),
+            object_properties: Vec::new(),
+            classes: Vec::new(),
+            subclass_relations: Vec::new(),
+            property_definitions: Vec::new(),
+        };
+
+        let extensions = ["ttl", "rdf", "owl", "jsonld"];
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let file_path = entry.path();
+
+            if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+                if extensions.contains(&ext) {
+                    println!("Parsing ontology file: {:?}", file_path);
+                    match parse_ontology(&file_path) {
+                        Ok(data) => {
+                            combined.individuals.extend(data.individuals);
+                            combined.object_properties.extend(data.object_properties);
+                            combined.classes.extend(data.classes);
+                            combined.subclass_relations.extend(data.subclass_relations);
+                            combined.property_definitions.extend(data.property_definitions);
+                        }
+                        Err(e) => {
+                            eprintln!("Warning: Failed to parse {:?}: {}", file_path, e);
+                        }
+                    }
+                }
+            }
+        }
+
+        if combined.individuals.is_empty() && combined.classes.is_empty() {
+            return Err("No ontology data found in directory".to_string());
+        }
+
+        combined
+    } else {
+        // Parse single file
+        parse_ontology(path).map_err(|e| format!("Failed to parse ontology: {}", e))?
+    };
+
+    let total_entities = ontology_data.classes.len() + ontology_data.individuals.len();
+    println!(
+        "Parsed ontology: {} individuals, {} object properties, {} classes ({} total)",
+        ontology_data.individuals.len(),
+        ontology_data.object_properties.len(),
+        ontology_data.classes.len(),
+        total_entities
+    );
+
+    // Force grid layout for large ontologies (hierarchical is too slow)
+    let layout = if total_entities > 500 {
+        println!("Large ontology detected ({} entities), forcing grid layout", total_entities);
+        crate::ontology::OntologyLayout::Grid
+    } else {
+        input.layout
+    };
+
+    // Transform to nodes and edges
+    let options = TransformOptions {
+        create_class_nodes: input.create_class_nodes,
+        create_individual_nodes: input.create_individual_nodes,
+        workspace_id: input.workspace_id,
+        layout,
+        ..Default::default()
+    };
+
+    let result = transform_to_nodus(&ontology_data, &options);
+
+    // Save nodes to database
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let mut node_ids = Vec::with_capacity(result.nodes.len());
+
+    for node in &result.nodes {
+        database::nodes::create(pool, node)
+            .await
+            .map_err(|e| format!("Failed to create node: {}", e))?;
+        node_ids.push(node.id.clone());
+    }
+
+    // Save edges to database
+    for edge in &result.edges {
+        database::edges::create(pool, edge)
+            .await
+            .map_err(|e| format!("Failed to create edge: {}", e))?;
+    }
+
+    println!(
+        "Import complete: {} nodes created, {} edges created, {} class nodes",
+        result.nodes.len(),
+        result.edges.len(),
+        result.class_nodes_created
+    );
+
+    Ok(crate::ontology::OntologyImportResult {
+        nodes_created: result.nodes.len(),
+        edges_created: result.edges.len(),
+        class_nodes_created: result.class_nodes_created,
+        node_ids,
+    })
 }

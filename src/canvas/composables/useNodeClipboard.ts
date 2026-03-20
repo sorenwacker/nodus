@@ -24,6 +24,53 @@ export interface ClipboardNodeData {
   }>
 }
 
+/**
+ * Validate that a value is a finite number within reasonable bounds
+ */
+function isValidCoordinate(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1_000_000
+}
+
+/**
+ * Validate clipboard data schema
+ */
+function validateClipboardData(data: unknown): data is ClipboardNodeData {
+  if (!data || typeof data !== 'object') return false
+
+  const obj = data as Record<string, unknown>
+  if (obj.type !== 'nodus-nodes') return false
+  if (!Array.isArray(obj.nodes)) return false
+  if (obj.nodes.length === 0) return false
+  if (obj.nodes.length > 1000) return false // Reasonable limit
+
+  // Validate each node
+  for (const node of obj.nodes) {
+    if (!node || typeof node !== 'object') return false
+    const n = node as Record<string, unknown>
+    if (typeof n.title !== 'string') return false
+    if (!isValidCoordinate(n.canvas_x)) return false
+    if (!isValidCoordinate(n.canvas_y)) return false
+    if (!isValidCoordinate(n.width)) return false
+    if (!isValidCoordinate(n.height)) return false
+  }
+
+  // Validate edges if present
+  if (obj.edges !== undefined) {
+    if (!Array.isArray(obj.edges)) return false
+    const nodeCount = obj.nodes.length
+    for (const edge of obj.edges) {
+      if (!edge || typeof edge !== 'object') return false
+      const e = edge as Record<string, unknown>
+      if (typeof e.source_index !== 'number' || typeof e.target_index !== 'number') return false
+      // Validate indices are within bounds
+      if (e.source_index < 0 || e.source_index >= nodeCount) return false
+      if (e.target_index < 0 || e.target_index >= nodeCount) return false
+    }
+  }
+
+  return true
+}
+
 export interface UseNodeClipboardOptions {
   store: {
     selectedNodeIds: string[]
@@ -73,13 +120,20 @@ export function useNodeClipboard(options: UseNodeClipboardOptions) {
         height: n.height,
         color_theme: n.color_theme,
       })),
-      edges: selectedEdges.map(e => ({
-        source_index: nodeIdToIndex.get(e.source_node_id)!,
-        target_index: nodeIdToIndex.get(e.target_node_id)!,
-        label: e.label,
-        link_type: e.link_type,
-        color: e.color,
-      }))
+      edges: selectedEdges
+        .filter(e => {
+          // Ensure both indices exist before including edge
+          const srcIdx = nodeIdToIndex.get(e.source_node_id)
+          const tgtIdx = nodeIdToIndex.get(e.target_node_id)
+          return srcIdx !== undefined && tgtIdx !== undefined
+        })
+        .map(e => ({
+          source_index: nodeIdToIndex.get(e.source_node_id) as number,
+          target_index: nodeIdToIndex.get(e.target_node_id) as number,
+          label: e.label,
+          link_type: e.link_type,
+          color: e.color,
+        }))
     }
 
     try {
@@ -98,17 +152,20 @@ export function useNodeClipboard(options: UseNodeClipboardOptions) {
   async function pasteNodes(): Promise<string[]> {
     try {
       const text = await readClipboard()
-      let data: ClipboardNodeData
+      let parsedData: unknown
 
       try {
-        data = JSON.parse(text)
+        parsedData = JSON.parse(text)
       } catch {
         return []
       }
 
-      if (data.type !== 'nodus-nodes' || !Array.isArray(data.nodes)) {
+      // Validate clipboard data schema
+      if (!validateClipboardData(parsedData)) {
         return []
       }
+
+      const data = parsedData
 
       const viewportSize = getViewportSize()
       const viewportCenter = screenToCanvas(

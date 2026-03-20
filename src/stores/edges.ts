@@ -3,7 +3,7 @@
  * Manages edge CRUD operations, deduplication, and cleanup
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { invoke } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import type { Edge, CreateEdgeInput } from '../types'
@@ -12,6 +12,16 @@ export const useEdgesStore = defineStore('edges', () => {
   const edges = ref<Edge[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  // Node validation callback - set by parent store
+  let nodeExistsCallback: ((id: string) => boolean) | null = null
+
+  /**
+   * Set the callback for validating node existence
+   */
+  function setNodeExistsCallback(callback: (id: string) => boolean): void {
+    nodeExistsCallback = callback
+  }
 
   /**
    * Initialize edges from database
@@ -43,8 +53,24 @@ export const useEdgesStore = defineStore('edges', () => {
 
   /**
    * Create a new edge
+   * Validates that both source and target nodes exist and prevents self-loops
    */
   async function createEdge(data: CreateEdgeInput): Promise<Edge> {
+    // Prevent self-loops
+    if (data.source_node_id === data.target_node_id) {
+      throw new Error('Cannot create self-referencing edge')
+    }
+
+    // Validate node existence if callback is set
+    if (nodeExistsCallback) {
+      if (!nodeExistsCallback(data.source_node_id)) {
+        throw new Error(`Source node ${data.source_node_id} does not exist`)
+      }
+      if (!nodeExistsCallback(data.target_node_id)) {
+        throw new Error(`Target node ${data.target_node_id} does not exist`)
+      }
+    }
+
     try {
       const edge = await invoke<Edge>('create_edge', { input: data })
       // Create new array to trigger Vue reactivity
@@ -225,6 +251,7 @@ export const useEdgesStore = defineStore('edges', () => {
 
     // Methods
     initialize,
+    setNodeExistsCallback,
     getEdgesForNodes,
     createEdge,
     deleteEdge,

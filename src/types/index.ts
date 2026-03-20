@@ -130,3 +130,21 @@ export interface CreateStorylineInput {
   color?: string
   workspace_id?: string
 }
+
+// Ontology import types
+
+export interface OntologyImportResult {
+  nodesCreated: number
+  edgesCreated: number
+  classNodesCreated: number
+  nodeIds: string[]
+}
+
+export type OntologyLayout = 'grid' | 'hierarchical'
+
+export interface ImportOntologyInput {
+  filePath: string
+  workspaceId?: string
+  createClassNodes: boolean
+  layout?: OntologyLayout
+}

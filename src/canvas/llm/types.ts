@@ -19,6 +19,9 @@ export interface AgentTool {
   }
 }
 
+// Alias for use in composables
+export type ToolDefinition = AgentTool
+
 export interface AgentTask {
   id: string
   description: string

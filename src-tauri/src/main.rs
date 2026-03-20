@@ -3,6 +3,7 @@
 mod checksum;
 mod commands;
 mod database;
+mod ontology;
 mod pdf;
 mod themes;
 mod typst_render;
@@ -20,6 +21,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::WatcherState(Mutex::new(None)))
         .manage(commands::LocksState(Mutex::new(std::collections::HashMap::new())))
         .setup(|app| {
@@ -64,6 +66,7 @@ fn main() {
             commands::refresh_workspace,
             commands::update_node_color,
             commands::update_node_workspace,
+            commands::update_node_tags,
             commands::check_file_available,
             commands::acquire_edit_lock,
             commands::release_edit_lock,
@@ -85,6 +88,14 @@ fn main() {
             commands::update_theme,
             commands::delete_theme,
             commands::validate_theme_yaml,
+            commands::get_frames,
+            commands::create_frame,
+            commands::update_frame_position,
+            commands::update_frame_size,
+            commands::update_frame_title,
+            commands::update_frame_color,
+            commands::delete_frame,
+            commands::import_ontology,
             render_typst_math,
         ])
         .run(tauri::generate_context!())

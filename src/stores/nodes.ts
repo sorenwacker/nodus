@@ -2,18 +2,20 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
   invoke,
-  listen,
-  readTextFile,
-  refreshWorkspace as refreshWorkspaceApi,
   acquireEditLock,
   releaseEditLock,
   checkFileAvailable,
 } from '../lib/tauri'
-import { parseReferences, citationToMarkdown, type BibEntry } from '../lib/bibtex'
 import { applyForceLayout } from '../canvas/layout'
-import { workspaceStorage } from '../lib/storage'
 import { storeLogger } from '../lib/logger'
 import { notifications$ } from '../composables/useNotifications'
+import { useStorylinesStore } from './storylines'
+import { useEdgesStore } from './edges'
+import { useFramesStore } from './frames'
+import { useWorkspaceStore } from './workspaces'
+import { useFileSync } from '../composables/useFileSync'
+import { useImport } from '../composables/useImport'
+import { useTagNodes } from '../composables/useTagNodes'
 import type {
   Node,
   Edge,
@@ -24,29 +26,73 @@ import type {
   FileChangeEvent,
   Storyline,
   StorylineNode,
-  CreateStorylineInput,
+  OntologyImportResult,
 } from '../types'
+
+// Maximum canvas coordinate bounds
+const MAX_CANVAS_COORD = 100_000
+const MIN_NODE_SIZE = 50
+const MAX_NODE_SIZE = 5_000
+
+/**
+ * Validate and clamp a coordinate value
+ */
+function clampCoord(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(-MAX_CANVAS_COORD, Math.min(MAX_CANVAS_COORD, value))
+}
+
+/**
+ * Validate and clamp a node size value
+ */
+function clampNodeSize(value: number): number {
+  if (!Number.isFinite(value)) return 200 // Default node width
+  return Math.max(MIN_NODE_SIZE, Math.min(MAX_NODE_SIZE, value))
+}
 
 // Re-export types for consumers
 export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
 
 export const useNodesStore = defineStore('nodes', () => {
+  // Node-specific state
   const nodes = ref<Node[]>([])
-  const edges = ref<Edge[]>([])
-  const frames = ref<Frame[]>([])
   const selectedNodeIds = ref<string[]>([])
-  const selectedFrameId = ref<string | null>(null)
-  const workspaces = ref<Workspace[]>(workspaceStorage.getAll())
-  const currentWorkspaceId = ref<string | null>(workspaceStorage.getCurrent())
   const loading = ref(false)
   const error = ref<string | null>(null)
   // Version counter to trigger edge re-routing when node positions/sizes change
   const nodeLayoutVersion = ref(0)
   // Track which nodes have edit locks held by this session
   const lockedNodeIds = ref<Set<string>>(new Set())
-  // Storylines
-  const storylines = ref<Storyline[]>([])
-  const storylineNodes = ref<Map<string, string[]>>(new Map()) // storyline_id -> node_ids[]
+
+  // Separate stores with their own state
+  const storylinesStore = useStorylinesStore()
+  const edgesStore = useEdgesStore()
+  const framesStore = useFramesStore()
+  const workspaceStore = useWorkspaceStore()
+
+  // File sync composable
+  const fileSync = useFileSync({
+    getNodes: () => nodes.value,
+    updateNodeInPlace: (id: string, updates: Partial<Node>) => {
+      const node = nodes.value.find(n => n.id === id)
+      if (node) {
+        Object.assign(node, updates)
+      }
+    },
+  })
+
+  // Import composable (initialized after createNode is defined)
+  let importComposable: ReturnType<typeof useImport>
+
+  // Tag nodes composable (initialized after dependencies are available)
+  let tagNodesComposable: ReturnType<typeof useTagNodes>
+
+  // Expose edges and frames from their stores for backwards compatibility
+  const edges = computed(() => edgesStore.edges)
+  const frames = computed(() => framesStore.frames)
+  const selectedFrameId = computed(() => framesStore.selectedFrameId)
+  const workspaces = computed(() => workspaceStore.workspaces)
+  const currentWorkspaceId = computed(() => workspaceStore.currentWorkspaceId)
 
   // For backwards compatibility
   const selectedNodeId = computed(() => selectedNodeIds.value[0] || null)
@@ -56,116 +102,63 @@ export const useNodesStore = defineStore('nodes', () => {
 
   // Filtered nodes/edges for current workspace
   const filteredNodes = computed(() => {
-    if (!currentWorkspaceId.value) {
+    const wsId = workspaceStore.currentWorkspaceId
+    if (!wsId) {
       // Default workspace: show nodes with no workspace_id
       return nodes.value.filter(n => !n.workspace_id)
     }
-    return nodes.value.filter(n => n.workspace_id === currentWorkspaceId.value)
+    return nodes.value.filter(n => n.workspace_id === wsId)
   })
 
   const filteredFrames = computed(() => {
-    if (!currentWorkspaceId.value) {
-      return frames.value.filter(f => !f.workspace_id)
-    }
-    return frames.value.filter(f => f.workspace_id === currentWorkspaceId.value)
+    return framesStore.getFramesForWorkspace(workspaceStore.currentWorkspaceId)
   })
 
   const filteredEdges = computed(() => {
     const nodeIds = new Set(filteredNodes.value.map(n => n.id))
-    return edges.value.filter(e =>
-      nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
-    )
+    return edgesStore.getEdgesForNodes(nodeIds)
   })
 
-  const filteredStorylines = computed(() => {
-    if (!currentWorkspaceId.value) {
-      return storylines.value.filter(s => !s.workspace_id)
-    }
-    return storylines.value.filter(s => s.workspace_id === currentWorkspaceId.value)
-  })
-
-  // Sync workspaces between localStorage and database (bidirectional)
-  async function syncWorkspacesToDatabase() {
-    interface DbWorkspace {
-      id: string
-      name: string
-      color: string | null
-      vault_path: string | null
-      created_at: number
-      updated_at: number
-    }
-
-    const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
-    const dbIds = new Set(dbWorkspaces.map(w => w.id))
-    const localIds = new Set(workspaces.value.map(w => w.id))
-
-    // Create any localStorage workspaces that don't exist in the database
-    for (const ws of workspaces.value) {
-      if (!dbIds.has(ws.id)) {
-        storeLogger.info(`Syncing workspace to database: ${ws.name} (${ws.id})`)
-        await invoke('create_workspace', {
-          input: {
-            id: ws.id,
-            name: ws.name,
-            color: null,
-            vaultPath: null,
-          }
-        })
-      }
-    }
-
-    // Load any database workspaces that don't exist in localStorage
-    for (const dbWs of dbWorkspaces) {
-      if (!localIds.has(dbWs.id)) {
-        storeLogger.info(`Loading workspace from database: ${dbWs.name} (${dbWs.id})`)
-        workspaces.value.push({
-          id: dbWs.id,
-          name: dbWs.name,
-        })
-      }
-    }
-
-    // Persist updated workspaces to localStorage
-    workspaceStorage.setAll(workspaces.value)
-  }
+  // Storylines are managed by separate store - expose computed for compatibility
+  const storylines = computed(() => storylinesStore.storylines)
+  const storylineNodes = computed(() => storylinesStore.storylineNodes)
+  const storylineNodesVersion = computed(() => storylinesStore.storylineNodesVersion)
+  const filteredStorylines = computed(() => storylinesStore.filteredStorylines)
 
   async function initialize() {
     loading.value = true
     error.value = null
     try {
-      // Sync localStorage workspaces to database (for foreign key constraints)
-      await syncWorkspacesToDatabase()
+      // Initialize workspace store (syncs localStorage with database)
+      await workspaceStore.initialize()
 
-      const [fetchedNodes, fetchedEdges] = await Promise.all([
-        invoke<Node[]>('get_nodes'),
-        invoke<Edge[]>('get_edges'),
+      // Initialize edges and frames stores
+      await Promise.all([
+        edgesStore.initialize(),
+        framesStore.initialize(),
       ])
+
+      // Load nodes
+      const fetchedNodes = await invoke<Node[]>('get_nodes')
       nodes.value = fetchedNodes
+
+      // Set up node existence callback for edge validation
+      edgesStore.setNodeExistsCallback((id) => nodes.value.some(n => n.id === id))
+
+      // Initialize storylines store with dependencies
+      storylinesStore.setDependencies({
+        getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
+        getEdges: () => edgesStore.edges,
+        getNodes: () => nodes.value,
+        createEdge: (data) => edgesStore.createEdge(data),
+        deleteEdge: (id) => edgesStore.deleteEdge(id),
+      })
 
       // Load storylines separately (may fail if migration hasn't run)
       try {
-        const fetchedStorylines = await invoke<Storyline[]>('get_storylines', { workspaceId: currentWorkspaceId.value })
-        storylines.value = fetchedStorylines
+        await storylinesStore.loadStorylines()
       } catch (e) {
         storeLogger.warn('Failed to load storylines (migration may not have run yet):', e)
-        storylines.value = []
-      }
-
-      // Deduplicate edges (keep first occurrence of each source-target pair)
-      // Also handles bidirectional duplicates (A->B and B->A count as same pair)
-      const seenPairs = new Set<string>()
-      const beforeCount = fetchedEdges.length
-      edges.value = fetchedEdges.filter(e => {
-        // Create canonical key (smaller ID first) to catch bidirectional duplicates
-        const ids = [e.source_node_id, e.target_node_id].sort()
-        const key = `${ids[0]}:${ids[1]}`
-        if (seenPairs.has(key)) return false
-        seenPairs.add(key)
-        return true
-      })
-      const removed = beforeCount - edges.value.length
-      if (removed > 0) {
-        storeLogger.info(`Initialize: deduplicated ${removed} edges (${beforeCount} -> ${edges.value.length})`)
       }
     } catch (e) {
       error.value = String(e)
@@ -216,17 +209,6 @@ export const useNodesStore = defineStore('nodes', () => {
           deleted_at: null,
         },
       ]
-      edges.value = [
-        {
-          id: 'e1',
-          source_node_id: '1',
-          target_node_id: '2',
-          label: null,
-          link_type: 'related',
-          weight: 1,
-          created_at: Date.now(),
-        },
-      ]
     } finally {
       loading.value = false
     }
@@ -239,12 +221,14 @@ export const useNodesStore = defineStore('nodes', () => {
   async function updateNodePosition(id: string, x: number, y: number) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
-      node.canvas_x = x
-      node.canvas_y = y
+      const clampedX = clampCoord(x)
+      const clampedY = clampCoord(y)
+      node.canvas_x = clampedX
+      node.canvas_y = clampedY
       node.updated_at = Date.now()
       nodeLayoutVersion.value++ // Trigger edge re-routing
       try {
-        await invoke('update_node_position', { id, x, y })
+        await invoke('update_node_position', { id, x: clampedX, y: clampedY })
       } catch (e) {
         console.error('Failed to update position:', e)
       }
@@ -254,8 +238,10 @@ export const useNodesStore = defineStore('nodes', () => {
   async function updateNodeSize(id: string, width: number, height: number, pushOthers = false) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
-      node.width = width
-      node.height = height
+      const clampedWidth = clampNodeSize(width)
+      const clampedHeight = clampNodeSize(height)
+      node.width = clampedWidth
+      node.height = clampedHeight
       node.updated_at = Date.now()
       nodeLayoutVersion.value++ // Trigger edge re-routing
 
@@ -265,7 +251,7 @@ export const useNodesStore = defineStore('nodes', () => {
       }
 
       try {
-        await invoke('update_node_size', { id, width, height })
+        await invoke('update_node_size', { id, width: clampedWidth, height: clampedHeight })
       } catch (e) {
         console.error('Failed to update size:', e)
       }
@@ -409,6 +395,31 @@ export const useNodesStore = defineStore('nodes', () => {
     return false
   }
 
+  // Hashtag extraction limits
+  const MAX_HASHTAG_COUNT = 50
+  const MAX_HASHTAG_LENGTH = 50
+
+  /**
+   * Extract hashtags from content
+   * Matches: #word, #multi-word-tag, #CamelCase, #123numeric
+   * Limited to prevent abuse
+   */
+  function extractHashtags(content: string): string[] {
+    const hashtagRegex = /#([a-zA-Z0-9][\w-]*)/g
+    const tags = new Set<string>()
+    let match
+    let count = 0
+    while ((match = hashtagRegex.exec(content)) !== null && count < MAX_HASHTAG_COUNT) {
+      const tag = match[1]
+      // Skip tags that are too long
+      if (tag.length <= MAX_HASHTAG_LENGTH) {
+        tags.add(tag)
+        count++
+      }
+    }
+    return Array.from(tags)
+  }
+
   async function updateNodeContent(id: string, content: string) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
@@ -422,6 +433,30 @@ export const useNodesStore = defineStore('nodes', () => {
         }
       } catch (e) {
         console.error('Failed to update content:', e)
+      }
+
+      // Extract hashtags and update tags
+      const extractedTags = extractHashtags(content)
+      if (extractedTags.length > 0) {
+        // Merge with existing tags (deduplicate)
+        let existingTags: string[] = []
+        if (node.tags) {
+          try {
+            const parsed = JSON.parse(node.tags)
+            existingTags = Array.isArray(parsed) ? parsed : []
+          } catch {
+            // Malformed JSON in tags field - reset to empty array
+            storeLogger.warn(`Invalid JSON in tags for node ${id}, resetting`)
+            existingTags = []
+          }
+        }
+        const mergedTags = Array.from(new Set([...existingTags, ...extractedTags]))
+        node.tags = JSON.stringify(mergedTags)
+        try {
+          await invoke('update_node_tags', { id, tags: mergedTags })
+        } catch (e) {
+          console.error('Failed to update tags:', e)
+        }
       }
 
       // Extract wikilinks and create edges
@@ -547,42 +582,35 @@ export const useNodesStore = defineStore('nodes', () => {
       console.error('Failed to delete node:', e)
     }
     nodes.value = nodes.value.filter(n => n.id !== id)
-    edges.value = edges.value.filter(
-      e => e.source_node_id !== id && e.target_node_id !== id
-    )
+    // Remove edges connected to deleted node
+    edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
   }
 
-  async function createEdge(data: CreateEdgeInput): Promise<Edge> {
-    try {
-      const edge = await invoke<Edge>('create_edge', { input: data })
-      // Create new array to trigger Vue reactivity
-      edges.value = [...edges.value, edge]
-      storeLogger.debug(`Created edge: ${edge.source_node_id} -> ${edge.target_node_id}`)
-      return edge
-    } catch (e) {
-      console.error('Failed to create edge:', e)
-      const edge: Edge = {
-        id: crypto.randomUUID(),
-        source_node_id: data.source_node_id,
-        target_node_id: data.target_node_id,
-        label: data.label || null,
-        link_type: data.link_type || 'related',
-        weight: 1,
-        created_at: Date.now(),
-      }
-      edges.value = [...edges.value, edge]
-      return edge
-    }
-  }
+  // Edge functions - forwarded to edges store
+  const createEdge = (data: CreateEdgeInput) => edgesStore.createEdge(data)
+  const deleteEdge = (id: string) => edgesStore.deleteEdge(id)
+  const restoreEdge = (edge: Edge) => edgesStore.restoreEdge(edge)
+  const updateEdgeLinkType = (id: string, linkType: string) => edgesStore.updateEdgeLinkType(id, linkType)
+  const updateEdgeColor = (id: string, color: string | null) => edgesStore.updateEdgeColor(id, color)
 
-  async function deleteEdge(id: string) {
-    try {
-      await invoke('delete_edge', { id })
-    } catch (e) {
-      console.error('Failed to delete edge:', e)
-    }
-    edges.value = edges.value.filter(e => e.id !== id)
-  }
+  // Initialize composables that depend on functions defined above
+  importComposable = useImport({
+    getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
+    getNodes: () => nodes.value,
+    setNodes: (n) => { nodes.value = n },
+    addNodes: (n) => { nodes.value.push(...n) },
+    setEdges: (e) => { edgesStore.edges.length = 0; edgesStore.edges.push(...e) },
+    createNode,
+    watchVault: (path) => fileSync.watchVault(path),
+  })
+
+  tagNodesComposable = useTagNodes({
+    getNodes: () => nodes.value,
+    getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
+    createNode,
+    getEdges: () => edgesStore.edges,
+    createEdge,
+  })
 
   // Restore a deleted node (for undo)
   async function restoreNode(node: Node) {
@@ -597,478 +625,60 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  // Restore a deleted edge (for undo)
-  async function restoreEdge(edge: Edge) {
-    try {
-      await invoke('restore_edge', { edge })
-    } catch (e) {
-      console.error('Failed to restore edge:', e)
-    }
-    // Add back to local state if not already present
-    if (!edges.value.find(e => e.id === edge.id)) {
-      edges.value.push(edge)
-    }
-  }
-
-  function updateEdgeLinkType(id: string, linkType: string) {
-    const idx = edges.value.findIndex(e => e.id === id)
-    if (idx !== -1) {
-      edges.value = edges.value.map(e =>
-        e.id === id ? { ...e, link_type: linkType } : e
-      )
-    }
-  }
-
-  async function updateEdgeColor(id: string, color: string | null): Promise<void> {
-    await invoke('update_edge_color', { id, color })
-    edges.value = edges.value.map(e =>
-      e.id === id ? { ...e, color } : e
-    )
-  }
-
   /**
-   * Update colors of all edges belonging to a storyline.
-   * Also claims unclaimed edges between consecutive storyline nodes.
+   * Update colors of all edges belonging to a storyline - forwarded to storylines store
    */
-  async function updateStorylineEdgeColors(storylineId: string, color: string | null): Promise<void> {
-    const nodeIds = storylineNodes.value.get(storylineId) || []
+  const updateStorylineEdgeColors = (storylineId: string, color: string | null) => storylinesStore.updateStorylineEdgeColors(storylineId, color)
 
-    // Find edges between consecutive storyline nodes and update them
-    for (let i = 0; i < nodeIds.length - 1; i++) {
-      const sourceId = nodeIds[i]
-      const targetId = nodeIds[i + 1]
+  // Import functions - forwarded to import composable
+  const importVault = (path: string, targetWorkspaceId?: string) => importComposable.importVault(path, targetWorkspaceId)
+  const importCitations = (filePath: string) => importComposable.importCitations(filePath)
+  const importOntology = (filePath: string, options?: { createClassNodes?: boolean; createIndividualNodes?: boolean; workspaceId?: string; layout?: 'grid' | 'hierarchical' }) =>
+    importComposable.importOntology(filePath, options)
+  const refreshWorkspace = () => importComposable.refreshWorkspace()
 
-      // Find edge in either direction
-      const edge = edges.value.find(
-        e => (e.source_node_id === sourceId && e.target_node_id === targetId) ||
-             (e.source_node_id === targetId && e.target_node_id === sourceId)
-      )
+  // File sync functions - forwarded to composable
+  const watchVault = (path: string) => fileSync.watchVault(path)
+  const stopWatching = () => fileSync.stopWatching()
 
-      if (edge) {
-        // Update edge with storyline_id and color
-        await invoke('update_edge_storyline', { id: edge.id, storylineId, color })
-        edges.value = edges.value.map(e =>
-          e.id === edge.id ? { ...e, storyline_id: storylineId, color } : e
-        )
-      }
-    }
-  }
-
-  async function importVault(path: string, targetWorkspaceId?: string): Promise<Node[]> {
-    loading.value = true
-    try {
-      const workspaceId = targetWorkspaceId ?? currentWorkspaceId.value
-      storeLogger.info(`Importing vault: ${path}`)
-
-      const importedNodes = await invoke<Node[]>('import_vault', {
-        path,
-        workspaceId
-      })
-
-      storeLogger.info(`Imported ${importedNodes.length} nodes`)
-      nodes.value.push(...importedNodes)
-
-      // Fetch all edges to include newly created wikilink edges
-      const fetchedEdges = await invoke<Edge[]>('get_edges')
-      edges.value = fetchedEdges
-
-      // Deduplicate edges (frontend only since backend already ran during import)
-      // Also handles bidirectional duplicates (A->B and B->A count as same pair)
-      const seenPairs = new Set<string>()
-      const beforeCount = edges.value.length
-      edges.value = edges.value.filter(e => {
-        const ids = [e.source_node_id, e.target_node_id].sort()
-        const key = `${ids[0]}:${ids[1]}`
-        if (seenPairs.has(key)) return false
-        seenPairs.add(key)
-        return true
-      })
-      const removed = beforeCount - edges.value.length
-      if (removed > 0) {
-        storeLogger.info(`Frontend deduplication removed ${removed} duplicate edges`)
-      }
-
-      // Start watching the vault for external changes
-      await watchVault(path)
-      storeLogger.info(`Started watching vault: ${path}`)
-
-      return importedNodes
-    } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Import failed:', e)
-      notifications$.error('Import failed', String(e))
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  /**
-   * Import citations from BibTeX or CSL-JSON file
-   * Creates citation nodes with formatted markdown content
-   */
-  async function importCitations(filePath: string): Promise<Node[]> {
-    loading.value = true
-    try {
-      storeLogger.info(`Importing citations from: ${filePath}`)
-
-      const content = await readTextFile(filePath)
-      const entries = parseReferences(content)
-
-      if (entries.length === 0) {
-        notifications$.warning('No citations found', 'The file did not contain any valid BibTeX or CSL-JSON entries')
-        return []
-      }
-
-      storeLogger.info(`Parsed ${entries.length} citation entries`)
-
-      // Create nodes for each citation entry
-      const createdNodes: Node[] = []
-      const startX = 100
-      const startY = 100
-      const nodeSpacing = 250
-      const nodesPerRow = 4
-
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i]
-        const row = Math.floor(i / nodesPerRow)
-        const col = i % nodesPerRow
-
-        const node = await createNode({
-          title: entry.title || entry.key,
-          markdown_content: citationToMarkdown(entry),
-          node_type: 'citation',
-          canvas_x: startX + col * nodeSpacing,
-          canvas_y: startY + row * nodeSpacing,
-          width: 220,
-          height: 180,
-          tags: entry.keywords ? entry.keywords.split(',').map(k => k.trim()) : undefined,
-        })
-
-        createdNodes.push(node)
-      }
-
-      storeLogger.info(`Created ${createdNodes.length} citation nodes`)
-      notifications$.success(
-        'Citations imported',
-        `${createdNodes.length} citation${createdNodes.length === 1 ? '' : 's'} added to canvas`
-      )
-
-      return createdNodes
-    } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Citation import failed:', e)
-      notifications$.error('Import failed', String(e))
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function refreshWorkspace(): Promise<number> {
-    loading.value = true
-    try {
-      storeLogger.info(`Refreshing workspace: ${currentWorkspaceId.value || 'default'}`)
-
-      const updated = await refreshWorkspaceApi(currentWorkspaceId.value)
-
-      if (updated > 0) {
-        // Reload nodes to get updated content
-        const fetchedNodes = await invoke<Node[]>('get_nodes')
-        nodes.value = fetchedNodes
-        storeLogger.info(`Refreshed ${updated} nodes from files`)
-      }
-
-      return updated
-    } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Refresh failed:', e)
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  let watcherUnlisten: (() => void) | null = null
-
-  async function watchVault(path: string): Promise<void> {
-    // Stop any existing watcher
-    await stopWatching()
-
-    // Start listening for file change events
-    watcherUnlisten = await listen<FileChangeEvent>('vault-file-changed', handleFileChange)
-
-    // Start the vault watcher
-    await invoke('watch_vault', { path })
-  }
-
-  async function stopWatching(): Promise<void> {
-    if (watcherUnlisten) {
-      watcherUnlisten()
-      watcherUnlisten = null
-    }
-    try {
-      await invoke('stop_watching')
-    } catch {
-      // Ignore errors if not watching
-    }
-  }
-
-  async function handleFileChange(event: FileChangeEvent) {
-    const filePath = event.path
-
-    switch (event.change_type) {
-      case 'Created': {
-        storeLogger.debug(`New file detected: ${filePath}`)
-        break
-      }
-      case 'Modified': {
-        const node = nodes.value.find(n => n.file_path === filePath)
-        if (node && event.new_checksum && node.checksum !== event.new_checksum) {
-          storeLogger.debug(`File modified externally: ${filePath}`)
-          try {
-            const content = await readTextFile(filePath)
-            node.markdown_content = content
-            node.checksum = event.new_checksum
-            node.updated_at = Date.now()
-            await invoke<string | null>('update_node_content', { id: node.id, content })
-          } catch (e) {
-            storeLogger.error('Failed to reload file content:', e)
-            node.checksum = event.new_checksum
-          }
-        }
-        break
-      }
-      case 'Deleted': {
-        const node = nodes.value.find(n => n.file_path === filePath)
-        if (node) {
-          storeLogger.debug(`File deleted externally: ${filePath}`)
-          node.file_path = null
-          node.updated_at = Date.now()
-        }
-        break
-      }
-    }
-  }
-
-  // Workspace management
-  function saveWorkspacesToStorage() {
-    workspaceStorage.setAll(workspaces.value)
-    workspaceStorage.setCurrent(currentWorkspaceId.value)
-  }
-
-  async function createWorkspace(name: string): Promise<Workspace> {
-    const workspace: Workspace = {
-      id: crypto.randomUUID(),
-      name,
-      created_at: Date.now(),
-    }
-
-    // Create workspace in database first (for foreign key constraints)
-    await invoke('create_workspace', {
-      input: {
-        id: workspace.id,
-        name: workspace.name,
-        color: null,
-        vaultPath: null,
-      }
-    })
-
-    workspaces.value.push(workspace)
-    saveWorkspacesToStorage()
-    return workspace
-  }
-
-  function switchWorkspace(workspaceId: string | null) {
-    currentWorkspaceId.value = workspaceId
-    saveWorkspacesToStorage()
-  }
-
-  function deleteWorkspace(id: string) {
-    workspaces.value = workspaces.value.filter(w => w.id !== id)
-    if (currentWorkspaceId.value === id) {
-      currentWorkspaceId.value = null
-    }
-    saveWorkspacesToStorage()
-  }
-
-  /**
-   * Recover a workspace that was deleted from localStorage but still exists in DB.
-   * Useful when workspace was accidentally deleted but nodes still reference it.
-   */
-  async function recoverWorkspace(id: string): Promise<Workspace | null> {
-    // Check if already in local list
-    if (workspaces.value.some(w => w.id === id)) {
-      storeLogger.debug('[Store] Workspace already exists locally:', id)
-      return workspaces.value.find(w => w.id === id) || null
-    }
-
-    // Fetch from database
-    interface DbWorkspace {
-      id: string
-      name: string
-      color: string | null
-      vault_path: string | null
-      created_at: number
-      updated_at: number
-    }
-
-    const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
-    const dbWorkspace = dbWorkspaces.find(w => w.id === id)
-
-    if (!dbWorkspace) {
-      storeLogger.debug('[Store] Workspace not found in database:', id)
-      return null
-    }
-
-    // Add to local list
-    const workspace: Workspace = {
-      id: dbWorkspace.id,
-      name: dbWorkspace.name,
-      created_at: dbWorkspace.created_at,
-      vault_path: dbWorkspace.vault_path || undefined,
-    }
-
-    workspaces.value.push(workspace)
-    saveWorkspacesToStorage()
-    storeLogger.debug('[Store] Recovered workspace:', workspace.name)
-
-    return workspace
-  }
-
-  /**
-   * Find orphaned workspace IDs (nodes reference workspaces not in local list)
-   */
-  function getOrphanedWorkspaceIds(): string[] {
-    const localIds = new Set(workspaces.value.map(w => w.id))
-    const referencedIds = new Set<string>()
-
-    for (const node of nodes.value) {
-      if (node.workspace_id && !localIds.has(node.workspace_id)) {
-        referencedIds.add(node.workspace_id)
-      }
-    }
-
-    return Array.from(referencedIds)
-  }
-
-  function renameWorkspace(id: string, newName: string) {
-    const workspace = workspaces.value.find(w => w.id === id)
-    if (workspace) {
-      workspace.name = newName
-      saveWorkspacesToStorage()
-    }
-  }
+  // Workspace functions - forwarded to workspace store
+  const createWorkspace = (name: string) => workspaceStore.createWorkspace(name)
+  const switchWorkspace = (workspaceId: string | null) => workspaceStore.switchWorkspace(workspaceId)
+  const deleteWorkspace = (id: string) => workspaceStore.deleteWorkspace(id)
+  const recoverWorkspace = (id: string) => workspaceStore.recoverWorkspace(id)
+  const getOrphanedWorkspaceIds = () => workspaceStore.getOrphanedWorkspaceIds(nodes.value)
+  const renameWorkspace = (id: string, newName: string) => workspaceStore.renameWorkspace(id, newName)
 
   function clearCanvas() {
     nodes.value = []
-    edges.value = []
+    edgesStore.edges.length = 0
     selectedNodeIds.value = []
   }
 
-  function cleanupOrphanEdges() {
-    const nodeIds = new Set(nodes.value.map(n => n.id))
-    const before = edges.value.length
-    edges.value = edges.value.filter(
-      e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
-    )
-    return before - edges.value.length
-  }
+  // Edge cleanup functions - forwarded to edges store
+  const cleanupOrphanEdges = () => edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
+  const deduplicateEdges = () => edgesStore.deduplicateEdges()
 
-  /**
-   * Deduplicate edges both in frontend and backend database
-   * Returns the number of duplicates removed
-   */
-  async function deduplicateEdges(): Promise<number> {
-    // Backend deduplication
-    let backendRemoved = 0
-    try {
-      backendRemoved = await invoke<number>('deduplicate_edges')
-      storeLogger.info(`Backend deduplication removed ${backendRemoved} edges`)
-    } catch (e) {
-      storeLogger.error('Backend deduplication failed:', e)
-    }
-
-    // Frontend deduplication (handles bidirectional duplicates)
-    const seenPairs = new Set<string>()
-    const beforeCount = edges.value.length
-    edges.value = edges.value.filter(e => {
-      const ids = [e.source_node_id, e.target_node_id].sort()
-      const key = `${ids[0]}:${ids[1]}`
-      if (seenPairs.has(key)) return false
-      seenPairs.add(key)
-      return true
-    })
-    const frontendRemoved = beforeCount - edges.value.length
-    storeLogger.info(`Frontend deduplication removed ${frontendRemoved} edges`)
-
-    return backendRemoved + frontendRemoved
-  }
-
-  // Frame management
-  function createFrame(x: number, y: number, width = 400, height = 300, title = 'Frame'): Frame {
-    const frame: Frame = {
-      id: crypto.randomUUID(),
-      title,
-      canvas_x: x,
-      canvas_y: y,
-      width,
-      height,
-      color: null,
-      workspace_id: currentWorkspaceId.value,
-    }
-    frames.value.push(frame)
-    return frame
-  }
-
-  function updateFramePosition(id: string, x: number, y: number) {
-    const frame = frames.value.find(f => f.id === id)
-    if (frame) {
-      frame.canvas_x = x
-      frame.canvas_y = y
-    }
-  }
-
-  function updateFrameSize(id: string, width: number, height: number) {
-    const frame = frames.value.find(f => f.id === id)
-    if (frame) {
-      frame.width = width
-      frame.height = height
-    }
-  }
-
-  function updateFrameTitle(id: string, title: string) {
-    const frame = frames.value.find(f => f.id === id)
-    if (frame) {
-      frame.title = title
-    }
-  }
-
-  function updateFrameColor(id: string, color: string | null) {
-    const frame = frames.value.find(f => f.id === id)
-    if (frame) {
-      frame.color = color
-    }
-  }
+  // Frame functions - forwarded to frames store (with node cleanup for delete)
+  const createFrame = (x: number, y: number, width = 400, height = 300, title = 'Frame') =>
+    framesStore.createFrame(x, y, width, height, title, workspaceStore.currentWorkspaceId)
+  const updateFramePosition = (id: string, x: number, y: number) => framesStore.updateFramePosition(id, x, y)
+  const updateFrameSize = (id: string, width: number, height: number) => framesStore.updateFrameSize(id, width, height)
+  const updateFrameTitle = (id: string, title: string) => framesStore.updateFrameTitle(id, title)
+  const updateFrameColor = (id: string, color: string | null) => framesStore.updateFrameColor(id, color)
 
   function deleteFrame(id: string) {
-    console.log('[Store] deleteFrame called with id:', id)
-    // Unassign nodes from this frame
+    // Unassign nodes from this frame first
     for (const node of nodes.value) {
       if (node.frame_id === id) {
         node.frame_id = null
       }
     }
-    const before = frames.value.length
-    frames.value = frames.value.filter(f => f.id !== id)
-    console.log('[Store] Frames before:', before, 'after:', frames.value.length)
-    if (selectedFrameId.value === id) {
-      selectedFrameId.value = null
-    }
+    framesStore.deleteFrame(id)
   }
 
   function selectFrame(id: string | null) {
-    selectedFrameId.value = id
+    framesStore.selectFrame(id)
     if (id) {
       selectedNodeIds.value = []
     }
@@ -1084,6 +694,7 @@ export const useNodesStore = defineStore('nodes', () => {
 
   /**
    * Apply force-directed layout to all nodes or a subset
+   * Nodes inside frames are excluded from layout
    */
   async function layoutNodes(
     nodeIds?: string[],
@@ -1094,13 +705,40 @@ export const useNodesStore = defineStore('nodes', () => {
       linkDistance?: number
     }
   ) {
-    const targetNodes = nodeIds
+    // Helper to check if a node is inside any frame (50%+ overlap)
+    const isNodeInFrame = (node: Node): boolean => {
+      if (node.frame_id) return true
+
+      const nodeWidth = node.width || 200
+      const nodeHeight = node.height || 120
+      const nodeArea = nodeWidth * nodeHeight
+
+      for (const frame of filteredFrames.value) {
+        const overlapX = Math.max(0,
+          Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
+          Math.max(node.canvas_x, frame.canvas_x))
+        const overlapY = Math.max(0,
+          Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
+          Math.max(node.canvas_y, frame.canvas_y))
+        if (overlapX * overlapY > nodeArea * 0.5) return true
+      }
+      return false
+    }
+
+    const allTargetNodes = nodeIds
       ? filteredNodes.value.filter(n => nodeIds.includes(n.id))
       : filteredNodes.value
 
+    // Exclude nodes inside frames from layout
+    const targetNodes = allTargetNodes.filter(n => !isNodeInFrame(n))
+    const excludedCount = allTargetNodes.length - targetNodes.length
+
+    console.log('[Layout] Frames:', filteredFrames.value.length)
+    console.log('[Layout] All nodes:', allTargetNodes.length, 'Excluded:', excludedCount, 'To layout:', targetNodes.length)
+
     if (targetNodes.length === 0) return
 
-    const layoutNodes = targetNodes.map(n => ({
+    const layoutNodesList = targetNodes.map(n => ({
       id: n.id,
       x: n.canvas_x,
       y: n.canvas_y,
@@ -1108,25 +746,24 @@ export const useNodesStore = defineStore('nodes', () => {
       height: n.height || 120,
     }))
 
-    // Calculate centroid of current nodes to use as center
-    const centroidX = layoutNodes.reduce((sum, n) => sum + n.x, 0) / layoutNodes.length
-    const centroidY = layoutNodes.reduce((sum, n) => sum + n.y, 0) / layoutNodes.length
+    // Calculate centroid based on nodes being laid out
+    const centroidX = layoutNodesList.reduce((sum, n) => sum + n.x, 0) / layoutNodesList.length
+    const centroidY = layoutNodesList.reduce((sum, n) => sum + n.y, 0) / layoutNodesList.length
 
+    // Only include edges where BOTH endpoints are outside frames
+    const layoutNodeIds = new Set(targetNodes.map(n => n.id))
     const layoutEdges = filteredEdges.value
-      .filter(e => {
-        const nodeIdSet = new Set(targetNodes.map(n => n.id))
-        return nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
-      })
+      .filter(e => layoutNodeIds.has(e.source_node_id) && layoutNodeIds.has(e.target_node_id))
       .map(e => ({
         source: e.source_node_id,
         target: e.target_node_id,
       }))
 
     // Adaptive iterations based on graph size
-    const nodeCount = layoutNodes.length
+    const nodeCount = layoutNodesList.length
     const iterations = nodeCount > 300 ? 150 : nodeCount > 100 ? 250 : 400
 
-    const positions = await applyForceLayout(layoutNodes, layoutEdges, {
+    const positions = await applyForceLayout(layoutNodesList, layoutEdges, {
       centerX: options?.centerX ?? centroidX,
       centerY: options?.centerY ?? centroidY,
       chargeStrength: options?.chargeStrength,
@@ -1210,309 +847,22 @@ export const useNodesStore = defineStore('nodes', () => {
     return lockedNodeIds.value.has(nodeId)
   }
 
-  // ============================================================================
-  // Storyline Management
-  // ============================================================================
+  // Storyline functions - forwarded to storylines store
+  const loadStorylines = () => storylinesStore.loadStorylines()
+  const createStoryline = (title: string, description?: string, color?: string) => storylinesStore.createStoryline(title, description, color)
+  const updateStoryline = (id: string, title: string, description?: string, color?: string) => storylinesStore.updateStoryline(id, title, description, color)
+  const deleteStoryline = (id: string) => storylinesStore.deleteStoryline(id)
+  const addNodeToStoryline = (storylineId: string, nodeId: string, position?: number) => storylinesStore.addNodeToStoryline(storylineId, nodeId, position)
+  const removeNodeFromStoryline = (storylineId: string, nodeId: string) => storylinesStore.removeNodeFromStoryline(storylineId, nodeId)
+  const reorderStorylineNodes = (storylineId: string, nodeIds: string[]) => storylinesStore.reorderStorylineNodes(storylineId, nodeIds)
+  const getStorylineNodes = (storylineId: string) => storylinesStore.getStorylineNodes(storylineId)
+  const getStorylinesForNode = (nodeId: string) => storylinesStore.getStorylinesForNode(nodeId)
+  const repairStorylineEdges = (storylineId: string) => storylinesStore.repairStorylineEdges(storylineId)
 
-  /**
-   * Load storylines for the current workspace
-   */
-  async function loadStorylines(): Promise<void> {
-    try {
-      const fetched = await invoke<Storyline[]>('get_storylines', {
-        workspaceId: currentWorkspaceId.value
-      })
-      storylines.value = fetched
-      storeLogger.debug(`Loaded ${fetched.length} storylines`)
-    } catch (e) {
-      storeLogger.error('Failed to load storylines:', e)
-    }
-  }
-
-  /**
-   * Create a new storyline
-   */
-  async function createStoryline(title: string, description?: string, color?: string): Promise<Storyline> {
-    const input: CreateStorylineInput = {
-      title,
-      description,
-      color,
-      workspace_id: currentWorkspaceId.value || undefined,
-    }
-
-    try {
-      const storyline = await invoke<Storyline>('create_storyline', { input })
-      storylines.value.push(storyline)
-      storylineNodes.value.set(storyline.id, [])
-      storeLogger.info(`Created storyline: ${title}`)
-      return storyline
-    } catch (e) {
-      storeLogger.error('Failed to create storyline:', e)
-      throw e
-    }
-  }
-
-  /**
-   * Update storyline title, description, and color
-   */
-  async function updateStoryline(id: string, title: string, description?: string, color?: string): Promise<void> {
-    try {
-      await invoke('update_storyline', { id, title, description, color })
-      const storyline = storylines.value.find(s => s.id === id)
-      if (storyline) {
-        storyline.title = title
-        storyline.description = description || null
-        storyline.color = color || null
-        storyline.updated_at = Date.now()
-      }
-    } catch (e) {
-      storeLogger.error('Failed to update storyline:', e)
-      throw e
-    }
-  }
-
-  /**
-   * Delete a storyline
-   */
-  async function deleteStoryline(id: string): Promise<void> {
-    try {
-      await invoke('delete_storyline', { id })
-      storylines.value = storylines.value.filter(s => s.id !== id)
-      storylineNodes.value.delete(id)
-      storeLogger.info(`Deleted storyline: ${id}`)
-    } catch (e) {
-      storeLogger.error('Failed to delete storyline:', e)
-      throw e
-    }
-  }
-
-  /**
-   * Add a node to a storyline and create edge to previous node in reading order
-   */
-  async function addNodeToStoryline(storylineId: string, nodeId: string, position?: number): Promise<void> {
-    try {
-      await invoke('add_node_to_storyline', { storylineId, nodeId, position })
-
-      // Get storyline color for edges
-      const storyline = storylines.value.find(s => s.id === storylineId)
-      const edgeColor = storyline?.color || undefined
-
-      const nodeIds = [...(storylineNodes.value.get(storylineId) || [])]
-      const insertPosition = position ?? nodeIds.length
-
-      // If inserting in middle, delete old edge between prev and next (if it belongs to this storyline)
-      if (position !== undefined && position > 0 && position < nodeIds.length) {
-        const prevNodeId = nodeIds[position - 1]
-        const nextNodeId = nodeIds[position]
-        const oldEdge = edges.value.find(
-          e => e.storyline_id === storylineId &&
-               ((e.source_node_id === prevNodeId && e.target_node_id === nextNodeId) ||
-                (e.source_node_id === nextNodeId && e.target_node_id === prevNodeId))
-        )
-        if (oldEdge) {
-          await deleteEdge(oldEdge.id)
-        }
-      }
-
-      // Create directed edge from previous node to this node (reading order)
-      if (insertPosition > 0) {
-        const prevNodeId = nodeIds[insertPosition - 1]
-        const edgeExists = edges.value.some(
-          e => (e.source_node_id === prevNodeId && e.target_node_id === nodeId) ||
-               (e.source_node_id === nodeId && e.target_node_id === prevNodeId)
-        )
-        if (!edgeExists) {
-          await createEdge({ source_node_id: prevNodeId, target_node_id: nodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
-        }
-      }
-
-      // If inserting in middle, create edge to next node
-      if (position !== undefined && position < nodeIds.length) {
-        const nextNodeId = nodeIds[position]
-        const edgeExists = edges.value.some(
-          e => (e.source_node_id === nodeId && e.target_node_id === nextNodeId) ||
-               (e.source_node_id === nextNodeId && e.target_node_id === nodeId)
-        )
-        if (!edgeExists) {
-          await createEdge({ source_node_id: nodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
-        }
-      }
-
-      // Update local cache
-      if (position !== undefined) {
-        nodeIds.splice(position, 0, nodeId)
-      } else {
-        nodeIds.push(nodeId)
-      }
-
-      const newMap = new Map(storylineNodes.value)
-      newMap.set(storylineId, nodeIds)
-      storylineNodes.value = newMap
-      storeLogger.debug(`Added node ${nodeId} to storyline ${storylineId}`)
-    } catch (e) {
-      storeLogger.error('Failed to add node to storyline:', e)
-      throw e
-    }
-  }
-
-  /**
-   * Remove a node from a storyline and clean up edges
-   */
-  async function removeNodeFromStoryline(storylineId: string, nodeId: string): Promise<void> {
-    try {
-      const nodeIds = storylineNodes.value.get(storylineId) || []
-      const nodeIndex = nodeIds.indexOf(nodeId)
-
-      // Get storyline color for potential new edge
-      const storyline = storylines.value.find(s => s.id === storylineId)
-      const edgeColor = storyline?.color || undefined
-
-      // Delete edges belonging to this storyline that involve this node
-      const storylineEdges = edges.value.filter(
-        e => e.storyline_id === storylineId &&
-             (e.source_node_id === nodeId || e.target_node_id === nodeId)
-      )
-      for (const edge of storylineEdges) {
-        await deleteEdge(edge.id)
-      }
-
-      // If node was in the middle, reconnect prev and next
-      if (nodeIndex > 0 && nodeIndex < nodeIds.length - 1) {
-        const prevNodeId = nodeIds[nodeIndex - 1]
-        const nextNodeId = nodeIds[nodeIndex + 1]
-        const edgeExists = edges.value.some(
-          e => (e.source_node_id === prevNodeId && e.target_node_id === nextNodeId) ||
-               (e.source_node_id === nextNodeId && e.target_node_id === prevNodeId)
-        )
-        if (!edgeExists) {
-          await createEdge({ source_node_id: prevNodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
-        }
-      }
-
-      await invoke('remove_node_from_storyline', { storylineId, nodeId })
-
-      // Update local cache with new Map for reactivity
-      const newMap = new Map(storylineNodes.value)
-      newMap.set(storylineId, nodeIds.filter(id => id !== nodeId))
-      storylineNodes.value = newMap
-      storeLogger.debug(`Removed node ${nodeId} from storyline ${storylineId}`)
-    } catch (e) {
-      storeLogger.error('Failed to remove node from storyline:', e)
-      throw e
-    }
-  }
-
-  /**
-   * Reorder nodes in a storyline and update edges
-   */
-  async function reorderStorylineNodes(storylineId: string, nodeIds: string[]): Promise<void> {
-    try {
-      await invoke('reorder_storyline_nodes', { storylineId, nodeIds })
-
-      // Get storyline color for edges
-      const storyline = storylines.value.find(s => s.id === storylineId)
-      const edgeColor = storyline?.color || undefined
-
-      // Delete all old edges belonging to this storyline
-      const oldStorylineEdges = edges.value.filter(e => e.storyline_id === storylineId)
-      for (const edge of oldStorylineEdges) {
-        await deleteEdge(edge.id)
-      }
-
-      // Create edges between consecutive nodes in new order
-      for (let i = 0; i < nodeIds.length - 1; i++) {
-        const sourceId = nodeIds[i]
-        const targetId = nodeIds[i + 1]
-        await createEdge({ source_node_id: sourceId, target_node_id: targetId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
-      }
-
-      // Create new Map for Vue reactivity
-      const newMap = new Map(storylineNodes.value)
-      newMap.set(storylineId, [...nodeIds])
-      storylineNodes.value = newMap
-      storeLogger.debug(`Reordered nodes in storyline ${storylineId}`)
-    } catch (e) {
-      storeLogger.error('Failed to reorder storyline nodes:', e)
-      throw e
-    }
-  }
-
-  /**
-   * Get full node data for a storyline, ordered by sequence
-   */
-  async function getStorylineNodes(storylineId: string): Promise<Node[]> {
-    try {
-      const nodeData = await invoke<Node[]>('get_storyline_nodes', { storylineId })
-      // Update cache with reactivity
-      const newMap = new Map(storylineNodes.value)
-      newMap.set(storylineId, nodeData.map(n => n.id))
-      storylineNodes.value = newMap
-      // Auto-repair edges to ensure consistency
-      await repairStorylineEdges(storylineId)
-      return nodeData
-    } catch (e) {
-      storeLogger.error('Failed to get storyline nodes:', e)
-      throw e
-    }
-  }
-
-  /**
-   * Get storylines that contain a specific node
-   */
-  function getStorylinesForNode(nodeId: string): Storyline[] {
-    return storylines.value.filter(s => {
-      const nodeIds = storylineNodes.value.get(s.id)
-      return nodeIds?.includes(nodeId)
-    })
-  }
-
-  /**
-   * Auto-repair storyline edges to ensure they match the node sequence.
-   * Removes orphan edges and creates missing edges.
-   */
-  async function repairStorylineEdges(storylineId: string): Promise<void> {
-    try {
-      const nodeIds = storylineNodes.value.get(storylineId) || []
-      if (nodeIds.length < 2) return
-
-      const storyline = storylines.value.find(s => s.id === storylineId)
-      const edgeColor = storyline?.color || undefined
-
-      // Build set of expected edge pairs (consecutive nodes)
-      const expectedPairs = new Set<string>()
-      for (let i = 0; i < nodeIds.length - 1; i++) {
-        const pair = [nodeIds[i], nodeIds[i + 1]].sort().join(':')
-        expectedPairs.add(pair)
-      }
-
-      // Find and delete orphan edges (storyline edges that don't connect consecutive nodes)
-      const storylineEdges = edges.value.filter(e => e.storyline_id === storylineId)
-      for (const edge of storylineEdges) {
-        const pair = [edge.source_node_id, edge.target_node_id].sort().join(':')
-        if (!expectedPairs.has(pair)) {
-          await deleteEdge(edge.id)
-          storeLogger.debug(`Deleted orphan storyline edge ${edge.id}`)
-        }
-      }
-
-      // Create missing edges
-      for (let i = 0; i < nodeIds.length - 1; i++) {
-        const sourceId = nodeIds[i]
-        const targetId = nodeIds[i + 1]
-        const edgeExists = edges.value.some(
-          e => e.storyline_id === storylineId &&
-               ((e.source_node_id === sourceId && e.target_node_id === targetId) ||
-                (e.source_node_id === targetId && e.target_node_id === sourceId))
-        )
-        if (!edgeExists) {
-          await createEdge({ source_node_id: sourceId, target_node_id: targetId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
-          storeLogger.debug(`Created missing storyline edge ${sourceId} -> ${targetId}`)
-        }
-      }
-    } catch (e) {
-      storeLogger.error('Failed to repair storyline edges:', e)
-    }
-  }
+  // Tag node functions - forwarded to tag nodes composable
+  const getOrCreateTagNode = (tagName: string, nearNodeId?: string) => tagNodesComposable.getOrCreateTagNode(tagName, nearNodeId)
+  const createTagEdges = (nodeId: string, tagNames: string[]) => tagNodesComposable.createTagEdges(nodeId, tagNames)
+  const getTagNodes = () => tagNodesComposable.getTagNodes()
 
   return {
     nodes,
@@ -1533,6 +883,7 @@ export const useNodesStore = defineStore('nodes', () => {
     storylines,
     filteredStorylines,
     storylineNodes,
+    storylineNodesVersion,
     initialize,
     getNode,
     findNodeByTitle,
@@ -1563,6 +914,7 @@ export const useNodesStore = defineStore('nodes', () => {
     assignNodesToFrame,
     importVault,
     importCitations,
+    importOntology,
     refreshWorkspace,
     watchVault,
     stopWatching,
@@ -1590,5 +942,10 @@ export const useNodesStore = defineStore('nodes', () => {
     getStorylineNodes,
     getStorylinesForNode,
     repairStorylineEdges,
+    // Tag management
+    extractHashtags,
+    getOrCreateTagNode,
+    createTagEdges,
+    getTagNodes,
   }
 })

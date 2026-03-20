@@ -74,19 +74,6 @@ pub struct ThemeYaml {
     pub effects: Option<ThemeEffects>,
 }
 
-/// Database theme record
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Theme {
-    pub id: String,
-    pub name: String,
-    pub display_name: String,
-    pub yaml_content: String,
-    pub is_builtin: bool,
-    pub workspace_id: Option<String>,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
 /// Validation error types
 #[derive(Debug, thiserror::Error)]
 pub enum ThemeError {
@@ -94,8 +81,6 @@ pub enum ThemeError {
     YamlParse(#[from] serde_yaml::Error),
     #[error("Invalid theme: {0}")]
     Validation(String),
-    #[error("Theme not found: {0}")]
-    NotFound(String),
 }
 
 /// Parse YAML string into ThemeYaml struct

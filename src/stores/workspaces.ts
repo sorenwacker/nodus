@@ -9,6 +9,30 @@ import { workspaceStorage } from '../lib/storage'
 import { storeLogger } from '../lib/logger'
 import type { Workspace } from '../types'
 
+// Maximum workspace name length
+const MAX_WORKSPACE_NAME_LENGTH = 100
+
+/**
+ * Sanitize workspace name to prevent XSS and ensure valid format
+ */
+function sanitizeWorkspaceName(name: string): string {
+  // Trim whitespace
+  let sanitized = name.trim()
+  // Remove HTML/script tags
+  sanitized = sanitized.replace(/<[^>]*>/g, '')
+  // Remove control characters
+  sanitized = sanitized.replace(/[\x00-\x1f\x7f]/g, '')
+  // Truncate to max length
+  if (sanitized.length > MAX_WORKSPACE_NAME_LENGTH) {
+    sanitized = sanitized.slice(0, MAX_WORKSPACE_NAME_LENGTH)
+  }
+  // Ensure not empty after sanitization
+  if (!sanitized) {
+    sanitized = 'Untitled Workspace'
+  }
+  return sanitized
+}
+
 interface DbWorkspace {
   id: string
   name: string
@@ -85,9 +109,10 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
   }
 
   async function createWorkspace(name: string): Promise<Workspace> {
+    const sanitizedName = sanitizeWorkspaceName(name)
     const workspace: Workspace = {
       id: crypto.randomUUID(),
-      name,
+      name: sanitizedName,
       created_at: Date.now(),
     }
 
@@ -122,7 +147,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
   function renameWorkspace(id: string, newName: string) {
     const workspace = workspaces.value.find((w) => w.id === id)
     if (workspace) {
-      workspace.name = newName
+      workspace.name = sanitizeWorkspaceName(newName)
       saveWorkspacesToStorage()
     }
   }

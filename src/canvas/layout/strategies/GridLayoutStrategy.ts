@@ -262,6 +262,16 @@ export const GridLayoutStrategy: LayoutStrategy = {
       maxY = Math.max(maxY, pos.y + h)
     }
 
+    // Guard against NaN from uninitialized min/max (no valid positions found)
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+      minX = 0
+      maxX = NODE_DEFAULTS.WIDTH
+    }
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+      minY = 0
+      maxY = NODE_DEFAULTS.HEIGHT
+    }
+
     const layoutCenterX = (minX + maxX) / 2
     const layoutCenterY = (minY + maxY) / 2
     const offsetX = options.centerX - layoutCenterX

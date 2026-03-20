@@ -36,10 +36,22 @@ export function useMinimap(options: MinimapOptions) {
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const node of nodeList) {
-      minX = Math.min(minX, node.canvas_x)
-      minY = Math.min(minY, node.canvas_y)
-      maxX = Math.max(maxX, node.canvas_x + node.width)
-      maxY = Math.max(maxY, node.canvas_y + node.height)
+      // Guard against NaN/undefined values
+      const x = node.canvas_x || 0
+      const y = node.canvas_y || 0
+      const w = node.width || 200
+      const h = node.height || 120
+      if (isNaN(x) || isNaN(y)) continue
+
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x + w)
+      maxY = Math.max(maxY, y + h)
+    }
+
+    // If all nodes had invalid coords, use defaults
+    if (!isFinite(minX)) {
+      return { minX: 0, minY: 0, maxX: 1000, maxY: 800, width: 1000, height: 800 }
     }
 
     const pad = 100
@@ -65,16 +77,26 @@ export function useMinimap(options: MinimapOptions) {
     const b = bounds.value
     const mScale = minimapScale.value
 
+    // Guard against division by zero or NaN
+    if (!scale.value || isNaN(mScale)) {
+      return { x: 0, y: 0, width: 50, height: 40 }
+    }
+
     const viewLeft = -offsetX.value / scale.value
     const viewTop = -offsetY.value / scale.value
     const viewWidth = viewportSize.width / scale.value
     const viewHeight = viewportSize.height / scale.value
 
+    const x = (viewLeft - b.minX) * mScale + MINIMAP_PADDING
+    const y = (viewTop - b.minY) * mScale + MINIMAP_PADDING
+    const width = viewWidth * mScale
+    const height = viewHeight * mScale
+
     return {
-      x: (viewLeft - b.minX) * mScale + MINIMAP_PADDING,
-      y: (viewTop - b.minY) * mScale + MINIMAP_PADDING,
-      width: viewWidth * mScale,
-      height: viewHeight * mScale,
+      x: isNaN(x) ? 0 : x,
+      y: isNaN(y) ? 0 : y,
+      width: isNaN(width) ? 50 : width,
+      height: isNaN(height) ? 40 : height,
     }
   })
 
@@ -84,11 +106,18 @@ export function useMinimap(options: MinimapOptions) {
   function getNodePosition(node: MinimapNode) {
     const b = bounds.value
     const mScale = minimapScale.value
+
+    // Guard against NaN values
+    const x = (node.canvas_x - b.minX) * mScale + MINIMAP_PADDING
+    const y = (node.canvas_y - b.minY) * mScale + MINIMAP_PADDING
+    const width = Math.max((node.width || 200) * mScale, 3)
+    const height = Math.max((node.height || 120) * mScale, 2)
+
     return {
-      x: (node.canvas_x - b.minX) * mScale + MINIMAP_PADDING,
-      y: (node.canvas_y - b.minY) * mScale + MINIMAP_PADDING,
-      width: Math.max((node.width || 200) * mScale, 3),
-      height: Math.max((node.height || 120) * mScale, 2),
+      x: isNaN(x) ? 0 : x,
+      y: isNaN(y) ? 0 : y,
+      width: isNaN(width) ? 3 : width,
+      height: isNaN(height) ? 2 : height,
     }
   }
 

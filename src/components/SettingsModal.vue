@@ -4,13 +4,14 @@
  * Unified settings interface for LLM, Canvas, and general preferences
  */
 import { ref, watch, onMounted, computed } from 'vue'
-import { llmStorage, canvasStorage } from '../lib/storage'
-import { providerRegistry } from '../canvas/llm/providers'
-import type { ProviderModel } from '../canvas/llm/providers'
-import { DEFAULT_SYSTEM_PROMPT, DEFAULT_AGENT_PROMPT } from '../canvas/llm/prompts'
+import { useI18n } from 'vue-i18n'
+import { llmStorage, canvasStorage, tagStorage } from '../lib/storage'
 import { useThemesStore } from '../stores/themes'
 import { useNodesStore } from '../stores/nodes'
+import { setLocale, getLocale, loadLocale } from '../i18n'
+import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
 
+const { t } = useI18n()
 const themesStore = useThemesStore()
 const nodesStore = useNodesStore()
 
@@ -23,263 +24,28 @@ const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general'>('general')
 
 // LLM enabled toggle
 const llmEnabled = ref(llmStorage.getLLMEnabled())
-const llmStreaming = ref(llmStorage.getLLMStreaming())
-
-// Provider settings
-const providers = providerRegistry.getProviders()
-const selectedProvider = ref(llmStorage.getProvider())
-const providerStatus = ref<'checking' | 'online' | 'offline'>('checking')
-
-// Provider-specific settings
-const providerConfigs = ref<Record<string, Record<string, unknown>>>({})
-const availableModels = ref<ProviderModel[]>([])
-const loadingModels = ref(false)
-
-// Load all stored configs on mount
-function loadStoredConfigs() {
-  const stored = llmStorage.getProviderConfigs()
-  providerConfigs.value = stored as Record<string, Record<string, unknown>>
-}
-
-// Current provider config (reactive)
-const currentConfig = computed(() => providerConfigs.value[selectedProvider.value] || {})
-
-// Current provider object
-const currentProvider = computed(() => providerRegistry.getProvider(selectedProvider.value))
-
-// Check if current provider needs API key
-const requiresApiKey = computed(() => currentProvider.value?.requiresApiKey ?? false)
-
-// API key validation status
-const apiKeyStatus = ref<'idle' | 'validating' | 'valid' | 'invalid'>('idle')
-
-// Get config values with defaults per provider
-const apiKey = computed({
-  get: () => (currentConfig.value.apiKey as string) || '',
-  set: (value: string) => setConfigValue('apiKey', value)
-})
-
-const baseUrl = computed({
-  get: () => {
-    const config = currentConfig.value
-    if (config.baseUrl) return config.baseUrl as string
-    // Default URLs per provider
-    if (selectedProvider.value === 'ollama') return 'http://localhost:11434'
-    if (selectedProvider.value === 'openai-compatible') return 'http://localhost:1234/v1'
-    if (selectedProvider.value === 'openai') return 'https://api.openai.com/v1'
-    if (selectedProvider.value === 'anthropic') return 'https://api.anthropic.com'
-    return ''
-  },
-  set: (value: string) => setConfigValue('baseUrl', value)
-})
-
-const selectedModel = computed({
-  get: () => {
-    const config = currentConfig.value
-    if (config.model) return config.model as string
-    // Default models per provider
-    if (selectedProvider.value === 'ollama') return 'llama3.2'
-    if (selectedProvider.value === 'openai-compatible') return ''  // User must select/enter
-    if (selectedProvider.value === 'openai') return 'gpt-4o'
-    if (selectedProvider.value === 'anthropic') return 'claude-3-5-sonnet-20241022'
-    return ''
-  },
-  set: (value: string) => setConfigValue('model', value)
-})
-
-const timeout = computed({
-  get: () => (currentConfig.value.timeout as number) || 300000,  // 5 min default for large context
-  set: (value: number) => setConfigValue('timeout', value)
-})
-
-const maxTokens = computed({
-  get: () => (currentConfig.value.maxTokens as number) || 4096,
-  set: (value: number) => setConfigValue('maxTokens', value)
-})
-
-const contextWindow = computed({
-  get: () => (currentConfig.value.contextLength as number) || 4096,
-  set: (value: number) => setConfigValue('contextLength', value)
-})
-
-// Chain context limit (how much content from connected nodes to include)
-const chainContextLimit = ref(llmStorage.getChainContextLimit())
-watch(chainContextLimit, (value) => {
-  llmStorage.setChainContextLimit(value)
-})
-
-// Search API key (Tavily)
-const searchApiKey = ref(llmStorage.getSearchApiKey())
-const searchKeyStatus = ref<'idle' | 'testing' | 'valid' | 'invalid'>('idle')
-watch(searchApiKey, (value) => {
-  llmStorage.setSearchApiKey(value)
-  searchKeyStatus.value = 'idle'
-})
-
-async function testSearchKey() {
-  if (!searchApiKey.value) return
-  searchKeyStatus.value = 'testing'
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('web_search', { query: 'test', apiKey: searchApiKey.value })
-    searchKeyStatus.value = 'valid'
-  } catch {
-    searchKeyStatus.value = 'invalid'
-  }
-}
-
-// System prompt (shared across providers)
-const llmSystemPrompt = ref(llmStorage.getSystemPrompt(''))
-
-// Agent prompt (for graph builder agent)
-const llmAgentPrompt = ref(llmStorage.getAgentPrompt(''))
 
 // Canvas Settings
 const gridSnap = ref(canvasStorage.getGridSnap())
 const gridSize = ref(canvasStorage.getGridSize())
 const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'straight'>(canvasStorage.getEdgeStyle())
 
+// Tag Settings
+const showTagNodes = ref(tagStorage.getShowTagNodes())
+
+// Language Settings
+const selectedLanguage = ref(getLocale())
+
+watch(selectedLanguage, async (locale) => {
+  await loadLocale(locale)
+  setLocale(locale)
+})
+
 // Theme is handled by themes store
 const selectedTheme = computed({
   get: () => themesStore.currentThemeName,
   set: (name: string) => themesStore.setTheme(name),
 })
-
-// Set config value for current provider
-function setConfigValue(key: string, value: unknown) {
-  if (!providerConfigs.value[selectedProvider.value]) {
-    providerConfigs.value[selectedProvider.value] = {}
-  }
-  providerConfigs.value[selectedProvider.value][key] = value
-  saveProviderConfig()
-}
-
-// Fetch available models for current provider
-async function fetchModels() {
-  loadingModels.value = true
-  providerStatus.value = 'checking'
-
-  const provider = currentProvider.value
-  if (!provider) {
-    loadingModels.value = false
-    providerStatus.value = 'offline'
-    return
-  }
-
-  // Apply current config to provider
-  const config = {
-    ...currentConfig.value,
-    apiKey: apiKey.value,
-    baseUrl: baseUrl.value,
-    model: selectedModel.value,
-    timeout: timeout.value,
-    maxTokens: maxTokens.value,
-    contextLength: contextWindow.value,
-  }
-  provider.configure(config)
-
-  try {
-    const isAvailable = await provider.isAvailable()
-    providerStatus.value = isAvailable ? 'online' : 'offline'
-
-    if (isAvailable) {
-      const models = await provider.listModels()
-      availableModels.value = models
-    } else {
-      availableModels.value = []
-    }
-  } catch {
-    providerStatus.value = 'offline'
-    availableModels.value = []
-  }
-
-  loadingModels.value = false
-}
-
-// Save provider config
-function saveProviderConfig() {
-  const config = {
-    apiKey: apiKey.value,
-    baseUrl: baseUrl.value,
-    model: selectedModel.value,
-    timeout: timeout.value,
-    maxTokens: maxTokens.value,
-    contextLength: contextWindow.value,
-  }
-
-  llmStorage.setProviderConfig(selectedProvider.value, config)
-
-  // Apply to provider
-  const provider = currentProvider.value
-  if (provider) {
-    provider.configure(config)
-  }
-}
-
-// Save active provider
-function saveActiveProvider() {
-  llmStorage.setProvider(selectedProvider.value)
-  providerRegistry.setActiveProvider(selectedProvider.value)
-  apiKeyStatus.value = 'idle'
-  fetchModels()
-}
-
-// Validate API key (or just test connection for optional key providers)
-async function validateApiKey() {
-  // For providers that don't require API key, skip if no key provided
-  if (!requiresApiKey.value && !apiKey.value) {
-    apiKeyStatus.value = 'idle'
-    return
-  }
-
-  // For providers that require API key, must have one
-  if (requiresApiKey.value && !apiKey.value) {
-    apiKeyStatus.value = 'idle'
-    return
-  }
-
-  apiKeyStatus.value = 'validating'
-
-  const provider = currentProvider.value
-  if (!provider) {
-    apiKeyStatus.value = 'invalid'
-    return
-  }
-
-  // Apply config with new API key
-  provider.configure({
-    apiKey: apiKey.value,
-    baseUrl: baseUrl.value,
-    model: selectedModel.value,
-    timeout: timeout.value,
-    maxTokens: maxTokens.value,
-    contextLength: contextWindow.value,
-  })
-
-  try {
-    const isAvailable = await provider.isAvailable()
-    apiKeyStatus.value = isAvailable ? 'valid' : 'invalid'
-
-    if (isAvailable) {
-      // Also fetch models on successful validation
-      providerStatus.value = 'online'
-      const models = await provider.listModels()
-      availableModels.value = models
-    }
-  } catch {
-    apiKeyStatus.value = 'invalid'
-  }
-}
-
-// Save system prompt
-function saveSystemPrompt() {
-  llmStorage.setSystemPrompt(llmSystemPrompt.value)
-}
-
-// Save agent prompt
-function saveAgentPrompt() {
-  llmStorage.setAgentPrompt(llmAgentPrompt.value)
-}
 
 // Save Canvas settings
 function saveCanvasSettings() {
@@ -288,75 +54,36 @@ function saveCanvasSettings() {
   canvasStorage.setEdgeStyle(edgeStyle.value)
 }
 
-// Theme changes are handled automatically by the themes store
+// Save Tag settings
+function saveTagSettings() {
+  tagStorage.setShowTagNodes(showTagNodes.value)
+  window.dispatchEvent(new CustomEvent('nodus-tag-nodes-change', { detail: showTagNodes.value }))
+}
 
 // Auto-save on changes
-watch(selectedProvider, saveActiveProvider)
-watch(llmSystemPrompt, saveSystemPrompt)
-watch(llmAgentPrompt, saveAgentPrompt)
 watch([gridSnap, gridSize, edgeStyle], saveCanvasSettings)
-watch([maxTokens, contextWindow, timeout, selectedModel], saveProviderConfig)
-
-// Refresh models when URL changes
-let fetchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-watch(baseUrl, () => {
-  if (fetchDebounceTimer) clearTimeout(fetchDebounceTimer)
-  fetchDebounceTimer = setTimeout(() => fetchModels(), 500)
-})
-
-// Validate API key when it changes
-let validateDebounceTimer: ReturnType<typeof setTimeout> | null = null
-watch(apiKey, () => {
-  if (validateDebounceTimer) clearTimeout(validateDebounceTimer)
-  validateDebounceTimer = setTimeout(() => validateApiKey(), 800)
-})
+watch(showTagNodes, saveTagSettings)
 
 onMounted(async () => {
-  loadStoredConfigs()
-  fetchModels()
-  // Refresh themes from database
   await themesStore.initialize()
 })
 
 // Watch LLM enabled toggle
 watch(llmEnabled, (value) => {
   llmStorage.setLLMEnabled(value)
-  // Emit custom event so other components can react
   window.dispatchEvent(new CustomEvent('nodus-llm-enabled-change', { detail: value }))
-  // Switch away from LLM tab if disabled
   if (!value && activeTab.value === 'llm') {
     activeTab.value = 'general'
   }
-})
-
-// Watch LLM streaming toggle
-watch(llmStreaming, (value) => {
-  llmStorage.setLLMStreaming(value)
 })
 
 function handleClose() {
   emit('close')
 }
 
-function resetSystemPrompt() {
-  llmSystemPrompt.value = ''
-  llmStorage.setSystemPrompt('')
-}
-
-function resetAgentPrompt() {
-  llmAgentPrompt.value = ''
-  llmStorage.setAgentPrompt('')
-}
-
-// Display timeout in seconds for UI
-const timeoutSeconds = computed({
-  get: () => Math.round(timeout.value / 1000),
-  set: (value: number) => { timeout.value = value * 1000 }
-})
-
 // Delete custom theme
 async function deleteCustomTheme(id: string) {
-  if (confirm('Delete this custom theme?')) {
+  if (confirm(t('settings.deleteTheme'))) {
     await themesStore.deleteTheme(id)
   }
 }
@@ -446,28 +173,14 @@ async function switchToWorkspace(id: string) {
   emit('close')
 }
 
-async function recoverOrphanedWorkspace(id: string) {
-  recoveringWorkspace.value = id
-  try {
-    const recovered = await nodesStore.recoverWorkspace(id)
-    if (recovered) {
-      // Remove from orphaned list
-      orphanedWorkspaceIds.value = orphanedWorkspaceIds.value.filter(wsId => wsId !== id)
-      // Switch to the recovered workspace
-      nodesStore.switchWorkspace(recovered.id)
-    }
-  } finally {
-    recoveringWorkspace.value = null
-  }
-}
 </script>
 
 <template>
   <div class="settings-overlay" @click.self="handleClose">
     <div class="settings-modal">
       <header class="settings-header">
-        <h2>Settings</h2>
-        <button class="close-btn" title="Close" @click="handleClose">
+        <h2>{{ t('settings.title') }}</h2>
+        <button class="close-btn" :title="t('common.close')" @click="handleClose">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -479,296 +192,44 @@ async function recoverOrphanedWorkspace(id: string) {
           :class="{ active: activeTab === 'general' }"
           @click="activeTab = 'general'"
         >
-          General
+          {{ t('settings.tabs.general') }}
         </button>
         <button
           :class="{ active: activeTab === 'themes' }"
           @click="activeTab = 'themes'"
         >
-          Themes
+          {{ t('settings.tabs.themes') }}
         </button>
         <button
           :class="{ active: activeTab === 'canvas' }"
           @click="activeTab = 'canvas'"
         >
-          Canvas
+          {{ t('settings.tabs.canvas') }}
         </button>
         <button
           v-if="llmEnabled"
           :class="{ active: activeTab === 'llm' }"
           @click="activeTab = 'llm'"
         >
-          LLM
+          {{ t('settings.tabs.llm') }}
         </button>
       </nav>
 
       <div class="settings-content">
         <!-- LLM Settings -->
-        <div v-if="activeTab === 'llm'" class="settings-section">
-          <!-- Provider Selection -->
-          <div class="setting-group">
-            <label>Provider</label>
-            <div class="input-with-status">
-              <select v-model="selectedProvider">
-                <option v-for="p in providers" :key="p.id" :value="p.id">
-                  {{ p.name }}
-                </option>
-              </select>
-              <span
-                class="status-indicator"
-                :class="providerStatus"
-                :title="providerStatus === 'online' ? 'Connected' : providerStatus === 'offline' ? 'Not connected' : 'Checking...'"
-              />
-            </div>
-          </div>
-
-          <!-- Streaming toggle -->
-          <div class="setting-group">
-            <label class="checkbox-label">
-              <input v-model="llmStreaming" type="checkbox" />
-              Enable Streaming
-            </label>
-            <span class="hint">Stream responses token-by-token (requires provider support)</span>
-          </div>
-
-          <!-- API Key (for providers that need or support it) -->
-          <div v-if="requiresApiKey || selectedProvider === 'openai-compatible'" class="setting-group">
-            <label>API Key {{ !requiresApiKey ? '(optional)' : '' }}</label>
-            <div class="input-with-status">
-              <input
-                v-model="apiKey"
-                type="password"
-                :placeholder="requiresApiKey ? 'Enter your API key' : 'Optional - leave empty if not required'"
-              />
-              <button
-                v-if="apiKey && apiKeyStatus !== 'validating'"
-                class="validate-btn"
-                title="Validate API key"
-                @click="validateApiKey"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              </button>
-              <span
-                v-if="apiKeyStatus !== 'idle'"
-                class="status-indicator"
-                :class="apiKeyStatus"
-                :title="apiKeyStatus === 'valid' ? 'Valid' : apiKeyStatus === 'invalid' ? 'Invalid' : 'Validating...'"
-              />
-            </div>
-            <span class="hint">
-              {{ selectedProvider === 'openai' ? 'Get your key at platform.openai.com' : selectedProvider === 'openai-compatible' ? 'Required by some endpoints (e.g., hosted APIs)' : 'Get your key at console.anthropic.com' }}
-            </span>
-          </div>
-
-          <!-- Base URL -->
-          <div class="setting-group">
-            <label>{{ selectedProvider === 'ollama' ? 'Ollama URL' : 'Base URL' }}</label>
-            <input
-              v-model="baseUrl"
-              type="text"
-              :placeholder="selectedProvider === 'ollama' ? 'http://localhost:11434' : 'API base URL'"
-            />
-          </div>
-
-          <!-- Model Selection -->
-          <div class="setting-group">
-            <label>Model</label>
-            <div class="model-select">
-              <div class="model-input-wrapper">
-                <input
-                  v-model="selectedModel"
-                  type="text"
-                  list="model-list"
-                  placeholder="Enter model name or select from list"
-                  :disabled="loadingModels"
-                />
-                <datalist id="model-list">
-                  <option v-for="model in availableModels" :key="model.id" :value="model.id">
-                    {{ model.name || model.id }}
-                  </option>
-                </datalist>
-              </div>
-              <button
-                class="refresh-btn"
-                :disabled="loadingModels"
-                title="Fetch available models"
-                @click="fetchModels"
-              >
-                <svg
-                  :class="{ spinning: loadingModels }"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                  <path d="M21 3v5h-5" />
-                </svg>
-              </button>
-            </div>
-            <span v-if="availableModels.length > 0" class="hint">
-              {{ availableModels.length }} models available
-            </span>
-            <span v-else class="hint">
-              Type model name or click refresh to fetch available models
-            </span>
-          </div>
-
-          <!-- Max Tokens -->
-          <div class="setting-group">
-            <label>Max Tokens</label>
-            <div class="slider-with-value">
-              <input
-                v-model.number="maxTokens"
-                type="range"
-                min="256"
-                max="32768"
-                step="256"
-                class="slider"
-              />
-              <span class="slider-value">{{ maxTokens >= 1024 ? (maxTokens / 1024).toFixed(1) + 'k' : maxTokens }}</span>
-            </div>
-            <div class="preset-buttons">
-              <button
-                v-for="preset in [512, 1024, 2048, 4096, 8192, 16384, 32768]"
-                :key="preset"
-                :class="{ active: maxTokens === preset }"
-                @click="maxTokens = preset"
-              >
-                {{ preset >= 1024 ? (preset / 1024) + 'k' : preset }}
-              </button>
-            </div>
-            <span class="hint">Maximum tokens in response</span>
-          </div>
-
-          <!-- Context Window (num_ctx for Ollama) -->
-          <div class="setting-group">
-            <label>Context Window</label>
-            <div class="input-with-presets">
-              <input
-                v-model.number="contextWindow"
-                type="number"
-                min="2048"
-                max="131072"
-                step="1024"
-              />
-              <div class="preset-buttons">
-                <button
-                  v-for="preset in [4096, 8192, 32768, 65536, 131072]"
-                  :key="preset"
-                  :class="{ active: contextWindow === preset }"
-                  @click="contextWindow = preset"
-                >
-                  {{ preset >= 1024 ? (preset / 1024) + 'k' : preset }}
-                </button>
-              </div>
-            </div>
-            <span class="hint">Model context size in tokens (Llama 3.1: up to 131072)</span>
-          </div>
-
-          <!-- Timeout -->
-          <div class="setting-group">
-            <label>Timeout (seconds)</label>
-            <input
-              v-model.number="timeoutSeconds"
-              type="number"
-              min="10"
-              max="300"
-              step="10"
-            />
-          </div>
-
-          <!-- Chain Context Limit -->
-          <div class="setting-group">
-            <label>Neighbor Context</label>
-            <div class="slider-group">
-              <input
-                v-model.number="chainContextLimit"
-                type="range"
-                min="0"
-                max="200000"
-                step="10000"
-                class="slider"
-              />
-              <span class="slider-value">{{ chainContextLimit === 0 ? 'Off' : (chainContextLimit / 1000) + 'k' }}</span>
-            </div>
-            <span class="hint">Include content from linked nodes when asking LLM</span>
-          </div>
-
-          <!-- Search API Key -->
-          <div class="setting-group">
-            <label>Web Search API Key (Tavily)</label>
-            <div class="input-with-status">
-              <input
-                v-model="searchApiKey"
-                type="password"
-                placeholder="Enter your Tavily API key"
-              />
-              <button
-                v-if="searchApiKey && searchKeyStatus !== 'testing'"
-                class="validate-btn"
-                title="Test API key"
-                @click="testSearchKey"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              </button>
-              <span
-                v-if="searchKeyStatus !== 'idle'"
-                class="status-indicator"
-                :class="searchKeyStatus === 'testing' ? 'validating' : searchKeyStatus"
-                :title="searchKeyStatus === 'valid' ? 'Valid' : searchKeyStatus === 'invalid' ? 'Invalid' : 'Testing...'"
-              />
-            </div>
-            <span class="hint">
-              Free: 1000 searches/month, no credit card. Get key at
-              <a href="https://tavily.com/" target="_blank" rel="noopener">tavily.com</a>
-            </span>
-          </div>
-
-          <!-- System Prompt -->
-          <div class="setting-group">
-            <label>
-              System Prompt (simple generation)
-              <button class="text-btn" @click="resetSystemPrompt">Reset</button>
-            </label>
-            <textarea
-              v-model="llmSystemPrompt"
-              rows="4"
-              :placeholder="DEFAULT_SYSTEM_PROMPT"
-            />
-          </div>
-
-          <!-- Agent Prompt -->
-          <div class="setting-group">
-            <label>
-              Agent Prompt (graph builder)
-              <button class="text-btn" @click="resetAgentPrompt">Reset</button>
-            </label>
-            <textarea
-              v-model="llmAgentPrompt"
-              rows="6"
-              :placeholder="DEFAULT_AGENT_PROMPT"
-            />
-          </div>
-        </div>
+        <LLMSettingsPanel v-if="activeTab === 'llm'" />
 
         <!-- Canvas Settings -->
         <div v-if="activeTab === 'canvas'" class="settings-section">
           <div class="setting-group">
             <label class="checkbox-label">
               <input v-model="gridSnap" type="checkbox" />
-              Snap to Grid
+              {{ t('settings.gridSnap') }}
             </label>
           </div>
 
           <div class="setting-group">
-            <label>Grid Size (px)</label>
+            <label>{{ t('settings.gridSize') }} ({{ t('settings.gridSizeUnit') }})</label>
             <input
               v-model.number="gridSize"
               type="number"
@@ -779,66 +240,85 @@ async function recoverOrphanedWorkspace(id: string) {
           </div>
 
           <div class="setting-group">
-            <label>Edge Style</label>
+            <label>{{ t('settings.edgeStyle') }}</label>
             <div class="edge-style-grid">
               <label class="edge-style-option">
                 <input v-model="edgeStyle" type="radio" value="orthogonal" />
                 <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 20 L4 12 L28 12 L28 4" />
                 </svg>
-                <span>Orthogonal</span>
+                <span>{{ t('settings.edgeStyles.orthogonal') }}</span>
               </label>
               <label class="edge-style-option">
                 <input v-model="edgeStyle" type="radio" value="diagonal" />
                 <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 20 L16 12 L28 4" />
                 </svg>
-                <span>Diagonal</span>
+                <span>{{ t('settings.edgeStyles.diagonal') }}</span>
               </label>
               <label class="edge-style-option">
                 <input v-model="edgeStyle" type="radio" value="curved" />
                 <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 20 C4 12, 28 12, 28 4" />
                 </svg>
-                <span>Curved</span>
+                <span>{{ t('settings.edgeStyles.curved') }}</span>
               </label>
               <label class="edge-style-option">
                 <input v-model="edgeStyle" type="radio" value="straight" />
                 <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 20 L28 4" />
                 </svg>
-                <span>Straight</span>
+                <span>{{ t('settings.edgeStyles.straight') }}</span>
               </label>
             </div>
+          </div>
+
+          <div class="setting-group">
+            <label class="checkbox-label">
+              <input v-model="showTagNodes" type="checkbox" />
+              {{ t('settings.showTagNodes') }}
+            </label>
+            <span class="hint">{{ t('settings.showTagNodesHint') }}</span>
           </div>
         </div>
 
         <!-- General Settings -->
         <div v-if="activeTab === 'general'" class="settings-section">
           <div class="setting-group">
+            <label>{{ t('settings.language') }}</label>
+            <select v-model="selectedLanguage" class="language-select">
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Francais</option>
+              <option value="es">Espanol</option>
+              <option value="it">Italiano</option>
+            </select>
+          </div>
+
+          <div class="setting-group">
             <label class="checkbox-label">
               <input v-model="llmEnabled" type="checkbox" />
-              LLM Features
+              {{ t('settings.llmEnabled') }}
             </label>
-            <span class="hint">Show AI prompt bars for graph and nodes</span>
+            <span class="hint">{{ t('settings.llmEnabledHint') }}</span>
           </div>
 
           <!-- Workspace Diagnostics -->
           <div class="setting-group">
-            <label>Workspace Diagnostics</label>
+            <label>{{ t('settings.workspaceDiagnostics') }}</label>
             <button
               class="scan-btn"
               :disabled="scanningWorkspaces"
               @click="scanWorkspaces"
             >
-              {{ scanningWorkspaces ? 'Scanning...' : 'Scan workspaces' }}
+              {{ scanningWorkspaces ? t('settings.scanning') : t('settings.scanWorkspaces') }}
             </button>
             <div v-if="workspaceStats.length > 0" class="workspace-stats">
               <table>
                 <thead>
                   <tr>
-                    <th>Workspace</th>
-                    <th>Nodes</th>
+                    <th>{{ t('settings.workspace') }}</th>
+                    <th>{{ t('settings.nodes') }}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -856,7 +336,7 @@ async function recoverOrphanedWorkspace(id: string) {
                         class="switch-btn"
                         @click="switchToWorkspace(ws.id)"
                       >
-                        {{ ws.name === '(deleted)' ? 'Recover' : 'Switch' }}
+                        {{ ws.name === '(deleted)' ? t('settings.recover') : t('settings.switch') }}
                       </button>
                     </td>
                   </tr>
@@ -864,15 +344,15 @@ async function recoverOrphanedWorkspace(id: string) {
               </table>
             </div>
             <span class="hint">
-              Scan to see node counts per workspace and find missing nodes.
+              {{ t('settings.workspaceStatsHint') }}
             </span>
           </div>
 
           <div class="setting-group">
-            <label>About</label>
+            <label>{{ t('settings.about') }}</label>
             <div class="about-info">
-              <p><strong>Nodus</strong> - Local-first knowledge graph</p>
-              <p class="version">Version 0.2.2</p>
+              <p><strong>{{ t('app.name') }}</strong> - {{ t('settings.aboutDescription') }}</p>
+              <p class="version">{{ t('settings.version') }} 0.2.2</p>
             </div>
           </div>
         </div>
@@ -880,7 +360,7 @@ async function recoverOrphanedWorkspace(id: string) {
         <!-- Themes Settings -->
         <div v-if="activeTab === 'themes'" class="settings-section">
           <div class="setting-group">
-            <label>Theme ({{ themesStore.themes.length }} available)</label>
+            <label>{{ t('settings.tabs.themes') }} ({{ themesStore.themes.length }} {{ t('settings.themeCount') }})</label>
             <div class="theme-grid">
               <label
                 v-for="theme in themesStore.themes"
@@ -900,7 +380,7 @@ async function recoverOrphanedWorkspace(id: string) {
                 <button
                   v-if="theme.is_builtin === 0"
                   class="delete-theme-btn"
-                  title="Delete theme"
+                  :title="t('common.delete')"
                   @click.prevent.stop="deleteCustomTheme(theme.id)"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -910,7 +390,7 @@ async function recoverOrphanedWorkspace(id: string) {
               </label>
             </div>
             <span class="hint">
-              Use the AI agent to create custom themes: "create a crazy bananas theme"
+              {{ t('settings.themeHint') }}
             </span>
           </div>
         </div>
@@ -1146,93 +626,6 @@ async function recoverOrphanedWorkspace(id: string) {
   background: #ef4444;
 }
 
-.validate-btn {
-  padding: 6px;
-  background: var(--border-node, #e4e4e7);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-main, #18181b);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .validate-btn {
-  background: #3f3f46;
-  color: #f4f4f5;
-}
-
-.validate-btn:hover {
-  background: var(--primary-color, #3b82f6);
-  color: white;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.model-select {
-  display: flex;
-  gap: 8px;
-}
-
-.model-input-wrapper {
-  flex: 1;
-  position: relative;
-}
-
-.model-input-wrapper input {
-  width: 100%;
-}
-
-.refresh-btn {
-  padding: 8px;
-  background: var(--border-node, #e4e4e7);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--text-main, #18181b);
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .refresh-btn {
-  background: #3f3f46;
-  color: #f4f4f5;
-}
-
-.refresh-btn:hover {
-  background: var(--primary-color, #3b82f6);
-  color: white;
-}
-
-.refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.text-btn {
-  background: none;
-  border: none;
-  color: var(--primary-color, #3b82f6);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.text-btn:hover {
-  text-decoration: underline;
-}
-
 .checkbox-label {
   display: flex !important;
   align-items: center;
@@ -1331,107 +724,6 @@ async function recoverOrphanedWorkspace(id: string) {
 .about-info .version {
   color: var(--text-muted, #71717a);
   margin-top: 4px;
-}
-
-.input-with-presets {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.input-with-presets input {
-  width: 100%;
-}
-
-.preset-buttons {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.preset-buttons button {
-  padding: 4px 10px;
-  font-size: 12px;
-  background: var(--bg-canvas, #f4f4f5);
-  border: 1px solid var(--border-node, #e4e4e7);
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-main, #18181b);
-  transition: all 0.15s;
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .preset-buttons button {
-  background: #18181b;
-  border-color: #3f3f46;
-  color: #f4f4f5;
-}
-
-.preset-buttons button:hover {
-  border-color: var(--primary-color, #3b82f6);
-}
-
-.preset-buttons button.active {
-  background: var(--primary-color, #3b82f6);
-  border-color: var(--primary-color, #3b82f6);
-  color: white;
-}
-
-.slider-with-value,
-.slider-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.slider-with-value .slider,
-.slider-group .slider {
-  flex: 1;
-  height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--border-node, #e4e4e7);
-  border-radius: 2px;
-  cursor: pointer;
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-with-value .slider,
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-group .slider {
-  background: #3f3f46;
-}
-
-.slider-with-value .slider::-webkit-slider-thumb,
-.slider-group .slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: var(--primary-color, #3b82f6);
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.slider-with-value .slider::-moz-range-thumb,
-.slider-group .slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: var(--primary-color, #3b82f6);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.slider-with-value .slider-value,
-.slider-group .slider-value {
-  min-width: 48px;
-  text-align: right;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-main, #18181b);
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-with-value .slider-value,
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .slider-group .slider-value {
-  color: #f4f4f5;
 }
 
 .edge-style-grid {

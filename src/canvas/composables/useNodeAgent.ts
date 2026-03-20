@@ -10,6 +10,62 @@ import { notifications$ } from '../../composables/useNotifications'
 import { llmStorage } from '../../lib/storage'
 import { convertLatexDocument } from '../../lib/latex-to-typst'
 
+/**
+ * Escape special characters that could be used for prompt injection
+ */
+function escapeForPrompt(text: string): string {
+  return text
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\[INST\]/gi, '[_INST_]')
+    .replace(/\[\/INST\]/gi, '[_/INST_]')
+    .replace(/```/g, "'''")}
+
+/**
+ * Validate URL scheme to prevent SSRF attacks
+ * Only allows http and https schemes
+ */
+function isValidFetchUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    // Only allow http/https schemes
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false
+    }
+    // Block localhost and private IPs
+    const hostname = parsed.hostname.toLowerCase()
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('172.16.') ||
+      hostname.startsWith('172.17.') ||
+      hostname.startsWith('172.18.') ||
+      hostname.startsWith('172.19.') ||
+      hostname.startsWith('172.20.') ||
+      hostname.startsWith('172.21.') ||
+      hostname.startsWith('172.22.') ||
+      hostname.startsWith('172.23.') ||
+      hostname.startsWith('172.24.') ||
+      hostname.startsWith('172.25.') ||
+      hostname.startsWith('172.26.') ||
+      hostname.startsWith('172.27.') ||
+      hostname.startsWith('172.28.') ||
+      hostname.startsWith('172.29.') ||
+      hostname.startsWith('172.30.') ||
+      hostname.startsWith('172.31.') ||
+      hostname === '[::1]'
+    ) {
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 interface SearchResult {
   title: string
   url: string
@@ -164,11 +220,28 @@ async function executeFetchUrl(url: string): Promise<string> {
   }
 }
 
+// Timeout for fetch requests (10 seconds)
+const FETCH_TIMEOUT_MS = 10_000
+
+/**
+ * Fetch with timeout support
+ */
+async function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    return response
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 async function executeWikipediaSearch(query: string): Promise<string> {
   // First, search for the article
   try {
     const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`
-    const searchResp = await fetch(searchUrl)
+    const searchResp = await fetchWithTimeout(searchUrl)
     if (searchResp.ok) {
       const searchData = await searchResp.json()
       if (searchData.query?.search?.length > 0) {
@@ -176,7 +249,7 @@ async function executeWikipediaSearch(query: string): Promise<string> {
 
         // Fetch the full article content using TextExtracts API
         const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&explaintext=1&exsectionformat=plain&format=json&origin=*`
-        const contentResp = await fetch(contentUrl)
+        const contentResp = await fetchWithTimeout(contentUrl)
         if (contentResp.ok) {
           const contentData = await contentResp.json()
           const pages = contentData.query?.pages
@@ -196,7 +269,11 @@ async function executeWikipediaSearch(query: string): Promise<string> {
       }
     }
   } catch (e) {
-    // Wikipedia search failed
+    // Check if it was a timeout
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(`Wikipedia search timed out for "${query}". Try again.`)
+    }
+    // Wikipedia search failed for other reasons
   }
 
   throw new Error(`Wikipedia search failed for "${query}". Try a different query.`)
@@ -210,11 +287,14 @@ export function useNodeAgent() {
   function buildSystemPrompt(ctx: NodeAgentContext): string {
     let connectedContext = ''
     if (ctx.connectedNodes.length > 0) {
-      connectedContext = '\n\nCONNECTED NOTES:\n' +
-        ctx.connectedNodes.slice(0, 5).map(n => `- ${n.title}: ${n.content.slice(0, 200)}...`).join('\n')
+      connectedContext = '\n\n<connected_notes>\n' +
+        ctx.connectedNodes.slice(0, 5).map(n =>
+          `<note title="${escapeForPrompt(n.title)}">${escapeForPrompt(n.content.slice(0, 200))}...</note>`
+        ).join('\n') +
+        '\n</connected_notes>'
     }
 
-    return `You are a note editor agent working on "${ctx.nodeTitle}".
+    return `You are a note editor agent working on <current_note_title>${escapeForPrompt(ctx.nodeTitle)}</current_note_title>.
 
 CURRENT CONTENT:
 ${ctx.nodeContent || '(empty)'}
@@ -296,10 +376,18 @@ DO NOT call done() without first calling update_content(). Your response will be
                 }
                 break
 
-              case 'fetch_url':
-                log.value.push(`  Fetching: ${args.url}`)
+              case 'fetch_url': {
+                const urlToFetch = args.url as string
+                log.value.push(`  Fetching: ${urlToFetch}`)
+                // Validate URL before fetching
+                if (!isValidFetchUrl(urlToFetch)) {
+                  const errorMsg = 'Invalid URL: only http/https URLs to public hosts are allowed'
+                  log.value.push(`  ERROR: ${errorMsg}`)
+                  result = `Error: ${errorMsg}`
+                  break
+                }
                 try {
-                  result = await executeFetchUrl(args.url as string)
+                  result = await executeFetchUrl(urlToFetch)
                   log.value.push(`  Got content (${result.length} chars)`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Fetch failed'
@@ -308,6 +396,7 @@ DO NOT call done() without first calling update_content(). Your response will be
                   result = `Error: ${errorMsg}`
                 }
                 break
+              }
 
               case 'wikipedia_search':
                 log.value.push(`  Wikipedia: ${args.query}`)

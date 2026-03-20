@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, inject, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
@@ -10,6 +11,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useNodesStore()
+const { storylineNodes, storylineNodesVersion } = storeToRefs(store)
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
 
 const selectedStorylineId = ref<string | null>(null)
@@ -27,9 +29,23 @@ const selectedStoryline = computed(() =>
 
 // Get nodes for selected storyline - reactive to store changes
 const selectedStorylineNodes = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _version = storylineNodesVersion.value // Force reactivity on Map changes
   if (!selectedStorylineId.value) return []
-  const nodeIds = store.storylineNodes.get(selectedStorylineId.value) || []
+  const nodeIds = storylineNodes.value.get(selectedStorylineId.value) || []
+  console.log('[StorylinePanel] selectedStorylineNodes computed', { version: _version, nodeIds })
   return nodeIds.map(id => store.getNode(id)).filter((n): n is Node => n !== undefined)
+})
+
+// Get node counts for all storylines - reactive to Map changes
+const storylineNodeCounts = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _version = storylineNodesVersion.value // Force reactivity
+  const counts: Record<string, number> = {}
+  for (const [id, nodeIds] of storylineNodes.value.entries()) {
+    counts[id] = nodeIds.length
+  }
+  return counts
 })
 
 function selectStoryline(id: string) {
@@ -45,8 +61,7 @@ function exitStorylineView() {
 async function loadStorylineNodes(storylineId: string) {
   try {
     const nodes = await store.getStorylineNodes(storylineId)
-    // Update the store's cache with node IDs
-    store.storylineNodes.set(storylineId, nodes.map(n => n.id))
+    // getStorylineNodes already updates the store's cache
   } catch (e) {
     console.error('Failed to load storyline nodes:', e)
   }
@@ -355,7 +370,7 @@ watch(() => store.currentWorkspaceId, () => {
           <template v-else>
             <span class="storyline-title">{{ storyline.title }}</span>
             <span class="node-count">
-              {{ store.storylineNodes.get(storyline.id)?.length || 0 }}
+              {{ storylineNodeCounts[storyline.id] || 0 }}
             </span>
           </template>
 

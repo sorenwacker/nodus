@@ -8,6 +8,27 @@ import { invoke } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import type { Frame } from '../types'
 
+// Maximum canvas coordinate bounds
+const MAX_CANVAS_COORD = 100_000
+const MIN_FRAME_SIZE = 50
+const MAX_FRAME_SIZE = 10_000
+
+/**
+ * Validate and clamp a coordinate value
+ */
+function clampCoord(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(-MAX_CANVAS_COORD, Math.min(MAX_CANVAS_COORD, value))
+}
+
+/**
+ * Validate and clamp a size value
+ */
+function clampSize(value: number, min = MIN_FRAME_SIZE, max = MAX_FRAME_SIZE): number {
+  if (!Number.isFinite(value)) return min
+  return Math.max(min, Math.min(max, value))
+}
+
 export const useFramesStore = defineStore('frames', () => {
   const frames = ref<Frame[]>([])
   const selectedFrameId = ref<string | null>(null)
@@ -93,9 +114,11 @@ export const useFramesStore = defineStore('frames', () => {
   function updateFramePosition(id: string, x: number, y: number): void {
     const frame = frames.value.find((f) => f.id === id)
     if (frame) {
-      frame.canvas_x = x
-      frame.canvas_y = y
-      invoke('update_frame_position', { id, x, y }).catch((e) =>
+      const clampedX = clampCoord(x)
+      const clampedY = clampCoord(y)
+      frame.canvas_x = clampedX
+      frame.canvas_y = clampedY
+      invoke('update_frame_position', { id, x: clampedX, y: clampedY }).catch((e) =>
         storeLogger.error('Failed to update frame position:', e)
       )
     }
@@ -107,9 +130,11 @@ export const useFramesStore = defineStore('frames', () => {
   function updateFrameSize(id: string, width: number, height: number): void {
     const frame = frames.value.find((f) => f.id === id)
     if (frame) {
-      frame.width = width
-      frame.height = height
-      invoke('update_frame_size', { id, width, height }).catch((e) =>
+      const clampedWidth = clampSize(width)
+      const clampedHeight = clampSize(height)
+      frame.width = clampedWidth
+      frame.height = clampedHeight
+      invoke('update_frame_size', { id, width: clampedWidth, height: clampedHeight }).catch((e) =>
         storeLogger.error('Failed to update frame size:', e)
       )
     }

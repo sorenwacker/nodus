@@ -67,6 +67,7 @@ export function useFrames(options: UseFramesOptions) {
   const frameResizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
   const editingFrameId = ref<string | null>(null)
   const editFrameTitle = ref('')
+  const pendingFramePlacement = ref(false)
 
   function onMouseDown(e: MouseEvent, frameId: string) {
     e.preventDefault()
@@ -194,7 +195,7 @@ export function useFrames(options: UseFramesOptions) {
       return
     }
 
-    // If nodes are selected, create frame around them
+    // If nodes are selected, create frame around them immediately
     if (store.selectedNodeIds.length > 0) {
       const selectedNodes = store.filteredNodes.filter(n => store.selectedNodeIds.includes(n.id))
       const padding = 40
@@ -218,11 +219,18 @@ export function useFrames(options: UseFramesOptions) {
       return
     }
 
-    // No selection - create frame at viewport center
-    const centerX = (rect.width / 2 - viewState.offsetX.value) / viewState.scale.value
-    const centerY = (rect.height / 2 - viewState.offsetY.value) / viewState.scale.value
-    const frame = store.createFrame(centerX - 200, centerY - 150, 400, 300, 'New Frame')
+    // No selection - enable placement mode (wait for click)
+    pendingFramePlacement.value = true
+  }
+
+  function createAtPosition(x: number, y: number) {
+    const frame = store.createFrame(x - 200, y - 150, 400, 300, 'New Frame')
     store.selectFrame(frame.id)
+    pendingFramePlacement.value = false
+  }
+
+  function cancelPlacement() {
+    pendingFramePlacement.value = false
   }
 
   function deleteSelected() {
@@ -240,6 +248,7 @@ export function useFrames(options: UseFramesOptions) {
     resizingFrame,
     editingFrameId,
     editFrameTitle,
+    pendingFramePlacement,
 
     // Functions
     onMouseDown,
@@ -248,6 +257,8 @@ export function useFrames(options: UseFramesOptions) {
     saveTitle,
     cancelTitleEditing,
     createAtCenter,
+    createAtPosition,
+    cancelPlacement,
     deleteSelected,
   }
 }

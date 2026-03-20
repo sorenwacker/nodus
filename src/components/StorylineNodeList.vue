@@ -11,6 +11,37 @@ const props = defineProps<{
   compact?: boolean
 }>()
 
+// Map legacy color values to current colors
+const legacyColorMap: Record<string, string> = {
+  '#fecaca': 'rgba(239, 68, 68, 0.08)',
+  '#fed7aa': 'rgba(249, 115, 22, 0.08)',
+  '#fef08a': 'rgba(234, 179, 8, 0.08)',
+  '#bbf7d0': 'rgba(34, 197, 94, 0.08)',
+  '#bfdbfe': 'rgba(59, 130, 246, 0.08)',
+  '#e9d5ff': 'rgba(168, 85, 247, 0.08)',
+  '#fbcfe8': 'rgba(236, 72, 153, 0.08)',
+  '#fef2f2': 'rgba(239, 68, 68, 0.08)',
+  '#fff7ed': 'rgba(249, 115, 22, 0.08)',
+  '#fefce8': 'rgba(234, 179, 8, 0.08)',
+  '#f0fdf4': 'rgba(34, 197, 94, 0.08)',
+  '#eff6ff': 'rgba(59, 130, 246, 0.08)',
+  '#faf5ff': 'rgba(168, 85, 247, 0.08)',
+  '#fdf2f8': 'rgba(236, 72, 153, 0.08)',
+  'rgba(239, 68, 68, 0.15)': 'rgba(239, 68, 68, 0.08)',
+  'rgba(249, 115, 22, 0.15)': 'rgba(249, 115, 22, 0.08)',
+  'rgba(234, 179, 8, 0.15)': 'rgba(234, 179, 8, 0.08)',
+  'rgba(34, 197, 94, 0.15)': 'rgba(34, 197, 94, 0.08)',
+  'rgba(59, 130, 246, 0.15)': 'rgba(59, 130, 246, 0.08)',
+  'rgba(168, 85, 247, 0.15)': 'rgba(168, 85, 247, 0.08)',
+  'rgba(236, 72, 153, 0.15)': 'rgba(236, 72, 153, 0.08)',
+}
+
+function getNodeBackground(colorTheme: string | null | undefined): string | undefined {
+  if (!colorTheme) return undefined
+  const normalizedColor = legacyColorMap[colorTheme] || colorTheme
+  return `linear-gradient(${normalizedColor}, ${normalizedColor}), var(--bg-surface)`
+}
+
 const emit = defineEmits<{
   (e: 'node-click', index: number): void
   (e: 'reorder', nodeIds: string[]): void
@@ -50,9 +81,11 @@ function handleNodeClick(index: number) {
 
 // Drag and drop
 function onDragStart(e: DragEvent, index: number) {
+  console.log('[StorylineNodeList] onDragStart', index)
   draggingNodeIndex.value = index
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
   }
 }
 
@@ -69,17 +102,25 @@ function onDrop(e: DragEvent, targetIndex: number) {
   e.preventDefault()
   dragOverIndex.value = null
 
+  console.log('[StorylineNodeList] onDrop called', { draggingNodeIndex: draggingNodeIndex.value, targetIndex })
+
   if (draggingNodeIndex.value === null) return
   if (draggingNodeIndex.value === targetIndex) {
     draggingNodeIndex.value = null
     return
   }
 
+  const fromIndex = draggingNodeIndex.value
   const nodesCopy = [...props.nodes]
-  const [removed] = nodesCopy.splice(draggingNodeIndex.value, 1)
-  nodesCopy.splice(targetIndex, 0, removed)
+  const [removed] = nodesCopy.splice(fromIndex, 1)
 
-  emit('reorder', nodesCopy.map(n => n.id))
+  // Adjust target index when dragging down (since we removed an element before it)
+  const adjustedTarget = targetIndex > fromIndex ? targetIndex - 1 : targetIndex
+  nodesCopy.splice(adjustedTarget, 0, removed)
+
+  const newOrder = nodesCopy.map(n => n.id)
+  console.log('[StorylineNodeList] Emitting reorder', newOrder)
+  emit('reorder', newOrder)
   draggingNodeIndex.value = null
 }
 
@@ -138,6 +179,7 @@ function onDragEnd() {
             dragging: draggingNodeIndex === index,
             'drag-over': dragOverIndex === index
           }"
+          :style="node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}"
           draggable="true"
           @click="handleNodeClick(index)"
           @dragstart="onDragStart($event, index)"
@@ -294,8 +336,10 @@ function onDragEnd() {
   border-radius: 6px;
   background: var(--bg-surface);
   margin-bottom: 2px;
-  cursor: pointer;
+  cursor: grab;
   transition: all 0.1s;
+  user-select: none;
+  -webkit-user-drag: element;
 }
 
 .compact .node-item {

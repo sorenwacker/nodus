@@ -127,7 +127,7 @@ watch(() => props.show, (show) => {
           </div>
 
           <div v-if="filteredShortcuts.length === 0" class="no-results">
-            No shortcuts match "{{ searchQuery }}"
+            {{ t('search.noResults') }}
           </div>
         </div>
 

@@ -29,7 +29,6 @@ pub enum WatcherError {
 #[allow(dead_code)]
 pub struct FileLock {
     file: File,
-    path: PathBuf,
 }
 
 impl FileLock {
@@ -37,32 +36,14 @@ impl FileLock {
     pub fn shared(path: &Path) -> Result<Self, WatcherError> {
         let file = File::open(path)?;
         file.try_lock_shared().map_err(|_| WatcherError::FileLocked)?;
-        Ok(Self {
-            file,
-            path: path.to_path_buf(),
-        })
+        Ok(Self { file })
     }
 
     /// Acquire an exclusive (write) lock on a file
     pub fn exclusive(path: &Path) -> Result<Self, WatcherError> {
         let file = File::options().read(true).write(true).open(path)?;
         file.try_lock_exclusive().map_err(|_| WatcherError::FileLocked)?;
-        Ok(Self {
-            file,
-            path: path.to_path_buf(),
-        })
-    }
-
-    /// Upgrade from shared to exclusive lock
-    pub fn upgrade(&self) -> Result<(), WatcherError> {
-        self.file.unlock()?;
-        self.file.try_lock_exclusive().map_err(|_| WatcherError::FileLocked)?;
-        Ok(())
-    }
-
-    /// Get the file path
-    pub fn path(&self) -> &Path {
-        &self.path
+        Ok(Self { file })
     }
 
     /// Write content to the locked file

@@ -4,10 +4,23 @@
  * ALL LLM calls go through the queue
  */
 import type { Ref } from 'vue'
-import type { ChatMessage, AgentTask } from '../llm/types'
+import type { ChatMessage, AgentTask, ToolDefinition } from '../llm/types'
 import { llmStorage, memoryStorage } from '../../lib/storage'
 import { DEFAULT_AGENT_PROMPT } from '../llm/prompts'
 import { llmQueue } from '../llm/queue'
+
+/**
+ * Escape special characters that could be used for prompt injection
+ * Replaces XML-like tags and control characters
+ */
+function escapeForPrompt(text: string): string {
+  return text
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\[INST\]/gi, '[_INST_]')
+    .replace(/\[\/INST\]/gi, '[_/INST_]')
+    .replace(/```/g, "'''")
+}
 
 export interface AgentContext {
   // Node store access
@@ -26,10 +39,10 @@ export interface AgentContext {
   conversationHistory: Ref<ChatMessage[]>
 
   // Tools
-  agentTools: any[]
+  agentTools: ToolDefinition[]
 
   // Tool executor
-  executeAgentTool: (name: string, args: any) => Promise<string>
+  executeAgentTool: (name: string, args: Record<string, unknown>) => Promise<string>
 }
 
 interface SystemPromptMessage {
@@ -39,6 +52,7 @@ interface SystemPromptMessage {
 
 /**
  * Generate system prompt with current node state and memories
+ * Uses XML-like structured separators to prevent prompt injection
  */
 function buildSystemPrompt(
   nodes: Array<{ title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>,
@@ -47,11 +61,12 @@ function buildSystemPrompt(
   let nodeList = 'No nodes yet. Canvas is empty.'
 
   if (nodes.length > 0 && nodes.length <= 30) {
+    // Escape node titles to prevent prompt injection
     nodeList = nodes.map((n, i) =>
-      `${i+1}. "${n.title}" @(${Math.round(n.canvas_x)},${Math.round(n.canvas_y)})`
+      `${i+1}. <node_title>${escapeForPrompt(n.title)}</node_title> @(${Math.round(n.canvas_x)},${Math.round(n.canvas_y)})`
     ).join('\n')
   } else if (nodes.length > 30) {
-    nodeList = nodes.slice(0, 20).map(n => n.title).join(', ') + `... (${nodes.length} total)`
+    nodeList = nodes.slice(0, 20).map(n => `<node_title>${escapeForPrompt(n.title)}</node_title>`).join(', ') + `... (${nodes.length} total)`
   }
 
   const customRules = llmStorage.getAgentPrompt(DEFAULT_AGENT_PROMPT)
@@ -181,7 +196,16 @@ export function useAgentRunner(ctx: AgentContext) {
         // Handle native tool calls
         if (msg.tool_calls && msg.tool_calls.length > 0) {
           for (const tc of msg.tool_calls) {
-            const result = await ctx.executeAgentTool(tc.function.name, tc.function.arguments)
+            // Parse arguments from string to object
+            let parsedArgs: Record<string, unknown> = {}
+            try {
+              parsedArgs = typeof tc.function.arguments === 'string'
+                ? JSON.parse(tc.function.arguments)
+                : tc.function.arguments
+            } catch {
+              // Invalid JSON, use empty args
+            }
+            const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
 
             if (result.startsWith('AGENT_DONE:')) {

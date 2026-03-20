@@ -138,12 +138,6 @@ ${}$"#, math)
     Ok(svg)
 }
 
-/// Clear the SVG cache
-pub fn clear_cache() {
-    let mut cache = SVG_CACHE.lock().unwrap();
-    cache.clear();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

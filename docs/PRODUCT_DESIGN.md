@@ -1370,10 +1370,10 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 26. [x] File locking mechanism (fs2 crate for cross-platform locks)
 27. [x] Integrity test suite (concurrent edit tests, checksum validation)
 28. [x] Typst backend rendering (Rust-side typst crate for math compilation)
+29. [x] Folder → Frame mapping (auto-create frames from Obsidian folders on import)
 
 ### In Progress
 
-- [ ] Folder → Frame mapping (auto-map Obsidian folders to Frames on import)
 - [ ] Typst WASM frontend integration (render math in browser via @myriaddreamin/typst.ts)
 
 ### Future

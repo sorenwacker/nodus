@@ -354,6 +354,10 @@
   cursor: grabbing;
 }
 
+.canvas-viewport.frame-placement {
+  cursor: crosshair;
+}
+
 .canvas-content {
   position: absolute;
   top: 0;
@@ -434,6 +438,38 @@
 /* Dim non-highlighted edges when a node is hovered/selected */
 .edges-layer:has(.edge-highlighted) .edge-line-visible:not(.edge-highlighted) {
   opacity: 0.25;
+}
+
+/* LOD (Level of Detail) mode - circles for large graphs */
+.node-circle {
+  position: absolute;
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 2px 6px var(--shadow-sm);
+  user-select: none;
+  will-change: transform;
+  contain: layout style paint;
+  backface-visibility: hidden;
+  pointer-events: auto;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.node-circle:hover {
+  box-shadow: 0 4px 12px var(--shadow-md);
+  z-index: 10;
+}
+
+.node-circle.selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4), 0 4px 12px var(--shadow-md);
+  z-index: 20;
+}
+
+.node-circle.dragging {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px var(--shadow-md);
+  z-index: 1000;
 }
 
 .node-card {
@@ -752,6 +788,8 @@
   overflow-y: auto;
   padding: 12px;
   padding-bottom: 20px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .inline-editor::placeholder {
@@ -779,6 +817,7 @@
   border: 1.5px solid var(--border-default);
   cursor: pointer;
   padding: 0;
+  background-color: white;
 }
 
 .color-dot:hover {
@@ -821,22 +860,43 @@
 
 .delete-node-btn {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 18px;
-  height: 18px;
+  top: -16px;
+  right: -16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--danger-color);
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+/* Visible circle is smaller than clickable area */
+.delete-node-btn::before {
+  content: 'x';
+  position: absolute;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 1.5px solid var(--danger-border);
   background: var(--danger-bg);
   color: var(--danger-color);
-  cursor: pointer;
-  padding: 0;
-  font-size: 11px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: 0 1px 3px var(--shadow-sm);
+  transition: background 0.1s, color 0.1s;
 }
 
-.delete-node-btn:hover {
+.delete-node-btn:hover::before {
   background: var(--danger-color);
   color: white;
 }
@@ -1455,6 +1515,12 @@
   color: #94a3b8;
 }
 
+.status-bar .layout-running {
+  color: var(--primary-color);
+  font-weight: 600;
+  animation: pulse 1s infinite;
+}
+
 .status-bar .ai-btn {
   margin-left: 8px;
   padding: 4px 10px;
@@ -1502,6 +1568,20 @@
 
 .status-bar .stop-btn:hover {
   filter: brightness(1.1);
+}
+
+.status-bar .undo-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: var(--text-muted);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.status-bar .undo-btn:hover {
+  background: var(--danger-color);
 }
 
 /* Magnifying lens - water droplet effect (GPU accelerated) */
@@ -1955,4 +2035,51 @@
   height: 1px;
   background: var(--border-default);
   margin: 4px 0;
+}
+
+/* Tag node styling - smaller, pill-shaped */
+.node-card[data-node-type="tag"] {
+  min-width: 60px;
+  max-width: 150px;
+  min-height: 32px;
+  height: auto !important;
+  border-radius: 16px;
+  background: var(--primary-color);
+  color: white;
+  border: 2px solid var(--primary-color);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.node-card[data-node-type="tag"] .node-header {
+  display: none;
+}
+
+.node-card[data-node-type="tag"] .node-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-align: center;
+}
+
+.node-card[data-node-type="tag"]:hover {
+  border-color: var(--primary-color);
+  filter: brightness(1.1);
+}
+
+.node-card[data-node-type="tag"].selected {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Tagged edge styling - dashed line, lighter color */
+.edge-tagged {
+  stroke-dasharray: 6, 4;
+  opacity: 0.7;
+}
+
+.edge-tagged:not(.edge-highlighted) {
+  stroke: var(--text-muted) !important;
 }

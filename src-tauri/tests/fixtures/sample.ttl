@@ -1,0 +1,53 @@
+@prefix ex: <http://example.org/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+# Classes
+ex:Person a owl:Class ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being" .
+
+ex:Organization a owl:Class ;
+    rdfs:label "Organization" ;
+    rdfs:comment "A formal group of people" .
+
+ex:Project a owl:Class ;
+    rdfs:label "Project" ;
+    rdfs:comment "A planned piece of work" .
+
+# Individuals
+ex:alice a ex:Person ;
+    rdfs:label "Alice Johnson" ;
+    foaf:age "32" ;
+    foaf:mbox "alice@example.org" ;
+    ex:worksFor ex:acme ;
+    ex:leadsProject ex:projectX .
+
+ex:bob a ex:Person ;
+    rdfs:label "Bob Smith" ;
+    foaf:age "45" ;
+    ex:worksFor ex:acme ;
+    ex:knows ex:alice .
+
+ex:carol a ex:Person ;
+    rdfs:label "Carol Williams" ;
+    foaf:age "28" ;
+    ex:worksFor ex:techcorp ;
+    ex:collaboratesWith ex:alice .
+
+ex:acme a ex:Organization ;
+    rdfs:label "ACME Inc" ;
+    rdfs:comment "A multinational corporation" ;
+    ex:location "New York" ;
+    ex:founded "1990" .
+
+ex:techcorp a ex:Organization ;
+    rdfs:label "TechCorp" ;
+    ex:location "San Francisco" .
+
+ex:projectX a ex:Project ;
+    rdfs:label "Project X" ;
+    rdfs:comment "A confidential research initiative" ;
+    ex:startDate "2024-01-15" ;
+    ex:budget "1000000" .

@@ -115,7 +115,27 @@ export async function applyForceLayout(
     connectedIds.add(e.target)
   }
   const disconnectedIds = new Set(simNodes.filter(n => !connectedIds.has(n.id)).map(n => n.id))
-  console.log('[FORCE] total nodes:', simNodes.length, 'connected:', connectedIds.size, 'disconnected:', disconnectedIds.size, 'center:', centerX, centerY)
+
+  // Pre-pass: move distant nodes closer to center before simulation
+  // This ensures outliers can converge in limited iterations
+  const maxInitialDistance = 2000
+  for (const node of simNodes) {
+    const dx = (node.x || 0) - centerX
+    const dy = (node.y || 0) - centerY
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (dist > maxInitialDistance) {
+      // Pull node to maxInitialDistance from center
+      const scale = maxInitialDistance / dist
+      node.x = centerX + dx * scale
+      node.y = centerY + dy * scale
+    }
+  }
+
+  // If all or most nodes are disconnected, use moderate gravity (not too weak, not collapsing)
+  const disconnectedRatio = simNodes.length > 0 ? disconnectedIds.size / simNodes.length : 0
+  // Keep gravity reasonable even for disconnected graphs - 0.3 minimum
+  const effectiveGravity = disconnectedRatio > 0.5 ? Math.max(gravityStrength * 0.5, 0.3) : gravityStrength
+  console.log('[FORCE] nodes:', simNodes.length, 'edges:', edges.length, 'disconnected:', disconnectedIds.size, `(${Math.round(disconnectedRatio * 100)}%)`, 'gravity:', effectiveGravity.toFixed(2))
 
   // Create simulation - keep nodes close together
   const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(simNodes)
@@ -125,26 +145,28 @@ export async function applyForceLayout(
       .strength(1.0))
     .force('charge', forceManyBody<SimNode>()
       .strength(d => {
-        // Disconnected nodes don't repel - they only get pulled to center
+        // Disconnected nodes: no repulsion (only collision prevents overlap)
+        // This keeps them in the cluster instead of being pushed out
         if (disconnectedIds.has(d.id)) return 0
         return chargeStrength
       })
-      .distanceMin(20)
-      .distanceMax(300))
-    // Strong gravity to keep nodes clustered
+      .distanceMin(10)
+      .distanceMax(500)
+      .theta(simNodes.length > 200 ? 0.9 : 0.7))
+    // Gravity to keep nodes clustered - stronger for disconnected nodes
     .force('gravityX', forceX<SimNode>(centerX).strength(d =>
-      disconnectedIds.has(d.id) ? gravityStrength : gravityStrength * 0.5))
+      disconnectedIds.has(d.id) ? effectiveGravity * 1.5 : effectiveGravity))
     .force('gravityY', forceY<SimNode>(centerY).strength(d =>
-      disconnectedIds.has(d.id) ? gravityStrength : gravityStrength * 0.5))
+      disconnectedIds.has(d.id) ? effectiveGravity * 1.5 : effectiveGravity))
     .force('collide', forceCollide<SimNode>()
       .radius(d => {
         // Use actual node diagonal / 2 as collision radius
-        // This is the minimum to prevent overlap, plus small gap for edges
+        // Tighter gap (15px) for denser packing
         const diagonal = Math.sqrt(d.width ** 2 + d.height ** 2)
-        return diagonal / 2 + 30  // 30px gap for edge routing
+        return diagonal / 2 + 15
       })
-      .strength(1.0)
-      .iterations(4))
+      .strength(0.8)  // Slightly softer collision
+      .iterations(3))
 
   // Run simulation
   if (onTick) {

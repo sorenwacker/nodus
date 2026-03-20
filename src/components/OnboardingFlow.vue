@@ -1,10 +1,27 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { setLocale, getLocale, loadLocale } from '../i18n'
 
 const { t } = useI18n()
 
 const STORAGE_KEY = 'nodus-onboarding-complete'
+
+// Language selection
+const selectedLanguage = ref(getLocale())
+const languages = [
+  { code: 'en', name: 'English' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'fr', name: 'Francais' },
+  { code: 'es', name: 'Espanol' },
+  { code: 'it', name: 'Italiano' },
+]
+
+async function selectLanguage(code: string) {
+  selectedLanguage.value = code
+  await loadLocale(code)
+  setLocale(code)
+}
 
 const emit = defineEmits<{
   complete: []
@@ -13,8 +30,8 @@ const emit = defineEmits<{
 const isVisible = ref(false)
 const currentStep = ref(0)
 
-const stepKeys = ['welcome', 'nodes', 'edges', 'import', 'math'] as const
-const stepIcons = ['graph', 'node', 'edge', 'import', 'math']
+const stepKeys = ['language', 'welcome', 'nodes', 'edges', 'import', 'math'] as const
+const stepIcons = ['language', 'graph', 'node', 'edge', 'import', 'math']
 
 const steps = computed(() => stepKeys.map((key, i) => ({
   title: t(`onboarding.${key}.title`),
@@ -88,7 +105,13 @@ defineExpose({
         <!-- Step content -->
         <div class="step-content">
           <div class="step-icon" :data-icon="steps[currentStep].icon">
-            <template v-if="steps[currentStep].icon === 'graph'">
+            <template v-if="steps[currentStep].icon === 'language'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+            </template>
+            <template v-else-if="steps[currentStep].icon === 'graph'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" />
                 <circle cx="6" cy="18" r="3" /><circle cx="18" cy="18" r="3" />
@@ -122,6 +145,19 @@ defineExpose({
 
           <h2 id="onboarding-title">{{ steps[currentStep].title }}</h2>
           <p>{{ steps[currentStep].description }}</p>
+
+          <!-- Language selector for language step -->
+          <div v-if="steps[currentStep].icon === 'language'" class="language-grid">
+            <button
+              v-for="lang in languages"
+              :key="lang.code"
+              class="language-option"
+              :class="{ selected: selectedLanguage === lang.code }"
+              @click="selectLanguage(lang.code)"
+            >
+              {{ lang.name }}
+            </button>
+          </div>
         </div>
 
         <!-- Navigation -->
@@ -308,5 +344,37 @@ defineExpose({
 
 .dot:hover {
   background: var(--text-muted);
+}
+
+/* Language selector */
+.language-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.language-option {
+  padding: 10px 20px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface-alt);
+  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.language-option:hover {
+  border-color: var(--primary-color);
+  background: var(--bg-elevated);
+}
+
+.language-option.selected {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+  color: white;
 }
 </style>

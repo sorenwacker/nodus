@@ -22,6 +22,7 @@ const KEYS = {
   canvasEdgeStyle: 'nodus_canvas_edge_style',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
+  showTagNodes: 'nodus_show_tag_nodes',
 } as const
 
 /**
@@ -176,6 +177,18 @@ export const canvasStorage = {
   },
   setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'straight'): void {
     localStorage.setItem(KEYS.canvasEdgeStyle, value)
+  },
+}
+
+/**
+ * Tag settings storage
+ */
+export const tagStorage = {
+  getShowTagNodes(): boolean {
+    return localStorage.getItem(KEYS.showTagNodes) === 'true'
+  },
+  setShowTagNodes(value: boolean): void {
+    localStorage.setItem(KEYS.showTagNodes, String(value))
   },
 }
 

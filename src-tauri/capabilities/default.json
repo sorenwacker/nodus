@@ -14,7 +14,9 @@
     "fs:allow-read-dir",
     "fs:allow-exists",
     "fs:allow-mkdir",
-    "fs:default"
+    "fs:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
   ],
   "platforms": ["linux", "macOS", "windows"]
 }
