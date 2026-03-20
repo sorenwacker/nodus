@@ -87,30 +87,6 @@
   flex-shrink: 0;
 }
 
-/* Tooltip styles for top bar buttons */
-.icon-btn[data-tooltip] {
-  position: relative;
-}
-
-.icon-btn[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px var(--shadow-md);
-  z-index: 1000;
-  pointer-events: none;
-}
-
 .toolbar-divider {
   width: 1px;
   height: 24px;

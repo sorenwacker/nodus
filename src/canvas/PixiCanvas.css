@@ -199,30 +199,6 @@
   border-color: var(--warning-color, #f59e0b);
 }
 
-/* LLM bar button tooltips */
-.llm-clear-btn[data-tooltip] {
-  position: relative;
-}
-
-.llm-clear-btn[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px var(--shadow-md);
-  z-index: 1000;
-  pointer-events: none;
-}
-
 .settings-grid {
   display: grid;
   grid-template-columns: 80px 1fr;
@@ -1434,25 +1410,10 @@
   position: relative;
 }
 
-/* Tooltip styles */
-.zoom-controls button[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border-radius: 4px;
-  border: 1px solid var(--border-default);
-  box-shadow: 0 2px 8px var(--shadow-md);
-  z-index: 100;
-  pointer-events: none;
+/* Zoom controls tooltips appear above (bottom of screen) */
+.zoom-controls [data-tooltip]:hover::after {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
 }
 
 .zoom-controls button svg {
