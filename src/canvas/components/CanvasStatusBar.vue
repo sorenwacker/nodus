@@ -52,8 +52,8 @@ const emit = defineEmits<{
     <button
       v-if="agentLog.length > 0"
       class="agent-log-toggle"
-      @click="emit('toggleAgentLog')"
       :title="showAgentLog ? t('canvas.status.hideAgentLog') : t('canvas.status.showAgentLog')"
+      @click="emit('toggleAgentLog')"
     >
       {{ t('canvas.status.log') }} ({{ agentLog.length }})
     </button>

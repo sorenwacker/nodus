@@ -26,7 +26,6 @@ import type {
   FileChangeEvent,
   Storyline,
   StorylineNode,
-  OntologyImportResult,
 } from '../types'
 
 // Maximum canvas coordinate bounds
@@ -82,9 +81,11 @@ export const useNodesStore = defineStore('nodes', () => {
   })
 
   // Import composable (initialized after createNode is defined)
+  // eslint-disable-next-line prefer-const
   let importComposable: ReturnType<typeof useImport>
 
   // Tag nodes composable (initialized after dependencies are available)
+  // eslint-disable-next-line prefer-const
   let tagNodesComposable: ReturnType<typeof useTagNodes>
 
   // Expose edges and frames from their stores for backwards compatibility

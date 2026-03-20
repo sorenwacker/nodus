@@ -39,8 +39,8 @@ const steps = computed(() => stepKeys.map((key, i) => ({
   icon: stepIcons[i],
 })))
 
-const isLastStep = computed(() => currentStep.value === steps.length - 1)
-const progress = computed(() => ((currentStep.value + 1) / steps.length) * 100)
+const isLastStep = computed(() => currentStep.value === steps.value.length - 1)
+const progress = computed(() => ((currentStep.value + 1) / steps.value.length) * 100)
 
 function nextStep() {
   if (isLastStep.value) {

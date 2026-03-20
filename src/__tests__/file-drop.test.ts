@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { parseReferences, citationToMarkdown, parseBibTeX, parseCslJson } from '../lib/bibtex'
 
 // Mock Tauri APIs since they're not available in test environment

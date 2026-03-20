@@ -246,14 +246,14 @@ watch(() => props.storylineId, loadStoryline)
       <!-- Header -->
       <header class="reader-header">
         <div class="header-left">
-          <button class="toc-toggle" @click="showToc = !showToc" title="Toggle contents">
+          <button class="toc-toggle" title="Toggle contents" @click="showToc = !showToc">
             <Icon name="menu" :size="18" />
           </button>
           <h1 class="reader-title">{{ storyline?.title || 'Loading...' }}</h1>
         </div>
         <div class="header-right">
           <span class="page-indicator">{{ activeNodeIndex + 1 }} / {{ nodes.length }}</span>
-          <button class="close-btn" @click="$emit('close')" title="Close (Esc)">
+          <button class="close-btn" title="Close (Esc)" @click="$emit('close')">
             <Icon name="close" :size="20" />
           </button>
         </div>
@@ -300,8 +300,8 @@ watch(() => props.storylineId, loadStoryline)
           <template v-else>
             <article
               v-for="(node, index) in nodes"
-              :key="node.id"
               :id="`node-${index}`"
+              :key="node.id"
               class="node-section"
             >
               <header class="section-header">

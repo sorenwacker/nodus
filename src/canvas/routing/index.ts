@@ -230,7 +230,7 @@ export function routeEdgesWithBundling(
   edges: EdgeDef[],
   nodes: NodeRect[],
   nodeMap: Map<string, NodeRect>,
-  style: EdgeStyle = 'orthogonal'
+  _style: EdgeStyle = 'orthogonal'
 ): Map<string, RoutedEdge & { strokeWidth: number; bundleSize: number; trunkPath?: string; trunkStrokeWidth?: number; isTrunkOwner?: boolean }> {
   const result = new Map<string, RoutedEdge & { strokeWidth: number; bundleSize: number; trunkPath?: string; trunkStrokeWidth?: number; isTrunkOwner?: boolean }>()
 

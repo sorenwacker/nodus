@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, provide } from 'vue'
+import { onMounted, ref, computed, provide } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from './stores/nodes'
 import { useThemesStore } from './stores/themes'
@@ -57,7 +57,6 @@ provide('showToast', showToast)
 
 // Undo/Redo composable
 import { useUndoRedo } from './composables/useUndoRedo'
-import type { Node, Edge } from './types'
 
 const undoRedo = useUndoRedo({
   store: {

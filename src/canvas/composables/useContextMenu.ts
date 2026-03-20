@@ -3,7 +3,7 @@
  * Handles right-click context menu for nodes
  */
 import { ref, computed } from 'vue'
-import type { Storyline, Workspace } from '../../types'
+import type { Storyline } from '../../types'
 
 export interface ContextMenuDeps {
   getSelectedNodeIds: () => string[]
@@ -75,8 +75,6 @@ export function useContextMenu(deps: ContextMenuDeps) {
   async function createStorylineFromNodes(): Promise<void> {
     if (affectedNodeIds.value.length === 0) return
 
-    const firstNode = affectedNodeIds.value[0]
-    // Generate title from first node or use "New Storyline"
     const storyline = await deps.createStoryline('New Storyline')
 
     for (const id of affectedNodeIds.value) {

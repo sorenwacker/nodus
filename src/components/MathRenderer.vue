@@ -6,7 +6,7 @@ const props = defineProps<{
   content: string
 }>()
 
-const { init, renderMathInContent, hasMath, isInitialized } = useTypst()
+const { init, renderMathInContent, hasMath } = useTypst()
 
 const renderedHtml = ref('')
 const isRendering = ref(false)
@@ -46,7 +46,7 @@ onMounted(render)
     <div v-if="isRendering" class="loading-indicator">
       <span class="spinner"></span>
     </div>
-    <div v-html="renderedHtml" class="rendered-content"></div>
+    <div class="rendered-content" v-html="renderedHtml"></div>
   </div>
 </template>
 

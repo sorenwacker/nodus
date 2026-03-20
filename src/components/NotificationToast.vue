@@ -3,15 +3,6 @@ import { useNotifications, type Notification } from '../composables/useNotificat
 
 const { notifications, dismiss } = useNotifications()
 
-function getIcon(type: Notification['type']): string {
-  switch (type) {
-    case 'error': return 'x-circle'
-    case 'warning': return 'alert-triangle'
-    case 'success': return 'check-circle'
-    case 'info': return 'info'
-  }
-}
-
 function getColor(type: Notification['type']): string {
   switch (type) {
     case 'error': return 'var(--color-error, #ef4444)'

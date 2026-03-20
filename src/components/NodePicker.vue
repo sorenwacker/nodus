@@ -71,9 +71,9 @@ function createNode() {
         type="text"
         placeholder="Node title..."
         class="create-input"
+        autofocus
         @keydown.enter="createNode"
         @keydown.escape="cancelCreate"
-        autofocus
       />
       <div class="create-actions">
         <button class="action-btn cancel" @click="cancelCreate">Cancel</button>

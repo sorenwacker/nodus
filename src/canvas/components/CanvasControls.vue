@@ -212,8 +212,8 @@ const emit = defineEmits<{
       v-if="neighborhoodMode"
       class="depth-select"
       :value="neighborhoodDepth"
-      @change="emit('setNeighborhoodDepth', Number(($event.target as HTMLSelectElement).value))"
       :data-tooltip="t('canvas.controls.neighborhoodDepth')"
+      @change="emit('setNeighborhoodDepth', Number(($event.target as HTMLSelectElement).value))"
     >
       <option value="1">1 {{ t('canvas.controls.hop') }}</option>
       <option value="2">2 {{ t('canvas.controls.hops') }}</option>

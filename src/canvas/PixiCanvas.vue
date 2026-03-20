@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 // marked is imported in useContentRenderer composable
-import { invoke, isTauri, openExternal } from '../lib/tauri'
+import { openExternal } from '../lib/tauri'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import {
   routeAllEdges,
@@ -415,7 +415,7 @@ const contentRenderer = useContentRenderer({
   getFilteredNodes: () => store.filteredNodes,
   isDarkMode: () => isDarkMode.value,
 })
-const { nodeRenderedContent, renderMarkdown, renderTypstMath, renderMermaidDiagrams, clearCaches: clearRenderCaches, setupWatchers: setupContentWatchers } = contentRenderer
+const { nodeRenderedContent, renderMarkdown, renderTypstMath, renderMermaidDiagrams, setupWatchers: setupContentWatchers } = contentRenderer
 
 // Node editor composable - handles inline editing with autosave
 const nodeEditor = useNodeEditor({
@@ -444,9 +444,9 @@ const edgeManipulation = useEdgeManipulation({
 })
 const {
   isCreatingEdge, edgeStartNode, edgePreviewEnd, selectedEdge,
-  startEdgeCreation, onEdgeClick, deleteSelectedEdge, changeEdgeLabel,
+  onEdgePreviewMove, onEdgeCreate, onEdgeClick, deleteSelectedEdge, changeEdgeLabel,
   reverseEdge, isEdgeBidirectional, makeUnidirectional, makeBidirectional,
-  insertNodeOnEdge, clearSelection: clearEdgeSelection
+  insertNodeOnEdge,
 } = edgeManipulation
 
 // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
@@ -593,7 +593,7 @@ const canvasPan = useCanvasPan({
     lastDragEndTime = Date.now()
   },
 })
-const { isPanning, startPan, stopPan } = canvasPan
+const { isPanning, startPan } = canvasPan
 const hoveredNodeId = ref<string | null>(null)
 const hoverMousePos = ref({ x: 0, y: 0 })
 
@@ -664,16 +664,6 @@ const highlightedEdgeIds = computed(() => {
   }
   return ids
 })
-
-// Check if an edge is connected to a hovered or selected node
-function isEdgeHighlighted(edge: { id?: string; source_node_id: string; target_node_id: string }): boolean {
-  // Fast path: use pre-computed set if edge has ID
-  if (edge.id) return highlightedEdgeIds.value.has(edge.id)
-  // Fallback for edges without ID
-  const active = activeNodeIds.value
-  if (active.size === 0) return false
-  return active.has(edge.source_node_id) || active.has(edge.target_node_id)
-}
 
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
@@ -884,7 +874,6 @@ const llm = useLLM()
 const {
   model: ollamaModel,
   contextLength: ollamaContextLength,
-  systemPrompt: customSystemPrompt,
   isRunning: agentRunning,
   log: agentLog,
   tasks: agentTasks,
@@ -2081,7 +2070,6 @@ const visibleEdgeLines = computed(() => {
   const selected = selectedEdge.value
   const bundling = edgeBundling.value
   const baseStrokeWidth = edgeStrokeWidth.value
-  const activeIds = activeNodeIds.value
 
   return edges.map(e => {
     const isHighlighted = highlighted.has(e.id)
@@ -2559,7 +2547,7 @@ function onResizeMove(e: MouseEvent) {
 
   // Update all selected nodes to the SAME size (not proportional)
   if (multiResizeInitial.value.size > 0) {
-    for (const [id, _initial] of multiResizeInitial.value) {
+    for (const [id] of multiResizeInitial.value) {
       if (id === resizingNode.value) continue
       const n = store.getNode(id)
       if (n) {
@@ -2581,7 +2569,7 @@ function stopResize() {
 
     // Update all other selected nodes to the SAME size
     if (multiResizeInitial.value.size > 0) {
-      for (const [id, _initial] of multiResizeInitial.value) {
+      for (const [id] of multiResizeInitial.value) {
         if (id === nodeId) continue
         store.updateNodeSize(id, width, height)
       }

@@ -306,12 +306,11 @@ function routeThreeSegment(
 
   // Standard 3-segment routing
   const startPrimary = getAxis(startStandoff, primaryAxis)
-  const endPrimary = getAxis(endStandoff, primaryAxis)
   const startSecondary = getAxis(startStandoff, secondaryAxis)
   const endSecondary = getAxis(endStandoff, secondaryAxis)
 
   // Ideal midpoint on primary axis
-  let idealMid = gridTracker.snap(startPrimary + delta / 2 + channelOffset)
+  const idealMid = gridTracker.snap(startPrimary + delta / 2 + channelOffset)
 
   // Check for obstacles and find clear route
   const checkPath = (mid: number): NodeRect[] => {
@@ -340,7 +339,7 @@ function routeThreeSegment(
   )
 
   // Check for obstacles at the chosen channel
-  let obstacles = checkPath(adjustedMid)
+  const obstacles = checkPath(adjustedMid)
 
   // If obstacles found, try to route around them
   if (obstacles.length > 0) {
@@ -415,43 +414,6 @@ function tryNearlyAlignedRoute(
   const corner1 = setAxis(startStandoff, secondaryAxis, detourValue)
   const corner2 = setAxis(endStandoff, secondaryAxis, detourValue)
   return buildResult([startPort, startStandoff, corner1, corner2, endStandoff, endEdge], gridTracker, true)
-}
-
-/**
- * Find a clear route around obstacles
- */
-function findClearRoute(
-  bestMid: number,
-  delta: number,
-  primaryAxis: Axis,
-  checkPath: (mid: number) => NodeRect[],
-  obstacles: NodeRect[]
-): { mid: number; usedDetour: boolean } {
-  const allBounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + DETOUR_MARGIN)
-
-  // Use the correct axis bounds
-  const minBound = primaryAxis === 'x' ? allBounds.minX : allBounds.minY
-  const maxBound = primaryAxis === 'x' ? allBounds.maxX : allBounds.maxY
-
-  // Try going further in the direction of travel
-  const tryFirst = delta > 0 ? maxBound : minBound
-  const trySecond = delta > 0 ? minBound : maxBound
-
-  const firstObs = checkPath(tryFirst)
-  if (firstObs.length === 0) {
-    return { mid: tryFirst, usedDetour: true }
-  }
-
-  const secondObs = checkPath(trySecond)
-  if (secondObs.length === 0) {
-    return { mid: trySecond, usedDetour: true }
-  }
-
-  // Use whichever clears more obstacles
-  return {
-    mid: firstObs.length <= secondObs.length ? tryFirst : trySecond,
-    usedDetour: true,
-  }
 }
 
 /**

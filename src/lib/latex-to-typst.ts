@@ -95,7 +95,7 @@ export function latexToTypst(latex: string): string {
 
   // Convert subscripts and superscripts with braces
   // x_{sub} -> x_sub, x^{sup} -> x^sup (Typst uses same syntax but prefers no braces for single chars)
-  result = result.replace(/\_\{([^{}]+)\}/g, '_($1)')
+  result = result.replace(/_\{([^{}]+)\}/g, '_($1)')
   result = result.replace(/\^\{([^{}]+)\}/g, '^($1)')
 
   // Convert sum, prod, int with limits
@@ -192,7 +192,7 @@ export function latexToTypst(latex: string): string {
 
   // Convert over/under braces
   result = result.replace(/\\overbrace\{([^{}]*)\}\^?\{([^{}]*)\}/g, 'overbrace($1, $2)')
-  result = result.replace(/\\underbrace\{([^{}]*)\}\_?\{([^{}]*)\}/g, 'underbrace($1, $2)')
+  result = result.replace(/\\underbrace\{([^{}]*)\}_?\{([^{}]*)\}/g, 'underbrace($1, $2)')
 
   // Convert cancel
   result = result.replace(/\\cancel\{([^{}]*)\}/g, 'cancel($1)')
@@ -218,7 +218,7 @@ export function hasLatexMath(content: string): boolean {
     /\\int/,
     /\\alpha|\\beta|\\gamma|\\delta/,
     /\\begin\{/,
-    /\\left[(\[{|]/,
+    /\\left[([{|]/,
     /\\\\/,  // Line breaks in math
   ]
   return latexPatterns.some(pattern => pattern.test(content))

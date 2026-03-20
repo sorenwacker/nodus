@@ -52,7 +52,7 @@ const shortcuts = computed(() => [
 const filteredShortcuts = computed(() => {
   if (!searchQuery.value.trim()) return shortcuts
   const q = searchQuery.value.toLowerCase()
-  return shortcuts.filter(s =>
+  return shortcuts.value.filter(s =>
     s.key.toLowerCase().includes(q) ||
     s.desc.toLowerCase().includes(q) ||
     s.category.toLowerCase().includes(q)

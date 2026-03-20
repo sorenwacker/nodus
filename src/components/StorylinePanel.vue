@@ -60,7 +60,7 @@ function exitStorylineView() {
 
 async function loadStorylineNodes(storylineId: string) {
   try {
-    const nodes = await store.getStorylineNodes(storylineId)
+    await store.getStorylineNodes(storylineId)
     // getStorylineNodes already updates the store's cache
   } catch (e) {
     console.error('Failed to load storyline nodes:', e)
@@ -265,7 +265,7 @@ watch(() => store.currentWorkspaceId, () => {
     <!-- Storyline View (when a storyline is selected) -->
     <template v-if="selectedStoryline">
       <header class="panel-header storyline-view-header">
-        <button class="back-btn" @click="exitStorylineView" title="Back to list">
+        <button class="back-btn" title="Back to list" @click="exitStorylineView">
           <Icon name="back" :size="16" />
         </button>
         <span class="panel-title">{{ selectedStoryline.title }}</span>
@@ -345,7 +345,7 @@ watch(() => store.currentWorkspaceId, () => {
       </div>
 
       <!-- Storylines list -->
-      <div class="storylines-list" v-if="!isDropTarget || storylines.length === 0">
+      <div v-if="!isDropTarget || storylines.length === 0" class="storylines-list">
         <div
           v-for="storyline in storylines"
           :key="storyline.id"

@@ -20,7 +20,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
 
 // Mock Tauri invoke with smart responses
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn().mockImplementation((command: string, args?: unknown) => {
+  invoke: vi.fn().mockImplementation((command: string, _args?: unknown) => {
     // Allow workspace operations to succeed
     if (command === 'create_workspace') {
       return Promise.resolve()
