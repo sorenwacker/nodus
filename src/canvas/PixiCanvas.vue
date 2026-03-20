@@ -301,12 +301,13 @@ watch(() => store.currentWorkspaceId, () => {
   neighborhood.exit()
   // Auto-fit to content when switching workspaces (so nodes are visible)
   hasInitiallyCentered = false
-  if (store.filteredNodes.length > 0) {
-    setTimeout(() => {
+  // Use nextTick + timeout to ensure Vue reactivity has updated filteredNodes
+  setTimeout(() => {
+    if (store.filteredNodes.length > 0) {
       fitToContent()
       hasInitiallyCentered = true
-    }, 100)
-  }
+    }
+  }, 200)
 })
 
 // Viewport size for culling (updated on resize)

@@ -67,6 +67,64 @@ export function useLayout(options: UseLayoutOptions) {
     }
   }
 
+  /**
+   * Push nodes out of frame boundaries after layout calculation.
+   * Ensures nodes don't end up inside frames.
+   */
+  function pushNodesOutOfFrames(
+    positions: Map<string, { x: number; y: number }>,
+    nodeMap: Map<string, { width?: number; height?: number }>
+  ): Map<string, { x: number; y: number }> {
+    const frames = store.getFilteredFrames()
+    if (frames.length === 0) return positions
+
+    const result = new Map<string, { x: number; y: number }>()
+
+    for (const [nodeId, pos] of positions) {
+      const nodeInfo = nodeMap.get(nodeId)
+      const nodeWidth = nodeInfo?.width || NODE_DEFAULTS.WIDTH
+      const nodeHeight = nodeInfo?.height || NODE_DEFAULTS.HEIGHT
+      let newX = pos.x
+      let newY = pos.y
+
+      // Check collision with each frame and push out
+      for (const frame of frames) {
+        const nodeRight = newX + nodeWidth
+        const nodeBottom = newY + nodeHeight
+        const frameRight = frame.canvas_x + frame.width
+        const frameBottom = frame.canvas_y + frame.height
+
+        // Check if node overlaps frame
+        const overlapX = newX < frameRight && nodeRight > frame.canvas_x
+        const overlapY = newY < frameBottom && nodeBottom > frame.canvas_y
+
+        if (overlapX && overlapY) {
+          // Calculate push distances for each direction
+          const pushLeft = nodeRight - frame.canvas_x
+          const pushRight = frameRight - newX
+          const pushUp = nodeBottom - frame.canvas_y
+          const pushDown = frameBottom - newY
+
+          // Find minimum push distance and apply
+          const minPush = Math.min(pushLeft, pushRight, pushUp, pushDown)
+          if (minPush === pushLeft) {
+            newX = frame.canvas_x - nodeWidth - 20
+          } else if (minPush === pushRight) {
+            newX = frameRight + 20
+          } else if (minPush === pushUp) {
+            newY = frame.canvas_y - nodeHeight - 20
+          } else {
+            newY = frameBottom + 20
+          }
+        }
+      }
+
+      result.set(nodeId, { x: newX, y: newY })
+    }
+
+    return result
+  }
+
   function animateToPositions(targets: Map<string, { x: number; y: number }>, duration = 400) {
     stopAnimation()
 
@@ -330,40 +388,68 @@ export function useLayout(options: UseLayoutOptions) {
       console.warn(`Very large graph (${nodes.length} nodes) - ${layout} layout may be slow`)
     }
 
-    // Group nodes by frame
+    // Helper to check if a node is spatially inside a frame (50%+ overlap)
+    const isNodeInFrame = (node: Node, frame: Frame): boolean => {
+      const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+      const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+      const nodeArea = nodeWidth * nodeHeight
+
+      const overlapX = Math.max(0,
+        Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
+        Math.max(node.canvas_x, frame.canvas_x))
+      const overlapY = Math.max(0,
+        Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
+        Math.max(node.canvas_y, frame.canvas_y))
+
+      return overlapX * overlapY > nodeArea * 0.5
+    }
+
+    // Create frame map first for spatial checks
+    const frameMap = new Map(allFrames.map(f => [f.id, f]))
+
+    // Group nodes by frame (check both frame_id and spatial overlap)
     const frameNodes = new Map<string, Node[]>() // frame_id -> nodes in that frame
     const unframedNodes: Node[] = []
 
     for (const node of nodes) {
-      if (node.frame_id) {
+      // Check explicit frame_id first
+      if (node.frame_id && frameMap.has(node.frame_id)) {
         if (!frameNodes.has(node.frame_id)) {
           frameNodes.set(node.frame_id, [])
         }
         frameNodes.get(node.frame_id)!.push(node)
-      } else {
+        continue
+      }
+
+      // Check spatial overlap with any frame
+      let inFrame = false
+      for (const frame of allFrames) {
+        if (isNodeInFrame(node, frame)) {
+          if (!frameNodes.has(frame.id)) {
+            frameNodes.set(frame.id, [])
+          }
+          frameNodes.get(frame.id)!.push(node)
+          inFrame = true
+          break
+        }
+      }
+
+      if (!inFrame) {
         unframedNodes.push(node)
       }
     }
-
-    // Create virtual nodes for frames (treat each frame as a single unit)
-    const frameMap = new Map(allFrames.map(f => [f.id, f]))
+    // Only layout unframed nodes - frames and their contents stay fixed
     const virtualNodes: Node[] = [...unframedNodes]
 
-    for (const [frameId, framedNodes] of frameNodes) {
-      const frame = frameMap.get(frameId)
-      if (frame) {
-        // Use frame as virtual node
-        virtualNodes.push({
-          id: `__frame__${frameId}`,
-          canvas_x: frame.x,
-          canvas_y: frame.y,
-          width: frame.width,
-          height: frame.height,
-        })
-      }
+    // Skip frames entirely - they don't participate in layout
+    // (Previously we created virtual nodes for frames and moved them as units)
+
+    if (virtualNodes.length === 0) {
+      console.log('[Layout] No unframed nodes to layout')
+      return
     }
 
-    // Calculate current center using virtual nodes
+    // Calculate current center using unframed nodes only
     let sumX = 0, sumY = 0
     for (const node of virtualNodes) {
       sumX += node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2
@@ -374,39 +460,9 @@ export function useLayout(options: UseLayoutOptions) {
 
     const gap = 150
 
-    // Helper to expand frame positions to include all nodes inside
+    // Frames are static - just pass through positions directly
     function expandToRealTargets(virtualTargets: Map<string, { x: number; y: number }>): Map<string, { x: number; y: number }> {
-      const realTargets = new Map<string, { x: number; y: number }>()
-
-      for (const [id, pos] of virtualTargets) {
-        if (id.startsWith('__frame__')) {
-          // This is a frame - move the frame and all nodes inside it
-          const frameId = id.replace('__frame__', '')
-          const frame = frameMap.get(frameId)
-          const framedNodeList = frameNodes.get(frameId)
-
-          if (frame && framedNodeList) {
-            const deltaX = pos.x - frame.x
-            const deltaY = pos.y - frame.y
-
-            // Move all nodes inside the frame
-            for (const node of framedNodeList) {
-              realTargets.set(node.id, {
-                x: node.canvas_x + deltaX,
-                y: node.canvas_y + deltaY,
-              })
-            }
-
-            // Store frame movement for later
-            realTargets.set(`__frame_move__${frameId}`, { x: deltaX, y: deltaY })
-          }
-        } else {
-          // Regular node
-          realTargets.set(id, pos)
-        }
-      }
-
-      return realTargets
+      return virtualTargets
     }
 
     if (layout === 'force') {
@@ -451,7 +507,7 @@ export function useLayout(options: UseLayoutOptions) {
           const frameId = id.replace('__frame_move__', '')
           const frame = frameMap.get(frameId)
           if (frame) {
-            store.updateFramePosition(frameId, frame.x + delta.x, frame.y + delta.y)
+            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
           }
         }
       }
@@ -515,7 +571,7 @@ export function useLayout(options: UseLayoutOptions) {
           const frameId = id.replace('__frame_move__', '')
           const frame = frameMap.get(frameId)
           if (frame) {
-            store.updateFramePosition(frameId, frame.x + delta.x, frame.y + delta.y)
+            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
           }
         }
       }
@@ -577,7 +633,7 @@ export function useLayout(options: UseLayoutOptions) {
           const frameId = id.replace('__frame_move__', '')
           const frame = frameMap.get(frameId)
           if (frame) {
-            store.updateFramePosition(frameId, frame.x + delta.x, frame.y + delta.y)
+            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
           }
         }
       }
@@ -607,7 +663,7 @@ export function useLayout(options: UseLayoutOptions) {
           const frameId = id.replace('__frame_move__', '')
           const frame = frameMap.get(frameId)
           if (frame) {
-            store.updateFramePosition(frameId, frame.x + delta.x, frame.y + delta.y)
+            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
           }
         }
       }
@@ -635,7 +691,7 @@ export function useLayout(options: UseLayoutOptions) {
           const frameId = id.replace('__frame_move__', '')
           const frame = frameMap.get(frameId)
           if (frame) {
-            store.updateFramePosition(frameId, frame.x + delta.x, frame.y + delta.y)
+            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
           }
         }
       }
@@ -647,6 +703,7 @@ export function useLayout(options: UseLayoutOptions) {
 
   function fitToContent() {
     const nodes = store.getFilteredNodes()
+    console.log('[fitToContent] nodes:', nodes.length)
     if (nodes.length === 0) return
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -658,7 +715,10 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     const rect = viewState.canvasRect()
-    if (!rect) return
+    if (!rect) {
+      console.log('[fitToContent] No canvas rect')
+      return
+    }
 
     const padding = 50
     const contentWidth = maxX - minX + padding * 2
@@ -666,7 +726,9 @@ export function useLayout(options: UseLayoutOptions) {
 
     const scaleX = rect.width / contentWidth
     const scaleY = rect.height / contentHeight
-    viewState.scale.value = Math.min(scaleX, scaleY, 1)
+    // Minimum scale of 0.02 to keep nodes visible, max of 1 to not zoom in beyond 100%
+    viewState.scale.value = Math.max(0.02, Math.min(scaleX, scaleY, 1))
+    console.log('[fitToContent] bounds:', { minX, minY, maxX, maxY, scale: viewState.scale.value })
 
     viewState.offsetX.value = (rect.width - contentWidth * viewState.scale.value) / 2 - minX * viewState.scale.value + padding * viewState.scale.value
     viewState.offsetY.value = (rect.height - contentHeight * viewState.scale.value) / 2 - minY * viewState.scale.value + padding * viewState.scale.value
@@ -704,9 +766,33 @@ export function useLayout(options: UseLayoutOptions) {
 
     const selectedIds = store.getSelectedNodeIds()
     const allNodes = store.getFilteredNodes()
-    const nodes = selectedIds.length > 0
+    const allFrames = store.getFilteredFrames()
+
+    // Helper to check if a node is inside any frame (50%+ overlap)
+    const isNodeInAnyFrame = (node: Node): boolean => {
+      if (node.frame_id) return true
+
+      const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+      const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+      const nodeArea = nodeWidth * nodeHeight
+
+      for (const frame of allFrames) {
+        const overlapX = Math.max(0,
+          Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
+          Math.max(node.canvas_x, frame.canvas_x))
+        const overlapY = Math.max(0,
+          Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
+          Math.max(node.canvas_y, frame.canvas_y))
+        if (overlapX * overlapY > nodeArea * 0.5) return true
+      }
+      return false
+    }
+
+    // Filter nodes: selected ones, excluding those in frames
+    const candidateNodes = selectedIds.length > 0
       ? allNodes.filter(n => selectedIds.includes(n.id))
       : allNodes
+    const nodes = candidateNodes.filter(n => !isNodeInAnyFrame(n))
 
     if (nodes.length === 0) return
 
@@ -741,10 +827,16 @@ export function useLayout(options: UseLayoutOptions) {
       }))
 
     // Execute strategy
-    const positions = await strategy.calculate(layoutNodes, layoutEdges, {
+    const calculatedPositions = await strategy.calculate(layoutNodes, layoutEdges, {
       centerX,
       centerY,
     })
+
+    // Build node map for frame collision detection
+    const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+
+    // Post-process: push nodes out of frames
+    const positions = pushNodesOutOfFrames(calculatedPositions, nodeMap)
 
     // Apply positions
     const animate = options?.animate !== false
