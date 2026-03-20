@@ -158,71 +158,50 @@ html, body, #app {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-/* Global tooltip styles for any element with data-tooltip attribute */
+/* Global tooltip styles - all elements with data-tooltip attribute */
 [data-tooltip] {
   position: relative;
 }
 
+/* Base tooltip appearance */
 [data-tooltip]:hover::after {
   content: attr(data-tooltip);
-  position: fixed;
-  padding: 5px 10px;
+  position: absolute;
+  padding: 6px 10px;
   background: var(--bg-surface);
   color: var(--text-main);
   font-size: 11px;
   font-weight: 500;
+  line-height: 1.3;
   white-space: nowrap;
-  border-radius: 5px;
+  border-radius: 6px;
   border: 1px solid var(--border-default);
   box-shadow: 0 4px 12px var(--shadow-md);
   z-index: 99999;
   pointer-events: none;
-  animation: tooltip-fade-in 0.1s ease-out;
-}
-
-/* Position tooltips using CSS custom properties set by JS, or fallback */
-[data-tooltip]:hover::after {
-  top: var(--tooltip-top, auto);
-  left: var(--tooltip-left, auto);
-  bottom: var(--tooltip-bottom, auto);
-  right: var(--tooltip-right, auto);
-}
-
-/* Default: show below and centered */
-[data-tooltip]:not([data-tooltip-pos]):hover::after {
-  top: calc(100% + 6px);
+  /* Default: below and centered */
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  position: absolute;
 }
 
-/* Tooltip above */
+/* Tooltip above (for bottom-positioned elements) */
 [data-tooltip-pos="top"]:hover::after {
-  bottom: calc(100% + 6px);
   top: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  position: absolute;
+  bottom: calc(100% + 8px);
 }
 
 /* Tooltip to the right */
 [data-tooltip-pos="right"]:hover::after {
-  left: calc(100% + 6px);
   top: 50%;
+  left: calc(100% + 8px);
   transform: translateY(-50%);
-  position: absolute;
 }
 
-/* Tooltip to the left */
+/* Tooltip to the left (for right-edge elements) */
 [data-tooltip-pos="left"]:hover::after {
-  right: calc(100% + 6px);
-  left: auto;
   top: 50%;
+  left: auto;
+  right: calc(100% + 8px);
   transform: translateY(-50%);
-  position: absolute;
-}
-
-@keyframes tooltip-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
