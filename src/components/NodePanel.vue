@@ -78,7 +78,7 @@ async function deleteNode() {
           @click="updateNodeColor(color.value)"
         ></button>
       </div>
-      <button class="close-btn" @click="closePanel">x</button>
+      <button class="close-btn" data-tooltip="Close panel" @click="closePanel">x</button>
     </header>
 
     <div class="panel-content">
@@ -95,7 +95,7 @@ async function deleteNode() {
       <span v-if="selectedNode.file_path" class="file-path">
         {{ selectedNode.file_path.split('/').pop() }}
       </span>
-      <button class="delete-btn" @click="deleteNode">Delete</button>
+      <button class="delete-btn" data-tooltip="Delete this node" @click="deleteNode">Delete</button>
     </footer>
   </aside>
 </template>

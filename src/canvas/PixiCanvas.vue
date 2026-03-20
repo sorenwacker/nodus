@@ -913,6 +913,7 @@ const pdfDrop = usePdfDrop({
     deleteNode: store.deleteNode,
     createEdge: store.createEdge,
     createFrame: store.createFrame,
+    importOntology: store.importOntology,
   },
   viewState: {
     getViewportCenter: () => {
@@ -3274,10 +3275,10 @@ ${edges.map(e => `  - id: "${e.id}"
         <button class="llm-clear-btn" :data-tooltip="t('canvas.agent.clearMemory')" :class="{ active: conversationHistory.length > 0 }" @click="clearConversation">
           {{ conversationHistory.length || 'C' }}
         </button>
-        <button v-if="!agentRunning" class="llm-send" :disabled="isGraphLLMLoading || !graphPrompt.trim()" @click="sendGraphPrompt">
+        <button v-if="!agentRunning" class="llm-send" data-tooltip="Send prompt" :disabled="isGraphLLMLoading || !graphPrompt.trim()" @click="sendGraphPrompt">
           {{ isGraphLLMLoading ? '...' : 'Go' }}
         </button>
-        <button v-else class="llm-stop" @click="stopAgent">Stop</button>
+        <button v-else class="llm-stop" data-tooltip="Stop agent" @click="stopAgent">Stop</button>
       </div>
       <!-- Agent Task List -->
       <div v-if="agentTasks.length > 0" class="agent-tasks">
@@ -3288,7 +3289,7 @@ ${edges.map(e => `  - id: "${e.id}"
       </div>
       <!-- Agent activity log -->
       <div v-if="agentLog.length > 0" class="agent-log">
-        <button class="clear-log-btn" :title="t('canvas.agent.clearLog')" @click="agentLog.length = 0">
+        <button class="clear-log-btn" :data-tooltip="t('canvas.agent.clearLog')" @click="agentLog.length = 0">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -3679,20 +3680,20 @@ ${edges.map(e => `  - id: "${e.id}"
         </div>
         <label>Direction:</label>
         <div class="direction-btns">
-          <button :title="t('canvas.edge.reverseDirection')" @click.stop="reverseEdge">{{ t('canvas.edge.flip') }}</button>
+          <button :data-tooltip="t('canvas.edge.reverseDirection')" @click.stop="reverseEdge">{{ t('canvas.edge.flip') }}</button>
           <button
             v-if="isEdgeBidirectional(selectedEdge || '')"
-            :title="t('canvas.edge.makeDirectional')"
+            :data-tooltip="t('canvas.edge.makeDirectional')"
             @click.stop="makeUnidirectional"
           >Directional</button>
           <button
             v-else
-            :title="t('canvas.edge.makeNonDirectional')"
+            :data-tooltip="t('canvas.edge.makeNonDirectional')"
             @click.stop="makeBidirectional"
           >Non-directional</button>
         </div>
-        <button class="insert-node-btn" @click="insertNodeOnEdge">Insert Node</button>
-        <button class="delete-edge-btn" @click="deleteSelectedEdge">Delete Edge</button>
+        <button class="insert-node-btn" data-tooltip="Insert a node on this edge" @click="insertNodeOnEdge">Insert Node</button>
+        <button class="delete-edge-btn" data-tooltip="Delete this edge" @click="deleteSelectedEdge">Delete Edge</button>
       </div>
     </div>
 

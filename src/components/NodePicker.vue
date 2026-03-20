@@ -59,7 +59,7 @@ function createNode() {
   <div class="node-picker" :class="{ 'position-above': position === 'above' }">
     <div class="node-picker-header">
       <span>{{ isCreating ? 'New node' : 'Select node' }}</span>
-      <button class="close-btn" @click="$emit('close')">
+      <button class="close-btn" data-tooltip="Close" @click="$emit('close')">
         <Icon name="close" :size="10" />
       </button>
     </div>

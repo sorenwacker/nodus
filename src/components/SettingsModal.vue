@@ -184,7 +184,7 @@ async function switchToWorkspace(id: string) {
     <div class="settings-modal">
       <header class="settings-header">
         <h2>{{ t('settings.title') }}</h2>
-        <button class="close-btn" :title="t('common.close')" @click="handleClose">
+        <button class="close-btn" :data-tooltip="t('common.close')" @click="handleClose">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -390,7 +390,7 @@ async function switchToWorkspace(id: string) {
                 <button
                   v-if="theme.is_builtin === 0"
                   class="delete-theme-btn"
-                  :title="t('common.delete')"
+                  :data-tooltip="t('common.delete')"
                   @click.prevent.stop="deleteCustomTheme(theme.id)"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

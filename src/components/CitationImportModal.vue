@@ -55,7 +55,7 @@ function formatAuthorShort(entry: BibEntry): string {
       <div class="modal-header">
         <h2>Import Citations</h2>
         <span class="filename">{{ filename }}</span>
-        <button class="close-btn" @click="emit('cancel')">x</button>
+        <button class="close-btn" data-tooltip="Close" @click="emit('cancel')">x</button>
       </div>
 
       <div class="selection-controls">

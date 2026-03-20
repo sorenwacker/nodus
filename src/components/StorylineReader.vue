@@ -253,7 +253,7 @@ watch(() => props.storylineId, loadStoryline)
         </div>
         <div class="header-right">
           <span class="page-indicator">{{ activeNodeIndex + 1 }} / {{ nodes.length }}</span>
-          <button class="close-btn" title="Close (Esc)" @click="$emit('close')">
+          <button class="close-btn" data-tooltip="Close (Esc)" @click="$emit('close')">
             <Icon name="close" :size="20" />
           </button>
         </div>

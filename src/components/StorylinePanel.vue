@@ -265,11 +265,11 @@ watch(() => store.currentWorkspaceId, () => {
     <!-- Storyline View (when a storyline is selected) -->
     <template v-if="selectedStoryline">
       <header class="panel-header storyline-view-header">
-        <button class="back-btn" title="Back to list" @click="exitStorylineView">
+        <button class="back-btn" data-tooltip="Back to list" @click="exitStorylineView">
           <Icon name="back" :size="16" />
         </button>
         <span class="panel-title">{{ selectedStoryline.title }}</span>
-        <label class="color-picker" title="Edge color">
+        <label class="color-picker" data-tooltip="Edge color">
           <span
             class="color-swatch"
             :style="{ backgroundColor: selectedStoryline.color || '#94a3b8' }"
@@ -280,7 +280,7 @@ watch(() => store.currentWorkspaceId, () => {
             @input="updateStorylineColor($event)"
           />
         </label>
-        <button class="icon-btn" title="Read Mode" @click="openReader">
+        <button class="icon-btn" data-tooltip="Read Mode" @click="openReader">
           <Icon name="book" :size="14" />
         </button>
       </header>
@@ -311,7 +311,7 @@ watch(() => store.currentWorkspaceId, () => {
         <button
           v-if="!isCreating"
           class="add-btn"
-          title="New Storyline"
+          data-tooltip="New Storyline"
           @click="isCreating = true"
         >
           <Icon name="plus" :size="14" />
@@ -363,7 +363,7 @@ watch(() => store.currentWorkspaceId, () => {
               @keydown.enter="saveEdit"
               @keydown.escape="cancelEdit"
             />
-            <button class="icon-btn" title="Save" @click.stop="saveEdit">
+            <button class="icon-btn" data-tooltip="Save" @click.stop="saveEdit">
               <Icon name="check" :size="12" />
             </button>
           </template>
@@ -377,14 +377,14 @@ watch(() => store.currentWorkspaceId, () => {
           <div class="storyline-actions" @click.stop>
             <button
               class="icon-btn"
-              title="Edit"
+              data-tooltip="Rename"
               @click="startEditing(storyline)"
             >
               <Icon name="edit" :size="12" />
             </button>
             <button
               class="icon-btn danger"
-              title="Delete"
+              data-tooltip="Delete"
               @click="deleteStoryline(storyline.id)"
             >
               <Icon name="trash" :size="12" />

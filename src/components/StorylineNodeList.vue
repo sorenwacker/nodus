@@ -159,7 +159,7 @@ function onDragEnd() {
           @mouseenter="hoveringInsertIndex = index"
           @mouseleave="hoveringInsertIndex = null"
         >
-          <button class="insert-btn" @click="toggleInsertPicker(index)">
+          <button class="insert-btn" data-tooltip="Insert node" @click="toggleInsertPicker(index)">
             <Icon name="plus" :size="compact ? 10 : 12" />
           </button>
           <NodePicker
@@ -193,7 +193,7 @@ function onDragEnd() {
           </div>
           <span class="node-order">{{ index + 1 }}</span>
           <span class="node-title">{{ node.title }}</span>
-          <button class="remove-btn" title="Remove" @click.stop="handleRemove(node.id)">
+          <button class="remove-btn" data-tooltip="Remove from storyline" @click.stop="handleRemove(node.id)">
             <Icon name="close" :size="compact ? 8 : 10" />
           </button>
         </div>
@@ -206,7 +206,7 @@ function onDragEnd() {
         @mouseenter="hoveringInsertIndex = nodes.length"
         @mouseleave="hoveringInsertIndex = null"
       >
-        <button class="insert-btn" @click="toggleInsertPicker(nodes.length)">
+        <button class="insert-btn" data-tooltip="Add node" @click="toggleInsertPicker(nodes.length)">
           <Icon name="plus" :size="compact ? 10 : 12" />
         </button>
         <NodePicker

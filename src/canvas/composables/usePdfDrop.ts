@@ -270,12 +270,14 @@ ${rawText}`
     const rawFilename = filePath.split('/').pop() || 'Ontology'
     const filename = sanitizeFilename(rawFilename)
 
+    console.log('[Ontology] Starting import:', filePath)
     isProcessing.value = true
     processingStatus.value = `Importing ${filename}...`
 
     try {
       const result = await store.importOntology(filePath, { createClassNodes: true, layout: 'hierarchical' })
 
+      console.log('[Ontology] Import result:', result)
       processingStatus.value = ''
 
       if (result.nodeIds.length > 0 && pushCreationUndo) {
@@ -284,6 +286,7 @@ ${rawText}`
 
       return result
     } catch (error) {
+      console.error('[Ontology] Import failed:', error)
       processingStatus.value = `Error: ${error}`
       throw error
     } finally {
@@ -519,12 +522,18 @@ ${rawText}`
 
         for (const path of paths) {
           const dropY = canvasPos.y + offsetY
+          console.log('[FileDrop] Processing file:', path)
 
           if (path.toLowerCase().endsWith('.pdf')) {
             await processPdfDrop(path, canvasPos.x, dropY)
             offsetY += FILE_SPACING
           } else if (isOntologyFile(path)) {
-            await processOntologyDrop(path)
+            console.log('[FileDrop] Recognized as ontology file')
+            try {
+              await processOntologyDrop(path)
+            } catch (e) {
+              console.error('[FileDrop] Ontology import error:', e)
+            }
             // Ontology import handles its own layout
           } else if (isMarkdownFile(path)) {
             await processMarkdownDrop(path, canvasPos.x, dropY)
