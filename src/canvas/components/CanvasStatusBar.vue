@@ -42,7 +42,7 @@ const emit = defineEmits<{
     <span v-if="isLayouting" class="sep">|</span>
     <span v-if="isPdfProcessing" class="pdf-processing">
       PDF: {{ pdfStatus }}
-      <button class="stop-btn" data-tooltip="Cancel PDF processing" @click="emit('stopPdf')">{{ t('canvas.status.stop') }}</button>
+      <button class="stop-btn" data-tooltip="Cancel PDF processing" data-tooltip-pos="top" @click="emit('stopPdf')">{{ t('canvas.status.stop') }}</button>
     </span>
     <span v-if="isPdfProcessing" class="sep">|</span>
     <span v-if="isLargeGraph" class="perf-mode">{{ t('canvas.status.perfMode') }}</span>
@@ -53,6 +53,7 @@ const emit = defineEmits<{
       v-if="agentLog.length > 0"
       class="agent-log-toggle"
       :data-tooltip="showAgentLog ? t('canvas.status.hideAgentLog') : t('canvas.status.showAgentLog')"
+      data-tooltip-pos="top"
       @click="emit('toggleAgentLog')"
     >
       {{ t('canvas.status.log') }} ({{ agentLog.length }})
