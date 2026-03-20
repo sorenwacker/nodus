@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { hasMath, hasTypstBlock } from '../composables/useTypst'
+
+// Mock @/lib/tauri before importing useTypst
+vi.mock('@/lib/tauri', () => ({
+  invoke: vi.fn().mockRejectedValue(new Error('Mock: No backend')),
+  isTauri: vi.fn().mockReturnValue(false),
+}))
 
 // Mock the typst.ts module since WASM doesn't run in Node
 vi.mock('@myriaddreamin/typst.ts', () => ({
@@ -7,6 +12,8 @@ vi.mock('@myriaddreamin/typst.ts', () => ({
     svg: vi.fn().mockResolvedValue('<svg>mock</svg>'),
   },
 }))
+
+import { hasMath, hasTypstBlock } from '../composables/useTypst'
 
 describe('useTypst', () => {
   describe('hasMath', () => {

@@ -50,7 +50,7 @@ describe('Nodes Store', () => {
       await store.initialize()
 
       expect(store.nodes.length).toBe(2)
-      expect(store.edges.length).toBe(1)
+      expect(store.edges.length).toBe(0) // No mock edges in fallback mode
     })
   })
 
@@ -164,7 +164,7 @@ describe('Nodes Store', () => {
 
       expect(edge.id).toBeDefined()
       expect(edge.link_type).toBe('cites')
-      expect(store.edges.length).toBe(2)
+      expect(store.edges.length).toBe(1) // First edge created
     })
   })
 
