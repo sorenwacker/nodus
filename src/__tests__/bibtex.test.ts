@@ -172,6 +172,68 @@ describe('BibTeX Parser', () => {
     it('returns empty array for invalid JSON', () => {
       expect(parseCslJson('invalid')).toEqual([])
     })
+
+    it('preserves Zotero item key as zoteroKey', () => {
+      const json = JSON.stringify([
+        {
+          id: 'ABCD1234',
+          type: 'article-journal',
+          title: 'Test Paper',
+        },
+      ])
+
+      const entries = parseCslJson(json)
+
+      expect(entries[0].zoteroKey).toBe('ABCD1234')
+    })
+
+    it('extracts collection names from Better BibTeX exports', () => {
+      const json = JSON.stringify([
+        {
+          id: 'test2024',
+          type: 'article-journal',
+          title: 'Paper in Collection',
+          collections: ['Machine Learning', 'Neural Networks'],
+        },
+      ])
+
+      const entries = parseCslJson(json)
+
+      expect(entries[0].collections).toEqual(['Machine Learning', 'Neural Networks'])
+    })
+
+    it('extracts attachments from Zotero exports', () => {
+      const json = JSON.stringify([
+        {
+          id: 'withpdf2024',
+          type: 'article-journal',
+          title: 'Paper with PDF',
+          attachments: [
+            { path: '/path/to/file.pdf', title: 'Full Text' },
+          ],
+        },
+      ])
+
+      const entries = parseCslJson(json)
+
+      expect(entries[0].attachments).toEqual(['/path/to/file.pdf'])
+    })
+
+    it('handles Better BibTeX citation-key field', () => {
+      const json = JSON.stringify([
+        {
+          id: 'zotero-internal-id',
+          'citation-key': 'einstein1905relativity',
+          type: 'article-journal',
+          title: 'Special Relativity',
+        },
+      ])
+
+      const entries = parseCslJson(json)
+
+      expect(entries[0].key).toBe('einstein1905relativity')
+      expect(entries[0].zoteroKey).toBe('zotero-internal-id')
+    })
   })
 
   describe('parseReferences', () => {

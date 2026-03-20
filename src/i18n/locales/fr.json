@@ -250,6 +250,21 @@
     "importFailed": "Échec de l'importation",
     "unsupportedFile": "Fichier non supporté"
   },
+  "import": {
+    "options": {
+      "title": "Options d'importation",
+      "entriesFound": "{count} citation trouvée | {count} citations trouvées",
+      "createFrame": "Créer un cadre pour la collection",
+      "collectionDetected": "Collection : {name}",
+      "noCollection": "Aucune collection détectée dans l'export",
+      "importAttachments": "Importer les PDFs attachés",
+      "noAttachments": "Aucune pièce jointe trouvée",
+      "layout": "Disposition",
+      "layoutGrid": "Grille",
+      "layoutForce": "Force",
+      "importButton": "Importer {count} citation | Importer {count} citations"
+    }
+  },
   "node": {
     "untitled": "Sans titre",
     "processing": "Traitement..."

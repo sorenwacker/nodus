@@ -922,6 +922,7 @@ const pdfDrop = usePdfDrop({
     updateNodeTitle: store.updateNodeTitle,
     deleteNode: store.deleteNode,
     createEdge: store.createEdge,
+    createFrame: store.createFrame,
   },
   viewState: {
     getViewportCenter: () => {

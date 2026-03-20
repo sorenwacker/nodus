@@ -250,6 +250,21 @@
     "importFailed": "Importazione fallita",
     "unsupportedFile": "File non supportato"
   },
+  "import": {
+    "options": {
+      "title": "Opzioni di importazione",
+      "entriesFound": "{count} citazione trovata | {count} citazioni trovate",
+      "createFrame": "Crea cornice per la collezione",
+      "collectionDetected": "Collezione: {name}",
+      "noCollection": "Nessuna collezione rilevata nell'esportazione",
+      "importAttachments": "Importa PDF allegati",
+      "noAttachments": "Nessun allegato trovato",
+      "layout": "Disposizione",
+      "layoutGrid": "Griglia",
+      "layoutForce": "Forza",
+      "importButton": "Importa {count} citazione | Importa {count} citazioni"
+    }
+  },
   "node": {
     "untitled": "Senza titolo",
     "processing": "Elaborazione..."

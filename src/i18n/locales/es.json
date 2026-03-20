@@ -250,6 +250,21 @@
     "importFailed": "Error de importación",
     "unsupportedFile": "Archivo no soportado"
   },
+  "import": {
+    "options": {
+      "title": "Opciones de importación",
+      "entriesFound": "{count} cita encontrada | {count} citas encontradas",
+      "createFrame": "Crear marco para la colección",
+      "collectionDetected": "Colección: {name}",
+      "noCollection": "No se detectó colección en la exportación",
+      "importAttachments": "Importar PDFs adjuntos",
+      "noAttachments": "No se encontraron adjuntos",
+      "layout": "Disposición",
+      "layoutGrid": "Cuadrícula",
+      "layoutForce": "Fuerza",
+      "importButton": "Importar {count} cita | Importar {count} citas"
+    }
+  },
   "node": {
     "untitled": "Sin título",
     "processing": "Procesando..."

@@ -33,6 +33,15 @@ function sanitizeFilename(filename: string): string {
   return sanitized
 }
 
+interface Frame {
+  id: string
+  title: string
+  canvas_x: number
+  canvas_y: number
+  width: number
+  height: number
+}
+
 interface Store {
   createNode: (data: {
     title: string
@@ -53,6 +62,7 @@ interface Store {
     filePath: string,
     options?: { createClassNodes?: boolean; layout?: 'grid' | 'hierarchical' }
   ) => Promise<{ nodesCreated: number; edgesCreated: number; nodeIds: string[] }>
+  createFrame?: (x: number, y: number, width: number, height: number, title: string) => Frame
 }
 
 const ONTOLOGY_EXTENSIONS = ['.ttl', '.rdf', '.owl', '.jsonld']
@@ -319,9 +329,30 @@ ${rawText}`
   }
 
   /**
-   * Process a dropped BibTeX/CSL-JSON file - create citation nodes
+   * Calculate frame dimensions for a grid of nodes
    */
-  async function processBibDrop(filePath: string, x: number, y: number) {
+  function calculateFrameDimensions(nodeCount: number, nodeSpacing: number, nodesPerRow: number) {
+    const cols = Math.min(nodeCount, nodesPerRow)
+    const rows = Math.ceil(nodeCount / nodesPerRow)
+    const framePadding = 40
+    const titleHeight = 30
+
+    return {
+      width: cols * nodeSpacing + framePadding,
+      height: rows * nodeSpacing + framePadding + titleHeight,
+    }
+  }
+
+  /**
+   * Process a dropped BibTeX/CSL-JSON file - create citation nodes
+   * Optionally creates a frame for the collection
+   */
+  async function processBibDrop(
+    filePath: string,
+    x: number,
+    y: number,
+    options?: { createFrame?: boolean }
+  ) {
     const rawFilename = filePath.split('/').pop() || 'Citations'
     const filename = sanitizeFilename(rawFilename)
 
@@ -335,15 +366,29 @@ ${rawText}`
 
       if (entries.length === 0) {
         processingStatus.value = 'No citations found'
-        return { count: 0 }
+        return { count: 0, collectionName: null }
       }
+
+      // Detect collection name from first entry (Zotero exports include this)
+      const collectionName = entries[0]?.collections?.[0] || null
+      const shouldCreateFrame = options?.createFrame !== false && store.createFrame && collectionName
 
       processingStatus.value = `Creating ${entries.length} citation nodes...`
 
       const nodeSpacing = 250
       const nodesPerRow = 4
-      let currentX = x
-      let currentY = y
+
+      // Calculate frame dimensions and position nodes inside
+      let nodeStartX = x
+      let nodeStartY = y
+
+      if (shouldCreateFrame && store.createFrame) {
+        const { width, height } = calculateFrameDimensions(entries.length, nodeSpacing, nodesPerRow)
+        store.createFrame(x, y, width, height, collectionName)
+        // Offset nodes to be inside the frame (account for frame title)
+        nodeStartX = x + 20
+        nodeStartY = y + 50
+      }
 
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i]
@@ -354,8 +399,8 @@ ${rawText}`
           title: entry.title || entry.key,
           node_type: 'citation',
           markdown_content: citationToMarkdown(entry),
-          canvas_x: x + col * nodeSpacing,
-          canvas_y: y + row * nodeSpacing,
+          canvas_x: nodeStartX + col * nodeSpacing,
+          canvas_y: nodeStartY + row * nodeSpacing,
         })
         lastImportNodeIds.push(node.id)
       }
@@ -364,7 +409,7 @@ ${rawText}`
         pushCreationUndo(lastImportNodeIds)
       }
 
-      return { count: entries.length }
+      return { count: entries.length, collectionName }
     } catch (error) {
       processingStatus.value = `Error: ${error}`
       throw error

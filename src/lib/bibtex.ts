@@ -20,7 +20,10 @@ export interface BibEntry {
   abstract?: string
   keywords?: string
   file?: string         // Path to attached PDF
-  [key: string]: string | undefined
+  zoteroKey?: string    // Zotero item key for future sync
+  attachments?: string[] // Paths to attached PDFs
+  collections?: string[] // Collection names for Frame mapping
+  [key: string]: string | string[] | undefined
 }
 
 /**
@@ -232,6 +235,7 @@ export function citationToMarkdown(entry: BibEntry): string {
 
 /**
  * Parse CSL-JSON format (alternative export from Zotero)
+ * Supports standard CSL-JSON and Better BibTeX extended format
  */
 export interface CslEntry {
   id: string
@@ -247,6 +251,10 @@ export interface CslEntry {
   DOI?: string
   URL?: string
   abstract?: string
+  // Better BibTeX / Zotero extensions
+  'citation-key'?: string
+  collections?: string[]
+  attachments?: Array<{ path?: string; title?: string }>
 }
 
 export function parseCslJson(content: string): BibEntry[] {
@@ -254,7 +262,8 @@ export function parseCslJson(content: string): BibEntry[] {
     const data: CslEntry[] = JSON.parse(content)
     return data.map(csl => ({
       type: csl.type || 'article',
-      key: csl.id || crypto.randomUUID(),
+      // Use citation-key if available (Better BibTeX), otherwise use id
+      key: csl['citation-key'] || csl.id || crypto.randomUUID(),
       title: csl.title,
       author: csl.author?.map(a => `${a.given || ''} ${a.family || ''}`.trim()).join(' and '),
       year: csl.issued?.['date-parts']?.[0]?.[0]?.toString(),
@@ -266,6 +275,10 @@ export function parseCslJson(content: string): BibEntry[] {
       doi: csl.DOI,
       url: csl.URL,
       abstract: csl.abstract,
+      // Zotero-specific fields
+      zoteroKey: csl.id,
+      collections: csl.collections,
+      attachments: csl.attachments?.map(a => a.path).filter((p): p is string => !!p),
     }))
   } catch {
     return []

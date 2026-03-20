@@ -250,6 +250,21 @@
     "importFailed": "Import fehlgeschlagen",
     "unsupportedFile": "Nicht unterstützte Datei"
   },
+  "import": {
+    "options": {
+      "title": "Importoptionen",
+      "entriesFound": "{count} Zitat gefunden | {count} Zitate gefunden",
+      "createFrame": "Rahmen für Sammlung erstellen",
+      "collectionDetected": "Sammlung: {name}",
+      "noCollection": "Keine Sammlung im Export erkannt",
+      "importAttachments": "Angehängte PDFs importieren",
+      "noAttachments": "Keine Anhänge gefunden",
+      "layout": "Anordnung",
+      "layoutGrid": "Raster",
+      "layoutForce": "Kraftbasiert",
+      "importButton": "{count} Zitat importieren | {count} Zitate importieren"
+    }
+  },
   "node": {
     "untitled": "Ohne Titel",
     "processing": "Verarbeitung..."

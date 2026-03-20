@@ -250,6 +250,21 @@
     "importFailed": "Import failed",
     "unsupportedFile": "Unsupported file"
   },
+  "import": {
+    "options": {
+      "title": "Import Options",
+      "entriesFound": "{count} citation found | {count} citations found",
+      "createFrame": "Create frame for collection",
+      "collectionDetected": "Collection: {name}",
+      "noCollection": "No collection detected in export",
+      "importAttachments": "Import attached PDFs",
+      "noAttachments": "No attachments found",
+      "layout": "Layout",
+      "layoutGrid": "Grid",
+      "layoutForce": "Force-directed",
+      "importButton": "Import {count} citation | Import {count} citations"
+    }
+  },
   "node": {
     "untitled": "Untitled",
     "processing": "Processing..."
