@@ -5,7 +5,22 @@
 import { ref } from 'vue'
 import { extractPdfText, readTextFile } from '../../lib/tauri'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
-import { parseReferences, citationToMarkdown } from '../../lib/bibtex'
+import { parseReferences, citationToMarkdown, type BibEntry } from '../../lib/bibtex'
+
+export type { BibEntry }
+
+/**
+ * Pending citation import data
+ */
+export interface PendingBibImport {
+  filePath: string
+  filename: string
+  entries: BibEntry[]
+  collectionName: string | null
+  hasAttachments: boolean
+  x: number
+  y: number
+}
 
 const CHUNK_SIZE = 3000 // Characters per chunk for LLM processing (smaller = faster LLM responses)
 const NODE_SPACING = 350 // Vertical spacing between nodes
@@ -95,6 +110,10 @@ export function usePdfDrop(options: UsePdfDropOptions) {
   const processingStatus = ref('')
   let aborted = false
   let lastImportNodeIds: string[] = []
+
+  // Pending bib import (for modal confirmation)
+  const pendingBibImport = ref<PendingBibImport | null>(null)
+  const showImportOptions = ref(false)
 
   function stop() {
     aborted = true
@@ -344,6 +363,67 @@ ${rawText}`
   }
 
   /**
+   * Preview a BibTeX/CSL-JSON file for import options modal
+   * Parses the file and prepares the pending import state
+   */
+  async function previewBibFile(filePath: string, x: number, y: number): Promise<PendingBibImport | null> {
+    const rawFilename = filePath.split('/').pop() || 'Citations'
+    const filename = sanitizeFilename(rawFilename)
+
+    try {
+      const content = await readTextFile(filePath)
+      const entries = parseReferences(content)
+
+      if (entries.length === 0) {
+        return null
+      }
+
+      const collectionName = entries[0]?.collections?.[0] || null
+      const hasAttachments = entries.some(e => e.attachments && e.attachments.length > 0)
+
+      const pending: PendingBibImport = {
+        filePath,
+        filename,
+        entries,
+        collectionName,
+        hasAttachments,
+        x,
+        y,
+      }
+
+      pendingBibImport.value = pending
+      showImportOptions.value = true
+
+      return pending
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Confirm pending bib import with options
+   */
+  async function confirmBibImport(options: { createFrame: boolean; importAttachments: boolean; layout: 'grid' | 'force' }) {
+    const pending = pendingBibImport.value
+    if (!pending) return { count: 0, collectionName: null }
+
+    showImportOptions.value = false
+    pendingBibImport.value = null
+
+    return processBibDrop(pending.filePath, pending.x, pending.y, {
+      createFrame: options.createFrame,
+    })
+  }
+
+  /**
+   * Cancel pending bib import
+   */
+  function cancelBibImport() {
+    showImportOptions.value = false
+    pendingBibImport.value = null
+  }
+
+  /**
    * Process a dropped BibTeX/CSL-JSON file - create citation nodes
    * Optionally creates a frame for the collection
    */
@@ -450,7 +530,19 @@ ${rawText}`
             await processMarkdownDrop(path, canvasPos.x, dropY)
             offsetY += FILE_SPACING
           } else if (isBibFile(path)) {
-            await processBibDrop(path, canvasPos.x, dropY)
+            // Show import options modal for bib files
+            const preview = await previewBibFile(path, canvasPos.x, dropY)
+            if (!preview) {
+              // No entries found, skip
+              continue
+            }
+            // If no collection detected, import directly without modal
+            if (!preview.collectionName) {
+              showImportOptions.value = false
+              pendingBibImport.value = null
+              await processBibDrop(path, canvasPos.x, dropY)
+            }
+            // Otherwise, modal is shown and user will confirm
             offsetY += FILE_SPACING
           }
         }
@@ -468,6 +560,9 @@ ${rawText}`
     // State
     isProcessing,
     processingStatus,
+    // Import options modal state
+    showImportOptions,
+    pendingBibImport,
     // Actions
     setup,
     cleanup,
@@ -476,6 +571,10 @@ ${rawText}`
     processOntologyDrop,
     processMarkdownDrop,
     processBibDrop,
+    // Bib import with modal
+    previewBibFile,
+    confirmBibImport,
+    cancelBibImport,
     // File type checks
     isOntologyFile,
     isBibFile,

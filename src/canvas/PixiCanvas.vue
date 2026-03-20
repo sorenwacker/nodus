@@ -38,6 +38,7 @@ import { useNodeClipboard } from './composables/useNodeClipboard'
 import { useNodeEditor } from './composables/useNodeEditor'
 import { useEdgeManipulation } from './composables/useEdgeManipulation'
 import { useContentRenderer } from './composables/useContentRenderer'
+import ImportOptionsModal from '../components/ImportOptionsModal.vue'
 import { useCanvasPan } from './composables/useCanvasPan'
 import { useContextMenu } from './composables/useContextMenu'
 import { NODE_DEFAULTS } from './constants'
@@ -3982,6 +3983,17 @@ ${edges.map(e => `  - id: "${e.id}"
         <p>Double-click anywhere to create a node</p>
       </div>
     </div>
+
+    <!-- Import options modal for Zotero/BibTeX files -->
+    <ImportOptionsModal
+      v-if="pdfDrop.showImportOptions.value && pdfDrop.pendingBibImport.value"
+      :filename="pdfDrop.pendingBibImport.value.filename"
+      :entry-count="pdfDrop.pendingBibImport.value.entries.length"
+      :collection-name="pdfDrop.pendingBibImport.value.collectionName"
+      :has-attachments="pdfDrop.pendingBibImport.value.hasAttachments"
+      @import="pdfDrop.confirmBibImport($event)"
+      @cancel="pdfDrop.cancelBibImport()"
+    />
     </div>
   </div>
 </template>
