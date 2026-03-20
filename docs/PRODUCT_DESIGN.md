@@ -1,7 +1,7 @@
 # Nodus - Product Design Document
 
-Version: 0.13.0
-Date: 2026-03-19
+Version: 0.15.0
+Date: 2026-03-20
 Status: Active Development
 
 ---
@@ -377,6 +377,32 @@ Users want the node on the canvas to be the "source of truth." They dislike clic
 - **External links:** Open in default system browser
 - **Context menu:** Right-click for node actions (fit, storyline, send to workspace, delete)
 - **Copy/Paste nodes:** Cmd+C/Cmd+V to copy and paste nodes (preserves layout)
+- **File drop import:** Drag files directly onto canvas (see File Drop Import below)
+
+### File Drop Import
+
+Drag and drop files directly onto the canvas to import them. Supported formats:
+
+| Format | Extension | Import Behavior |
+|--------|-----------|-----------------|
+| **PDF** | `.pdf` | Extract text, clean up with AI, create note node(s) |
+| **Markdown** | `.md` | Create note node with content |
+| **BibTeX** | `.bib` | Parse citations, create citation nodes |
+| **CSL-JSON** | `.json` | Parse citations, create citation nodes |
+| **Ontology** | `.ttl`, `.rdf`, `.owl`, `.jsonld` | Import RDF graph as nodes and edges |
+
+**PDF Import:**
+- Extracts text from PDF using Rust backend
+- Splits long documents into multiple connected nodes
+- AI cleanup: fixes OCR errors, rejoins broken paragraphs, formats as markdown
+- Shows progress indicator during processing
+
+**Ontology Import:**
+- When ontology files are dropped, a modal appears with options:
+  - Create nodes for classes
+  - Create nodes for individuals/instances
+- Nodes are auto-laid out after import
+- RDF properties become edges between nodes
 
 ### Keyboard Shortcuts
 
@@ -434,8 +460,11 @@ Edges are routed using a motherboard/PCB-inspired lane system:
 4. Obstacle avoidance via spatial indexing
 
 **Edge styles:**
+- `straight`: Direct line between nodes
 - `orthogonal`: 90-degree turns only (default)
 - `diagonal`: Angled routing with obstacle avoidance
+- `curved`: Smooth Bezier curve
+- `hyperbolic`: S-curve that exits/enters nodes orthogonally
 
 ### Themes
 
@@ -772,11 +801,35 @@ The canvas includes a built-in agent that can build and modify knowledge graphs 
 
 9. **Content Enforcement:** Node agent must call `update_content()` before `done()` or request is rejected.
 
+### Internationalization (i18n)
+
+Nodus supports multiple EU languages:
+
+| Language | Code | Status |
+|----------|------|--------|
+| English | `en` | Complete |
+| German | `de` | Complete |
+| French | `fr` | Complete |
+| Spanish | `es` | Complete |
+| Italian | `it` | Complete |
+
+**Language Selection:**
+- First launch: Language selector appears in onboarding flow
+- Settings > General: Language dropdown to change anytime
+- Persistence: Choice saved to localStorage, persists across sessions
+- Browser detection: Auto-detects browser language on first launch
+
+**Implementation:**
+- Uses vue-i18n with lazy loading for non-default locales
+- Locale files: `src/i18n/locales/{lang}.json`
+- All UI strings are translatable; user content remains in original language
+
 ### Settings
 
 Settings modal with four tabs: General, Themes, Canvas, LLM.
 
 **General:**
+- Language selector (en, de, fr, es, it)
 - LLM Features toggle (show/hide AI prompts)
 - Workspace diagnostics (scan for node counts per workspace, recovery)
 
@@ -787,7 +840,7 @@ Settings modal with four tabs: General, Themes, Canvas, LLM.
 **Canvas:**
 - Snap to grid toggle
 - Grid size (px)
-- Edge style (orthogonal, diagonal, curved, straight)
+- Edge style (straight, orthogonal, diagonal, curved, hyperbolic)
 
 **LLM:**
 - Provider selection (Ollama, OpenAI, Anthropic, OpenAI-compatible)
@@ -1311,13 +1364,17 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 20. [x] Theme system with 4 themes and persistence
 21. [x] External links open in system browser
 22. [x] LLM agent with tool calling and queue manager
+23. [x] Multi-language support (en, de, fr, es, it)
+24. [x] Language selector in onboarding and settings
+25. [x] Unified file drop import (PDF, MD, BibTeX, ontology)
+26. [x] File locking mechanism (fs2 crate for cross-platform locks)
+27. [x] Integrity test suite (concurrent edit tests, checksum validation)
+28. [x] Typst backend rendering (Rust-side typst crate for math compilation)
 
 ### In Progress
 
-- [ ] Implement file locking mechanism (fs2 crate)
-- [ ] Create integrity test suite
-- [ ] Folder → Frame mapping
-- [ ] Typst WASM integration (@myriaddreamin/typst.ts)
+- [ ] Folder → Frame mapping (auto-map Obsidian folders to Frames on import)
+- [ ] Typst WASM frontend integration (render math in browser via @myriaddreamin/typst.ts)
 
 ### Future
 
@@ -1346,4 +1403,4 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 ---
 
 *Document: `/docs/PRODUCT_DESIGN.md`*
-*Version: 0.11.0 — Added implemented features: PCB-style edge routing with lane separation, undo/redo with node deletion support, multi-directional node resize, neighborhood mode with depth control (1-5 hops), theme system (4 themes with persistence), external link handling, LLM queue manager. Updated roadmap to reflect current state.*
+*Version: 0.15.0 — Added: file locking mechanism (fs2 crate), integrity test suite, Typst backend rendering, hyperbolic edge style, multi-language support (en/de/fr/es/it), language selector UI. Updated roadmap to reflect current state.*
