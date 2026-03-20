@@ -292,7 +292,20 @@
       "general": "Allgemein",
       "themes": "Designs",
       "canvas": "Leinwand",
-      "llm": "KI"
+      "llm": "KI",
+      "zotero": "Zotero"
+    },
+    "zotero": {
+      "library": "Zotero-Bibliothek",
+      "detect": "Zotero erkennen",
+      "detecting": "Erkennung...",
+      "detectHint": "Lokale Zotero-Installation automatisch erkennen",
+      "connected": "Verbunden",
+      "disconnect": "Trennen",
+      "collections": "Sammlungen",
+      "loading": "Sammlungen werden geladen...",
+      "noCollections": "Keine Sammlungen gefunden",
+      "collectionsHint": "Sammlungen aus Ihrer Zotero-Bibliothek"
     },
     "language": "Sprache",
     "llmEnabled": "KI-Funktionen",

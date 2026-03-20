@@ -292,7 +292,20 @@
       "general": "Generale",
       "themes": "Temi",
       "canvas": "Tela",
-      "llm": "IA"
+      "llm": "IA",
+      "zotero": "Zotero"
+    },
+    "zotero": {
+      "library": "Libreria Zotero",
+      "detect": "Rileva Zotero",
+      "detecting": "Rilevamento...",
+      "detectHint": "Rileva automaticamente l'installazione locale di Zotero",
+      "connected": "Connesso",
+      "disconnect": "Disconnetti",
+      "collections": "Collezioni",
+      "loading": "Caricamento collezioni...",
+      "noCollections": "Nessuna collezione trovata",
+      "collectionsHint": "Collezioni dalla tua libreria Zotero"
     },
     "language": "Lingua",
     "llmEnabled": "Funzionalità IA",

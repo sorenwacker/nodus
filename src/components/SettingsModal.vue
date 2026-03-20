@@ -10,6 +10,7 @@ import { useThemesStore } from '../stores/themes'
 import { useNodesStore } from '../stores/nodes'
 import { setLocale, getLocale, loadLocale } from '../i18n'
 import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
+import { useZotero } from '../canvas/composables/useZotero'
 
 const { t } = useI18n()
 const themesStore = useThemesStore()
@@ -20,7 +21,10 @@ const emit = defineEmits<{
 }>()
 
 // Active tab
-const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general'>('general')
+const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general' | 'zotero'>('general')
+
+// Zotero integration
+const zotero = useZotero()
 
 // LLM enabled toggle
 const llmEnabled = ref(llmStorage.getLLMEnabled())
@@ -213,6 +217,12 @@ async function switchToWorkspace(id: string) {
         >
           {{ t('settings.tabs.llm') }}
         </button>
+        <button
+          :class="{ active: activeTab === 'zotero' }"
+          @click="activeTab = 'zotero'"
+        >
+          {{ t('settings.tabs.zotero') }}
+        </button>
       </nav>
 
       <div class="settings-content">
@@ -392,6 +402,64 @@ async function switchToWorkspace(id: string) {
             <span class="hint">
               {{ t('settings.themeHint') }}
             </span>
+          </div>
+        </div>
+
+        <!-- Zotero Settings -->
+        <div v-if="activeTab === 'zotero'" class="settings-section">
+          <div class="setting-group">
+            <label>{{ t('settings.zotero.library') }}</label>
+
+            <div v-if="!zotero.isConnected.value" class="zotero-connect">
+              <button
+                class="detect-btn"
+                :disabled="zotero.isLoading.value"
+                @click="zotero.detectZotero()"
+              >
+                {{ zotero.isLoading.value ? t('settings.zotero.detecting') : t('settings.zotero.detect') }}
+              </button>
+              <span class="hint">{{ t('settings.zotero.detectHint') }}</span>
+            </div>
+
+            <div v-else class="zotero-connected">
+              <div class="connected-status">
+                <span class="status-icon">&#10003;</span>
+                <span>{{ t('settings.zotero.connected') }}</span>
+                <button class="disconnect-btn" @click="zotero.disconnect()">
+                  {{ t('settings.zotero.disconnect') }}
+                </button>
+              </div>
+              <div class="zotero-path">{{ zotero.zoteroPath.value }}</div>
+            </div>
+
+            <div v-if="zotero.error.value" class="error-message">
+              {{ zotero.error.value }}
+            </div>
+          </div>
+
+          <div v-if="zotero.isConnected.value" class="setting-group">
+            <label>{{ t('settings.zotero.collections') }} ({{ zotero.collections.value.length }})</label>
+
+            <div v-if="zotero.isLoading.value" class="loading">
+              {{ t('settings.zotero.loading') }}
+            </div>
+
+            <div v-else-if="zotero.collections.value.length === 0" class="no-collections">
+              {{ t('settings.zotero.noCollections') }}
+            </div>
+
+            <div v-else class="collections-list">
+              <div
+                v-for="collection in zotero.topLevelCollections.value"
+                :key="collection.key"
+                class="collection-item"
+              >
+                <span class="collection-name">{{ collection.name }}</span>
+                <span class="collection-count">{{ collection.item_count }}</span>
+              </div>
+            </div>
+
+            <span class="hint">{{ t('settings.zotero.collectionsHint') }}</span>
           </div>
         </div>
       </div>
@@ -991,5 +1059,135 @@ async function switchToWorkspace(id: string) {
 
 .switch-btn:hover {
   opacity: 0.9;
+}
+
+/* Zotero Settings */
+.zotero-connect {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detect-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.detect-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.detect-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zotero-connected {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connected-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-icon {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.disconnect-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted, #71717a);
+}
+
+.disconnect-btn:hover {
+  background: var(--bg-canvas, #f4f4f5);
+  color: var(--text-main, #18181b);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .disconnect-btn {
+  border-color: #3f3f46;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .disconnect-btn:hover {
+  background: #3f3f46;
+  color: #f4f4f5;
+}
+
+.zotero-path {
+  font-size: 12px;
+  color: var(--text-muted, #71717a);
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 13px;
+  padding: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+}
+
+.loading {
+  color: var(--text-muted, #71717a);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.no-collections {
+  color: var(--text-muted, #71717a);
+  font-size: 13px;
+}
+
+.collections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.collection-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-canvas, #f4f4f5);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .collection-item {
+  background: #18181b;
+}
+
+.collection-name {
+  color: var(--text-main, #18181b);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .collection-name {
+  color: #f4f4f5;
+}
+
+.collection-count {
+  color: var(--text-muted, #71717a);
+  font-size: 12px;
 }
 </style>

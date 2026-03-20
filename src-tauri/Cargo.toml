@@ -38,6 +38,7 @@ rio_xml = "0.8"
 oxiri = "0.2"
 
 # Utilities
+dirs = "5.0"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 sha2 = "0.10"
 chrono = { version = "0.4", features = ["serde"] }

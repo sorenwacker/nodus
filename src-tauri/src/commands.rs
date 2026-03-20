@@ -1451,3 +1451,32 @@ pub async fn import_ontology(
         node_ids,
     })
 }
+
+// ============================================================================
+// Zotero Commands
+// ============================================================================
+
+/// Detect the Zotero data directory path
+#[tauri::command]
+pub async fn detect_zotero_path() -> Result<Option<String>, String> {
+    Ok(crate::zotero::detect_zotero_path().map(|p| p.to_string_lossy().to_string()))
+}
+
+/// List all collections in the Zotero library
+#[tauri::command]
+pub async fn list_zotero_collections(
+    zotero_path: String,
+) -> Result<Vec<crate::zotero::ZoteroCollection>, String> {
+    let path = PathBuf::from(zotero_path);
+    crate::zotero::get_collections(&path).await
+}
+
+/// Get items in a Zotero collection
+#[tauri::command]
+pub async fn get_zotero_collection_items(
+    zotero_path: String,
+    collection_key: String,
+) -> Result<Vec<crate::zotero::ZoteroItem>, String> {
+    let path = PathBuf::from(zotero_path);
+    crate::zotero::get_collection_items(&path, &collection_key).await
+}

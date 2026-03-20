@@ -292,7 +292,20 @@
       "general": "General",
       "themes": "Themes",
       "canvas": "Canvas",
-      "llm": "LLM"
+      "llm": "LLM",
+      "zotero": "Zotero"
+    },
+    "zotero": {
+      "library": "Zotero Library",
+      "detect": "Detect Zotero",
+      "detecting": "Detecting...",
+      "detectHint": "Auto-detect local Zotero installation",
+      "connected": "Connected",
+      "disconnect": "Disconnect",
+      "collections": "Collections",
+      "loading": "Loading collections...",
+      "noCollections": "No collections found",
+      "collectionsHint": "Collections from your Zotero library"
     },
     "language": "Language",
     "llmEnabled": "LLM Features",

@@ -292,7 +292,20 @@
       "general": "General",
       "themes": "Temas",
       "canvas": "Lienzo",
-      "llm": "IA"
+      "llm": "IA",
+      "zotero": "Zotero"
+    },
+    "zotero": {
+      "library": "Biblioteca Zotero",
+      "detect": "Detectar Zotero",
+      "detecting": "Detectando...",
+      "detectHint": "Detectar automáticamente la instalación local de Zotero",
+      "connected": "Conectado",
+      "disconnect": "Desconectar",
+      "collections": "Colecciones",
+      "loading": "Cargando colecciones...",
+      "noCollections": "No se encontraron colecciones",
+      "collectionsHint": "Colecciones de su biblioteca Zotero"
     },
     "language": "Idioma",
     "llmEnabled": "Funciones de IA",

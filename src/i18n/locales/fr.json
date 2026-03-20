@@ -292,7 +292,20 @@
       "general": "Général",
       "themes": "Thèmes",
       "canvas": "Canevas",
-      "llm": "IA"
+      "llm": "IA",
+      "zotero": "Zotero"
+    },
+    "zotero": {
+      "library": "Bibliothèque Zotero",
+      "detect": "Détecter Zotero",
+      "detecting": "Détection...",
+      "detectHint": "Détecter automatiquement l'installation locale de Zotero",
+      "connected": "Connecté",
+      "disconnect": "Déconnecter",
+      "collections": "Collections",
+      "loading": "Chargement des collections...",
+      "noCollections": "Aucune collection trouvée",
+      "collectionsHint": "Collections de votre bibliothèque Zotero"
     },
     "language": "Langue",
     "llmEnabled": "Fonctionnalités IA",
