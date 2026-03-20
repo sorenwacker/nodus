@@ -827,15 +827,27 @@ pub mod themes {
         let now = chrono::Utc::now().timestamp();
 
         for (name, theme_yaml) in builtin_themes {
-            // Check if theme already exists
-            let existing = get_by_name(pool, &name).await?;
-            if existing.is_some() {
-                continue; // Don't overwrite existing themes
-            }
-
-            // Serialize back to YAML for storage
+            // Serialize to YAML for storage
             let yaml_content = serde_yaml::to_string(&theme_yaml)
                 .map_err(|e| DatabaseError::Migration(e.to_string()))?;
+
+            // Check if theme already exists
+            let existing = get_by_name(pool, &name).await?;
+            if let Some(existing_theme) = existing {
+                // Update existing builtin theme with latest YAML
+                if existing_theme.is_builtin == 1 {
+                    sqlx::query(
+                        "UPDATE themes SET yaml_content = ?, display_name = ?, updated_at = ? WHERE id = ?"
+                    )
+                    .bind(&yaml_content)
+                    .bind(&theme_yaml.display_name)
+                    .bind(now)
+                    .bind(&existing_theme.id)
+                    .execute(pool)
+                    .await?;
+                }
+                continue;
+            }
 
             let theme = Theme {
                 id: uuid::Uuid::new_v4().to_string(),
