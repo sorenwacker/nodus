@@ -672,7 +672,7 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 - [x] Frames for grouping
 - [x] Obsidian vault import
 - [x] Auto-layout algorithm (D3-force)
-- [ ] Bi-directional vault sync
+- [x] Bi-directional vault sync
 - [x] Wikilink → link parsing
 - [x] Minimap
 - [x] Keyboard shortcuts
@@ -1372,11 +1372,12 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 28. [x] Typst backend rendering (Rust-side typst crate for math compilation)
 29. [x] Folder → Frame mapping (auto-create frames from Obsidian folders on import)
 30. [x] Typst WASM frontend integration (browser mode fallback via @myriaddreamin/typst.ts)
+31. [x] Bi-directional vault sync (file watcher + write-back with checksum tracking)
 
 ### In Progress
 
-- [ ] Bi-directional vault sync (write changes back to .md files)
 - [ ] Obsidian Plugin (sync x,y coordinates with Obsidian Canvas)
+- [ ] Zotero integration (citation import, drag to canvas)
 
 ### Future
 
