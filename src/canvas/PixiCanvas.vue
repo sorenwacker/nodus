@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
-import { marked } from 'marked'
+// marked is imported in useContentRenderer composable
 import { invoke, isTauri, openExternal } from '../lib/tauri'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import {
@@ -34,6 +35,11 @@ import { usePdfDrop } from './composables/usePdfDrop'
 import { useNodeAgent, type NodeAgentContext } from './composables/useNodeAgent'
 import { useViewState } from './composables/useViewState'
 import { useNodeClipboard } from './composables/useNodeClipboard'
+import { useNodeEditor } from './composables/useNodeEditor'
+import { useEdgeManipulation } from './composables/useEdgeManipulation'
+import { useContentRenderer } from './composables/useContentRenderer'
+import { useCanvasPan } from './composables/useCanvasPan'
+import { useContextMenu } from './composables/useContextMenu'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
@@ -78,13 +84,9 @@ const pushCreationUndo = (nodeIds: string[]) => {
   }
 }
 
-// Configure marked
-marked.use({
-  gfm: true,
-  breaks: true,
-  async: false,
-})
+// Content renderer is configured via composable
 
+const { t } = useI18n()
 const store = useNodesStore()
 const themesStore = useThemesStore()
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
@@ -111,6 +113,8 @@ const viewState = useViewState({
 const { scale, offsetX, offsetY, isZooming, hasSavedView: savedView, scheduleSaveViewState, centerGrid, screenToCanvas, startZooming } = viewState
 
 onMounted(() => {
+  // Setup content renderer watchers for markdown/math/mermaid
+  setupContentWatchers()
 
   updateTheme()
   // Watch for theme changes
@@ -404,6 +408,45 @@ const clipboard = useNodeClipboard({
 })
 const { copySelectedNodes, pasteNodes } = clipboard
 
+// Content renderer composable - handles markdown, math, mermaid rendering with caching
+const contentRenderer = useContentRenderer({
+  getFilteredNodes: () => store.filteredNodes,
+  isDarkMode: () => isDarkMode.value,
+})
+const { nodeRenderedContent, renderMarkdown, renderTypstMath, renderMermaidDiagrams, clearCaches: clearRenderCaches, setupWatchers: setupContentWatchers } = contentRenderer
+
+// Node editor composable - handles inline editing with autosave
+const nodeEditor = useNodeEditor({
+  store: {
+    getNode: store.getNode,
+    updateNodeContent: store.updateNodeContent,
+    updateNodeTitle: store.updateNodeTitle,
+  },
+})
+// Note: startEditing, saveEditing, onEditorKeydown have local implementations with extra logic (auto-fit, mermaid render)
+const { editingNodeId, editContent, editingTitleId, editTitle, startEditingTitle, saveTitleEditing, cancelTitleEditing } = nodeEditor
+
+// Edge manipulation composable - handles edge creation, selection, modification
+const edgeManipulation = useEdgeManipulation({
+  store: {
+    getNode: store.getNode,
+    edges: store.edges,
+    filteredEdges: store.filteredEdges,
+    filteredNodes: store.filteredNodes,
+    createNode: store.createNode,
+    createEdge: store.createEdge,
+    deleteEdge: store.deleteEdge,
+    selectNode: store.selectNode,
+  },
+  screenToCanvas,
+})
+const {
+  isCreatingEdge, edgeStartNode, edgePreviewEnd, selectedEdge,
+  startEdgeCreation, onEdgeClick, deleteSelectedEdge, changeEdgeLabel,
+  reverseEdge, isEdgeBidirectional, makeUnidirectional, makeBidirectional,
+  insertNodeOnEdge, clearSelection: clearEdgeSelection
+} = edgeManipulation
+
 // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
 // In neighborhood mode, always use full routing since we have few nodes
 const isLargeGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 200 || store.filteredEdges.length > 500))
@@ -537,18 +580,34 @@ function onMinimapClick(e: MouseEvent) {
 const draggingNode = ref<string | null>(null)
 const dragStart = ref({ x: 0, y: 0, nodeX: 0, nodeY: 0 })
 const multiDragInitial = ref<Map<string, { x: number; y: number }>>(new Map())
-const isPanning = ref(false)
-const panStart = ref({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
-const selectedEdge = ref<string | null>(null)
+// Canvas panning composable
+const canvasPan = useCanvasPan({
+  getOffset: () => ({ x: offsetX.value, y: offsetY.value }),
+  setOffset: (x, y) => {
+    offsetX.value = x
+    offsetY.value = y
+  },
+  onPanEnd: () => {
+    lastDragEndTime = Date.now()
+  },
+})
+const { isPanning, startPan, stopPan } = canvasPan
 const hoveredNodeId = ref<string | null>(null)
 const hoverMousePos = ref({ x: 0, y: 0 })
 
-// Context menu state
-const contextMenuVisible = ref(false)
-const contextMenuPosition = ref({ x: 0, y: 0 })
-const contextMenuNodeId = ref<string | null>(null)
-const contextMenuStorylineSubmenu = ref(false)
-const contextMenuWorkspaceSubmenu = ref(false)
+// Context menu composable
+const contextMenu = useContextMenu({
+  getSelectedNodeIds: () => store.selectedNodeIds,
+  addNodeToStoryline: (storylineId, nodeId) => store.addNodeToStoryline(storylineId, nodeId),
+  createStoryline: (title) => store.createStoryline(title),
+  moveNodesToWorkspace: (nodeIds, workspaceId) => store.moveNodesToWorkspace(nodeIds, workspaceId),
+})
+// Expose refs for template compatibility
+const contextMenuVisible = contextMenu.visible
+const contextMenuPosition = contextMenu.position
+const contextMenuNodeId = contextMenu.nodeId
+const contextMenuStorylineSubmenu = contextMenu.storylineSubmenu
+const contextMenuWorkspaceSubmenu = contextMenu.workspaceSubmenu
 
 // Node agent mode - always agent (tools enabled)
 const nodeAgentMode = ref<'simple' | 'agent'>('agent')
@@ -613,11 +672,6 @@ function isEdgeHighlighted(edge: { id?: string; source_node_id: string; target_n
   if (active.size === 0) return false
   return active.has(edge.source_node_id) || active.has(edge.target_node_id)
 }
-
-// Edge creation
-const isCreatingEdge = ref(false)
-const edgeStartNode = ref<string | null>(null)
-const edgePreviewEnd = ref({ x: 0, y: 0 })
 
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
@@ -822,37 +876,6 @@ async function refreshFromFiles() {
     console.error('Failed to refresh workspace:', e)
   }
 }
-
-// Inline editing
-const editingNodeId = ref<string | null>(null)
-const editContent = ref('')
-const editingTitleId = ref<string | null>(null)
-const editTitle = ref('')
-
-// Autosave with debounce
-let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
-let autosaveTitleTimer: ReturnType<typeof setTimeout> | null = null
-const AUTOSAVE_DELAY = 1000 // Save 1 second after typing stops
-
-watch(editContent, (newContent) => {
-  if (!editingNodeId.value) return
-  if (autosaveContentTimer) clearTimeout(autosaveContentTimer)
-  autosaveContentTimer = setTimeout(() => {
-    if (editingNodeId.value) {
-      store.updateNodeContent(editingNodeId.value, newContent)
-    }
-  }, AUTOSAVE_DELAY)
-})
-
-watch(editTitle, (newTitle) => {
-  if (!editingTitleId.value) return
-  if (autosaveTitleTimer) clearTimeout(autosaveTitleTimer)
-  autosaveTitleTimer = setTimeout(() => {
-    if (editingTitleId.value) {
-      store.updateNodeTitle(editingTitleId.value, newTitle)
-    }
-  }, AUTOSAVE_DELAY)
-})
 
 // LLM interface - using composable
 const llm = useLLM()
@@ -1938,6 +1961,33 @@ const edgeLines = computed(() => {
       const cx = midX + Math.cos(angle) * curveAmt
       const cy = midY + Math.sin(angle) * curveAmt
       path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} Q${cx},${cy} ${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+    } else if (edgeStyle === 'hyperbolic') {
+      // Hyperbolic: smooth S-curve that leaves/enters nodes orthogonally
+      // Control points extend in the orthogonal direction (port → standoff direction)
+
+      // Calculate orthogonal exit direction (from port to standoff)
+      const startDirX = startStandoff.x - startPort.x
+      const startDirY = startStandoff.y - startPort.y
+      const startDirLen = Math.sqrt(startDirX * startDirX + startDirY * startDirY) || 1
+
+      // Calculate orthogonal entry direction (from port to standoff, but we want toward standoff)
+      const endDirX = endStandoff.x - endEdge.x
+      const endDirY = endStandoff.y - endEdge.y
+      const endDirLen = Math.sqrt(endDirX * endDirX + endDirY * endDirY) || 1
+
+      // Distance between standoffs determines control point extension
+      const dist = Math.sqrt((endStandoff.x - startStandoff.x) ** 2 + (endStandoff.y - startStandoff.y) ** 2)
+      const extension = Math.min(dist * 0.7, 180)
+
+      // Control points extend orthogonally from each standoff
+      // CP1: continue in the direction the edge left the source node
+      const cp1x = startStandoff.x + (startDirX / startDirLen) * extension
+      const cp1y = startStandoff.y + (startDirY / startDirLen) * extension
+      // CP2: approach from the direction the edge will enter the target node
+      const cp2x = endStandoff.x + (endDirX / endDirLen) * extension
+      const cp2y = endStandoff.y + (endDirY / endDirLen) * extension
+
+      path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
     } else if (routed?.svgPath) {
       // Use pre-routed path from routing modules (diagonal or orthogonal)
       path = routed.svgPath
@@ -1987,6 +2037,9 @@ const edgeLines = computed(() => {
 // Threshold for "edges on hover only" mode (based on visible edges, not total)
 const EDGE_HOVER_ONLY_THRESHOLD = 1000
 
+// Threshold for filtering edges by viewport visibility
+const EDGE_VIEWPORT_FILTER_THRESHOLD = 200
+
 // Visible edges - filtered for large graphs with pre-computed rendering properties
 const visibleEdgeLines = computed(() => {
   let edges = edgeLines.value
@@ -1994,15 +2047,19 @@ const visibleEdgeLines = computed(() => {
   const hovered = hoveredNodeId.value
   const selectedNodes = store.selectedNodeIds
 
-  // Filter to edges that should be rendered:
-  // 1. Edges connected to hovered/selected nodes (always show, even if other endpoint is off-screen)
-  // 2. Edges where BOTH endpoints are visible
-  edges = edges.filter(e => {
-    const connectedToActive = hovered === e.source_node_id || hovered === e.target_node_id ||
-      selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
-    if (connectedToActive) return true
-    return visIds.has(e.source_node_id) && visIds.has(e.target_node_id)
-  })
+  // For small graphs, show all edges regardless of viewport visibility
+  // Only filter by viewport for larger graphs to improve performance
+  if (edges.length > EDGE_VIEWPORT_FILTER_THRESHOLD) {
+    // Filter to edges that should be rendered:
+    // 1. Edges connected to hovered/selected nodes (always show, even if other endpoint is off-screen)
+    // 2. Edges where BOTH endpoints are visible
+    edges = edges.filter(e => {
+      const connectedToActive = hovered === e.source_node_id || hovered === e.target_node_id ||
+        selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
+      if (connectedToActive) return true
+      return visIds.has(e.source_node_id) && visIds.has(e.target_node_id)
+    })
+  }
 
   // For very large visible edge counts (1000+), only show edges on hover/select
   if (edges.length > EDGE_HOVER_ONLY_THRESHOLD) {
@@ -2221,38 +2278,6 @@ function onCanvasMouseDown(e: MouseEvent) {
     startPan(e)
     return
   }
-}
-
-function startPan(e: MouseEvent) {
-  panStart.value = {
-    x: e.clientX,
-    y: e.clientY,
-    offsetX: offsetX.value,
-    offsetY: offsetY.value,
-  }
-  document.addEventListener('mousemove', onPanMove)
-  document.addEventListener('mouseup', stopPan)
-}
-
-function onPanMove(e: MouseEvent) {
-  // Only set panning true after mouse actually moves (allows double-click to work)
-  const dx = e.clientX - panStart.value.x
-  const dy = e.clientY - panStart.value.y
-  if (!isPanning.value && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
-    isPanning.value = true
-  }
-  if (!isPanning.value) return
-  offsetX.value = panStart.value.offsetX + dx
-  offsetY.value = panStart.value.offsetY + dy
-}
-
-function stopPan() {
-  if (isPanning.value) {
-    lastDragEndTime = Date.now()
-  }
-  isPanning.value = false
-  document.removeEventListener('mousemove', onPanMove)
-  document.removeEventListener('mouseup', stopPan)
 }
 
 // Node hover handlers for tooltip
@@ -2703,44 +2728,6 @@ function startEditing(nodeId: string) {
   }, 10)
 }
 
-function startEditingTitle(nodeId: string) {
-  const node = store.getNode(nodeId)
-  if (!node) return
-  editingTitleId.value = nodeId
-  editTitle.value = node.title || ''
-  setTimeout(() => {
-    const input = document.querySelector('.title-editor') as HTMLInputElement
-    if (input) {
-      input.focus()
-      input.select()
-    }
-  }, 10)
-}
-
-function saveTitleEditing() {
-  if (editingTitleId.value && editTitle.value.trim()) {
-    // Clear any pending autosave timer
-    if (autosaveTitleTimer) {
-      clearTimeout(autosaveTitleTimer)
-      autosaveTitleTimer = null
-    }
-    // Update local state
-    const node = store.getNode(editingTitleId.value)
-    if (node) {
-      node.title = editTitle.value
-    }
-    // Persist to database
-    store.updateNodeTitle(editingTitleId.value, editTitle.value)
-  }
-  editingTitleId.value = null
-  editTitle.value = ''
-}
-
-function cancelTitleEditing() {
-  editingTitleId.value = null
-  editTitle.value = ''
-}
-
 function saveEditing(e?: FocusEvent) {
   // Don't close if focus moved to LLM inputs, buttons, or color bar
   if (e?.relatedTarget) {
@@ -2779,156 +2766,6 @@ function onEditorKeydown(e: KeyboardEvent) {
   }
   // Don't propagate to prevent canvas shortcuts
   e.stopPropagation()
-}
-
-// Edge creation
-function onEdgePreviewMove(e: MouseEvent) {
-  edgePreviewEnd.value = screenToCanvas(e.clientX, e.clientY)
-}
-
-function onEdgeCreate(e: MouseEvent) {
-  document.removeEventListener('mousemove', onEdgePreviewMove)
-  document.removeEventListener('mouseup', onEdgeCreate)
-
-  if (!edgeStartNode.value) {
-    isCreatingEdge.value = false
-    return
-  }
-
-  // Find node under cursor using DOM hit testing
-  const target = document.elementFromPoint(e.clientX, e.clientY)
-  const nodeCard = target?.closest('.node-card') as HTMLElement | null
-  const targetNodeId = nodeCard?.dataset.nodeId
-  const finalTarget = targetNodeId ? store.filteredNodes.find(n => n.id === targetNodeId) : null
-
-  if (finalTarget && finalTarget.id !== edgeStartNode.value) {
-    store.createEdge({
-      source_node_id: edgeStartNode.value,
-      target_node_id: finalTarget.id,
-      link_type: 'related',
-    })
-  }
-
-  isCreatingEdge.value = false
-  edgeStartNode.value = null
-}
-
-// Edge selection
-function onEdgeClick(e: MouseEvent, edgeId: string) {
-  e.stopPropagation()
-  selectedEdge.value = edgeId
-  store.selectNode(null)
-}
-
-async function deleteSelectedEdge() {
-  if (selectedEdge.value) {
-    await store.deleteEdge(selectedEdge.value)
-    selectedEdge.value = null
-  }
-}
-
-function changeEdgeLabel(label: string) {
-  if (selectedEdge.value) {
-    const edge = store.filteredEdges.find(e => e.id === selectedEdge.value)
-    if (edge) {
-      edge.label = label || null
-    }
-  }
-}
-
-function reverseEdge() {
-  if (!selectedEdge.value) return
-  const edge = store.filteredEdges.find(e => e.id === selectedEdge.value)
-  if (!edge) return
-  // Swap source and target
-  const temp = edge.source_node_id
-  edge.source_node_id = edge.target_node_id
-  edge.target_node_id = temp
-}
-
-function isEdgeBidirectional(edgeId: string): boolean {
-  const edge = store.edges.find(e => e.id === edgeId)
-  if (!edge) return false
-  return store.edges.some(
-    e => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
-  )
-}
-
-async function makeUnidirectional() {
-  if (!selectedEdge.value) return
-  const edge = store.edges.find(e => e.id === selectedEdge.value)
-  if (!edge) return
-
-  // Find and delete the reverse edge
-  const reverseEdge = store.edges.find(
-    e => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
-  )
-
-  if (reverseEdge) {
-    await store.deleteEdge(reverseEdge.id)
-  }
-}
-
-async function makeBidirectional() {
-  if (!selectedEdge.value) return
-  const edge = store.edges.find(e => e.id === selectedEdge.value)
-  if (!edge) return
-
-  // Check if reverse edge already exists
-  const reverseExists = store.edges.some(
-    e => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
-  )
-
-  if (!reverseExists) {
-    await store.createEdge({
-      source_node_id: edge.target_node_id,
-      target_node_id: edge.source_node_id,
-      link_type: edge.link_type,
-      label: edge.label || undefined,
-    })
-  }
-}
-
-async function insertNodeOnEdge() {
-  if (!selectedEdge.value) return
-
-  const edge = store.filteredEdges.find(e => e.id === selectedEdge.value)
-  if (!edge) return
-
-  const sourceNode = store.getNode(edge.source_node_id)
-  const targetNode = store.getNode(edge.target_node_id)
-  if (!sourceNode || !targetNode) return
-
-  // Calculate midpoint
-  const midX = (sourceNode.canvas_x + targetNode.canvas_x) / 2
-  const midY = (sourceNode.canvas_y + targetNode.canvas_y) / 2
-
-  // Create new node at midpoint
-  const newNode = await store.createNode({
-    title: '',
-    node_type: 'note',
-    markdown_content: '',
-    canvas_x: midX,
-    canvas_y: midY,
-  })
-
-  // Delete old edge
-  await store.deleteEdge(edge.id)
-
-  // Create two new edges
-  await store.createEdge({
-    source_node_id: edge.source_node_id,
-    target_node_id: newNode.id,
-    link_type: edge.link_type,
-  })
-  await store.createEdge({
-    source_node_id: newNode.id,
-    target_node_id: edge.target_node_id,
-    link_type: edge.link_type,
-  })
-
-  selectedEdge.value = null
-  store.selectNode(newNode.id)
 }
 
 // Double click to create node
@@ -3019,11 +2856,12 @@ function getEdgeHighlightColor(nodeColor: string | null): string {
 }
 
 // Edge style types
-type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'straight'
+type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'
 const edgeStyles: { value: EdgeStyleType; label: string }[] = [
   { value: 'orthogonal', label: '⌐' },
   { value: 'diagonal', label: '∠' },
   { value: 'curved', label: '∿' },
+  { value: 'hyperbolic', label: '∼' },
   { value: 'straight', label: '/' },
 ]
 
@@ -3044,7 +2882,7 @@ function toggleMagnifier() {
 }
 
 function cycleEdgeStyle() {
-  const styles: EdgeStyleType[] = ['orthogonal', 'diagonal', 'curved', 'straight']
+  const styles: EdgeStyleType[] = ['orthogonal', 'diagonal', 'curved', 'hyperbolic', 'straight']
   const idx = styles.indexOf(globalEdgeStyle.value)
   globalEdgeStyle.value = styles[(idx + 1) % styles.length]
   canvasStorage.setEdgeStyle(globalEdgeStyle.value)
@@ -3077,329 +2915,6 @@ function changeEdgeColor(color: string) {
     store.updateEdgeLinkType(selectedEdge.value, color)
   }
 }
-
-// Render markdown to HTML with caching
-const markdownCache = new Map<string, string>()
-let mermaidCounter = 0
-let typstCounter = 0
-
-// Math cache: math expression -> rendered HTML
-const mathCache = new Map<string, string>()
-
-async function renderTypstMath() {
-  if (!isTauri()) return
-
-  const elements = document.querySelectorAll('.typst-pending')
-  for (const el of elements) {
-    const math = el.getAttribute('data-math')
-    const isDisplay = el.classList.contains('typst-display')
-    if (!math) continue
-
-    // Check cache
-    const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
-    if (mathCache.has(cacheKey)) {
-      el.innerHTML = mathCache.get(cacheKey)!
-      el.classList.remove('typst-pending')
-      continue
-    }
-
-    try {
-      const svg = await invoke<string>('render_typst_math', {
-        math,
-        displayMode: isDisplay,
-      })
-      mathCache.set(cacheKey, svg)
-      el.innerHTML = svg
-      el.classList.remove('typst-pending')
-    } catch (e) {
-      console.warn('Math render error:', e)
-      el.textContent = math // Fallback to raw math
-      el.classList.remove('typst-pending')
-      el.classList.add('typst-error')
-    }
-  }
-}
-
-function renderMarkdown(content: string | null): string {
-  if (!content) return ''
-
-  // Don't cache content with math - render inline instead
-  const hasMath = /\$[^$]+\$/.test(content)
-
-  // Check cache first (only for non-math content)
-  if (!hasMath && markdownCache.has(content)) {
-    return markdownCache.get(content)!
-  }
-
-  // Extract math blocks BEFORE markdown processing to preserve backslashes
-  const mathPlaceholders: Map<string, string> = new Map()
-  let processedContent = content
-
-  // Extract display math first ($$...$$)
-  processedContent = processedContent.replace(/\$\$([^$]+)\$\$/g, (match, math) => {
-    const id = `MATH_DISPLAY_${mathPlaceholders.size}`
-    mathPlaceholders.set(id, math.trim())
-    return id
-  })
-
-  // Extract inline math ($...$)
-  processedContent = processedContent.replace(/(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g, (match, math) => {
-    const id = `MATH_INLINE_${mathPlaceholders.size}`
-    mathPlaceholders.set(id, math.trim())
-    return id
-  })
-
-  // Render markdown (without math blocks)
-  let html = marked.parse(processedContent) as string
-
-  // Restore math blocks - use cached SVG or create pending placeholders
-  for (const [id, math] of mathPlaceholders) {
-    const isDisplay = id.startsWith('MATH_DISPLAY_')
-    const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
-
-    let wrapper: string
-    if (mathCache.has(cacheKey)) {
-      // Use cached SVG
-      const rendered = mathCache.get(cacheKey)!
-      wrapper = isDisplay
-        ? `<div class="typst-display">${rendered}</div>`
-        : `<span class="typst-inline">${rendered}</span>`
-    } else {
-      // Create placeholder for async rendering
-      const escapedMath = math.replace(/"/g, '&quot;')
-      wrapper = isDisplay
-        ? `<div class="typst-display typst-pending" data-math="${escapedMath}">${math}</div>`
-        : `<span class="typst-inline typst-pending" data-math="${escapedMath}">${math}</span>`
-    }
-    html = html.replace(id, wrapper)
-  }
-
-  // Post-process to handle mermaid code blocks
-  const mermaidRegex = /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g
-
-  let needsMermaidRender = false
-  html = html.replace(mermaidRegex, (match, code) => {
-    const id = `mermaid-${mermaidCounter++}`
-    const decoded = code
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-
-    // If we have cached SVG for this mermaid code, use it directly
-    if (mermaidCache.has(decoded)) {
-      return `<div class="mermaid-wrapper">${mermaidCache.get(decoded)}</div>`
-    }
-    // Only trigger mermaid render if we have uncached diagrams
-    needsMermaidRender = true
-    return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${decoded}</pre></div>`
-  })
-
-  // Only schedule mermaid render if there are uncached diagrams
-  if (needsMermaidRender) {
-    setTimeout(() => renderMermaidDiagrams?.(), 50)
-  }
-
-  // Convert [[link]] and [[link|display]] wikilinks to clickable elements
-  const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-  html = html.replace(wikilinkRegex, (match, target, display) => {
-    const displayText = display || target
-    const targetTrimmed = target.trim()
-    // Check if target node exists for styling
-    const targetExists = store.filteredNodes.some(
-      n => n.title.toLowerCase() === targetTrimmed.toLowerCase()
-    )
-    const missingClass = targetExists ? '' : ' missing'
-    return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
-  })
-
-  // Cache the result (limit cache size)
-  if (markdownCache.size > 100) {
-    const firstKey = markdownCache.keys().next().value
-    markdownCache.delete(firstKey)
-  }
-  markdownCache.set(content, html)
-
-  return html
-}
-
-// Pre-rendered HTML cache for each node (avoids re-renders during drag)
-const nodeRenderedContent = ref<Record<string, string>>({})
-const nodeContentHashes = new Map<string, string>() // Track content for change detection
-
-// Debounced markdown rendering - only re-render changed nodes
-let markdownRenderTimer: ReturnType<typeof setTimeout> | null = null
-function updateRenderedContent() {
-  if (markdownRenderTimer) clearTimeout(markdownRenderTimer)
-  markdownRenderTimer = setTimeout(() => {
-    const result = { ...nodeRenderedContent.value }
-    let changed = false
-
-    // Track which nodes still exist
-    const currentIds = new Set<string>()
-
-    for (const node of store.filteredNodes) {
-      currentIds.add(node.id)
-      const contentKey = node.markdown_content || ''
-      const prevHash = nodeContentHashes.get(node.id)
-
-      // Only re-render if content actually changed
-      if (prevHash !== contentKey) {
-        result[node.id] = renderMarkdown(node.markdown_content)
-        nodeContentHashes.set(node.id, contentKey)
-        changed = true
-      } else if (!result[node.id]) {
-        // New node, render it
-        result[node.id] = renderMarkdown(node.markdown_content)
-        nodeContentHashes.set(node.id, contentKey)
-        changed = true
-      }
-    }
-
-    // Clean up removed nodes
-    for (const id of nodeContentHashes.keys()) {
-      if (!currentIds.has(id)) {
-        nodeContentHashes.delete(id)
-        delete result[id]
-        changed = true
-      }
-    }
-
-    if (changed) {
-      nodeRenderedContent.value = result
-      // Render Typst math after DOM updates
-      nextTick(() => renderTypstMath())
-    }
-  }, 50) // 50ms debounce
-}
-
-// Watch for node changes with shallow comparison
-watch(
-  () => store.filteredNodes.length + store.filteredNodes.reduce((sum, n) => sum + (n.markdown_content?.length || 0), 0),
-  updateRenderedContent,
-  { immediate: true }
-)
-
-// Mermaid rendering
-let mermaidLoaded = false
-let mermaidApi: any = null
-const mermaidCache = new Map<string, string>() // code -> svg
-let mermaidRenderPending = false
-let mermaidRenderQueued = false
-
-async function renderMermaidDiagrams() {
-  // If already rendering, queue another render for when it's done
-  if (mermaidRenderPending) {
-    mermaidRenderQueued = true
-    return
-  }
-  mermaidRenderPending = true
-  mermaidRenderQueued = false
-
-  await nextTick()
-
-  const elements = document.querySelectorAll('.mermaid')
-  if (elements.length === 0) {
-    mermaidRenderPending = false
-    // Check if another render was queued
-    if (mermaidRenderQueued) {
-      mermaidRenderQueued = false
-      setTimeout(renderMermaidDiagrams, 50)
-    }
-    return
-  }
-
-  // Lazy load mermaid only when needed
-  if (!mermaidLoaded) {
-    try {
-      const mod = await import('mermaid')
-      let api = mod.default || mod
-      if (api.default) api = api.default
-
-      mermaidApi = api
-      if (typeof mermaidApi.initialize === 'function') {
-        mermaidApi.initialize({
-          startOnLoad: false,
-          theme: isDarkMode.value ? 'dark' : 'default',
-          securityLevel: 'loose',
-        })
-      }
-      mermaidLoaded = true
-    } catch (e) {
-      console.error('Mermaid load error:', e)
-      mermaidRenderPending = false
-      return
-    }
-  }
-
-  let didRenderNew = false
-  for (const el of elements) {
-    // Skip if already contains SVG (already rendered in DOM)
-    if (el.querySelector('svg')) continue
-
-    const code = el.textContent?.trim() || ''
-    if (!code) continue
-
-    // Check cache first
-    if (mermaidCache.has(code)) {
-      el.innerHTML = mermaidCache.get(code)!
-      didRenderNew = true
-      continue
-    }
-
-    try {
-      const id = `m${Date.now()}${Math.random().toString(36).substr(2, 5)}`
-      const { svg } = await mermaidApi.render(id, code)
-      mermaidCache.set(code, svg)
-      el.innerHTML = svg
-      didRenderNew = true
-    } catch (e: any) {
-      const msg = e.message || String(e)
-      const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${msg.substring(0, 100)}</div>`
-      mermaidCache.set(code, errorHtml)
-      el.innerHTML = errorHtml
-      didRenderNew = true
-    }
-  }
-
-  // Only clear markdown cache if we actually rendered something new
-  if (didRenderNew) {
-    markdownCache.clear()
-    // Note: Don't auto-fit here - it causes unexpected node resizing
-    // Users can manually fit nodes with the Fit button
-  }
-
-  mermaidRenderPending = false
-
-  // Check if another render was queued while we were rendering
-  if (mermaidRenderQueued) {
-    mermaidRenderQueued = false
-    setTimeout(renderMermaidDiagrams, 50)
-  }
-}
-
-// Track mermaid code for re-rendering (only changes when actual mermaid content changes)
-let lastMermaidCode = ''
-
-// Watch for mermaid content changes only
-watch(() => {
-  // Extract only mermaid code blocks from all nodes
-  const mermaidBlocks: string[] = []
-  for (const node of store.filteredNodes) {
-    const content = node.markdown_content || ''
-    const matches = content.match(/```mermaid[\s\S]*?```/g)
-    if (matches) {
-      mermaidBlocks.push(...matches)
-    }
-  }
-  return mermaidBlocks.join('|||')
-}, (newMermaidCode) => {
-  if (newMermaidCode && newMermaidCode !== lastMermaidCode) {
-    lastMermaidCode = newMermaidCode
-    setTimeout(renderMermaidDiagrams, 100)
-  }
-})
 
 // Node colors for the color picker (transparent tints layered over solid bg)
 const defaultNodeColors = [
@@ -3589,10 +3104,7 @@ function onContextMenu(e: MouseEvent) {
   if (nodeCard) {
     const nodeId = nodeCard.dataset.nodeId
     if (nodeId) {
-      contextMenuNodeId.value = nodeId
-      contextMenuPosition.value = { x: e.clientX, y: e.clientY }
-      contextMenuVisible.value = true
-      contextMenuStorylineSubmenu.value = false
+      contextMenu.open(e, nodeId)
 
       // Select the node if not already selected
       if (!store.selectedNodeIds.includes(nodeId)) {
@@ -3603,14 +3115,11 @@ function onContextMenu(e: MouseEvent) {
   }
 
   // Hide context menu if clicking elsewhere
-  contextMenuVisible.value = false
+  contextMenu.close()
 }
 
 function closeContextMenu() {
-  contextMenuVisible.value = false
-  contextMenuStorylineSubmenu.value = false
-  contextMenuWorkspaceSubmenu.value = false
-  contextMenuNodeId.value = null
+  contextMenu.close()
 }
 
 async function addNodeToStoryline(storylineId: string) {
@@ -3661,13 +3170,7 @@ async function createStorylineFromNode() {
 }
 
 /// Computed: number of selected nodes for context menu display
-const contextMenuNodeCount = computed(() => {
-  if (!contextMenuNodeId.value) return 0
-  if (store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)) {
-    return store.selectedNodeIds.length
-  }
-  return 1
-})
+const contextMenuNodeCount = computed(() => contextMenu.nodeCount.value)
 
 // Computed: workspaces other than the current one (for "Send to Workspace" menu)
 const otherWorkspaces = computed(() => {
@@ -3770,14 +3273,14 @@ ${edges.map(e => `  - id: "${e.id}"
         <input
           v-model="graphPrompt"
           type="text"
-          placeholder="Ask about the graph..."
+          :placeholder="t('canvas.agent.placeholder')"
           class="llm-input"
           :disabled="isGraphLLMLoading"
           @keydown.enter="sendGraphPrompt"
           @keydown.up="onPromptKeydown"
           @keydown.down="onPromptKeydown"
         />
-        <button class="llm-clear-btn" data-tooltip="Clear conversation memory" :class="{ active: conversationHistory.length > 0 }" @click="clearConversation">
+        <button class="llm-clear-btn" :data-tooltip="t('canvas.agent.clearMemory')" :class="{ active: conversationHistory.length > 0 }" @click="clearConversation">
           {{ conversationHistory.length || 'C' }}
         </button>
         <button v-if="!agentRunning" class="llm-send" :disabled="isGraphLLMLoading || !graphPrompt.trim()" @click="sendGraphPrompt">
@@ -3794,7 +3297,7 @@ ${edges.map(e => `  - id: "${e.id}"
       </div>
       <!-- Agent activity log -->
       <div v-if="agentLog.length > 0" class="agent-log">
-        <button class="clear-log-btn" title="Clear log" @click="agentLog.length = 0">
+        <button class="clear-log-btn" :title="t('canvas.agent.clearLog')" @click="agentLog.length = 0">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -3959,7 +3462,7 @@ ${edges.map(e => `  - id: "${e.id}"
           <button
             v-if="store.selectedFrameId === frame.id && editingFrameId !== frame.id"
             class="frame-delete-btn"
-            title="Delete frame"
+            :title="t('canvas.frame.delete')"
             @click.stop="deleteSelectedFrame"
           >x</button>
         </div>
@@ -3980,7 +3483,7 @@ ${edges.map(e => `  - id: "${e.id}"
             height: getLODRadius(node.id) * 2 + 'px',
             background: node.color_theme || 'var(--primary-color)',
           }"
-          :title="node.title + ' (' + (nodeDegree[node.id] || 0) + ' connections)'"
+          :title="node.title + ' (' + (nodeDegree[node.id] || 0) + ' ' + t('canvas.node.connections') + ')'"
           @mousedown="onNodeMouseDown($event, node.id)"
           @mouseenter="hoveredNodeId = node.id"
           @mouseleave="hoveredNodeId = null"
@@ -4037,14 +3540,14 @@ ${edges.map(e => `  - id: "${e.id}"
             @mousedown.stop
             @mouseup.stop
           />
-          <span v-else>{{ node.title || 'Untitled' }}</span>
+          <span v-else>{{ node.title || t('canvas.node.untitled') }}</span>
         </div>
         <!-- Editing mode (disabled when collapsed) -->
         <textarea
           v-if="editingNodeId === node.id && !isSemanticZoomCollapsed"
           v-model="editContent"
           class="inline-editor"
-          placeholder="Write markdown..."
+          :placeholder="t('canvas.node.writePlaceholder')"
           spellcheck="false"
           autocorrect="off"
           autocapitalize="off"
@@ -4074,7 +3577,7 @@ ${edges.map(e => `  - id: "${e.id}"
           <span class="color-bar-sep"></span>
           <button
             class="autofit-toggle"
-            title="Fit node to content"
+            :title="t('canvas.node.fitContent')"
             @click.stop="fitNodeNow(node.id)"
           >Fit</button>
         </div>
@@ -4114,7 +3617,7 @@ ${edges.map(e => `  - id: "${e.id}"
         <input
           v-model="nodePrompt"
           type="text"
-          :placeholder="isNodeLLMLoading ? 'Processing...' : 'Ask AI to update this note...'"
+          :placeholder="isNodeLLMLoading ? t('canvas.node.processing') : t('canvas.node.askPlaceholder')"
           class="node-llm-input"
           :class="{ loading: isNodeLLMLoading }"
           tabindex="0"
@@ -4158,7 +3661,7 @@ ${edges.map(e => `  - id: "${e.id}"
         <input
           type="text"
           :value="store.filteredEdges.find(e => e.id === selectedEdge)?.label || ''"
-          placeholder="e.g. depends on"
+          :placeholder="t('canvas.edge.labelPlaceholder')"
           class="edge-label-input"
           @input="changeEdgeLabel(($event.target as HTMLInputElement).value)"
         />
@@ -4185,15 +3688,15 @@ ${edges.map(e => `  - id: "${e.id}"
         </div>
         <label>Direction:</label>
         <div class="direction-btns">
-          <button title="Reverse direction" @click.stop="reverseEdge">Flip</button>
+          <button :title="t('canvas.edge.reverseDirection')" @click.stop="reverseEdge">{{ t('canvas.edge.flip') }}</button>
           <button
             v-if="isEdgeBidirectional(selectedEdge || '')"
-            title="Make directional (one-way)"
+            :title="t('canvas.edge.makeDirectional')"
             @click.stop="makeUnidirectional"
           >Directional</button>
           <button
             v-else
-            title="Make non-directional (both ways)"
+            :title="t('canvas.edge.makeNonDirectional')"
             @click.stop="makeBidirectional"
           >Non-directional</button>
         </div>
@@ -4316,7 +3819,7 @@ ${edges.map(e => `  - id: "${e.id}"
         top: (hoverMousePos.y + 16) + 'px',
       }"
     >
-      <div class="hover-tooltip-title">{{ hoveredNode.title || 'Untitled' }}</div>
+      <div class="hover-tooltip-title">{{ hoveredNode.title || t('canvas.node.untitled') }}</div>
       <div v-if="tooltipContent" class="hover-tooltip-content">
         {{ tooltipContent }}{{ tooltipContent.length >= 200 ? '...' : '' }}
       </div>

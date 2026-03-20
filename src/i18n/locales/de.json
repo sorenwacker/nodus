@@ -2,10 +2,151 @@
   "app": {
     "name": "Nodus"
   },
+  "search": {
+    "placeholder": "Knoten suchen...",
+    "inputPlaceholder": "Knoten nach Titel oder Inhalt suchen...",
+    "noResults": "Keine Ergebnisse gefunden"
+  },
+  "canvas": {
+    "agent": {
+      "placeholder": "Frage zum Graph stellen...",
+      "clearMemory": "Konversationsspeicher löschen",
+      "clearLog": "Protokoll löschen"
+    },
+    "node": {
+      "writePlaceholder": "Markdown schreiben...",
+      "askPlaceholder": "KI bitten, diese Notiz zu aktualisieren...",
+      "processing": "Verarbeitung...",
+      "fitContent": "An Inhalt anpassen",
+      "untitled": "Ohne Titel",
+      "connections": "Verbindungen"
+    },
+    "edge": {
+      "labelPlaceholder": "z.B. abhängig von",
+      "flip": "Umkehren",
+      "reverseDirection": "Richtung umkehren",
+      "makeDirectional": "Gerichtet machen (einweg)",
+      "makeNonDirectional": "Ungerichtet machen (bidirektional)"
+    },
+    "frame": {
+      "delete": "Rahmen löschen",
+      "addFrame": "Rahmen hinzufügen - Ausgewählte Knoten gruppieren",
+      "clickToPlace": "Auf Leinwand klicken um Rahmen zu platzieren (Esc zum Abbrechen)"
+    },
+    "status": {
+      "layoutRunning": "Layout wird ausgeführt...",
+      "stop": "Stopp",
+      "perfMode": "PERF",
+      "nodes": "Knoten",
+      "edges": "Kanten",
+      "hideAgentLog": "Agenten-Protokoll verbergen",
+      "showAgentLog": "Agenten-Protokoll anzeigen",
+      "log": "Log",
+      "hint": "Hoch/runter scrollen: Zoom | Seitwärts scrollen: Verschieben | Alt+Ziehen: Verknüpfen | Doppelklick: Neu"
+    },
+    "controls": {
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern",
+      "fitToContent": "An Inhalt anpassen - Alle Knoten anzeigen",
+      "snapToGrid": "Am Raster ausrichten - Knoten beim Ziehen am Raster ausrichten",
+      "gridLayout": "Rasterlayout - Knoten im Raster anordnen",
+      "forceLayout": "Kraftbasiertes Layout - Nach Verbindungen anordnen",
+      "hierarchicalLayout": "Hierarchisches Layout - Als Baum anordnen (für DAGs/Ontologien)",
+      "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
+      "edgeStyle": "Kantenform",
+      "edgeBundling": "Kantenbündelung - Kanten mit gemeinsamen Endpunkten zusammenfassen",
+      "magnifier": "Lupe - Vergrößerte Ansicht bei Verkleinerung anzeigen",
+      "neighborhoodView": "Nachbarschaftsansicht - Nur ausgewählten Knoten und Nachbarn anzeigen (N)",
+      "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
+      "hop": "Schritt",
+      "hops": "Schritte"
+    }
+  },
+  "llm": {
+    "provider": "Anbieter",
+    "status": {
+      "connected": "Verbunden",
+      "notConnected": "Nicht verbunden",
+      "checking": "Prüfe..."
+    },
+    "streaming": {
+      "label": "Streaming aktivieren",
+      "hint": "Antworten Token für Token streamen (erfordert Anbieterunterstützung)"
+    },
+    "apiKey": {
+      "label": "API-Schlüssel",
+      "optional": "(optional)",
+      "placeholder": "API-Schlüssel eingeben",
+      "optionalPlaceholder": "Optional - leer lassen falls nicht erforderlich",
+      "validate": "API-Schlüssel prüfen",
+      "valid": "Gültig",
+      "invalid": "Ungültig",
+      "validating": "Prüfe..."
+    },
+    "hints": {
+      "openai": "Schlüssel auf platform.openai.com erhalten",
+      "anthropic": "Schlüssel auf console.anthropic.com erhalten",
+      "compatible": "Von einigen Endpunkten benötigt (z.B. gehostete APIs)"
+    },
+    "baseUrl": {
+      "label": "Basis-URL",
+      "ollamaLabel": "Ollama-URL",
+      "ollamaPlaceholder": "http://localhost:11434",
+      "placeholder": "API-Basis-URL"
+    },
+    "model": {
+      "label": "Modell",
+      "placeholder": "Modellnamen eingeben oder aus Liste wählen",
+      "fetch": "Verfügbare Modelle abrufen",
+      "available": "{count} Modelle verfügbar",
+      "fetchHint": "Modellnamen eingeben oder Aktualisieren klicken, um verfügbare Modelle abzurufen"
+    },
+    "maxTokens": {
+      "label": "Max. Token",
+      "hint": "Maximale Token in der Antwort"
+    },
+    "contextWindow": {
+      "label": "Kontextfenster",
+      "hint": "Modell-Kontextgröße in Token (Llama 3.1: bis zu 131072)"
+    },
+    "timeout": {
+      "label": "Zeitlimit (Sekunden)"
+    },
+    "neighborContext": {
+      "label": "Nachbar-Kontext",
+      "off": "Aus",
+      "hint": "Inhalt von verknüpften Knoten bei LLM-Anfragen einbeziehen"
+    },
+    "searchApi": {
+      "label": "Web-Suche API-Schlüssel (Tavily)",
+      "placeholder": "Tavily API-Schlüssel eingeben",
+      "test": "API-Schlüssel testen",
+      "testing": "Teste...",
+      "hint": "Kostenlos: 1000 Suchen/Monat, keine Kreditkarte. Schlüssel auf"
+    },
+    "systemPrompt": {
+      "label": "System-Prompt (einfache Generierung)",
+      "reset": "Zurücksetzen"
+    },
+    "agentPrompt": {
+      "label": "Agent-Prompt (Graph-Builder)",
+      "reset": "Zurücksetzen"
+    }
+  },
+  "workspace": {
+    "pathPlaceholder": "/pfad/zum/vault",
+    "namePlaceholder": "Arbeitsbereich-Name",
+    "defaultName": "Mein Forschungsprojekt",
+    "descriptionPlaceholder": "Wofür ist dieser Arbeitsbereich?"
+  },
   "onboarding": {
+    "language": {
+      "title": "Sprache wählen",
+      "description": "Wählen Sie Ihre bevorzugte Sprache. Sie können dies später in den Einstellungen ändern."
+    },
     "welcome": {
       "title": "Willkommen bei Nodus",
-      "description": "Ein lokaler Wissensgraph zum visuellen Denken. Ihre Daten bleiben auf Ihrem Geraet."
+      "description": "Ein lokaler Wissensgraph zum visuellen Denken. Ihre Daten bleiben auf Ihrem Gerät."
     },
     "nodes": {
       "title": "Knoten erstellen",
@@ -17,23 +158,23 @@
     },
     "import": {
       "title": "Forschung importieren",
-      "description": "Legen Sie .bib-Dateien von Zotero, .md-Dateien oder PDFs direkt auf die Leinwand."
+      "description": "Dateien direkt auf die Leinwand ziehen: PDFs, Markdown (.md), BibTeX (.bib) und Ontologien (.ttl, .rdf, .owl)."
     },
     "math": {
       "title": "Mathematik & Gleichungen",
-      "description": "Verwenden Sie $...$ fuer Inline-Mathematik und $$...$$ fuer Anzeigegleichungen. Unterstuetzt von Typst."
+      "description": "Verwenden Sie $...$ für Inline-Mathematik und $$...$$ für Anzeigegleichungen. Unterstützt von Typst."
     },
     "buttons": {
       "next": "Weiter",
-      "back": "Zurueck",
-      "skip": "Ueberspringen",
+      "back": "Zurück",
+      "skip": "Überspringen",
       "getStarted": "Loslegen"
     }
   },
   "shortcuts": {
-    "title": "Tastaturkuerzel",
-    "search": "Kuerzel suchen...",
-    "toggle": "Druecken Sie ? um diese Hilfe umzuschalten",
+    "title": "Tastaturkürzel",
+    "search": "Kürzel suchen...",
+    "toggle": "Drücken Sie ? um diese Hilfe umzuschalten",
     "categories": {
       "navigation": "Navigation",
       "selection": "Auswahl",
@@ -52,7 +193,7 @@
       "selectAll": "Cmd/Strg+A",
       "escape": "Escape",
       "doubleClick": "Doppelklick",
-      "delete": "Entf / Ruecktaste",
+      "delete": "Entf / Rücktaste",
       "undo": "Cmd/Strg+Z",
       "redo": "Cmd/Strg+Shift+Z",
       "layout": "L",
@@ -65,19 +206,19 @@
     },
     "descriptions": {
       "panCanvas": "Leinwand verschieben",
-      "zoomInOut": "Vergroessern/Verkleinern",
+      "zoomInOut": "Vergrößern/Verkleinern",
       "fitToView": "Alle Knoten einpassen",
       "toggleNeighborhood": "Nachbarschaftsmodus umschalten",
-      "selectNode": "Knoten auswaehlen",
-      "addToSelection": "Zur Auswahl hinzufuegen",
-      "selectAll": "Alle Knoten auswaehlen",
+      "selectNode": "Knoten auswählen",
+      "addToSelection": "Zur Auswahl hinzufügen",
+      "selectAll": "Alle Knoten auswählen",
       "clearSelection": "Auswahl aufheben",
       "editCreate": "Knoten bearbeiten / erstellen",
-      "deleteSelected": "Ausgewaehlte loeschen",
-      "undo": "Rueckgaengig",
+      "deleteSelected": "Ausgewählte löschen",
+      "undo": "Rückgängig",
       "redo": "Wiederholen",
       "autoLayout": "Knoten automatisch anordnen",
-      "resetSizes": "Alle Knotengroessen zuruecksetzen",
+      "resetSizes": "Alle Knotengrößen zurücksetzen",
       "importFiles": ".bib .md .pdf importieren",
       "exportYaml": "Graph als YAML exportieren",
       "refreshFiles": "Von Dateien aktualisieren",
@@ -90,34 +231,83 @@
     "doubleClick": "Doppelklick",
     "createNote": "Notiz erstellen",
     "dropFiles": "Dateien ablegen",
-    "fileTypes": ".bib .md .pdf",
+    "fileTypes": ".pdf .md .bib .ttl",
     "paste": "Cmd+V",
-    "pasteText": "Text einfuegen",
-    "mathHint": "Verwenden Sie $...$ fuer Gleichungen"
+    "pasteText": "Text einfügen",
+    "mathHint": "Verwenden Sie $...$ für Gleichungen"
   },
   "dropZone": {
     "title": "Dateien zum Importieren ablegen",
-    "fileTypes": ".bib, .json, .md, .pdf"
+    "fileTypes": ".pdf, .md, .bib, .ttl, .rdf, .owl"
   },
   "notifications": {
     "citationsImported": "Zitate importiert",
-    "citationsCount": "{count} Zitat zur Leinwand hinzugefuegt | {count} Zitate zur Leinwand hinzugefuegt",
+    "citationsCount": "{count} Zitat zur Leinwand hinzugefügt | {count} Zitate zur Leinwand hinzugefügt",
     "notesImported": "Notizen importiert",
-    "notesCount": "{count} Notiz zur Leinwand hinzugefuegt | {count} Notizen zur Leinwand hinzugefuegt",
+    "notesCount": "{count} Notiz zur Leinwand hinzugefügt | {count} Notizen zur Leinwand hinzugefügt",
     "noCitations": "Keine Zitate gefunden",
-    "noCitationsDesc": "Die Datei enthielt keine gueltigen BibTeX- oder CSL-JSON-Eintraege",
+    "noCitationsDesc": "Die Datei enthielt keine gültigen BibTeX- oder CSL-JSON-Einträge",
     "importFailed": "Import fehlgeschlagen",
-    "unsupportedFile": "Nicht unterstuetzte Datei"
+    "unsupportedFile": "Nicht unterstützte Datei"
   },
   "node": {
     "untitled": "Ohne Titel",
     "processing": "Verarbeitung..."
   },
   "common": {
-    "close": "Schliessen",
+    "close": "Schließen",
     "cancel": "Abbrechen",
     "save": "Speichern",
-    "delete": "Loeschen",
+    "delete": "Löschen",
     "edit": "Bearbeiten"
+  },
+  "toolbar": {
+    "editWorkspace": "Arbeitsbereich bearbeiten",
+    "newWorkspace": "Neuer Arbeitsbereich",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen",
+    "storylines": "Handlungsstränge",
+    "importVault": "Vault importieren",
+    "theme": "Design",
+    "settings": "Einstellungen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "tabs": {
+      "general": "Allgemein",
+      "themes": "Designs",
+      "canvas": "Leinwand",
+      "llm": "KI"
+    },
+    "language": "Sprache",
+    "llmEnabled": "KI-Funktionen",
+    "llmEnabledHint": "KI-Eingabefelder für Graph und Knoten anzeigen",
+    "gridSnap": "Am Raster ausrichten",
+    "gridSize": "Rastergröße",
+    "gridSizeUnit": "px",
+    "edgeStyle": "Kantenform",
+    "edgeStyles": {
+      "orthogonal": "Orthogonal",
+      "diagonal": "Diagonal",
+      "curved": "Gebogen",
+      "hyperbolic": "Hyperbolisch",
+      "straight": "Gerade"
+    },
+    "showTagNodes": "Tags als Knoten anzeigen",
+    "showTagNodesHint": "#Hashtags als verbundene Tag-Knoten auf der Leinwand anzeigen",
+    "workspaceDiagnostics": "Arbeitsbereich-Diagnose",
+    "scanWorkspaces": "Arbeitsbereiche scannen",
+    "scanning": "Scannen...",
+    "workspaceStatsHint": "Scannen, um Knotenzahlen pro Arbeitsbereich zu sehen und fehlende Knoten zu finden.",
+    "workspace": "Arbeitsbereich",
+    "nodes": "Knoten",
+    "switch": "Wechseln",
+    "recover": "Wiederherstellen",
+    "about": "Info",
+    "aboutDescription": "Lokaler Wissensgraph",
+    "version": "Version",
+    "themeCount": "verfügbar",
+    "themeHint": "Verwenden Sie den KI-Agenten, um benutzerdefinierte Designs zu erstellen",
+    "deleteTheme": "Dieses benutzerdefinierte Design löschen?"
   }
 }

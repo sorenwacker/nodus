@@ -2,7 +2,148 @@
   "app": {
     "name": "Nodus"
   },
+  "search": {
+    "placeholder": "Search nodes...",
+    "inputPlaceholder": "Search nodes by title or content...",
+    "noResults": "No results found"
+  },
+  "canvas": {
+    "agent": {
+      "placeholder": "Ask about the graph...",
+      "clearMemory": "Clear conversation memory",
+      "clearLog": "Clear log"
+    },
+    "node": {
+      "writePlaceholder": "Write markdown...",
+      "askPlaceholder": "Ask AI to update this note...",
+      "processing": "Processing...",
+      "fitContent": "Fit node to content",
+      "untitled": "Untitled",
+      "connections": "connections"
+    },
+    "edge": {
+      "labelPlaceholder": "e.g. depends on",
+      "flip": "Flip",
+      "reverseDirection": "Reverse direction",
+      "makeDirectional": "Make directional (one-way)",
+      "makeNonDirectional": "Make non-directional (both ways)"
+    },
+    "frame": {
+      "delete": "Delete frame",
+      "addFrame": "Add Frame - Group selected nodes",
+      "clickToPlace": "Click on canvas to place frame (Esc to cancel)"
+    },
+    "status": {
+      "layoutRunning": "Layout running...",
+      "stop": "Stop",
+      "perfMode": "PERF",
+      "nodes": "nodes",
+      "edges": "edges",
+      "hideAgentLog": "Hide agent log",
+      "showAgentLog": "Show agent log",
+      "log": "Log",
+      "hint": "Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new"
+    },
+    "controls": {
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "fitToContent": "Fit to Content - Show all nodes",
+      "snapToGrid": "Snap to Grid - Align nodes to grid when dragging",
+      "gridLayout": "Grid Layout - Arrange nodes in a grid",
+      "forceLayout": "Force Layout - Arrange by connections",
+      "hierarchicalLayout": "Hierarchical Layout - Arrange as tree (for DAGs/ontologies)",
+      "fitNodesToContent": "Fit Nodes to Content - Resize all nodes to show full content",
+      "edgeStyle": "Edge Style",
+      "edgeBundling": "Edge Bundling - Merge edges with shared endpoints",
+      "magnifier": "Magnifier - Show magnified view when zoomed out",
+      "neighborhoodView": "Neighborhood View - Show only selected node and neighbors (N)",
+      "neighborhoodDepth": "Neighborhood depth (hops)",
+      "hop": "hop",
+      "hops": "hops"
+    }
+  },
+  "llm": {
+    "provider": "Provider",
+    "status": {
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "checking": "Checking..."
+    },
+    "streaming": {
+      "label": "Enable Streaming",
+      "hint": "Stream responses token-by-token (requires provider support)"
+    },
+    "apiKey": {
+      "label": "API Key",
+      "optional": "(optional)",
+      "placeholder": "Enter your API key",
+      "optionalPlaceholder": "Optional - leave empty if not required",
+      "validate": "Validate API key",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "validating": "Validating..."
+    },
+    "hints": {
+      "openai": "Get your key at platform.openai.com",
+      "anthropic": "Get your key at console.anthropic.com",
+      "compatible": "Required by some endpoints (e.g., hosted APIs)"
+    },
+    "baseUrl": {
+      "label": "Base URL",
+      "ollamaLabel": "Ollama URL",
+      "ollamaPlaceholder": "http://localhost:11434",
+      "placeholder": "API base URL"
+    },
+    "model": {
+      "label": "Model",
+      "placeholder": "Enter model name or select from list",
+      "fetch": "Fetch available models",
+      "available": "{count} models available",
+      "fetchHint": "Type model name or click refresh to fetch available models"
+    },
+    "maxTokens": {
+      "label": "Max Tokens",
+      "hint": "Maximum tokens in response"
+    },
+    "contextWindow": {
+      "label": "Context Window",
+      "hint": "Model context size in tokens (Llama 3.1: up to 131072)"
+    },
+    "timeout": {
+      "label": "Timeout (seconds)"
+    },
+    "neighborContext": {
+      "label": "Neighbor Context",
+      "off": "Off",
+      "hint": "Include content from linked nodes when asking LLM"
+    },
+    "searchApi": {
+      "label": "Web Search API Key (Tavily)",
+      "placeholder": "Enter your Tavily API key",
+      "test": "Test API key",
+      "testing": "Testing...",
+      "hint": "Free: 1000 searches/month, no credit card. Get key at"
+    },
+    "systemPrompt": {
+      "label": "System Prompt (simple generation)",
+      "reset": "Reset"
+    },
+    "agentPrompt": {
+      "label": "Agent Prompt (graph builder)",
+      "reset": "Reset"
+    }
+  },
+  "workspace": {
+    "pathPlaceholder": "/path/to/vault",
+    "namePlaceholder": "Workspace name",
+    "defaultName": "My Research Project",
+    "descriptionPlaceholder": "What is this workspace for?"
+  },
   "onboarding": {
+    "language": {
+      "title": "Choose Your Language",
+      "description": "Select your preferred language. You can change this later in Settings."
+    },
     "welcome": {
       "title": "Welcome to Nodus",
       "description": "A local-first knowledge graph for visual thinking. Your data stays on your device."
@@ -17,7 +158,7 @@
     },
     "import": {
       "title": "Import Your Research",
-      "description": "Drop .bib files from Zotero, .md files, or PDFs directly onto the canvas."
+      "description": "Drop files directly onto the canvas: PDFs, Markdown (.md), BibTeX (.bib), and ontologies (.ttl, .rdf, .owl)."
     },
     "math": {
       "title": "Math & Equations",
@@ -90,14 +231,14 @@
     "doubleClick": "Double-click",
     "createNote": "Create a note",
     "dropFiles": "Drop files",
-    "fileTypes": ".bib .md .pdf",
+    "fileTypes": ".pdf .md .bib .ttl",
     "paste": "Cmd+V",
     "pasteText": "Paste text",
     "mathHint": "Use $...$ for math equations"
   },
   "dropZone": {
     "title": "Drop files to import",
-    "fileTypes": ".bib, .json, .md, .pdf"
+    "fileTypes": ".pdf, .md, .bib, .ttl, .rdf, .owl"
   },
   "notifications": {
     "citationsImported": "Citations imported",
@@ -119,5 +260,54 @@
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit"
+  },
+  "toolbar": {
+    "editWorkspace": "Edit Workspace",
+    "newWorkspace": "New Workspace",
+    "undo": "Undo",
+    "redo": "Redo",
+    "storylines": "Storylines",
+    "importVault": "Import Vault",
+    "theme": "Theme",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "themes": "Themes",
+      "canvas": "Canvas",
+      "llm": "LLM"
+    },
+    "language": "Language",
+    "llmEnabled": "LLM Features",
+    "llmEnabledHint": "Show AI prompt bars for graph and nodes",
+    "gridSnap": "Snap to Grid",
+    "gridSize": "Grid Size",
+    "gridSizeUnit": "px",
+    "edgeStyle": "Edge Style",
+    "edgeStyles": {
+      "orthogonal": "Orthogonal",
+      "diagonal": "Diagonal",
+      "curved": "Curved",
+      "hyperbolic": "Hyperbolic",
+      "straight": "Straight"
+    },
+    "showTagNodes": "Show Tags as Nodes",
+    "showTagNodesHint": "Display #hashtags as connected tag nodes on canvas",
+    "workspaceDiagnostics": "Workspace Diagnostics",
+    "scanWorkspaces": "Scan workspaces",
+    "scanning": "Scanning...",
+    "workspaceStatsHint": "Scan to see node counts per workspace and find missing nodes.",
+    "workspace": "Workspace",
+    "nodes": "Nodes",
+    "switch": "Switch",
+    "recover": "Recover",
+    "about": "About",
+    "aboutDescription": "Local-first knowledge graph",
+    "version": "Version",
+    "themeCount": "available",
+    "themeHint": "Use the AI agent to create custom themes",
+    "deleteTheme": "Delete this custom theme?"
   }
 }

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed, provide } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useNodesStore } from './stores/nodes'
 import { useThemesStore } from './stores/themes'
+import { useAppSearch } from './composables/useAppSearch'
+import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
@@ -9,6 +12,7 @@ import OnboardingFlow from './components/OnboardingFlow.vue'
 import StorylinePanel from './components/StorylinePanel.vue'
 import StorylineReader from './components/StorylineReader.vue'
 
+const { t } = useI18n()
 const store = useNodesStore()
 const themesStore = useThemesStore()
 const showImportDialog = ref(false)
@@ -17,146 +21,19 @@ const showWorkspaceEditor = ref(false)
 const vaultPath = ref('')
 const importTarget = ref<'current' | 'new'>('new')
 const importWorkspaceName = ref('')
-const searchQuery = ref('')
-const showSearch = ref(false)
 const showSettings = ref(false)
+
+// Search composable
+const search = useAppSearch({
+  getFilteredNodes: () => store.filteredNodes,
+  selectNode: store.selectNode,
+})
+const { searchQuery, showSearch, searchResults, toggleSearch, closeSearch, selectResult: selectSearchResult } = search
 const currentTheme = computed(() => themesStore.currentThemeName)
 const showStorylinePanel = ref(false)
 const readerStorylineId = ref<string | null>(null)
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
-
-// Undo/Redo system - supports position, content, and deletion changes
-import type { Node, Edge } from './types'
-
-interface UndoSnapshot {
-  type: 'position' | 'content' | 'deletion'
-  positions?: Map<string, { x: number; y: number }>
-  content?: { nodeId: string; oldContent: string | null; oldTitle: string }
-  deletion?: { node: Node; edges: Edge[] }
-}
-const undoStack = ref<UndoSnapshot[]>([])
-const redoStack = ref<UndoSnapshot[]>([])
-const MAX_UNDO = 50
-
-function capturePositionSnapshot(): UndoSnapshot {
-  const positions = new Map<string, { x: number; y: number }>()
-  for (const node of store.filteredNodes) {
-    positions.set(node.id, { x: node.canvas_x, y: node.canvas_y })
-  }
-  return { type: 'position', positions }
-}
-
-function pushUndo() {
-  const snapshot = capturePositionSnapshot()
-  if (snapshot.positions?.size === 0) {
-    return // Don't push empty snapshots
-  }
-  undoStack.value.push(snapshot)
-  if (undoStack.value.length > MAX_UNDO) {
-    undoStack.value.shift()
-  }
-  redoStack.value = []
-}
-
-function pushContentUndo(nodeId: string, oldContent: string | null, oldTitle: string) {
-  undoStack.value.push({
-    type: 'content',
-    content: { nodeId, oldContent, oldTitle }
-  })
-  if (undoStack.value.length > MAX_UNDO) {
-    undoStack.value.shift()
-  }
-  redoStack.value = []
-}
-
-function pushDeletionUndo(node: Node, edges: Edge[]) {
-  undoStack.value.push({
-    type: 'deletion',
-    deletion: { node: { ...node }, edges: edges.map(e => ({ ...e })) }
-  })
-  if (undoStack.value.length > MAX_UNDO) {
-    undoStack.value.shift()
-  }
-  redoStack.value = []
-}
-
-async function undo() {
-  if (undoStack.value.length === 0) {
-    showToast('Nothing to undo', 'info')
-    return
-  }
-  const snapshot = undoStack.value.pop()!
-
-  if (snapshot.type === 'position' && snapshot.positions) {
-    redoStack.value.push(capturePositionSnapshot())
-    for (const [id, pos] of snapshot.positions) {
-      await store.updateNodePosition(id, pos.x, pos.y)
-    }
-    showToast('Undo position', 'info')
-  } else if (snapshot.type === 'content' && snapshot.content) {
-    const node = store.getNode(snapshot.content.nodeId)
-    if (node) {
-      // Save current state for redo
-      redoStack.value.push({
-        type: 'content',
-        content: {
-          nodeId: node.id,
-          oldContent: node.markdown_content,
-          oldTitle: node.title
-        }
-      })
-      // Restore old content
-      await store.updateNodeContent(node.id, snapshot.content.oldContent || '')
-      await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
-      showToast('Undo content', 'info')
-    }
-  } else if (snapshot.type === 'deletion' && snapshot.deletion) {
-    // Restore deleted node
-    const { node, edges } = snapshot.deletion
-    await store.restoreNode(node)
-    // Restore connected edges
-    for (const edge of edges) {
-      await store.restoreEdge(edge)
-    }
-    showToast('Undo deletion', 'info')
-  }
-}
-
-async function redo() {
-  if (redoStack.value.length === 0) return
-  const snapshot = redoStack.value.pop()!
-
-  if (snapshot.type === 'position' && snapshot.positions) {
-    undoStack.value.push(capturePositionSnapshot())
-    for (const [id, pos] of snapshot.positions) {
-      await store.updateNodePosition(id, pos.x, pos.y)
-    }
-    showToast('Redo position', 'info')
-  } else if (snapshot.type === 'content' && snapshot.content) {
-    const node = store.getNode(snapshot.content.nodeId)
-    if (node) {
-      // Save current state for undo
-      undoStack.value.push({
-        type: 'content',
-        content: {
-          nodeId: node.id,
-          oldContent: node.markdown_content,
-          oldTitle: node.title
-        }
-      })
-      // Apply redo content
-      await store.updateNodeContent(node.id, snapshot.content.oldContent || '')
-      await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
-      showToast('Redo content', 'info')
-    }
-  }
-}
-
-// Expose undo functions to child components
-provide('pushUndo', pushUndo)
-provide('pushContentUndo', pushContentUndo)
-provide('pushDeletionUndo', pushDeletionUndo)
 
 // Toast notifications
 interface Toast {
@@ -177,6 +54,32 @@ function showToast(message: string, type: 'error' | 'success' | 'info' = 'info')
 
 // Provide toast function to child components
 provide('showToast', showToast)
+
+// Undo/Redo composable
+import { useUndoRedo } from './composables/useUndoRedo'
+import type { Node, Edge } from './types'
+
+const undoRedo = useUndoRedo({
+  store: {
+    getNode: store.getNode,
+    getFilteredNodes: () => store.filteredNodes,
+    updateNodePosition: store.updateNodePosition,
+    updateNodeContent: store.updateNodeContent,
+    updateNodeTitle: store.updateNodeTitle,
+    restoreNode: store.restoreNode,
+    restoreEdge: store.restoreEdge,
+    deleteNode: store.deleteNode,
+  },
+  showToast,
+})
+
+const { undoStack, redoStack, pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, undo, redo } = undoRedo
+
+// Expose undo functions to child components
+provide('pushUndo', pushUndo)
+provide('pushContentUndo', pushContentUndo)
+provide('pushDeletionUndo', pushDeletionUndo)
+provide('pushCreationUndo', pushCreationUndo)
 
 // Reset all nodes to default size
 async function resetAllNodeSizes() {
@@ -241,143 +144,51 @@ function cycleTheme() {
   themesStore.cycleTheme()
 }
 
-// Normalize text for search: lowercase and remove diacritics (ö→o, é→e, etc.)
-function normalizeText(str: string): string {
-  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+// Keyboard shortcuts handlers
+function handleEscape() {
+  if (showSettings.value) {
+    showSettings.value = false
+  } else if (showSearch.value) {
+    closeSearch()
+  } else if (store.selectedNodeId) {
+    store.selectNode(null)
+  }
 }
 
-const searchResults = computed(() => {
-  if (!searchQuery.value.trim()) return []
-  const q = normalizeText(searchQuery.value)
-
-  // Search in filtered nodes (current workspace)
-  const matches = store.filteredNodes.filter(n => {
-    const title = normalizeText(n.title)
-    const content = normalizeText(n.markdown_content || '')
-    return title.includes(q) || content.includes(q)
-  })
-
-  // Sort by relevance: exact title match > title starts with > title contains > content only
-  matches.sort((a, b) => {
-    const aTitle = normalizeText(a.title)
-    const bTitle = normalizeText(b.title)
-
-    // Exact title match
-    if (aTitle === q && bTitle !== q) return -1
-    if (bTitle === q && aTitle !== q) return 1
-
-    // Title starts with query
-    const aStarts = aTitle.startsWith(q)
-    const bStarts = bTitle.startsWith(q)
-    if (aStarts && !bStarts) return -1
-    if (bStarts && !aStarts) return 1
-
-    // Title contains query
-    const aTitleMatch = aTitle.includes(q)
-    const bTitleMatch = bTitle.includes(q)
-    if (aTitleMatch && !bTitleMatch) return -1
-    if (bTitleMatch && !aTitleMatch) return 1
-
-    // Both in content only - sort alphabetically
-    return aTitle.localeCompare(bTitle)
-  })
-
-  return matches.slice(0, 10)
-})
-
-function selectSearchResult(nodeId: string) {
-  store.selectNode(nodeId)
-  showSearch.value = false
-  searchQuery.value = ''
-  // Dispatch event for PixiCanvas to zoom to the node
-  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId } }))
-}
-
-function onKeydown(e: KeyboardEvent) {
-  const target = e.target as HTMLElement
-  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
-
-  // Cmd/Ctrl + Z: Undo (not in input)
-  if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !isInput) {
-    e.preventDefault()
-    undo()
-    return
-  }
-  // Cmd/Ctrl + Shift + Z or Cmd/Ctrl + Y: Redo (not in input)
-  if ((e.metaKey || e.ctrlKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y') && !isInput) {
-    e.preventDefault()
-    redo()
-    return
-  }
-  // Cmd/Ctrl + R: Reload app
-  if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
-    e.preventDefault()
-    window.location.reload()
-  }
-  // Cmd/Ctrl + K: Open search
-  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-    e.preventDefault()
-    showSearch.value = !showSearch.value
-    if (showSearch.value) {
-      setTimeout(() => {
-        document.querySelector<HTMLInputElement>('.search-input')?.focus()
-      }, 50)
-    }
-  }
-  // Cmd/Ctrl + ,: Open settings
-  if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-    e.preventDefault()
-    showSettings.value = !showSettings.value
-  }
-  // Escape: Close dialogs or deselect
-  if (e.key === 'Escape') {
-    if (showSettings.value) {
-      showSettings.value = false
-    } else if (showSearch.value) {
-      showSearch.value = false
-      searchQuery.value = ''
-    } else if (store.selectedNodeId) {
-      store.selectNode(null)
-    }
-  }
-  // Shift+R: Reset all node sizes to default
-  if ((e.key === 'R' || e.key === 'r') && e.shiftKey && !isInput) {
-    e.preventDefault()
-    resetAllNodeSizes()
-  }
-  // Delete/Backspace: Delete selected nodes or frames (when not in input)
-  if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
-    if (store.selectedNodeIds.length > 0) {
-      e.preventDefault()
-      for (const id of [...store.selectedNodeIds]) {
-        const node = store.getNode(id)
-        if (node) {
-          // Capture connected edges before deletion
-          const connectedEdges = store.filteredEdges.filter(
-            e => e.source_node_id === id || e.target_node_id === id
-          )
-          pushDeletionUndo(node, connectedEdges)
-        }
-        store.deleteNode(id)
+function handleDelete() {
+  if (store.selectedNodeIds.length > 0) {
+    for (const id of [...store.selectedNodeIds]) {
+      const node = store.getNode(id)
+      if (node) {
+        const connectedEdges = store.filteredEdges.filter(
+          e => e.source_node_id === id || e.target_node_id === id
+        )
+        pushDeletionUndo(node, connectedEdges)
       }
-    } else if (store.selectedFrameId) {
-      e.preventDefault()
-      store.deleteFrame(store.selectedFrameId)
-      store.selectFrame(null)
+      store.deleteNode(id)
     }
+  } else if (store.selectedFrameId) {
+    store.deleteFrame(store.selectedFrameId)
+    store.selectFrame(null)
   }
 }
+
+// Register keyboard shortcuts using composable
+useKeyboardShortcuts({
+  onUndo: undo,
+  onRedo: redo,
+  onSearch: toggleSearch,
+  onSettings: () => { showSettings.value = !showSettings.value },
+  onEscape: handleEscape,
+  onResetSizes: resetAllNodeSizes,
+  onDelete: handleDelete,
+})
 
 onMounted(async () => {
   // Initialize themes first to apply visual styling
   await themesStore.initialize()
   // Then initialize data
   store.initialize()
-  window.addEventListener('keydown', onKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', onKeydown)
 })
 
 async function importVault() {
@@ -470,25 +281,25 @@ async function openFolderDialog() {
               {{ ws.name }}
             </option>
           </select>
-          <button class="icon-btn" data-tooltip="Edit Workspace" @click="openWorkspaceEditor">
+          <button class="icon-btn" :data-tooltip="t('toolbar.editWorkspace')" @click="openWorkspaceEditor">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="icon-btn" data-tooltip="New Workspace" @click="showWorkspaceDialog = true">
+          <button class="icon-btn" :data-tooltip="t('toolbar.newWorkspace')" @click="showWorkspaceDialog = true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
         <div class="toolbar-divider"></div>
-        <button class="icon-btn" :disabled="undoStack.length === 0" data-tooltip="Undo (Cmd+Z)" @click="undo">
+        <button class="icon-btn" :disabled="undoStack.length === 0" :data-tooltip="`${t('toolbar.undo')} (Cmd+Z)`" @click="undo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
         </button>
-        <button class="icon-btn" :disabled="redoStack.length === 0" data-tooltip="Redo (Cmd+Shift+Z)" @click="redo">
+        <button class="icon-btn" :disabled="redoStack.length === 0" :data-tooltip="`${t('toolbar.redo')} (Cmd+Shift+Z)`" @click="redo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
       </div>
       <div class="toolbar-center">
         <button class="search-trigger" @click="showSearch = true">
           <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <span class="search-placeholder">Search nodes...</span>
+          <span class="search-placeholder">{{ t('search.placeholder') }}</span>
           <span class="search-shortcut">Cmd+K</span>
         </button>
       </div>
@@ -496,7 +307,7 @@ async function openFolderDialog() {
         <button
           class="icon-btn"
           :class="{ active: showStorylinePanel }"
-          data-tooltip="Storylines"
+          :data-tooltip="t('toolbar.storylines')"
           @click="showStorylinePanel = !showStorylinePanel"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -504,16 +315,16 @@ async function openFolderDialog() {
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
           </svg>
         </button>
-        <button class="icon-btn" data-tooltip="Import Vault" @click="showImportDialog = true">
+        <button class="icon-btn" :data-tooltip="t('toolbar.importVault')" @click="showImportDialog = true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
-        <button class="icon-btn theme-btn" :data-tooltip="`Theme: ${currentTheme}`" @click="cycleTheme">
+        <button class="icon-btn theme-btn" :data-tooltip="`${t('toolbar.theme')}: ${currentTheme}`" @click="cycleTheme">
           <svg v-if="currentTheme === 'light'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
           <svg v-else-if="currentTheme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <svg v-else-if="currentTheme === 'pitch-black'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20"/></svg>
           <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </button>
-        <button class="icon-btn settings-btn" data-tooltip="Settings (Cmd+,)" @click="showSettings = true">
+        <button class="icon-btn settings-btn" :data-tooltip="`${t('toolbar.settings')} (Cmd+,)`" @click="showSettings = true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
             <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
@@ -529,7 +340,7 @@ async function openFolderDialog() {
           v-model="searchQuery"
           type="text"
           class="search-input"
-          placeholder="Search nodes by title or content..."
+          :placeholder="t('search.inputPlaceholder')"
           @keydown.escape="showSearch = false"
         />
         <div class="search-results">
@@ -548,7 +359,7 @@ async function openFolderDialog() {
             </div>
           </div>
           <div v-if="searchQuery && searchResults.length === 0" class="no-results">
-            No nodes found
+            {{ t('search.noResults') }}
           </div>
         </div>
       </div>
@@ -580,7 +391,7 @@ async function openFolderDialog() {
               <input
                 v-model="vaultPath"
                 type="text"
-                placeholder="/path/to/vault"
+                :placeholder="t('workspace.pathPlaceholder')"
                 class="path-input"
               />
               <button class="browse-btn" @click="openFolderDialog">Browse</button>
@@ -596,7 +407,7 @@ async function openFolderDialog() {
               v-if="importTarget === 'new'"
               v-model="importWorkspaceName"
               type="text"
-              placeholder="Workspace name"
+              :placeholder="t('workspace.namePlaceholder')"
               class="path-input workspace-name-input"
             />
 
@@ -627,7 +438,7 @@ async function openFolderDialog() {
             <input
               v-model="newWorkspaceName"
               type="text"
-              placeholder="My Research Project"
+              :placeholder="t('workspace.defaultName')"
               class="path-input"
               @keydown.enter="createNewWorkspace"
             />
@@ -650,7 +461,7 @@ async function openFolderDialog() {
             <input
               v-model="editingWorkspace.name"
               type="text"
-              placeholder="Workspace name"
+              :placeholder="t('workspace.namePlaceholder')"
               class="path-input"
               :disabled="!store.currentWorkspaceId"
             />
@@ -659,7 +470,7 @@ async function openFolderDialog() {
             Description:
             <textarea
               v-model="editingWorkspace.description"
-              placeholder="What is this workspace for?"
+              :placeholder="t('workspace.descriptionPlaceholder')"
               class="description-input"
               rows="3"
             ></textarea>
@@ -708,576 +519,4 @@ async function openFolderDialog() {
   </div>
 </template>
 
-<style scoped>
-.app-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #f4f4f5;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 20px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-  flex-shrink: 0;
-  box-shadow: 0 1px 3px var(--shadow-sm);
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.app-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #3b82f6;
-  margin: 0;
-  letter-spacing: -0.5px;
-}
-
-.workspace-selector {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.workspace-selector select {
-  padding: 6px 10px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  background: var(--bg-surface);
-  cursor: pointer;
-  min-width: 140px;
-}
-
-.workspace-selector select:hover {
-  border-color: var(--text-muted);
-}
-
-.icon-btn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--bg-surface);
-  cursor: pointer;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.icon-btn:hover:not(:disabled) {
-  background: var(--bg-elevated);
-  border-color: var(--text-muted);
-  color: var(--text-main);
-}
-
-.icon-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.icon-btn.active {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
-  color: white;
-}
-
-.icon-btn svg {
-  flex-shrink: 0;
-}
-
-/* Tooltip styles for top bar buttons */
-.icon-btn[data-tooltip] {
-  position: relative;
-}
-
-.icon-btn[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px var(--shadow-md);
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 24px;
-  background: var(--border-default);
-  margin: 0 4px;
-}
-
-.toolbar-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.toolbar-btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.15s ease;
-  box-shadow: 0 1px 2px var(--shadow-sm);
-}
-
-.toolbar-btn:hover {
-  background: var(--bg-elevated);
-  border-color: var(--text-muted);
-}
-
-.theme-btn {
-  width: 36px;
-  padding: 8px;
-  font-weight: 600;
-}
-
-.toolbar-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  padding: 0 20px;
-}
-
-.search-trigger {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: var(--bg-surface-alt);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  cursor: pointer;
-  min-width: 280px;
-}
-
-.search-trigger:hover {
-  background: var(--bg-elevated);
-}
-
-.search-icon {
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.search-placeholder {
-  flex: 1;
-  text-align: left;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.search-shortcut {
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--border-default);
-}
-
-.search-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 100px;
-  z-index: 300;
-}
-
-.search-dialog {
-  background: var(--bg-surface);
-  border-radius: 12px;
-  width: 500px;
-  max-width: 90%;
-  box-shadow: 0 20px 40px var(--shadow-md);
-  overflow: hidden;
-}
-
-.search-input {
-  width: 100%;
-  padding: 16px 20px;
-  border: none;
-  border-bottom: 1px solid var(--border-default);
-  font-size: 16px;
-  outline: none;
-  background: var(--bg-surface);
-  color: var(--text-main);
-}
-
-.search-input::placeholder {
-  color: var(--text-muted);
-}
-
-.search-results {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.search-result {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
-  cursor: pointer;
-}
-
-.search-result:hover {
-  background: var(--bg-elevated);
-}
-
-.result-icon {
-  width: 32px;
-  height: 32px;
-  background: var(--primary-color);
-  color: white;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.result-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.result-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.result-preview {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 2px;
-}
-
-.no-results {
-  padding: 20px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.main-content {
-  flex: 1;
-  display: flex;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Dialog styles */
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-
-.dialog {
-  background: var(--bg-surface);
-  border-radius: 12px;
-  padding: 24px;
-  width: 400px;
-  max-width: 90%;
-  box-shadow: 0 20px 40px var(--shadow-md);
-}
-
-.dialog h2 {
-  margin: 0 0 20px 0;
-  font-size: 18px;
-  color: var(--text-main);
-}
-
-.dialog-content {
-  margin-bottom: 20px;
-}
-
-.dialog-content label {
-  display: block;
-  font-size: 14px;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-
-.path-input-row {
-  display: flex;
-  gap: 8px;
-}
-
-.path-input {
-  flex: 1;
-  padding: 10px 12px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  font-size: 14px;
-  background: var(--bg-surface);
-  color: var(--text-main);
-}
-
-.path-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
-.browse-btn {
-  padding: 10px 16px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface-alt);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text-main);
-}
-
-.browse-btn:hover {
-  background: var(--bg-elevated);
-}
-
-.import-target-section {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text-main);
-}
-
-.radio-label input[type="radio"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary-color);
-}
-
-.workspace-name-input {
-  margin-left: 24px;
-  margin-top: 4px;
-}
-
-.dialog-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.cancel-btn {
-  padding: 10px 20px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text-main);
-}
-
-.import-btn {
-  padding: 10px 20px;
-  border: none;
-  background: var(--primary-color);
-  color: #ffffff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.import-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.import-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-/* Toast notifications */
-.toast-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.toast {
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: toast-slide-in 0.3s ease;
-  max-width: 350px;
-}
-
-@keyframes toast-slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.toast.error {
-  background: #fef2f2;
-  color: #991b1b;
-  border-left: 4px solid #dc2626;
-}
-
-.toast.success {
-  background: #f0fdf4;
-  color: #166534;
-  border-left: 4px solid #22c55e;
-}
-
-.toast.info {
-  background: #eff6ff;
-  color: #1e40af;
-  border-left: 4px solid #3b82f6;
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .toast.error {
-  background: #450a0a;
-  color: #fecaca;
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .toast.success {
-  background: #052e16;
-  color: #bbf7d0;
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .toast.info {
-  background: #172554;
-  color: #bfdbfe;
-}
-
-/* Workspace Editor */
-.workspace-editor .dialog-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.workspace-editor .actions-right {
-  display: flex;
-  gap: 8px;
-}
-
-.description-input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  font-size: 13px;
-  background: var(--bg-surface);
-  color: var(--text-main);
-  resize: vertical;
-  font-family: inherit;
-}
-
-.description-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
-.workspace-stats {
-  display: flex;
-  gap: 8px;
-  padding: 12px;
-  background: var(--bg-surface-alt);
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 8px;
-}
-
-.stat-sep {
-  color: var(--border-default);
-}
-
-.delete-btn {
-  padding: 8px 16px;
-  border: 1px solid var(--danger-border);
-  border-radius: 6px;
-  background: var(--danger-bg);
-  color: var(--danger-color);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.delete-btn:hover {
-  background: var(--danger-color);
-  color: white;
-  border-color: var(--danger-color);
-}
-
-.theme-btn {
-  width: 32px;
-  padding: 0;
-}
-</style>
+<style src="./App.css" scoped></style>

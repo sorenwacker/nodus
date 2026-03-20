@@ -1,0 +1,313 @@
+{
+  "app": {
+    "name": "Nodus"
+  },
+  "search": {
+    "placeholder": "Cerca nodi...",
+    "inputPlaceholder": "Cerca nodi per titolo o contenuto...",
+    "noResults": "Nessun risultato trovato"
+  },
+  "canvas": {
+    "agent": {
+      "placeholder": "Chiedi informazioni sul grafo...",
+      "clearMemory": "Cancella memoria conversazione",
+      "clearLog": "Cancella registro"
+    },
+    "node": {
+      "writePlaceholder": "Scrivi markdown...",
+      "askPlaceholder": "Chiedi all'IA di aggiornare questa nota...",
+      "processing": "Elaborazione...",
+      "fitContent": "Adatta al contenuto",
+      "untitled": "Senza titolo",
+      "connections": "connessioni"
+    },
+    "edge": {
+      "labelPlaceholder": "es. dipende da",
+      "flip": "Inverti",
+      "reverseDirection": "Inverti direzione",
+      "makeDirectional": "Rendi direzionale (unidirezionale)",
+      "makeNonDirectional": "Rendi non direzionale (bidirezionale)"
+    },
+    "frame": {
+      "delete": "Elimina cornice",
+      "addFrame": "Aggiungi cornice - Raggruppa nodi selezionati",
+      "clickToPlace": "Clicca sulla tela per posizionare la cornice (Esc per annullare)"
+    },
+    "status": {
+      "layoutRunning": "Layout in corso...",
+      "stop": "Ferma",
+      "perfMode": "PERF",
+      "nodes": "nodi",
+      "edges": "archi",
+      "hideAgentLog": "Nascondi registro agente",
+      "showAgentLog": "Mostra registro agente",
+      "log": "Registro",
+      "hint": "Scorri su/giù: zoom | Scorri lateralmente: sposta | Alt+trascina: collega | Doppio clic: nuovo"
+    },
+    "controls": {
+      "zoomIn": "Ingrandisci",
+      "zoomOut": "Riduci",
+      "fitToContent": "Adatta al contenuto - Mostra tutti i nodi",
+      "snapToGrid": "Allinea alla griglia - Allinea nodi durante il trascinamento",
+      "gridLayout": "Layout a griglia - Disponi nodi in griglia",
+      "forceLayout": "Layout a forza - Disponi per connessioni",
+      "hierarchicalLayout": "Layout gerarchico - Disponi come albero (per DAG/ontologie)",
+      "fitNodesToContent": "Adatta nodi al contenuto - Ridimensiona tutti i nodi",
+      "edgeStyle": "Stile archi",
+      "edgeBundling": "Raggruppamento archi - Unisci archi con endpoint comuni",
+      "magnifier": "Lente - Mostra vista ingrandita quando rimpicciolito",
+      "neighborhoodView": "Vista vicinato - Mostra solo nodo selezionato e vicini (N)",
+      "neighborhoodDepth": "Profondità vicinato (salti)",
+      "hop": "salto",
+      "hops": "salti"
+    }
+  },
+  "llm": {
+    "provider": "Provider",
+    "status": {
+      "connected": "Connesso",
+      "notConnected": "Non connesso",
+      "checking": "Verifica..."
+    },
+    "streaming": {
+      "label": "Abilita streaming",
+      "hint": "Trasmetti le risposte token per token (richiede supporto del provider)"
+    },
+    "apiKey": {
+      "label": "Chiave API",
+      "optional": "(opzionale)",
+      "placeholder": "Inserisci la tua chiave API",
+      "optionalPlaceholder": "Opzionale - lascia vuoto se non richiesto",
+      "validate": "Valida chiave API",
+      "valid": "Valida",
+      "invalid": "Non valida",
+      "validating": "Validazione..."
+    },
+    "hints": {
+      "openai": "Ottieni la chiave su platform.openai.com",
+      "anthropic": "Ottieni la chiave su console.anthropic.com",
+      "compatible": "Richiesto da alcuni endpoint (es. API ospitate)"
+    },
+    "baseUrl": {
+      "label": "URL base",
+      "ollamaLabel": "URL Ollama",
+      "ollamaPlaceholder": "http://localhost:11434",
+      "placeholder": "URL base dell'API"
+    },
+    "model": {
+      "label": "Modello",
+      "placeholder": "Inserisci il nome del modello o seleziona dalla lista",
+      "fetch": "Recupera modelli disponibili",
+      "available": "{count} modelli disponibili",
+      "fetchHint": "Digita il nome del modello o clicca aggiorna per recuperare i modelli disponibili"
+    },
+    "maxTokens": {
+      "label": "Token max",
+      "hint": "Numero massimo di token nella risposta"
+    },
+    "contextWindow": {
+      "label": "Finestra di contesto",
+      "hint": "Dimensione del contesto del modello in token (Llama 3.1: fino a 131072)"
+    },
+    "timeout": {
+      "label": "Timeout (secondi)"
+    },
+    "neighborContext": {
+      "label": "Contesto vicini",
+      "off": "Disattivato",
+      "hint": "Includi il contenuto dei nodi collegati nelle richieste al LLM"
+    },
+    "searchApi": {
+      "label": "Chiave API ricerca web (Tavily)",
+      "placeholder": "Inserisci la tua chiave API Tavily",
+      "test": "Testa chiave API",
+      "testing": "Test in corso...",
+      "hint": "Gratis: 1000 ricerche/mese, senza carta di credito. Ottieni la chiave su"
+    },
+    "systemPrompt": {
+      "label": "Prompt di sistema (generazione semplice)",
+      "reset": "Ripristina"
+    },
+    "agentPrompt": {
+      "label": "Prompt agente (costruttore di grafi)",
+      "reset": "Ripristina"
+    }
+  },
+  "workspace": {
+    "pathPlaceholder": "/percorso/al/vault",
+    "namePlaceholder": "Nome spazio di lavoro",
+    "defaultName": "Il mio progetto di ricerca",
+    "descriptionPlaceholder": "A cosa serve questo spazio di lavoro?"
+  },
+  "onboarding": {
+    "language": {
+      "title": "Scegli la tua lingua",
+      "description": "Seleziona la tua lingua preferita. Puoi modificarla in seguito nelle Impostazioni."
+    },
+    "welcome": {
+      "title": "Benvenuto su Nodus",
+      "description": "Un grafo di conoscenza locale per il pensiero visivo. I tuoi dati rimangono sul tuo dispositivo."
+    },
+    "nodes": {
+      "title": "Creare nodi",
+      "description": "Fai doppio clic ovunque sulla tela per creare una nuova nota. Trascina i nodi per organizzarli."
+    },
+    "edges": {
+      "title": "Connettere le idee",
+      "description": "Fai clic su un nodo, poi Maiusc+clic su un altro per creare una connessione. Usa i [[wikilink]] nelle tue note."
+    },
+    "import": {
+      "title": "Importare la tua ricerca",
+      "description": "Trascina file direttamente sulla tela: PDF, Markdown (.md), BibTeX (.bib) e ontologie (.ttl, .rdf, .owl)."
+    },
+    "math": {
+      "title": "Matematica ed equazioni",
+      "description": "Usa $...$ per la matematica in linea e $$...$$ per le equazioni in blocco. Alimentato da Typst."
+    },
+    "buttons": {
+      "next": "Avanti",
+      "back": "Indietro",
+      "skip": "Salta",
+      "getStarted": "Inizia"
+    }
+  },
+  "shortcuts": {
+    "title": "Scorciatoie da tastiera",
+    "search": "Cerca scorciatoie...",
+    "toggle": "Premi ? per mostrare/nascondere questo aiuto",
+    "categories": {
+      "navigation": "Navigazione",
+      "selection": "Selezione",
+      "editing": "Modifica",
+      "layout": "Disposizione",
+      "data": "Dati",
+      "math": "Matematica"
+    },
+    "keys": {
+      "scroll": "Scorrere",
+      "pinchZoom": "Pizzica / Ctrl+Scorrere",
+      "fit": "F",
+      "neighborhood": "N",
+      "click": "Clic",
+      "shiftClick": "Maiusc+Clic",
+      "selectAll": "Cmd/Ctrl+A",
+      "escape": "Esc",
+      "doubleClick": "Doppio clic",
+      "delete": "Canc / Backspace",
+      "undo": "Cmd/Ctrl+Z",
+      "redo": "Cmd/Ctrl+Maiusc+Z",
+      "layout": "L",
+      "resetSizes": "Maiusc+R",
+      "dropFiles": "Rilasciare file",
+      "export": "Maiusc+E",
+      "refresh": "Ctrl+Maiusc+R",
+      "inlineMath": "$...$",
+      "displayMath": "$$...$$"
+    },
+    "descriptions": {
+      "panCanvas": "Spostare la tela",
+      "zoomInOut": "Zoom avanti/indietro",
+      "fitToView": "Adatta tutti i nodi alla vista",
+      "toggleNeighborhood": "Attiva/disattiva modalità vicinato",
+      "selectNode": "Seleziona nodo",
+      "addToSelection": "Aggiungi alla selezione",
+      "selectAll": "Seleziona tutti i nodi",
+      "clearSelection": "Annulla selezione",
+      "editCreate": "Modifica/Crea nodo",
+      "deleteSelected": "Elimina selezionati",
+      "undo": "Annulla",
+      "redo": "Ripristina",
+      "autoLayout": "Disposizione automatica",
+      "resetSizes": "Reimposta dimensioni",
+      "importFiles": "Importa .bib .md .pdf",
+      "exportYaml": "Esporta grafo come YAML",
+      "refreshFiles": "Aggiorna dai file",
+      "inlineMath": "Matematica in linea (Typst)",
+      "displayMath": "Matematica in blocco (Typst)"
+    }
+  },
+  "emptyState": {
+    "title": "Inizia il tuo grafo di conoscenza",
+    "doubleClick": "Doppio clic",
+    "createNote": "Crea una nota",
+    "dropFiles": "Rilascia file",
+    "fileTypes": ".pdf .md .bib .ttl",
+    "paste": "Cmd+V",
+    "pasteText": "Incolla testo",
+    "mathHint": "Usa $...$ per le equazioni"
+  },
+  "dropZone": {
+    "title": "Rilascia file per importare",
+    "fileTypes": ".pdf, .md, .bib, .ttl, .rdf, .owl"
+  },
+  "notifications": {
+    "citationsImported": "Citazioni importate",
+    "citationsCount": "{count} citazione aggiunta alla tela | {count} citazioni aggiunte alla tela",
+    "notesImported": "Note importate",
+    "notesCount": "{count} nota aggiunta alla tela | {count} note aggiunte alla tela",
+    "noCitations": "Nessuna citazione trovata",
+    "noCitationsDesc": "Il file non conteneva voci BibTeX o CSL-JSON valide",
+    "importFailed": "Importazione fallita",
+    "unsupportedFile": "File non supportato"
+  },
+  "node": {
+    "untitled": "Senza titolo",
+    "processing": "Elaborazione..."
+  },
+  "common": {
+    "close": "Chiudi",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "delete": "Elimina",
+    "edit": "Modifica"
+  },
+  "toolbar": {
+    "editWorkspace": "Modifica spazio di lavoro",
+    "newWorkspace": "Nuovo spazio di lavoro",
+    "undo": "Annulla",
+    "redo": "Ripristina",
+    "storylines": "Trame",
+    "importVault": "Importa vault",
+    "theme": "Tema",
+    "settings": "Impostazioni"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "tabs": {
+      "general": "Generale",
+      "themes": "Temi",
+      "canvas": "Tela",
+      "llm": "IA"
+    },
+    "language": "Lingua",
+    "llmEnabled": "Funzionalità IA",
+    "llmEnabledHint": "Mostra barre di comando IA per il grafo e i nodi",
+    "gridSnap": "Allinea alla griglia",
+    "gridSize": "Dimensione griglia",
+    "gridSizeUnit": "px",
+    "edgeStyle": "Stile degli archi",
+    "edgeStyles": {
+      "orthogonal": "Ortogonale",
+      "diagonal": "Diagonale",
+      "curved": "Curvo",
+      "hyperbolic": "Iperbolico",
+      "straight": "Dritto"
+    },
+    "showTagNodes": "Mostra tag come nodi",
+    "showTagNodesHint": "Mostra #hashtag come nodi tag connessi sulla tela",
+    "workspaceDiagnostics": "Diagnostica spazio di lavoro",
+    "scanWorkspaces": "Scansiona spazi di lavoro",
+    "scanning": "Scansione...",
+    "workspaceStatsHint": "Scansiona per vedere il conteggio dei nodi per spazio di lavoro e trovare nodi mancanti.",
+    "workspace": "Spazio di lavoro",
+    "nodes": "Nodi",
+    "switch": "Cambia",
+    "recover": "Recupera",
+    "about": "Informazioni",
+    "aboutDescription": "Grafo di conoscenza locale",
+    "version": "Versione",
+    "themeCount": "disponibili",
+    "themeHint": "Usa l'agente IA per creare temi personalizzati",
+    "deleteTheme": "Eliminare questo tema personalizzato?"
+  }
+}

@@ -1,0 +1,313 @@
+{
+  "app": {
+    "name": "Nodus"
+  },
+  "search": {
+    "placeholder": "Buscar nodos...",
+    "inputPlaceholder": "Buscar nodos por título o contenido...",
+    "noResults": "No se encontraron resultados"
+  },
+  "canvas": {
+    "agent": {
+      "placeholder": "Preguntar sobre el grafo...",
+      "clearMemory": "Borrar memoria de conversación",
+      "clearLog": "Borrar registro"
+    },
+    "node": {
+      "writePlaceholder": "Escribir markdown...",
+      "askPlaceholder": "Pedir a la IA que actualice esta nota...",
+      "processing": "Procesando...",
+      "fitContent": "Ajustar al contenido",
+      "untitled": "Sin título",
+      "connections": "conexiones"
+    },
+    "edge": {
+      "labelPlaceholder": "ej. depende de",
+      "flip": "Invertir",
+      "reverseDirection": "Invertir dirección",
+      "makeDirectional": "Hacer direccional (un sentido)",
+      "makeNonDirectional": "Hacer no direccional (bidireccional)"
+    },
+    "frame": {
+      "delete": "Eliminar marco",
+      "addFrame": "Agregar marco - Agrupar nodos seleccionados",
+      "clickToPlace": "Haga clic en el lienzo para colocar el marco (Esc para cancelar)"
+    },
+    "status": {
+      "layoutRunning": "Ejecutando disposición...",
+      "stop": "Detener",
+      "perfMode": "PERF",
+      "nodes": "nodos",
+      "edges": "aristas",
+      "hideAgentLog": "Ocultar registro del agente",
+      "showAgentLog": "Mostrar registro del agente",
+      "log": "Registro",
+      "hint": "Desplazar arriba/abajo: zoom | Desplazar lateralmente: mover | Alt+arrastrar: enlazar | Doble clic: nuevo"
+    },
+    "controls": {
+      "zoomIn": "Acercar",
+      "zoomOut": "Alejar",
+      "fitToContent": "Ajustar al contenido - Mostrar todos los nodos",
+      "snapToGrid": "Ajustar a la cuadrícula - Alinear nodos al arrastrar",
+      "gridLayout": "Disposición en cuadrícula - Ordenar nodos en cuadrícula",
+      "forceLayout": "Disposición por fuerza - Ordenar por conexiones",
+      "hierarchicalLayout": "Disposición jerárquica - Ordenar como árbol (para DAGs/ontologías)",
+      "fitNodesToContent": "Ajustar nodos al contenido - Redimensionar todos los nodos",
+      "edgeStyle": "Estilo de aristas",
+      "edgeBundling": "Agrupación de aristas - Fusionar aristas con puntos finales comunes",
+      "magnifier": "Lupa - Mostrar vista ampliada al alejar",
+      "neighborhoodView": "Vista de vecindario - Mostrar solo el nodo seleccionado y vecinos (N)",
+      "neighborhoodDepth": "Profundidad del vecindario (saltos)",
+      "hop": "salto",
+      "hops": "saltos"
+    }
+  },
+  "llm": {
+    "provider": "Proveedor",
+    "status": {
+      "connected": "Conectado",
+      "notConnected": "No conectado",
+      "checking": "Verificando..."
+    },
+    "streaming": {
+      "label": "Habilitar streaming",
+      "hint": "Transmitir respuestas token por token (requiere soporte del proveedor)"
+    },
+    "apiKey": {
+      "label": "Clave API",
+      "optional": "(opcional)",
+      "placeholder": "Ingrese su clave API",
+      "optionalPlaceholder": "Opcional - dejar vacío si no es requerido",
+      "validate": "Validar clave API",
+      "valid": "Válida",
+      "invalid": "Inválida",
+      "validating": "Validando..."
+    },
+    "hints": {
+      "openai": "Obtenga su clave en platform.openai.com",
+      "anthropic": "Obtenga su clave en console.anthropic.com",
+      "compatible": "Requerido por algunos endpoints (ej. APIs alojadas)"
+    },
+    "baseUrl": {
+      "label": "URL base",
+      "ollamaLabel": "URL de Ollama",
+      "ollamaPlaceholder": "http://localhost:11434",
+      "placeholder": "URL base de la API"
+    },
+    "model": {
+      "label": "Modelo",
+      "placeholder": "Ingrese el nombre del modelo o seleccione de la lista",
+      "fetch": "Obtener modelos disponibles",
+      "available": "{count} modelos disponibles",
+      "fetchHint": "Escriba el nombre del modelo o haga clic en actualizar para obtener los modelos disponibles"
+    },
+    "maxTokens": {
+      "label": "Tokens máx",
+      "hint": "Número máximo de tokens en la respuesta"
+    },
+    "contextWindow": {
+      "label": "Ventana de contexto",
+      "hint": "Tamaño del contexto del modelo en tokens (Llama 3.1: hasta 131072)"
+    },
+    "timeout": {
+      "label": "Tiempo de espera (segundos)"
+    },
+    "neighborContext": {
+      "label": "Contexto de vecinos",
+      "off": "Desactivado",
+      "hint": "Incluir contenido de nodos enlazados al consultar el LLM"
+    },
+    "searchApi": {
+      "label": "Clave API de búsqueda web (Tavily)",
+      "placeholder": "Ingrese su clave API de Tavily",
+      "test": "Probar clave API",
+      "testing": "Probando...",
+      "hint": "Gratis: 1000 búsquedas/mes, sin tarjeta de crédito. Obtenga su clave en"
+    },
+    "systemPrompt": {
+      "label": "Prompt del sistema (generación simple)",
+      "reset": "Restablecer"
+    },
+    "agentPrompt": {
+      "label": "Prompt del agente (constructor de grafos)",
+      "reset": "Restablecer"
+    }
+  },
+  "workspace": {
+    "pathPlaceholder": "/ruta/al/vault",
+    "namePlaceholder": "Nombre del espacio de trabajo",
+    "defaultName": "Mi proyecto de investigación",
+    "descriptionPlaceholder": "¿Para qué es este espacio de trabajo?"
+  },
+  "onboarding": {
+    "language": {
+      "title": "Elige tu idioma",
+      "description": "Selecciona tu idioma preferido. Puedes cambiarlo más tarde en Configuración."
+    },
+    "welcome": {
+      "title": "Bienvenido a Nodus",
+      "description": "Un grafo de conocimiento local para el pensamiento visual. Tus datos permanecen en tu dispositivo."
+    },
+    "nodes": {
+      "title": "Crear nodos",
+      "description": "Haz doble clic en cualquier lugar del lienzo para crear una nueva nota. Arrastra los nodos para organizarlos."
+    },
+    "edges": {
+      "title": "Conectar ideas",
+      "description": "Haz clic en un nodo, luego Mayús+clic en otro para crear una conexión. Usa [[wikilinks]] en tus notas."
+    },
+    "import": {
+      "title": "Importar tu investigación",
+      "description": "Arrastra archivos directamente al lienzo: PDFs, Markdown (.md), BibTeX (.bib) y ontologías (.ttl, .rdf, .owl)."
+    },
+    "math": {
+      "title": "Matemáticas y ecuaciones",
+      "description": "Usa $...$ para matemáticas en línea y $$...$$ para ecuaciones en bloque. Impulsado por Typst."
+    },
+    "buttons": {
+      "next": "Siguiente",
+      "back": "Atrás",
+      "skip": "Omitir",
+      "getStarted": "Comenzar"
+    }
+  },
+  "shortcuts": {
+    "title": "Atajos de teclado",
+    "search": "Buscar atajos...",
+    "toggle": "Presiona ? para mostrar/ocultar esta ayuda",
+    "categories": {
+      "navigation": "Navegación",
+      "selection": "Selección",
+      "editing": "Edición",
+      "layout": "Disposición",
+      "data": "Datos",
+      "math": "Matemáticas"
+    },
+    "keys": {
+      "scroll": "Desplazar",
+      "pinchZoom": "Pellizcar / Ctrl+Desplazar",
+      "fit": "F",
+      "neighborhood": "N",
+      "click": "Clic",
+      "shiftClick": "Mayús+Clic",
+      "selectAll": "Cmd/Ctrl+A",
+      "escape": "Escape",
+      "doubleClick": "Doble clic",
+      "delete": "Supr / Retroceso",
+      "undo": "Cmd/Ctrl+Z",
+      "redo": "Cmd/Ctrl+Mayús+Z",
+      "layout": "L",
+      "resetSizes": "Mayús+R",
+      "dropFiles": "Soltar archivos",
+      "export": "Mayús+E",
+      "refresh": "Ctrl+Mayús+R",
+      "inlineMath": "$...$",
+      "displayMath": "$$...$$"
+    },
+    "descriptions": {
+      "panCanvas": "Desplazar lienzo",
+      "zoomInOut": "Acercar/alejar",
+      "fitToView": "Ajustar todos los nodos a la vista",
+      "toggleNeighborhood": "Alternar modo vecindario",
+      "selectNode": "Seleccionar nodo",
+      "addToSelection": "Agregar a la selección",
+      "selectAll": "Seleccionar todos los nodos",
+      "clearSelection": "Limpiar selección",
+      "editCreate": "Editar/Crear nodo",
+      "deleteSelected": "Eliminar seleccionados",
+      "undo": "Deshacer",
+      "redo": "Rehacer",
+      "autoLayout": "Disposición automática",
+      "resetSizes": "Restablecer tamaños",
+      "importFiles": "Importar .bib .md .pdf",
+      "exportYaml": "Exportar grafo como YAML",
+      "refreshFiles": "Actualizar desde archivos",
+      "inlineMath": "Matemáticas en línea (Typst)",
+      "displayMath": "Matemáticas en bloque (Typst)"
+    }
+  },
+  "emptyState": {
+    "title": "Comienza tu grafo de conocimiento",
+    "doubleClick": "Doble clic",
+    "createNote": "Crear una nota",
+    "dropFiles": "Soltar archivos",
+    "fileTypes": ".pdf .md .bib .ttl",
+    "paste": "Cmd+V",
+    "pasteText": "Pegar texto",
+    "mathHint": "Usa $...$ para ecuaciones"
+  },
+  "dropZone": {
+    "title": "Suelta archivos para importar",
+    "fileTypes": ".pdf, .md, .bib, .ttl, .rdf, .owl"
+  },
+  "notifications": {
+    "citationsImported": "Citas importadas",
+    "citationsCount": "{count} cita agregada al lienzo | {count} citas agregadas al lienzo",
+    "notesImported": "Notas importadas",
+    "notesCount": "{count} nota agregada al lienzo | {count} notas agregadas al lienzo",
+    "noCitations": "No se encontraron citas",
+    "noCitationsDesc": "El archivo no contenía entradas BibTeX o CSL-JSON válidas",
+    "importFailed": "Error de importación",
+    "unsupportedFile": "Archivo no soportado"
+  },
+  "node": {
+    "untitled": "Sin título",
+    "processing": "Procesando..."
+  },
+  "common": {
+    "close": "Cerrar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar"
+  },
+  "toolbar": {
+    "editWorkspace": "Editar espacio de trabajo",
+    "newWorkspace": "Nuevo espacio de trabajo",
+    "undo": "Deshacer",
+    "redo": "Rehacer",
+    "storylines": "Líneas argumentales",
+    "importVault": "Importar vault",
+    "theme": "Tema",
+    "settings": "Configuración"
+  },
+  "settings": {
+    "title": "Configuración",
+    "tabs": {
+      "general": "General",
+      "themes": "Temas",
+      "canvas": "Lienzo",
+      "llm": "IA"
+    },
+    "language": "Idioma",
+    "llmEnabled": "Funciones de IA",
+    "llmEnabledHint": "Mostrar barras de comandos de IA para el grafo y los nodos",
+    "gridSnap": "Ajustar a la cuadrícula",
+    "gridSize": "Tamaño de cuadrícula",
+    "gridSizeUnit": "px",
+    "edgeStyle": "Estilo de aristas",
+    "edgeStyles": {
+      "orthogonal": "Ortogonal",
+      "diagonal": "Diagonal",
+      "curved": "Curvo",
+      "hyperbolic": "Hiperbólico",
+      "straight": "Recto"
+    },
+    "showTagNodes": "Mostrar etiquetas como nodos",
+    "showTagNodesHint": "Mostrar #hashtags como nodos de etiqueta conectados en el lienzo",
+    "workspaceDiagnostics": "Diagnósticos del espacio de trabajo",
+    "scanWorkspaces": "Escanear espacios de trabajo",
+    "scanning": "Escaneando...",
+    "workspaceStatsHint": "Escanea para ver el recuento de nodos por espacio de trabajo y encontrar nodos faltantes.",
+    "workspace": "Espacio de trabajo",
+    "nodes": "Nodos",
+    "switch": "Cambiar",
+    "recover": "Recuperar",
+    "about": "Acerca de",
+    "aboutDescription": "Grafo de conocimiento local",
+    "version": "Versión",
+    "themeCount": "disponibles",
+    "themeHint": "Usa el agente de IA para crear temas personalizados",
+    "deleteTheme": "¿Eliminar este tema personalizado?"
+  }
+}

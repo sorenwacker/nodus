@@ -1,0 +1,313 @@
+{
+  "app": {
+    "name": "Nodus"
+  },
+  "search": {
+    "placeholder": "Rechercher des nœuds...",
+    "inputPlaceholder": "Rechercher des nœuds par titre ou contenu...",
+    "noResults": "Aucun résultat trouvé"
+  },
+  "canvas": {
+    "agent": {
+      "placeholder": "Poser une question sur le graphe...",
+      "clearMemory": "Effacer la mémoire de conversation",
+      "clearLog": "Effacer le journal"
+    },
+    "node": {
+      "writePlaceholder": "Écrire en markdown...",
+      "askPlaceholder": "Demander à l'IA de mettre à jour cette note...",
+      "processing": "Traitement...",
+      "fitContent": "Ajuster au contenu",
+      "untitled": "Sans titre",
+      "connections": "connexions"
+    },
+    "edge": {
+      "labelPlaceholder": "ex. dépend de",
+      "flip": "Inverser",
+      "reverseDirection": "Inverser la direction",
+      "makeDirectional": "Rendre directionnel (sens unique)",
+      "makeNonDirectional": "Rendre non-directionnel (bidirectionnel)"
+    },
+    "frame": {
+      "delete": "Supprimer le cadre",
+      "addFrame": "Ajouter un cadre - Grouper les nœuds sélectionnés",
+      "clickToPlace": "Cliquez sur le canevas pour placer le cadre (Échap pour annuler)"
+    },
+    "status": {
+      "layoutRunning": "Disposition en cours...",
+      "stop": "Arrêter",
+      "perfMode": "PERF",
+      "nodes": "nœuds",
+      "edges": "arêtes",
+      "hideAgentLog": "Masquer le journal de l'agent",
+      "showAgentLog": "Afficher le journal de l'agent",
+      "log": "Journal",
+      "hint": "Défiler haut/bas: zoom | Défiler latéralement: déplacer | Alt+glisser: lier | Double-clic: nouveau"
+    },
+    "controls": {
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière",
+      "fitToContent": "Ajuster au contenu - Afficher tous les nœuds",
+      "snapToGrid": "Aligner sur la grille - Aligner les nœuds lors du déplacement",
+      "gridLayout": "Disposition en grille - Arranger les nœuds en grille",
+      "forceLayout": "Disposition par force - Arranger par connexions",
+      "hierarchicalLayout": "Disposition hiérarchique - Arranger en arbre (pour DAGs/ontologies)",
+      "fitNodesToContent": "Ajuster les nœuds au contenu - Redimensionner tous les nœuds",
+      "edgeStyle": "Style des arêtes",
+      "edgeBundling": "Regroupement d'arêtes - Fusionner les arêtes avec endpoints communs",
+      "magnifier": "Loupe - Afficher une vue agrandie en zoom arrière",
+      "neighborhoodView": "Vue de voisinage - Afficher uniquement le nœud sélectionné et ses voisins (N)",
+      "neighborhoodDepth": "Profondeur de voisinage (sauts)",
+      "hop": "saut",
+      "hops": "sauts"
+    }
+  },
+  "llm": {
+    "provider": "Fournisseur",
+    "status": {
+      "connected": "Connecté",
+      "notConnected": "Non connecté",
+      "checking": "Vérification..."
+    },
+    "streaming": {
+      "label": "Activer le streaming",
+      "hint": "Streamer les réponses token par token (nécessite le support du fournisseur)"
+    },
+    "apiKey": {
+      "label": "Clé API",
+      "optional": "(optionnel)",
+      "placeholder": "Entrez votre clé API",
+      "optionalPlaceholder": "Optionnel - laisser vide si non requis",
+      "validate": "Valider la clé API",
+      "valid": "Valide",
+      "invalid": "Invalide",
+      "validating": "Validation..."
+    },
+    "hints": {
+      "openai": "Obtenez votre clé sur platform.openai.com",
+      "anthropic": "Obtenez votre clé sur console.anthropic.com",
+      "compatible": "Requis par certains endpoints (ex. APIs hébergées)"
+    },
+    "baseUrl": {
+      "label": "URL de base",
+      "ollamaLabel": "URL Ollama",
+      "ollamaPlaceholder": "http://localhost:11434",
+      "placeholder": "URL de base de l'API"
+    },
+    "model": {
+      "label": "Modèle",
+      "placeholder": "Entrez le nom du modèle ou sélectionnez dans la liste",
+      "fetch": "Récupérer les modèles disponibles",
+      "available": "{count} modèles disponibles",
+      "fetchHint": "Tapez le nom du modèle ou cliquez sur actualiser pour récupérer les modèles disponibles"
+    },
+    "maxTokens": {
+      "label": "Tokens max",
+      "hint": "Nombre maximum de tokens dans la réponse"
+    },
+    "contextWindow": {
+      "label": "Fenêtre de contexte",
+      "hint": "Taille du contexte du modèle en tokens (Llama 3.1: jusqu'à 131072)"
+    },
+    "timeout": {
+      "label": "Délai d'attente (secondes)"
+    },
+    "neighborContext": {
+      "label": "Contexte des voisins",
+      "off": "Désactivé",
+      "hint": "Inclure le contenu des nœuds liés lors des requêtes au LLM"
+    },
+    "searchApi": {
+      "label": "Clé API de recherche web (Tavily)",
+      "placeholder": "Entrez votre clé API Tavily",
+      "test": "Tester la clé API",
+      "testing": "Test en cours...",
+      "hint": "Gratuit: 1000 recherches/mois, sans carte bancaire. Obtenez votre clé sur"
+    },
+    "systemPrompt": {
+      "label": "Prompt système (génération simple)",
+      "reset": "Réinitialiser"
+    },
+    "agentPrompt": {
+      "label": "Prompt agent (constructeur de graphe)",
+      "reset": "Réinitialiser"
+    }
+  },
+  "workspace": {
+    "pathPlaceholder": "/chemin/vers/vault",
+    "namePlaceholder": "Nom de l'espace de travail",
+    "defaultName": "Mon projet de recherche",
+    "descriptionPlaceholder": "À quoi sert cet espace de travail?"
+  },
+  "onboarding": {
+    "language": {
+      "title": "Choisissez votre langue",
+      "description": "Sélectionnez votre langue préférée. Vous pouvez modifier cela plus tard dans les Paramètres."
+    },
+    "welcome": {
+      "title": "Bienvenue sur Nodus",
+      "description": "Un graphe de connaissances local pour la pensée visuelle. Vos données restent sur votre appareil."
+    },
+    "nodes": {
+      "title": "Créer des nœuds",
+      "description": "Double-cliquez n'importe où sur le canevas pour créer une nouvelle note. Faites glisser les nœuds pour les organiser."
+    },
+    "edges": {
+      "title": "Connecter les idées",
+      "description": "Cliquez sur un nœud, puis Maj+clic sur un autre pour créer une connexion. Utilisez les [[wikilinks]] dans vos notes."
+    },
+    "import": {
+      "title": "Importer vos recherches",
+      "description": "Déposez des fichiers directement sur le canevas: PDFs, Markdown (.md), BibTeX (.bib) et ontologies (.ttl, .rdf, .owl)."
+    },
+    "math": {
+      "title": "Maths et équations",
+      "description": "Utilisez $...$ pour les maths en ligne et $$...$$ pour les équations en bloc. Propulsé par Typst."
+    },
+    "buttons": {
+      "next": "Suivant",
+      "back": "Retour",
+      "skip": "Passer",
+      "getStarted": "Commencer"
+    }
+  },
+  "shortcuts": {
+    "title": "Raccourcis clavier",
+    "search": "Rechercher des raccourcis...",
+    "toggle": "Appuyez sur ? pour afficher/masquer cette aide",
+    "categories": {
+      "navigation": "Navigation",
+      "selection": "Sélection",
+      "editing": "Édition",
+      "layout": "Disposition",
+      "data": "Données",
+      "math": "Maths"
+    },
+    "keys": {
+      "scroll": "Défiler",
+      "pinchZoom": "Pincer / Ctrl+Défiler",
+      "fit": "F",
+      "neighborhood": "N",
+      "click": "Clic",
+      "shiftClick": "Maj+Clic",
+      "selectAll": "Cmd/Ctrl+A",
+      "escape": "Échap",
+      "doubleClick": "Double-clic",
+      "delete": "Suppr / Retour",
+      "undo": "Cmd/Ctrl+Z",
+      "redo": "Cmd/Ctrl+Maj+Z",
+      "layout": "L",
+      "resetSizes": "Maj+R",
+      "dropFiles": "Déposer des fichiers",
+      "export": "Maj+E",
+      "refresh": "Ctrl+Maj+R",
+      "inlineMath": "$...$",
+      "displayMath": "$$...$$"
+    },
+    "descriptions": {
+      "panCanvas": "Déplacer le canevas",
+      "zoomInOut": "Zoom avant/arrière",
+      "fitToView": "Ajuster tous les nœuds à la vue",
+      "toggleNeighborhood": "Basculer le mode voisinage",
+      "selectNode": "Sélectionner un nœud",
+      "addToSelection": "Ajouter à la sélection",
+      "selectAll": "Sélectionner tous les nœuds",
+      "clearSelection": "Effacer la sélection",
+      "editCreate": "Modifier/Créer un nœud",
+      "deleteSelected": "Supprimer la sélection",
+      "undo": "Annuler",
+      "redo": "Rétablir",
+      "autoLayout": "Disposition automatique",
+      "resetSizes": "Réinitialiser les tailles",
+      "importFiles": "Importer .bib .md .pdf",
+      "exportYaml": "Exporter le graphe en YAML",
+      "refreshFiles": "Actualiser depuis les fichiers",
+      "inlineMath": "Maths en ligne (Typst)",
+      "displayMath": "Maths en bloc (Typst)"
+    }
+  },
+  "emptyState": {
+    "title": "Commencez votre graphe de connaissances",
+    "doubleClick": "Double-clic",
+    "createNote": "Créer une note",
+    "dropFiles": "Déposer des fichiers",
+    "fileTypes": ".pdf .md .bib .ttl",
+    "paste": "Cmd+V",
+    "pasteText": "Coller du texte",
+    "mathHint": "Utilisez $...$ pour les équations"
+  },
+  "dropZone": {
+    "title": "Déposez des fichiers pour importer",
+    "fileTypes": ".pdf, .md, .bib, .ttl, .rdf, .owl"
+  },
+  "notifications": {
+    "citationsImported": "Citations importées",
+    "citationsCount": "{count} citation ajoutée au canevas | {count} citations ajoutées au canevas",
+    "notesImported": "Notes importées",
+    "notesCount": "{count} note ajoutée au canevas | {count} notes ajoutées au canevas",
+    "noCitations": "Aucune citation trouvée",
+    "noCitationsDesc": "Le fichier ne contenait aucune entrée BibTeX ou CSL-JSON valide",
+    "importFailed": "Échec de l'importation",
+    "unsupportedFile": "Fichier non supporté"
+  },
+  "node": {
+    "untitled": "Sans titre",
+    "processing": "Traitement..."
+  },
+  "common": {
+    "close": "Fermer",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier"
+  },
+  "toolbar": {
+    "editWorkspace": "Modifier l'espace de travail",
+    "newWorkspace": "Nouvel espace de travail",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "storylines": "Scénarios",
+    "importVault": "Importer un vault",
+    "theme": "Thème",
+    "settings": "Paramètres"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "tabs": {
+      "general": "Général",
+      "themes": "Thèmes",
+      "canvas": "Canevas",
+      "llm": "IA"
+    },
+    "language": "Langue",
+    "llmEnabled": "Fonctionnalités IA",
+    "llmEnabledHint": "Afficher les barres de commande IA pour le graphe et les nœuds",
+    "gridSnap": "Aligner sur la grille",
+    "gridSize": "Taille de la grille",
+    "gridSizeUnit": "px",
+    "edgeStyle": "Style des arêtes",
+    "edgeStyles": {
+      "orthogonal": "Orthogonal",
+      "diagonal": "Diagonal",
+      "curved": "Courbe",
+      "hyperbolic": "Hyperbolique",
+      "straight": "Droit"
+    },
+    "showTagNodes": "Afficher les tags comme nœuds",
+    "showTagNodesHint": "Afficher les #hashtags comme nœuds de tag connectés sur le canevas",
+    "workspaceDiagnostics": "Diagnostics de l'espace de travail",
+    "scanWorkspaces": "Scanner les espaces de travail",
+    "scanning": "Analyse en cours...",
+    "workspaceStatsHint": "Scannez pour voir le nombre de nœuds par espace de travail et trouver les nœuds manquants.",
+    "workspace": "Espace de travail",
+    "nodes": "Nœuds",
+    "switch": "Basculer",
+    "recover": "Récupérer",
+    "about": "À propos",
+    "aboutDescription": "Graphe de connaissances local",
+    "version": "Version",
+    "themeCount": "disponibles",
+    "themeHint": "Utilisez l'agent IA pour créer des thèmes personnalisés",
+    "deleteTheme": "Supprimer ce thème personnalisé ?"
+  }
+}
