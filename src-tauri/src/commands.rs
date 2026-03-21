@@ -419,13 +419,20 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
     let mut files_to_import: Vec<(PathBuf, String)> = Vec::new(); // (file_path, folder)
 
     for entry in walkdir::WalkDir::new(&path)
+        .follow_links(true)
         .into_iter()
+        .filter_entry(|e| {
+            // Skip hidden directories (but allow hidden files)
+            let name = e.file_name().to_string_lossy();
+            !e.file_type().is_dir() || !name.starts_with('.')
+        })
         .filter_map(|e| e.ok())
     {
         let file_path = entry.path();
 
         if file_path.extension().map_or(false, |ext| ext == "md") {
             let folder = get_relative_folder(file_path, &path).unwrap_or_default();
+            println!("  Found: {:?} in folder: '{}'", file_path.file_name(), folder);
             files_to_import.push((file_path.to_path_buf(), folder.clone()));
 
             // Track folder for frame creation
@@ -434,6 +441,8 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
             }).1 += 1;
         }
     }
+
+    println!("Total files found: {}, folders: {:?}", files_to_import.len(), folder_frames.keys().collect::<Vec<_>>());
 
     // Create frames for non-root folders with multiple files
     let frame_spacing = 800.0;
