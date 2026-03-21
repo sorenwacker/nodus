@@ -2059,6 +2059,34 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
+/* Comment node styling - italic, dashed border, muted appearance */
+.node-card[data-node-type="comment"] {
+  border-style: dashed;
+  border-color: var(--text-muted);
+  background: var(--bg-surface-alt);
+  opacity: 0.9;
+}
+
+.node-card[data-node-type="comment"] .node-header {
+  display: none;
+}
+
+.node-card[data-node-type="comment"] .node-content {
+  font-style: italic;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.node-card[data-node-type="comment"]:hover {
+  border-color: var(--primary-color);
+  opacity: 1;
+}
+
+.node-card[data-node-type="comment"].selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
 /* Tagged edge styling - dashed line, lighter color */
 .edge-tagged {
   stroke-dasharray: 6, 4;

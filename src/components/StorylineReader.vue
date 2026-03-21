@@ -208,6 +208,22 @@ async function handleNodeCreate(index: number, title: string) {
   }
 }
 
+async function handleCommentCreate(index: number, text: string) {
+  if (!storyline.value) return
+  try {
+    const node = await store.createNode({
+      title: 'Comment',
+      node_type: 'comment',
+      markdown_content: text,
+    })
+    await store.addNodeToStoryline(storyline.value.id, node.id, index)
+    nodes.value = await store.getStorylineNodes(props.storylineId)
+    await renderNodeContent(node)
+  } catch (e) {
+    console.error('Failed to create comment:', e)
+  }
+}
+
 async function handleNodeRemove(nodeId: string) {
   if (!storyline.value) return
   try {
@@ -276,6 +292,7 @@ watch(() => props.storylineId, loadStoryline)
               @remove="handleNodeRemove"
               @add="handleNodeAdd"
               @create="handleNodeCreate"
+              @create-comment="handleCommentCreate"
             />
           </div>
         </aside>
@@ -298,18 +315,36 @@ watch(() => props.storylineId, loadStoryline)
           </div>
 
           <template v-else>
-            <article
-              v-for="(node, index) in nodes"
-              :id="`node-${index}`"
-              :key="node.id"
-              class="node-section"
-            >
-              <header class="section-header">
-                <span class="section-number">{{ index + 1 }}</span>
-                <h2 class="section-title">{{ node.title }}</h2>
-              </header>
-              <div class="section-content" v-html="renderedContent.get(node.id) || ''"></div>
-            </article>
+            <template v-for="(node, index) in nodes" :key="node.id">
+              <!-- Comment nodes render as callouts -->
+              <aside
+                v-if="node.node_type === 'comment'"
+                :id="`node-${index}`"
+                class="comment-callout"
+              >
+                <div class="comment-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div class="comment-text" v-html="renderedContent.get(node.id) || node.markdown_content || ''"></div>
+              </aside>
+
+              <!-- Regular nodes render as sections -->
+              <article
+                v-else
+                :id="`node-${index}`"
+                class="node-section"
+              >
+                <header class="section-header">
+                  <span class="section-number">{{ index + 1 }}</span>
+                  <h2 class="section-title">{{ node.title }}</h2>
+                </header>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div class="section-content" v-html="renderedContent.get(node.id) || ''"></div>
+              </article>
+            </template>
           </template>
         </main>
       </div>
@@ -567,6 +602,38 @@ watch(() => props.storylineId, loadStoryline)
 
 .empty-state .hint {
   font-size: 12px;
+}
+
+/* Comment callouts */
+.comment-callout {
+  display: flex;
+  gap: 12px;
+  margin: 24px 0;
+  padding: 16px 20px;
+  background: var(--bg-surface-alt);
+  border-left: 3px solid var(--text-muted);
+  border-radius: 0 8px 8px 0;
+}
+
+.comment-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.comment-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.comment-text :deep(p) {
+  margin: 0;
+}
+
+.comment-text :deep(p + p) {
+  margin-top: 0.5em;
 }
 
 .node-section {

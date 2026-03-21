@@ -143,6 +143,22 @@ async function handleNodeCreate(index: number, title: string) {
   }
 }
 
+async function handleCommentCreate(index: number, text: string) {
+  if (!selectedStorylineId.value) return
+  try {
+    const node = await store.createNode({
+      title: 'Comment',
+      node_type: 'comment',
+      markdown_content: text,
+    })
+    await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
+    showToast?.('Added comment', 'success')
+  } catch (e) {
+    console.error('Failed to create comment:', e)
+    showToast?.(`Failed to create comment: ${e}`, 'error')
+  }
+}
+
 async function handleNodeRemove(nodeId: string) {
   if (!selectedStorylineId.value) return
   try {
@@ -300,6 +316,7 @@ watch(() => store.currentWorkspaceId, () => {
           @remove="handleNodeRemove"
           @add="handleNodeAdd"
           @create="handleNodeCreate"
+          @create-comment="handleCommentCreate"
         />
       </div>
     </template>

@@ -14,11 +14,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select', nodeId: string): void
   (e: 'create', title: string): void
+  (e: 'create-comment', text: string): void
   (e: 'close'): void
 }>()
 
 const isCreating = ref(false)
+const isCreatingComment = ref(false)
 const newNodeTitle = ref('')
+const newCommentText = ref('')
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
@@ -74,19 +77,54 @@ function createNode() {
     newNodeTitle.value = ''
   }
 }
+
+function startCreatingComment() {
+  isCreatingComment.value = true
+  newCommentText.value = ''
+}
+
+function cancelCreateComment() {
+  isCreatingComment.value = false
+  newCommentText.value = ''
+}
+
+function createComment() {
+  if (newCommentText.value.trim()) {
+    emit('create-comment', newCommentText.value.trim())
+    isCreatingComment.value = false
+    newCommentText.value = ''
+  }
+}
 </script>
 
 <template>
   <div class="node-picker" :class="{ 'position-above': position === 'above' }">
     <div class="node-picker-header">
-      <span>{{ isCreating ? 'New node' : 'Select node' }}</span>
+      <span>{{ isCreating ? 'New node' : isCreatingComment ? 'New comment' : 'Select node' }}</span>
       <button class="close-btn" data-tooltip="Close" @click="$emit('close')">
         <Icon name="close" :size="10" />
       </button>
     </div>
 
+    <!-- Create new comment form -->
+    <div v-if="isCreatingComment" class="node-picker-create">
+      <textarea
+        v-model="newCommentText"
+        placeholder="Comment text..."
+        class="create-input comment-input"
+        rows="3"
+        autofocus
+        @keydown.enter.ctrl="createComment"
+        @keydown.escape="cancelCreateComment"
+      ></textarea>
+      <div class="create-actions">
+        <button class="action-btn cancel" @click="cancelCreateComment">Cancel</button>
+        <button class="action-btn create" :disabled="!newCommentText.trim()" @click="createComment">Add</button>
+      </div>
+    </div>
+
     <!-- Create new node form -->
-    <div v-if="isCreating" class="node-picker-create">
+    <div v-else-if="isCreating" class="node-picker-create">
       <input
         v-model="newNodeTitle"
         type="text"
@@ -116,11 +154,17 @@ function createNode() {
         />
       </div>
 
-      <!-- Create new option -->
-      <button v-if="allowCreate !== false" class="node-picker-item create-option" @click="startCreating">
-        <Icon name="plus" :size="14" />
-        <span>Create new node</span>
-      </button>
+      <!-- Create new options -->
+      <div v-if="allowCreate !== false" class="create-options">
+        <button class="node-picker-item create-option" @click="startCreating">
+          <Icon name="plus" :size="14" />
+          <span>Create node</span>
+        </button>
+        <button class="node-picker-item create-option comment-option" @click="startCreatingComment">
+          <Icon name="comment" :size="14" />
+          <span>Add comment</span>
+        </button>
+      </div>
 
       <div v-if="availableNodes.length === 0" class="node-picker-empty">
         {{ searchQuery ? 'No matching nodes' : 'No available nodes' }}
@@ -266,14 +310,30 @@ function createNode() {
   background: var(--bg-surface-alt);
 }
 
+.create-options {
+  border-bottom: 1px solid var(--border-default);
+}
+
 .create-option {
   gap: 8px;
   color: var(--primary-color);
-  border-bottom: 1px solid var(--border-default);
 }
 
 .create-option:hover {
   background: var(--bg-elevated);
+}
+
+.create-option.comment-option {
+  color: var(--text-secondary);
+}
+
+.create-option.comment-option:hover {
+  color: var(--primary-color);
+}
+
+.comment-input {
+  resize: none;
+  font-family: inherit;
 }
 
 .node-picker-create {

@@ -48,6 +48,7 @@ const emit = defineEmits<{
   (e: 'remove', nodeId: string): void
   (e: 'add', index: number, nodeId: string): void
   (e: 'create', index: number, title: string): void
+  (e: 'create-comment', index: number, text: string): void
 }>()
 
 const showingInsertPicker = ref<number | null>(null)
@@ -68,6 +69,11 @@ function handleSelect(index: number, nodeId: string) {
 
 function handleCreate(index: number, title: string) {
   emit('create', index, title)
+  showingInsertPicker.value = null
+}
+
+function handleCreateComment(index: number, text: string) {
+  emit('create-comment', index, text)
   showingInsertPicker.value = null
 }
 
@@ -145,6 +151,7 @@ function onDragEnd() {
           :exclude-node-ids="[]"
           @select="handleSelect(0, $event)"
           @create="handleCreate(0, $event)"
+          @create-comment="handleCreateComment(0, $event)"
           @close="showingInsertPicker = null"
         />
       </div>
@@ -167,6 +174,7 @@ function onDragEnd() {
             :exclude-node-ids="excludedNodeIds"
             @select="handleSelect(index, $event)"
             @create="handleCreate(index, $event)"
+            @create-comment="handleCreateComment(index, $event)"
             @close="showingInsertPicker = null"
           />
         </div>
@@ -177,7 +185,8 @@ function onDragEnd() {
           :class="{
             active: activeIndex === index,
             dragging: draggingNodeIndex === index,
-            'drag-over': dragOverIndex === index
+            'drag-over': dragOverIndex === index,
+            'is-comment': node.node_type === 'comment'
           }"
           :style="node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}"
           draggable="true"
@@ -191,8 +200,11 @@ function onDragEnd() {
           <div class="drag-handle">
             <Icon name="drag" :size="compact ? 10 : 12" />
           </div>
-          <span class="node-order">{{ index + 1 }}</span>
-          <span class="node-title">{{ node.title }}</span>
+          <span v-if="node.node_type === 'comment'" class="node-order comment-icon">
+            <Icon name="comment" :size="compact ? 10 : 12" />
+          </span>
+          <span v-else class="node-order">{{ index + 1 }}</span>
+          <span class="node-title">{{ node.node_type === 'comment' ? (node.markdown_content || 'Comment') : node.title }}</span>
           <button class="remove-btn" data-tooltip="Remove from storyline" @click.stop="handleRemove(node.id)">
             <Icon name="close" :size="compact ? 8 : 10" />
           </button>
@@ -215,6 +227,7 @@ function onDragEnd() {
           position="above"
           @select="handleSelect(nodes.length, $event)"
           @create="handleCreate(nodes.length, $event)"
+          @create-comment="handleCreateComment(nodes.length, $event)"
           @close="showingInsertPicker = null"
         />
       </div>
@@ -403,6 +416,23 @@ function onDragEnd() {
 
 .node-item.active .node-order {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.node-order.comment-icon {
+  background: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.node-item.is-comment {
+  border-left: 2px solid var(--text-muted);
+  opacity: 0.85;
+  font-style: italic;
+}
+
+.node-item.is-comment .node-title {
+  color: var(--text-secondary);
 }
 
 .node-title {

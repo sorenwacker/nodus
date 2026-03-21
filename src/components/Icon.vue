@@ -20,6 +20,7 @@ const icons: Record<string, string> = {
   'arrow-down': '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>',
   'arrow-up': '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
   drag: '<circle cx="9" cy="6" r="2"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/><circle cx="15" cy="18" r="2"/>',
+  comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
 }
 
 const fillIcons = ['drag'] // Icons that use fill instead of stroke
@@ -31,6 +32,7 @@ const colorClass = computed(() => {
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-v-html -->
   <svg
     class="icon"
     :class="colorClass"
@@ -44,6 +46,7 @@ const colorClass = computed(() => {
     stroke-linejoin="round"
     v-html="icons[name] || ''"
   />
+  <!-- eslint-enable vue/no-v-html -->
 </template>
 
 <style scoped>
