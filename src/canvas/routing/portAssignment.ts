@@ -114,40 +114,44 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
     const side = sideStr as Side
     const isHorizontalSide = side === 'left' || side === 'right'
 
-    // Sort by perpendicular position of the other node to minimize crossings.
-    // For left/right sides: primary sort by Y, secondary by X (for same-Y sources)
-    // For top/bottom sides: primary sort by X, secondary by Y (for same-X sources)
+    // Get this node's center for angle calculation
+    const firstEntry = entries[0]
+    const thisNode = firstEntry.isSource ? firstEntry.info.source : firstEntry.info.target
+    const nodeCx = thisNode.canvas_x + (thisNode.width || 200) / 2
+    const nodeCy = thisNode.canvas_y + (thisNode.height || 120) / 2
+
+    // Sort by ANGLE from this node to the other node
+    // This ensures edges fan out in angular order, minimizing immediate crossings
     entries.sort((a, b) => {
-      const posA = isHorizontalSide ? a.otherNodeY : a.otherNodeX
-      const posB = isHorizontalSide ? b.otherNodeY : b.otherNodeX
+      const angleA = Math.atan2(a.otherNodeY - nodeCy, a.otherNodeX - nodeCx)
+      const angleB = Math.atan2(b.otherNodeY - nodeCy, b.otherNodeX - nodeCx)
 
-      if (Math.abs(posA - posB) > 1) {
-        return posA - posB
-      }
+      // For different sides, we need different angular orderings:
+      // RIGHT side (-π/4 to π/4): sort by angle ascending (top to bottom)
+      // BOTTOM side (π/4 to 3π/4): sort by angle ascending (left to right)
+      // LEFT side (3π/4 to -3π/4): sort by angle ascending (bottom to top)
+      // TOP side (-3π/4 to -π/4): sort by angle ascending (right to left)
 
-      // Secondary sort: when primary positions are similar, sort by the OTHER axis.
-      // This creates a natural "fan" pattern for sources at the same level:
-      // - For LEFT side: sources further LEFT (smaller X) get HIGHER ports (smaller index)
-      // - For RIGHT side: sources further RIGHT (larger X) get HIGHER ports (smaller index)
-      // - For TOP side: sources further UP (smaller Y) get LEFT ports (smaller index)
-      // - For BOTTOM side: sources further DOWN (larger Y) get LEFT ports (smaller index)
-      const secondaryA = isHorizontalSide ? a.otherNodeX : a.otherNodeY
-      const secondaryB = isHorizontalSide ? b.otherNodeX : b.otherNodeY
+      // Normalize angles based on side to get consistent port ordering
+      let normA = angleA
+      let normB = angleB
 
-      // For RIGHT side, reverse the X ordering (larger X = smaller index)
-      // For BOTTOM side, reverse the Y ordering (larger Y = smaller index)
-      if (side === 'right' || side === 'bottom') {
-        if (Math.abs(secondaryA - secondaryB) > 1) {
-          return secondaryB - secondaryA  // Reversed
-        }
+      if (side === 'left') {
+        // For left side, edges going up should be at top, edges going down at bottom
+        // Angle to up-left is around -3π/4, angle to down-left is around 3π/4
+        // We want up (-Y) to get smaller index, so sort by Y component
+        return a.otherNodeY - b.otherNodeY
+      } else if (side === 'right') {
+        // For right side, edges going up should be at top
+        // Angle to up-right is around -π/4, angle to down-right is around π/4
+        return a.otherNodeY - b.otherNodeY
+      } else if (side === 'top') {
+        // For top side, edges going left should be at left
+        return a.otherNodeX - b.otherNodeX
       } else {
-        if (Math.abs(secondaryA - secondaryB) > 1) {
-          return secondaryA - secondaryB  // Normal
-        }
+        // For bottom side, edges going left should be at left
+        return a.otherNodeX - b.otherNodeX
       }
-
-      // Final tie-breaker: edge ID for stability
-      return a.edgeId.localeCompare(b.edgeId)
     })
 
 
@@ -339,100 +343,96 @@ function segmentsIntersect(
 
 /**
  * Optimize port assignments to minimize edge crossings
- * Uses a greedy approach: for each node side, try swapping adjacent ports
- * and keep swaps that reduce the total crossing count
+ * Uses angular sorting at each node to ensure edges fan out without crossing
  */
 export function optimizePortAssignments(
   edgeInfos: EdgeInfo[],
   sourceAssignments: Map<string, PortAssignment>,
   targetAssignments: Map<string, PortAssignment>
 ): void {
-  // Build lookup maps for quick access
+  // Build edge info lookup
   const edgeInfoMap = new Map<string, EdgeInfo>()
   for (const info of edgeInfos) {
     edgeInfoMap.set(info.edge.id, info)
   }
 
-  // Group assignments by node+side
-  const nodeGroups = new Map<string, { assignments: PortAssignment[]; isSource: boolean }[]>()
+  // Group all edges by node+side (combining source and target assignments)
+  const nodeSideEdges = new Map<string, Array<{
+    edgeId: string
+    isSource: boolean
+    otherX: number
+    otherY: number
+    assignment: PortAssignment
+  }>>()
 
   for (const [edgeId, assignment] of sourceAssignments) {
     const key = `${assignment.node.id}:${assignment.side}`
-    if (!nodeGroups.has(key)) nodeGroups.set(key, [])
-    const group = nodeGroups.get(key)!
-    let found = group.find(g => g.isSource === true)
-    if (!found) {
-      found = { assignments: [], isSource: true }
-      group.push(found)
+    if (!nodeSideEdges.has(key)) nodeSideEdges.set(key, [])
+    const info = edgeInfoMap.get(edgeId)
+    if (info) {
+      const otherCx = info.target.canvas_x + (info.target.width || 200) / 2
+      const otherCy = info.target.canvas_y + (info.target.height || 120) / 2
+      nodeSideEdges.get(key)!.push({ edgeId, isSource: true, otherX: otherCx, otherY: otherCy, assignment })
     }
-    found.assignments.push(assignment)
   }
 
   for (const [edgeId, assignment] of targetAssignments) {
     const key = `${assignment.node.id}:${assignment.side}`
-    if (!nodeGroups.has(key)) nodeGroups.set(key, [])
-    const group = nodeGroups.get(key)!
-    let found = group.find(g => g.isSource === false)
-    if (!found) {
-      found = { assignments: [], isSource: false }
-      group.push(found)
+    if (!nodeSideEdges.has(key)) nodeSideEdges.set(key, [])
+    const info = edgeInfoMap.get(edgeId)
+    if (info) {
+      const otherCx = info.source.canvas_x + (info.source.width || 200) / 2
+      const otherCy = info.source.canvas_y + (info.source.height || 120) / 2
+      nodeSideEdges.get(key)!.push({ edgeId, isSource: false, otherX: otherCx, otherY: otherCy, assignment })
     }
-    found.assignments.push(assignment)
   }
 
-  // For each node side, optimize port order
-  for (const [key, groups] of nodeGroups) {
-    // Combine all assignments for this node+side
-    const allAssignments: { assignment: PortAssignment; isSource: boolean }[] = []
-    for (const g of groups) {
-      for (const a of g.assignments) {
-        allAssignments.push({ assignment: a, isSource: g.isSource })
+  // Re-sort and re-assign indices for each node+side
+  for (const [key, edges] of nodeSideEdges) {
+    if (edges.length <= 1) continue
+
+    const [nodeId, sideStr] = key.split(':')
+    const side = sideStr as Side
+    const isHorizontalSide = side === 'left' || side === 'right'
+
+    // Get node center
+    const firstEdge = edges[0]
+    const node = firstEdge.assignment.node
+    const nodeCx = node.canvas_x + (node.width || 200) / 2
+    const nodeCy = node.canvas_y + (node.height || 120) / 2
+
+    // Sort by angle from node center to other node
+    edges.sort((a, b) => {
+      const angleA = Math.atan2(a.otherY - nodeCy, a.otherX - nodeCx)
+      const angleB = Math.atan2(b.otherY - nodeCy, b.otherX - nodeCx)
+
+      // Map angles to port order based on side
+      // For right side: angles from -π/2 (up) to π/2 (down), map to top-to-bottom ports
+      // For left side: angles from π/2 (down) to -π/2 (up), but edges point left so reverse
+      // For top side: angles from -π (left) to 0 (right), map to left-to-right ports
+      // For bottom side: angles from 0 (right) to π (left), map to left-to-right ports
+
+      if (side === 'right') {
+        // Right side: -π/2 to π/2, ascending angle = top to bottom
+        return angleA - angleB
+      } else if (side === 'left') {
+        // Left side: π to π/2 (up) and -π to -π/2 (down)
+        // We want up (small Y) at top port, down (large Y) at bottom port
+        return a.otherY - b.otherY
+      } else if (side === 'top') {
+        // Top side: left (small X) to right (large X)
+        return a.otherX - b.otherX
+      } else {
+        // Bottom side: left (small X) to right (large X)
+        return a.otherX - b.otherX
       }
-    }
+    })
 
-    if (allAssignments.length <= 2) continue // Nothing to optimize
-
-    // Sort by current index
-    allAssignments.sort((a, b) => a.assignment.index - b.assignment.index)
-
-    // Try to minimize crossings using bubble-sort style swaps
-    let improved = true
-    let iterations = 0
-    const maxIterations = allAssignments.length * 2
-
-    while (improved && iterations < maxIterations) {
-      improved = false
-      iterations++
-
-      for (let i = 0; i < allAssignments.length - 1; i++) {
-        const a = allAssignments[i]
-        const b = allAssignments[i + 1]
-
-        // Count crossings with current order
-        const currentCrossings = countCrossingsForPair(
-          a, b, i, i + 1, allAssignments, edgeInfoMap, sourceAssignments, targetAssignments
-        )
-
-        // Count crossings if we swap
-        const swappedCrossings = countCrossingsForPair(
-          b, a, i, i + 1, allAssignments, edgeInfoMap, sourceAssignments, targetAssignments
-        )
-
-        if (swappedCrossings < currentCrossings) {
-          // Swap improves crossings - apply it
-          allAssignments[i] = b
-          allAssignments[i + 1] = a
-
-          // Update the actual assignments
-          const aIdx = a.assignment.index
-          const bIdx = b.assignment.index
-          a.assignment.index = bIdx
-          b.assignment.index = aIdx
-
-          improved = true
-        }
-      }
-    }
+    // Reassign indices based on sorted order
+    edges.forEach((edge, idx) => {
+      edge.assignment.index = idx
+      edge.assignment.total = edges.length
+    })
   }
 }
 

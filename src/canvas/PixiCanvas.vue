@@ -2280,6 +2280,14 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   }
   selectedEdge.value = null
 
+  // Log clicked node info for debugging port assignments
+  const clickedNode = store.getNode(nodeId)
+  const nodeEdges = store.filteredEdges.filter(e => e.source_node_id === nodeId || e.target_node_id === nodeId)
+  console.log(`[Click] "${clickedNode?.title}" - ${nodeEdges.length} edges`)
+
+  // Trigger edge re-routing
+  store.nodeLayoutVersion++
+
   // In neighborhood mode, clicking a neighbor navigates to its neighborhood
   if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
     focusNodeId.value = nodeId
