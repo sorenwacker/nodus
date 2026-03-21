@@ -3115,6 +3115,24 @@ function getNodeBackground(colorTheme: string | null): string | undefined {
   if (!colorTheme) return undefined
   // Normalize legacy colors to current format
   const normalizedColor = legacyColorMap[colorTheme] || colorTheme
+
+  // Check if color is problematic for current theme
+  // In dark mode, don't use very light colors; in light mode, don't use very dark colors
+  if (normalizedColor.startsWith('#')) {
+    const hex = normalizedColor.replace('#', '')
+    const r = parseInt(hex.substr(0, 2), 16)
+    const g = parseInt(hex.substr(2, 2), 16)
+    const b = parseInt(hex.substr(4, 2), 16)
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000
+
+    const isDarkTheme = currentTheme.value === 'dark' || currentTheme.value === 'pitch-black' || currentTheme.value === 'cyber'
+
+    // If color is too bright for dark mode (>200) or too dark for light mode (<50), skip it
+    if ((isDarkTheme && brightness > 200) || (!isDarkTheme && brightness < 50)) {
+      return undefined
+    }
+  }
+
   // Use linear-gradient to layer transparent color over solid background
   return `linear-gradient(${normalizedColor}, ${normalizedColor}), var(--bg-surface)`
 }
