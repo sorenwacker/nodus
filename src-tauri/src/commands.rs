@@ -422,9 +422,9 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         .follow_links(true)
         .into_iter()
         .filter_entry(|e| {
-            // Skip hidden directories (but allow hidden files)
+            // Skip all hidden files and directories (starting with .)
             let name = e.file_name().to_string_lossy();
-            !e.file_type().is_dir() || !name.starts_with('.')
+            !name.starts_with('.')
         })
         .filter_map(|e| e.ok())
     {
