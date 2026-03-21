@@ -219,7 +219,7 @@ export const GridLayoutStrategy: LayoutStrategy = {
       return new Map()
     }
 
-    const gap = options.gap ?? 30
+    const gap = options.gap ?? 50
 
     // Use fast grid for very large graphs or when edge-aware is disabled
     const useFastGrid = nodes.length > 500 || options.edgeAware === false
