@@ -374,7 +374,7 @@ export function useLayout(options: UseLayoutOptions) {
       const positions = fastGridLayout(fastNodes, {
         centerX,
         centerY,
-        gap: 30,
+        gap: 50,
       })
 
       // Batch update positions to avoid blocking UI
@@ -458,7 +458,8 @@ export function useLayout(options: UseLayoutOptions) {
     const centerX = sumX / virtualNodes.length
     const centerY = sumY / virtualNodes.length
 
-    const gap = 150
+    // Gap between nodes in grid layout
+    const gridGap = 50
 
     // Frames are static - just pass through positions directly
     function expandToRealTargets(virtualTargets: Map<string, { x: number; y: number }>): Map<string, { x: number; y: number }> {
@@ -591,7 +592,7 @@ export function useLayout(options: UseLayoutOptions) {
 
     if (layout === 'grid') {
       const edges = store.getFilteredEdges()
-      const trialTargets = tetrisGridLayout(virtualNodes, edges, 0, 0, gap)
+      const trialTargets = tetrisGridLayout(virtualNodes, edges, 0, 0, gridGap)
 
       if (trialTargets.size === 0) {
         console.warn('Grid layout: no positions generated')
