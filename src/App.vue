@@ -94,7 +94,7 @@ async function resetAllNodeSizes() {
   await Promise.all(updates)
 
   store.nodeLayoutVersion++
-  showToast(`Reset ${count} node sizes to default`, 'info')
+  showToast(t('toasts.resetNodeSizes', { count }), 'info')
 }
 
 async function createNewWorkspace() {
@@ -107,7 +107,7 @@ async function createNewWorkspace() {
     showWorkspaceDialog.value = false
   } catch (e) {
     console.error('Failed to create workspace:', e)
-    showToast('Failed to create workspace: ' + e, 'error')
+    showToast(t('toasts.workspaceCreateFailed') + ': ' + e, 'error')
   }
 }
 
@@ -127,12 +127,12 @@ function saveWorkspaceChanges() {
     store.renameWorkspace(editingWorkspace.value.id, editingWorkspace.value.name)
   }
   showWorkspaceEditor.value = false
-  showToast('Workspace updated', 'success')
+  showToast(t('toasts.workspaceUpdated'), 'success')
 }
 
 function deleteCurrentWorkspace() {
   if (!editingWorkspace.value?.id) {
-    showToast('Cannot delete default workspace', 'error')
+    showToast(t('toasts.cannotDeleteDefault'), 'error')
     return
   }
   // Show confirmation dialog
@@ -150,7 +150,7 @@ async function confirmDeleteWorkspace() {
   await store.deleteWorkspace(id, !keepFiles)
   showDeleteWorkspaceDialog.value = false
   showWorkspaceEditor.value = false
-  showToast(`Deleted workspace "${name}"`, 'info')
+  showToast(t('toasts.workspaceDeleted', { name }), 'info')
 }
 
 async function resetDefaultWorkspace() {
@@ -159,7 +159,7 @@ async function resetDefaultWorkspace() {
   }
   await store.resetDefaultWorkspace()
   showWorkspaceEditor.value = false
-  showToast('Default workspace reset to starter content', 'success')
+  showToast(t('toasts.workspaceReset'), 'success')
 }
 
 function cycleTheme() {
@@ -230,10 +230,10 @@ async function importVault() {
     importWorkspaceName.value = ''
     importTarget.value = 'new'
     keepOriginalFiles.value = true // Reset to safe default
-    showToast(`Imported ${imported.length} nodes`, 'success')
+    showToast(t('toasts.importSuccess', { count: imported.length }), 'success')
   } catch (e) {
     console.error('Import failed:', e)
-    showToast('Failed to import vault: ' + e, 'error')
+    showToast(t('toasts.importFailed') + ': ' + e, 'error')
   }
 }
 
@@ -442,10 +442,10 @@ async function openFolderDialog() {
     <!-- Workspace Dialog -->
     <div v-if="showWorkspaceDialog" class="dialog-overlay" @click.self="showWorkspaceDialog = false">
       <div class="dialog">
-        <h2>New Workspace</h2>
+        <h2>{{ t('workspace.new') }}</h2>
         <div class="dialog-content">
           <label>
-            Workspace Name:
+            {{ t('workspace.workspaceName') }}:
             <input
               v-model="newWorkspaceName"
               type="text"
@@ -456,8 +456,8 @@ async function openFolderDialog() {
           </label>
         </div>
         <div class="dialog-actions">
-          <button class="cancel-btn" @click="showWorkspaceDialog = false">Cancel</button>
-          <button class="import-btn" :disabled="!newWorkspaceName.trim()" @click="createNewWorkspace">Create</button>
+          <button class="cancel-btn" @click="showWorkspaceDialog = false">{{ t('common.cancel') }}</button>
+          <button class="import-btn" :disabled="!newWorkspaceName.trim()" @click="createNewWorkspace">{{ t('workspace.create') }}</button>
         </div>
       </div>
     </div>
@@ -465,10 +465,10 @@ async function openFolderDialog() {
     <!-- Workspace Editor Dialog -->
     <div v-if="showWorkspaceEditor && editingWorkspace" class="dialog-overlay" @click.self="showWorkspaceEditor = false">
       <div class="dialog workspace-editor">
-        <h2>Edit Workspace</h2>
+        <h2>{{ t('workspace.edit') }}</h2>
         <div class="dialog-content">
           <label>
-            Name:
+            {{ t('workspace.name') }}:
             <input
               v-model="editingWorkspace.name"
               type="text"
@@ -478,7 +478,7 @@ async function openFolderDialog() {
             />
           </label>
           <label>
-            Description:
+            {{ t('workspace.description') }}:
             <textarea
               v-model="editingWorkspace.description"
               :placeholder="t('workspace.descriptionPlaceholder')"
@@ -487,9 +487,9 @@ async function openFolderDialog() {
             ></textarea>
           </label>
           <div class="workspace-stats">
-            <span>{{ store.filteredNodes.length }} nodes</span>
+            <span>{{ store.filteredNodes.length }} {{ t('canvas.status.nodes') }}</span>
             <span class="stat-sep">|</span>
-            <span>{{ store.filteredEdges.length }} edges</span>
+            <span>{{ store.filteredEdges.length }} {{ t('canvas.status.edges') }}</span>
           </div>
         </div>
         <div class="dialog-actions">
@@ -498,18 +498,18 @@ async function openFolderDialog() {
             class="delete-btn"
             @click="deleteCurrentWorkspace"
           >
-            Delete Workspace
+            {{ t('common.delete') }} {{ t('settings.workspace') }}
           </button>
           <button
             v-if="!editingWorkspace?.id"
             class="reset-btn"
             @click="resetDefaultWorkspace"
           >
-            Reset to Starter Content
+            {{ t('settings.resetDefaultWorkspaceBtn') }}
           </button>
           <div class="actions-right">
-            <button class="cancel-btn" @click="showWorkspaceEditor = false">Cancel</button>
-            <button class="import-btn" @click="saveWorkspaceChanges">Save</button>
+            <button class="cancel-btn" @click="showWorkspaceEditor = false">{{ t('common.cancel') }}</button>
+            <button class="import-btn" @click="saveWorkspaceChanges">{{ t('common.save') }}</button>
           </div>
         </div>
       </div>
@@ -518,26 +518,26 @@ async function openFolderDialog() {
     <!-- Delete Workspace Confirmation -->
     <div v-if="showDeleteWorkspaceDialog" class="dialog-overlay" @click.self="showDeleteWorkspaceDialog = false">
       <div class="dialog delete-confirm-dialog">
-        <h2>Delete Workspace</h2>
+        <h2>{{ t('workspace.deleteConfirmTitle') }}</h2>
         <div class="dialog-content">
-          <p>Are you sure you want to delete "{{ editingWorkspace?.name }}"?</p>
+          <p>{{ t('workspace.deleteConfirmText', { name: editingWorkspace?.name }) }}</p>
 
           <div class="delete-options">
             <label class="checkbox-label">
               <input v-model="deleteWorkspaceKeepFiles" type="checkbox" />
-              <span>Keep original markdown files (source of truth)</span>
+              <span>{{ t('workspace.keepFiles') }}</span>
             </label>
             <p v-if="!deleteWorkspaceKeepFiles" class="warning-text">
-              Warning: This will permanently delete original files from disk
+              {{ t('workspace.keepFilesWarning') }}
             </p>
             <p v-else class="info-text">
-              Files will remain in your vault for future re-import
+              {{ t('workspace.keepFilesInfo') }}
             </p>
           </div>
         </div>
         <div class="dialog-actions">
-          <button class="cancel-btn" @click="showDeleteWorkspaceDialog = false">Cancel</button>
-          <button class="delete-btn" @click="confirmDeleteWorkspace">Delete</button>
+          <button class="cancel-btn" @click="showDeleteWorkspaceDialog = false">{{ t('common.cancel') }}</button>
+          <button class="delete-btn" @click="confirmDeleteWorkspace">{{ t('common.delete') }}</button>
         </div>
       </div>
     </div>

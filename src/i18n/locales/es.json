@@ -137,7 +137,19 @@
     "pathPlaceholder": "/ruta/al/vault",
     "namePlaceholder": "Nombre del espacio de trabajo",
     "defaultName": "Mi proyecto de investigación",
-    "descriptionPlaceholder": "¿Para qué es este espacio de trabajo?"
+    "descriptionPlaceholder": "¿Para qué es este espacio de trabajo?",
+    "new": "Nuevo espacio de trabajo",
+    "edit": "Editar espacio de trabajo",
+    "name": "Nombre",
+    "workspaceName": "Nombre del espacio de trabajo",
+    "description": "Descripción",
+    "create": "Crear",
+    "deleteWorkspace": "Eliminar espacio de trabajo",
+    "deleteConfirmTitle": "Eliminar espacio de trabajo",
+    "deleteConfirmText": "¿Estás seguro de que quieres eliminar \"{name}\"?",
+    "keepFiles": "Conservar archivos markdown originales (fuente de verdad)",
+    "keepFilesWarning": "Advertencia: Esto eliminará permanentemente los archivos originales del disco",
+    "keepFilesInfo": "Los archivos permanecerán en tu vault para una futura reimportación"
   },
   "onboarding": {
     "language": {
@@ -286,6 +298,17 @@
     "theme": "Tema",
     "settings": "Configuración"
   },
+  "toasts": {
+    "resetNodeSizes": "{count} tamaños de nodos restablecidos",
+    "workspaceCreated": "Espacio de trabajo creado",
+    "workspaceCreateFailed": "Error al crear el espacio de trabajo",
+    "workspaceUpdated": "Espacio de trabajo actualizado",
+    "workspaceDeleted": "Espacio de trabajo \"{name}\" eliminado",
+    "cannotDeleteDefault": "No se puede eliminar el espacio de trabajo predeterminado",
+    "workspaceReset": "Espacio de trabajo restablecido al contenido inicial",
+    "importSuccess": "{count} nodos importados",
+    "importFailed": "Error al importar el vault"
+  },
   "settings": {
     "title": "Configuración",
     "tabs": {
@@ -331,6 +354,10 @@
     "nodes": "Nodos",
     "switch": "Cambiar",
     "recover": "Recuperar",
+    "resetDefaultWorkspace": "Restablecer espacio predeterminado",
+    "resetDefaultWorkspaceBtn": "Restablecer al contenido inicial",
+    "resetDefaultWorkspaceHint": "Elimina todos los nodos del espacio predeterminado y crea el contenido de bienvenida.",
+    "resetDefaultWorkspaceConfirm": "Esto eliminará todos los nodos del espacio predeterminado y restaurará el contenido inicial. ¿Estás seguro?",
     "about": "Acerca de",
     "aboutDescription": "Grafo de conocimiento local",
     "version": "Versión",

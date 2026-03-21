@@ -137,7 +137,19 @@
     "pathPlaceholder": "/path/to/vault",
     "namePlaceholder": "Workspace name",
     "defaultName": "My Research Project",
-    "descriptionPlaceholder": "What is this workspace for?"
+    "descriptionPlaceholder": "What is this workspace for?",
+    "new": "New Workspace",
+    "edit": "Edit Workspace",
+    "name": "Name",
+    "workspaceName": "Workspace Name",
+    "description": "Description",
+    "create": "Create",
+    "deleteWorkspace": "Delete Workspace",
+    "deleteConfirmTitle": "Delete Workspace",
+    "deleteConfirmText": "Are you sure you want to delete \"{name}\"?",
+    "keepFiles": "Keep original markdown files (source of truth)",
+    "keepFilesWarning": "Warning: This will permanently delete original files from disk",
+    "keepFilesInfo": "Files will remain in your vault for future re-import"
   },
   "onboarding": {
     "language": {
@@ -285,6 +297,17 @@
     "importVault": "Import Vault",
     "theme": "Theme",
     "settings": "Settings"
+  },
+  "toasts": {
+    "resetNodeSizes": "Reset {count} node sizes to default",
+    "workspaceCreated": "Workspace created",
+    "workspaceCreateFailed": "Failed to create workspace",
+    "workspaceUpdated": "Workspace updated",
+    "workspaceDeleted": "Deleted workspace \"{name}\"",
+    "cannotDeleteDefault": "Cannot delete default workspace",
+    "workspaceReset": "Default workspace reset to starter content",
+    "importSuccess": "Imported {count} nodes",
+    "importFailed": "Failed to import vault"
   },
   "settings": {
     "title": "Settings",

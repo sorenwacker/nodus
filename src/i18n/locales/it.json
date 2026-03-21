@@ -137,7 +137,19 @@
     "pathPlaceholder": "/percorso/al/vault",
     "namePlaceholder": "Nome spazio di lavoro",
     "defaultName": "Il mio progetto di ricerca",
-    "descriptionPlaceholder": "A cosa serve questo spazio di lavoro?"
+    "descriptionPlaceholder": "A cosa serve questo spazio di lavoro?",
+    "new": "Nuovo spazio di lavoro",
+    "edit": "Modifica spazio di lavoro",
+    "name": "Nome",
+    "workspaceName": "Nome spazio di lavoro",
+    "description": "Descrizione",
+    "create": "Crea",
+    "deleteWorkspace": "Elimina spazio di lavoro",
+    "deleteConfirmTitle": "Elimina spazio di lavoro",
+    "deleteConfirmText": "Sei sicuro di voler eliminare \"{name}\"?",
+    "keepFiles": "Mantieni i file markdown originali (fonte di verità)",
+    "keepFilesWarning": "Attenzione: Questo eliminerà permanentemente i file originali dal disco",
+    "keepFilesInfo": "I file rimarranno nel tuo vault per una futura reimportazione"
   },
   "onboarding": {
     "language": {
@@ -286,6 +298,17 @@
     "theme": "Tema",
     "settings": "Impostazioni"
   },
+  "toasts": {
+    "resetNodeSizes": "{count} dimensioni nodi reimpostate",
+    "workspaceCreated": "Spazio di lavoro creato",
+    "workspaceCreateFailed": "Impossibile creare lo spazio di lavoro",
+    "workspaceUpdated": "Spazio di lavoro aggiornato",
+    "workspaceDeleted": "Spazio di lavoro \"{name}\" eliminato",
+    "cannotDeleteDefault": "Impossibile eliminare lo spazio di lavoro predefinito",
+    "workspaceReset": "Spazio di lavoro reimpostato al contenuto iniziale",
+    "importSuccess": "{count} nodi importati",
+    "importFailed": "Importazione vault fallita"
+  },
   "settings": {
     "title": "Impostazioni",
     "tabs": {
@@ -331,6 +354,10 @@
     "nodes": "Nodi",
     "switch": "Cambia",
     "recover": "Recupera",
+    "resetDefaultWorkspace": "Reimposta spazio predefinito",
+    "resetDefaultWorkspaceBtn": "Reimposta al contenuto iniziale",
+    "resetDefaultWorkspaceHint": "Rimuove tutti i nodi dallo spazio predefinito e crea il contenuto di benvenuto.",
+    "resetDefaultWorkspaceConfirm": "Questo eliminerà tutti i nodi dallo spazio predefinito e ripristinerà il contenuto iniziale. Sei sicuro?",
     "about": "Informazioni",
     "aboutDescription": "Grafo di conoscenza locale",
     "version": "Versione",

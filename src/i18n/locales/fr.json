@@ -137,7 +137,19 @@
     "pathPlaceholder": "/chemin/vers/vault",
     "namePlaceholder": "Nom de l'espace de travail",
     "defaultName": "Mon projet de recherche",
-    "descriptionPlaceholder": "À quoi sert cet espace de travail?"
+    "descriptionPlaceholder": "À quoi sert cet espace de travail?",
+    "new": "Nouvel espace de travail",
+    "edit": "Modifier l'espace de travail",
+    "name": "Nom",
+    "workspaceName": "Nom de l'espace de travail",
+    "description": "Description",
+    "create": "Créer",
+    "deleteWorkspace": "Supprimer l'espace de travail",
+    "deleteConfirmTitle": "Supprimer l'espace de travail",
+    "deleteConfirmText": "Êtes-vous sûr de vouloir supprimer \"{name}\" ?",
+    "keepFiles": "Conserver les fichiers markdown originaux (source de vérité)",
+    "keepFilesWarning": "Attention: Cela supprimera définitivement les fichiers originaux du disque",
+    "keepFilesInfo": "Les fichiers resteront dans votre vault pour une future réimportation"
   },
   "onboarding": {
     "language": {
@@ -286,6 +298,17 @@
     "theme": "Thème",
     "settings": "Paramètres"
   },
+  "toasts": {
+    "resetNodeSizes": "{count} tailles de noeuds réinitialisées",
+    "workspaceCreated": "Espace de travail créé",
+    "workspaceCreateFailed": "Échec de la création de l'espace de travail",
+    "workspaceUpdated": "Espace de travail mis à jour",
+    "workspaceDeleted": "Espace de travail \"{name}\" supprimé",
+    "cannotDeleteDefault": "Impossible de supprimer l'espace de travail par défaut",
+    "workspaceReset": "Espace de travail réinitialisé au contenu de démarrage",
+    "importSuccess": "{count} noeuds importés",
+    "importFailed": "Échec de l'importation du vault"
+  },
   "settings": {
     "title": "Paramètres",
     "tabs": {
@@ -331,6 +354,10 @@
     "nodes": "Nœuds",
     "switch": "Basculer",
     "recover": "Récupérer",
+    "resetDefaultWorkspace": "Réinitialiser l'espace par défaut",
+    "resetDefaultWorkspaceBtn": "Réinitialiser au contenu de démarrage",
+    "resetDefaultWorkspaceHint": "Supprime tous les nœuds de l'espace par défaut et crée le contenu de bienvenue.",
+    "resetDefaultWorkspaceConfirm": "Cela supprimera tous les nœuds de l'espace par défaut et restaurera le contenu de démarrage. Êtes-vous sûr ?",
     "about": "À propos",
     "aboutDescription": "Graphe de connaissances local",
     "version": "Version",

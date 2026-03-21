@@ -137,7 +137,19 @@
     "pathPlaceholder": "/pfad/zum/vault",
     "namePlaceholder": "Arbeitsbereich-Name",
     "defaultName": "Mein Forschungsprojekt",
-    "descriptionPlaceholder": "Wofür ist dieser Arbeitsbereich?"
+    "descriptionPlaceholder": "Wofür ist dieser Arbeitsbereich?",
+    "new": "Neuer Arbeitsbereich",
+    "edit": "Arbeitsbereich bearbeiten",
+    "name": "Name",
+    "workspaceName": "Arbeitsbereich-Name",
+    "description": "Beschreibung",
+    "create": "Erstellen",
+    "deleteWorkspace": "Arbeitsbereich löschen",
+    "deleteConfirmTitle": "Arbeitsbereich löschen",
+    "deleteConfirmText": "Möchten Sie \"{name}\" wirklich löschen?",
+    "keepFiles": "Original-Markdown-Dateien behalten (Quelldaten)",
+    "keepFilesWarning": "Warnung: Dies löscht die Originaldateien dauerhaft von der Festplatte",
+    "keepFilesInfo": "Dateien bleiben in Ihrem Vault für zukünftigen Re-Import"
   },
   "onboarding": {
     "language": {
@@ -286,6 +298,17 @@
     "theme": "Design",
     "settings": "Einstellungen"
   },
+  "toasts": {
+    "resetNodeSizes": "{count} Knotengrößen zurückgesetzt",
+    "workspaceCreated": "Arbeitsbereich erstellt",
+    "workspaceCreateFailed": "Arbeitsbereich konnte nicht erstellt werden",
+    "workspaceUpdated": "Arbeitsbereich aktualisiert",
+    "workspaceDeleted": "Arbeitsbereich \"{name}\" gelöscht",
+    "cannotDeleteDefault": "Standard-Arbeitsbereich kann nicht gelöscht werden",
+    "workspaceReset": "Standard-Arbeitsbereich auf Startinhalt zurückgesetzt",
+    "importSuccess": "{count} Knoten importiert",
+    "importFailed": "Vault-Import fehlgeschlagen"
+  },
   "settings": {
     "title": "Einstellungen",
     "tabs": {
@@ -331,6 +354,10 @@
     "nodes": "Knoten",
     "switch": "Wechseln",
     "recover": "Wiederherstellen",
+    "resetDefaultWorkspace": "Standard-Arbeitsbereich zurücksetzen",
+    "resetDefaultWorkspaceBtn": "Auf Startinhalt zurücksetzen",
+    "resetDefaultWorkspaceHint": "Entfernt alle Knoten im Standard-Arbeitsbereich und erstellt den Willkommensinhalt.",
+    "resetDefaultWorkspaceConfirm": "Dies löscht alle Knoten im Standard-Arbeitsbereich und stellt den Startinhalt wieder her. Sind Sie sicher?",
     "about": "Info",
     "aboutDescription": "Lokaler Wissensgraph",
     "version": "Version",
