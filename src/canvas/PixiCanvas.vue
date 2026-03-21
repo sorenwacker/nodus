@@ -5,6 +5,7 @@ import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import {
   routeAllEdges,
@@ -1465,21 +1466,36 @@ Output ONLY the JSON array:`
 
     case 'web_search': {
       const query = args.query || ''
+      agentLog.value.push(`> Web search: "${query}"`)
       try {
-        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`
-        const resp = await fetch(proxyUrl)
-        const data = await resp.json()
-        const results: string[] = []
-        if (data.Abstract) results.push(data.Abstract)
-        if (data.RelatedTopics) {
-          for (const topic of data.RelatedTopics.slice(0, 5)) {
-            if (topic.Text) results.push(topic.Text)
-          }
+        // Get API key from settings
+        const settings = localStorage.getItem('nodus-settings')
+        const apiKey = settings ? JSON.parse(settings).searchApiKey : null
+
+        if (!apiKey) {
+          agentLog.value.push('> Web search: No API key')
+          return 'Web search requires Tavily API key in Settings'
         }
-        return results.length ? `Search "${query}":\n${results.join('\n\n')}` : `No results for "${query}"`
-      } catch {
-        return 'Search unavailable'
+
+        const results = await invoke<Array<{ title: string; url: string; content: string }>>('web_search', {
+          query,
+          apiKey,
+        })
+
+        agentLog.value.push(`> Web search: Found ${results.length} results`)
+
+        if (results.length === 0) {
+          return `No web results for "${query}"`
+        }
+
+        const formatted = results.map((r, i) =>
+          `${i + 1}. **${r.title}**\n${r.content}\n[${r.url}]`
+        ).join('\n\n')
+
+        return `## Web Search: "${query}"\n\n${formatted}`
+      } catch (e) {
+        agentLog.value.push(`> Web search failed: ${e}`)
+        return `Web search failed: ${e}`
       }
     }
 

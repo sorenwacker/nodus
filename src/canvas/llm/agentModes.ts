@@ -30,6 +30,7 @@ const exploreMode: AgentModeConfig = {
   toolWhitelist: [
     'read_graph',
     'query_nodes',
+    'web_search',
     'research',
     'deep_research',
     'fetch_wikipedia',
@@ -44,14 +45,22 @@ MODE: EXPLORE (Read-only Research)
 You are in exploration mode. Your job is to gather comprehensive information.
 You CANNOT make changes to the canvas in this mode.
 
-For thorough research:
-1. Use deep_research() for multi-round iterative research with cross-validation
-2. Use fetch_wikipedia() to get full article content on specific topics
-3. Use validate_claim() to cross-check facts across multiple sources
-4. Use check_completeness() to assess if more research is needed
+RESEARCH METHODOLOGY - ITERATE EXTENSIVELY:
+1. Start with wikipedia_search() for the main topic
+2. Call fetch_wikipedia() for EACH article found - read them thoroughly
+3. Extract every key concept, person, term, region, etc.
+4. For EACH concept: call wikipedia_search() again
+5. Fetch those articles too with fetch_wikipedia()
+6. Use research() for web searches on specific aspects
+7. Call validate_claim() on important facts
+8. Call check_completeness() - if < 90%, KEEP GOING
+9. Repeat until you've explored all branches of the topic
 
-Keep researching iteratively until check_completeness() shows high coverage.
-When you have gathered enough context, use done() to signal completion.`,
+EXPECT TO MAKE 30-100 TOOL CALLS for proper research.
+Follow every interesting lead. Cross-reference sources.
+Build a complete picture before signaling done().
+
+When comprehensively researched, use done() with a full summary.`,
 }
 
 /**
@@ -64,6 +73,7 @@ const planMode: AgentModeConfig = {
   toolWhitelist: [
     'read_graph',
     'query_nodes',
+    'web_search',
     'research',
     'deep_research',
     'fetch_wikipedia',
@@ -80,18 +90,25 @@ MODE: PLAN (Design)
 You are in planning mode. Your job is to research and design an approach.
 You CANNOT make changes to the canvas yet - that happens after approval.
 
-For research-heavy tasks:
-1. Use deep_research() for comprehensive, multi-round research
-2. Use fetch_wikipedia() for detailed information on specific topics
-3. Use validate_claim() to cross-check important facts
-4. Use check_completeness() to ensure thorough coverage
+FOR RESEARCH TASKS - USE ITERATIVE APPROACH:
+Do NOT just call deep_research once. Instead, iterate manually:
+
+1. Start with wikipedia_search() to find key articles
+2. Call fetch_wikipedia() for EACH relevant article found
+3. Use research() or web_search() for additional queries
+4. Extract concepts from results and search for THOSE
+5. Call validate_claim() on important facts
+6. Call check_completeness() - if score < 90%, KEEP RESEARCHING
+7. Generate follow-up queries and repeat steps 1-6
+8. Continue until completeness is HIGH or you've exhausted the topic
+
+ITERATE MANY TIMES. Use 20-50+ tool calls for thorough research.
+Each Wikipedia article, each web search, each validation is a separate call.
 
 When research is complete:
-1. Use think() to reason about the best approach
+1. Use think() to synthesize findings
 2. Use create_plan() to create a detailed step-by-step plan
-3. Use request_approval() to pause for user review
-
-The user will approve, reject, or modify your plan before execution begins.`,
+3. Use request_approval() to pause for user review`,
 }
 
 /**
@@ -144,14 +161,23 @@ MODE: EXECUTE (Approved)
 You are executing an approved plan. Make the changes as specified.
 Work through each step methodically. Use update_task() to mark progress.
 
-For research tasks:
-- Use deep_research() for thorough, iterative research with cross-validation
-- Use fetch_wikipedia() to get detailed content from Wikipedia
-- Use validate_claim() to verify facts across sources
-- Use check_completeness() to ensure comprehensive coverage before finishing
+FOR RESEARCH-HEAVY EXECUTION - ITERATE EXTENSIVELY:
+Do NOT rely on single tool calls. For comprehensive research:
 
-Keep iterating until research is complete and validated.
-If you encounter issues, document them but continue with other steps if possible.`,
+1. Call wikipedia_search() with different query variations
+2. Call fetch_wikipedia() for EVERY relevant article - read them all
+3. Extract key concepts from each article
+4. Search for those concepts: more wikipedia_search(), more fetch_wikipedia()
+5. Use research() for web results on specific subtopics
+6. Call validate_claim() on key facts you discover
+7. Call check_completeness() periodically
+8. If completeness < 90%, generate new queries and CONTINUE
+9. Keep going until you've thoroughly covered the topic
+
+USE 50-100+ TOOL CALLS for exhaustive research.
+Create nodes as you discover information.
+Cross-reference and validate findings.
+Do not stop until the topic is comprehensively covered.`,
 }
 
 /**
