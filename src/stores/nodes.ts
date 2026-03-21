@@ -632,7 +632,7 @@ export const useNodesStore = defineStore('nodes', () => {
   const updateStorylineEdgeColors = (storylineId: string, color: string | null) => storylinesStore.updateStorylineEdgeColors(storylineId, color)
 
   // Import functions - forwarded to import composable
-  const importVault = (path: string, targetWorkspaceId?: string) => importComposable.importVault(path, targetWorkspaceId)
+  const importVault = (path: string, deleteOriginals?: boolean, targetWorkspaceId?: string) => importComposable.importVault(path, deleteOriginals, targetWorkspaceId)
   const importCitations = (filePath: string) => importComposable.importCitations(filePath)
   const importOntology = (filePath: string, options?: { createClassNodes?: boolean; createIndividualNodes?: boolean; workspaceId?: string; layout?: 'grid' | 'hierarchical' }) =>
     importComposable.importOntology(filePath, options)

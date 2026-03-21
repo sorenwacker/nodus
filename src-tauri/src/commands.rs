@@ -393,10 +393,11 @@ fn get_relative_folder(file_path: &std::path::Path, vault_root: &std::path::Path
 }
 
 #[tauri::command]
-pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<Vec<Node>, String> {
+pub async fn import_vault(path: String, workspace_id: Option<String>, delete_originals: Option<bool>) -> Result<Vec<Node>, String> {
     let path = PathBuf::from(&path);
+    let should_delete = delete_originals.unwrap_or(false);
 
-    println!("Importing vault from: {:?}, workspace_id: {:?}", path, workspace_id);
+    println!("Importing vault from: {:?}, workspace_id: {:?}, delete_originals: {}", path, workspace_id, should_delete);
 
     if !path.exists() {
         return Err("Vault path does not exist".to_string());
@@ -490,6 +491,8 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
 
     // Second pass: import files and assign to frames
     let mut folder_node_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    // Track files to delete after successful import
+    let mut files_to_delete: Vec<PathBuf> = Vec::new();
 
     for (file_path, folder) in files_to_import {
         let file_path_str = file_path.to_string_lossy().to_string();
@@ -558,10 +561,18 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         let now_ts = chrono::Utc::now().timestamp();
         let node_id = uuid::Uuid::new_v4().to_string();
 
+        // If we're deleting originals, don't store file_path (file won't exist)
+        // Also skip checksum since there's no file to track
+        let (stored_file_path, stored_checksum) = if should_delete {
+            (None, None)
+        } else {
+            (Some(file_path_str.clone()), Some(checksum))
+        };
+
         let node = Node {
             id: node_id.clone(),
             title: title.clone(),
-            file_path: Some(file_path_str),
+            file_path: stored_file_path,
             markdown_content: Some(content),
             node_type: "note".to_string(),
             canvas_x: initial_x,
@@ -574,7 +585,7 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
             is_collapsed: false,
             tags: None,
             workspace_id: workspace_id.clone(),
-            checksum: Some(checksum),
+            checksum: stored_checksum,
             created_at: now_ts,
             updated_at: now_ts,
             deleted_at: None,
@@ -583,6 +594,11 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
         database::nodes::create(pool, &node)
             .await
             .map_err(|e| e.to_string())?;
+
+        // Track file for deletion if requested
+        if should_delete {
+            files_to_delete.push(file_path);
+        }
 
         if let Some(fid) = &frame_id {
             node_folders.push((node_id.clone(), fid.clone()));
@@ -634,8 +650,28 @@ pub async fn import_vault(path: String, workspace_id: Option<String>) -> Result<
     // Clean up duplicate edges
     let duplicates_removed = database::edges::deduplicate(pool).await.unwrap_or(0);
 
-    println!("Import complete: {} nodes imported, {} skipped, {} edges created, {} frames created, {} duplicates removed",
-             nodes.len(), skipped, edge_count, frame_count, duplicates_removed);
+    // Delete original files if requested (after successful import)
+    let mut deleted_count = 0;
+    if !files_to_delete.is_empty() {
+        for file in &files_to_delete {
+            if file.exists() {
+                match std::fs::remove_file(file) {
+                    Ok(_) => {
+                        deleted_count += 1;
+                        println!("Deleted original file: {:?}", file);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to delete file {:?}: {}", file, e);
+                    }
+                }
+            }
+        }
+        println!("Deleted {} original files after import", deleted_count);
+    }
+
+    println!("Import complete: {} nodes imported, {} skipped, {} edges created, {} frames created, {} duplicates removed{}",
+             nodes.len(), skipped, edge_count, frame_count, duplicates_removed,
+             if should_delete { format!(", {} files deleted", deleted_count) } else { String::new() });
 
     Ok(nodes)
 }

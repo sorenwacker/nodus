@@ -21,6 +21,7 @@ const showWorkspaceEditor = ref(false)
 const vaultPath = ref('')
 const importTarget = ref<'current' | 'new'>('new')
 const importWorkspaceName = ref('')
+const keepOriginalFiles = ref(true) // Keep original files by default (safe option)
 const showSettings = ref(false)
 
 // Search composable
@@ -201,11 +202,12 @@ async function importVault() {
       store.switchWorkspace(ws.id)
     }
 
-    const imported = await store.importVault(vaultPath.value.trim())
+    const imported = await store.importVault(vaultPath.value.trim(), !keepOriginalFiles.value)
     showImportDialog.value = false
     vaultPath.value = ''
     importWorkspaceName.value = ''
     importTarget.value = 'new'
+    keepOriginalFiles.value = true // Reset to safe default
     showToast(`Imported ${imported.length} nodes`, 'success')
   } catch (e) {
     console.error('Import failed:', e)
@@ -414,6 +416,16 @@ async function openFolderDialog() {
               <input v-model="importTarget" type="radio" value="current" />
               <span>Import into current workspace</span>
             </label>
+          </div>
+
+          <div class="import-options-section">
+            <label class="checkbox-label">
+              <input v-model="keepOriginalFiles" type="checkbox" />
+              <span>Keep original files (recommended for Obsidian vaults)</span>
+            </label>
+            <p v-if="!keepOriginalFiles" class="warning-text">
+              Warning: Original files will be deleted after import
+            </p>
           </div>
         </div>
         <div class="dialog-actions">

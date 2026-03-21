@@ -35,16 +35,20 @@ export function useImport(deps: ImportDeps) {
 
   /**
    * Import markdown files from a vault directory
+   * @param path - Path to the vault directory
+   * @param deleteOriginals - If true, delete original files after import (default: false)
+   * @param targetWorkspaceId - Optional workspace to import into
    */
-  async function importVault(path: string, targetWorkspaceId?: string): Promise<Node[]> {
+  async function importVault(path: string, deleteOriginals?: boolean, targetWorkspaceId?: string): Promise<Node[]> {
     loading.value = true
     try {
       const workspaceId = targetWorkspaceId ?? deps.getCurrentWorkspaceId()
-      storeLogger.info(`Importing vault: ${path}`)
+      storeLogger.info(`Importing vault: ${path}, deleteOriginals: ${deleteOriginals}`)
 
       const importedNodes = await invoke<Node[]>('import_vault', {
         path,
         workspaceId,
+        deleteOriginals: deleteOriginals ?? false,
       })
 
       storeLogger.info(`Imported ${importedNodes.length} nodes`)
