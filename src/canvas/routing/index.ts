@@ -30,14 +30,27 @@ export { SpatialIndex, getSpatialIndex, invalidateSpatialIndex } from './spatial
 export { routeDiagonal, validateDiagonalPath, type DiagonalRouteParams, type DiagonalRouteResult } from './diagonalRouter'
 export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, type OrthogonalRouteResult } from './orthogonalRouter'
 
+// Export crossing reduction module
+export {
+  reduceCrossings,
+  setStrategy as setCrossingStrategy,
+  getStrategy as getCrossingStrategy,
+  BarycentricReduction,
+  GreedySwapReduction,
+  CombinedReduction,
+  type CrossingReductionStrategy,
+  type CrossingReductionResult,
+} from './crossingReduction'
+
 // Internal imports
 import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
 import { getPortPoint, getStandoff } from './geometry'
-import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, type PortAssignment } from './portAssignment'
+import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING } from './portAssignment'
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
-import { findObstacles, getObstacleBounds, OBSTACLE_MARGIN, segmentIntersectsNode } from './obstacleAvoider'
+import { findObstacles, getObstacleBounds, OBSTACLE_MARGIN } from './obstacleAvoider'
+import { reduceCrossings as runCrossingReduction } from './crossingReduction'
 
 // Minimum orthogonal standoff distance from node edge
 // Larger standoff = more room for edge routing lanes
@@ -159,187 +172,6 @@ function pathToSvgString(path: Point[]): string {
   return svg
 }
 
-/**
- * Reduce edge crossings by swapping port assignments
- * Counts actual line segment crossings and swaps to reduce them
- */
-function reduceCrossings(
-  edgeInfos: EdgeInfo[],
-  sourceAssignments: Map<string, PortAssignment>,
-  targetAssignments: Map<string, PortAssignment>,
-  nodeMap: Map<string, NodeRect>
-): void {
-  // Build edge paths (simplified: just source center to target center)
-  const edgePaths = new Map<string, { x1: number; y1: number; x2: number; y2: number }>()
-  for (const info of edgeInfos) {
-    const srcAssign = sourceAssignments.get(info.edge.id)
-    const tgtAssign = targetAssignments.get(info.edge.id)
-
-    // Get port positions
-    const srcNode = info.source
-    const tgtNode = info.target
-    const srcCx = srcNode.canvas_x + (srcNode.width || 200) / 2
-    const srcCy = srcNode.canvas_y + (srcNode.height || 120) / 2
-    const tgtCx = tgtNode.canvas_x + (tgtNode.width || 200) / 2
-    const tgtCy = tgtNode.canvas_y + (tgtNode.height || 120) / 2
-
-    // Apply port offsets
-    const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
-    const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
-
-    let x1 = srcCx, y1 = srcCy, x2 = tgtCx, y2 = tgtCy
-
-    if (info.sourceSide === 'left' || info.sourceSide === 'right') {
-      y1 += srcOffset
-    } else {
-      x1 += srcOffset
-    }
-    if (info.targetSide === 'left' || info.targetSide === 'right') {
-      y2 += tgtOffset
-    } else {
-      x2 += tgtOffset
-    }
-
-    edgePaths.set(info.edge.id, { x1, y1, x2, y2 })
-  }
-
-  // Count total crossings
-  const countCrossings = (): number => {
-    let count = 0
-    const ids = Array.from(edgePaths.keys())
-    for (let i = 0; i < ids.length; i++) {
-      for (let j = i + 1; j < ids.length; j++) {
-        const e1 = edgePaths.get(ids[i])!
-        const e2 = edgePaths.get(ids[j])!
-        if (linesIntersect(e1.x1, e1.y1, e1.x2, e1.y2, e2.x1, e2.y1, e2.x2, e2.y2)) {
-          count++
-        }
-      }
-    }
-    return count
-  }
-
-  // Group edges by node+side for swapping
-  const groups = new Map<string, string[]>()
-  for (const info of edgeInfos) {
-    const srcKey = `${info.edge.source_node_id}:${info.sourceSide}`
-    const tgtKey = `${info.edge.target_node_id}:${info.targetSide}`
-    if (!groups.has(srcKey)) groups.set(srcKey, [])
-    if (!groups.has(tgtKey)) groups.set(tgtKey, [])
-    groups.get(srcKey)!.push(info.edge.id)
-    groups.get(tgtKey)!.push(info.edge.id)
-  }
-
-  // Try swapping ports to reduce crossings
-  let improved = true
-  let iterations = 0
-  const maxIterations = 50
-
-  while (improved && iterations < maxIterations) {
-    improved = false
-    iterations++
-
-    for (const [key, edgeIds] of groups) {
-      if (edgeIds.length < 2) continue
-
-      const [nodeId, side] = key.split(':')
-      const isSource = edgeInfos.some(e => e.edge.source_node_id === nodeId && edgeIds.includes(e.edge.id))
-      const assignments = isSource ? sourceAssignments : targetAssignments
-
-      // Get current assignments for this group
-      const groupAssigns = edgeIds
-        .map(id => ({ id, assign: assignments.get(id)! }))
-        .filter(a => a.assign)
-        .sort((a, b) => a.assign.index - b.assign.index)
-
-      // Try swapping adjacent pairs
-      for (let i = 0; i < groupAssigns.length - 1; i++) {
-        const before = countCrossings()
-
-        // Swap indices - save both original values
-        const a = groupAssigns[i]
-        const b = groupAssigns[i + 1]
-        const origAIdx = a.assign.index
-        const origBIdx = b.assign.index
-        a.assign.index = origBIdx
-        b.assign.index = origAIdx
-
-        // Update edge paths
-        updateEdgePath(a.id, edgeInfos, sourceAssignments, targetAssignments, edgePaths)
-        updateEdgePath(b.id, edgeInfos, sourceAssignments, targetAssignments, edgePaths)
-
-        const after = countCrossings()
-
-        if (after < before) {
-          improved = true
-          console.log(`[Crossings] Reduced ${before} -> ${after} by swapping at ${key}`)
-        } else {
-          // Revert swap - restore original values
-          a.assign.index = origAIdx
-          b.assign.index = origBIdx
-          updateEdgePath(a.id, edgeInfos, sourceAssignments, targetAssignments, edgePaths)
-          updateEdgePath(b.id, edgeInfos, sourceAssignments, targetAssignments, edgePaths)
-        }
-      }
-    }
-  }
-}
-
-function updateEdgePath(
-  edgeId: string,
-  edgeInfos: EdgeInfo[],
-  sourceAssignments: Map<string, PortAssignment>,
-  targetAssignments: Map<string, PortAssignment>,
-  edgePaths: Map<string, { x1: number; y1: number; x2: number; y2: number }>
-): void {
-  const info = edgeInfos.find(e => e.edge.id === edgeId)
-  if (!info) return
-
-  const srcAssign = sourceAssignments.get(edgeId)
-  const tgtAssign = targetAssignments.get(edgeId)
-
-  const srcNode = info.source
-  const tgtNode = info.target
-  const srcCx = srcNode.canvas_x + (srcNode.width || 200) / 2
-  const srcCy = srcNode.canvas_y + (srcNode.height || 120) / 2
-  const tgtCx = tgtNode.canvas_x + (tgtNode.width || 200) / 2
-  const tgtCy = tgtNode.canvas_y + (tgtNode.height || 120) / 2
-
-  const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
-  const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
-
-  let x1 = srcCx, y1 = srcCy, x2 = tgtCx, y2 = tgtCy
-
-  if (info.sourceSide === 'left' || info.sourceSide === 'right') {
-    y1 += srcOffset
-  } else {
-    x1 += srcOffset
-  }
-  if (info.targetSide === 'left' || info.targetSide === 'right') {
-    y2 += tgtOffset
-  } else {
-    x2 += tgtOffset
-  }
-
-  edgePaths.set(edgeId, { x1, y1, x2, y2 })
-}
-
-function linesIntersect(
-  x1: number, y1: number, x2: number, y2: number,
-  x3: number, y3: number, x4: number, y4: number
-): boolean {
-  const d1x = x2 - x1, d1y = y2 - y1
-  const d2x = x4 - x3, d2y = y4 - y3
-  const cross = d1x * d2y - d1y * d2x
-  if (Math.abs(cross) < 0.0001) return false
-
-  const dx = x3 - x1, dy = y3 - y1
-  const t = (dx * d2y - dy * d2x) / cross
-  const u = (dx * d1y - dy * d1x) / cross
-
-  return t > 0.01 && t < 0.99 && u > 0.01 && u < 0.99
-}
-
 // EdgeInfo type (matches what analyzeEdges returns)
 interface EdgeInfo {
   edge: EdgeDef
@@ -368,7 +200,7 @@ export function routeAllEdges(
   const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
 
   // Iteratively reduce crossings by swapping ports
-  reduceCrossings(edgeInfos, sourceAssignments, targetAssignments, nodeMap)
+  runCrossingReduction(edgeInfos, sourceAssignments, targetAssignments)
 
   // Create grid tracker for edge overlap prevention (PCB-style lane routing)
   // Grid size determines minimum spacing between parallel edges

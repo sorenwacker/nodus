@@ -168,14 +168,14 @@ export const canvasStorage = {
   setGridSize(value: number): void {
     localStorage.setItem(KEYS.canvasGridSize, String(value))
   },
-  getEdgeStyle(): 'orthogonal' | 'diagonal' | 'curved' | 'straight' {
+  getEdgeStyle(): 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' {
     const value = localStorage.getItem(KEYS.canvasEdgeStyle)
-    if (value === 'diagonal' || value === 'curved' || value === 'straight') {
+    if (value === 'diagonal' || value === 'curved' || value === 'hyperbolic' || value === 'straight') {
       return value
     }
     return 'orthogonal'
   },
-  setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'straight'): void {
+  setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'): void {
     localStorage.setItem(KEYS.canvasEdgeStyle, value)
   },
 }

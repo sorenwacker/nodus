@@ -32,7 +32,7 @@ const llmEnabled = ref(llmStorage.getLLMEnabled())
 // Canvas Settings
 const gridSnap = ref(canvasStorage.getGridSnap())
 const gridSize = ref(canvasStorage.getGridSize())
-const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'straight'>(canvasStorage.getEdgeStyle())
+const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'>(canvasStorage.getEdgeStyle())
 
 // Tag Settings
 const showTagNodes = ref(tagStorage.getShowTagNodes())
@@ -272,6 +272,13 @@ async function switchToWorkspace(id: string) {
                   <path d="M4 20 C4 12, 28 12, 28 4" />
                 </svg>
                 <span>{{ t('settings.edgeStyles.curved') }}</span>
+              </label>
+              <label class="edge-style-option">
+                <input v-model="edgeStyle" type="radio" value="hyperbolic" />
+                <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 20 L4 16 C10 16, 22 8, 28 8 L28 4" />
+                </svg>
+                <span>{{ t('settings.edgeStyles.hyperbolic') }}</span>
               </label>
               <label class="edge-style-option">
                 <input v-model="edgeStyle" type="radio" value="straight" />
