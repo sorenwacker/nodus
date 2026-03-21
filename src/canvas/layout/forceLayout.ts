@@ -67,7 +67,7 @@ export async function applyForceLayout(
   const {
     centerX = 0,
     centerY = 0,
-    chargeStrength = -100,
+    chargeStrength = -300,
     linkDistance = 150,
     iterations = 300,
     gravityStrength = 0.6,
