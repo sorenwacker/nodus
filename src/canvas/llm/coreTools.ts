@@ -98,6 +98,64 @@ export function registerCoreTools(): void {
     { category: 'crud' }
   )
 
+  defineTool<{ edges: Array<{ from_title: string; to_title: string; label?: string }> }>(
+    'create_edges_batch',
+    'Create multiple edges at once. More efficient than create_edge for mind maps and graphs.',
+    {
+      type: 'object',
+      properties: {
+        edges: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              from_title: { type: 'string', description: 'Source node title' },
+              to_title: { type: 'string', description: 'Target node title' },
+              label: { type: 'string', description: 'Edge label (optional)' },
+            },
+            required: ['from_title', 'to_title'],
+          },
+          description: 'Array of edges to create',
+        },
+      },
+      required: ['edges'],
+    },
+    async (args, ctx) => {
+      const results: string[] = []
+      let created = 0
+      let failed = 0
+
+      for (const edge of args.edges) {
+        const fromNode = ctx.store.filteredNodes.find(n => n.title === edge.from_title)
+        const toNode = ctx.store.filteredNodes.find(n => n.title === edge.to_title)
+
+        if (!fromNode) {
+          results.push(`Skip: "${edge.from_title}" not found`)
+          failed++
+          continue
+        }
+        if (!toNode) {
+          results.push(`Skip: "${edge.to_title}" not found`)
+          failed++
+          continue
+        }
+
+        await ctx.store.createEdge({
+          source_node_id: fromNode.id,
+          target_node_id: toNode.id,
+          label: edge.label,
+        })
+        created++
+      }
+
+      if (failed > 0) {
+        return `Created ${created} edges, ${failed} failed: ${results.join('; ')}`
+      }
+      return `Created ${created} edges`
+    },
+    { category: 'batch' }
+  )
+
   defineTool<{ title: string }>(
     'delete_node',
     'Delete a single node by its title',

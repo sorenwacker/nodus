@@ -36,6 +36,7 @@ export const DEFAULT_AGENT_PROMPT = `CONTENT RULES:
 BEHAVIOR:
 - Do EXACTLY what user asks - no more, no less
 - Use create_nodes_batch for 3+ nodes
+- Use create_edges_batch for 3+ edges (mind maps, graphs)
 - Do NOT add extra operations (don't move unless asked, don't connect unless asked)
 - For SEMANTIC tasks (categories): use smart_move, smart_color, smart_connect
 - ALWAYS call done() when finished
