@@ -213,6 +213,53 @@ export function registerCoreTools(): void {
     { category: 'crud' }
   )
 
+  defineTool<{ from_title: string; to_title: string; label?: string; color?: string }>(
+    'update_edge',
+    'Update an edge label or color by specifying the connected node titles',
+    {
+      type: 'object',
+      properties: {
+        from_title: { type: 'string', description: 'Title of source node' },
+        to_title: { type: 'string', description: 'Title of target node' },
+        label: { type: 'string', description: 'New edge label (optional)' },
+        color: { type: 'string', description: 'New edge color as hex code, e.g. #ff0000 (optional)' },
+      },
+      required: ['from_title', 'to_title'],
+    },
+    async (args, ctx) => {
+      const fromNode = ctx.store.filteredNodes.find(n => n.title === args.from_title)
+      const toNode = ctx.store.filteredNodes.find(n => n.title === args.to_title)
+      if (!fromNode) return `Error: Node "${args.from_title}" not found`
+      if (!toNode) return `Error: Node "${args.to_title}" not found`
+
+      // Find the edge between these nodes
+      const edge = ctx.store.filteredEdges.find(
+        e => (e.source_node_id === fromNode.id && e.target_node_id === toNode.id) ||
+             (e.source_node_id === toNode.id && e.target_node_id === fromNode.id)
+      )
+      if (!edge) return `Error: No edge between "${args.from_title}" and "${args.to_title}"`
+
+      const updates: string[] = []
+
+      if (args.label !== undefined && ctx.store.updateEdgeLabel) {
+        await ctx.store.updateEdgeLabel(edge.id, args.label || null)
+        updates.push(`label="${args.label || '(none)'}"`)
+      }
+
+      if (args.color !== undefined && ctx.store.updateEdgeColor) {
+        await ctx.store.updateEdgeColor(edge.id, args.color || null)
+        updates.push(`color="${args.color || 'default'}"`)
+      }
+
+      if (updates.length === 0) {
+        return 'No updates provided (specify label or color)'
+      }
+
+      return `Updated edge "${args.from_title}" -> "${args.to_title}": ${updates.join(', ')}`
+    },
+    { category: 'crud' }
+  )
+
   defineTool<{ filter: string }>(
     'delete_matching',
     'Delete multiple nodes matching a filter.',
@@ -617,6 +664,56 @@ export function registerCoreTools(): void {
   // QUERY
   // ============================================================
 
+  defineTool<{ include_content?: boolean; max_content_length?: number }>(
+    'read_graph',
+    'Read the current graph state including nodes, their content, and connections. Use this first to understand what exists.',
+    {
+      type: 'object',
+      properties: {
+        include_content: { type: 'boolean', description: 'Include node content (default: true)' },
+        max_content_length: { type: 'number', description: 'Max chars per node content (default: 500)' },
+      },
+      required: [],
+    },
+    async (args, ctx) => {
+      const includeContent = args.include_content !== false
+      const maxLen = args.max_content_length || 500
+      const nodes = ctx.store.filteredNodes
+      const edges = ctx.store.filteredEdges
+
+      if (nodes.length === 0) {
+        return 'Graph is empty. No nodes exist yet.'
+      }
+
+      // Build node descriptions
+      const nodeDescriptions = nodes.map(n => {
+        const content = includeContent && n.markdown_content
+          ? `\n   Content: ${n.markdown_content.slice(0, maxLen)}${n.markdown_content.length > maxLen ? '...' : ''}`
+          : ''
+        return `- "${n.title}" @(${Math.round(n.canvas_x)},${Math.round(n.canvas_y)})${content}`
+      }).join('\n')
+
+      // Build edge descriptions
+      const edgeDescriptions = edges.length > 0
+        ? edges.map(e => {
+            const from = nodes.find(n => n.id === e.source_node_id)?.title || '?'
+            const to = nodes.find(n => n.id === e.target_node_id)?.title || '?'
+            const label = e.label ? ` [${e.label}]` : ''
+            return `  "${from}" -> "${to}"${label}`
+          }).join('\n')
+        : '  (no connections)'
+
+      return `CURRENT GRAPH STATE:
+
+NODES (${nodes.length}):
+${nodeDescriptions}
+
+EDGES (${edges.length}):
+${edgeDescriptions}`
+    },
+    { category: 'query' }
+  )
+
   defineTool<{ filter: string }>(
     'query_nodes',
     'Query nodes from database. Returns list of {title, content} for planning.',
@@ -835,6 +932,78 @@ export function registerCoreTools(): void {
       return `__UNHANDLED__:remember`
     },
     { category: 'planning' }
+  )
+
+  // ============================================================
+  // AGENT PLANNING TOOLS (for interactive approval flow)
+  // ============================================================
+
+  defineTool<{ title: string; steps: Array<{ description: string; details?: string }> }>(
+    'create_plan',
+    'Create a detailed plan with steps for user approval. Use this to propose changes before making them.',
+    {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Short title describing the plan goal' },
+        steps: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              description: { type: 'string', description: 'What this step will do' },
+              details: { type: 'string', description: 'Optional implementation details' },
+            },
+          },
+          description: 'Array of steps to execute',
+        },
+      },
+      required: ['title', 'steps'],
+    },
+    async (args, _ctx) => {
+      // Return marker for PixiCanvas to handle with plan state
+      return `__CREATE_PLAN__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
+  )
+
+  defineTool<{ plan_id?: string; message?: string }>(
+    'request_approval',
+    'Request user approval for the current plan. Agent will pause until user approves, rejects, or modifies.',
+    {
+      type: 'object',
+      properties: {
+        plan_id: { type: 'string', description: 'Optional plan ID (defaults to current plan)' },
+        message: { type: 'string', description: 'Optional message to show user with approval request' },
+      },
+      required: [],
+    },
+    async (args, _ctx) => {
+      // Return marker for PixiCanvas to handle - pauses agent loop
+      return `__REQUEST_APPROVAL__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
+  )
+
+  defineTool<{ query: string; sources?: string[] }>(
+    'research',
+    'Research a topic across web and local nodes. Returns results with source attribution.',
+    {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+        sources: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Sources to search: "local", "web", "wikipedia". Defaults to ["local", "web"]',
+        },
+      },
+      required: ['query'],
+    },
+    async (args, _ctx) => {
+      // Return marker for PixiCanvas to handle with research module
+      return `__RESEARCH__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
   )
 
   // ============================================================

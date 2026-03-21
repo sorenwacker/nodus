@@ -2096,3 +2096,11 @@
 .edge-tagged:not(.edge-highlighted) {
   stroke: var(--text-muted) !important;
 }
+
+/* Agent task panel container - fixed position bottom right */
+.agent-task-panel-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9000;
+}

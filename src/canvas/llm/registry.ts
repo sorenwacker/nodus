@@ -44,13 +44,15 @@ export interface INodeStore {
   filteredNodes: Node[]
   filteredEdges: Edge[]
   createNode: (data: Partial<Node>) => Promise<Node>
-  createEdge: (data: { source_node_id: string; target_node_id: string; label?: string }) => Promise<Edge>
+  createEdge: (data: { source_node_id: string; target_node_id: string; label?: string; color?: string }) => Promise<Edge>
   deleteNode: (id: string) => Promise<void>
   deleteEdge: (id: string) => Promise<void>
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
   updateNodeColor?: (id: string, color: string) => Promise<void>
+  updateEdgeLabel?: (id: string, label: string | null) => Promise<void>
+  updateEdgeColor?: (id: string, color: string | null) => Promise<void>
 }
 
 // Tool handler function signature

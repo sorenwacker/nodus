@@ -44,6 +44,11 @@ import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
+import PlanApprovalModal from '../components/PlanApprovalModal.vue'
+import AgentTaskPanel from '../components/AgentTaskPanel.vue'
+import { usePlanState } from './llm/planState'
+import { quickResearch } from './llm/research'
+import { useAgentTasksStore } from '../stores/agentTasks'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -90,7 +95,13 @@ const pushCreationUndo = (nodeIds: string[]) => {
 const { t } = useI18n()
 const store = useNodesStore()
 const themesStore = useThemesStore()
+const agentTasksStore = useAgentTasksStore()
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
+
+// Plan state for interactive approval flow
+const planState = usePlanState()
+// Destructure refs for template auto-unwrapping
+const { currentPlan: planCurrentPlan, showApprovalModal: planShowApprovalModal } = planState
 
 // Reactive theme tracking
 const isDarkMode = ref(false)
@@ -1043,6 +1054,8 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
       updateNodePosition: store.updateNodePosition,
       updateNodeContent: store.updateNodeContent,
       updateNodeTitle: store.updateNodeTitle,
+      updateEdgeLabel: store.updateEdgeLabel,
+      updateEdgeColor: store.updateEdgeColor,
     },
     log: (msg: string) => agentLog.value.push(msg),
     screenToCanvas,
@@ -1054,6 +1067,52 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
   // Try extracted executor (handles simple tools)
   const result = await executeTool(name, args, toolCtx)
   console.log(`[Tool] ${name} -> executeTool returned:`, result.slice(0, 100))
+
+  // Handle agent planning markers
+  if (result.startsWith('__CREATE_PLAN__:')) {
+    try {
+      const data = JSON.parse(result.replace('__CREATE_PLAN__:', ''))
+      const plan = planState.createPlan(data.title || 'Plan', data.steps || [])
+      agentLog.value.push(`> Plan created: ${plan.title} (${plan.steps.length} steps)`)
+    } catch (e) {
+      console.error('[Tool] Failed to parse create_plan:', e)
+    }
+    return result
+  }
+
+  if (result.startsWith('__REQUEST_APPROVAL__:')) {
+    console.log('[Tool] Handling request_approval marker')
+    console.log('[Tool] currentPlan:', planState.currentPlan.value)
+    console.log('[Tool] showApprovalModal before:', planState.showApprovalModal.value)
+    if (planState.currentPlan.value) {
+      const success = planState.requestApproval()
+      console.log('[Tool] requestApproval result:', success)
+      console.log('[Tool] showApprovalModal after:', planState.showApprovalModal.value)
+      agentLog.value.push('> Requesting approval...')
+    } else {
+      console.log('[Tool] No current plan!')
+    }
+    return result
+  }
+
+  // Handle research marker - actually perform the research
+  if (result.startsWith('__RESEARCH__:')) {
+    try {
+      const data = JSON.parse(result.replace('__RESEARCH__:', ''))
+      const query = data.query || ''
+      const sources = Array.isArray(data.sources)
+        ? data.sources as Array<'local' | 'web' | 'wikipedia'>
+        : ['local', 'web'] as Array<'local' | 'web' | 'wikipedia'>
+
+      agentLog.value.push(`> Researching: ${query}`)
+      const researchResult = await quickResearch(query, store.filteredNodes, sources)
+      return researchResult || 'No results found'
+    } catch (e) {
+      console.error('[Tool] Research error:', e)
+      return `Research failed: ${e}`
+    }
+  }
+
   if (!result.startsWith('__UNHANDLED__:')) {
     return result
   }
@@ -1467,6 +1526,63 @@ Apply the changes and output the complete updated YAML. Output ONLY the YAML, no
       return `Remembered for this workspace: ${message}`
     }
 
+    // Agent planning tools
+    case 'create_plan': {
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const title = parsedArgs.title || 'Untitled Plan'
+      const steps = parsedArgs.steps || []
+
+      if (!Array.isArray(steps) || steps.length === 0) {
+        return 'No steps provided for plan'
+      }
+
+      // Create plan using plan state
+      const plan = planState.createPlan(title, steps)
+      agentLog.value.push(`> Plan created: ${title} (${steps.length} steps)`)
+
+      return `__CREATE_PLAN__:${JSON.stringify({ planId: plan.id, title, stepCount: steps.length })}`
+    }
+
+    case 'request_approval': {
+      // Trigger approval request
+      if (!planState.currentPlan.value) {
+        return 'No plan to approve'
+      }
+
+      const success = planState.requestApproval()
+      if (!success) {
+        return 'Failed to request approval'
+      }
+
+      agentLog.value.push('> Requesting approval...')
+      return `__REQUEST_APPROVAL__:${JSON.stringify({ planId: planState.currentPlan.value.id })}`
+    }
+
+    case 'research': {
+      let parsedArgs = args
+      if (typeof args === 'string') {
+        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
+      }
+      const query = parsedArgs.query || ''
+      if (!query) return 'No query provided'
+
+      const sources = Array.isArray(parsedArgs.sources)
+        ? parsedArgs.sources as Array<'local' | 'web' | 'wikipedia'>
+        : ['local', 'web'] as Array<'local' | 'web' | 'wikipedia'>
+
+      agentLog.value.push(`> Researching: ${query}`)
+
+      try {
+        const results = await quickResearch(query, store.filteredNodes, sources)
+        return results
+      } catch (e) {
+        return `Research failed: ${e}`
+      }
+    }
+
     default:
       return `Unknown tool: ${name}`
   }
@@ -1501,6 +1617,56 @@ const agentRunner = useAgentRunner(agentContext)
 
 function stopAgent() {
   agentRunner.stop()
+}
+
+// Plan approval handlers
+async function handlePlanApprove() {
+  console.log('[PixiCanvas] handlePlanApprove called')
+  const success = planState.approvePlan()
+  console.log('[PixiCanvas] approvePlan result:', success)
+  if (success) {
+    agentLog.value.push('> Plan approved')
+    // Set tasks in store
+    if (planState.currentPlan.value) {
+      agentTasksStore.setTasks(
+        planState.currentPlan.value.steps.map(s => ({
+          description: s.description,
+          details: s.details,
+        }))
+      )
+      // Start execution
+      planState.startExecution()
+      // Resume agent with approval
+      await agentRunner.resume({ approved: true })
+    }
+  }
+}
+
+function handlePlanReject(reason?: string) {
+  console.log('[PixiCanvas] handlePlanReject called')
+  planState.rejectPlan(reason)
+  agentLog.value.push(`> Plan rejected${reason ? ': ' + reason : ''}`)
+  // Resume agent to revise plan
+  agentRunner.resume({ approved: false, message: reason })
+}
+
+function handlePlanModify(stepId: string, newDescription: string) {
+  planState.modifyStep(stepId, { description: newDescription })
+  agentLog.value.push(`> Step modified: ${newDescription.slice(0, 40)}...`)
+}
+
+function handlePlanAddStep(description: string, afterStepId?: string) {
+  planState.addStep(description, undefined, afterStepId)
+  agentLog.value.push(`> Step added: ${description.slice(0, 40)}...`)
+}
+
+function handlePlanRemoveStep(stepId: string) {
+  planState.removeStep(stepId)
+  agentLog.value.push('> Step removed')
+}
+
+function closePlanModal() {
+  planShowApprovalModal.value = false
 }
 
 async function sendGraphPrompt() {
@@ -4081,6 +4247,25 @@ ${edges.map(e => `  - id: "${e.id}"
       @import="pdfDrop.confirmBibImport($event)"
       @cancel="pdfDrop.cancelBibImport()"
     />
+
+    <!-- Plan approval modal for agent planning -->
+    <PlanApprovalModal
+      :plan="planCurrentPlan"
+      :visible="planShowApprovalModal"
+      @approve="handlePlanApprove"
+      @reject="handlePlanReject"
+      @modify="handlePlanModify"
+      @add-step="handlePlanAddStep"
+      @remove-step="handlePlanRemoveStep"
+      @close="closePlanModal"
+    />
+
+    <!-- Agent task panel for progress display -->
+    <Teleport to="body">
+      <div v-if="agentTasksStore.totalTasks > 0" class="agent-task-panel-container">
+        <AgentTaskPanel />
+      </div>
+    </Teleport>
     </div>
   </div>
 </template>

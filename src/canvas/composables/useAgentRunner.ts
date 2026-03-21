@@ -2,12 +2,23 @@
  * Agent runner composable
  * Handles the LLM agent loop for graph building
  * ALL LLM calls go through the queue
+ *
+ * Supports three modes:
+ * - Explore: Read-only research
+ * - Plan: Design approach for user approval
+ * - Execute: Make changes after approval
  */
-import type { Ref } from 'vue'
-import type { ChatMessage, AgentTask, ToolDefinition } from '../llm/types'
+import { ref, type Ref } from 'vue'
+import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } from '../llm/types'
 import { llmStorage, memoryStorage } from '../../lib/storage'
 import { DEFAULT_AGENT_PROMPT } from '../llm/prompts'
 import { llmQueue } from '../llm/queue'
+import {
+  filterToolsForMode,
+  getModeSystemPrompt,
+  getModeMaxIterations,
+  DEFAULT_AGENT_MODE,
+} from '../llm/agentModes'
 
 /**
  * Escape special characters that could be used for prompt injection
@@ -56,7 +67,9 @@ interface SystemPromptMessage {
  */
 function buildSystemPrompt(
   nodes: Array<{ title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>,
-  workspaceId: string
+  workspaceId: string,
+  mode: AgentMode,
+  plan?: AgentPlan | null
 ): SystemPromptMessage {
   let nodeList = 'No nodes yet. Canvas is empty.'
 
@@ -77,10 +90,26 @@ function buildSystemPrompt(
     ? `\nMEMORY (from previous sessions):\n${memories.map(m => `- ${m}`).join('\n')}\n`
     : ''
 
+  // Get mode-specific prompt addition
+  const modePrompt = getModeSystemPrompt(mode)
+
+  // Include plan context if executing
+  let planSection = ''
+  if (plan && mode === 'execute') {
+    const stepsList = plan.steps.map((s, i) => {
+      const status = s.status === 'done' ? '[x]' :
+                     s.status === 'in_progress' ? '[>]' :
+                     s.status === 'error' ? '[!]' : '[ ]'
+      return `${status} ${i + 1}. ${s.description}`
+    }).join('\n')
+    planSection = `\nAPPROVED PLAN: ${plan.title}\n${stepsList}\n`
+  }
+
   return {
     role: 'system',
     content: `You are a graph builder agent.
-
+${modePrompt}
+${planSection}
 CANVAS: x right, y down.
 ${memorySection}
 NODES (${nodes.length}):
@@ -88,7 +117,7 @@ ${nodeList}
 
 TOOLS:
 - create_node(title, content): Create one node
-- generate_sequence(count, title_pattern, content_pattern?, layout?, connect?): Generate N nodes. {n}=number. connect=true links 1→2→3...
+- generate_sequence(count, title_pattern, content_pattern?, layout?, connect?): Generate N nodes. {n}=number. connect=true links 1->2->3...
 - create_nodes_batch(nodes): Create/update up to ~50 nodes. nodes=[{title, content}]. Updates existing.
 - create_edge(from_title, to_title): Connect two nodes
 - delete_edges(filter): Delete edges. filter="all" or node title
@@ -97,24 +126,27 @@ TOOLS:
 - delete_matching(filter): Delete multiple nodes. filter="all"|"even"|"odd"|"empty"|term
 - auto_layout("grid"|"horizontal"|"vertical"|"circle"|"clock"|"star"): Arrange all nodes
 - query_nodes(filter): Query DB. filter="all"|"empty"|"has_content"|"search term". Returns node list.
-- for_each_node(action, template, filter?): action="set"|"append"|"llm". For "llm": template is the instruction (e.g., "clean up this text, remove references"), content is passed automatically. ALWAYS use this for bulk content processing/cleanup.
-- batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}]. YOU generate the values.
-- smart_move(instruction): Move nodes by semantic criteria. E.g., "car brands to left, animals to right".
-- smart_color(instruction): Color nodes by semantic criteria. E.g., "males blue, females pink" or "urgent red".
-- color_matching(pattern, color): Fast grep-style coloring. E.g., pattern="#department", color="#ef4444" (red). No LLM, instant.
-- smart_connect(groups): Connect nodes within groups. E.g., "animals, car brands" connects animals together and cars together.
-- web_search(query): Search web for information
-- think(thought): Express your reasoning before acting. Use for complex tasks.
-- plan(tasks): Create a task list for multi-step operations. tasks=["step 1", "step 2", ...]
-- update_task(task_index, status): Update task status. status="done"|"in_progress"|"failed"
+- for_each_node(action, template, filter?): action="set"|"append"|"llm". For "llm": template is the instruction.
+- batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}].
+- smart_move(instruction): Move nodes by semantic criteria.
+- smart_color(instruction): Color nodes by semantic criteria.
+- color_matching(pattern, color): Fast grep-style coloring.
+- smart_connect(groups): Connect nodes within groups.
+- research(query, sources?): Research topic across web + local nodes. sources=["local","web","wikipedia"]
+- create_plan(title, steps): Create a plan for user approval. steps=[{description, details?}]
+- request_approval(plan_id?, message?): Request user approval for current plan.
+- think(thought): Express your reasoning before acting.
+- plan(tasks): Create a task list for multi-step operations.
+- update_task(task_index, status): Update task status.
 - remember(message): Store important info for this workspace's memory
-- create_theme(name, description): Create a custom theme. E.g., "crazy-bananas", "bright tropical colors with yellow background"
-- update_theme(name, changes): Modify a custom theme. E.g., "crazy-bananas", "make it darker"
-- apply_theme(name): Switch to a theme. E.g., "light", "dark", "cyber", or custom theme name
-- list_themes(): List available themes
 - done(summary): Call when finished
 
-WORKFLOW: For complex tasks, use think() to reason, then plan() to create steps, then execute each step and update_task() when done.
+WORKFLOW:
+1. Use research() or query_nodes() to understand context
+2. Use think() to reason about approach
+3. Use create_plan() to propose steps
+4. Use request_approval() to pause for user review
+5. After approval, execute the plan step by step
 
 ${customRules}`,
   }
@@ -139,29 +171,84 @@ function pruneMessages(messages: ChatMessage[], keepRecent: number = 6): ChatMes
   return [systemPrompt, userRequest, summary, ...recentMessages]
 }
 
+/**
+ * Agent runner result with pause capability
+ */
+export interface AgentRunResult {
+  status: 'done' | 'paused' | 'error' | 'stopped' | 'max_iterations'
+  message: string
+  pauseReason?: 'approval_requested' | 'user_input_needed'
+  planData?: { title: string; steps: Array<{ description: string; details?: string }> }
+}
+
 export function useAgentRunner(ctx: AgentContext) {
+  // Current mode
+  const mode = ref<AgentMode>(DEFAULT_AGENT_MODE)
+
+  // Paused state
+  const isPaused = ref(false)
+  const pauseReason = ref<string | null>(null)
+
+  // Saved state for resume
+  let savedMessages: ChatMessage[] = []
+  let savedIteration = 0
+
+  // Current plan (for execute mode)
+  const currentPlan = ref<AgentPlan | null>(null)
+
   /**
    * Stop the running agent
    */
   function stop() {
     llmQueue.cancelCurrent()
     ctx.isRunning.value = false
+    isPaused.value = false
+    pauseReason.value = null
     ctx.log.value.push('> Stopped by user')
+  }
+
+  /**
+   * Set agent mode
+   */
+  function setMode(newMode: AgentMode) {
+    mode.value = newMode
+    ctx.log.value.push(`> Mode: ${newMode}`)
+  }
+
+  /**
+   * Set plan for execution
+   */
+  function setPlan(plan: AgentPlan) {
+    currentPlan.value = plan
+  }
+
+  /**
+   * Get tools filtered for current mode
+   */
+  function getFilteredTools(): ToolDefinition[] {
+    return filterToolsForMode(ctx.agentTools, mode.value) as ToolDefinition[]
   }
 
   /**
    * Run the agent with a user request
    */
-  async function run(userRequest: string): Promise<string> {
+  async function run(userRequest: string, startMode?: AgentMode): Promise<AgentRunResult> {
     // Singleton - stop any existing agent
     if (ctx.isRunning.value) {
       stop()
+    }
+
+    // Set mode if provided
+    if (startMode) {
+      mode.value = startMode
     }
 
     // Auto-cleanup orphan edges
     ctx.cleanupOrphanEdges()
 
     ctx.isRunning.value = true
+    isPaused.value = false
+    pauseReason.value = null
     ctx.tasks.value = []
 
     // Append new request to log
@@ -169,17 +256,72 @@ export function useAgentRunner(ctx: AgentContext) {
       ctx.log.value.push('---')
     }
     ctx.log.value.push(`User: ${userRequest}`)
+    ctx.log.value.push(`> Mode: ${mode.value}`)
 
-    // Build initial messages with current node state and memories
-    let messages: ChatMessage[] = [
-      buildSystemPrompt(ctx.filteredNodes(), ctx.workspaceId()),
+    // Build initial messages with current node state, memories, and mode
+    const messages: ChatMessage[] = [
+      buildSystemPrompt(ctx.filteredNodes(), ctx.workspaceId(), mode.value, currentPlan.value),
       { role: 'user', content: userRequest },
     ]
 
-    const maxIterations = 200
+    const maxIterations = getModeMaxIterations(mode.value)
     const pruneEvery = 10
 
-    for (let i = 0; i < maxIterations; i++) {
+    return await runLoop(messages, 0, maxIterations, pruneEvery)
+  }
+
+  /**
+   * Resume after pause (e.g., after approval)
+   */
+  async function resume(approvalResult?: { approved: boolean; message?: string }): Promise<AgentRunResult> {
+    if (!isPaused.value || savedMessages.length === 0) {
+      return { status: 'error', message: 'No paused agent to resume' }
+    }
+
+    ctx.isRunning.value = true
+    isPaused.value = false
+
+    // Add approval result to messages
+    if (approvalResult) {
+      if (approvalResult.approved) {
+        savedMessages.push({
+          role: 'user',
+          content: `Plan APPROVED. ${approvalResult.message || 'Proceed with execution.'}`,
+        })
+        // Switch to execute mode
+        mode.value = 'execute'
+        ctx.log.value.push('> Plan approved - switching to execute mode')
+      } else {
+        savedMessages.push({
+          role: 'user',
+          content: `Plan REJECTED. ${approvalResult.message || 'Please revise the plan.'}`,
+        })
+        ctx.log.value.push('> Plan rejected - revising')
+      }
+    }
+
+    const maxIterations = getModeMaxIterations(mode.value)
+    return await runLoop(savedMessages, savedIteration, maxIterations, 10)
+  }
+
+  /**
+   * Main agent loop
+   */
+  async function runLoop(
+    messages: ChatMessage[],
+    startIteration: number,
+    maxIterations: number,
+    pruneEvery: number
+  ): Promise<AgentRunResult> {
+    // Get tools for current mode
+    const tools = getFilteredTools()
+
+    for (let i = startIteration; i < maxIterations; i++) {
+      // Check if we should stop
+      if (!ctx.isRunning.value) {
+        return { status: 'stopped', message: 'Agent stopped by user' }
+      }
+
       // Prune context periodically
       if (i > 0 && i % pruneEvery === 0) {
         messages = pruneMessages(messages)
@@ -187,8 +329,8 @@ export function useAgentRunner(ctx: AgentContext) {
       }
 
       try {
-        // Use the queue for all LLM calls
-        const data = await llmQueue.chat(messages as ChatMessage[], ctx.agentTools)
+        // Use the queue for all LLM calls with filtered tools
+        const data = await llmQueue.chat(messages as ChatMessage[], tools)
         const msg = data.message
 
         messages.push(msg)
@@ -208,13 +350,58 @@ export function useAgentRunner(ctx: AgentContext) {
             const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
 
+            // Check for special markers
             if (result.startsWith('AGENT_DONE:')) {
               ctx.conversationHistory.value.push({
                 role: 'assistant',
                 content: result.replace('AGENT_DONE:', '').trim()
               })
               ctx.isRunning.value = false
-              return result.replace('AGENT_DONE:', '').trim()
+              return { status: 'done', message: result.replace('AGENT_DONE:', '').trim() }
+            }
+
+            if (result.startsWith('__CREATE_PLAN__:')) {
+              // Plan was created, continue loop
+              ctx.log.value.push('> Plan created')
+            }
+
+            if (result.startsWith('__REQUEST_APPROVAL__:')) {
+              // Pause for user approval
+              ctx.log.value.push('> Waiting for approval...')
+              isPaused.value = true
+              pauseReason.value = 'approval_requested'
+              savedMessages = messages
+              savedIteration = i + 1
+              ctx.isRunning.value = false
+
+              // Extract plan data if present
+              let planData: { title: string; steps: Array<{ description: string; details?: string }> } | undefined
+              try {
+                const jsonStr = result.replace('__REQUEST_APPROVAL__:', '')
+                const data = JSON.parse(jsonStr)
+                if (data.planData) {
+                  planData = data.planData
+                }
+              } catch {
+                // No plan data in result
+              }
+
+              return {
+                status: 'paused',
+                message: 'Waiting for user approval',
+                pauseReason: 'approval_requested',
+                planData,
+              }
+            }
+
+            if (result.startsWith('AGENT_PAUSED:')) {
+              // Generic pause
+              isPaused.value = true
+              pauseReason.value = result.replace('AGENT_PAUSED:', '').trim()
+              savedMessages = messages
+              savedIteration = i + 1
+              ctx.isRunning.value = false
+              return { status: 'paused', message: pauseReason.value }
             }
           }
         } else if (msg.content) {
@@ -223,7 +410,7 @@ export function useAgentRunner(ctx: AgentContext) {
           // If LLM asks a question or says it's done, stop
           if (msg.content.includes('?') || /done|complete|finished|empty/i.test(msg.content)) {
             ctx.isRunning.value = false
-            return msg.content.slice(0, 200)
+            return { status: 'done', message: msg.content.slice(0, 200) }
           }
 
           // Try to parse tool calls from text (fallback for models without native tool calling)
@@ -255,7 +442,7 @@ export function useAgentRunner(ctx: AgentContext) {
                     content: result.replace('AGENT_DONE:', '').trim()
                   })
                   ctx.isRunning.value = false
-                  return result.replace('AGENT_DONE:', '').trim()
+                  return { status: 'done', message: result.replace('AGENT_DONE:', '').trim() }
                 }
                 continue
               }
@@ -266,31 +453,43 @@ export function useAgentRunner(ctx: AgentContext) {
           const looksComplete = /now shows|complete|finished|created|done|successfully/i.test(msg.content)
           if (looksComplete) {
             ctx.isRunning.value = false
-            return 'Done'
+            return { status: 'done', message: 'Done' }
           }
 
           // Prompt to continue
           messages.push({ role: 'user', content: 'Use tools only. Call done() when finished.' })
           continue
         }
-      } catch (e: any) {
-        if (e.name === 'AbortError' || e.message === 'Cancelled') {
+      } catch (e: unknown) {
+        const error = e as { name?: string; message?: string }
+        if (error.name === 'AbortError' || error.message === 'Cancelled') {
           ctx.log.value.push('> Agent stopped')
           ctx.isRunning.value = false
-          return 'Agent stopped by user'
+          return { status: 'stopped', message: 'Agent stopped by user' }
         }
         console.error('Agent error:', e)
         ctx.isRunning.value = false
-        throw e
+        return { status: 'error', message: String(e) }
       }
     }
 
     ctx.isRunning.value = false
-    return 'Agent reached max iterations'
+    return { status: 'max_iterations', message: 'Agent reached max iterations' }
   }
 
   return {
+    // State
+    mode,
+    isPaused,
+    pauseReason,
+    currentPlan,
+
+    // Actions
     run,
+    resume,
     stop,
+    setMode,
+    setPlan,
+    getFilteredTools,
   }
 }

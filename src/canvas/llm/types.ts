@@ -46,3 +46,42 @@ export interface ChatMessage {
   }>
   tool_call_id?: string
 }
+
+/**
+ * Agent mode determines available tools and behavior
+ */
+export type AgentMode = 'explore' | 'plan' | 'execute'
+
+/**
+ * A single step in an agent plan
+ */
+export interface PlanStep {
+  id: string
+  description: string
+  status: 'pending' | 'approved' | 'rejected' | 'in_progress' | 'done' | 'error'
+  details?: string
+  toolCalls?: string[]
+}
+
+/**
+ * An agent plan with steps requiring user approval
+ */
+export interface AgentPlan {
+  id: string
+  title: string
+  steps: PlanStep[]
+  status: 'draft' | 'pending_approval' | 'approved' | 'executing' | 'completed' | 'cancelled'
+  createdAt: number
+  approvedAt?: number
+}
+
+/**
+ * Research result from web or local sources
+ */
+export interface ResearchResult {
+  source: 'web' | 'local' | 'wikipedia'
+  title: string
+  content: string
+  url?: string
+  nodeId?: string
+}
