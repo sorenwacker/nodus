@@ -9,7 +9,7 @@ export * from './types'
 // Re-export utilities
 export { pathToSvg } from './svgPath'
 export { getSide, getPortPoint, getStandoff, getAngledStandoff, getNodeCenter, CORNER_MARGIN } from './geometry'
-export { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, optimizePortAssignments, detectCrossings, type CrossingReport } from './portAssignment'
+export { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, optimizePortAssignments, detectCrossings, clearPortCache, type CrossingReport } from './portAssignment'
 export { createOrthogonalPath, cleanPath, findOrthogonalPath } from './pathBuilder'
 
 // Export new routing modules
@@ -45,7 +45,7 @@ export {
 // Internal imports
 import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
 import { getPortPoint, getStandoff } from './geometry'
-import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING } from './portAssignment'
+import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, cachePortIndex } from './portAssignment'
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
@@ -119,45 +119,51 @@ function bezierPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Poi
 }
 
 /**
- * Route around obstacles with a simple orthogonal detour for straight edges
+ * Route around obstacles with a diagonal detour for straight edges.
+ * Creates a smooth 3-segment path that deflects around obstacles while
+ * maintaining a mostly straight appearance.
  */
-function routeAroundObstaclesSimple(
+function routeAroundObstaclesDiagonal(
   start: Point,
   end: Point,
-  obstacles: NodeRect[],
-  sourceSide: Side,
-  targetSide: Side
+  obstacles: NodeRect[]
 ): Point[] {
   const bounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + 20)
   const dx = end.x - start.x
   const dy = end.y - start.y
 
-  // Determine primary direction
-  const isHorizontal = Math.abs(dx) > Math.abs(dy)
+  // Calculate midpoint of the line
+  const midX = (start.x + end.x) / 2
+  const midY = (start.y + end.y) / 2
 
-  if (isHorizontal) {
-    // Edge is primarily horizontal - route vertically around obstacle
-    const goAbove = start.y < bounds.minY || (start.y < (bounds.minY + bounds.maxY) / 2)
-    const midY = goAbove ? bounds.minY : bounds.maxY
+  // Determine if we need to go around above/below or left/right
+  // Calculate which direction has more clearance
+  const obsCenterX = (bounds.minX + bounds.maxX) / 2
+  const obsCenterY = (bounds.minY + bounds.maxY) / 2
 
-    return [
-      start,
-      { x: start.x, y: midY },
-      { x: end.x, y: midY },
-      end,
-    ]
-  } else {
-    // Edge is primarily vertical - route horizontally around obstacle
-    const goLeft = start.x < bounds.minX || (start.x < (bounds.minX + bounds.maxX) / 2)
-    const midX = goLeft ? bounds.minX : bounds.maxX
+  // Calculate perpendicular direction to the edge
+  const len = Math.sqrt(dx * dx + dy * dy) || 1
+  const perpX = -dy / len  // Perpendicular vector
+  const perpY = dx / len
 
-    return [
-      start,
-      { x: midX, y: start.y },
-      { x: midX, y: end.y },
-      end,
-    ]
-  }
+  // Determine which side of the line the obstacle is on
+  const toObsX = obsCenterX - midX
+  const toObsY = obsCenterY - midY
+  const obsSide = perpX * toObsX + perpY * toObsY
+
+  // Deflect away from obstacle
+  const deflectSign = obsSide > 0 ? -1 : 1
+
+  // Calculate deflection distance based on obstacle size
+  const obsWidth = bounds.maxX - bounds.minX
+  const obsHeight = bounds.maxY - bounds.minY
+  const deflectDist = Math.max(obsWidth, obsHeight) / 2 + OBSTACLE_MARGIN + 30
+
+  // Create a single waypoint that deflects the path
+  const waypointX = midX + perpX * deflectDist * deflectSign
+  const waypointY = midY + perpY * deflectDist * deflectSign
+
+  return [start, { x: waypointX, y: waypointY }, end]
 }
 
 /**
@@ -199,8 +205,29 @@ export function routeAllEdges(
   // Assign port indices for spreading
   const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
 
-  // Iteratively reduce crossings by swapping ports
-  runCrossingReduction(edgeInfos, sourceAssignments, targetAssignments)
+  // Log sample assignments - all multi-edge groups
+  if (false) {  // Disabled logging
+    console.log(`[routeAllEdges] After optimization: ${result_crossing.swapsPerformed} swaps`)
+    // Show edges where multiple edges share a node+side (both source and target)
+    const byNodeSide = new Map<string, Array<{ id: string; isSource: boolean }>>()
+    for (const info of edgeInfos) {
+      const srcKey = `${info.source.id}:${info.sourceSide}`
+      const tgtKey = `${info.target.id}:${info.targetSide}`
+      if (!byNodeSide.has(srcKey)) byNodeSide.set(srcKey, [])
+      if (!byNodeSide.has(tgtKey)) byNodeSide.set(tgtKey, [])
+      byNodeSide.get(srcKey)!.push({ id: info.edge.id, isSource: true })
+      byNodeSide.get(tgtKey)!.push({ id: info.edge.id, isSource: false })
+    }
+    for (const [key, entries] of byNodeSide) {
+      if (entries.length > 1) {
+        const indices = entries.map(e => {
+          const a = e.isSource ? sourceAssignments.get(e.id) : targetAssignments.get(e.id)
+          return a ? `${e.id.slice(0,8)}:${a.index}` : `${e.id.slice(0,8)}:?`
+        }).sort()
+        console.log(`[Spread] ${key.slice(0,8)}...:${key.split(':')[1]} = [${indices.join(', ')}]`)
+      }
+    }
+  }
 
   // Create grid tracker for edge overlap prevention (PCB-style lane routing)
   // Grid size determines minimum spacing between parallel edges
@@ -271,6 +298,11 @@ export function routeAllEdges(
     const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
     const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
 
+    // Debug: log edges with spreading (total > 1)
+    if ((srcAssign && srcAssign.total > 1) || (tgtAssign && tgtAssign.total > 1)) {
+      console.log(`[Edge] ${edge.id.slice(0,8)}: src=${sourceSide} idx=${srcAssign?.index}/${srcAssign?.total} off=${srcOffset.toFixed(0)}, tgt=${targetSide} idx=${tgtAssign?.index}/${tgtAssign?.total} off=${tgtOffset.toFixed(0)}`)
+    }
+
     const sourcePort = getPortPoint(source, sourceSide, srcOffset)
     const targetPort = getPortPoint(target, targetSide, tgtOffset)
     const sourceStandoff = getStandoff(sourcePort, sourceSide, STANDOFF)
@@ -291,8 +323,8 @@ export function routeAllEdges(
         const svgPath = `M ${sourcePort.x} ${sourcePort.y} L ${targetPort.x} ${targetPort.y}`
         routeResult = { path, svgPath }
       } else {
-        // Route around obstacles with simple detour
-        const detourPath = routeAroundObstaclesSimple(sourcePort, targetPort, obstacles, sourceSide, targetSide)
+        // Route around obstacles with diagonal detour (stays mostly straight)
+        const detourPath = routeAroundObstaclesDiagonal(sourcePort, targetPort, obstacles)
         const svgPath = pathToSvgString(detourPath)
         routeResult = { path: detourPath, svgPath }
       }
@@ -443,18 +475,33 @@ export function routeAllEdges(
       })
     } else {
       // orthogonal (default)
-      // Calculate channel offset to create non-crossing parallel paths.
-      // Each edge gets assigned to a different "lane" based on port offsets.
-      // Multiply by LANE_WIDTH to ensure proper visual separation.
-      const sourceCenter = source.canvas_x + (source.width || 200) / 2
-      const targetCenter = target.canvas_x + (target.width || 200) / 2
-      const sourceLeftOfTarget = sourceCenter < targetCenter
+      // Calculate channel offset based on target position to avoid lane crossings.
+      // Edges going to higher targets (lower Y) should use higher lanes.
+      // Edges going to righter targets (higher X) should use righter lanes.
+      const sourceY = source.canvas_y + (source.height || 120) / 2
+      const targetY = target.canvas_y + (target.height || 120) / 2
+      const sourceX = source.canvas_x + (source.width || 200) / 2
+      const targetX = target.canvas_x + (target.width || 200) / 2
 
-      // Use whichever offset is larger (more edges sharing that endpoint)
-      // Scale by lane width for proper visual separation
-      const baseOffset = Math.abs(srcOffset) > Math.abs(tgtOffset) ? srcOffset : tgtOffset
-      const scaledOffset = (baseOffset / PORT_SPACING) * LANE_WIDTH
-      const channelOffset = sourceLeftOfTarget ? -scaledOffset : scaledOffset
+      // Use target position relative to source to determine lane
+      // This ensures edges fan out in the direction of their targets
+      const dy = targetY - sourceY
+      const dx = targetX - sourceX
+      const isMainlyVertical = Math.abs(dy) > Math.abs(dx)
+
+      // Channel offset to avoid orthogonal crossings.
+      // For edges from same node: edge going FURTHER should use OUTER lane.
+      // This prevents its horizontal from crossing closer edge's vertical turn.
+      //
+      // For left/right exits: further target = more negative dx
+      //   - Further target needs HIGHER Y lane (positive offset) to pass below verticals
+      // For top/bottom exits: further target = more negative dy
+      //   - Further target needs lane away from turn direction
+
+      // Reverse the port offset direction: outer port → outer lane
+      // Port offset is already ordered by target position, but for orthogonal
+      // we need the OPPOSITE: far targets get far lanes
+      const channelOffset = -(srcOffset + tgtOffset) * 3
 
       routeResult = routeOrthogonal({
         startPort: sourcePort,
@@ -477,6 +524,52 @@ export function routeAllEdges(
       debugInfo: { srcOffset, tgtOffset, srcSide: sourceSide, tgtSide: targetSide },
     })
   }
+
+  return result
+}
+
+/**
+ * Optimize entry points (port assignments) for edges connected to a specific node.
+ * Reduces edge crossings by reordering ports on the clicked node's sides.
+ * Call this when clicking on a node to improve edge layout.
+ * Stores optimized indices in cache for next routing pass.
+ */
+export function optimizeNodeEntrypoints(
+  nodeId: string,
+  edges: EdgeDef[],
+  nodeMap: Map<string, NodeRect>
+): { improved: boolean; initialCrossings: number; finalCrossings: number; swapsPerformed: number } {
+  // Filter to edges connected to this node
+  const nodeEdges = edges.filter(e => e.source_node_id === nodeId || e.target_node_id === nodeId)
+
+  if (nodeEdges.length < 2) {
+    console.log(`[optimizeNodeEntrypoints] Node ${nodeId.slice(0,8)}... has ${nodeEdges.length} edges, skipping`)
+    return { improved: false, initialCrossings: 0, finalCrossings: 0, swapsPerformed: 0 }
+  }
+
+  console.log(`[optimizeNodeEntrypoints] Optimizing ${nodeEdges.length} edges for node ${nodeId.slice(0,8)}...`)
+
+  // Analyze edges and determine sides
+  const edgeInfos = analyzeEdges(nodeEdges, nodeMap)
+
+  // Assign port indices for spreading
+  const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
+
+  // Run crossing reduction (modifies assignments in place)
+  const result = runCrossingReduction(edgeInfos, sourceAssignments, targetAssignments)
+
+  // Cache the optimized indices for the next routing pass
+  if (result.swapsPerformed > 0) {
+    for (const [edgeId, assign] of sourceAssignments) {
+      cachePortIndex(edgeId, true, assign.index, assign.total)
+    }
+    for (const [edgeId, assign] of targetAssignments) {
+      cachePortIndex(edgeId, false, assign.index, assign.total)
+    }
+    console.log(`[optimizeNodeEntrypoints] Cached ${sourceAssignments.size + targetAssignments.size} port assignments`)
+  }
+
+  console.log(`[optimizeNodeEntrypoints] Result: ${result.initialCrossings} -> ${result.finalCrossings} crossings (${result.swapsPerformed} swaps)`)
 
   return result
 }

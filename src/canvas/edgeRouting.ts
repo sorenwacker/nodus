@@ -18,6 +18,8 @@ export {
   // Functions
   routeAllEdges,
   routeEdgesWithBundling,
+  optimizeNodeEntrypoints,
+  clearPortCache,
   pathToSvg,
   getSide,
   getPortPoint,

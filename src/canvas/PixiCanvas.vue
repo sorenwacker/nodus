@@ -9,6 +9,7 @@ import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manage
 import {
   routeAllEdges,
   routeEdgesWithBundling,
+  optimizeNodeEntrypoints,
   assignPorts,
   calculatePortOffset,
   getSide,
@@ -741,6 +742,7 @@ const layout = useLayout({
   pushUndo,
 })
 const isLayouting = ref(false)
+
 async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid') {
   isLayouting.value = true
   console.log(`[LAYOUT] Starting ${type} layout...`)
@@ -2285,6 +2287,28 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   const nodeEdges = store.filteredEdges.filter(e => e.source_node_id === nodeId || e.target_node_id === nodeId)
   console.log(`[Click] "${clickedNode?.title}" - ${nodeEdges.length} edges`)
 
+  // Optimize entry points for this node (wrapped in try-catch to not break click handling)
+  try {
+    const optNodeMap = new Map<string, NodeRect>()
+    for (const n of store.filteredNodes) {
+      optNodeMap.set(n.id, {
+        id: n.id,
+        canvas_x: n.canvas_x,
+        canvas_y: n.canvas_y,
+        width: n.width || NODE_DEFAULTS.WIDTH,
+        height: n.height || NODE_DEFAULTS.HEIGHT,
+      })
+    }
+    const edgeDefs = store.filteredEdges.map(edge => ({
+      id: edge.id,
+      source_node_id: edge.source_node_id,
+      target_node_id: edge.target_node_id,
+    }))
+    optimizeNodeEntrypoints(nodeId, edgeDefs, optNodeMap)
+  } catch (err) {
+    console.error('[optimizeNodeEntrypoints] Error:', err)
+  }
+
   // Trigger edge re-routing
   store.nodeLayoutVersion++
 
@@ -3146,7 +3170,7 @@ async function moveNodesToWorkspace(workspaceId: string | null) {
 
 // Export current graph/subgraph as YAML for debugging
 function exportGraphAsYaml() {
-  const selectedIds = store.getSelectedNodeIds()
+  const selectedIds = store.selectedNodeIds
   const selectedSet = new Set(selectedIds)
   const hasSelection = selectedIds.length > 0
 
@@ -3363,6 +3387,7 @@ ${edges.map(e => `  - id: "${e.id}"
           :stroke="highlightColor"
           stroke-width="2"
           stroke-dasharray="8,4"
+          style="pointer-events: none"
         />
       </svg>
 
