@@ -70,7 +70,7 @@ export function registerCoreTools(): void {
     { category: 'crud' }
   )
 
-  defineTool<{ from_title: string; to_title: string; label?: string }>(
+  defineTool<{ from_title: string; to_title: string; label?: string; color?: string }>(
     'create_edge',
     'Create an edge connecting two nodes by their titles',
     {
@@ -79,6 +79,7 @@ export function registerCoreTools(): void {
         from_title: { type: 'string', description: 'Title of source node' },
         to_title: { type: 'string', description: 'Title of target node' },
         label: { type: 'string', description: 'Edge label (optional)' },
+        color: { type: 'string', description: 'Edge color as hex code, e.g. #ff0000 (optional)' },
       },
       required: ['from_title', 'to_title'],
     },
@@ -92,13 +93,14 @@ export function registerCoreTools(): void {
         source_node_id: fromNode.id,
         target_node_id: toNode.id,
         label: args.label,
+        color: args.color,
       })
       return `Created edge from "${args.from_title}" to "${args.to_title}"`
     },
     { category: 'crud' }
   )
 
-  defineTool<{ edges: Array<{ from_title: string; to_title: string; label?: string }> }>(
+  defineTool<{ edges: Array<{ from_title: string; to_title: string; label?: string; color?: string }> }>(
     'create_edges_batch',
     'Create multiple edges at once. More efficient than create_edge for mind maps and graphs.',
     {
@@ -112,6 +114,7 @@ export function registerCoreTools(): void {
               from_title: { type: 'string', description: 'Source node title' },
               to_title: { type: 'string', description: 'Target node title' },
               label: { type: 'string', description: 'Edge label (optional)' },
+              color: { type: 'string', description: 'Edge color as hex code, e.g. #ff0000 (optional)' },
             },
             required: ['from_title', 'to_title'],
           },
@@ -144,6 +147,7 @@ export function registerCoreTools(): void {
           source_node_id: fromNode.id,
           target_node_id: toNode.id,
           label: edge.label,
+          color: edge.color,
         })
         created++
       }
