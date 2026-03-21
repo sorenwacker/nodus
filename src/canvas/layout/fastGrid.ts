@@ -27,7 +27,7 @@ export function fastGridLayout(
   const n = nodes.length
   if (n === 0) return new Map()
 
-  const gap = options.gap ?? 80
+  const gap = options.gap ?? 120
   const cols = options.columns ?? Math.ceil(Math.sqrt(n))
   const rows = Math.ceil(n / cols)
 
