@@ -181,3 +181,184 @@ export function calculatePortOffset(index: number, total: number): number {
   if (total <= 1) return 0
   return (index - (total - 1) / 2) * PORT_SPACING
 }
+
+/**
+ * Optimize port assignments to minimize edge crossings
+ * Uses a greedy approach: for each node side, try swapping adjacent ports
+ * and keep swaps that reduce the total crossing count
+ */
+export function optimizePortAssignments(
+  edgeInfos: EdgeInfo[],
+  sourceAssignments: Map<string, PortAssignment>,
+  targetAssignments: Map<string, PortAssignment>
+): void {
+  // Build lookup maps for quick access
+  const edgeInfoMap = new Map<string, EdgeInfo>()
+  for (const info of edgeInfos) {
+    edgeInfoMap.set(info.edge.id, info)
+  }
+
+  // Group assignments by node+side
+  const nodeGroups = new Map<string, { assignments: PortAssignment[]; isSource: boolean }[]>()
+
+  for (const [edgeId, assignment] of sourceAssignments) {
+    const key = `${assignment.node.id}:${assignment.side}`
+    if (!nodeGroups.has(key)) nodeGroups.set(key, [])
+    const group = nodeGroups.get(key)!
+    let found = group.find(g => g.isSource === true)
+    if (!found) {
+      found = { assignments: [], isSource: true }
+      group.push(found)
+    }
+    found.assignments.push(assignment)
+  }
+
+  for (const [edgeId, assignment] of targetAssignments) {
+    const key = `${assignment.node.id}:${assignment.side}`
+    if (!nodeGroups.has(key)) nodeGroups.set(key, [])
+    const group = nodeGroups.get(key)!
+    let found = group.find(g => g.isSource === false)
+    if (!found) {
+      found = { assignments: [], isSource: false }
+      group.push(found)
+    }
+    found.assignments.push(assignment)
+  }
+
+  // For each node side, optimize port order
+  for (const [key, groups] of nodeGroups) {
+    // Combine all assignments for this node+side
+    const allAssignments: { assignment: PortAssignment; isSource: boolean }[] = []
+    for (const g of groups) {
+      for (const a of g.assignments) {
+        allAssignments.push({ assignment: a, isSource: g.isSource })
+      }
+    }
+
+    if (allAssignments.length <= 2) continue // Nothing to optimize
+
+    // Sort by current index
+    allAssignments.sort((a, b) => a.assignment.index - b.assignment.index)
+
+    // Try to minimize crossings using bubble-sort style swaps
+    let improved = true
+    let iterations = 0
+    const maxIterations = allAssignments.length * 2
+
+    while (improved && iterations < maxIterations) {
+      improved = false
+      iterations++
+
+      for (let i = 0; i < allAssignments.length - 1; i++) {
+        const a = allAssignments[i]
+        const b = allAssignments[i + 1]
+
+        // Count crossings with current order
+        const currentCrossings = countCrossingsForPair(
+          a, b, i, i + 1, allAssignments, edgeInfoMap, sourceAssignments, targetAssignments
+        )
+
+        // Count crossings if we swap
+        const swappedCrossings = countCrossingsForPair(
+          b, a, i, i + 1, allAssignments, edgeInfoMap, sourceAssignments, targetAssignments
+        )
+
+        if (swappedCrossings < currentCrossings) {
+          // Swap improves crossings - apply it
+          allAssignments[i] = b
+          allAssignments[i + 1] = a
+
+          // Update the actual assignments
+          const aIdx = a.assignment.index
+          const bIdx = b.assignment.index
+          a.assignment.index = bIdx
+          b.assignment.index = aIdx
+
+          improved = true
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Count crossings involving a pair of edges at adjacent port positions
+ */
+function countCrossingsForPair(
+  entryA: { assignment: PortAssignment; isSource: boolean },
+  entryB: { assignment: PortAssignment; isSource: boolean },
+  idxA: number,
+  idxB: number,
+  allAssignments: { assignment: PortAssignment; isSource: boolean }[],
+  edgeInfoMap: Map<string, EdgeInfo>,
+  sourceAssignments: Map<string, PortAssignment>,
+  targetAssignments: Map<string, PortAssignment>
+): number {
+  let crossings = 0
+
+  const infoA = edgeInfoMap.get(entryA.assignment.edgeId)
+  const infoB = edgeInfoMap.get(entryB.assignment.edgeId)
+  if (!infoA || !infoB) return 0
+
+  // Get the "other end" positions for both edges
+  const otherA = getOtherEndPosition(infoA, entryA.isSource, sourceAssignments, targetAssignments)
+  const otherB = getOtherEndPosition(infoB, entryB.isSource, sourceAssignments, targetAssignments)
+
+  // A crossing occurs when the port order doesn't match the other-end order
+  // If A is above B at ports but A's other end is below B's other end, they cross
+  const side = entryA.assignment.side
+  const isHorizontalSide = side === 'left' || side === 'right'
+
+  if (isHorizontalSide) {
+    // Ports are ordered by Y, check if other ends have opposite Y order
+    const portOrderAFirst = idxA < idxB
+    const otherOrderAFirst = otherA.y < otherB.y
+
+    // If port order and other-end order disagree, count as crossing
+    if (portOrderAFirst !== otherOrderAFirst && Math.abs(otherA.y - otherB.y) > 20) {
+      crossings++
+    }
+  } else {
+    // Ports are ordered by X, check if other ends have opposite X order
+    const portOrderAFirst = idxA < idxB
+    const otherOrderAFirst = otherA.x < otherB.x
+
+    if (portOrderAFirst !== otherOrderAFirst && Math.abs(otherA.x - otherB.x) > 20) {
+      crossings++
+    }
+  }
+
+  return crossings
+}
+
+/**
+ * Get the position of the other end of an edge
+ */
+function getOtherEndPosition(
+  info: EdgeInfo,
+  isSource: boolean,
+  sourceAssignments: Map<string, PortAssignment>,
+  targetAssignments: Map<string, PortAssignment>
+): { x: number; y: number } {
+  // If this is a source endpoint, the other end is the target
+  const otherNode = isSource ? info.target : info.source
+  const otherAssignment = isSource
+    ? targetAssignments.get(info.edge.id)
+    : sourceAssignments.get(info.edge.id)
+
+  const cx = otherNode.canvas_x + (otherNode.width || 200) / 2
+  const cy = otherNode.canvas_y + (otherNode.height || 120) / 2
+
+  // Adjust for port offset if available
+  if (otherAssignment) {
+    const offset = calculatePortOffset(otherAssignment.index, otherAssignment.total)
+    const side = otherAssignment.side
+    if (side === 'left' || side === 'right') {
+      return { x: cx, y: cy + offset }
+    } else {
+      return { x: cx + offset, y: cy }
+    }
+  }
+
+  return { x: cx, y: cy }
+}

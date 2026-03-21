@@ -33,6 +33,7 @@ pub struct FileLock {
 
 impl FileLock {
     /// Acquire a shared (read) lock on a file
+    #[allow(dead_code)]
     pub fn shared(path: &Path) -> Result<Self, WatcherError> {
         let file = File::open(path)?;
         file.try_lock_shared().map_err(|_| WatcherError::FileLocked)?;

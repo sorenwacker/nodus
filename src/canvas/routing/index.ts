@@ -9,7 +9,7 @@ export * from './types'
 // Re-export utilities
 export { pathToSvg } from './svgPath'
 export { getSide, getPortPoint, getStandoff, getAngledStandoff, getNodeCenter, CORNER_MARGIN } from './geometry'
-export { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING } from './portAssignment'
+export { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, optimizePortAssignments } from './portAssignment'
 export { createOrthogonalPath, cleanPath, findOrthogonalPath } from './pathBuilder'
 
 // Export new routing modules
@@ -33,7 +33,7 @@ export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, ty
 // Internal imports
 import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
 import { getPortPoint, getStandoff } from './geometry'
-import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING } from './portAssignment'
+import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, optimizePortAssignments } from './portAssignment'
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
@@ -175,6 +175,9 @@ export function routeAllEdges(
 
   // Assign port indices for spreading
   const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
+
+  // Optimize port order to minimize edge crossings
+  optimizePortAssignments(edgeInfos, sourceAssignments, targetAssignments)
 
   // Create grid tracker for edge overlap prevention (PCB-style lane routing)
   // Grid size determines minimum spacing between parallel edges

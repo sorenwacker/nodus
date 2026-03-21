@@ -352,6 +352,7 @@ pub mod nodes {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn update_frame_id(
         pool: &DbPool,
         id: &str,

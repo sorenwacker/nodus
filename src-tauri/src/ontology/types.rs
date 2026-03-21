@@ -19,6 +19,7 @@ pub struct OntologyData {
 
 /// An OWL ObjectProperty definition with domain and range
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct OntologyProperty {
     /// Full IRI of the property
     pub iri: String,
