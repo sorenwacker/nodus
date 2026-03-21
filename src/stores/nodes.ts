@@ -649,7 +649,6 @@ export const useNodesStore = defineStore('nodes', () => {
 
     // Get localized templates based on current language
     const locale = localStorage.getItem('nodus-locale') || 'en'
-    storeLogger.info(`Creating starter nodes with locale: ${locale}`)
     const templates = getStarterTemplates(locale)
     const titles = getStarterTitles(locale)
 
