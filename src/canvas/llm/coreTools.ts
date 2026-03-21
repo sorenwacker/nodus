@@ -1051,6 +1051,23 @@ ${edgeDescriptions}`
     { category: 'agent' }
   )
 
+  defineTool<{ query: string; limit?: number }>(
+    'wikipedia_search',
+    'Search Wikipedia for articles matching a query. Returns list of matching articles with snippets. Use this to discover relevant Wikipedia articles before fetching full content.',
+    {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+        limit: { type: 'number', description: 'Max results (default: 5)' },
+      },
+      required: ['query'],
+    },
+    async (args, _ctx) => {
+      return `__WIKIPEDIA_SEARCH__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
+  )
+
   defineTool<{ claim: string }>(
     'validate_claim',
     'Cross-validate a specific claim or fact across multiple sources. Returns confidence level and supporting sources.',

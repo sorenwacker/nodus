@@ -1125,23 +1125,71 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     try {
       const data = JSON.parse(result.replace('__DEEP_RESEARCH__:', ''))
       const topic = data.topic || ''
-      const depth = data.depth || 'moderate'
+      const depth = data.depth || 'thorough'
+      const aspects = data.aspects || []
 
       agentLog.value.push(`> Deep research: ${topic} (depth: ${depth})`)
+
+      // Pass logging function so all searches appear in agent log
+      const logFn = (msg: string) => {
+        agentLog.value.push(msg)
+      }
 
       const deepResult = await deepResearch(topic, {
         depth: depth as 'quick' | 'moderate' | 'thorough' | 'exhaustive',
         localNodes: store.filteredNodes,
         validateClaims: true,
         extractConcepts: true,
+        aspects,
+        log: logFn,
       })
 
-      agentLog.value.push(`> Found ${deepResult.findings.length} findings, ${Math.round(deepResult.completenessScore * 100)}% coverage`)
+      agentLog.value.push(`> Research complete: ${deepResult.findings.length} findings, ${Math.round(deepResult.completenessScore * 100)}% coverage`)
 
       return formatDeepResearchResults(deepResult)
     } catch (e) {
       console.error('[Tool] Deep research error:', e)
       return `Deep research failed: ${e}`
+    }
+  }
+
+  // Handle Wikipedia search
+  if (result.startsWith('__WIKIPEDIA_SEARCH__:')) {
+    try {
+      const data = JSON.parse(result.replace('__WIKIPEDIA_SEARCH__:', ''))
+      const query = data.query || ''
+      const limit = data.limit || 5
+
+      agentLog.value.push(`> Wikipedia search: "${query}"`)
+
+      const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=${limit}`
+      const resp = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) })
+
+      if (!resp.ok) {
+        return `Wikipedia search failed: ${resp.status}`
+      }
+
+      const respData = await resp.json()
+      const results: string[] = []
+
+      if (respData.query?.search) {
+        for (const item of respData.query.search) {
+          const cleanSnippet = item.snippet.replace(/<[^>]+>/g, '')
+          const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`
+          results.push(`**${item.title}**\n${cleanSnippet}\n[${url}]`)
+        }
+      }
+
+      agentLog.value.push(`> Found ${results.length} Wikipedia articles`)
+
+      if (results.length === 0) {
+        return `No Wikipedia articles found for "${query}"`
+      }
+
+      return `## Wikipedia Search: "${query}"\n\n${results.join('\n\n')}`
+    } catch (e) {
+      console.error('[Tool] Wikipedia search error:', e)
+      return `Wikipedia search failed: ${e}`
     }
   }
 
@@ -1151,10 +1199,11 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
       const data = JSON.parse(result.replace('__FETCH_WIKIPEDIA__:', ''))
       const title = data.title || ''
 
-      agentLog.value.push(`> Fetching Wikipedia: ${title}`)
+      const logFn = (msg: string) => agentLog.value.push(msg)
 
-      const content = await fetchWikipediaArticle(title)
+      const content = await fetchWikipediaArticle(title, logFn)
       if (content) {
+        agentLog.value.push(`> Wikipedia: Got ${content.length} chars for "${title}"`)
         return `# Wikipedia: ${title}\n\n${content}`
       }
       return `Wikipedia article "${title}" not found`

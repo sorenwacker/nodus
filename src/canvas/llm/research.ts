@@ -1,30 +1,41 @@
 /**
- * Research Module
+ * Research Module - Deep Iterative Research with Cross-Validation
  *
- * Unified research across multiple sources:
+ * Sources:
  * - Local nodes (from current canvas)
- * - Web search (DuckDuckGo)
- * - Wikipedia (search + full articles)
+ * - Web search (Tavily API via Tauri backend)
+ * - Wikipedia (full articles + search)
  *
- * Supports deep research with:
- * - Multi-step iterative queries
+ * Features:
+ * - Multi-round iterative queries
+ * - Concept extraction and follow-up
  * - Cross-validation across sources
- * - Completeness checking
+ * - Completeness assessment
  */
 
+import { invoke } from '@tauri-apps/api/core'
 import type { ResearchResult } from './types'
 import type { Node } from '../../types'
+
+// Tavily search result from backend
+interface TavilyResult {
+  title: string
+  url: string
+  content: string
+}
 
 export interface ResearchOptions {
   sources?: Array<'local' | 'web' | 'wikipedia'>
   maxResults?: number
   localNodes?: Node[]
+  log?: (msg: string) => void
 }
 
 export interface DeepResearchOptions extends ResearchOptions {
   depth?: 'quick' | 'moderate' | 'thorough' | 'exhaustive'
   validateClaims?: boolean
   extractConcepts?: boolean
+  aspects?: string[]
 }
 
 export interface ResearchFinding {
@@ -42,16 +53,32 @@ export interface DeepResearchResult {
   sources: ResearchResult[]
   completenessScore: number
   suggestedFollowUps: string[]
+  queriesPerformed: string[]
 }
 
 const DEFAULT_SOURCES: Array<'local' | 'web' | 'wikipedia'> = ['local', 'web', 'wikipedia']
-const DEFAULT_MAX_RESULTS = 10
 
 const DEPTH_CONFIG = {
-  quick: { rounds: 1, resultsPerRound: 5, followUps: 0 },
-  moderate: { rounds: 2, resultsPerRound: 8, followUps: 2 },
-  thorough: { rounds: 3, resultsPerRound: 10, followUps: 4 },
-  exhaustive: { rounds: 5, resultsPerRound: 15, followUps: 6 },
+  quick: { rounds: 1, searchesPerRound: 2, followUps: 1, wikiArticles: 1 },
+  moderate: { rounds: 2, searchesPerRound: 3, followUps: 3, wikiArticles: 2 },
+  thorough: { rounds: 3, searchesPerRound: 4, followUps: 5, wikiArticles: 4 },
+  exhaustive: { rounds: 5, searchesPerRound: 5, followUps: 8, wikiArticles: 6 },
+}
+
+/**
+ * Get the Tavily API key from storage
+ */
+async function getApiKey(): Promise<string | null> {
+  try {
+    const settings = localStorage.getItem('nodus-settings')
+    if (settings) {
+      const parsed = JSON.parse(settings)
+      return parsed.searchApiKey || null
+    }
+  } catch {
+    // Ignore
+  }
+  return null
 }
 
 /**
@@ -74,23 +101,14 @@ function searchLocalNodes(
 
     let score = 0
 
-    // Exact phrase match in title (highest priority)
-    if (titleLower.includes(queryLower)) {
-      score += 100
-    }
+    if (titleLower.includes(queryLower)) score += 100
+    if (contentLower.includes(queryLower)) score += 50
 
-    // Exact phrase match in content
-    if (contentLower.includes(queryLower)) {
-      score += 50
-    }
-
-    // Individual term matches
     for (const term of queryTerms) {
       if (titleLower.includes(term)) score += 10
       if (contentLower.includes(term)) score += 5
     }
 
-    // Term density
     const termCount = queryTerms.filter(t => fullText.includes(t)).length
     score += (termCount / queryTerms.length) * 20
 
@@ -99,7 +117,6 @@ function searchLocalNodes(
     }
   }
 
-  // Sort by score descending
   scored.sort((a, b) => b.score - a.score)
 
   return scored.slice(0, maxResults).map(({ node }) => ({
@@ -111,55 +128,50 @@ function searchLocalNodes(
 }
 
 /**
- * Search web using DuckDuckGo Instant Answer API
+ * Search web using Tavily API (via Tauri backend)
  */
-async function searchWeb(query: string, maxResults: number): Promise<ResearchResult[]> {
+async function searchWebTavily(
+  query: string,
+  log?: (msg: string) => void
+): Promise<ResearchResult[]> {
   try {
-    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`
-
-    const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) })
-    if (!resp.ok) return []
-
-    const data = await resp.json()
-    const results: ResearchResult[] = []
-
-    // Abstract (main answer)
-    if (data.Abstract && data.AbstractText) {
-      results.push({
-        source: 'web',
-        title: data.Heading || query,
-        content: data.AbstractText,
-        url: data.AbstractURL,
-      })
+    const apiKey = await getApiKey()
+    if (!apiKey) {
+      log?.('> Web search: No API key configured')
+      return []
     }
 
-    // Related topics
-    if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
-      for (const topic of data.RelatedTopics.slice(0, maxResults - results.length)) {
-        if (topic.Text) {
-          results.push({
-            source: 'web',
-            title: topic.FirstURL?.split('/').pop()?.replace(/_/g, ' ') || 'Related',
-            content: topic.Text,
-            url: topic.FirstURL,
-          })
-        }
-      }
-    }
+    log?.(`> Web search: "${query}"`)
 
-    return results.slice(0, maxResults)
+    const results = await invoke<TavilyResult[]>('web_search', {
+      query,
+      apiKey,
+    })
+
+    return results.map(r => ({
+      source: 'web' as const,
+      title: r.title,
+      content: r.content,
+      url: r.url,
+    }))
   } catch (e) {
-    console.error('[Research] Web search error:', e)
+    console.error('[Research] Tavily search error:', e)
+    log?.(`> Web search failed: ${e}`)
     return []
   }
 }
 
 /**
- * Search Wikipedia API
+ * Search Wikipedia
  */
-async function searchWikipedia(query: string, maxResults: number): Promise<ResearchResult[]> {
+async function searchWikipedia(
+  query: string,
+  maxResults: number,
+  log?: (msg: string) => void
+): Promise<ResearchResult[]> {
   try {
+    log?.(`> Wikipedia search: "${query}"`)
+
     const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=${maxResults}`
 
     const resp = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) })
@@ -170,7 +182,6 @@ async function searchWikipedia(query: string, maxResults: number): Promise<Resea
 
     if (data.query?.search) {
       for (const item of data.query.search) {
-        // Strip HTML tags from snippet
         const cleanSnippet = item.snippet.replace(/<[^>]+>/g, '')
         results.push({
           source: 'wikipedia',
@@ -191,8 +202,13 @@ async function searchWikipedia(query: string, maxResults: number): Promise<Resea
 /**
  * Fetch full Wikipedia article content
  */
-export async function fetchWikipediaArticle(title: string): Promise<string | null> {
+export async function fetchWikipediaArticle(
+  title: string,
+  log?: (msg: string) => void
+): Promise<string | null> {
   try {
+    log?.(`> Fetching Wikipedia article: "${title}"`)
+
     const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=false&explaintext=true&format=json&origin=*`
 
     const resp = await fetch(url, { signal: AbortSignal.timeout(15000) })
@@ -205,8 +221,7 @@ export async function fetchWikipediaArticle(title: string): Promise<string | nul
       const pageId = Object.keys(pages)[0]
       if (pageId && pageId !== '-1') {
         const extract = pages[pageId].extract
-        // Limit to reasonable size (first ~5000 chars)
-        return extract ? extract.slice(0, 5000) : null
+        return extract ? extract.slice(0, 8000) : null
       }
     }
 
@@ -218,66 +233,85 @@ export async function fetchWikipediaArticle(title: string): Promise<string | nul
 }
 
 /**
- * Fetch Wikipedia article sections
- */
-export async function fetchWikipediaSections(title: string): Promise<Array<{ title: string; content: string }>> {
-  try {
-    const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections|text&format=json&origin=*`
-
-    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) })
-    if (!resp.ok) return []
-
-    const data = await resp.json()
-    const sections: Array<{ title: string; content: string }> = []
-
-    if (data.parse?.sections) {
-      for (const section of data.parse.sections.slice(0, 10)) {
-        sections.push({
-          title: section.line,
-          content: '', // Would need additional API call for full content
-        })
-      }
-    }
-
-    return sections
-  } catch (e) {
-    console.error('[Research] Wikipedia sections error:', e)
-    return []
-  }
-}
-
-/**
- * Extract key concepts from text
+ * Extract key concepts from text using simple NLP
  */
 function extractConcepts(text: string): string[] {
-  // Simple extraction: find capitalized phrases and repeated terms
+  // Extract capitalized phrases and technical terms
   const words = text.split(/\s+/)
   const conceptCounts = new Map<string, number>()
 
-  // Look for capitalized words (potential proper nouns/concepts)
-  const capitalizedPattern = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$/
-
+  // Pattern for potential concepts (capitalized, multi-word allowed)
   for (let i = 0; i < words.length; i++) {
-    const word = words[i].replace(/[^a-zA-Z]/g, '')
-    if (word.length > 3 && capitalizedPattern.test(word)) {
+    const word = words[i].replace(/[^a-zA-Z-]/g, '')
+
+    // Single capitalized words (3+ chars)
+    if (word.length >= 3 && /^[A-Z][a-z]+/.test(word)) {
       conceptCounts.set(word, (conceptCounts.get(word) || 0) + 1)
     }
 
-    // Bigrams
+    // Two-word phrases
     if (i < words.length - 1) {
-      const bigram = `${words[i]} ${words[i + 1]}`.replace(/[^a-zA-Z\s]/g, '')
-      if (capitalizedPattern.test(bigram)) {
-        conceptCounts.set(bigram, (conceptCounts.get(bigram) || 0) + 1)
+      const next = words[i + 1].replace(/[^a-zA-Z-]/g, '')
+      if (/^[A-Z][a-z]+/.test(word) && /^[a-z]+/.test(next) && next.length >= 3) {
+        const phrase = `${word} ${next}`
+        conceptCounts.set(phrase, (conceptCounts.get(phrase) || 0) + 1)
       }
     }
   }
 
-  // Return top concepts by frequency
+  // Return concepts that appear at least twice, sorted by frequency
   return Array.from(conceptCounts.entries())
     .filter(([_, count]) => count >= 2)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
+    .slice(0, 15)
     .map(([concept]) => concept)
+}
+
+/**
+ * Generate follow-up queries based on topic and discovered concepts
+ */
+function generateFollowUpQueries(
+  topic: string,
+  concepts: string[],
+  aspects: string[],
+  queriesUsed: Set<string>
+): string[] {
+  const followUps: string[] = []
+
+  // Add aspect-based queries
+  for (const aspect of aspects) {
+    const q = `${topic} ${aspect}`
+    if (!queriesUsed.has(q.toLowerCase())) {
+      followUps.push(q)
+    }
+  }
+
+  // Add concept-based queries
+  for (const concept of concepts) {
+    // Skip if concept is too similar to topic
+    if (topic.toLowerCase().includes(concept.toLowerCase())) continue
+
+    const q = `${concept} ${topic}`
+    if (!queriesUsed.has(q.toLowerCase())) {
+      followUps.push(q)
+    }
+  }
+
+  // Add standard research queries
+  const standardQueries = [
+    `${topic} anatomy structure`,
+    `${topic} function purpose`,
+    `${topic} research findings`,
+    `${topic} scientific overview`,
+  ]
+
+  for (const q of standardQueries) {
+    if (!queriesUsed.has(q.toLowerCase())) {
+      followUps.push(q)
+    }
+  }
+
+  return followUps
 }
 
 /**
@@ -285,13 +319,24 @@ function extractConcepts(text: string): string[] {
  */
 export async function validateClaim(
   claim: string,
-  localNodes: Node[] = []
+  localNodes: Node[] = [],
+  log?: (msg: string) => void
 ): Promise<{ validated: boolean; confidence: 'high' | 'medium' | 'low'; sources: string[] }> {
-  const results = await research(claim, {
-    sources: ['web', 'wikipedia', 'local'],
-    maxResults: 6,
-    localNodes,
-  })
+  log?.(`> Validating claim: "${claim.slice(0, 50)}..."`)
+
+  const results: ResearchResult[] = []
+
+  // Search web
+  const webResults = await searchWebTavily(claim, log)
+  results.push(...webResults)
+
+  // Search Wikipedia
+  const wikiResults = await searchWikipedia(claim, 3, log)
+  results.push(...wikiResults)
+
+  // Search local
+  const localResults = searchLocalNodes(claim, localNodes, 3)
+  results.push(...localResults)
 
   const matchingSources: string[] = []
   const claimTerms = claim.toLowerCase().split(/\s+/).filter(t => t.length > 3)
@@ -301,7 +346,7 @@ export async function validateClaim(
     const matchCount = claimTerms.filter(term => contentLower.includes(term)).length
     const matchRatio = matchCount / claimTerms.length
 
-    if (matchRatio > 0.5) {
+    if (matchRatio > 0.4) {
       matchingSources.push(result.source)
     }
   }
@@ -323,7 +368,6 @@ export function assessCompleteness(
   findings: ResearchFinding[],
   expectedAspects: string[] = []
 ): { score: number; missing: string[]; suggestions: string[] } {
-  // Check how many aspects are covered
   const coveredAspects = new Set<string>()
   const allContent = findings.map(f => f.claim.toLowerCase()).join(' ')
 
@@ -333,68 +377,67 @@ export function assessCompleteness(
     }
   }
 
-  const coverage = expectedAspects.length > 0
-    ? coveredAspects.size / expectedAspects.length
-    : findings.length / 10 // Default: expect ~10 findings
+  // Score based on:
+  // - Number of findings (more = better, up to 20)
+  // - Aspect coverage
+  // - High-confidence findings
+  const findingsScore = Math.min(findings.length / 20, 1) * 0.4
+  const aspectScore = expectedAspects.length > 0
+    ? (coveredAspects.size / expectedAspects.length) * 0.3
+    : 0.3
+  const confidenceScore = (findings.filter(f => f.confidence === 'high').length / Math.max(findings.length, 1)) * 0.3
+
+  const score = findingsScore + aspectScore + confidenceScore
 
   const missing = expectedAspects.filter(a => !coveredAspects.has(a))
-
-  // Generate suggestions based on missing aspects
   const suggestions = missing.map(aspect => `${topic} ${aspect}`)
 
-  // Also add general follow-up suggestions
-  if (findings.length < 5) {
-    suggestions.push(`${topic} overview`, `${topic} key concepts`)
+  if (findings.length < 10) {
+    suggestions.push(`${topic} comprehensive overview`)
+    suggestions.push(`${topic} detailed analysis`)
   }
 
   return {
-    score: Math.min(1, coverage),
+    score: Math.min(1, score),
     missing,
     suggestions: suggestions.slice(0, 5),
   }
 }
 
 /**
- * Perform unified research across sources
+ * Perform basic research across sources
  */
 export async function research(
   query: string,
   options: ResearchOptions = {}
 ): Promise<ResearchResult[]> {
   const sources = options.sources || DEFAULT_SOURCES
-  const maxResults = options.maxResults || DEFAULT_MAX_RESULTS
+  const maxResults = options.maxResults || 10
   const localNodes = options.localNodes || []
+  const log = options.log
 
   const results: ResearchResult[] = []
-  const perSourceLimit = Math.ceil(maxResults / sources.length)
-
-  // Run searches in parallel
-  const searches: Promise<ResearchResult[]>[] = []
 
   if (sources.includes('local') && localNodes.length > 0) {
-    searches.push(Promise.resolve(searchLocalNodes(query, localNodes, perSourceLimit)))
+    const local = searchLocalNodes(query, localNodes, Math.ceil(maxResults / 3))
+    results.push(...local)
   }
 
   if (sources.includes('web')) {
-    searches.push(searchWeb(query, perSourceLimit))
+    const web = await searchWebTavily(query, log)
+    results.push(...web)
   }
 
   if (sources.includes('wikipedia')) {
-    searches.push(searchWikipedia(query, perSourceLimit))
+    const wiki = await searchWikipedia(query, Math.ceil(maxResults / 3), log)
+    results.push(...wiki)
   }
 
-  const searchResults = await Promise.all(searches)
-
-  for (const sourceResults of searchResults) {
-    results.push(...sourceResults)
-  }
-
-  // Return up to maxResults total
   return results.slice(0, maxResults)
 }
 
 /**
- * Deep research with multiple rounds and cross-validation
+ * Deep research with multiple iterative rounds and cross-validation
  */
 export async function deepResearch(
   topic: string,
@@ -404,76 +447,133 @@ export async function deepResearch(
   const config = DEPTH_CONFIG[depth]
   const localNodes = options.localNodes || []
   const shouldValidate = options.validateClaims !== false
-  const shouldExtractConcepts = options.extractConcepts !== false
+  const aspects = options.aspects || []
+  const log = options.log || console.log
 
   const allResults: ResearchResult[] = []
   const findings: ResearchFinding[] = []
   const concepts = new Set<string>()
   const queriesUsed = new Set<string>()
+  const wikiArticlesFetched = new Set<string>()
 
-  console.log(`[Research] Starting deep research on "${topic}" (depth: ${depth})`)
+  log(`[Deep Research] Starting: "${topic}" (depth: ${depth})`)
+  log(`[Deep Research] Config: ${config.rounds} rounds, ${config.searchesPerRound} searches/round, ${config.wikiArticles} wiki articles`)
 
-  // Round 1: Initial broad search
-  queriesUsed.add(topic)
-  const initialResults = await research(topic, {
+  // === ROUND 1: Initial broad searches ===
+  log(`\n[Round 1] Initial research...`)
+
+  // Primary topic search
+  queriesUsed.add(topic.toLowerCase())
+  const primaryResults = await research(topic, {
     sources: ['web', 'wikipedia', 'local'],
-    maxResults: config.resultsPerRound,
+    maxResults: 8,
     localNodes,
+    log,
   })
-  allResults.push(...initialResults)
+  allResults.push(...primaryResults)
 
-  // Extract concepts for follow-up queries
-  if (shouldExtractConcepts) {
-    const allText = initialResults.map(r => r.content).join(' ')
-    for (const concept of extractConcepts(allText)) {
-      concepts.add(concept)
-    }
+  // Extract initial concepts
+  const initialText = primaryResults.map(r => `${r.title} ${r.content}`).join(' ')
+  for (const c of extractConcepts(initialText)) {
+    concepts.add(c)
   }
 
-  // Additional rounds with follow-up queries
-  for (let round = 1; round < config.rounds; round++) {
-    // Generate follow-up queries from concepts
-    const followUpConcepts = Array.from(concepts).slice(0, config.followUps)
+  log(`[Round 1] Found ${primaryResults.length} results, extracted ${concepts.size} concepts`)
 
-    for (const concept of followUpConcepts) {
-      const followUpQuery = `${topic} ${concept}`
-      if (queriesUsed.has(followUpQuery)) continue
-      queriesUsed.add(followUpQuery)
+  // Fetch Wikipedia articles for key topics from initial results
+  const wikiTitles = primaryResults
+    .filter(r => r.source === 'wikipedia')
+    .slice(0, Math.ceil(config.wikiArticles / 2))
+    .map(r => r.title)
 
-      console.log(`[Research] Follow-up query: "${followUpQuery}"`)
+  for (const title of wikiTitles) {
+    if (wikiArticlesFetched.has(title)) continue
+    wikiArticlesFetched.add(title)
 
-      const results = await research(followUpQuery, {
-        sources: ['web', 'wikipedia'],
-        maxResults: Math.ceil(config.resultsPerRound / 2),
-        localNodes,
+    const content = await fetchWikipediaArticle(title, log)
+    if (content) {
+      allResults.push({
+        source: 'wikipedia',
+        title: `${title} (full article)`,
+        content: content.slice(0, 3000),
+        url: `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
       })
 
-      allResults.push(...results)
-
-      // Extract more concepts
-      if (shouldExtractConcepts) {
-        const text = results.map(r => r.content).join(' ')
-        for (const c of extractConcepts(text)) {
-          concepts.add(c)
-        }
+      // Extract more concepts from full article
+      for (const c of extractConcepts(content)) {
+        concepts.add(c)
       }
     }
   }
 
-  // Fetch full Wikipedia articles for key topics
-  const wikiResults = allResults.filter(r => r.source === 'wikipedia').slice(0, 3)
-  for (const wiki of wikiResults) {
-    const fullContent = await fetchWikipediaArticle(wiki.title)
-    if (fullContent) {
-      wiki.content = fullContent.slice(0, 2000)
+  // === SUBSEQUENT ROUNDS: Follow-up queries ===
+  for (let round = 2; round <= config.rounds; round++) {
+    log(`\n[Round ${round}] Follow-up research...`)
+
+    // Generate follow-up queries
+    const followUps = generateFollowUpQueries(
+      topic,
+      Array.from(concepts),
+      aspects,
+      queriesUsed
+    ).slice(0, config.followUps)
+
+    let searchesThisRound = 0
+
+    for (const query of followUps) {
+      if (searchesThisRound >= config.searchesPerRound) break
+
+      queriesUsed.add(query.toLowerCase())
+
+      // Web search
+      const webResults = await searchWebTavily(query, log)
+      allResults.push(...webResults)
+      searchesThisRound++
+
+      // Wikipedia search every other query
+      if (searchesThisRound % 2 === 0) {
+        const wikiResults = await searchWikipedia(query, 3, log)
+        allResults.push(...wikiResults)
+
+        // Fetch full article for top result
+        if (wikiResults.length > 0 && wikiArticlesFetched.size < config.wikiArticles) {
+          const title = wikiResults[0].title
+          if (!wikiArticlesFetched.has(title)) {
+            wikiArticlesFetched.add(title)
+            const content = await fetchWikipediaArticle(title, log)
+            if (content) {
+              allResults.push({
+                source: 'wikipedia',
+                title: `${title} (full article)`,
+                content: content.slice(0, 3000),
+                url: `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
+              })
+
+              for (const c of extractConcepts(content)) {
+                concepts.add(c)
+              }
+            }
+          }
+        }
+      }
+
+      // Extract concepts from new results
+      const newText = webResults.map(r => `${r.title} ${r.content}`).join(' ')
+      for (const c of extractConcepts(newText)) {
+        concepts.add(c)
+      }
     }
+
+    log(`[Round ${round}] Performed ${searchesThisRound} searches, now have ${allResults.length} total results`)
   }
 
-  // Create findings from results
+  // === CREATE FINDINGS ===
+  log(`\n[Processing] Creating findings from ${allResults.length} results...`)
+
   const seenClaims = new Set<string>()
+
   for (const result of allResults) {
-    // Use title as claim identifier
-    const claimKey = result.title.toLowerCase()
+    const claimKey = result.title.toLowerCase().slice(0, 50)
     if (seenClaims.has(claimKey)) continue
     seenClaims.add(claimKey)
 
@@ -481,18 +581,18 @@ export async function deepResearch(
       claim: result.title,
       sources: [{
         source: result.source,
-        excerpt: result.content.slice(0, 200),
+        excerpt: result.content.slice(0, 300),
         url: result.url,
       }],
       confidence: 'medium',
       validated: false,
     }
 
-    // Add sources from other results with same/similar title
+    // Add sources from other results with similar titles
     for (const other of allResults) {
       if (other === result) continue
-      if (other.title.toLowerCase().includes(claimKey) ||
-          claimKey.includes(other.title.toLowerCase())) {
+      const otherKey = other.title.toLowerCase().slice(0, 50)
+      if (otherKey.includes(claimKey) || claimKey.includes(otherKey)) {
         finding.sources.push({
           source: other.source,
           excerpt: other.content.slice(0, 200),
@@ -501,35 +601,46 @@ export async function deepResearch(
       }
     }
 
-    // Update confidence based on source count
-    if (finding.sources.length >= 3) {
+    // Set confidence based on source diversity
+    const uniqueSourceTypes = new Set(finding.sources.map(s => s.source))
+    if (uniqueSourceTypes.size >= 3) {
       finding.confidence = 'high'
-    } else if (finding.sources.length === 1) {
+    } else if (uniqueSourceTypes.size === 1) {
       finding.confidence = 'low'
     }
 
     findings.push(finding)
   }
 
-  // Cross-validate findings if enabled
-  if (shouldValidate) {
-    for (const finding of findings.slice(0, 5)) { // Validate top 5
-      const validation = await validateClaim(finding.claim, localNodes)
+  // === VALIDATION ===
+  if (shouldValidate && findings.length > 0) {
+    log(`\n[Validation] Cross-validating top findings...`)
+
+    const toValidate = findings
+      .filter(f => f.confidence !== 'high')
+      .slice(0, 5)
+
+    for (const finding of toValidate) {
+      const validation = await validateClaim(finding.claim, localNodes, log)
       finding.validated = validation.validated
-      if (validation.confidence === 'high') {
+      if (validation.validated && validation.confidence === 'high') {
         finding.confidence = 'high'
       }
     }
   }
 
-  // Assess completeness
-  const expectedAspects = Array.from(concepts).slice(0, 5)
-  const completeness = assessCompleteness(topic, findings, expectedAspects)
+  // === COMPLETENESS ASSESSMENT ===
+  const completeness = assessCompleteness(topic, findings, aspects)
+
+  log(`\n[Complete] ${findings.length} findings, ${Math.round(completeness.score * 100)}% coverage`)
 
   // Generate summary
-  const summary = `Research on "${topic}" found ${findings.length} key findings from ${allResults.length} sources. ` +
-    `${findings.filter(f => f.confidence === 'high').length} findings have high confidence. ` +
-    `Coverage score: ${Math.round(completeness.score * 100)}%.`
+  const highConfidence = findings.filter(f => f.confidence === 'high').length
+  const validated = findings.filter(f => f.validated).length
+  const summary = `Deep research on "${topic}" completed with ${config.rounds} rounds of queries. ` +
+    `Found ${findings.length} unique findings from ${allResults.length} sources. ` +
+    `${highConfidence} findings have high confidence, ${validated} were cross-validated. ` +
+    `Coverage: ${Math.round(completeness.score * 100)}%.`
 
   return {
     topic,
@@ -539,36 +650,32 @@ export async function deepResearch(
     sources: allResults,
     completenessScore: completeness.score,
     suggestedFollowUps: completeness.suggestions,
+    queriesPerformed: Array.from(queriesUsed),
   }
 }
 
 /**
- * Format research results for LLM context
+ * Format research results for display
  */
 export function formatResearchResults(results: ResearchResult[]): string {
-  if (results.length === 0) {
-    return 'No results found.'
-  }
+  if (results.length === 0) return 'No results found.'
 
-  const sections: string[] = []
-
-  // Group by source
   const bySource = new Map<string, ResearchResult[]>()
   for (const r of results) {
     if (!bySource.has(r.source)) bySource.set(r.source, [])
     bySource.get(r.source)!.push(r)
   }
 
-  // Format each source section
+  const sections: string[] = []
+
   for (const [source, sourceResults] of bySource) {
     const header = source === 'local' ? 'Local Nodes' :
                    source === 'web' ? 'Web Results' :
                    source === 'wikipedia' ? 'Wikipedia' : source
 
     const items = sourceResults.map((r, i) => {
-      const ref = r.nodeId ? `[node:${r.nodeId}]` :
-                  r.url ? `[${r.url}]` : ''
-      return `${i + 1}. **${r.title}** ${ref}\n   ${r.content.slice(0, 300)}${r.content.length > 300 ? '...' : ''}`
+      const ref = r.nodeId ? `[node:${r.nodeId}]` : r.url ? `[${r.url}]` : ''
+      return `${i + 1}. **${r.title}** ${ref}\n   ${r.content.slice(0, 300)}...`
     }).join('\n')
 
     sections.push(`### ${header}\n${items}`)
@@ -583,43 +690,54 @@ export function formatResearchResults(results: ResearchResult[]): string {
 export function formatDeepResearchResults(result: DeepResearchResult): string {
   const sections: string[] = []
 
-  sections.push(`# Research: ${result.topic}\n`)
+  sections.push(`# Deep Research: ${result.topic}\n`)
   sections.push(result.summary)
   sections.push('')
 
-  // Key findings
+  // Stats
+  sections.push(`**Queries performed:** ${result.queriesPerformed.length}`)
+  sections.push(`**Total sources:** ${result.sources.length}`)
+  sections.push(`**Unique findings:** ${result.findings.length}`)
+  sections.push('')
+
+  // Key findings (top 20)
   sections.push('## Key Findings\n')
-  for (const finding of result.findings.slice(0, 15)) {
-    const confidence = finding.confidence === 'high' ? '[HIGH]' :
-                       finding.confidence === 'medium' ? '[MED]' : '[LOW]'
-    const validated = finding.validated ? ' (validated)' : ''
-    sections.push(`- **${finding.claim}** ${confidence}${validated}`)
-    if (finding.sources.length > 0) {
-      sections.push(`  Sources: ${finding.sources.map(s => s.source).join(', ')}`)
-    }
+  for (const finding of result.findings.slice(0, 20)) {
+    const conf = finding.confidence === 'high' ? '[HIGH]' :
+                 finding.confidence === 'medium' ? '[MED]' : '[LOW]'
+    const val = finding.validated ? ' (validated)' : ''
+    const sources = finding.sources.map(s => s.source).join(', ')
+    sections.push(`- **${finding.claim}** ${conf}${val}`)
+    sections.push(`  Sources: ${sources}`)
   }
 
-  // Concepts discovered
+  // Concepts
   if (result.concepts.length > 0) {
-    sections.push('\n## Related Concepts\n')
-    sections.push(result.concepts.slice(0, 15).join(', '))
+    sections.push('\n## Key Concepts Discovered\n')
+    sections.push(result.concepts.slice(0, 20).join(', '))
   }
 
   // Completeness
-  sections.push(`\n## Completeness: ${Math.round(result.completenessScore * 100)}%`)
+  sections.push(`\n## Research Completeness: ${Math.round(result.completenessScore * 100)}%`)
 
-  if (result.suggestedFollowUps.length > 0) {
+  if (result.suggestedFollowUps.length > 0 && result.completenessScore < 0.9) {
     sections.push('\n## Suggested Follow-up Research')
     for (const suggestion of result.suggestedFollowUps) {
       sections.push(`- ${suggestion}`)
     }
   }
 
+  // Queries used
+  sections.push('\n## Queries Performed')
+  for (const q of result.queriesPerformed.slice(0, 15)) {
+    sections.push(`- ${q}`)
+  }
+
   return sections.join('\n')
 }
 
 /**
- * Quick search - just returns formatted string
+ * Quick search - simple formatted string result
  */
 export async function quickResearch(
   query: string,
