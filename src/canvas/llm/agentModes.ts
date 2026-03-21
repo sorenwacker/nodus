@@ -26,19 +26,30 @@ export interface AgentModeConfig {
 const exploreMode: AgentModeConfig = {
   name: 'explore',
   description: 'Read-only research mode for gathering context',
-  maxIterations: 30,
+  maxIterations: 100,
   toolWhitelist: [
     'read_graph',
     'query_nodes',
     'research',
+    'deep_research',
+    'fetch_wikipedia',
+    'validate_claim',
+    'check_completeness',
     'think',
     'done',
   ],
   systemPromptAddition: `
-MODE: EXPLORE (Read-only)
-You are in exploration mode. Your job is to gather information and context.
+MODE: EXPLORE (Read-only Research)
+You are in exploration mode. Your job is to gather comprehensive information.
 You CANNOT make changes to the canvas in this mode.
-Available actions: query existing nodes, research topics, think through problems.
+
+For thorough research:
+1. Use deep_research() for multi-round iterative research with cross-validation
+2. Use fetch_wikipedia() to get full article content on specific topics
+3. Use validate_claim() to cross-check facts across multiple sources
+4. Use check_completeness() to assess if more research is needed
+
+Keep researching iteratively until check_completeness() shows high coverage.
 When you have gathered enough context, use done() to signal completion.`,
 }
 
@@ -48,11 +59,15 @@ When you have gathered enough context, use done() to signal completion.`,
 const planMode: AgentModeConfig = {
   name: 'plan',
   description: 'Design approach and create plans for user approval',
-  maxIterations: 50,
+  maxIterations: 100,
   toolWhitelist: [
     'read_graph',
     'query_nodes',
     'research',
+    'deep_research',
+    'fetch_wikipedia',
+    'validate_claim',
+    'check_completeness',
     'think',
     'create_plan',
     'request_approval',
@@ -60,13 +75,19 @@ const planMode: AgentModeConfig = {
   ],
   systemPromptAddition: `
 MODE: PLAN (Design)
-You are in planning mode. Your job is to design an approach for the user's request.
+You are in planning mode. Your job is to research and design an approach.
 You CANNOT make changes to the canvas yet - that happens after approval.
-Steps:
-1. Use query_nodes and research to understand the current state
-2. Use think() to reason about the best approach
-3. Use create_plan() to create a detailed step-by-step plan
-4. Use request_approval() to pause for user review
+
+For research-heavy tasks:
+1. Use deep_research() for comprehensive, multi-round research
+2. Use fetch_wikipedia() for detailed information on specific topics
+3. Use validate_claim() to cross-check important facts
+4. Use check_completeness() to ensure thorough coverage
+
+When research is complete:
+1. Use think() to reason about the best approach
+2. Use create_plan() to create a detailed step-by-step plan
+3. Use request_approval() to pause for user review
 
 The user will approve, reject, or modify your plan before execution begins.`,
 }
@@ -77,7 +98,7 @@ The user will approve, reject, or modify your plan before execution begins.`,
 const executeMode: AgentModeConfig = {
   name: 'execute',
   description: 'Execute approved plan and make changes',
-  maxIterations: 200,
+  maxIterations: 500,
   toolWhitelist: [
     // All tools available
     'read_graph',
@@ -101,6 +122,10 @@ const executeMode: AgentModeConfig = {
     'color_matching',
     'web_search',
     'research',
+    'deep_research',
+    'fetch_wikipedia',
+    'validate_claim',
+    'check_completeness',
     'think',
     'plan',
     'update_task',
@@ -115,6 +140,14 @@ const executeMode: AgentModeConfig = {
 MODE: EXECUTE (Approved)
 You are executing an approved plan. Make the changes as specified.
 Work through each step methodically. Use update_task() to mark progress.
+
+For research tasks:
+- Use deep_research() for thorough, iterative research with cross-validation
+- Use fetch_wikipedia() to get detailed content from Wikipedia
+- Use validate_claim() to verify facts across sources
+- Use check_completeness() to ensure comprehensive coverage before finishing
+
+Keep iterating until research is complete and validated.
 If you encounter issues, document them but continue with other steps if possible.`,
 }
 

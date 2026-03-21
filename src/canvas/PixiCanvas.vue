@@ -47,7 +47,14 @@ import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
 import { usePlanState } from './llm/planState'
-import { quickResearch } from './llm/research'
+import {
+  quickResearch,
+  deepResearch,
+  formatDeepResearchResults,
+  fetchWikipediaArticle,
+  validateClaim,
+  assessCompleteness,
+} from './llm/research'
 import { useAgentTasksStore } from '../stores/agentTasks'
 
 // Undo injection for position, content, and deletion changes
@@ -1110,6 +1117,108 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     } catch (e) {
       console.error('[Tool] Research error:', e)
       return `Research failed: ${e}`
+    }
+  }
+
+  // Handle deep research - multi-round iterative research with validation
+  if (result.startsWith('__DEEP_RESEARCH__:')) {
+    try {
+      const data = JSON.parse(result.replace('__DEEP_RESEARCH__:', ''))
+      const topic = data.topic || ''
+      const depth = data.depth || 'moderate'
+
+      agentLog.value.push(`> Deep research: ${topic} (depth: ${depth})`)
+
+      const deepResult = await deepResearch(topic, {
+        depth: depth as 'quick' | 'moderate' | 'thorough' | 'exhaustive',
+        localNodes: store.filteredNodes,
+        validateClaims: true,
+        extractConcepts: true,
+      })
+
+      agentLog.value.push(`> Found ${deepResult.findings.length} findings, ${Math.round(deepResult.completenessScore * 100)}% coverage`)
+
+      return formatDeepResearchResults(deepResult)
+    } catch (e) {
+      console.error('[Tool] Deep research error:', e)
+      return `Deep research failed: ${e}`
+    }
+  }
+
+  // Handle Wikipedia article fetch
+  if (result.startsWith('__FETCH_WIKIPEDIA__:')) {
+    try {
+      const data = JSON.parse(result.replace('__FETCH_WIKIPEDIA__:', ''))
+      const title = data.title || ''
+
+      agentLog.value.push(`> Fetching Wikipedia: ${title}`)
+
+      const content = await fetchWikipediaArticle(title)
+      if (content) {
+        return `# Wikipedia: ${title}\n\n${content}`
+      }
+      return `Wikipedia article "${title}" not found`
+    } catch (e) {
+      console.error('[Tool] Wikipedia fetch error:', e)
+      return `Wikipedia fetch failed: ${e}`
+    }
+  }
+
+  // Handle claim validation
+  if (result.startsWith('__VALIDATE_CLAIM__:')) {
+    try {
+      const data = JSON.parse(result.replace('__VALIDATE_CLAIM__:', ''))
+      const claim = data.claim || ''
+
+      agentLog.value.push(`> Validating: ${claim.slice(0, 50)}...`)
+
+      const validation = await validateClaim(claim, store.filteredNodes)
+
+      return `Claim: "${claim}"\nValidated: ${validation.validated ? 'YES' : 'NO'}\nConfidence: ${validation.confidence}\nSources: ${validation.sources.join(', ') || 'none'}`
+    } catch (e) {
+      console.error('[Tool] Validation error:', e)
+      return `Validation failed: ${e}`
+    }
+  }
+
+  // Handle completeness check
+  if (result.startsWith('__CHECK_COMPLETENESS__:')) {
+    try {
+      const data = JSON.parse(result.replace('__CHECK_COMPLETENESS__:', ''))
+      const topic = data.topic || ''
+      const findings = data.findings || []
+
+      agentLog.value.push(`> Checking completeness: ${topic}`)
+
+      // Convert findings to the format expected
+      const findingsForAssess = findings.map((f: string) => ({
+        claim: f,
+        sources: [],
+        confidence: 'medium' as const,
+        validated: false,
+      }))
+
+      const result2 = assessCompleteness(topic, findingsForAssess, [])
+
+      const response = [
+        `Topic: ${topic}`,
+        `Coverage Score: ${Math.round(result2.score * 100)}%`,
+        `Findings Analyzed: ${findings.length}`,
+        '',
+        result2.score >= 0.8 ? 'Research appears COMPLETE.' : 'Research may be INCOMPLETE.',
+      ]
+
+      if (result2.suggestions.length > 0) {
+        response.push('', 'Suggested follow-up queries:')
+        for (const s of result2.suggestions) {
+          response.push(`- ${s}`)
+        }
+      }
+
+      return response.join('\n')
+    } catch (e) {
+      console.error('[Tool] Completeness check error:', e)
+      return `Completeness check failed: ${e}`
     }
   }
 

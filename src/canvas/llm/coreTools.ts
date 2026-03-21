@@ -1006,6 +1006,88 @@ ${edgeDescriptions}`
     { category: 'agent' }
   )
 
+  defineTool<{
+    topic: string
+    depth?: 'quick' | 'moderate' | 'thorough' | 'exhaustive'
+    aspects?: string[]
+  }>(
+    'deep_research',
+    'Perform deep, iterative research with cross-validation. Use for comprehensive research that needs multiple rounds of queries, Wikipedia article fetching, and source validation. Returns findings with confidence levels.',
+    {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'Main research topic' },
+        depth: {
+          type: 'string',
+          description: 'Research depth: "quick" (1 round), "moderate" (2 rounds), "thorough" (3 rounds), "exhaustive" (5 rounds). Default: moderate',
+        },
+        aspects: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Specific aspects to investigate (e.g., ["anatomy", "function", "disorders"])',
+        },
+      },
+      required: ['topic'],
+    },
+    async (args, _ctx) => {
+      return `__DEEP_RESEARCH__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
+  )
+
+  defineTool<{ title: string }>(
+    'fetch_wikipedia',
+    'Fetch full Wikipedia article content for a topic. Use to get detailed information on a specific subject.',
+    {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Wikipedia article title (e.g., "Cerebral cortex")' },
+      },
+      required: ['title'],
+    },
+    async (args, _ctx) => {
+      return `__FETCH_WIKIPEDIA__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
+  )
+
+  defineTool<{ claim: string }>(
+    'validate_claim',
+    'Cross-validate a specific claim or fact across multiple sources. Returns confidence level and supporting sources.',
+    {
+      type: 'object',
+      properties: {
+        claim: { type: 'string', description: 'The claim or fact to validate' },
+      },
+      required: ['claim'],
+    },
+    async (args, _ctx) => {
+      return `__VALIDATE_CLAIM__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
+  )
+
+  defineTool<{ topic: string; findings: string[] }>(
+    'check_completeness',
+    'Assess if research on a topic is complete. Returns coverage score and suggests follow-up queries if gaps exist.',
+    {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'The research topic' },
+        findings: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of findings/claims already discovered',
+        },
+      },
+      required: ['topic', 'findings'],
+    },
+    async (args, _ctx) => {
+      return `__CHECK_COMPLETENESS__:${JSON.stringify(args)}`
+    },
+    { category: 'agent' }
+  )
+
   // ============================================================
   // THEME TOOLS
   // ============================================================
