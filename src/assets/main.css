@@ -73,7 +73,7 @@
 
 /* Cyber - Hologram/Laser/Steampunk fusion */
 [data-theme='cyber'] {
-  --bg-canvas: #0a0a12;
+  --bg-canvas: #000000;
   --bg-surface: #0d1117;
   --bg-surface-alt: #161b22;
   --bg-elevated: #21262d;
