@@ -18,6 +18,7 @@ import {
   getObstacleBounds,
   OBSTACLE_MARGIN,
 } from './obstacleAvoider'
+import { cleanPath } from './pathBuilder'
 
 // Routing constants
 const ALIGNMENT_THRESHOLD = 5        // Points within this distance are considered aligned
@@ -79,8 +80,10 @@ function buildResult(
   gridTracker: GridTracker,
   usedDetour: boolean
 ): OrthogonalRouteResult {
-  markPathSegments(path, gridTracker)
-  return { path, svgPath: buildSvgPath(path), usedDetour }
+  // Remove redundant collinear points to minimize turns
+  const cleaned = cleanPath(path)
+  markPathSegments(cleaned, gridTracker)
+  return { path: cleaned, svgPath: buildSvgPath(cleaned), usedDetour }
 }
 
 /**
