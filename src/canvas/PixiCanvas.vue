@@ -2866,10 +2866,24 @@ const cyberHighlightColors: Record<string, string> = {
 }
 
 // Get edge highlight color, mapping to cyber neon if needed
+// Avoids using light colors in light mode (would be invisible)
 function getEdgeHighlightColor(nodeColor: string | null): string {
   if (!nodeColor) return highlightColor.value
   if (currentTheme.value === 'cyber' && cyberHighlightColors[nodeColor]) {
     return cyberHighlightColors[nodeColor]
+  }
+  // For non-cyber themes, check if the node color is too light for visibility
+  // Skip white and very light colors in light mode
+  if (currentTheme.value !== 'dark' && currentTheme.value !== 'pitch-black') {
+    const hex = nodeColor.replace('#', '')
+    const r = parseInt(hex.substr(0, 2), 16)
+    const g = parseInt(hex.substr(2, 2), 16)
+    const b = parseInt(hex.substr(4, 2), 16)
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000
+    // If color is too bright (>200), use the default highlight color instead
+    if (brightness > 200) {
+      return highlightColor.value
+    }
   }
   return nodeColor
 }
