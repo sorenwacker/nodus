@@ -553,8 +553,8 @@ export function useLayout(options: UseLayoutOptions) {
 
       const positions = applyHierarchicalLayout(layoutNodes, layoutEdges, {
         direction: 'TB',
-        nodeSpacingX: 50,
-        nodeSpacingY: 120,
+        nodeSpacingX: 150,
+        nodeSpacingY: 360,
         centerX,
         centerY,
       })

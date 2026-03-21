@@ -45,8 +45,8 @@ export function applyHierarchicalLayout(
 ): Map<string, { x: number; y: number }> {
   const {
     direction = 'TB',
-    nodeSpacingX = 50,
-    nodeSpacingY = 80,
+    nodeSpacingX = 150,
+    nodeSpacingY = 240,
     centerX = 0,
     centerY = 0,
     align,

@@ -38,8 +38,8 @@ export const HierarchicalLayoutStrategy: LayoutStrategy = {
 
     const positions = applyHierarchicalLayout(nodes, edges, {
       direction: options.direction ?? 'TB',
-      nodeSpacingX: options.nodeSpacingX ?? 50,
-      nodeSpacingY: options.nodeSpacingY ?? 120,
+      nodeSpacingX: options.nodeSpacingX ?? 150,
+      nodeSpacingY: options.nodeSpacingY ?? 360,
       centerX: options.centerX,
       centerY: options.centerY,
       align: options.align,
