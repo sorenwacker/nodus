@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
 
@@ -8,6 +8,7 @@ const props = defineProps<{
   maxItems?: number
   position?: 'above' | 'below'
   allowCreate?: boolean
+  showSearch?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +19,8 @@ const emit = defineEmits<{
 
 const isCreating = ref(false)
 const newNodeTitle = ref('')
+const searchQuery = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
 const store = useNodesStore()
 
@@ -25,12 +28,30 @@ const maxItems = computed(() => props.maxItems ?? 10)
 
 const availableNodes = computed(() => {
   const excluded = new Set(props.excludeNodeIds || [])
-  return store.filteredNodes.filter(n => !excluded.has(n.id))
+  let nodes = store.filteredNodes.filter(n => !excluded.has(n.id))
+
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    nodes = nodes.filter(n =>
+      n.title.toLowerCase().includes(q) ||
+      (n.content && n.content.toLowerCase().includes(q))
+    )
+  }
+
+  return nodes
 })
 
 const displayedNodes = computed(() => availableNodes.value.slice(0, maxItems.value))
 const hasMore = computed(() => availableNodes.value.length > maxItems.value)
 const moreCount = computed(() => availableNodes.value.length - maxItems.value)
+
+// Focus search input when mounted
+onMounted(() => {
+  if (props.showSearch) {
+    nextTick(() => searchInputRef.value?.focus())
+  }
+})
 
 function selectNode(nodeId: string) {
   emit('select', nodeId)
@@ -83,16 +104,28 @@ function createNode() {
 
     <!-- Node selection list -->
     <template v-else>
+      <!-- Search box -->
+      <div v-if="showSearch" class="node-picker-search">
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search nodes..."
+          class="search-input"
+          @keydown.escape="$emit('close')"
+        />
+      </div>
+
       <!-- Create new option -->
       <button v-if="allowCreate !== false" class="node-picker-item create-option" @click="startCreating">
         <Icon name="plus" :size="14" />
         <span>Create new node</span>
       </button>
 
-      <div v-if="availableNodes.length === 0 && allowCreate === false" class="node-picker-empty">
-        No available nodes
+      <div v-if="availableNodes.length === 0" class="node-picker-empty">
+        {{ searchQuery ? 'No matching nodes' : 'No available nodes' }}
       </div>
-      <div v-else-if="availableNodes.length > 0" class="node-picker-list">
+      <div v-else class="node-picker-list">
         <button
           v-for="node in displayedNodes"
           :key="node.id"
@@ -163,6 +196,30 @@ function createNode() {
 .close-btn:hover {
   background: var(--bg-elevated);
   color: var(--text-main);
+}
+
+.node-picker-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.node-picker-search .search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.node-picker-search .search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.node-picker-search .search-input::placeholder {
+  color: var(--text-muted);
 }
 
 .node-picker-empty {

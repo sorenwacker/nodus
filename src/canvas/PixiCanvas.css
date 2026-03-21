@@ -1998,6 +1998,30 @@
   margin: 4px 0;
 }
 
+/* Link picker overlay */
+.link-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+}
+
+.link-picker-modal {
+  position: relative;
+}
+
+.link-picker-modal .node-picker {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  margin: 0;
+  width: 320px;
+}
+
 /* Tag node styling - smaller, pill-shaped */
 .node-card[data-node-type="tag"] {
   min-width: 60px;

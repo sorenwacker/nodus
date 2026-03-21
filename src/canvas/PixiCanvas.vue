@@ -45,6 +45,7 @@ import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
+import NodePicker from '../components/NodePicker.vue'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -514,6 +515,27 @@ const shouldShowMagnifier = computed(() => magnifierEnabled.value && scale.value
 
 // Help modal
 const showHelpModal = ref(false)
+
+// Link picker from context menu
+const showLinkPicker = ref(false)
+const linkPickerSourceNodeId = ref<string | null>(null)
+
+function openLinkPicker() {
+  linkPickerSourceNodeId.value = contextMenuNodeId.value
+  showLinkPicker.value = true
+  closeContextMenu()
+}
+
+function closeLinkPicker() {
+  showLinkPicker.value = false
+  linkPickerSourceNodeId.value = null
+}
+
+async function linkToNode(targetNodeId: string) {
+  if (!linkPickerSourceNodeId.value) return
+  await store.addEdge(linkPickerSourceNodeId.value, targetNodeId)
+  closeLinkPicker()
+}
 
 // Only render nodes visible within magnifier viewport for performance
 const magnifierVisibleNodes = computed(() => {
@@ -3820,6 +3842,14 @@ ${edges.map(e => `  - id: "${e.id}"
         <span>Find on Canvas</span>
       </div>
 
+      <div class="context-menu-item" @click="openLinkPicker">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        <span>Link to...</span>
+      </div>
+
       <div class="context-menu-divider"></div>
 
       <div
@@ -3912,6 +3942,22 @@ ${edges.map(e => `  - id: "${e.id}"
       @click="closeContextMenu"
       @contextmenu.prevent="closeContextMenu"
     ></div>
+
+    <!-- Link to picker modal -->
+    <Teleport to="body">
+      <div v-if="showLinkPicker" class="link-picker-overlay" @click="closeLinkPicker">
+        <div class="link-picker-modal" @click.stop>
+          <NodePicker
+            :exclude-node-ids="linkPickerSourceNodeId ? [linkPickerSourceNodeId] : []"
+            :show-search="true"
+            :allow-create="false"
+            :max-items="20"
+            @select="linkToNode"
+            @close="closeLinkPicker"
+          />
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Empty state overlay -->
     <div v-if="store.filteredNodes.length === 0" class="empty-state-overlay">
