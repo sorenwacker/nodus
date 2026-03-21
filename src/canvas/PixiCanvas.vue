@@ -2047,13 +2047,32 @@ const visibleEdgeLines = computed(() => {
     })
   }
 
+  // Build neighbor set for 2-hop edge display
+  // Neighbors are nodes directly connected to hovered/selected nodes
+  const neighborIds = new Set<string>()
+  if (hovered || selectedNodes.length > 0) {
+    for (const e of edges) {
+      if (e.source_node_id === hovered || selectedNodes.includes(e.source_node_id)) {
+        neighborIds.add(e.target_node_id)
+      }
+      if (e.target_node_id === hovered || selectedNodes.includes(e.target_node_id)) {
+        neighborIds.add(e.source_node_id)
+      }
+    }
+  }
+
   // For very large visible edge counts (500+), only show edges on hover/select
+  // Also include neighbor's edges (2nd hop) for context
   if (edges.length > EDGE_HOVER_ONLY_THRESHOLD) {
     if (hovered || selectedNodes.length > 0) {
-      edges = edges.filter(e =>
-        e.source_node_id === hovered || e.target_node_id === hovered ||
-        selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
-      )
+      edges = edges.filter(e => {
+        // Direct edges to hovered/selected nodes
+        const isDirect = e.source_node_id === hovered || e.target_node_id === hovered ||
+          selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
+        if (isDirect) return true
+        // 2nd hop: edges where at least one endpoint is a neighbor
+        return neighborIds.has(e.source_node_id) || neighborIds.has(e.target_node_id)
+      })
     } else {
       edges = []
     }
@@ -2067,6 +2086,15 @@ const visibleEdgeLines = computed(() => {
   return edges.map(e => {
     const isHighlighted = highlighted.has(e.id)
     const isSelected = selected === e.id
+
+    // Determine if this is a direct edge or a 2nd-hop neighbor edge
+    const isDirect = e.source_node_id === hovered || e.target_node_id === hovered ||
+      selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
+    const isNeighborEdge = !isDirect && (neighborIds.has(e.source_node_id) || neighborIds.has(e.target_node_id))
+
+    // Opacity: direct edges are full, neighbor edges are transparent
+    const opacity = isNeighborEdge ? 0.25 : 1.0
+
     // Use explicit color field first, then link_type as fallback, then default
     const color = (e.color && e.color.startsWith('#')) ? e.color
       : (e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value)
@@ -2099,6 +2127,8 @@ const visibleEdgeLines = computed(() => {
       ...e,
       isHighlighted,
       isSelected,
+      isNeighborEdge,
+      opacity,
       color,
       edgeHighlightColor,
       renderStrokeWidth,
@@ -3377,10 +3407,11 @@ ${edges.map(e => `  - id: "${e.id}"
             :d="edge.path"
             :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
             :stroke-width="edge.isHighlighted ? edgeStrokeWidth * 2 : edgeStrokeWidth"
+            :stroke-opacity="edge.opacity"
             :marker-end="edge.isHighlighted && !edge.isBidirectional && !edge.isShortEdge ? `url(#${edge.arrowMarkerId})` : undefined"
             fill="none"
             class="edge-line-fast"
-            :class="{ 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged' }"
+            :class="{ 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged', 'edge-neighbor': edge.isNeighborEdge }"
           />
         </template>
         <template v-else>
@@ -3411,11 +3442,12 @@ ${edges.map(e => `  - id: "${e.id}"
               :d="edge.path"
               :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
               :stroke-width="edge.renderStrokeWidth"
+              :stroke-opacity="edge.opacity"
               :marker-end="edge.isBidirectional || edge.isShortEdge ? undefined : `url(#${edge.arrowMarkerId})`"
               stroke-linecap="round"
               fill="none"
               class="edge-line-visible"
-              :class="{ 'edge-selected': edge.isSelected, 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged' }"
+              :class="{ 'edge-selected': edge.isSelected, 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged', 'edge-neighbor': edge.isNeighborEdge }"
               pointer-events="none"
             />
             <text
