@@ -83,12 +83,10 @@ export const useNodesStore = defineStore('nodes', () => {
   })
 
   // Import composable (initialized after createNode is defined)
-  // eslint-disable-next-line prefer-const
-  let importComposable: ReturnType<typeof useImport>
+  let importComposable: ReturnType<typeof useImport> = undefined!
 
   // Tag nodes composable (initialized after dependencies are available)
-  // eslint-disable-next-line prefer-const
-  let tagNodesComposable: ReturnType<typeof useTagNodes>
+  let tagNodesComposable: ReturnType<typeof useTagNodes> = undefined!
 
   // Expose edges and frames from their stores for backwards compatibility
   const edges = computed(() => edgesStore.edges)
@@ -651,21 +649,21 @@ export const useNodesStore = defineStore('nodes', () => {
 
     // Create the welcome/starter nodes
     await createNode({
-      title: 'Typst Math Reference',
-      markdown_content: TYPST_MATH_REFERENCE,
+      title: 'Getting Started',
+      markdown_content: GETTING_STARTED,
       canvas_x: 100,
       canvas_y: 100,
-      width: 280,
-      height: 320,
+      width: 340,
+      height: 420,
     })
 
     await createNode({
-      title: 'Getting Started',
-      markdown_content: GETTING_STARTED,
-      canvas_x: 420,
+      title: 'Typst Math Reference',
+      markdown_content: TYPST_MATH_REFERENCE,
+      canvas_x: 480,
       canvas_y: 100,
-      width: 280,
-      height: 320,
+      width: 380,
+      height: 480,
     })
 
     storeLogger.info('Default workspace reset complete')
