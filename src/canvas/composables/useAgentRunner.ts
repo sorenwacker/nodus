@@ -238,10 +238,10 @@ export function useAgentRunner(ctx: AgentContext) {
       stop()
     }
 
-    // Set mode if provided
-    if (startMode) {
-      mode.value = startMode
-    }
+    // Reset to default mode for new requests (not resumes)
+    // This ensures each new request starts fresh in plan mode
+    mode.value = startMode || DEFAULT_AGENT_MODE
+    currentPlan.value = null
 
     // Auto-cleanup orphan edges
     ctx.cleanupOrphanEdges()
@@ -313,10 +313,9 @@ export function useAgentRunner(ctx: AgentContext) {
     maxIterations: number,
     pruneEvery: number
   ): Promise<AgentRunResult> {
-    // Get tools for current mode
-    const tools = getFilteredTools()
-
     for (let i = startIteration; i < maxIterations; i++) {
+      // Get tools for current mode (refresh each iteration in case mode changed)
+      const tools = getFilteredTools()
       // Check if we should stop
       if (!ctx.isRunning.value) {
         return { status: 'stopped', message: 'Agent stopped by user' }
@@ -337,7 +336,21 @@ export function useAgentRunner(ctx: AgentContext) {
 
         // Handle native tool calls
         if (msg.tool_calls && msg.tool_calls.length > 0) {
+          // Get allowed tools for current mode
+          const allowedToolNames = new Set(tools.map(t => t.function.name))
+
           for (const tc of msg.tool_calls) {
+            // Validate tool is allowed in current mode
+            if (!allowedToolNames.has(tc.function.name)) {
+              ctx.log.value.push(`> Rejected: ${tc.function.name} (not allowed in ${mode.value} mode)`)
+              messages.push({
+                role: 'tool',
+                content: `Error: Tool "${tc.function.name}" is not available in ${mode.value} mode. Use only the tools provided.`,
+                tool_call_id: tc.id
+              })
+              continue
+            }
+
             // Parse arguments from string to object
             let parsedArgs: Record<string, unknown> = {}
             try {
