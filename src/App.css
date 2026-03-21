@@ -632,6 +632,23 @@
   margin-top: 8px;
 }
 
+.reset-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--warning-border, #fcd34d);
+  border-radius: 6px;
+  background: var(--warning-bg, #fefce8);
+  color: var(--warning-color, #a16207);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.reset-btn:hover {
+  background: var(--warning-color, #a16207);
+  color: white;
+  border-color: var(--warning-color, #a16207);
+}
+
 .delete-options {
   margin-top: 16px;
 }

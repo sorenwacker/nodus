@@ -177,14 +177,6 @@ async function switchToWorkspace(id: string) {
   emit('close')
 }
 
-async function resetDefaultWorkspace() {
-  if (!confirm(t('settings.resetDefaultWorkspaceConfirm'))) {
-    return
-  }
-  await nodesStore.resetDefaultWorkspace()
-  emit('close')
-}
-
 </script>
 
 <template>
@@ -371,18 +363,6 @@ async function resetDefaultWorkspace() {
             <span class="hint">
               {{ t('settings.workspaceStatsHint') }}
             </span>
-          </div>
-
-          <!-- Reset Default Workspace -->
-          <div class="setting-group">
-            <label>{{ t('settings.resetDefaultWorkspace') }}</label>
-            <button
-              class="reset-btn"
-              @click="resetDefaultWorkspace"
-            >
-              {{ t('settings.resetDefaultWorkspaceBtn') }}
-            </button>
-            <span class="hint">{{ t('settings.resetDefaultWorkspaceHint') }}</span>
           </div>
 
           <div class="setting-group">

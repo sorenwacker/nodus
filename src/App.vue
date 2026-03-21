@@ -153,6 +153,15 @@ async function confirmDeleteWorkspace() {
   showToast(`Deleted workspace "${name}"`, 'info')
 }
 
+async function resetDefaultWorkspace() {
+  if (!confirm('This will delete all nodes in the default workspace and restore the starter content. Continue?')) {
+    return
+  }
+  await store.resetDefaultWorkspace()
+  showWorkspaceEditor.value = false
+  showToast('Default workspace reset to starter content', 'success')
+}
+
 function cycleTheme() {
   themesStore.cycleTheme()
 }
@@ -512,6 +521,13 @@ async function openFolderDialog() {
             @click="deleteCurrentWorkspace"
           >
             Delete Workspace
+          </button>
+          <button
+            v-if="!editingWorkspace?.id"
+            class="reset-btn"
+            @click="resetDefaultWorkspace"
+          >
+            Reset to Starter Content
           </button>
           <div class="actions-right">
             <button class="cancel-btn" @click="showWorkspaceEditor = false">Cancel</button>
