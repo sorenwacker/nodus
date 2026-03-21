@@ -354,15 +354,14 @@ export class CombinedReduction implements CrossingReductionStrategy {
     // First pass: barycentric ordering
     const baryResult = this.barycentric.reduce(edgeInfos, sourceAssignments, targetAssignments)
 
-    // DISABLED: Greedy refinement may be counter-productive for curved edges
-    // The straight-line crossing model doesn't match visual crossings
-    // const greedyResult = this.greedy.reduce(edgeInfos, sourceAssignments, targetAssignments)
+    // Second pass: greedy refinement to find swaps barycentric missed
+    const greedyResult = this.greedy.reduce(edgeInfos, sourceAssignments, targetAssignments)
 
     return {
-      improved: baryResult.improved,
+      improved: baryResult.improved || greedyResult.improved,
       initialCrossings: baryResult.initialCrossings,
-      finalCrossings: baryResult.finalCrossings,
-      swapsPerformed: baryResult.swapsPerformed
+      finalCrossings: greedyResult.finalCrossings,
+      swapsPerformed: baryResult.swapsPerformed + greedyResult.swapsPerformed
     }
   }
 }
