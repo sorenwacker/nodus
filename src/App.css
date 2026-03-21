@@ -372,6 +372,27 @@
   gap: 8px;
 }
 
+.import-options-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-color);
+}
+
 .radio-label {
   display: flex;
   align-items: center;
@@ -594,6 +615,29 @@
   background: var(--danger-color);
   color: white;
   border-color: var(--danger-color);
+}
+
+.warning-text {
+  color: var(--danger-color);
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--danger-bg);
+  border-radius: 4px;
+}
+
+.info-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.delete-options {
+  margin-top: 16px;
+}
+
+.delete-confirm-dialog {
+  max-width: 400px;
 }
 
 .theme-btn {

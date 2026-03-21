@@ -136,10 +136,10 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     saveWorkspacesToStorage()
   }
 
-  async function deleteWorkspace(id: string) {
-    // Delete from database first
+  async function deleteWorkspace(id: string, deleteFiles?: boolean) {
+    // Delete from database (and optionally files)
     try {
-      await invoke('delete_workspace', { id })
+      await invoke('delete_workspace', { id, deleteFiles: deleteFiles ?? false })
     } catch (e) {
       storeLogger.error('Failed to delete workspace from database:', e)
       // Continue with local deletion anyway

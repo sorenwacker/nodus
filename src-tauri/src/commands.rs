@@ -718,8 +718,38 @@ pub async fn get_workspaces() -> Result<Vec<database::workspaces::Workspace>, St
 }
 
 #[tauri::command]
-pub async fn delete_workspace(id: String) -> Result<(), String> {
+pub async fn delete_workspace(id: String, delete_files: Option<bool>) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // If delete_files is true, delete all files associated with nodes in this workspace
+    if delete_files.unwrap_or(false) {
+        let nodes = database::nodes::get_all(pool).await.map_err(|e| e.to_string())?;
+        let mut deleted_count = 0;
+
+        for node in nodes {
+            if node.workspace_id.as_deref() == Some(&id) {
+                if let Some(file_path) = &node.file_path {
+                    let path = std::path::Path::new(file_path);
+                    if path.exists() {
+                        match std::fs::remove_file(path) {
+                            Ok(_) => {
+                                deleted_count += 1;
+                                println!("Deleted file: {:?}", path);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to delete {:?}: {}", path, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if deleted_count > 0 {
+            println!("Deleted {} files from workspace {}", deleted_count, id);
+        }
+    }
+
     database::workspaces::delete(pool, &id)
         .await
         .map_err(|e| e.to_string())

@@ -23,6 +23,8 @@ const importTarget = ref<'current' | 'new'>('new')
 const importWorkspaceName = ref('')
 const keepOriginalFiles = ref(true) // Keep original files by default (safe option)
 const showSettings = ref(false)
+const showDeleteWorkspaceDialog = ref(false)
+const deleteWorkspaceKeepFiles = ref(true)
 
 // Search composable
 const search = useAppSearch({
@@ -133,9 +135,20 @@ function deleteCurrentWorkspace() {
     showToast('Cannot delete default workspace', 'error')
     return
   }
+  // Show confirmation dialog
+  deleteWorkspaceKeepFiles.value = true
+  showDeleteWorkspaceDialog.value = true
+}
+
+async function confirmDeleteWorkspace() {
+  if (!editingWorkspace.value?.id) return
+
   const id = editingWorkspace.value.id
   const name = editingWorkspace.value.name
-  store.deleteWorkspace(id)
+  const keepFiles = deleteWorkspaceKeepFiles.value
+
+  await store.deleteWorkspace(id, !keepFiles)
+  showDeleteWorkspaceDialog.value = false
   showWorkspaceEditor.value = false
   showToast(`Deleted workspace "${name}"`, 'info')
 }
@@ -504,6 +517,33 @@ async function openFolderDialog() {
             <button class="cancel-btn" @click="showWorkspaceEditor = false">Cancel</button>
             <button class="import-btn" @click="saveWorkspaceChanges">Save</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Workspace Confirmation -->
+    <div v-if="showDeleteWorkspaceDialog" class="dialog-overlay" @click.self="showDeleteWorkspaceDialog = false">
+      <div class="dialog delete-confirm-dialog">
+        <h2>Delete Workspace</h2>
+        <div class="dialog-content">
+          <p>Are you sure you want to delete "{{ editingWorkspace?.name }}"?</p>
+
+          <div class="delete-options">
+            <label class="checkbox-label">
+              <input v-model="deleteWorkspaceKeepFiles" type="checkbox" />
+              <span>Keep original markdown files (source of truth)</span>
+            </label>
+            <p v-if="!deleteWorkspaceKeepFiles" class="warning-text">
+              Warning: This will permanently delete original files from disk
+            </p>
+            <p v-else class="info-text">
+              Files will remain in your vault for future re-import
+            </p>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button class="cancel-btn" @click="showDeleteWorkspaceDialog = false">Cancel</button>
+          <button class="delete-btn" @click="confirmDeleteWorkspace">Delete</button>
         </div>
       </div>
     </div>
