@@ -183,6 +183,161 @@ export function calculatePortOffset(index: number, total: number): number {
 }
 
 /**
+ * Result of crossing detection
+ */
+export interface CrossingReport {
+  /** Total number of edge crossings */
+  totalCrossings: number
+  /** Edges involved in crossings, sorted by crossing count */
+  edgesByCrossings: Array<{ edgeId: string; crossings: number }>
+  /** Nodes with most crossing edges, sorted by count */
+  nodesByCrossings: Array<{ nodeId: string; crossings: number }>
+  /** Pairs of crossing edges */
+  crossingPairs: Array<{ edge1: string; edge2: string }>
+}
+
+/**
+ * Detect edge crossings for a specific node's neighborhood
+ * Only checks edges connected to the focus node and its neighbors
+ * @param focusNodeId - The node to analyze (if undefined, analyzes all - use with caution on large graphs)
+ */
+export function detectCrossings(
+  edgeInfos: EdgeInfo[],
+  sourceAssignments: Map<string, PortAssignment>,
+  targetAssignments: Map<string, PortAssignment>,
+  focusNodeId?: string
+): CrossingReport {
+  // Filter to neighborhood if focus node provided
+  let relevantEdges = edgeInfos
+
+  if (focusNodeId) {
+    // Find edges connected to focus node
+    const directEdges = edgeInfos.filter(
+      e => e.source.id === focusNodeId || e.target.id === focusNodeId
+    )
+
+    // Find neighbor node IDs
+    const neighborIds = new Set<string>()
+    for (const e of directEdges) {
+      if (e.source.id) neighborIds.add(e.source.id)
+      if (e.target.id) neighborIds.add(e.target.id)
+    }
+
+    // Include edges between neighbors (2-hop neighborhood)
+    relevantEdges = edgeInfos.filter(e => {
+      const srcId = e.source.id || ''
+      const tgtId = e.target.id || ''
+      return neighborIds.has(srcId) || neighborIds.has(tgtId)
+    })
+  }
+  const crossingPairs: Array<{ edge1: string; edge2: string }> = []
+  const edgeCrossings = new Map<string, number>()
+  const nodeCrossings = new Map<string, number>()
+
+  // Get edge endpoints with port offsets
+  const edgeEndpoints = new Map<string, { x1: number; y1: number; x2: number; y2: number }>()
+
+  for (const info of relevantEdges) {
+    const srcAssign = sourceAssignments.get(info.edge.id)
+    const tgtAssign = targetAssignments.get(info.edge.id)
+
+    const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
+    const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
+
+    const srcCx = info.source.canvas_x + (info.source.width || 200) / 2
+    const srcCy = info.source.canvas_y + (info.source.height || 120) / 2
+    const tgtCx = info.target.canvas_x + (info.target.width || 200) / 2
+    const tgtCy = info.target.canvas_y + (info.target.height || 120) / 2
+
+    // Approximate port positions (simplified - actual port is on node edge)
+    const x1 = srcCx + (info.sourceSide === 'left' ? -50 : info.sourceSide === 'right' ? 50 : srcOffset)
+    const y1 = srcCy + (info.sourceSide === 'top' ? -50 : info.sourceSide === 'bottom' ? 50 : srcOffset)
+    const x2 = tgtCx + (info.targetSide === 'left' ? -50 : info.targetSide === 'right' ? 50 : tgtOffset)
+    const y2 = tgtCy + (info.targetSide === 'top' ? -50 : info.targetSide === 'bottom' ? 50 : tgtOffset)
+
+    edgeEndpoints.set(info.edge.id, { x1, y1, x2, y2 })
+    edgeCrossings.set(info.edge.id, 0)
+  }
+
+  // Check all pairs for crossings
+  const edgeIds = Array.from(edgeEndpoints.keys())
+
+  for (let i = 0; i < edgeIds.length; i++) {
+    for (let j = i + 1; j < edgeIds.length; j++) {
+      const id1 = edgeIds[i]
+      const id2 = edgeIds[j]
+      const e1 = edgeEndpoints.get(id1)!
+      const e2 = edgeEndpoints.get(id2)!
+
+      if (segmentsIntersect(e1.x1, e1.y1, e1.x2, e1.y2, e2.x1, e2.y1, e2.x2, e2.y2)) {
+        crossingPairs.push({ edge1: id1, edge2: id2 })
+        edgeCrossings.set(id1, (edgeCrossings.get(id1) || 0) + 1)
+        edgeCrossings.set(id2, (edgeCrossings.get(id2) || 0) + 1)
+
+        // Track node crossings
+        const info1 = relevantEdges.find(e => e.edge.id === id1)
+        const info2 = relevantEdges.find(e => e.edge.id === id2)
+        if (info1) {
+          nodeCrossings.set(info1.source.id || '', (nodeCrossings.get(info1.source.id || '') || 0) + 1)
+          nodeCrossings.set(info1.target.id || '', (nodeCrossings.get(info1.target.id || '') || 0) + 1)
+        }
+        if (info2) {
+          nodeCrossings.set(info2.source.id || '', (nodeCrossings.get(info2.source.id || '') || 0) + 1)
+          nodeCrossings.set(info2.target.id || '', (nodeCrossings.get(info2.target.id || '') || 0) + 1)
+        }
+      }
+    }
+  }
+
+  // Sort results
+  const edgesByCrossings = Array.from(edgeCrossings.entries())
+    .filter(([_, count]) => count > 0)
+    .map(([edgeId, crossings]) => ({ edgeId, crossings }))
+    .sort((a, b) => b.crossings - a.crossings)
+
+  const nodesByCrossings = Array.from(nodeCrossings.entries())
+    .filter(([id, count]) => id && count > 0)
+    .map(([nodeId, crossings]) => ({ nodeId, crossings }))
+    .sort((a, b) => b.crossings - a.crossings)
+
+  return {
+    totalCrossings: crossingPairs.length,
+    edgesByCrossings,
+    nodesByCrossings,
+    crossingPairs,
+  }
+}
+
+/**
+ * Check if two line segments intersect
+ */
+function segmentsIntersect(
+  x1: number, y1: number, x2: number, y2: number,
+  x3: number, y3: number, x4: number, y4: number
+): boolean {
+  // Calculate direction vectors
+  const d1x = x2 - x1
+  const d1y = y2 - y1
+  const d2x = x4 - x3
+  const d2y = y4 - y3
+
+  const cross = d1x * d2y - d1y * d2x
+
+  // Parallel lines
+  if (Math.abs(cross) < 0.0001) return false
+
+  const dx = x3 - x1
+  const dy = y3 - y1
+
+  const t = (dx * d2y - dy * d2x) / cross
+  const u = (dx * d1y - dy * d1x) / cross
+
+  // Check if intersection point is within both segments
+  // Use small margin to avoid counting shared endpoints
+  return t > 0.01 && t < 0.99 && u > 0.01 && u < 0.99
+}
+
+/**
  * Optimize port assignments to minimize edge crossings
  * Uses a greedy approach: for each node side, try swapping adjacent ports
  * and keep swaps that reduce the total crossing count
