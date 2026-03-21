@@ -8,6 +8,8 @@ import {
 } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
+import { TYPST_MATH_REFERENCE, GETTING_STARTED } from '../lib/templates'
+import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
 import { useStorylinesStore } from './storylines'
 import { useEdgesStore } from './edges'
@@ -396,31 +398,6 @@ export const useNodesStore = defineStore('nodes', () => {
     return false
   }
 
-  // Hashtag extraction limits
-  const MAX_HASHTAG_COUNT = 50
-  const MAX_HASHTAG_LENGTH = 50
-
-  /**
-   * Extract hashtags from content
-   * Matches: #word, #multi-word-tag, #CamelCase, #123numeric
-   * Limited to prevent abuse
-   */
-  function extractHashtags(content: string): string[] {
-    const hashtagRegex = /#([a-zA-Z0-9][\w-]*)/g
-    const tags = new Set<string>()
-    let match
-    let count = 0
-    while ((match = hashtagRegex.exec(content)) !== null && count < MAX_HASHTAG_COUNT) {
-      const tag = match[1]
-      // Skip tags that are too long
-      if (tag.length <= MAX_HASHTAG_LENGTH) {
-        tags.add(tag)
-        count++
-      }
-    }
-    return Array.from(tags)
-  }
-
   async function updateNodeContent(id: string, content: string) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
@@ -461,12 +438,7 @@ export const useNodesStore = defineStore('nodes', () => {
       }
 
       // Extract wikilinks and create edges
-      const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
-      const links = new Set<string>()
-      let match
-      while ((match = wikilinkRegex.exec(content)) !== null) {
-        links.add(match[1].trim().toLowerCase())
-      }
+      const links = extractWikilinks(content)
 
       // Create edges for each wikilink
       for (const linkTitle of links) {
@@ -678,45 +650,9 @@ export const useNodesStore = defineStore('nodes', () => {
     selectedNodeIds.value = []
 
     // Create the welcome/starter nodes
-    const mathReference = `# Typst Math Reference
-
-| Symbol | Syntax |
-|--------|--------|
-| Arrow over letter | $arrow(x)$ |
-| Hat over letter | $hat(x)$ |
-| Bar over letter | $overline(x)$ |
-| Subscript | $x_1$ or $x_(i+1)$ |
-| Superscript | $x^2$ or $x^(n+1)$ |
-| Fraction | $a/b$ or $frac(a, b)$ |
-| Square root | $sqrt(x)$ |
-| Greek letters | $alpha, beta, gamma$ |
-
-Use \`$...$\` for inline and \`$$...$$\` for display math.
-
-Full reference: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`
-
-    const gettingStarted = `# Getting Started with Nodus
-
-## Create Nodes
-- **Double-click** on canvas to create a node
-- **Drag files** onto canvas to import
-
-## Connect Nodes
-- **Cmd/Ctrl + click** on two nodes to connect them
-- Or use right-click menu > "Link to..."
-
-## Navigate
-- **Scroll** to zoom in/out
-- **Drag canvas** to pan
-- **Cmd/Ctrl + F** to search
-
-## Workspaces
-- Create separate workspaces for different projects
-- Import Obsidian vaults to sync with existing notes`
-
     await createNode({
       title: 'Typst Math Reference',
-      markdown_content: mathReference,
+      markdown_content: TYPST_MATH_REFERENCE,
       canvas_x: 100,
       canvas_y: 100,
       width: 280,
@@ -725,7 +661,7 @@ Full reference: [typst.app/docs/reference/math](https://typst.app/docs/reference
 
     await createNode({
       title: 'Getting Started',
-      markdown_content: gettingStarted,
+      markdown_content: GETTING_STARTED,
       canvas_x: 420,
       canvas_y: 100,
       width: 280,

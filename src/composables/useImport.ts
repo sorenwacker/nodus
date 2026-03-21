@@ -6,6 +6,7 @@ import { ref } from 'vue'
 import { invoke, readTextFile, refreshWorkspace as refreshWorkspaceApi } from '../lib/tauri'
 import { parseReferences, citationToMarkdown } from '../lib/bibtex'
 import { storeLogger } from '../lib/logger'
+import { handleAsyncError } from '../lib/errorHandling'
 import { notifications$ } from '../composables/useNotifications'
 import type { Node, Edge, OntologyImportResult } from '../types'
 
@@ -79,10 +80,11 @@ export function useImport(deps: ImportDeps) {
 
       return importedNodes
     } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Import failed:', e)
-      notifications$.error('Import failed', String(e))
-      throw e
+      handleAsyncError({
+        context: 'Import',
+        error,
+        notify: (t, m) => notifications$.error(t, m),
+      })(e)
     } finally {
       loading.value = false
     }
@@ -144,10 +146,11 @@ export function useImport(deps: ImportDeps) {
 
       return createdNodes
     } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Citation import failed:', e)
-      notifications$.error('Import failed', String(e))
-      throw e
+      handleAsyncError({
+        context: 'Citation import',
+        error,
+        notify: (t, m) => notifications$.error(t, m),
+      })(e)
     } finally {
       loading.value = false
     }
@@ -199,10 +202,11 @@ export function useImport(deps: ImportDeps) {
 
       return result
     } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Ontology import failed:', e)
-      notifications$.error('Import failed', String(e))
-      throw e
+      handleAsyncError({
+        context: 'Ontology import',
+        error,
+        notify: (t, m) => notifications$.error(t, m),
+      })(e)
     } finally {
       loading.value = false
     }
@@ -228,9 +232,12 @@ export function useImport(deps: ImportDeps) {
 
       return updated
     } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Refresh failed:', e)
-      throw e
+      handleAsyncError({
+        context: 'Refresh',
+        error,
+        notify: (t, m) => notifications$.error(t, m),
+      })(e)
+      return 0 // Return 0 on error (unreachable due to rethrow, but satisfies TypeScript)
     } finally {
       loading.value = false
     }

@@ -2,7 +2,16 @@
 //!
 //! All commands are async and return Results for proper error handling.
 
-use crate::database::{self, edges::Edge, frames::Frame, nodes::Node, storylines::{Storyline, StorylineNode}, themes::Theme};
+use crate::database::{
+    self,
+    edges::Edge,
+    frames::Frame,
+    nodes::Node,
+    storylines::{Storyline, StorylineNode},
+    themes::Theme,
+};
+use crate::import_helpers;
+use crate::layout_config;
 use crate::themes as theme_module;
 use crate::watcher::{write_file_locked, FileChangeEvent, FileLock, VaultWatcher};
 use serde::Deserialize;
@@ -232,11 +241,20 @@ pub async fn update_edge_color(id: String, color: Option<String>) -> Result<(), 
 }
 
 #[tauri::command]
-pub async fn update_edge_storyline(id: String, storyline_id: Option<String>, color: Option<String>) -> Result<(), String> {
+pub async fn update_edge_storyline(
+    id: String,
+    storyline_id: Option<String>,
+    color: Option<String>,
+) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    database::edges::update_storyline_and_color(pool, &id, storyline_id.as_deref(), color.as_deref())
-        .await
-        .map_err(|e| e.to_string())
+    database::edges::update_storyline_and_color(
+        pool,
+        &id,
+        storyline_id.as_deref(),
+        color.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -271,8 +289,7 @@ pub async fn update_node_content(id: String, content: String) -> Result<Option<S
             let path = std::path::Path::new(file_path);
             if path.exists() {
                 // Write to file with exclusive lock and get new checksum
-                let checksum = write_file_locked(path, &content)
-                    .map_err(|e| e.to_string())?;
+                let checksum = write_file_locked(path, &content).map_err(|e| e.to_string())?;
 
                 // Update content and checksum in database
                 database::nodes::update_content_and_checksum(pool, &id, &content, &checksum)
@@ -375,29 +392,19 @@ pub async fn stop_watching(watcher_state: State<'_, WatcherState>) -> Result<(),
     Ok(())
 }
 
-/// Extract wikilinks from markdown content
-fn extract_wikilinks(content: &str) -> Vec<String> {
-    let re = regex::Regex::new(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]").unwrap();
-    re.captures_iter(content)
-        .map(|cap| cap[1].to_string())
-        .collect()
-}
-
-/// Get relative folder path from vault root (empty string for root)
-fn get_relative_folder(file_path: &std::path::Path, vault_root: &std::path::Path) -> Option<String> {
-    file_path.parent().and_then(|parent| {
-        parent.strip_prefix(vault_root).ok().map(|rel| {
-            rel.to_string_lossy().to_string()
-        })
-    })
-}
-
 #[tauri::command]
-pub async fn import_vault(path: String, workspace_id: Option<String>, delete_originals: Option<bool>) -> Result<Vec<Node>, String> {
+pub async fn import_vault(
+    path: String,
+    workspace_id: Option<String>,
+    delete_originals: Option<bool>,
+) -> Result<Vec<Node>, String> {
     let path = PathBuf::from(&path);
     let should_delete = delete_originals.unwrap_or(false);
 
-    println!("Importing vault from: {:?}, workspace_id: {:?}, delete_originals: {}", path, workspace_id, should_delete);
+    println!(
+        "Importing vault from: {:?}, workspace_id: {:?}, delete_originals: {}",
+        path, workspace_id, should_delete
+    );
 
     if !path.exists() {
         return Err("Vault path does not exist".to_string());
@@ -405,48 +412,32 @@ pub async fn import_vault(path: String, workspace_id: Option<String>, delete_ori
 
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     let mut nodes = Vec::new();
-    let mut title_to_id: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut title_to_id: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     let mut node_links: Vec<(String, Vec<String>)> = Vec::new();
     let mut skipped = 0;
 
     // Track folders and their frames
     // Key: relative folder path, Value: (frame_id, nodes_in_folder count)
-    let mut folder_frames: std::collections::HashMap<String, (String, usize)> = std::collections::HashMap::new();
+    let mut folder_frames: std::collections::HashMap<String, (String, usize)> =
+        std::collections::HashMap::new();
     // Track which node belongs to which folder
     let mut node_folders: Vec<(String, String)> = Vec::new(); // (node_id, folder_path)
 
     // First pass: collect all files and create frames for folders
     let now = chrono::Utc::now().timestamp_millis();
-    let mut files_to_import: Vec<(PathBuf, String)> = Vec::new(); // (file_path, folder)
-
-    for entry in walkdir::WalkDir::new(&path)
-        .follow_links(true)
+    let (collected_files, folder_counts) = import_helpers::collect_markdown_files(&path);
+    let files_to_import: Vec<(PathBuf, String)> = collected_files
         .into_iter()
-        .filter_entry(|e| {
-            // Skip all hidden files and directories (starting with .)
-            let name = e.file_name().to_string_lossy();
-            !name.starts_with('.')
-        })
-        .filter_map(|e| e.ok())
-    {
-        let file_path = entry.path();
+        .map(|f| (f.path, f.folder))
+        .collect();
 
-        if file_path.extension().map_or(false, |ext| ext == "md") {
-            let folder = get_relative_folder(file_path, &path).unwrap_or_default();
-            println!("  Found: {:?} in folder: '{}'", file_path.file_name(), folder);
-            files_to_import.push((file_path.to_path_buf(), folder.clone()));
-
-            // Track folder for frame creation
-            folder_frames.entry(folder).or_insert_with(|| {
-                (String::new(), 0) // frame_id will be set later
-            }).1 += 1;
-        }
+    // Initialize folder_frames from counts
+    for (folder, count) in folder_counts {
+        folder_frames.insert(folder, (String::new(), count));
     }
 
-    println!("Total files found: {}, folders: {:?}", files_to_import.len(), folder_frames.keys().collect::<Vec<_>>());
-
     // Create frames for non-root folders with multiple files
-    let frame_spacing = 800.0;
     let mut frame_count = 0;
     for (folder, (frame_id_slot, count)) in folder_frames.iter_mut() {
         // Skip root folder (empty string) and single-file folders
@@ -456,27 +447,30 @@ pub async fn import_vault(path: String, workspace_id: Option<String>, delete_ori
 
         // Check if frame already exists
         let frame_title = folder.split('/').last().unwrap_or(folder);
-        if let Ok(Some(existing)) = database::frames::get_by_title_and_workspace(
-            pool,
-            frame_title,
-            workspace_id.as_deref()
-        ).await {
+        if let Ok(Some(existing)) =
+            database::frames::get_by_title_and_workspace(pool, frame_title, workspace_id.as_deref())
+                .await
+        {
             *frame_id_slot = existing.id;
             continue;
         }
 
         // Create new frame
         let frame_id = uuid::Uuid::new_v4().to_string();
-        let frame_x = (frame_count % 3) as f64 * frame_spacing + 50.0;
-        let frame_y = (frame_count / 3) as f64 * frame_spacing + 50.0;
+        let frame_x = (frame_count % layout_config::FRAME_COLS) as f64
+            * layout_config::FRAME_SPACING
+            + layout_config::FRAME_ORIGIN;
+        let frame_y = (frame_count / layout_config::FRAME_COLS) as f64
+            * layout_config::FRAME_SPACING
+            + layout_config::FRAME_ORIGIN;
 
         let frame = database::frames::Frame {
             id: frame_id.clone(),
             title: frame_title.to_string(),
             canvas_x: frame_x,
             canvas_y: frame_y,
-            width: 600.0,
-            height: 400.0,
+            width: layout_config::FRAME_WIDTH,
+            height: layout_config::FRAME_HEIGHT,
             color: None,
             workspace_id: workspace_id.clone(),
             created_at: now,
@@ -490,7 +484,8 @@ pub async fn import_vault(path: String, workspace_id: Option<String>, delete_ori
     }
 
     // Second pass: import files and assign to frames
-    let mut folder_node_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut folder_node_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     // Track files to delete after successful import
     let mut files_to_delete: Vec<PathBuf> = Vec::new();
 
@@ -518,42 +513,52 @@ pub async fn import_vault(path: String, workspace_id: Option<String>, delete_ori
             .to_string();
 
         // Extract wikilinks
-        let links = extract_wikilinks(&content);
+        let links = import_helpers::extract_wikilinks(&content);
 
         // Compute checksum
         let checksum = crate::checksum::compute_string(&content);
 
         // Get frame info for this folder
         let frame_id = folder_frames.get(&folder).and_then(|(fid, _)| {
-            if fid.is_empty() { None } else { Some(fid.clone()) }
+            if fid.is_empty() {
+                None
+            } else {
+                Some(fid.clone())
+            }
         });
 
         // Calculate position within frame or on canvas
         let node_idx = folder_node_counts.entry(folder.clone()).or_insert(0);
         let (initial_x, initial_y) = if frame_id.is_some() {
             // Position within frame
-            let cols = 3;
-            let spacing = 180.0;
             let frame_info = folder_frames.get(&folder);
             let (frame_x, frame_y) = if let Some((_, _)) = frame_info {
                 // Find frame position
                 let fi = folder_frames.keys().position(|k| k == &folder).unwrap_or(0);
-                let fx = (fi % 3) as f64 * 800.0 + 50.0;
-                let fy = (fi / 3) as f64 * 800.0 + 50.0;
+                let fx = (fi % layout_config::FRAME_COLS) as f64 * layout_config::FRAME_SPACING
+                    + layout_config::FRAME_ORIGIN;
+                let fy = (fi / layout_config::FRAME_COLS) as f64 * layout_config::FRAME_SPACING
+                    + layout_config::FRAME_ORIGIN;
                 (fx, fy)
             } else {
-                (50.0, 50.0)
+                (layout_config::FRAME_ORIGIN, layout_config::FRAME_ORIGIN)
             };
-            let x = frame_x + 30.0 + (*node_idx % cols) as f64 * spacing;
-            let y = frame_y + 60.0 + (*node_idx / cols) as f64 * 140.0;
+            let x = frame_x
+                + layout_config::FRAME_NODE_X_OFFSET
+                + (*node_idx % layout_config::FRAME_NODE_COLS) as f64
+                    * layout_config::FRAME_NODE_SPACING;
+            let y = frame_y
+                + layout_config::FRAME_NODE_Y_OFFSET
+                + (*node_idx / layout_config::FRAME_NODE_COLS) as f64
+                    * layout_config::FRAME_NODE_ROW_HEIGHT;
             (x, y)
         } else {
             // Root folder nodes - grid layout
-            let cols = 5;
-            let spacing = 250.0;
             let idx = nodes.len();
-            let x = (idx % cols) as f64 * spacing + 100.0;
-            let y = (idx / cols) as f64 * spacing + 100.0;
+            let x = (idx % layout_config::ROOT_NODE_COLS) as f64 * layout_config::ROOT_NODE_SPACING
+                + layout_config::ROOT_NODE_ORIGIN;
+            let y = (idx / layout_config::ROOT_NODE_COLS) as f64 * layout_config::ROOT_NODE_SPACING
+                + layout_config::ROOT_NODE_ORIGIN;
             (x, y)
         };
         *node_idx += 1;
@@ -577,8 +582,8 @@ pub async fn import_vault(path: String, workspace_id: Option<String>, delete_ori
             node_type: "note".to_string(),
             canvas_x: initial_x,
             canvas_y: initial_y,
-            width: 200.0,
-            height: 120.0,
+            width: layout_config::NODE_WIDTH,
+            height: layout_config::NODE_HEIGHT,
             z_index: 0,
             frame_id: frame_id.clone(),
             color_theme: None,
@@ -612,12 +617,12 @@ pub async fn import_vault(path: String, workspace_id: Option<String>, delete_ori
     // Create edges for wikilinks (deduplicated)
     let now = chrono::Utc::now().timestamp();
     let mut edge_count = 0;
-    let mut seen_edges: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+    let mut seen_edges: std::collections::HashSet<(String, String)> =
+        std::collections::HashSet::new();
 
     for (source_id, links) in node_links {
-        let unique_links: std::collections::HashSet<String> = links.into_iter()
-            .map(|l| l.to_lowercase())
-            .collect();
+        let unique_links: std::collections::HashSet<String> =
+            links.into_iter().map(|l| l.to_lowercase()).collect();
 
         for link in unique_links {
             if let Some(target_id) = title_to_id.get(&link) {
@@ -689,7 +694,9 @@ pub struct CreateWorkspaceInput {
 }
 
 #[tauri::command]
-pub async fn create_workspace(input: CreateWorkspaceInput) -> Result<database::workspaces::Workspace, String> {
+pub async fn create_workspace(
+    input: CreateWorkspaceInput,
+) -> Result<database::workspaces::Workspace, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
 
     let now = chrono::Utc::now().timestamp();
@@ -723,7 +730,9 @@ pub async fn delete_workspace(id: String, delete_files: Option<bool>) -> Result<
 
     // If delete_files is true, delete all files associated with nodes in this workspace
     if delete_files.unwrap_or(false) {
-        let nodes = database::nodes::get_all(pool).await.map_err(|e| e.to_string())?;
+        let nodes = database::nodes::get_all(pool)
+            .await
+            .map_err(|e| e.to_string())?;
         let mut deleted_count = 0;
 
         for node in nodes {
@@ -767,7 +776,9 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
     let pool = database::get_pool().map_err(|e| e.to_string())?;
 
     // Get all nodes in workspace
-    let nodes = database::nodes::get_all(pool).await.map_err(|e| e.to_string())?;
+    let nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let mut updated = 0u32;
 
@@ -874,7 +885,9 @@ pub async fn extract_pdf_text(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn extract_pdf_annotations(path: String) -> Result<Vec<crate::pdf::PdfAnnotation>, String> {
+pub async fn extract_pdf_annotations(
+    path: String,
+) -> Result<Vec<crate::pdf::PdfAnnotation>, String> {
     let path = std::path::Path::new(&path);
     crate::pdf::extract_annotations(path)
 }
@@ -952,9 +965,7 @@ pub async fn release_edit_lock(
 
 /// Get list of currently locked node IDs
 #[tauri::command]
-pub async fn get_locked_nodes(
-    locks_state: State<'_, LocksState>,
-) -> Result<Vec<String>, String> {
+pub async fn get_locked_nodes(locks_state: State<'_, LocksState>) -> Result<Vec<String>, String> {
     let locks = locks_state.0.lock().unwrap();
     Ok(locks.keys().cloned().collect())
 }
@@ -1010,7 +1021,12 @@ pub async fn get_storyline(id: String) -> Result<Option<Storyline>, String> {
 }
 
 #[tauri::command]
-pub async fn update_storyline(id: String, title: String, description: Option<String>, color: Option<String>) -> Result<(), String> {
+pub async fn update_storyline(
+    id: String,
+    title: String,
+    description: Option<String>,
+    color: Option<String>,
+) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::storylines::update(pool, &id, &title, description.as_deref(), color.as_deref())
         .await
@@ -1026,7 +1042,11 @@ pub async fn delete_storyline(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn add_node_to_storyline(storyline_id: String, node_id: String, position: Option<i32>) -> Result<StorylineNode, String> {
+pub async fn add_node_to_storyline(
+    storyline_id: String,
+    node_id: String,
+    position: Option<i32>,
+) -> Result<StorylineNode, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::storylines::add_node(pool, &storyline_id, &node_id, position)
         .await
@@ -1034,7 +1054,10 @@ pub async fn add_node_to_storyline(storyline_id: String, node_id: String, positi
 }
 
 #[tauri::command]
-pub async fn remove_node_from_storyline(storyline_id: String, node_id: String) -> Result<(), String> {
+pub async fn remove_node_from_storyline(
+    storyline_id: String,
+    node_id: String,
+) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::storylines::remove_node(pool, &storyline_id, &node_id)
         .await
@@ -1042,7 +1065,10 @@ pub async fn remove_node_from_storyline(storyline_id: String, node_id: String) -
 }
 
 #[tauri::command]
-pub async fn reorder_storyline_nodes(storyline_id: String, node_ids: Vec<String>) -> Result<(), String> {
+pub async fn reorder_storyline_nodes(
+    storyline_id: String,
+    node_ids: Vec<String>,
+) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::storylines::reorder_nodes(pool, &storyline_id, &node_ids)
         .await
@@ -1072,7 +1098,10 @@ pub struct SearchResult {
 /// Requires a Tavily API key (free tier: 1000 credits/month, no credit card)
 /// Get your key at: https://tavily.com/
 #[tauri::command]
-pub async fn web_search(query: String, api_key: Option<String>) -> Result<Vec<SearchResult>, String> {
+pub async fn web_search(
+    query: String,
+    api_key: Option<String>,
+) -> Result<Vec<SearchResult>, String> {
     let api_key = api_key.filter(|k| !k.is_empty())
         .ok_or_else(|| "No search API key configured. Get a free Tavily API key at https://tavily.com/ and add it in Settings.".to_string())?;
 
@@ -1088,7 +1117,8 @@ pub async fn web_search(query: String, api_key: Option<String>) -> Result<Vec<Se
         "include_answer": false
     });
 
-    let response = client.post("https://api.tavily.com/search")
+    let response = client
+        .post("https://api.tavily.com/search")
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
@@ -1107,19 +1137,37 @@ pub async fn web_search(query: String, api_key: Option<String>) -> Result<Vec<Se
         return Err(format!("Search returned status: {}", response.status()));
     }
 
-    let json: serde_json::Value = response.json().await
+    let json: serde_json::Value = response
+        .json()
+        .await
         .map_err(|e| format!("Failed to parse search results: {}", e))?;
 
     let mut results: Vec<SearchResult> = Vec::new();
 
     if let Some(search_results) = json.get("results").and_then(|r| r.as_array()) {
         for item in search_results.iter().take(5) {
-            let title = item.get("title").and_then(|t| t.as_str()).unwrap_or("").to_string();
-            let url = item.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
-            let content = item.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+            let title = item
+                .get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string();
+            let url = item
+                .get("url")
+                .and_then(|u| u.as_str())
+                .unwrap_or("")
+                .to_string();
+            let content = item
+                .get("content")
+                .and_then(|c| c.as_str())
+                .unwrap_or("")
+                .to_string();
 
             if !title.is_empty() && !url.is_empty() {
-                results.push(SearchResult { title, url, content });
+                results.push(SearchResult {
+                    title,
+                    url,
+                    content,
+                });
             }
         }
     }
@@ -1143,8 +1191,12 @@ pub async fn fetch_url(url: String) -> Result<String, String> {
     // This service renders the page and returns clean markdown
     let jina_url = format!("https://r.jina.ai/{}", url);
 
-    let response = client.get(&jina_url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    let response = client
+        .get(&jina_url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        )
         .header("Accept", "text/plain")
         .send()
         .await
@@ -1155,7 +1207,9 @@ pub async fn fetch_url(url: String) -> Result<String, String> {
         return fetch_url_direct(&client, &url).await;
     }
 
-    let content = response.text().await
+    let content = response
+        .text()
+        .await
         .map_err(|e| format!("Failed to read content: {}", e))?;
 
     Ok(content)
@@ -1163,8 +1217,12 @@ pub async fn fetch_url(url: String) -> Result<String, String> {
 
 /// Direct fetch fallback (for when Jina is unavailable)
 async fn fetch_url_direct(client: &reqwest::Client, url: &str) -> Result<String, String> {
-    let response = client.get(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    let response = client
+        .get(url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        )
         .send()
         .await
         .map_err(|e| format!("Failed to fetch URL: {}", e))?;
@@ -1173,7 +1231,9 @@ async fn fetch_url_direct(client: &reqwest::Client, url: &str) -> Result<String,
         return Err(format!("URL returned status: {}", response.status()));
     }
 
-    let html = response.text().await
+    let html = response
+        .text()
+        .await
         .map_err(|e| format!("Failed to read content: {}", e))?;
 
     // Basic HTML to text conversion
@@ -1230,7 +1290,11 @@ pub async fn create_theme(input: CreateThemeInput) -> Result<Theme, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
 
     // Check if name already exists
-    if database::themes::get_by_name(pool, &input.name).await.map_err(|e| e.to_string())?.is_some() {
+    if database::themes::get_by_name(pool, &input.name)
+        .await
+        .map_err(|e| e.to_string())?
+        .is_some()
+    {
         return Err(format!("Theme with name '{}' already exists", input.name));
     }
 
@@ -1406,13 +1470,17 @@ pub struct ImportOntologyInput {
     pub layout: crate::ontology::OntologyLayout,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[tauri::command]
 pub async fn import_ontology(
     input: ImportOntologyInput,
 ) -> Result<crate::ontology::OntologyImportResult, String> {
-    use crate::ontology::{parse_ontology, transform_to_nodus, transformer::TransformOptions, types::OntologyData};
+    use crate::ontology::{
+        parse_ontology, transform_to_nodus, transformer::TransformOptions, types::OntologyData,
+    };
     use std::path::Path;
 
     let path = Path::new(&input.file_path);
@@ -1446,7 +1514,9 @@ pub async fn import_ontology(
                             combined.object_properties.extend(data.object_properties);
                             combined.classes.extend(data.classes);
                             combined.subclass_relations.extend(data.subclass_relations);
-                            combined.property_definitions.extend(data.property_definitions);
+                            combined
+                                .property_definitions
+                                .extend(data.property_definitions);
                         }
                         Err(e) => {
                             eprintln!("Warning: Failed to parse {:?}: {}", file_path, e);
@@ -1477,7 +1547,10 @@ pub async fn import_ontology(
 
     // Force grid layout for large ontologies (hierarchical is too slow)
     let layout = if total_entities > 500 {
-        println!("Large ontology detected ({} entities), forcing grid layout", total_entities);
+        println!(
+            "Large ontology detected ({} entities), forcing grid layout",
+            total_entities
+        );
         crate::ontology::OntologyLayout::Grid
     } else {
         input.layout

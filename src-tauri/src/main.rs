@@ -3,6 +3,8 @@
 mod checksum;
 mod commands;
 mod database;
+mod import_helpers;
+mod layout_config;
 mod ontology;
 mod pdf;
 mod themes;
@@ -24,7 +26,9 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(commands::WatcherState(Mutex::new(None)))
-        .manage(commands::LocksState(Mutex::new(std::collections::HashMap::new())))
+        .manage(commands::LocksState(Mutex::new(
+            std::collections::HashMap::new(),
+        )))
         .setup(|app| {
             // Initialize database
             let app_handle = app.handle().clone();
