@@ -61,6 +61,8 @@ function skip() {
 }
 
 function complete() {
+  // Ensure selected language is persisted even if user didn't click it
+  setLocale(selectedLanguage.value)
   localStorage.setItem(STORAGE_KEY, 'true')
   isVisible.value = false
   emit('complete')
