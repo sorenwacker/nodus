@@ -1999,7 +1999,6 @@ const visibleEdgeLines = computed(() => {
   // Pre-compute rendering properties to avoid repeated function calls in template
   const highlighted = highlightedEdgeIds.value
   const selected = selectedEdge.value
-  const bundling = edgeBundling.value
   const baseStrokeWidth = edgeStrokeWidth.value
 
   return edges.map(e => {
@@ -2008,7 +2007,7 @@ const visibleEdgeLines = computed(() => {
     // Use explicit color field first, then link_type as fallback, then default
     const color = (e.color && e.color.startsWith('#')) ? e.color
       : (e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value)
-    const effectiveStrokeWidth = bundling ? e.strokeWidth * baseStrokeWidth : baseStrokeWidth
+    const effectiveStrokeWidth = baseStrokeWidth
     // Use multiplier for highlight to scale properly with zoom
     const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth * 2 : effectiveStrokeWidth
 
