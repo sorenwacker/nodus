@@ -210,7 +210,7 @@ onMounted(async () => {
   // Initialize themes first to apply visual styling
   await themesStore.initialize()
   // Then initialize data
-  store.initialize()
+  await store.initialize()
 })
 
 async function importVault() {
