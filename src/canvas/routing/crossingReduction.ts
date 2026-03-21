@@ -150,7 +150,7 @@ export class BarycentricReduction implements CrossingReductionStrategy {
     let swapsPerformed = 0
 
     // Sort each group by barycenter (position of connected node)
-    // For orthogonal routing: need to handle same-side vs opposite-side approach
+    // For orthogonal routing: separate by approach direction, reverse within each
     for (const [key, entries] of groups) {
       if (entries.length < 2) continue
 
@@ -165,37 +165,33 @@ export class BarycentricReduction implements CrossingReductionStrategy {
       if (!nodeInfo) continue
 
       const nodeRect = nodeInfo.edge.source_node_id === nodeId ? nodeInfo.source : nodeInfo.target
-      const nodeCenterX = nodeRect.canvas_x + (nodeRect.width || 200) / 2
-      const nodeCenterY = nodeRect.canvas_y + (nodeRect.height || 120) / 2
+      const nodeCenterPos = isHorizontalSide
+        ? nodeRect.canvas_y + (nodeRect.height || 120) / 2
+        : nodeRect.canvas_x + (nodeRect.width || 200) / 2
 
-      // Check if all "other" nodes approach from the same side
-      // For horizontal entry (left/right): check if all sources are above or below
-      // For vertical entry (top/bottom): check if all sources are left or right of center
-      let allSameSide = true
-      let firstDirection: 'positive' | 'negative' | null = null
+      // Separate entries by approach direction
+      const negative: typeof entries = []  // left of center (for top/bottom) or above center (for left/right)
+      const positive: typeof entries = []  // right of center or below center
 
       for (const entry of entries) {
-        const direction = isHorizontalSide
-          ? (entry.otherPos > nodeCenterY ? 'positive' : 'negative')
-          : (entry.otherPos > nodeCenterX ? 'positive' : 'negative')
-
-        if (firstDirection === null) {
-          firstDirection = direction
-        } else if (direction !== firstDirection) {
-          allSameSide = false
-          break
+        if (entry.otherPos < nodeCenterPos) {
+          negative.push(entry)
+        } else {
+          positive.push(entry)
         }
       }
 
-      if (allSameSide && entries.length > 1) {
-        // All edges approach from same side: REVERSE order
-        // Inner source → outer port prevents lane crossings
-        entries.sort((a, b) => b.otherPos - a.otherPos)
-      } else {
-        // Edges approach from different sides: normal order
-        // Left/top sources → left/top ports
-        entries.sort((a, b) => a.otherPos - b.otherPos)
-      }
+      // Sort each group: REVERSE order within each approach direction
+      // This ensures: leftmost source → rightmost port (among left-approachers)
+      // And: rightmost source → leftmost port (among right-approachers)
+      negative.sort((a, b) => b.otherPos - a.otherPos)  // reverse: more negative → higher index
+      positive.sort((a, b) => a.otherPos - b.otherPos)  // reverse: more positive → higher index
+
+      // Combine: negative side gets lower indices (left/top ports), positive gets higher (right/bottom)
+      // But WITHIN each group, inner sources get outer positions
+      const combined = [...negative, ...positive]
+      entries.length = 0
+      entries.push(...combined)
 
       // Reassign indices based on sorted order
       console.log(`[Barycentric] Group ${key}: reassigning ${entries.length} edges`)
