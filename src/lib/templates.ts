@@ -4,6 +4,8 @@
 
 export const TYPST_MATH_REFERENCE = `# Typst Math Reference
 
+Nodus supports Typst math syntax for equations.
+
 | Symbol | Syntax |
 |--------|--------|
 | Arrow over letter | $arrow(x)$ |
@@ -17,23 +19,51 @@ export const TYPST_MATH_REFERENCE = `# Typst Math Reference
 
 Use \`$...$\` for inline and \`$$...$$\` for display math.
 
+See also: [[Getting Started]]
+
 Full reference: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`
 
 export const GETTING_STARTED = `# Getting Started with Nodus
 
 ## Create Nodes
 - **Double-click** on canvas to create a node
-- **Drag files** onto canvas to import
+- Or use [[Importing Files]] to bring in existing content
 
 ## Connect Nodes
 - **Cmd/Ctrl + click** on two nodes to connect them
-- Or use right-click menu > "Link to..."
+- Use \`[[wikilinks]]\` in text to auto-link nodes
+- Right-click menu > "Link to..."
 
 ## Navigate
 - **Scroll** to zoom in/out
 - **Drag canvas** to pan
 - **Cmd/Ctrl + F** to search
 
-## Workspaces
-- Create separate workspaces for different projects
-- Import Obsidian vaults to sync with existing notes`
+## Learn More
+- [[Typst Math Reference]] for equations
+- [[Importing Files]] for bulk import`
+
+export const IMPORTING_FILES = `# Importing Files
+
+## Drag and Drop
+- **Markdown files** (.md) become nodes directly
+- **PDF files** extract text and annotations
+- **BibTeX files** (.bib) create citation nodes
+- **Folders** import all markdown files inside
+
+## Import Vault
+Use **File > Import Vault** to import an entire Obsidian vault or folder of markdown files.
+
+Options:
+- Keep files synced (edits update the original)
+- Copy content only (no file link)
+
+## Supported Formats
+| Format | Result |
+|--------|--------|
+| .md | Note node with content |
+| .pdf | Note with extracted text |
+| .bib | Citation nodes |
+| .ttl/.owl | Ontology import |
+
+See [[Getting Started]] for basic navigation.`

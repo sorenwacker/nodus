@@ -8,7 +8,7 @@ import {
 } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
-import { TYPST_MATH_REFERENCE, GETTING_STARTED } from '../lib/templates'
+import { TYPST_MATH_REFERENCE, GETTING_STARTED, IMPORTING_FILES } from '../lib/templates'
 import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
 import { useStorylinesStore } from './storylines'
@@ -648,22 +648,53 @@ export const useNodesStore = defineStore('nodes', () => {
     selectedNodeIds.value = []
 
     // Create the welcome/starter nodes
-    await createNode({
+    const gettingStarted = await createNode({
       title: 'Getting Started',
       markdown_content: GETTING_STARTED,
       canvas_x: 100,
       canvas_y: 100,
-      width: 340,
-      height: 420,
+      width: 420,
+      height: 520,
     })
 
-    await createNode({
+    const importingFiles = await createNode({
+      title: 'Importing Files',
+      markdown_content: IMPORTING_FILES,
+      canvas_x: 580,
+      canvas_y: 100,
+      width: 440,
+      height: 580,
+    })
+
+    const mathReference = await createNode({
       title: 'Typst Math Reference',
       markdown_content: TYPST_MATH_REFERENCE,
-      canvas_x: 480,
-      canvas_y: 100,
-      width: 380,
-      height: 480,
+      canvas_x: 100,
+      canvas_y: 680,
+      width: 480,
+      height: 520,
+    })
+
+    // Create demo edges with different styles and labels
+    await createEdge({
+      source_node_id: gettingStarted.id,
+      target_node_id: importingFiles.id,
+      link_type: 'related',
+      label: 'see also',
+    })
+
+    await createEdge({
+      source_node_id: gettingStarted.id,
+      target_node_id: mathReference.id,
+      link_type: 'cites',
+      label: 'references',
+    })
+
+    await createEdge({
+      source_node_id: importingFiles.id,
+      target_node_id: gettingStarted.id,
+      link_type: 'supports',
+      label: 'extends',
     })
 
     storeLogger.info('Default workspace reset complete')
