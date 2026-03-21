@@ -334,8 +334,27 @@ export function useAgentRunner(ctx: AgentContext) {
 
         messages.push(msg)
 
-        // Handle native tool calls
-        if (msg.tool_calls && msg.tool_calls.length > 0) {
+        // Check if content has embedded tool calls that should be processed BEFORE native tool calls
+        // Some models output both text with tool JSON AND a native done() call
+        if (msg.content && msg.tool_calls?.length) {
+          const hasEmbeddedTools = /<\|channel\|>.*?to=functions\.\w+/.test(msg.content) ||
+                                   /<\|constrain\|>json<\|message\|>\{/.test(msg.content) ||
+                                   /```json[\s\S]*?"name"\s*:/.test(msg.content)
+
+          if (hasEmbeddedTools) {
+            // Process content-based tools first, skip native calls this iteration
+            ctx.log.value.push('> Processing embedded tool calls from content...')
+            // Fall through to content processing below
+          }
+        }
+
+        // Handle native tool calls (skip if we detected embedded tools above)
+        const hasEmbeddedToolsInContent = msg.content && (
+          /<\|channel\|>.*?to=functions\.\w+/.test(msg.content) ||
+          /<\|constrain\|>json<\|message\|>\{/.test(msg.content)
+        )
+
+        if (msg.tool_calls && msg.tool_calls.length > 0 && !hasEmbeddedToolsInContent) {
           // Get allowed tools for current mode
           const allowedToolNames = new Set(tools.map(t => t.function.name))
 
