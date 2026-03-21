@@ -73,10 +73,7 @@ pub fn detect_zotero_path() -> Option<PathBuf> {
     ];
 
     #[cfg(target_os = "linux")]
-    let candidates = vec![
-        home.join("Zotero"),
-        home.join(".zotero/zotero"),
-    ];
+    let candidates = vec![home.join("Zotero"), home.join(".zotero/zotero")];
 
     // Check for zotero.sqlite in each candidate
     for candidate in candidates {

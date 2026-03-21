@@ -36,14 +36,16 @@ impl FileLock {
     #[allow(dead_code)]
     pub fn shared(path: &Path) -> Result<Self, WatcherError> {
         let file = File::open(path)?;
-        file.try_lock_shared().map_err(|_| WatcherError::FileLocked)?;
+        file.try_lock_shared()
+            .map_err(|_| WatcherError::FileLocked)?;
         Ok(Self { file })
     }
 
     /// Acquire an exclusive (write) lock on a file
     pub fn exclusive(path: &Path) -> Result<Self, WatcherError> {
         let file = File::options().read(true).write(true).open(path)?;
-        file.try_lock_exclusive().map_err(|_| WatcherError::FileLocked)?;
+        file.try_lock_exclusive()
+            .map_err(|_| WatcherError::FileLocked)?;
         Ok(Self { file })
     }
 
@@ -67,7 +69,10 @@ pub fn write_file_locked(path: &Path, content: &str) -> Result<String, WatcherEr
     drop(lock);
     // Compute new checksum
     crate::checksum::compute_file(path).map_err(|e| {
-        WatcherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+        WatcherError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            e.to_string(),
+        ))
     })
 }
 
@@ -389,7 +394,11 @@ mod tests {
         assert_eq!(create_event.unwrap().change_type, ChangeType::Created);
 
         // External editor modifies
-        fs::write(&file_path, "# Initial\nContent from Nodus\n\nAdded by Obsidian").unwrap();
+        fs::write(
+            &file_path,
+            "# Initial\nContent from Nodus\n\nAdded by Obsidian",
+        )
+        .unwrap();
         let modify_event = detect_change(&file_path, &checksums);
         assert!(modify_event.is_some());
         assert_eq!(modify_event.unwrap().change_type, ChangeType::Modified);
@@ -495,7 +504,11 @@ mod tests {
         let elapsed = start.elapsed();
 
         // 100 checksums should complete in under 1 second
-        assert!(elapsed < Duration::from_secs(1), "Checksum too slow: {:?}", elapsed);
+        assert!(
+            elapsed < Duration::from_secs(1),
+            "Checksum too slow: {:?}",
+            elapsed
+        );
     }
 
     #[test]
@@ -515,7 +528,11 @@ mod tests {
         let elapsed = start.elapsed();
 
         // 100 change detections should complete in under 500ms
-        assert!(elapsed < Duration::from_millis(500), "Detection too slow: {:?}", elapsed);
+        assert!(
+            elapsed < Duration::from_millis(500),
+            "Detection too slow: {:?}",
+            elapsed
+        );
     }
 
     // ========================================================================
@@ -633,7 +650,11 @@ mod tests {
         };
 
         // External app (Obsidian) modifies file
-        fs::write(&file_path, "# Note\nOriginal content\n\n## Added by Obsidian").unwrap();
+        fs::write(
+            &file_path,
+            "# Note\nOriginal content\n\n## Added by Obsidian",
+        )
+        .unwrap();
 
         // Nodus detects change via checksum
         let event = detect_change(&file_path, &checksums);

@@ -29,8 +29,7 @@ pub async fn initialize(app: &AppHandle) -> Result<(), DatabaseError> {
         .app_data_dir()
         .map_err(|e| DatabaseError::Path(e.to_string()))?;
 
-    std::fs::create_dir_all(&app_dir)
-        .map_err(|e| DatabaseError::Path(e.to_string()))?;
+    std::fs::create_dir_all(&app_dir).map_err(|e| DatabaseError::Path(e.to_string()))?;
 
     let db_path = app_dir.join("nodus.db");
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
@@ -43,9 +42,9 @@ pub async fn initialize(app: &AppHandle) -> Result<(), DatabaseError> {
     // Run migrations
     run_migrations(&pool).await?;
 
-    DB_POOL.set(pool).map_err(|_| {
-        DatabaseError::Migration("Database already initialized".into())
-    })?;
+    DB_POOL
+        .set(pool)
+        .map_err(|_| DatabaseError::Migration("Database already initialized".into()))?;
 
     Ok(())
 }
@@ -135,7 +134,7 @@ pub mod nodes {
 
     pub async fn get_all(pool: &DbPool) -> Result<Vec<Node>, DatabaseError> {
         let nodes = sqlx::query_as::<_, Node>(
-            "SELECT * FROM nodes WHERE deleted_at IS NULL ORDER BY z_index, created_at"
+            "SELECT * FROM nodes WHERE deleted_at IS NULL ORDER BY z_index, created_at",
         )
         .fetch_all(pool)
         .await?;
@@ -143,22 +142,22 @@ pub mod nodes {
     }
 
     pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Node>, DatabaseError> {
-        let node = sqlx::query_as::<_, Node>(
-            "SELECT * FROM nodes WHERE id = ? AND deleted_at IS NULL"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+        let node =
+            sqlx::query_as::<_, Node>("SELECT * FROM nodes WHERE id = ? AND deleted_at IS NULL")
+                .bind(id)
+                .fetch_optional(pool)
+                .await?;
         Ok(node)
     }
 
-    pub async fn get_by_file_path(pool: &DbPool, file_path: &str) -> Result<Option<Node>, DatabaseError> {
-        let node = sqlx::query_as::<_, Node>(
-            "SELECT * FROM nodes WHERE file_path = ?"
-        )
-        .bind(file_path)
-        .fetch_optional(pool)
-        .await?;
+    pub async fn get_by_file_path(
+        pool: &DbPool,
+        file_path: &str,
+    ) -> Result<Option<Node>, DatabaseError> {
+        let node = sqlx::query_as::<_, Node>("SELECT * FROM nodes WHERE file_path = ?")
+            .bind(file_path)
+            .fetch_optional(pool)
+            .await?;
         Ok(node)
     }
 
@@ -179,7 +178,7 @@ pub mod nodes {
                 color_theme, is_collapsed, tags, workspace_id, checksum,
                 created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#
+            "#,
         )
         .bind(&node.id)
         .bind(&node.title)
@@ -254,11 +253,7 @@ pub mod nodes {
         Ok(())
     }
 
-    pub async fn update_title(
-        pool: &DbPool,
-        id: &str,
-        title: &str,
-    ) -> Result<(), DatabaseError> {
+    pub async fn update_title(pool: &DbPool, id: &str, title: &str) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp();
         sqlx::query("UPDATE nodes SET title = ?, updated_at = ? WHERE id = ?")
             .bind(title)
@@ -294,7 +289,7 @@ pub mod nodes {
     ) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp();
         sqlx::query(
-            "UPDATE nodes SET markdown_content = ?, checksum = ?, updated_at = ? WHERE id = ?"
+            "UPDATE nodes SET markdown_content = ?, checksum = ?, updated_at = ? WHERE id = ?",
         )
         .bind(content)
         .bind(checksum)
@@ -341,8 +336,8 @@ pub mod nodes {
         tags: &[String],
     ) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp();
-        let tags_json = serde_json::to_string(tags)
-            .map_err(|e| DatabaseError::Migration(e.to_string()))?;
+        let tags_json =
+            serde_json::to_string(tags).map_err(|e| DatabaseError::Migration(e.to_string()))?;
         sqlx::query("UPDATE nodes SET tags = ?, updated_at = ? WHERE id = ?")
             .bind(&tags_json)
             .bind(now)
@@ -423,7 +418,11 @@ pub mod edges {
         Ok(())
     }
 
-    pub async fn update_color(pool: &DbPool, id: &str, color: Option<&str>) -> Result<(), DatabaseError> {
+    pub async fn update_color(
+        pool: &DbPool,
+        id: &str,
+        color: Option<&str>,
+    ) -> Result<(), DatabaseError> {
         sqlx::query("UPDATE edges SET color = ? WHERE id = ?")
             .bind(color)
             .bind(id)
@@ -432,7 +431,12 @@ pub mod edges {
         Ok(())
     }
 
-    pub async fn update_storyline_and_color(pool: &DbPool, id: &str, storyline_id: Option<&str>, color: Option<&str>) -> Result<(), DatabaseError> {
+    pub async fn update_storyline_and_color(
+        pool: &DbPool,
+        id: &str,
+        storyline_id: Option<&str>,
+        color: Option<&str>,
+    ) -> Result<(), DatabaseError> {
         sqlx::query("UPDATE edges SET storyline_id = ?, color = ? WHERE id = ?")
             .bind(storyline_id)
             .bind(color)
@@ -452,7 +456,7 @@ pub mod edges {
                 FROM edges
                 GROUP BY source_node_id, target_node_id
             )
-            "#
+            "#,
         )
         .execute(pool)
         .await?;
@@ -476,11 +480,10 @@ pub mod workspaces {
     }
 
     pub async fn get_all(pool: &DbPool) -> Result<Vec<Workspace>, DatabaseError> {
-        let workspaces = sqlx::query_as::<_, Workspace>(
-            "SELECT * FROM workspaces ORDER BY created_at"
-        )
-        .fetch_all(pool)
-        .await?;
+        let workspaces =
+            sqlx::query_as::<_, Workspace>("SELECT * FROM workspaces ORDER BY created_at")
+                .fetch_all(pool)
+                .await?;
         Ok(workspaces)
     }
 
@@ -489,7 +492,7 @@ pub mod workspaces {
             r#"
             INSERT INTO workspaces (id, name, color, vault_path, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
-            "#
+            "#,
         )
         .bind(&workspace.id)
         .bind(&workspace.name)
@@ -535,11 +538,14 @@ pub mod storylines {
         pub sequence_order: i32,
     }
 
-    pub async fn get_by_workspace(pool: &DbPool, workspace_id: Option<&str>) -> Result<Vec<Storyline>, DatabaseError> {
+    pub async fn get_by_workspace(
+        pool: &DbPool,
+        workspace_id: Option<&str>,
+    ) -> Result<Vec<Storyline>, DatabaseError> {
         let storylines = match workspace_id {
             Some(id) => {
                 sqlx::query_as::<_, Storyline>(
-                    "SELECT * FROM storylines WHERE workspace_id = ? ORDER BY created_at"
+                    "SELECT * FROM storylines WHERE workspace_id = ? ORDER BY created_at",
                 )
                 .bind(id)
                 .fetch_all(pool)
@@ -547,7 +553,7 @@ pub mod storylines {
             }
             None => {
                 sqlx::query_as::<_, Storyline>(
-                    "SELECT * FROM storylines WHERE workspace_id IS NULL ORDER BY created_at"
+                    "SELECT * FROM storylines WHERE workspace_id IS NULL ORDER BY created_at",
                 )
                 .fetch_all(pool)
                 .await?
@@ -557,12 +563,10 @@ pub mod storylines {
     }
 
     pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Storyline>, DatabaseError> {
-        let storyline = sqlx::query_as::<_, Storyline>(
-            "SELECT * FROM storylines WHERE id = ?"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+        let storyline = sqlx::query_as::<_, Storyline>("SELECT * FROM storylines WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
         Ok(storyline)
     }
 
@@ -585,7 +589,13 @@ pub mod storylines {
         Ok(())
     }
 
-    pub async fn update(pool: &DbPool, id: &str, title: &str, description: Option<&str>, color: Option<&str>) -> Result<(), DatabaseError> {
+    pub async fn update(
+        pool: &DbPool,
+        id: &str,
+        title: &str,
+        description: Option<&str>,
+        color: Option<&str>,
+    ) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp();
         sqlx::query(
             "UPDATE storylines SET title = ?, description = ?, color = ?, updated_at = ? WHERE id = ?"
@@ -610,10 +620,15 @@ pub mod storylines {
 
     // Storyline nodes management
 
-    pub async fn add_node(pool: &DbPool, storyline_id: &str, node_id: &str, position: Option<i32>) -> Result<StorylineNode, DatabaseError> {
+    pub async fn add_node(
+        pool: &DbPool,
+        storyline_id: &str,
+        node_id: &str,
+        position: Option<i32>,
+    ) -> Result<StorylineNode, DatabaseError> {
         // Get the current max sequence_order
         let max_order: Option<i32> = sqlx::query_scalar(
-            "SELECT MAX(sequence_order) FROM storyline_nodes WHERE storyline_id = ?"
+            "SELECT MAX(sequence_order) FROM storyline_nodes WHERE storyline_id = ?",
         )
         .bind(storyline_id)
         .fetch_one(pool)
@@ -645,7 +660,7 @@ pub mod storylines {
             r#"
             INSERT OR IGNORE INTO storyline_nodes (id, storyline_id, node_id, sequence_order)
             VALUES (?, ?, ?, ?)
-            "#
+            "#,
         )
         .bind(&storyline_node.id)
         .bind(&storyline_node.storyline_id)
@@ -657,7 +672,7 @@ pub mod storylines {
         // If no rows were inserted, the node already exists - fetch and return existing
         if result.rows_affected() == 0 {
             let existing = sqlx::query_as::<_, StorylineNode>(
-                "SELECT * FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?"
+                "SELECT * FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?",
             )
             .bind(storyline_id)
             .bind(node_id)
@@ -669,10 +684,14 @@ pub mod storylines {
         Ok(storyline_node)
     }
 
-    pub async fn remove_node(pool: &DbPool, storyline_id: &str, node_id: &str) -> Result<(), DatabaseError> {
+    pub async fn remove_node(
+        pool: &DbPool,
+        storyline_id: &str,
+        node_id: &str,
+    ) -> Result<(), DatabaseError> {
         // Get the sequence_order of the node being removed
         let order: Option<i32> = sqlx::query_scalar(
-            "SELECT sequence_order FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?"
+            "SELECT sequence_order FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?",
         )
         .bind(storyline_id)
         .bind(node_id)
@@ -700,7 +719,11 @@ pub mod storylines {
         Ok(())
     }
 
-    pub async fn reorder_nodes(pool: &DbPool, storyline_id: &str, node_ids: &[String]) -> Result<(), DatabaseError> {
+    pub async fn reorder_nodes(
+        pool: &DbPool,
+        storyline_id: &str,
+        node_ids: &[String],
+    ) -> Result<(), DatabaseError> {
         // Update sequence_order for each node based on its position in the array
         for (order, node_id) in node_ids.iter().enumerate() {
             sqlx::query(
@@ -716,14 +739,17 @@ pub mod storylines {
     }
 
     /// Get full node data for a storyline, ordered by sequence
-    pub async fn get_nodes_with_data(pool: &DbPool, storyline_id: &str) -> Result<Vec<super::nodes::Node>, DatabaseError> {
+    pub async fn get_nodes_with_data(
+        pool: &DbPool,
+        storyline_id: &str,
+    ) -> Result<Vec<super::nodes::Node>, DatabaseError> {
         let nodes = sqlx::query_as::<_, super::nodes::Node>(
             r#"
             SELECT n.* FROM nodes n
             INNER JOIN storyline_nodes sn ON n.id = sn.node_id
             WHERE sn.storyline_id = ? AND n.deleted_at IS NULL
             ORDER BY sn.sequence_order
-            "#
+            "#,
         )
         .bind(storyline_id)
         .fetch_all(pool)
@@ -751,31 +777,26 @@ pub mod themes {
     }
 
     pub async fn get_all(pool: &DbPool) -> Result<Vec<Theme>, DatabaseError> {
-        let themes = sqlx::query_as::<_, Theme>(
-            "SELECT * FROM themes ORDER BY is_builtin DESC, name"
-        )
-        .fetch_all(pool)
-        .await?;
+        let themes =
+            sqlx::query_as::<_, Theme>("SELECT * FROM themes ORDER BY is_builtin DESC, name")
+                .fetch_all(pool)
+                .await?;
         Ok(themes)
     }
 
     pub async fn get_by_name(pool: &DbPool, name: &str) -> Result<Option<Theme>, DatabaseError> {
-        let theme = sqlx::query_as::<_, Theme>(
-            "SELECT * FROM themes WHERE name = ?"
-        )
-        .bind(name)
-        .fetch_optional(pool)
-        .await?;
+        let theme = sqlx::query_as::<_, Theme>("SELECT * FROM themes WHERE name = ?")
+            .bind(name)
+            .fetch_optional(pool)
+            .await?;
         Ok(theme)
     }
 
     pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Theme>, DatabaseError> {
-        let theme = sqlx::query_as::<_, Theme>(
-            "SELECT * FROM themes WHERE id = ?"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+        let theme = sqlx::query_as::<_, Theme>("SELECT * FROM themes WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
         Ok(theme)
     }
 
@@ -799,7 +820,12 @@ pub mod themes {
         Ok(())
     }
 
-    pub async fn update(pool: &DbPool, id: &str, yaml_content: &str, display_name: &str) -> Result<(), DatabaseError> {
+    pub async fn update(
+        pool: &DbPool,
+        id: &str,
+        yaml_content: &str,
+        display_name: &str,
+    ) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp();
         sqlx::query(
             "UPDATE themes SET yaml_content = ?, display_name = ?, updated_at = ? WHERE id = ? AND is_builtin = 0"
@@ -888,11 +914,9 @@ pub mod frames {
     }
 
     pub async fn get_all(pool: &DbPool) -> Result<Vec<Frame>, DatabaseError> {
-        let frames = sqlx::query_as::<_, Frame>(
-            "SELECT * FROM frames ORDER BY created_at"
-        )
-        .fetch_all(pool)
-        .await?;
+        let frames = sqlx::query_as::<_, Frame>("SELECT * FROM frames ORDER BY created_at")
+            .fetch_all(pool)
+            .await?;
         Ok(frames)
     }
 
@@ -918,7 +942,12 @@ pub mod frames {
         Ok(())
     }
 
-    pub async fn update_position(pool: &DbPool, id: &str, x: f64, y: f64) -> Result<(), DatabaseError> {
+    pub async fn update_position(
+        pool: &DbPool,
+        id: &str,
+        x: f64,
+        y: f64,
+    ) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp_millis();
         sqlx::query("UPDATE frames SET canvas_x = ?, canvas_y = ?, updated_at = ? WHERE id = ?")
             .bind(x)
@@ -930,7 +959,12 @@ pub mod frames {
         Ok(())
     }
 
-    pub async fn update_size(pool: &DbPool, id: &str, width: f64, height: f64) -> Result<(), DatabaseError> {
+    pub async fn update_size(
+        pool: &DbPool,
+        id: &str,
+        width: f64,
+        height: f64,
+    ) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp_millis();
         sqlx::query("UPDATE frames SET width = ?, height = ?, updated_at = ? WHERE id = ?")
             .bind(width)
@@ -953,7 +987,11 @@ pub mod frames {
         Ok(())
     }
 
-    pub async fn update_color(pool: &DbPool, id: &str, color: Option<&str>) -> Result<(), DatabaseError> {
+    pub async fn update_color(
+        pool: &DbPool,
+        id: &str,
+        color: Option<&str>,
+    ) -> Result<(), DatabaseError> {
         let now = chrono::Utc::now().timestamp_millis();
         sqlx::query("UPDATE frames SET color = ?, updated_at = ? WHERE id = ?")
             .bind(color)
@@ -980,7 +1018,7 @@ pub mod frames {
         let frame = match workspace_id {
             Some(ws_id) => {
                 sqlx::query_as::<_, Frame>(
-                    "SELECT * FROM frames WHERE title = ? AND workspace_id = ?"
+                    "SELECT * FROM frames WHERE title = ? AND workspace_id = ?",
                 )
                 .bind(title)
                 .bind(ws_id)
@@ -989,7 +1027,7 @@ pub mod frames {
             }
             None => {
                 sqlx::query_as::<_, Frame>(
-                    "SELECT * FROM frames WHERE title = ? AND workspace_id IS NULL"
+                    "SELECT * FROM frames WHERE title = ? AND workspace_id IS NULL",
                 )
                 .bind(title)
                 .fetch_optional(pool)

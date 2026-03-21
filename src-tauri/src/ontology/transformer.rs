@@ -61,7 +61,8 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
     let mut edges = Vec::new();
     let mut iri_to_node_id: HashMap<String, String> = HashMap::new();
     // Track edge triples to avoid true duplicates: (source_id, target_id, link_type) -> exists
-    let mut seen_edges: std::collections::HashSet<(String, String, String)> = std::collections::HashSet::new();
+    let mut seen_edges: std::collections::HashSet<(String, String, String)> =
+        std::collections::HashSet::new();
     let now = chrono::Utc::now().timestamp();
 
     // Grid layout parameters
@@ -215,7 +216,11 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
         }
 
         // Skip if we've already seen this exact edge
-        let key = (source_id.clone(), target_id.clone(), prop.predicate_local_name.clone());
+        let key = (
+            source_id.clone(),
+            target_id.clone(),
+            prop.predicate_local_name.clone(),
+        );
         if seen_edges.contains(&key) {
             continue;
         }
@@ -252,7 +257,11 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
                 continue;
             }
 
-            let key = (source_id.clone(), target_id.clone(), "subClassOf".to_string());
+            let key = (
+                source_id.clone(),
+                target_id.clone(),
+                "subClassOf".to_string(),
+            );
             if seen_edges.contains(&key) {
                 continue;
             }
@@ -275,10 +284,7 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
         // Create edges from property definitions (domain -> range)
         // This shows which properties connect which classes
         for prop in &data.property_definitions {
-            let prop_name = prop
-                .label
-                .clone()
-                .unwrap_or_else(|| local_name(&prop.iri));
+            let prop_name = prop.label.clone().unwrap_or_else(|| local_name(&prop.iri));
 
             // Create edge for each domain -> range pair
             for domain_iri in &prop.domains {
@@ -628,7 +634,11 @@ mod tests {
 
         let john_node = result.nodes.iter().find(|n| n.title == "John Doe").unwrap();
         assert_eq!(john_node.node_type, "person");
-        assert!(john_node.markdown_content.as_ref().unwrap().contains("| age | 42 |"));
+        assert!(john_node
+            .markdown_content
+            .as_ref()
+            .unwrap()
+            .contains("| age | 42 |"));
 
         let edge = &result.edges[0];
         assert_eq!(edge.link_type, "knows");
@@ -646,29 +656,50 @@ mod tests {
         let data = parse_ontology(path).unwrap();
 
         // Classes only (no individuals) - this is the default now
-        let result_classes_only = transform_to_nodus(&data, &TransformOptions {
-            create_class_nodes: true,
-            create_individual_nodes: false,
-            ..Default::default()
-        });
-        assert_eq!(result_classes_only.nodes.len(), 31, "Should have 31 class nodes only");
+        let result_classes_only = transform_to_nodus(
+            &data,
+            &TransformOptions {
+                create_class_nodes: true,
+                create_individual_nodes: false,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            result_classes_only.nodes.len(),
+            31,
+            "Should have 31 class nodes only"
+        );
         assert_eq!(result_classes_only.class_nodes_created, 31);
 
         // Both classes and individuals
-        let result_both = transform_to_nodus(&data, &TransformOptions {
-            create_class_nodes: true,
-            create_individual_nodes: true,
-            ..Default::default()
-        });
-        assert_eq!(result_both.nodes.len(), 42, "Should have 31 classes + 11 individuals");
+        let result_both = transform_to_nodus(
+            &data,
+            &TransformOptions {
+                create_class_nodes: true,
+                create_individual_nodes: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            result_both.nodes.len(),
+            42,
+            "Should have 31 classes + 11 individuals"
+        );
 
         // Individuals only
-        let result_individuals = transform_to_nodus(&data, &TransformOptions {
-            create_class_nodes: false,
-            create_individual_nodes: true,
-            ..Default::default()
-        });
-        assert_eq!(result_individuals.nodes.len(), 11, "Should have 11 individuals only");
+        let result_individuals = transform_to_nodus(
+            &data,
+            &TransformOptions {
+                create_class_nodes: false,
+                create_individual_nodes: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            result_individuals.nodes.len(),
+            11,
+            "Should have 11 individuals only"
+        );
     }
 
     #[test]
@@ -684,7 +715,10 @@ mod tests {
         let data = parse_ontology(path).unwrap();
 
         println!("\n=== MIAPPE Property Definitions ===");
-        println!("Total property_definitions: {}", data.property_definitions.len());
+        println!(
+            "Total property_definitions: {}",
+            data.property_definitions.len()
+        );
 
         for prop in &data.property_definitions {
             println!("\nProperty: {}", prop.iri);
@@ -696,31 +730,48 @@ mod tests {
         }
 
         // Transform and check edges
-        let result = transform_to_nodus(&data, &TransformOptions {
-            create_class_nodes: true,
-            create_individual_nodes: false,
-            ..Default::default()
-        });
+        let result = transform_to_nodus(
+            &data,
+            &TransformOptions {
+                create_class_nodes: true,
+                create_individual_nodes: false,
+                ..Default::default()
+            },
+        );
 
         println!("\n=== Edges Created ===");
         println!("Total edges: {}", result.edges.len());
 
         // Build node ID to title map
-        let id_to_title: std::collections::HashMap<String, String> = result.nodes
+        let id_to_title: std::collections::HashMap<String, String> = result
+            .nodes
             .iter()
             .map(|n| (n.id.clone(), n.title.clone()))
             .collect();
 
         for edge in &result.edges {
-            let src = id_to_title.get(&edge.source_node_id).cloned().unwrap_or_else(|| edge.source_node_id.clone());
-            let tgt = id_to_title.get(&edge.target_node_id).cloned().unwrap_or_else(|| edge.target_node_id.clone());
-            println!("  {} --[{}]--> {}", src, edge.label.as_deref().unwrap_or("?"), tgt);
+            let src = id_to_title
+                .get(&edge.source_node_id)
+                .cloned()
+                .unwrap_or_else(|| edge.source_node_id.clone());
+            let tgt = id_to_title
+                .get(&edge.target_node_id)
+                .cloned()
+                .unwrap_or_else(|| edge.target_node_id.clone());
+            println!(
+                "  {} --[{}]--> {}",
+                src,
+                edge.label.as_deref().unwrap_or("?"),
+                tgt
+            );
         }
 
         // Check for duplicate node pairs with different edge types
-        let mut edge_pairs: std::collections::HashMap<(String, String), Vec<String>> = std::collections::HashMap::new();
+        let mut edge_pairs: std::collections::HashMap<(String, String), Vec<String>> =
+            std::collections::HashMap::new();
         for edge in &result.edges {
-            edge_pairs.entry((edge.source_node_id.clone(), edge.target_node_id.clone()))
+            edge_pairs
+                .entry((edge.source_node_id.clone(), edge.target_node_id.clone()))
                 .or_default()
                 .push(edge.label.clone().unwrap_or_default());
         }
@@ -756,13 +807,18 @@ mod tests {
                     combined.object_properties.extend(data.object_properties);
                     combined.classes.extend(data.classes);
                     combined.subclass_relations.extend(data.subclass_relations);
-                    combined.property_definitions.extend(data.property_definitions);
+                    combined
+                        .property_definitions
+                        .extend(data.property_definitions);
                 }
             }
         }
 
         println!("\n=== SOSA Property Definitions ===");
-        println!("Total property_definitions: {}", combined.property_definitions.len());
+        println!(
+            "Total property_definitions: {}",
+            combined.property_definitions.len()
+        );
 
         for prop in &combined.property_definitions {
             if !prop.domains.is_empty() && !prop.ranges.is_empty() {
@@ -780,24 +836,39 @@ mod tests {
         combined.classes.retain(|c| seen.insert(c.iri.clone()));
 
         // Transform and check edges
-        let result = transform_to_nodus(&combined, &TransformOptions {
-            create_class_nodes: true,
-            create_individual_nodes: false,
-            ..Default::default()
-        });
+        let result = transform_to_nodus(
+            &combined,
+            &TransformOptions {
+                create_class_nodes: true,
+                create_individual_nodes: false,
+                ..Default::default()
+            },
+        );
 
         println!("\n=== Edges Created ===");
         println!("Total edges: {}", result.edges.len());
 
-        let id_to_title: std::collections::HashMap<String, String> = result.nodes
+        let id_to_title: std::collections::HashMap<String, String> = result
+            .nodes
             .iter()
             .map(|n| (n.id.clone(), n.title.clone()))
             .collect();
 
         for edge in &result.edges {
-            let src = id_to_title.get(&edge.source_node_id).cloned().unwrap_or_else(|| edge.source_node_id.clone());
-            let tgt = id_to_title.get(&edge.target_node_id).cloned().unwrap_or_else(|| edge.target_node_id.clone());
-            println!("  {} --[{}]--> {}", src, edge.label.as_deref().unwrap_or("?"), tgt);
+            let src = id_to_title
+                .get(&edge.source_node_id)
+                .cloned()
+                .unwrap_or_else(|| edge.source_node_id.clone());
+            let tgt = id_to_title
+                .get(&edge.target_node_id)
+                .cloned()
+                .unwrap_or_else(|| edge.target_node_id.clone());
+            println!(
+                "  {} --[{}]--> {}",
+                src,
+                edge.label.as_deref().unwrap_or("?"),
+                tgt
+            );
         }
     }
 }

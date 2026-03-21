@@ -157,11 +157,13 @@ impl TripleCollector {
                     // If it's a class definition, track it (owl:Class or rdfs:Class)
                     if obj_iri == OWL_CLASS || obj_iri == RDFS_CLASS {
                         let mut classes = self.classes.borrow_mut();
-                        classes.entry(subject_iri.clone()).or_insert_with(|| OntologyClass {
-                            iri: subject_iri.clone(),
-                            label: None,
-                            description: None,
-                        });
+                        classes
+                            .entry(subject_iri.clone())
+                            .or_insert_with(|| OntologyClass {
+                                iri: subject_iri.clone(),
+                                label: None,
+                                description: None,
+                            });
                     }
 
                     // If it's an ObjectProperty definition, track it
@@ -218,7 +220,8 @@ impl TripleCollector {
                     data.description = Some(value);
                 } else if !EXCLUDED_PREDICATES.contains(&predicate_iri.as_str()) {
                     // Data property
-                    data.data_properties.push((local_name(&predicate_iri), value));
+                    data.data_properties
+                        .push((local_name(&predicate_iri), value));
                 }
 
                 // Update class if this is a class definition
@@ -347,9 +350,10 @@ fn parse_json_ld(path: &Path) -> Result<OntologyData, String> {
         // Get type(s)
         let types: Vec<String> = match obj.get("@type") {
             Some(serde_json::Value::String(t)) => vec![t.clone()],
-            Some(serde_json::Value::Array(arr)) => {
-                arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
-            }
+            Some(serde_json::Value::Array(arr)) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
             _ => Vec::new(),
         };
 
@@ -507,7 +511,10 @@ ex:jane a ex:Person ;
             .unwrap();
         assert!(john.iri.contains("john"));
         assert_eq!(john.data_properties.len(), 1);
-        assert_eq!(john.data_properties[0], ("age".to_string(), "42".to_string()));
+        assert_eq!(
+            john.data_properties[0],
+            ("age".to_string(), "42".to_string())
+        );
     }
 
     #[test]
@@ -530,7 +537,11 @@ ex:jane a ex:Person ;
 
         let result = parse_ontology(path).unwrap();
         // README says 21 classes
-        assert!(result.classes.len() >= 20, "Expected ~21 classes, got {}", result.classes.len());
+        assert!(
+            result.classes.len() >= 20,
+            "Expected ~21 classes, got {}",
+            result.classes.len()
+        );
     }
 
     #[test]
@@ -555,9 +566,14 @@ ex:jane a ex:Person ;
         }
 
         // Dedupe by IRI
-        let unique: std::collections::HashSet<String> = combined.classes.iter().map(|c| c.iri.clone()).collect();
+        let unique: std::collections::HashSet<String> =
+            combined.classes.iter().map(|c| c.iri.clone()).collect();
         // README says 19 classes but SOSA+SSN together may have more
-        assert!(unique.len() >= 19, "Expected ~19 classes, got {}", unique.len());
+        assert!(
+            unique.len() >= 19,
+            "Expected ~19 classes, got {}",
+            unique.len()
+        );
     }
 
     #[test]
@@ -569,7 +585,11 @@ ex:jane a ex:Person ;
 
         let result = parse_ontology(path).unwrap();
         // README says 120 classes
-        assert!(result.classes.len() >= 100, "Expected ~120 classes, got {}", result.classes.len());
+        assert!(
+            result.classes.len() >= 100,
+            "Expected ~120 classes, got {}",
+            result.classes.len()
+        );
     }
 
     #[test]
@@ -592,9 +612,14 @@ ex:jane a ex:Person ;
             }
         }
 
-        let unique: std::collections::HashSet<String> = combined.classes.iter().map(|c| c.iri.clone()).collect();
+        let unique: std::collections::HashSet<String> =
+            combined.classes.iter().map(|c| c.iri.clone()).collect();
         // README says 291 classes
-        assert!(unique.len() >= 250, "Expected ~291 classes, got {}", unique.len());
+        assert!(
+            unique.len() >= 250,
+            "Expected ~291 classes, got {}",
+            unique.len()
+        );
     }
 
     #[test]
@@ -608,24 +633,49 @@ ex:jane a ex:Person ;
         let result = parse_ontology(path).unwrap();
         // README says 5074 classes
         println!("OBI: {} classes", result.classes.len());
-        assert!(result.classes.len() >= 5000, "Expected ~5074 classes, got {}", result.classes.len());
+        assert!(
+            result.classes.len() >= 5000,
+            "Expected ~5074 classes, got {}",
+            result.classes.len()
+        );
     }
 
     #[test]
     fn test_all_ontologies_summary() {
-        use crate::ontology::{transform_to_nodus, transformer::TransformOptions, types::OntologyData};
+        use crate::ontology::{
+            transform_to_nodus, transformer::TransformOptions, types::OntologyData,
+        };
 
         // Expected class counts from README.md
         let ontologies: &[(&str, &str, usize)] = &[
-            ("PPEO", "/Users/sdrwacker/workspace/ontologies/PPEO/PPEO.owl", 31),
-            ("PROV-O", "/Users/sdrwacker/workspace/ontologies/PROV-O/prov-o.ttl", 21),
-            ("OESO", "/Users/sdrwacker/workspace/ontologies/OESO/oeso.owl", 120),
-            ("SOSA-SSN", "/Users/sdrwacker/workspace/ontologies/SOSA-SSN", 19),
+            (
+                "PPEO",
+                "/Users/sdrwacker/workspace/ontologies/PPEO/PPEO.owl",
+                31,
+            ),
+            (
+                "PROV-O",
+                "/Users/sdrwacker/workspace/ontologies/PROV-O/prov-o.ttl",
+                21,
+            ),
+            (
+                "OESO",
+                "/Users/sdrwacker/workspace/ontologies/OESO/oeso.owl",
+                120,
+            ),
+            (
+                "SOSA-SSN",
+                "/Users/sdrwacker/workspace/ontologies/SOSA-SSN",
+                19,
+            ),
             ("OBOE", "/Users/sdrwacker/workspace/ontologies/OBOE", 291),
         ];
 
         println!("\n=== Ontology Import Validation ===\n");
-        println!("{:<12} {:>8} {:>8} {:>8} {:>8}", "Ontology", "Expected", "Classes", "Nodes", "Edges");
+        println!(
+            "{:<12} {:>8} {:>8} {:>8} {:>8}",
+            "Ontology", "Expected", "Classes", "Nodes", "Edges"
+        );
         println!("{}", "-".repeat(56));
 
         for (name, path_str, expected_min) in ontologies {
@@ -660,18 +710,37 @@ ex:jane a ex:Person ;
                 parse_ontology(path).unwrap()
             };
 
-            let result = transform_to_nodus(&data, &TransformOptions {
-                create_class_nodes: true,
-                workspace_id: Some(format!("{}-workspace", name.to_lowercase())),
-                ..Default::default()
-            });
+            let result = transform_to_nodus(
+                &data,
+                &TransformOptions {
+                    create_class_nodes: true,
+                    workspace_id: Some(format!("{}-workspace", name.to_lowercase())),
+                    ..Default::default()
+                },
+            );
 
-            let status = if data.classes.len() >= *expected_min { "OK" } else { "LOW" };
-            println!("{:<12} {:>8} {:>8} {:>8} {:>8} {}",
-                name, expected_min, data.classes.len(), result.nodes.len(), result.edges.len(), status);
+            let status = if data.classes.len() >= *expected_min {
+                "OK"
+            } else {
+                "LOW"
+            };
+            println!(
+                "{:<12} {:>8} {:>8} {:>8} {:>8} {}",
+                name,
+                expected_min,
+                data.classes.len(),
+                result.nodes.len(),
+                result.edges.len(),
+                status
+            );
 
-            assert!(data.classes.len() >= *expected_min,
-                "{}: Expected {} classes, got {}", name, expected_min, data.classes.len());
+            assert!(
+                data.classes.len() >= *expected_min,
+                "{}: Expected {} classes, got {}",
+                name,
+                expected_min,
+                data.classes.len()
+            );
         }
 
         println!("\n{}", "=".repeat(56));

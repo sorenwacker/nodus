@@ -2,16 +2,16 @@
 //!
 //! Renders Typst math expressions to SVG strings
 
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
+use typst::diag::FileResult;
 use typst::foundations::{Bytes, Datetime};
+use typst::syntax::{FileId, Source};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::Library;
 use typst::World;
-use typst::syntax::{FileId, Source};
-use typst::diag::FileResult;
 
 /// Cache for rendered SVGs
 static SVG_CACHE: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
@@ -32,9 +32,7 @@ static FONTS: Lazy<(LazyHash<FontBook>, Vec<Font>)> = Lazy::new(|| {
     (LazyHash::new(book), fonts)
 });
 
-static LIBRARY: Lazy<LazyHash<Library>> = Lazy::new(|| {
-    LazyHash::new(Library::default())
-});
+static LIBRARY: Lazy<LazyHash<Library>> = Lazy::new(|| LazyHash::new(Library::default()));
 
 /// Simple world implementation for Typst
 struct MathWorld {
@@ -66,7 +64,9 @@ impl World for MathWorld {
         if id == self.source.id() {
             Ok(self.source.clone())
         } else {
-            Err(typst::diag::FileError::NotFound(id.vpath().as_rootless_path().into()))
+            Err(typst::diag::FileError::NotFound(
+                id.vpath().as_rootless_path().into(),
+            ))
         }
     }
 
@@ -98,26 +98,31 @@ pub fn render_math_to_svg(math: &str, display_mode: bool) -> Result<String, Stri
     // Use generous margins to prevent clipping of tall elements (fractions, sums, etc.)
     // Use fill: none for transparent background
     let typst_code = if display_mode {
-        format!(r#"#set page(width: auto, height: auto, margin: (x: 0.3em, y: 0.5em), fill: none)
+        format!(
+            r#"#set page(width: auto, height: auto, margin: (x: 0.3em, y: 0.5em), fill: none)
 #set text(size: 14pt)
-$ {} $"#, math)
+$ {} $"#,
+            math
+        )
     } else {
-        format!(r#"#set page(width: auto, height: auto, margin: (x: 0.2em, y: 0.3em), fill: none)
+        format!(
+            r#"#set page(width: auto, height: auto, margin: (x: 0.2em, y: 0.3em), fill: none)
 #set text(size: 14pt)
-${}$"#, math)
+${}$"#,
+            math
+        )
     };
 
     let world = MathWorld::new(&typst_code);
 
     // Compile
-    let document = typst::compile(&world)
-        .output
-        .map_err(|errors| {
-            errors.iter()
-                .map(|e| e.message.to_string())
-                .collect::<Vec<_>>()
-                .join("; ")
-        })?;
+    let document = typst::compile(&world).output.map_err(|errors| {
+        errors
+            .iter()
+            .map(|e| e.message.to_string())
+            .collect::<Vec<_>>()
+            .join("; ")
+    })?;
 
     // Render first page to SVG
     let svg = if let Some(page) = document.pages.first() {

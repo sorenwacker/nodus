@@ -154,10 +154,22 @@ mod tests {
 
     #[test]
     fn test_format_detection() {
-        assert_eq!(OntologyFormat::from_extension("ttl"), Some(OntologyFormat::Turtle));
-        assert_eq!(OntologyFormat::from_extension("rdf"), Some(OntologyFormat::RdfXml));
-        assert_eq!(OntologyFormat::from_extension("owl"), Some(OntologyFormat::RdfXml));
-        assert_eq!(OntologyFormat::from_extension("jsonld"), Some(OntologyFormat::JsonLd));
+        assert_eq!(
+            OntologyFormat::from_extension("ttl"),
+            Some(OntologyFormat::Turtle)
+        );
+        assert_eq!(
+            OntologyFormat::from_extension("rdf"),
+            Some(OntologyFormat::RdfXml)
+        );
+        assert_eq!(
+            OntologyFormat::from_extension("owl"),
+            Some(OntologyFormat::RdfXml)
+        );
+        assert_eq!(
+            OntologyFormat::from_extension("jsonld"),
+            Some(OntologyFormat::JsonLd)
+        );
         assert_eq!(OntologyFormat::from_extension("txt"), None);
     }
 }

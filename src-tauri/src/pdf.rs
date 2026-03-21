@@ -254,8 +254,14 @@ mod tests {
     #[test]
     fn test_strip_xml_tags() {
         assert_eq!(strip_xml_tags("<p>Hello</p>"), "Hello");
-        assert_eq!(strip_xml_tags("<span style=\"color:red\">Text</span>"), "Text");
+        assert_eq!(
+            strip_xml_tags("<span style=\"color:red\">Text</span>"),
+            "Text"
+        );
         assert_eq!(strip_xml_tags("No tags here"), "No tags here");
-        assert_eq!(strip_xml_tags("<p><b>Bold</b> and <i>italic</i></p>"), "Bold and italic");
+        assert_eq!(
+            strip_xml_tags("<p><b>Bold</b> and <i>italic</i></p>"),
+            "Bold and italic"
+        );
     }
 }
