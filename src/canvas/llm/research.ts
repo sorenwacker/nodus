@@ -68,17 +68,9 @@ const DEPTH_CONFIG = {
 /**
  * Get the Tavily API key from storage
  */
-async function getApiKey(): Promise<string | null> {
-  try {
-    const settings = localStorage.getItem('nodus-settings')
-    if (settings) {
-      const parsed = JSON.parse(settings)
-      return parsed.searchApiKey || null
-    }
-  } catch {
-    // Ignore
-  }
-  return null
+function getApiKey(): string | null {
+  // Key is stored directly, not in a JSON object
+  return localStorage.getItem('nodus_search_api_key') || null
 }
 
 /**

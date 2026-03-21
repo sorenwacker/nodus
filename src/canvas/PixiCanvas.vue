@@ -1468,9 +1468,8 @@ Output ONLY the JSON array:`
       const query = args.query || ''
       agentLog.value.push(`> Web search: "${query}"`)
       try {
-        // Get API key from settings
-        const settings = localStorage.getItem('nodus-settings')
-        const apiKey = settings ? JSON.parse(settings).searchApiKey : null
+        // Get API key from storage (stored as plain string, not JSON)
+        const apiKey = localStorage.getItem('nodus_search_api_key')
 
         if (!apiKey) {
           agentLog.value.push('> Web search: No API key')
