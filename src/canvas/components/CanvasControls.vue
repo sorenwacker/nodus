@@ -15,8 +15,6 @@ defineProps<{
   isLargeGraph: boolean
   /** Current global edge style */
   globalEdgeStyle: 'straight' | 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic'
-  /** Whether edge bundling is enabled */
-  edgeBundling: boolean
   /** Whether magnifier is enabled */
   magnifierEnabled: boolean
   /** Whether neighborhood mode is active */
@@ -35,7 +33,6 @@ const emit = defineEmits<{
   (e: 'layout', type: 'grid' | 'force' | 'hierarchical'): void
   (e: 'fitNodesToContent'): void
   (e: 'cycleEdgeStyle'): void
-  (e: 'toggleEdgeBundling'): void
   (e: 'toggleMagnifier'): void
   (e: 'toggleNeighborhoodMode'): void
   (e: 'setNeighborhoodDepth', depth: number): void
@@ -45,24 +42,25 @@ const emit = defineEmits<{
 
 <template>
   <div class="zoom-controls" @mousedown.stop>
-    <button :data-tooltip="t('canvas.controls.zoomIn')" @click="emit('zoomIn')">
+    <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.zoomIn')" @click="emit('zoomIn')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19" />
         <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
     </button>
     <span>{{ Math.round(scale * 100) }}%</span>
-    <button :data-tooltip="t('canvas.controls.zoomOut')" @click="emit('zoomOut')">
+    <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.zoomOut')" @click="emit('zoomOut')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
     </button>
-    <button :data-tooltip="t('canvas.controls.fitToContent')" @click="emit('fitToContent')">
+    <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.fitToContent')" @click="emit('fitToContent')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
       </svg>
     </button>
     <button
+      data-tooltip-pos="top"
       :class="{ active: gridLockEnabled }"
       :data-tooltip="t('canvas.controls.snapToGrid')"
       @click="emit('toggleGridLock')"
@@ -74,7 +72,7 @@ const emit = defineEmits<{
         <rect x="3" y="14" width="7" height="7" />
       </svg>
     </button>
-    <button :data-tooltip="t('canvas.controls.gridLayout')" @click="emit('layout', 'grid')">
+    <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.gridLayout')" @click="emit('layout', 'grid')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="5" height="5" />
         <rect x="10" y="3" width="5" height="5" />
@@ -84,7 +82,7 @@ const emit = defineEmits<{
         <rect x="17" y="10" width="5" height="5" />
       </svg>
     </button>
-    <button :data-tooltip="t('canvas.controls.forceLayout')" @click="emit('layout', 'force')">
+    <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.forceLayout')" @click="emit('layout', 'force')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="6" cy="6" r="3" />
         <circle cx="18" cy="6" r="3" />
@@ -95,6 +93,7 @@ const emit = defineEmits<{
       </svg>
     </button>
     <button
+      data-tooltip-pos="top"
       :data-tooltip="t('canvas.controls.hierarchicalLayout')"
       @click="emit('layout', 'hierarchical')"
     >
@@ -114,14 +113,14 @@ const emit = defineEmits<{
         <line x1="18" y1="14" x2="20" y2="18" />
       </svg>
     </button>
-    <button :data-tooltip="t('canvas.controls.fitNodesToContent')" @click="emit('fitNodesToContent')">
+    <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.fitNodesToContent')" @click="emit('fitNodesToContent')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <path d="M9 3v18" />
         <path d="M3 9h18" />
       </svg>
     </button>
-    <button :disabled="isLargeGraph" :data-tooltip="`${t('canvas.controls.edgeStyle')}: ${t('settings.edgeStyles.' + globalEdgeStyle)}`" @click="emit('cycleEdgeStyle')">
+    <button data-tooltip-pos="top" :disabled="isLargeGraph" :data-tooltip="`${t('canvas.controls.edgeStyle')}: ${t('settings.edgeStyles.' + globalEdgeStyle)}`" @click="emit('cycleEdgeStyle')">
       <svg
         v-if="globalEdgeStyle === 'orthogonal'"
         width="14"
@@ -171,17 +170,7 @@ const emit = defineEmits<{
       </svg>
     </button>
     <button
-      :class="{ active: edgeBundling }"
-      :data-tooltip="t('canvas.controls.edgeBundling')"
-      @click="emit('toggleEdgeBundling')"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 4 L12 12 L4 20" />
-        <path d="M8 4 L12 12 L8 20" />
-        <line x1="12" y1="12" x2="20" y2="12" stroke-width="3" />
-      </svg>
-    </button>
-    <button
+      data-tooltip-pos="top-left"
       :class="{ active: magnifierEnabled }"
       :data-tooltip="t('canvas.controls.magnifier')"
       @click="emit('toggleMagnifier')"
@@ -192,6 +181,7 @@ const emit = defineEmits<{
       </svg>
     </button>
     <button
+      data-tooltip-pos="top-left"
       :class="{ active: neighborhoodMode }"
       :data-tooltip="t('canvas.controls.neighborhoodView')"
       @mousedown.stop.prevent="emit('toggleNeighborhoodMode')"
@@ -210,6 +200,7 @@ const emit = defineEmits<{
     </button>
     <select
       v-if="neighborhoodMode"
+      data-tooltip-pos="top-left"
       class="depth-select"
       :value="neighborhoodDepth"
       :data-tooltip="t('canvas.controls.neighborhoodDepth')"
@@ -222,6 +213,7 @@ const emit = defineEmits<{
       <option value="5">5 {{ t('canvas.controls.hops') }}</option>
     </select>
     <button
+      data-tooltip-pos="top-left"
       :data-tooltip="pendingFramePlacement ? t('canvas.frame.clickToPlace') : t('canvas.frame.addFrame')"
       :class="{ active: pendingFramePlacement }"
       @click="emit('createFrame')"
@@ -264,26 +256,6 @@ const emit = defineEmits<{
   justify-content: center;
   padding: 0;
   position: relative;
-}
-
-.zoom-controls button[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border-radius: 4px;
-  border: 1px solid var(--border-default);
-  box-shadow: 0 2px 8px var(--shadow-md);
-  z-index: 100;
-  pointer-events: none;
 }
 
 .zoom-controls button svg {

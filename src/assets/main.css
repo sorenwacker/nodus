@@ -221,3 +221,12 @@ html, body, #app {
   right: calc(100% + 8px);
   transform: translateY(-50%);
 }
+
+/* Tooltip above, right-aligned (for bottom-right elements) */
+[data-tooltip-pos="top-left"]:hover::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: auto;
+  right: 0;
+  transform: none;
+}

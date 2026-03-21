@@ -8,7 +8,6 @@ import { openExternal } from '../lib/tauri'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import {
   routeAllEdges,
-  routeEdgesWithBundling,
   optimizeNodeEntrypoints,
   assignPorts,
   calculatePortOffset,
@@ -1703,10 +1702,6 @@ const edgeLines = computed(() => {
         path,
         style: 'straight' as const,
         strokeWidth: 1,
-        bundleSize: 1,
-        trunkPath: undefined,
-        trunkStrokeWidth: 3,
-        isTrunkOwner: false,
         hitX1: x1, hitY1: y1, hitX2: x2, hitY2: y2,
         link_type: edge.link_type,
         label: edge.label,
@@ -1800,7 +1795,7 @@ const edgeLines = computed(() => {
   // Use batch routing for all edge styles
   // The routing modules handle grid tracking, obstacle avoidance, and path generation
   const effectiveStyle: EdgeStyle = style
-  let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; bundleSize?: number; path?: Array<{x: number; y: number}>; debugInfo?: { srcOffset: number; tgtOffset: number; srcSide: string; tgtSide: string } }> | null = null
+  let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; path?: Array<{x: number; y: number}>; debugInfo?: { srcOffset: number; tgtOffset: number; srcSide: string; tgtSide: string } }> | null = null
 
   // Build spatial index for fast obstacle detection (O(log n) instead of O(n))
   const spatialIndex = new SpatialIndex()
@@ -1808,11 +1803,7 @@ const edgeLines = computed(() => {
   setRoutingSpatialIndex(spatialIndex)
 
   try {
-    if (edgeBundling.value) {
-      routedEdges = routeEdgesWithBundling(edgeDefs, nodeRects, nodeMap, effectiveStyle)
-    } else {
-      routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
-    }
+    routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
   } finally {
     // Clear spatial index after routing
     setRoutingSpatialIndex(null)
@@ -1936,12 +1927,8 @@ const edgeLines = computed(() => {
       path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
     }
 
-    // Get stroke width and trunk info (from bundling or default)
-    const bundleStrokeWidth = routed?.strokeWidth || 1.5
-    const bundleSize = routed?.bundleSize || 1
-    const trunkPath = routed?.trunkPath
-    const trunkStrokeWidth = routed?.trunkStrokeWidth || 3
-    const isTrunkOwner = routed?.isTrunkOwner || false
+    // Get stroke width from routing or default
+    const strokeWidth = routed?.strokeWidth || 1.5
 
     return {
       id: edge.id,
@@ -1953,11 +1940,7 @@ const edgeLines = computed(() => {
       y2,
       path,
       style: edgeStyle,
-      strokeWidth: bundleStrokeWidth,
-      bundleSize,
-      trunkPath,
-      trunkStrokeWidth,
-      isTrunkOwner,
+      strokeWidth,
       // Full extent for hit area (includes arrow)
       hitX1: startPort.x,
       hitY1: startPort.y,
@@ -2838,13 +2821,6 @@ const edgeStyles: { value: EdgeStyleType; label: string }[] = [
 const edgeStyleMap = ref<Record<string, string>>({})
 const globalEdgeStyle = ref<EdgeStyleType>(canvasStorage.getEdgeStyle())
 
-// Edge bundling - merge edges with shared endpoints
-const edgeBundling = ref(false)
-
-function toggleEdgeBundling() {
-  edgeBundling.value = !edgeBundling.value
-}
-
 function toggleMagnifier() {
   magnifierEnabled.value = !magnifierEnabled.value
   uiStorage.setMagnifierEnabled(magnifierEnabled.value)
@@ -3323,17 +3299,6 @@ ${edges.map(e => `  - id: "${e.id}"
               class="edge-hit-area"
               @click="onEdgeClick($event, edge.id)"
             />
-            <!-- Trunk path (thick, shared segment) - only rendered by trunk owner -->
-            <path
-              v-if="edgeBundling && edge.isTrunkOwner && edge.trunkPath"
-              :d="edge.trunkPath"
-              :stroke="edge.color"
-              :stroke-width="edge.trunkStrokeWidth * edgeStrokeWidth"
-              stroke-linecap="round"
-              fill="none"
-              class="edge-trunk"
-              pointer-events="none"
-            />
             <!-- Glow effect for selected edge -->
             <path
               v-if="edge.isSelected"
@@ -3681,7 +3646,6 @@ ${edges.map(e => `  - id: "${e.id}"
       :grid-lock-enabled="gridLockEnabled"
       :is-large-graph="isLargeGraph"
       :global-edge-style="globalEdgeStyle"
-      :edge-bundling="edgeBundling"
       :magnifier-enabled="magnifierEnabled"
       :neighborhood-mode="neighborhoodMode"
       :neighborhood-depth="neighborhoodDepth"
@@ -3693,7 +3657,6 @@ ${edges.map(e => `  - id: "${e.id}"
       @layout="autoLayoutNodes"
       @fit-nodes-to-content="fitAllNodesToContent"
       @cycle-edge-style="cycleEdgeStyle"
-      @toggle-edge-bundling="toggleEdgeBundling"
       @toggle-magnifier="toggleMagnifier"
       @toggle-neighborhood-mode="toggleNeighborhoodMode()"
       @set-neighborhood-depth="setDepth"

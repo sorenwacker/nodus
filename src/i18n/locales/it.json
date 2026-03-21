@@ -54,7 +54,6 @@
       "hierarchicalLayout": "Layout gerarchico - Disponi come albero (per DAG/ontologie)",
       "fitNodesToContent": "Adatta nodi al contenuto - Ridimensiona tutti i nodi",
       "edgeStyle": "Stile archi",
-      "edgeBundling": "Raggruppamento archi - Unisci archi con endpoint comuni",
       "magnifier": "Lente - Mostra vista ingrandita quando rimpicciolito",
       "neighborhoodView": "Vista vicinato - Mostra solo nodo selezionato e vicini (N)",
       "neighborhoodDepth": "Profondità vicinato (salti)",

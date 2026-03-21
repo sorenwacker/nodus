@@ -54,7 +54,6 @@
       "hierarchicalLayout": "Disposición jerárquica - Ordenar como árbol (para DAGs/ontologías)",
       "fitNodesToContent": "Ajustar nodos al contenido - Redimensionar todos los nodos",
       "edgeStyle": "Estilo de aristas",
-      "edgeBundling": "Agrupación de aristas - Fusionar aristas con puntos finales comunes",
       "magnifier": "Lupa - Mostrar vista ampliada al alejar",
       "neighborhoodView": "Vista de vecindario - Mostrar solo el nodo seleccionado y vecinos (N)",
       "neighborhoodDepth": "Profundidad del vecindario (saltos)",

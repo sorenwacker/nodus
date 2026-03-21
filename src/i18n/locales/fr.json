@@ -54,7 +54,6 @@
       "hierarchicalLayout": "Disposition hiérarchique - Arranger en arbre (pour DAGs/ontologies)",
       "fitNodesToContent": "Ajuster les nœuds au contenu - Redimensionner tous les nœuds",
       "edgeStyle": "Style des arêtes",
-      "edgeBundling": "Regroupement d'arêtes - Fusionner les arêtes avec endpoints communs",
       "magnifier": "Loupe - Afficher une vue agrandie en zoom arrière",
       "neighborhoodView": "Vue de voisinage - Afficher uniquement le nœud sélectionné et ses voisins (N)",
       "neighborhoodDepth": "Profondeur de voisinage (sauts)",

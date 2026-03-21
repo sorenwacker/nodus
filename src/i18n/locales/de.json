@@ -54,7 +54,6 @@
       "hierarchicalLayout": "Hierarchisches Layout - Als Baum anordnen (für DAGs/Ontologien)",
       "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
       "edgeStyle": "Kantenform",
-      "edgeBundling": "Kantenbündelung - Kanten mit gemeinsamen Endpunkten zusammenfassen",
       "magnifier": "Lupe - Vergrößerte Ansicht bei Verkleinerung anzeigen",
       "neighborhoodView": "Nachbarschaftsansicht - Nur ausgewählten Knoten und Nachbarn anzeigen (N)",
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
