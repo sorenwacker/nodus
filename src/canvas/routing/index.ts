@@ -31,12 +31,13 @@ export { routeDiagonal, validateDiagonalPath, type DiagonalRouteParams, type Dia
 export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, type OrthogonalRouteResult } from './orthogonalRouter'
 
 // Internal imports
-import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle } from './types'
+import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
 import { getPortPoint, getStandoff } from './geometry'
 import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING } from './portAssignment'
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
+import { findObstacles, getObstacleBounds, OBSTACLE_MARGIN, segmentIntersectsNode } from './obstacleAvoider'
 
 // Minimum orthogonal standoff distance from node edge
 // Larger standoff = more room for edge routing lanes
@@ -44,6 +45,119 @@ const STANDOFF = 80
 
 // Lane width for edge separation (like PCB trace spacing)
 const LANE_WIDTH = 12
+
+/**
+ * Find obstacles along a straight line
+ */
+function findObstaclesOnLine(
+  start: Point,
+  end: Point,
+  nodes: NodeRect[],
+  excludeIds: Set<string>
+): NodeRect[] {
+  return findObstacles(start.x, start.y, end.x, end.y, nodes, excludeIds)
+}
+
+/**
+ * Find obstacles along a cubic bezier curve by sampling points
+ */
+function findObstaclesOnCurve(
+  p0: Point,
+  p1: Point,
+  p2: Point,
+  p3: Point,
+  nodes: NodeRect[],
+  excludeIds: Set<string>
+): NodeRect[] {
+  const obstacles = new Set<NodeRect>()
+  const samples = 10
+
+  // Sample points along the bezier curve
+  for (let i = 0; i < samples; i++) {
+    const t1 = i / samples
+    const t2 = (i + 1) / samples
+
+    const pt1 = bezierPoint(p0, p1, p2, p3, t1)
+    const pt2 = bezierPoint(p0, p1, p2, p3, t2)
+
+    const segmentObstacles = findObstacles(pt1.x, pt1.y, pt2.x, pt2.y, nodes, excludeIds)
+    for (const obs of segmentObstacles) {
+      obstacles.add(obs)
+    }
+  }
+
+  return Array.from(obstacles)
+}
+
+/**
+ * Calculate point on cubic bezier curve at parameter t
+ */
+function bezierPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
+  const mt = 1 - t
+  const mt2 = mt * mt
+  const mt3 = mt2 * mt
+  const t2 = t * t
+  const t3 = t2 * t
+
+  return {
+    x: mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x,
+    y: mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y,
+  }
+}
+
+/**
+ * Route around obstacles with a simple orthogonal detour for straight edges
+ */
+function routeAroundObstaclesSimple(
+  start: Point,
+  end: Point,
+  obstacles: NodeRect[],
+  sourceSide: Side,
+  targetSide: Side
+): Point[] {
+  const bounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + 20)
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+
+  // Determine primary direction
+  const isHorizontal = Math.abs(dx) > Math.abs(dy)
+
+  if (isHorizontal) {
+    // Edge is primarily horizontal - route vertically around obstacle
+    const goAbove = start.y < bounds.minY || (start.y < (bounds.minY + bounds.maxY) / 2)
+    const midY = goAbove ? bounds.minY : bounds.maxY
+
+    return [
+      start,
+      { x: start.x, y: midY },
+      { x: end.x, y: midY },
+      end,
+    ]
+  } else {
+    // Edge is primarily vertical - route horizontally around obstacle
+    const goLeft = start.x < bounds.minX || (start.x < (bounds.minX + bounds.maxX) / 2)
+    const midX = goLeft ? bounds.minX : bounds.maxX
+
+    return [
+      start,
+      { x: midX, y: start.y },
+      { x: midX, y: end.y },
+      end,
+    ]
+  }
+}
+
+/**
+ * Convert path points to SVG path string
+ */
+function pathToSvgString(path: Point[]): string {
+  if (path.length === 0) return ''
+  let svg = `M ${path[0].x} ${path[0].y}`
+  for (let i = 1; i < path.length; i++) {
+    svg += ` L ${path[i].x} ${path[i].y}`
+  }
+  return svg
+}
 
 /**
  * Route all edges with proper port spreading, grid tracking, and obstacle avoidance
@@ -142,10 +256,20 @@ export function routeAllEdges(
     let routeResult: { path: Point[]; svgPath: string }
 
     if (style === 'straight') {
-      // Direct line from port to port
-      const path = [sourcePort, targetPort]
-      const svgPath = `M ${sourcePort.x} ${sourcePort.y} L ${targetPort.x} ${targetPort.y}`
-      routeResult = { path, svgPath }
+      // Direct line from port to port with obstacle avoidance
+      const obstacles = findObstaclesOnLine(sourcePort, targetPort, nodes, excludeIds)
+
+      if (obstacles.length === 0) {
+        // No obstacles - use direct line
+        const path = [sourcePort, targetPort]
+        const svgPath = `M ${sourcePort.x} ${sourcePort.y} L ${targetPort.x} ${targetPort.y}`
+        routeResult = { path, svgPath }
+      } else {
+        // Route around obstacles with simple detour
+        const detourPath = routeAroundObstaclesSimple(sourcePort, targetPort, obstacles, sourceSide, targetSide)
+        const svgPath = pathToSvgString(detourPath)
+        routeResult = { path: detourPath, svgPath }
+      }
     } else if (style === 'curved') {
       // Bezier curve with control points based on distance
       const dx = targetPort.x - sourcePort.x
@@ -167,8 +291,117 @@ export function routeAllEdges(
       else if (targetSide === 'bottom') cp2y += curvature
       else if (targetSide === 'top') cp2y -= curvature
 
+      // Check for obstacles along the curve path (sample points along bezier)
+      const curveObstacles = findObstaclesOnCurve(
+        sourcePort, { x: cp1x, y: cp1y }, { x: cp2x, y: cp2y }, targetPort,
+        nodes, excludeIds
+      )
+
+      if (curveObstacles.length > 0) {
+        // Obstacles found - increase curvature to route around them
+        const bounds = getObstacleBounds(curveObstacles, OBSTACLE_MARGIN + 30)
+        const midX = (sourcePort.x + targetPort.x) / 2
+        const midY = (sourcePort.y + targetPort.y) / 2
+
+        // Determine which direction to curve away from obstacles
+        const obsCenterX = (bounds.minX + bounds.maxX) / 2
+        const obsCenterY = (bounds.minY + bounds.maxY) / 2
+
+        // Curve perpendicular to the edge direction, away from obstacles
+        const perpX = -(targetPort.y - sourcePort.y)
+        const perpY = targetPort.x - sourcePort.x
+        const perpLen = Math.sqrt(perpX * perpX + perpY * perpY) || 1
+
+        // Determine which side of the edge the obstacle is on
+        const obsSide = perpX * (obsCenterX - midX) + perpY * (obsCenterY - midY)
+        const detourSign = obsSide > 0 ? -1 : 1
+
+        // Calculate detour distance
+        const detourDist = Math.max(curvature * 1.5, 80)
+
+        // Adjust control points to curve away from obstacles
+        cp1x = sourcePort.x + (perpX / perpLen) * detourDist * detourSign
+        cp1y = sourcePort.y + (perpY / perpLen) * detourDist * detourSign
+        if (sourceSide === 'right') cp1x = Math.max(cp1x, sourcePort.x + curvature)
+        else if (sourceSide === 'left') cp1x = Math.min(cp1x, sourcePort.x - curvature)
+        else if (sourceSide === 'bottom') cp1y = Math.max(cp1y, sourcePort.y + curvature)
+        else if (sourceSide === 'top') cp1y = Math.min(cp1y, sourcePort.y - curvature)
+
+        cp2x = targetPort.x + (perpX / perpLen) * detourDist * detourSign
+        cp2y = targetPort.y + (perpY / perpLen) * detourDist * detourSign
+        if (targetSide === 'right') cp2x = Math.max(cp2x, targetPort.x + curvature)
+        else if (targetSide === 'left') cp2x = Math.min(cp2x, targetPort.x - curvature)
+        else if (targetSide === 'bottom') cp2y = Math.max(cp2y, targetPort.y + curvature)
+        else if (targetSide === 'top') cp2y = Math.min(cp2y, targetPort.y - curvature)
+      }
+
       const path = [sourcePort, { x: cp1x, y: cp1y }, { x: cp2x, y: cp2y }, targetPort]
       const svgPath = `M ${sourcePort.x} ${sourcePort.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetPort.x} ${targetPort.y}`
+      routeResult = { path, svgPath }
+    } else if (style === 'hyperbolic') {
+      // Hyperbolic: smooth S-curve with orthogonal exits using standoffs
+      // Calculate orthogonal exit direction (from port to standoff)
+      const startDirX = sourceStandoff.x - sourcePort.x
+      const startDirY = sourceStandoff.y - sourcePort.y
+      const startDirLen = Math.sqrt(startDirX * startDirX + startDirY * startDirY) || 1
+
+      const endDirX = targetStandoff.x - targetPort.x
+      const endDirY = targetStandoff.y - targetPort.y
+      const endDirLen = Math.sqrt(endDirX * endDirX + endDirY * endDirY) || 1
+
+      // Distance between standoffs determines control point extension
+      const dist = Math.sqrt(
+        (targetStandoff.x - sourceStandoff.x) ** 2 +
+        (targetStandoff.y - sourceStandoff.y) ** 2
+      )
+      let extension = Math.min(dist * 0.7, 180)
+
+      // Control points extend orthogonally from each standoff
+      let cp1x = sourceStandoff.x + (startDirX / startDirLen) * extension
+      let cp1y = sourceStandoff.y + (startDirY / startDirLen) * extension
+      let cp2x = targetStandoff.x + (endDirX / endDirLen) * extension
+      let cp2y = targetStandoff.y + (endDirY / endDirLen) * extension
+
+      // Check for obstacles along the curve path
+      const curveObstacles = findObstaclesOnCurve(
+        sourceStandoff, { x: cp1x, y: cp1y }, { x: cp2x, y: cp2y }, targetStandoff,
+        nodes, excludeIds
+      )
+
+      if (curveObstacles.length > 0) {
+        // Obstacles found - increase extension to route around them
+        const bounds = getObstacleBounds(curveObstacles, OBSTACLE_MARGIN + 30)
+        const midX = (sourceStandoff.x + targetStandoff.x) / 2
+        const midY = (sourceStandoff.y + targetStandoff.y) / 2
+
+        // Determine which direction to curve away from obstacles
+        const obsCenterX = (bounds.minX + bounds.maxX) / 2
+        const obsCenterY = (bounds.minY + bounds.maxY) / 2
+
+        // Curve perpendicular to the edge direction, away from obstacles
+        const perpX = -(targetStandoff.y - sourceStandoff.y)
+        const perpY = targetStandoff.x - sourceStandoff.x
+        const perpLen = Math.sqrt(perpX * perpX + perpY * perpY) || 1
+
+        // Determine which side of the edge the obstacle is on
+        const obsSide = perpX * (obsCenterX - midX) + perpY * (obsCenterY - midY)
+        const detourSign = obsSide > 0 ? -1 : 1
+
+        // Increase extension to route around
+        extension = Math.max(extension * 1.5, 120)
+
+        // Adjust control points to curve away from obstacles
+        const offsetX = (perpX / perpLen) * 60 * detourSign
+        const offsetY = (perpY / perpLen) * 60 * detourSign
+
+        cp1x = sourceStandoff.x + (startDirX / startDirLen) * extension + offsetX
+        cp1y = sourceStandoff.y + (startDirY / startDirLen) * extension + offsetY
+        cp2x = targetStandoff.x + (endDirX / endDirLen) * extension + offsetX
+        cp2y = targetStandoff.y + (endDirY / endDirLen) * extension + offsetY
+      }
+
+      const path = [sourcePort, sourceStandoff, { x: cp1x, y: cp1y }, { x: cp2x, y: cp2y }, targetStandoff, targetPort]
+      const svgPath = `M ${sourcePort.x} ${sourcePort.y} L ${sourceStandoff.x} ${sourceStandoff.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetStandoff.x} ${targetStandoff.y} L ${targetPort.x} ${targetPort.y}`
       routeResult = { path, svgPath }
     } else if (style === 'diagonal') {
       routeResult = routeDiagonal({

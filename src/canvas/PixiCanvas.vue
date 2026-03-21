@@ -1926,61 +1926,6 @@ const edgeLines = computed(() => {
     // For huge graphs (400+ nodes), use simple straight lines for performance
     if (isHugeGraph.value) {
       path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
-    } else if (edgeStyle === 'curved') {
-      // Curved: port -> standoff -> bezier curve -> standoff -> port
-      // Use grid tracker to offset control point and prevent overlapping curves
-      const midX = (startStandoff.x + endStandoff.x) / 2
-      const midY = (startStandoff.y + endStandoff.y) / 2
-      const dist = Math.sqrt((endStandoff.x - startStandoff.x) ** 2 + (endStandoff.y - startStandoff.y) ** 2)
-      const baseCurveAmt = Math.min(dist * 0.3, 50)
-
-      // Find a free channel for the curve's peak (perpendicular to the edge direction)
-      const angle = Math.atan2(endStandoff.y - startStandoff.y, endStandoff.x - startStandoff.x) + Math.PI / 2
-      const isMoreHorizontal = Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))
-
-      // Track channel based on curve direction using GridTracker
-      let curveOffset = 0
-      if (isMoreHorizontal) {
-        const idealX = midX + Math.cos(angle) * baseCurveAmt
-        const channelX = gridTracker.findAndMarkChannel(idealX, false, startStandoff.y, endStandoff.y)
-        curveOffset = channelX - idealX
-      } else {
-        const idealY = midY + Math.sin(angle) * baseCurveAmt
-        const channelY = gridTracker.findAndMarkChannel(idealY, true, startStandoff.x, endStandoff.x)
-        curveOffset = channelY - idealY
-      }
-
-      const curveAmt = baseCurveAmt + curveOffset
-      const cx = midX + Math.cos(angle) * curveAmt
-      const cy = midY + Math.sin(angle) * curveAmt
-      path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} Q${cx},${cy} ${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-    } else if (edgeStyle === 'hyperbolic') {
-      // Hyperbolic: smooth S-curve that leaves/enters nodes orthogonally
-      // Control points extend in the orthogonal direction (port → standoff direction)
-
-      // Calculate orthogonal exit direction (from port to standoff)
-      const startDirX = startStandoff.x - startPort.x
-      const startDirY = startStandoff.y - startPort.y
-      const startDirLen = Math.sqrt(startDirX * startDirX + startDirY * startDirY) || 1
-
-      // Calculate orthogonal entry direction (from port to standoff, but we want toward standoff)
-      const endDirX = endStandoff.x - endEdge.x
-      const endDirY = endStandoff.y - endEdge.y
-      const endDirLen = Math.sqrt(endDirX * endDirX + endDirY * endDirY) || 1
-
-      // Distance between standoffs determines control point extension
-      const dist = Math.sqrt((endStandoff.x - startStandoff.x) ** 2 + (endStandoff.y - startStandoff.y) ** 2)
-      const extension = Math.min(dist * 0.7, 180)
-
-      // Control points extend orthogonally from each standoff
-      // CP1: continue in the direction the edge left the source node
-      const cp1x = startStandoff.x + (startDirX / startDirLen) * extension
-      const cp1y = startStandoff.y + (startDirY / startDirLen) * extension
-      // CP2: approach from the direction the edge will enter the target node
-      const cp2x = endStandoff.x + (endDirX / endDirLen) * extension
-      const cp2y = endStandoff.y + (endDirY / endDirLen) * extension
-
-      path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
     } else if (routed?.svgPath) {
       // Use pre-routed path from routing modules (diagonal or orthogonal)
       path = routed.svgPath
