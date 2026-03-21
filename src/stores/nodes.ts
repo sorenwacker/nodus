@@ -8,7 +8,7 @@ import {
 } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
-import { TYPST_MATH_REFERENCE, GETTING_STARTED, IMPORTING_FILES } from '../lib/templates'
+import { getStarterTemplates, getStarterTitles } from '../lib/templates'
 import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
 import { useStorylinesStore } from './storylines'
@@ -647,32 +647,37 @@ export const useNodesStore = defineStore('nodes', () => {
     nodes.value = nodes.value.filter(n => n.workspace_id !== null)
     selectedNodeIds.value = []
 
-    // Create the welcome/starter nodes
+    // Get localized templates based on current language
+    const locale = localStorage.getItem('nodus-locale') || 'en'
+    const templates = getStarterTemplates(locale)
+    const titles = getStarterTitles(locale)
+
+    // Create the welcome/starter nodes with generous sizes
     const gettingStarted = await createNode({
-      title: 'Getting Started',
-      markdown_content: GETTING_STARTED,
+      title: titles.gettingStarted,
+      markdown_content: templates.gettingStarted,
       canvas_x: 100,
       canvas_y: 100,
-      width: 420,
-      height: 520,
+      width: 500,
+      height: 600,
     })
 
     const importingFiles = await createNode({
-      title: 'Importing Files',
-      markdown_content: IMPORTING_FILES,
-      canvas_x: 580,
+      title: titles.importingFiles,
+      markdown_content: templates.importingFiles,
+      canvas_x: 700,
       canvas_y: 100,
-      width: 440,
-      height: 580,
+      width: 520,
+      height: 720,
     })
 
     const mathReference = await createNode({
-      title: 'Typst Math Reference',
-      markdown_content: TYPST_MATH_REFERENCE,
+      title: titles.mathReference,
+      markdown_content: templates.mathReference,
       canvas_x: 100,
-      canvas_y: 680,
-      width: 480,
-      height: 520,
+      canvas_y: 780,
+      width: 560,
+      height: 620,
     })
 
     // Create demo edges with different styles and labels
