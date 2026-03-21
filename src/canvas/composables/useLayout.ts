@@ -374,7 +374,7 @@ export function useLayout(options: UseLayoutOptions) {
       const positions = fastGridLayout(fastNodes, {
         centerX,
         centerY,
-        gap: 120,
+        gap: 360,
       })
 
       // Batch update positions to avoid blocking UI
@@ -459,7 +459,7 @@ export function useLayout(options: UseLayoutOptions) {
     const centerY = sumY / virtualNodes.length
 
     // Gap between nodes in grid layout
-    const gridGap = 120
+    const gridGap = 360
 
     // Frames are static - just pass through positions directly
     function expandToRealTargets(virtualTargets: Map<string, { x: number; y: number }>): Map<string, { x: number; y: number }> {
