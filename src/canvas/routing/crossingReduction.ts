@@ -34,22 +34,70 @@ export interface CrossingReductionStrategy {
 }
 
 /**
- * Count crossings between two specific edges
+ * Check if two orthogonal edges would cross based on their port assignments.
+ * For edges sharing a node side, they cross if port order doesn't match target order.
+ *
+ * Key insight: For orthogonal routing, two edges A and B entering the SAME side of a node
+ * will cross if:
+ * - A's source is to the LEFT of B's source (for top/bottom entry)
+ * - But A's port is to the RIGHT of B's port
+ *
+ * This is because the orthogonal path goes: source → horizontal → turn → vertical → port
+ * If the port order is reversed from source order, the vertical segments must cross.
  */
-function edgesCross(
-  e1: { x1: number; y1: number; x2: number; y2: number },
-  e2: { x1: number; y1: number; x2: number; y2: number }
+function edgesCrossOrthogonal(
+  info1: EdgeInfo,
+  info2: EdgeInfo,
+  sourceAssignments: Map<string, PortAssignment>,
+  targetAssignments: Map<string, PortAssignment>
 ): boolean {
-  const d1x = e1.x2 - e1.x1, d1y = e1.y2 - e1.y1
-  const d2x = e2.x2 - e2.x1, d2y = e2.y2 - e2.y1
-  const cross = d1x * d2y - d1y * d2x
-  if (Math.abs(cross) < 0.0001) return false
+  // Check source side crossing (both edges exit from same side of same node)
+  if (info1.edge.source_node_id === info2.edge.source_node_id &&
+      info1.sourceSide === info2.sourceSide) {
+    const assign1 = sourceAssignments.get(info1.edge.id)
+    const assign2 = sourceAssignments.get(info2.edge.id)
+    if (assign1 && assign2) {
+      const isHorizontalSide = info1.sourceSide === 'left' || info1.sourceSide === 'right'
+      // Compare target positions
+      const pos1 = isHorizontalSide
+        ? info1.target.canvas_y + (info1.target.height || 120) / 2
+        : info1.target.canvas_x + (info1.target.width || 200) / 2
+      const pos2 = isHorizontalSide
+        ? info2.target.canvas_y + (info2.target.height || 120) / 2
+        : info2.target.canvas_x + (info2.target.width || 200) / 2
+      // Crossing if port order doesn't match target order
+      const portOrder = assign1.index < assign2.index
+      const targetOrder = pos1 < pos2
+      if (portOrder !== targetOrder && Math.abs(pos1 - pos2) > 30) {
+        return true
+      }
+    }
+  }
 
-  const dx = e2.x1 - e1.x1, dy = e2.y1 - e1.y1
-  const t = (dx * d2y - dy * d2x) / cross
-  const u = (dx * d1y - dy * d1x) / cross
+  // Check target side crossing (both edges enter same side of same node)
+  if (info1.edge.target_node_id === info2.edge.target_node_id &&
+      info1.targetSide === info2.targetSide) {
+    const assign1 = targetAssignments.get(info1.edge.id)
+    const assign2 = targetAssignments.get(info2.edge.id)
+    if (assign1 && assign2) {
+      const isHorizontalSide = info1.targetSide === 'left' || info1.targetSide === 'right'
+      // Compare source positions
+      const pos1 = isHorizontalSide
+        ? info1.source.canvas_y + (info1.source.height || 120) / 2
+        : info1.source.canvas_x + (info1.source.width || 200) / 2
+      const pos2 = isHorizontalSide
+        ? info2.source.canvas_y + (info2.source.height || 120) / 2
+        : info2.source.canvas_x + (info2.source.width || 200) / 2
+      // Crossing if port order doesn't match source order
+      const portOrder = assign1.index < assign2.index
+      const sourceOrder = pos1 < pos2
+      if (portOrder !== sourceOrder && Math.abs(pos1 - pos2) > 30) {
+        return true
+      }
+    }
+  }
 
-  return t > 0.01 && t < 0.99 && u > 0.01 && u < 0.99
+  return false
 }
 
 /**
@@ -103,14 +151,14 @@ export class BarycentricReduction implements CrossingReductionStrategy {
       return { improved: false, initialCrossings: 0, finalCrossings: 0, swapsPerformed: 0 }
     }
 
-    // Count initial crossings
+    // Count crossings using orthogonal-aware detection
     const countCrossings = (): number => {
       let count = 0
       for (let i = 0; i < edgeInfos.length; i++) {
         for (let j = i + 1; j < edgeInfos.length; j++) {
-          const p1 = getEdgePath(edgeInfos[i], sourceAssignments, targetAssignments)
-          const p2 = getEdgePath(edgeInfos[j], sourceAssignments, targetAssignments)
-          if (edgesCross(p1, p2)) count++
+          if (edgesCrossOrthogonal(edgeInfos[i], edgeInfos[j], sourceAssignments, targetAssignments)) {
+            count++
+          }
         }
       }
       return count
@@ -236,20 +284,14 @@ export class GreedySwapReduction implements CrossingReductionStrategy {
       return { improved: false, initialCrossings: 0, finalCrossings: 0, swapsPerformed: 0 }
     }
 
-    const edgePaths = new Map<string, { x1: number; y1: number; x2: number; y2: number }>()
-    const rebuildPaths = () => {
-      for (const info of edgeInfos) {
-        edgePaths.set(info.edge.id, getEdgePath(info, sourceAssignments, targetAssignments))
-      }
-    }
-    rebuildPaths()
-
+    // Use orthogonal-aware crossing detection
     const countCrossings = (): number => {
       let count = 0
-      const ids = Array.from(edgePaths.keys())
-      for (let i = 0; i < ids.length; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-          if (edgesCross(edgePaths.get(ids[i])!, edgePaths.get(ids[j])!)) count++
+      for (let i = 0; i < edgeInfos.length; i++) {
+        for (let j = i + 1; j < edgeInfos.length; j++) {
+          if (edgesCrossOrthogonal(edgeInfos[i], edgeInfos[j], sourceAssignments, targetAssignments)) {
+            count++
+          }
         }
       }
       return count
@@ -302,23 +344,20 @@ export class GreedySwapReduction implements CrossingReductionStrategy {
             const origA = a.assign.index
             const origB = b.assign.index
 
-            // Swap
+            // Swap indices
             a.assign.index = origB
             b.assign.index = origA
-            edgePaths.set(a.edgeId, getEdgePath(edgeInfos.find(e => e.edge.id === a.edgeId)!, sourceAssignments, targetAssignments))
-            edgePaths.set(b.edgeId, getEdgePath(edgeInfos.find(e => e.edge.id === b.edgeId)!, sourceAssignments, targetAssignments))
 
             const after = countCrossings()
 
             if (after < before) {
               improved = true
               swapsPerformed++
+              console.log(`[GreedySwap] Swap improved: ${before} -> ${after} crossings`)
             } else {
               // Revert
               a.assign.index = origA
               b.assign.index = origB
-              edgePaths.set(a.edgeId, getEdgePath(edgeInfos.find(e => e.edge.id === a.edgeId)!, sourceAssignments, targetAssignments))
-              edgePaths.set(b.edgeId, getEdgePath(edgeInfos.find(e => e.edge.id === b.edgeId)!, sourceAssignments, targetAssignments))
             }
           }
         }
