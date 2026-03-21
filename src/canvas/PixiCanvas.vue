@@ -2195,7 +2195,7 @@ function onWheel(e: WheelEvent) {
 
     const zoomIntensity = 0.003
     const delta = Math.exp(-e.deltaY * zoomIntensity)
-    const newScale = Math.min(Math.max(scale.value * delta, 0.05), 3)
+    const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
@@ -3780,7 +3780,7 @@ ${edges.map(e => `  - id: "${e.id}"
       :neighborhood-depth="neighborhoodDepth"
       :pending-frame-placement="frames.pendingFramePlacement.value"
       @zoom-in="scale = Math.min(scale * 1.25, 3)"
-      @zoom-out="scale = Math.max(scale * 0.8, 0.05)"
+      @zoom-out="scale = Math.max(scale * 0.8, 0.01)"
       @fit-to-content="fitToContent"
       @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
       @layout="autoLayoutNodes"

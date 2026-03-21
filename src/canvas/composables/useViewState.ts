@@ -89,12 +89,12 @@ export function useViewState(options: UseViewStateOptions) {
   }
 
   function zoomOut() {
-    scale.value = Math.max(scale.value * 0.8, 0.05)
+    scale.value = Math.max(scale.value * 0.8, 0.01)
     scheduleSaveViewState()
   }
 
   function setScale(newScale: number) {
-    scale.value = Math.max(0.05, Math.min(3, newScale))
+    scale.value = Math.max(0.01, Math.min(3, newScale))
     scheduleSaveViewState()
   }
 
