@@ -512,7 +512,7 @@
 
 .node-header {
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-default);
@@ -878,7 +878,7 @@
 }
 
 .node-content {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-main);
   line-height: 1.5;
   overflow-y: auto;

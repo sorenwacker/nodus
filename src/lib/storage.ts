@@ -10,6 +10,7 @@ const KEYS = {
   workspaces: 'nodus-workspaces',
   currentWorkspace: 'nodus-current-workspace',
   magnifier: 'nodus-magnifier',
+  fontScale: 'nodus-font-scale',
   promptHistory: 'nodus-prompt-history',
   llmPrompt: 'nodus_llm_prompt',
   llmAgentPrompt: 'nodus_llm_agent_prompt',
@@ -77,6 +78,13 @@ export const uiStorage = {
   },
   setMagnifierEnabled(value: boolean): void {
     localStorage.setItem(KEYS.magnifier, String(value))
+  },
+  getFontScale(): number {
+    const val = localStorage.getItem(KEYS.fontScale)
+    return val ? parseFloat(val) : 1.0
+  },
+  setFontScale(value: number): void {
+    localStorage.setItem(KEYS.fontScale, String(value))
   },
 }
 

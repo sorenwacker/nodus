@@ -233,6 +233,26 @@ onMounted(() => {
       e.preventDefault()
       refreshFromFiles()
     }
+
+    // Cmd+Plus / Cmd+= increases font scale
+    if ((e.key === '+' || e.key === '=') && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      increaseFontScale()
+    }
+
+    // Cmd+Minus decreases font scale
+    if (e.key === '-' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      decreaseFontScale()
+    }
+
+    // Cmd+0 resets font scale
+    if (e.key === '0' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      fontScale.value = 1.0
+      uiStorage.setFontScale(1.0)
+      document.documentElement.style.setProperty('--font-scale', '1')
+    }
   }
   window.addEventListener('keydown', handleKeydown)
 
@@ -515,6 +535,28 @@ const shouldShowMagnifier = computed(() => magnifierEnabled.value && scale.value
 
 // Help modal
 const showHelpModal = ref(false)
+
+// Font scale (Cmd+/Cmd-)
+const fontScale = ref(uiStorage.getFontScale())
+const MIN_FONT_SCALE = 0.7
+const MAX_FONT_SCALE = 1.5
+
+function increaseFontScale() {
+  fontScale.value = Math.min(MAX_FONT_SCALE, fontScale.value + 0.1)
+  uiStorage.setFontScale(fontScale.value)
+  document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
+}
+
+function decreaseFontScale() {
+  fontScale.value = Math.max(MIN_FONT_SCALE, fontScale.value - 0.1)
+  uiStorage.setFontScale(fontScale.value)
+  document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
+}
+
+// Initialize font scale on mount
+onMounted(() => {
+  document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
+})
 
 // Link picker from context menu
 const showLinkPicker = ref(false)
