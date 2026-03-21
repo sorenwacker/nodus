@@ -58,7 +58,8 @@
       "neighborhoodView": "Nachbarschaftsansicht - Nur ausgewählten Knoten und Nachbarn anzeigen (N)",
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
       "hop": "Schritt",
-      "hops": "Schritte"
+      "hops": "Schritte",
+      "help": "Hilfe - Tastenkombinationen und Nutzung"
     }
   },
   "llm": {

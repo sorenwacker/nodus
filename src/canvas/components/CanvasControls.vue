@@ -37,6 +37,7 @@ const emit = defineEmits<{
   (e: 'toggleNeighborhoodMode'): void
   (e: 'setNeighborhoodDepth', depth: number): void
   (e: 'createFrame'): void
+  (e: 'showHelp'): void
 }>()
 </script>
 
@@ -221,6 +222,17 @@ const emit = defineEmits<{
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <line x1="9" y1="3" x2="9" y2="21" />
+      </svg>
+    </button>
+    <button
+      data-tooltip-pos="top-left"
+      :data-tooltip="t('canvas.controls.help')"
+      @click="emit('showHelp')"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
     </button>
   </div>

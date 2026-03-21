@@ -58,7 +58,8 @@
       "neighborhoodView": "Vista vicinato - Mostra solo nodo selezionato e vicini (N)",
       "neighborhoodDepth": "Profondità vicinato (salti)",
       "hop": "salto",
-      "hops": "salti"
+      "hops": "salti",
+      "help": "Aiuto - Scorciatoie da tastiera e utilizzo"
     }
   },
   "llm": {

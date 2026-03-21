@@ -58,7 +58,8 @@
       "neighborhoodView": "Vista de vecindario - Mostrar solo el nodo seleccionado y vecinos (N)",
       "neighborhoodDepth": "Profundidad del vecindario (saltos)",
       "hop": "salto",
-      "hops": "saltos"
+      "hops": "saltos",
+      "help": "Ayuda - Atajos de teclado y uso"
     }
   },
   "llm": {

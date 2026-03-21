@@ -44,6 +44,7 @@ import { useContextMenu } from './composables/useContextMenu'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
+import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -510,6 +511,9 @@ const isMouseOnCanvas = ref(false)
 const magnifierPos = ref({ x: 0, y: 0 })
 const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
 const shouldShowMagnifier = computed(() => magnifierEnabled.value && scale.value < MAGNIFIER_THRESHOLD && showMagnifier.value && !isLargeGraph.value)
+
+// Help modal
+const showHelpModal = ref(false)
 
 // Only render nodes visible within magnifier viewport for performance
 const magnifierVisibleNodes = computed(() => {
@@ -3660,7 +3664,11 @@ ${edges.map(e => `  - id: "${e.id}"
       @toggle-neighborhood-mode="toggleNeighborhoodMode()"
       @set-neighborhood-depth="setDepth"
       @create-frame="createFrameAtCenter"
+      @show-help="showHelpModal = true"
     />
+
+    <!-- Help Modal -->
+    <KeyboardShortcutsModal :show="showHelpModal" @close="showHelpModal = false" />
 
     <!-- Status Bar -->
     <CanvasStatusBar

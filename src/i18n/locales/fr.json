@@ -58,7 +58,8 @@
       "neighborhoodView": "Vue de voisinage - Afficher uniquement le nœud sélectionné et ses voisins (N)",
       "neighborhoodDepth": "Profondeur de voisinage (sauts)",
       "hop": "saut",
-      "hops": "sauts"
+      "hops": "sauts",
+      "help": "Aide - Raccourcis clavier et utilisation"
     }
   },
   "llm": {

@@ -58,7 +58,8 @@
       "neighborhoodView": "Neighborhood View - Show only selected node and neighbors (N)",
       "neighborhoodDepth": "Neighborhood depth (hops)",
       "hop": "hop",
-      "hops": "hops"
+      "hops": "hops",
+      "help": "Help - Keyboard shortcuts and usage"
     }
   },
   "llm": {
