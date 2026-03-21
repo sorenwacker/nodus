@@ -25,11 +25,13 @@ export interface AgentModeConfig {
  */
 const exploreMode: AgentModeConfig = {
   name: 'explore',
-  description: 'Read-only research mode for gathering context',
-  maxIterations: 100,
+  description: 'Research mode - gather information and build the graph',
+  maxIterations: 200,
   toolWhitelist: [
+    // Reading
     'read_graph',
     'query_nodes',
+    // Research
     'web_search',
     'research',
     'deep_research',
@@ -37,30 +39,38 @@ const exploreMode: AgentModeConfig = {
     'wikipedia_search',
     'validate_claim',
     'check_completeness',
+    // Creating (build as you go)
+    'create_node',
+    'create_nodes_batch',
+    'create_edge',
+    'create_edges_batch',
+    'update_node',
+    'auto_layout',
+    // Thinking
     'think',
     'done',
   ],
   systemPromptAddition: `
-MODE: EXPLORE (Read-only Research)
-You are in exploration mode. Your job is to gather comprehensive information.
-You CANNOT make changes to the canvas in this mode.
+MODE: EXPLORE (Research & Build)
+Research thoroughly AND build the graph as you discover information.
 
-RESEARCH METHODOLOGY - ITERATE EXTENSIVELY:
-1. Start with wikipedia_search() for the main topic
-2. Call fetch_wikipedia() for EACH article found - read them thoroughly
-3. Extract every key concept, person, term, region, etc.
-4. For EACH concept: call wikipedia_search() again
-5. Fetch those articles too with fetch_wikipedia()
-6. Use research() for web searches on specific aspects
-7. Call validate_claim() on important facts
-8. Call check_completeness() - if < 90%, KEEP GOING
-9. Repeat until you've explored all branches of the topic
+METHODOLOGY - RESEARCH AND CREATE SIMULTANEOUSLY:
+1. wikipedia_search() for the main topic
+2. fetch_wikipedia() for each article found
+3. CREATE A NODE for each key concept as you discover it
+4. CREATE EDGES to connect related concepts
+5. Extract more concepts, search for those
+6. Keep creating nodes as you learn
+7. validate_claim() on important facts
+8. check_completeness() - if < 90%, KEEP GOING
+9. auto_layout() periodically to organize
 
-EXPECT TO MAKE 30-100 TOOL CALLS for proper research.
-Follow every interesting lead. Cross-reference sources.
-Build a complete picture before signaling done().
+BUILD THE GRAPH AS YOU RESEARCH - don't wait until the end.
+Each Wikipedia article = potential nodes.
+Each relationship discovered = an edge.
 
-When comprehensively researched, use done() with a full summary.`,
+EXPECT 50-200 TOOL CALLS mixing research and creation.
+When done, the graph should represent your research visually.`,
 }
 
 /**
@@ -68,11 +78,13 @@ When comprehensively researched, use done() with a full summary.`,
  */
 const planMode: AgentModeConfig = {
   name: 'plan',
-  description: 'Design approach and create plans for user approval',
-  maxIterations: 100,
+  description: 'Research, build graph, then create plan for approval',
+  maxIterations: 200,
   toolWhitelist: [
+    // Reading
     'read_graph',
     'query_nodes',
+    // Research
     'web_search',
     'research',
     'deep_research',
@@ -80,35 +92,43 @@ const planMode: AgentModeConfig = {
     'wikipedia_search',
     'validate_claim',
     'check_completeness',
+    // Creating (build as you research)
+    'create_node',
+    'create_nodes_batch',
+    'create_edge',
+    'create_edges_batch',
+    'update_node',
+    'auto_layout',
+    // Planning
     'think',
     'create_plan',
     'request_approval',
     'done',
   ],
   systemPromptAddition: `
-MODE: PLAN (Design)
-You are in planning mode. Your job is to research and design an approach.
-You CANNOT make changes to the canvas yet - that happens after approval.
+MODE: PLAN (Research, Build, Plan)
+Research thoroughly, BUILD THE GRAPH as you go, then create a plan.
 
-FOR RESEARCH TASKS - USE ITERATIVE APPROACH:
-Do NOT just call deep_research once. Instead, iterate manually:
+METHODOLOGY - RESEARCH AND CREATE SIMULTANEOUSLY:
+1. wikipedia_search() for the main topic
+2. fetch_wikipedia() for each article
+3. CREATE NODES immediately for key concepts you discover
+4. CREATE EDGES to show relationships
+5. Keep researching - more searches, more articles
+6. Keep creating nodes and edges as you learn
+7. validate_claim() on important facts
+8. check_completeness() - if < 90%, KEEP GOING
+9. auto_layout() to organize the graph
 
-1. Start with wikipedia_search() to find key articles
-2. Call fetch_wikipedia() for EACH relevant article found
-3. Use research() or web_search() for additional queries
-4. Extract concepts from results and search for THOSE
-5. Call validate_claim() on important facts
-6. Call check_completeness() - if score < 90%, KEEP RESEARCHING
-7. Generate follow-up queries and repeat steps 1-6
-8. Continue until completeness is HIGH or you've exhausted the topic
+BUILD THE GRAPH WHILE RESEARCHING.
+Don't wait - create nodes as soon as you discover information.
 
-ITERATE MANY TIMES. Use 20-50+ tool calls for thorough research.
-Each Wikipedia article, each web search, each validation is a separate call.
+After thorough research with graph built:
+1. think() to synthesize
+2. create_plan() for any remaining work
+3. request_approval()
 
-When research is complete:
-1. Use think() to synthesize findings
-2. Use create_plan() to create a detailed step-by-step plan
-3. Use request_approval() to pause for user review`,
+EXPECT 50-200 TOOL CALLS mixing research and node creation.`,
 }
 
 /**
