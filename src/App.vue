@@ -154,7 +154,7 @@ async function confirmDeleteWorkspace() {
 }
 
 async function resetDefaultWorkspace() {
-  if (!confirm('This will delete all nodes in the default workspace and restore the starter content. Continue?')) {
+  if (!confirm(t('settings.resetDefaultWorkspaceConfirm'))) {
     return
   }
   await store.resetDefaultWorkspace()
