@@ -15,8 +15,6 @@ import {
   getPortPoint,
   getStandoff,
   getAngledStandoff,
-  GridTracker,
-  PORT_SPACING,
   SpatialIndex,
   setRoutingSpatialIndex,
   type NodeRect,
@@ -1032,7 +1030,7 @@ function onNodePromptKeydown(e: KeyboardEvent) {
   }
 }
 
-async function executeAgentTool(name: string, args: any): Promise<string> {
+async function executeAgentTool(name: string, args: Record<string, unknown>): Promise<string> {
   // Create tool context for the extracted executor
   const toolCtx: ToolContext = {
     store: {
@@ -1678,8 +1676,8 @@ ${currentContent || '(empty)'}`
         setTimeout(() => fitNodeToContent(nodeId), 100)
       }, 50)
     }
-  } catch (e: any) {
-    alert(e.message)
+  } catch (e) {
+    alert(e instanceof Error ? e.message : String(e))
   } finally {
     isNodeLLMLoading.value = false
   }
@@ -1777,7 +1775,7 @@ const edgeLines = computed(() => {
         isShortEdge: Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) < 50,
         debugInfo: undefined,
       }
-    }).filter(Boolean) as any[]
+    }).filter((e): e is NonNullable<typeof e> => e !== null)
   }
 
   // NOTE: Don't filter by visibleNodeIds here - that would make routing
@@ -1876,9 +1874,6 @@ const edgeLines = computed(() => {
     // Clear spatial index after routing
     setRoutingSpatialIndex(null)
   }
-
-  // Grid tracker for edge overlap prevention
-  const gridTracker = new GridTracker(PORT_SPACING)
 
   // Sort edges to minimize crossings
   // Edges are sorted by their midpoint position so parallel edges don't cross
@@ -2026,7 +2021,7 @@ const edgeLines = computed(() => {
 })
 
 // Threshold for "edges on hover only" mode (based on visible edges, not total)
-const EDGE_HOVER_ONLY_THRESHOLD = 1000
+const EDGE_HOVER_ONLY_THRESHOLD = 500
 
 // Threshold for filtering edges by viewport visibility
 const EDGE_VIEWPORT_FILTER_THRESHOLD = 200
@@ -2052,7 +2047,7 @@ const visibleEdgeLines = computed(() => {
     })
   }
 
-  // For very large visible edge counts (1000+), only show edges on hover/select
+  // For very large visible edge counts (500+), only show edges on hover/select
   if (edges.length > EDGE_HOVER_ONLY_THRESHOLD) {
     if (hovered || selectedNodes.length > 0) {
       edges = edges.filter(e =>
@@ -3306,6 +3301,7 @@ ${edges.map(e => `  - id: "${e.id}"
 }
 
 // Expose export function globally for debugging
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(window as any).exportGraphAsYaml = exportGraphAsYaml
 </script>
 
@@ -3590,13 +3586,15 @@ ${edges.map(e => `  - id: "${e.id}"
           @blur="saveEditing($event)"
           @keydown="onEditorKeydown"
         ></textarea>
-        <!-- View mode - hidden when collapsed for performance -->
+        <!-- View mode - hidden when collapsed for performance, v-html required for markdown -->
+        <!-- eslint-disable vue/no-v-html -->
         <div
           v-else-if="!isSemanticZoomCollapsed"
           class="node-content"
           @click="handleContentClick"
           v-html="nodeRenderedContent[node.id] || ''"
         ></div>
+        <!-- eslint-enable vue/no-v-html -->
 
         <!-- Color palette and options (shown when selected or editing) -->
         <div v-if="store.selectedNodeIds.includes(node.id) || editingNodeId === node.id" class="node-color-bar" @mousedown.prevent>
