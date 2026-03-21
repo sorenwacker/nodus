@@ -435,6 +435,20 @@ export function useAgentRunner(ctx: AgentContext) {
           const pythonTagMatch = msg.content.match(/<\|python_tag\|>\s*(\{[\s\S]*\})/)
           if (!toolJson && pythonTagMatch) toolJson = pythonTagMatch[1]
 
+          // Handle Ollama channel format: <|channel|>commentary to=functions.XXX<|message|>{...}
+          const channelMatch = msg.content.match(/<\|channel\|>.*?to=functions\.(\w+).*?<\|message\|>(\{[\s\S]*?\})/)
+          if (!toolJson && channelMatch) {
+            const funcName = channelMatch[1]
+            const funcArgs = channelMatch[2]
+            toolJson = JSON.stringify({ name: funcName, arguments: JSON.parse(funcArgs) })
+          }
+
+          // Also try: <|channel|>...<|constrain|>json<|message|>{...}
+          const constrainMatch = msg.content.match(/<\|constrain\|>json<\|message\|>(\{[\s\S]*?\})/)
+          if (!toolJson && constrainMatch) {
+            toolJson = constrainMatch[1]
+          }
+
           const rawJsonMatch = msg.content.match(/^\s*(\{"name"\s*:[\s\S]*\})/)
           if (!toolJson && rawJsonMatch) toolJson = rawJsonMatch[1]
 
