@@ -656,6 +656,85 @@ export const useNodesStore = defineStore('nodes', () => {
     selectedNodeIds.value = []
   }
 
+  /**
+   * Reset the default workspace to initial state with starter nodes
+   * Deletes all nodes in the default workspace and creates welcome content
+   */
+  async function resetDefaultWorkspace(): Promise<void> {
+    storeLogger.info('Resetting default workspace to initial state')
+
+    // Delete all nodes in the default workspace (workspace_id = null)
+    const defaultNodes = nodes.value.filter(n => n.workspace_id === null)
+    for (const node of defaultNodes) {
+      try {
+        await invoke('delete_node', { id: node.id })
+      } catch (e) {
+        storeLogger.error(`Failed to delete node ${node.id}:`, e)
+      }
+    }
+
+    // Clear local state for default workspace
+    nodes.value = nodes.value.filter(n => n.workspace_id !== null)
+    selectedNodeIds.value = []
+
+    // Create the welcome/starter nodes
+    const mathReference = `# Typst Math Reference
+
+| Symbol | Syntax |
+|--------|--------|
+| Arrow over letter | $arrow(x)$ |
+| Hat over letter | $hat(x)$ |
+| Bar over letter | $overline(x)$ |
+| Subscript | $x_1$ or $x_(i+1)$ |
+| Superscript | $x^2$ or $x^(n+1)$ |
+| Fraction | $a/b$ or $frac(a, b)$ |
+| Square root | $sqrt(x)$ |
+| Greek letters | $alpha, beta, gamma$ |
+
+Use \`$...$\` for inline and \`$$...$$\` for display math.
+
+Full reference: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`
+
+    const gettingStarted = `# Getting Started with Nodus
+
+## Create Nodes
+- **Double-click** on canvas to create a node
+- **Drag files** onto canvas to import
+
+## Connect Nodes
+- **Cmd/Ctrl + click** on two nodes to connect them
+- Or use right-click menu > "Link to..."
+
+## Navigate
+- **Scroll** to zoom in/out
+- **Drag canvas** to pan
+- **Cmd/Ctrl + F** to search
+
+## Workspaces
+- Create separate workspaces for different projects
+- Import Obsidian vaults to sync with existing notes`
+
+    await createNode({
+      title: 'Typst Math Reference',
+      markdown_content: mathReference,
+      canvas_x: 100,
+      canvas_y: 100,
+      width: 280,
+      height: 320,
+    })
+
+    await createNode({
+      title: 'Getting Started',
+      markdown_content: gettingStarted,
+      canvas_x: 420,
+      canvas_y: 100,
+      width: 280,
+      height: 320,
+    })
+
+    storeLogger.info('Default workspace reset complete')
+  }
+
   // Edge cleanup functions - forwarded to edges store
   const cleanupOrphanEdges = () => edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
   const deduplicateEdges = () => edgesStore.deduplicateEdges()
@@ -926,6 +1005,7 @@ export const useNodesStore = defineStore('nodes', () => {
     getOrphanedWorkspaceIds,
     renameWorkspace,
     clearCanvas,
+    resetDefaultWorkspace,
     cleanupOrphanEdges,
     deduplicateEdges,
     layoutNodes,

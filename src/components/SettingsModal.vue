@@ -177,6 +177,14 @@ async function switchToWorkspace(id: string) {
   emit('close')
 }
 
+async function resetDefaultWorkspace() {
+  if (!confirm(t('settings.resetDefaultWorkspaceConfirm'))) {
+    return
+  }
+  await nodesStore.resetDefaultWorkspace()
+  emit('close')
+}
+
 </script>
 
 <template>
@@ -363,6 +371,18 @@ async function switchToWorkspace(id: string) {
             <span class="hint">
               {{ t('settings.workspaceStatsHint') }}
             </span>
+          </div>
+
+          <!-- Reset Default Workspace -->
+          <div class="setting-group">
+            <label>{{ t('settings.resetDefaultWorkspace') }}</label>
+            <button
+              class="reset-btn"
+              @click="resetDefaultWorkspace"
+            >
+              {{ t('settings.resetDefaultWorkspaceBtn') }}
+            </button>
+            <span class="hint">{{ t('settings.resetDefaultWorkspaceHint') }}</span>
           </div>
 
           <div class="setting-group">
@@ -1009,6 +1029,23 @@ async function switchToWorkspace(id: string) {
 .scan-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.reset-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  background: var(--danger-bg, #fef2f2);
+  color: var(--danger-color, #dc2626);
+  border: 1px solid var(--danger-border, #fecaca);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.reset-btn:hover {
+  background: var(--danger-color, #dc2626);
+  color: white;
+  border-color: var(--danger-color, #dc2626);
 }
 
 .workspace-stats {
