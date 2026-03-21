@@ -128,7 +128,7 @@ function routeAroundObstaclesDiagonal(
   end: Point,
   obstacles: NodeRect[]
 ): Point[] {
-  const bounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + 20)
+  const bounds = getObstacleBounds(obstacles, 5)  // Minimal margin for bounds
   const dx = end.x - start.x
   const dy = end.y - start.y
 
@@ -137,7 +137,6 @@ function routeAroundObstaclesDiagonal(
   const midY = (start.y + end.y) / 2
 
   // Determine if we need to go around above/below or left/right
-  // Calculate which direction has more clearance
   const obsCenterX = (bounds.minX + bounds.maxX) / 2
   const obsCenterY = (bounds.minY + bounds.maxY) / 2
 
@@ -154,10 +153,20 @@ function routeAroundObstaclesDiagonal(
   // Deflect away from obstacle
   const deflectSign = obsSide > 0 ? -1 : 1
 
-  // Calculate deflection distance based on obstacle size
-  const obsWidth = bounds.maxX - bounds.minX
-  const obsHeight = bounds.maxY - bounds.minY
-  const deflectDist = Math.max(obsWidth, obsHeight) / 2 + OBSTACLE_MARGIN + 30
+  // Calculate minimal deflection distance - just enough to clear the obstacle
+  // Use distance from line to obstacle edge, plus small margin
+  const obsHalfWidth = (bounds.maxX - bounds.minX) / 2
+  const obsHalfHeight = (bounds.maxY - bounds.minY) / 2
+
+  // Distance from midpoint to obstacle center along perpendicular
+  const distToObsCenter = Math.abs(perpX * toObsX + perpY * toObsY)
+
+  // How much of obstacle extends toward the line
+  const obsExtent = Math.abs(perpX) * obsHalfWidth + Math.abs(perpY) * obsHalfHeight
+
+  // Deflection needed = obstacle extent - current clearance + small margin
+  const clearanceNeeded = obsExtent - distToObsCenter + 15
+  const deflectDist = Math.max(clearanceNeeded, 20)  // Minimum 20px deflection
 
   // Create a single waypoint that deflects the path
   const waypointX = midX + perpX * deflectDist * deflectSign
