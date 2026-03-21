@@ -5,7 +5,6 @@ import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
-import { invoke } from '@tauri-apps/api/core'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import {
   routeAllEdges,
@@ -48,15 +47,9 @@ import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
 import { usePlanState } from './llm/planState'
-import {
-  quickResearch,
-  deepResearch,
-  formatDeepResearchResults,
-  fetchWikipediaArticle,
-  validateClaim,
-  assessCompleteness,
-} from './llm/research'
 import { useAgentTasksStore } from '../stores/agentTasks'
+import { useMarkerHandlers } from './composables/useMarkerHandlers'
+import { useLLMTools } from './composables/useLLMTools'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -1049,6 +1042,33 @@ function onNodePromptKeydown(e: KeyboardEvent) {
   }
 }
 
+// Marker handlers composable for processing tool result markers
+const markerHandlers = useMarkerHandlers({
+  planState,
+  nodes: computed(() => store.filteredNodes),
+  log: (msg: string) => agentLog.value.push(msg),
+})
+
+// LLM tools composable for handling LLM-dependent tools
+const llmTools = useLLMTools({
+  llmQueue,
+  callOllama,
+  store: {
+    filteredNodes: store.filteredNodes,
+    updateNodeContent: store.updateNodeContent,
+    updateNodePosition: store.updateNodePosition,
+    updateNodeColor: store.updateNodeColor,
+    createEdge: store.createEdge,
+    currentWorkspaceId: store.currentWorkspaceId,
+  },
+  themesStore,
+  planState,
+  tasks: agentTasks,
+  memoryStorage,
+  log: (msg: string) => agentLog.value.push(msg),
+  pushContentUndo,
+})
+
 async function executeAgentTool(name: string, args: Record<string, unknown>): Promise<string> {
   // Create tool context for the extracted executor
   const toolCtx: ToolContext = {
@@ -1076,689 +1096,26 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
   const result = await executeTool(name, args, toolCtx)
   console.log(`[Tool] ${name} -> executeTool returned:`, result.slice(0, 100))
 
-  // Handle agent planning markers
-  if (result.startsWith('__CREATE_PLAN__:')) {
-    try {
-      const data = JSON.parse(result.replace('__CREATE_PLAN__:', ''))
-      const plan = planState.createPlan(data.title || 'Plan', data.steps || [])
-      agentLog.value.push(`> Plan created: ${plan.title} (${plan.steps.length} steps)`)
-    } catch (e) {
-      console.error('[Tool] Failed to parse create_plan:', e)
-    }
-    return result
+  // Try marker handlers for async processing
+  const markerResult = await markerHandlers.handleMarker(result)
+  if (markerResult !== null) {
+    return markerResult
   }
 
-  if (result.startsWith('__REQUEST_APPROVAL__:')) {
-    console.log('[Tool] Handling request_approval marker')
-    console.log('[Tool] currentPlan:', planState.currentPlan.value)
-    console.log('[Tool] showApprovalModal before:', planState.showApprovalModal.value)
-    if (planState.currentPlan.value) {
-      const success = planState.requestApproval()
-      console.log('[Tool] requestApproval result:', success)
-      console.log('[Tool] showApprovalModal after:', planState.showApprovalModal.value)
-      agentLog.value.push('> Requesting approval...')
-    } else {
-      console.log('[Tool] No current plan!')
-    }
-    return result
-  }
-
-  // Handle research marker - actually perform the research
-  if (result.startsWith('__RESEARCH__:')) {
-    try {
-      const data = JSON.parse(result.replace('__RESEARCH__:', ''))
-      const query = data.query || ''
-      const sources = Array.isArray(data.sources)
-        ? data.sources as Array<'local' | 'web' | 'wikipedia'>
-        : ['local', 'web'] as Array<'local' | 'web' | 'wikipedia'>
-
-      agentLog.value.push(`> Researching: ${query}`)
-      const researchResult = await quickResearch(query, store.filteredNodes, sources)
-      return researchResult || 'No results found'
-    } catch (e) {
-      console.error('[Tool] Research error:', e)
-      return `Research failed: ${e}`
-    }
-  }
-
-  // Handle deep research - multi-round iterative research with validation
-  if (result.startsWith('__DEEP_RESEARCH__:')) {
-    try {
-      const data = JSON.parse(result.replace('__DEEP_RESEARCH__:', ''))
-      const topic = data.topic || ''
-      const depth = data.depth || 'thorough'
-      const aspects = data.aspects || []
-
-      agentLog.value.push(`> Deep research: ${topic} (depth: ${depth})`)
-
-      // Pass logging function so all searches appear in agent log
-      const logFn = (msg: string) => {
-        agentLog.value.push(msg)
-      }
-
-      const deepResult = await deepResearch(topic, {
-        depth: depth as 'quick' | 'moderate' | 'thorough' | 'exhaustive',
-        localNodes: store.filteredNodes,
-        validateClaims: true,
-        extractConcepts: true,
-        aspects,
-        log: logFn,
-      })
-
-      agentLog.value.push(`> Research complete: ${deepResult.findings.length} findings, ${Math.round(deepResult.completenessScore * 100)}% coverage`)
-
-      return formatDeepResearchResults(deepResult)
-    } catch (e) {
-      console.error('[Tool] Deep research error:', e)
-      return `Deep research failed: ${e}`
-    }
-  }
-
-  // Handle Wikipedia search
-  if (result.startsWith('__WIKIPEDIA_SEARCH__:')) {
-    try {
-      const data = JSON.parse(result.replace('__WIKIPEDIA_SEARCH__:', ''))
-      const query = data.query || ''
-      const limit = data.limit || 5
-
-      agentLog.value.push(`> Wikipedia search: "${query}"`)
-
-      const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=${limit}`
-      const resp = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) })
-
-      if (!resp.ok) {
-        return `Wikipedia search failed: ${resp.status}`
-      }
-
-      const respData = await resp.json()
-      const results: string[] = []
-
-      if (respData.query?.search) {
-        for (const item of respData.query.search) {
-          const cleanSnippet = item.snippet.replace(/<[^>]+>/g, '')
-          const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`
-          results.push(`**${item.title}**\n${cleanSnippet}\n[${url}]`)
-        }
-      }
-
-      agentLog.value.push(`> Found ${results.length} Wikipedia articles`)
-
-      if (results.length === 0) {
-        return `No Wikipedia articles found for "${query}"`
-      }
-
-      return `## Wikipedia Search: "${query}"\n\n${results.join('\n\n')}`
-    } catch (e) {
-      console.error('[Tool] Wikipedia search error:', e)
-      return `Wikipedia search failed: ${e}`
-    }
-  }
-
-  // Handle Wikipedia article fetch
-  if (result.startsWith('__FETCH_WIKIPEDIA__:')) {
-    try {
-      const data = JSON.parse(result.replace('__FETCH_WIKIPEDIA__:', ''))
-      const title = data.title || ''
-
-      const logFn = (msg: string) => agentLog.value.push(msg)
-
-      const content = await fetchWikipediaArticle(title, logFn)
-      if (content) {
-        agentLog.value.push(`> Wikipedia: Got ${content.length} chars for "${title}"`)
-        return `# Wikipedia: ${title}\n\n${content}`
-      }
-      return `Wikipedia article "${title}" not found`
-    } catch (e) {
-      console.error('[Tool] Wikipedia fetch error:', e)
-      return `Wikipedia fetch failed: ${e}`
-    }
-  }
-
-  // Handle claim validation
-  if (result.startsWith('__VALIDATE_CLAIM__:')) {
-    try {
-      const data = JSON.parse(result.replace('__VALIDATE_CLAIM__:', ''))
-      const claim = data.claim || ''
-
-      agentLog.value.push(`> Validating: ${claim.slice(0, 50)}...`)
-
-      const validation = await validateClaim(claim, store.filteredNodes)
-
-      return `Claim: "${claim}"\nValidated: ${validation.validated ? 'YES' : 'NO'}\nConfidence: ${validation.confidence}\nSources: ${validation.sources.join(', ') || 'none'}`
-    } catch (e) {
-      console.error('[Tool] Validation error:', e)
-      return `Validation failed: ${e}`
-    }
-  }
-
-  // Handle completeness check
-  if (result.startsWith('__CHECK_COMPLETENESS__:')) {
-    try {
-      const data = JSON.parse(result.replace('__CHECK_COMPLETENESS__:', ''))
-      const topic = data.topic || ''
-      const findings = data.findings || []
-
-      agentLog.value.push(`> Checking completeness: ${topic}`)
-
-      // Convert findings to the format expected
-      const findingsForAssess = findings.map((f: string) => ({
-        claim: f,
-        sources: [],
-        confidence: 'medium' as const,
-        validated: false,
-      }))
-
-      const result2 = assessCompleteness(topic, findingsForAssess, [])
-
-      const response = [
-        `Topic: ${topic}`,
-        `Coverage Score: ${Math.round(result2.score * 100)}%`,
-        `Findings Analyzed: ${findings.length}`,
-        '',
-        result2.score >= 0.8 ? 'Research appears COMPLETE.' : 'Research may be INCOMPLETE.',
-      ]
-
-      if (result2.suggestions.length > 0) {
-        response.push('', 'Suggested follow-up queries:')
-        for (const s of result2.suggestions) {
-          response.push(`- ${s}`)
-        }
-      }
-
-      return response.join('\n')
-    } catch (e) {
-      console.error('[Tool] Completeness check error:', e)
-      return `Completeness check failed: ${e}`
-    }
-  }
-
+  // If not a marker and not unhandled, return result
   if (!result.startsWith('__UNHANDLED__:')) {
     return result
   }
-  console.log(`[Tool] ${name} falling through to switch`)
 
-  // Handle LLM-dependent tools inline
-  switch (name) {
-    case 'for_each_node': {
-      let nodes = [...store.filteredNodes]
-      const filter = args.filter || 'all'
-      if (filter === 'empty') {
-        nodes = nodes.filter(n => !n.markdown_content?.trim())
-      } else if (filter === 'has_content') {
-        nodes = nodes.filter(n => n.markdown_content?.trim())
-      } else if (filter !== 'all') {
-        const term = filter.toLowerCase()
-        nodes = nodes.filter(n => n.title.toLowerCase().includes(term) || n.markdown_content?.toLowerCase().includes(term))
-      }
-      if (nodes.length === 0) return `No nodes match filter "${filter}"`
-      agentLog.value.push(`> Iterating ${nodes.length} nodes`)
+  console.log(`[Tool] ${name} falling through to LLM tools`)
 
-      const evalExpr = (expr: string, n: number): string => {
-        try {
-          const safe = expr.replace(/\bn\b/g, String(n)).replace(/\^/g, '**')
-          if (!/^[\d\s+\-*/().]+$/.test(safe)) return expr
-          return String(Math.round(Function(`"use strict"; return (${safe})`)() * 1000) / 1000)
-        } catch { return expr }
-      }
-
-      const results: string[] = []
-      for (const node of nodes) {
-        const num = parseInt(node.title.match(/\d+/)?.[0] || '0')
-        let query = (args.template || '').replace(/\{title\}/g, node.title).replace(/\{([^}]+)\}/g, (_: string, expr: string) => evalExpr(expr, num))
-
-        if (args.action === 'set') {
-          pushContentUndo(node.id, node.markdown_content, node.title)
-          await store.updateNodeContent(node.id, query)
-          results.push(`${node.title}: set`)
-        } else if (args.action === 'append') {
-          pushContentUndo(node.id, node.markdown_content, node.title)
-          await store.updateNodeContent(node.id, (node.markdown_content || '') + '\n\n' + query)
-          results.push(`${node.title}: appended`)
-        } else if (args.action === 'llm') {
-          // Skip empty nodes
-          if (!node.markdown_content?.trim()) {
-            results.push(`${node.title}: skipped (empty)`)
-            continue
-          }
-          // Save undo state before modifying
-          pushContentUndo(node.id, node.markdown_content, node.title)
-          try {
-            const prompt = `${query}\n\nContent to process:\n${node.markdown_content}`
-            const system = 'You are a text processor. Apply the instruction to the content. Output ONLY the processed text, nothing else.'
-            const result = await callOllama(prompt, system)
-            if (result?.trim()) {
-              await store.updateNodeContent(node.id, result.trim())
-              results.push(`${node.title}: processed`)
-            }
-          } catch (e) { results.push(`${node.title}: llm failed - ${e}`) }
-        }
-      }
-      return `Processed ${nodes.length} nodes`
-    }
-
-    case 'smart_move': {
-      const nodes = store.filteredNodes
-      if (nodes.length === 0) return 'No nodes to move'
-      const instruction = args.instruction || ''
-      agentLog.value.push(`> Smart move: ${nodes.length} nodes`)
-
-      let categories: string[] = []
-      try {
-        const prompt = `Extract category names from: "${instruction}"\nList ONLY categories separated by comma:`
-        const response = await llmQueue.generate(prompt)
-        categories = (response || '').toLowerCase().split(/[,\n]+/).map((c: string) => c.trim()).filter((c: string) => c.length > 1)
-      } catch { /* ignore LLM errors, use fallback categories */ }
-      if (categories.length < 2) categories = ['left', 'right']
-
-      const groups: Map<string, typeof nodes> = new Map()
-      for (const node of nodes) {
-        try {
-          const prompt = `Classify "${node.title}" into ONE of: ${categories.join(', ')}\nAnswer with ONLY the category:`
-          const response = await llmQueue.generate(prompt)
-          const group = (response || 'other').toLowerCase().trim().split(/\s+/)[0]
-          if (!groups.has(group)) groups.set(group, [])
-          groups.get(group)!.push(node)
-        } catch { /* ignore classification errors */ }
-      }
-
-      let moved = 0
-      const spacing = 250
-      let groupX = 100
-      for (const [, groupNodes] of groups) {
-        for (let i = 0; i < groupNodes.length; i++) {
-          await store.updateNodePosition(groupNodes[i].id, groupX, 100 + i * 180)
-          moved++
-        }
-        groupX += spacing
-      }
-      return `Moved ${moved} nodes into ${groups.size} groups`
-    }
-
-    case 'smart_connect': {
-      const nodes = store.filteredNodes
-      if (nodes.length < 2) return 'Need at least 2 nodes'
-      const groupsArg = args.groups || ''
-      agentLog.value.push(`> Smart connect: ${nodes.length} nodes`)
-
-      const nodeGroups: Map<string, string> = new Map()
-      for (const node of nodes) {
-        try {
-          const prompt = `Classify "${node.title}" into ONE of: ${groupsArg}\nAnswer with ONLY the group name:`
-          const response = await llmQueue.generate(prompt)
-          nodeGroups.set(node.id, (response || 'other').toLowerCase().trim().split(/\s+/)[0])
-        } catch { /* ignore classification errors */ }
-      }
-
-      let edgeCount = 0
-      const groupedNodes = new Map<string, string[]>()
-      for (const [id, group] of nodeGroups) {
-        if (!groupedNodes.has(group)) groupedNodes.set(group, [])
-        groupedNodes.get(group)!.push(id)
-      }
-
-      for (const [, ids] of groupedNodes) {
-        for (let i = 0; i < ids.length - 1; i++) {
-          await store.createEdge({ source_node_id: ids[i], target_node_id: ids[i + 1] })
-          edgeCount++
-        }
-      }
-      return `Created ${edgeCount} edges in ${groupedNodes.size} groups`
-    }
-
-    case 'smart_color': {
-      const nodes = store.filteredNodes
-      if (nodes.length === 0) return 'No nodes to color'
-      const instruction = args.instruction || ''
-      agentLog.value.push(`> Smart color: ${nodes.length} nodes`)
-
-      // Extract color mappings from instruction using LLM
-      let colorMappings: Array<{ category: string; color: string }> = []
-      try {
-        const prompt = `Extract category-to-color mappings from: "${instruction}"
-Output as JSON array: [{"category":"name","color":"#hex"}]
-Available colors: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink), #6b7280 (gray)
-Example: "departments red, people blue" -> [{"category":"departments","color":"#ef4444"},{"category":"people","color":"#3b82f6"}]
-Output ONLY the JSON array:`
-        const response = await llmQueue.generate(prompt)
-        const match = (response || '').match(/\[[\s\S]*\]/)
-        if (match) colorMappings = JSON.parse(match[0])
-      } catch { /* ignore LLM errors */ }
-
-      if (colorMappings.length === 0) return 'Could not parse color instruction'
-
-      let colored = 0
-      for (const node of nodes) {
-        // Check each mapping - match against title and content
-        const nodeText = `${node.title} ${node.markdown_content || ''}`.toLowerCase()
-        for (const { category, color } of colorMappings) {
-          if (nodeText.includes(category.toLowerCase()) ||
-              nodeText.includes(`#${category.toLowerCase()}`)) {
-            await store.updateNodeColor(node.id, color)
-            colored++
-            break
-          }
-        }
-      }
-      return `Colored ${colored} nodes`
-    }
-
-    case 'color_matching': {
-      // Simple pattern-based coloring (grep style)
-      const pattern = (args.pattern || '').toLowerCase()
-      const color = args.color || '#ef4444'
-      if (!pattern) return 'Pattern required'
-
-      const nodes = store.filteredNodes
-      let colored = 0
-      const matchedTitles: string[] = []
-      for (const node of nodes) {
-        // Search in title, content, and tags
-        const nodeText = `${node.title} ${node.markdown_content || ''} ${node.tags || ''}`.toLowerCase()
-        if (nodeText.includes(pattern)) {
-          await store.updateNodeColor(node.id, color)
-          colored++
-          matchedTitles.push(node.title)
-        }
-      }
-      const preview = matchedTitles.slice(0, 5).join(', ')
-      return `Colored ${colored}/${nodes.length} nodes matching "${pattern}": ${preview}${colored > 5 ? '...' : ''}`
-    }
-
-    case 'web_search': {
-      const query = args.query || ''
-      agentLog.value.push(`> Web search: "${query}"`)
-      try {
-        // Get API key from storage (stored as plain string, not JSON)
-        const apiKey = localStorage.getItem('nodus_search_api_key')
-
-        if (!apiKey) {
-          agentLog.value.push('> Web search: No API key')
-          return 'Web search requires Tavily API key in Settings'
-        }
-
-        const results = await invoke<Array<{ title: string; url: string; content: string }>>('web_search', {
-          query,
-          apiKey,
-        })
-
-        agentLog.value.push(`> Web search: Found ${results.length} results`)
-
-        if (results.length === 0) {
-          return `No web results for "${query}"`
-        }
-
-        const formatted = results.map((r, i) =>
-          `${i + 1}. **${r.title}**\n${r.content}\n[${r.url}]`
-        ).join('\n\n')
-
-        return `## Web Search: "${query}"\n\n${formatted}`
-      } catch (e) {
-        agentLog.value.push(`> Web search failed: ${e}`)
-        return `Web search failed: ${e}`
-      }
-    }
-
-    case 'create_theme': {
-      // Parse args if it's a string
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const themeName = parsedArgs.name || 'custom-theme'
-      const description = parsedArgs.description || ''
-      agentLog.value.push(`> Creating theme: ${themeName}`)
-      console.log('[Theme] CASE HIT - Creating theme:', themeName, description, 'raw args:', args)
-
-      try {
-        // Generate theme YAML using LLM
-        const prompt = `Create a YAML theme configuration based on this description: "${description}"
-
-The theme should have this structure:
-name: "${themeName}"
-display_name: "${themeName.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}"
-description: "${description}"
-is_dark: false (or true if it's a dark theme)
-variables:
-  bg_canvas: "#hex"
-  bg_surface: "#hex"
-  bg_surface_alt: "#hex"
-  bg_elevated: "#hex"
-  text_main: "#hex"
-  text_secondary: "#hex"
-  text_muted: "#hex"
-  border_default: "#hex"
-  border_subtle: "#hex"
-  primary_color: "#hex"
-  danger_color: "#hex"
-  danger_bg: "#hex"
-  danger_border: "#hex"
-  dot_color: "#hex"
-  shadow_sm: "rgba(...)"
-  shadow_md: "rgba(...)"
-
-Make colors match the description. Be creative! Output ONLY the YAML, no explanations.`
-
-        const yamlContent = await llmQueue.generate(prompt)
-        console.log('[Theme] Generated YAML:', yamlContent?.slice(0, 200))
-        if (!yamlContent) return 'Failed to generate theme'
-
-        // Clean up YAML (remove markdown code blocks if present)
-        let cleanYaml = yamlContent.trim()
-        if (cleanYaml.startsWith('```')) {
-          cleanYaml = cleanYaml.replace(/^```(yaml)?\n?/, '').replace(/\n?```$/, '')
-        }
-        console.log('[Theme] Clean YAML:', cleanYaml.slice(0, 200))
-
-        // Create the theme
-        console.log('[Theme] Calling createTheme...')
-        const newTheme = await themesStore.createTheme({
-          name: themeName,
-          display_name: themeName.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-          yaml_content: cleanYaml,
-        })
-        console.log('[Theme] Created theme:', newTheme)
-        console.log('[Theme] Themes in store:', themesStore.themes.length)
-
-        // Apply the new theme
-        themesStore.setTheme(newTheme.name)
-        return `Created and applied theme "${themeName}"`
-      } catch (e) {
-        console.error('[Theme] Error creating theme:', e)
-        return `Failed to create theme: ${e}`
-      }
-    }
-
-    case 'update_theme': {
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const themeName = parsedArgs.name || ''
-      const changes = parsedArgs.changes || ''
-      if (!themeName) return 'Theme name required'
-      agentLog.value.push(`> Updating theme: ${themeName}`)
-
-      try {
-        // Find the theme
-        const theme = themesStore.themes.find(t => t.name === themeName)
-        if (!theme) return `Theme "${themeName}" not found`
-        if (theme.is_builtin === 1) return 'Cannot modify built-in themes'
-
-        // Generate updated YAML using LLM
-        const prompt = `Update this theme YAML based on the instruction: "${changes}"
-
-Current theme YAML:
-${theme.yaml_content}
-
-Apply the changes and output the complete updated YAML. Output ONLY the YAML, no explanations.`
-
-        const yamlContent = await llmQueue.generate(prompt)
-        if (!yamlContent) return 'Failed to generate updated theme'
-
-        // Clean up YAML
-        let cleanYaml = yamlContent.trim()
-        if (cleanYaml.startsWith('```')) {
-          cleanYaml = cleanYaml.replace(/^```(yaml)?\n?/, '').replace(/\n?```$/, '')
-        }
-
-        // Update the theme
-        await themesStore.updateTheme({
-          id: theme.id,
-          yaml_content: cleanYaml,
-          display_name: theme.display_name,
-        })
-
-        return `Updated theme "${themeName}"`
-      } catch (e) {
-        return `Failed to update theme: ${e}`
-      }
-    }
-
-    case 'apply_theme': {
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const themeName = parsedArgs.name || ''
-      if (!themeName) return 'Theme name required'
-
-      const theme = themesStore.themes.find(t => t.name === themeName)
-      if (!theme) return `Theme "${themeName}" not found. Available: ${themesStore.themes.map(t => t.name).join(', ')}`
-
-      themesStore.setTheme(themeName)
-      return `Applied theme "${themeName}"`
-    }
-
-    case 'list_themes': {
-      const builtin = themesStore.builtinThemes.map(t => t.name)
-      const custom = themesStore.customThemes.map(t => t.name)
-      return `Built-in themes: ${builtin.join(', ')}\nCustom themes: ${custom.length > 0 ? custom.join(', ') : '(none)'}\nCurrent: ${themesStore.currentThemeName}`
-    }
-
-    case 'plan': {
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const tasks = parsedArgs.tasks || []
-      if (!Array.isArray(tasks) || tasks.length === 0) return 'No tasks provided'
-
-      // Clear previous tasks and set new ones
-      agentTasks.value = tasks.map((t: string, i: number) => ({
-        id: `task-${i}`,
-        description: t,
-        status: 'pending' as const
-      }))
-
-      // Log the plan
-      agentLog.value.push('--- PLAN ---')
-      tasks.forEach((t: string, i: number) => {
-        agentLog.value.push(`[ ] ${i + 1}. ${t}`)
-      })
-      agentLog.value.push('------------')
-
-      return `Created plan with ${tasks.length} tasks`
-    }
-
-    case 'update_task': {
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const taskIndex = parsedArgs.task_index ?? -1
-      const status = parsedArgs.status || 'done'
-
-      if (taskIndex < 0 || taskIndex >= agentTasks.value.length) {
-        return `Invalid task index: ${taskIndex}`
-      }
-
-      const task = agentTasks.value[taskIndex]
-      const oldStatus = task.status
-      task.status = status === 'done' ? 'done' : status === 'failed' ? 'error' : 'running'
-
-      // Update log with status
-      const statusIcon = status === 'done' ? '[x]' : status === 'failed' ? '[!]' : '[>]'
-      agentLog.value.push(`${statusIcon} Task ${taskIndex + 1}: ${task.description} -> ${status}`)
-
-      return `Task ${taskIndex + 1} updated: ${oldStatus} -> ${status}`
-    }
-
-    case 'remember': {
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const message = parsedArgs.message || ''
-      if (!message) return 'Nothing to remember'
-
-      // Store in per-workspace memory
-      const workspaceId = store.currentWorkspaceId || 'default'
-      memoryStorage.addMemory(workspaceId, message)
-
-      agentLog.value.push(`[memory] ${message}`)
-      return `Remembered for this workspace: ${message}`
-    }
-
-    // Agent planning tools
-    case 'create_plan': {
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const title = parsedArgs.title || 'Untitled Plan'
-      const steps = parsedArgs.steps || []
-
-      if (!Array.isArray(steps) || steps.length === 0) {
-        return 'No steps provided for plan'
-      }
-
-      // Create plan using plan state
-      const plan = planState.createPlan(title, steps)
-      agentLog.value.push(`> Plan created: ${title} (${steps.length} steps)`)
-
-      return `__CREATE_PLAN__:${JSON.stringify({ planId: plan.id, title, stepCount: steps.length })}`
-    }
-
-    case 'request_approval': {
-      // Trigger approval request
-      if (!planState.currentPlan.value) {
-        return 'No plan to approve'
-      }
-
-      const success = planState.requestApproval()
-      if (!success) {
-        return 'Failed to request approval'
-      }
-
-      agentLog.value.push('> Requesting approval...')
-      return `__REQUEST_APPROVAL__:${JSON.stringify({ planId: planState.currentPlan.value.id })}`
-    }
-
-    case 'research': {
-      let parsedArgs = args
-      if (typeof args === 'string') {
-        try { parsedArgs = JSON.parse(args) } catch { parsedArgs = {} }
-      }
-      const query = parsedArgs.query || ''
-      if (!query) return 'No query provided'
-
-      const sources = Array.isArray(parsedArgs.sources)
-        ? parsedArgs.sources as Array<'local' | 'web' | 'wikipedia'>
-        : ['local', 'web'] as Array<'local' | 'web' | 'wikipedia'>
-
-      agentLog.value.push(`> Researching: ${query}`)
-
-      try {
-        const results = await quickResearch(query, store.filteredNodes, sources)
-        return results
-      } catch (e) {
-        return `Research failed: ${e}`
-      }
-    }
-
-    default:
-      return `Unknown tool: ${name}`
+  // Try LLM-dependent tools
+  const llmResult = await llmTools.executeLLMTool(name, args)
+  if (llmResult !== null) {
+    return llmResult
   }
+
+  return `Unknown tool: ${name}`
 }
 
 function clearConversation() {
