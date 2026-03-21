@@ -282,24 +282,49 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
   const crossedY = (sourceSide === 'bottom' && startStandoff.y > endStandoff.y) ||
                    (sourceSide === 'top' && startStandoff.y < endStandoff.y)
 
-  // If crossed, route directly between ports with a simple midpoint
+  // If crossed, use reduced standoffs or route directly with diagonal
   if (crossedX || crossedY) {
-    const midX = (startPort.x + endPort.x) / 2
-    const midY = (startPort.y + endPort.y) / 2
-    let path: Point[]
-    let svgPath: string
+    // For diagonal mode: create a direct diagonal path between ports
+    // Use the midpoint calculation to create a proper 45-degree segment
+    const portDx = endPort.x - startPort.x
+    const portDy = endPort.y - startPort.y
+    const absDx = Math.abs(portDx)
+    const absDy = Math.abs(portDy)
+    const signX = portDx >= 0 ? 1 : -1
+    const signY = portDy >= 0 ? 1 : -1
 
-    if (crossedX) {
-      // Go vertical first, then horizontal
-      path = [startPort, { x: startPort.x, y: midY }, { x: endPort.x, y: midY }, endEdge]
-      svgPath = `M${startPort.x},${startPort.y} L${startPort.x},${midY} L${endPort.x},${midY} L${endEdge.x},${endEdge.y}`
-    } else {
-      // Go horizontal first, then vertical
-      path = [startPort, { x: midX, y: startPort.y }, { x: midX, y: endPort.y }, endEdge]
-      svgPath = `M${startPort.x},${startPort.y} L${midX},${startPort.y} L${midX},${endPort.y} L${endEdge.x},${endEdge.y}`
+    // Calculate diagonal segment based on shorter dimension
+    const diagDist = Math.min(absDx, absDy)
+
+    if (diagDist < MIN_DIAG_DIST) {
+      // Too short for diagonal - use simple L-shape
+      const midX = (startPort.x + endPort.x) / 2
+      const midY = (startPort.y + endPort.y) / 2
+      const isHorizontalStart = sourceSide === 'left' || sourceSide === 'right'
+      const path = isHorizontalStart
+        ? [startPort, { x: midX, y: startPort.y }, { x: midX, y: endPort.y }, endEdge]
+        : [startPort, { x: startPort.x, y: midY }, { x: endPort.x, y: midY }, endEdge]
+      return { path, svgPath: buildSvgPath(path), usedDetour: false }
     }
 
-    return { path, svgPath, usedDetour: false }
+    // Create diagonal path: short orthogonal -> 45° diagonal -> short orthogonal
+    const isHorizDominant = absDx >= absDy
+    let p1: Point, p2: Point
+
+    if (isHorizDominant) {
+      // Horizontal dominant: go horizontal a bit, then diagonal, then horizontal
+      const orthoLen = (absDx - diagDist) / 2
+      p1 = { x: startPort.x + orthoLen * signX, y: startPort.y }
+      p2 = { x: p1.x + diagDist * signX, y: startPort.y + diagDist * signY }
+    } else {
+      // Vertical dominant: go vertical a bit, then diagonal, then vertical
+      const orthoLen = (absDy - diagDist) / 2
+      p1 = { x: startPort.x, y: startPort.y + orthoLen * signY }
+      p2 = { x: startPort.x + diagDist * signX, y: p1.y + diagDist * signY }
+    }
+
+    const path = [startPort, p1, p2, endEdge]
+    return { path, svgPath: buildSvgPath(path), usedDetour: false }
   }
 
   // Very short path - just draw a line
