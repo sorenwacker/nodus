@@ -375,9 +375,14 @@ export function useAgentRunner(ctx: AgentContext) {
             try {
               parsedArgs = typeof tc.function.arguments === 'string'
                 ? JSON.parse(tc.function.arguments)
-                : tc.function.arguments
-            } catch {
-              // Invalid JSON, use empty args
+                : (tc.function.arguments || {})
+            } catch (e) {
+              // Invalid JSON - log the error and malformed args for debugging
+              const argsPreview = typeof tc.function.arguments === 'string'
+                ? tc.function.arguments.slice(0, 100)
+                : JSON.stringify(tc.function.arguments).slice(0, 100)
+              console.error(`Failed to parse tool arguments for ${tc.function.name}:`, e)
+              ctx.log.value.push(`> Warning: Malformed args for ${tc.function.name}: ${argsPreview}...`)
             }
             const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
@@ -459,13 +464,23 @@ export function useAgentRunner(ctx: AgentContext) {
           if (!toolJson && channelMatch) {
             const funcName = channelMatch[1]
             const funcArgs = channelMatch[2]
-            toolJson = JSON.stringify({ name: funcName, arguments: JSON.parse(funcArgs) })
+            try {
+              toolJson = JSON.stringify({ name: funcName, arguments: JSON.parse(funcArgs) })
+            } catch {
+              ctx.log.value.push(`> Failed to parse channel JSON`)
+            }
           }
 
           // Also try: <|channel|>...<|constrain|>json<|message|>{...}
-          const constrainMatch = msg.content.match(/<\|constrain\|>json<\|message\|>(\{[\s\S]*?\})/)
+          const constrainMatch = msg.content.match(/<\|channel\|>.*?to=functions\.(\w+).*?<\|constrain\|>json<\|message\|>(\{[\s\S]*?\})/)
           if (!toolJson && constrainMatch) {
-            toolJson = constrainMatch[1]
+            const funcName = constrainMatch[1]
+            const funcArgs = constrainMatch[2]
+            try {
+              toolJson = JSON.stringify({ name: funcName, arguments: JSON.parse(funcArgs) })
+            } catch {
+              ctx.log.value.push(`> Failed to parse constrain JSON`)
+            }
           }
 
           const rawJsonMatch = msg.content.match(/^\s*(\{"name"\s*:[\s\S]*\})/)

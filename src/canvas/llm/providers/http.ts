@@ -67,7 +67,14 @@ export async function httpFetch(
         status: result.status,
         statusText: '',
         headers: new Headers(),
-        json: async () => JSON.parse(result.body),
+        json: async () => {
+          try {
+            return JSON.parse(result.body)
+          } catch (e) {
+            console.error('Failed to parse API response as JSON:', result.body.slice(0, 200))
+            throw new Error(`Invalid JSON response: ${e instanceof Error ? e.message : e}`)
+          }
+        },
         text: async () => result.body,
       } as Response
     } catch (e) {

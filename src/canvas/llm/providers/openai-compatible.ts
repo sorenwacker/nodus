@@ -161,17 +161,26 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     }
 
     if (choice?.message?.tool_calls) {
-      message.tool_calls = choice.message.tool_calls.map((tc: {
-        id: string
-        function: { name: string; arguments: string }
-      }) => ({
-        id: tc.id,
-        type: 'function' as const,
-        function: {
-          name: tc.function.name,
-          arguments: tc.function.arguments,
-        },
-      }))
+      message.tool_calls = choice.message.tool_calls
+        .filter((tc: { id: string; function?: { name?: string; arguments?: string } }) => {
+          // Filter out malformed tool calls
+          if (!tc.function?.name) {
+            console.warn('Skipping tool call without function name:', tc)
+            return false
+          }
+          return true
+        })
+        .map((tc: {
+          id: string
+          function: { name: string; arguments: string }
+        }) => ({
+          id: tc.id,
+          type: 'function' as const,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments || '{}',
+          },
+        }))
     }
 
     return { message }
