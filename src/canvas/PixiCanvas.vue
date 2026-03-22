@@ -3086,11 +3086,19 @@ ${edges.map(e => `  - id: "${e.id}"
       </div>
       <!-- Agent activity log -->
       <div v-if="agentLog.length > 0" class="agent-log">
-        <button class="clear-log-btn" :data-tooltip="t('canvas.agent.clearLog')" @click="agentLog.length = 0">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+        <div class="log-buttons">
+          <button class="log-btn" title="Copy log" @click="navigator.clipboard.writeText(agentLog.join('\n'))">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+          <button class="log-btn" title="Clear log" @click="agentLog.length = 0">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
       </div>
     </div>
