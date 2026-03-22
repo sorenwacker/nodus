@@ -49,6 +49,9 @@ const exploreMode: AgentModeConfig = {
     // Coloring
     'smart_color',
     'color_matching',
+    // Batch operations
+    'for_each_node',
+    'batch_update',
     // Thinking
     'think',
     'done',
@@ -105,6 +108,9 @@ const planMode: AgentModeConfig = {
     // Coloring
     'smart_color',
     'color_matching',
+    // Batch operations
+    'for_each_node',
+    'batch_update',
     // Planning
     'think',
     'create_plan',

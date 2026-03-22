@@ -1221,21 +1221,22 @@ ${edgeDescriptions}`
       const template = args.template
       const action = args.action
 
-      // LLM action - use LLM to transform each node's content
+      // LLM action - use LLM to generate/transform content
       if (action === 'llm') {
         const { providerRegistry } = await import('./providers')
         const provider = providerRegistry.getActiveProvider()
         let processed = 0
 
         for (const node of nodes) {
-          if (!node.markdown_content?.trim()) continue
-
           ctx.log(`> Processing "${node.title}"...`)
+
+          // Use existing content if available, otherwise use title for generation
+          const sourceText = node.markdown_content?.trim() || node.title
 
           try {
             const result = await provider.generate({
-              prompt: `${template}\n\nContent:\n${node.markdown_content}`,
-              system: 'You are a text processor. Follow the instruction exactly. Output only the processed text, no explanations.',
+              prompt: `${template}\n\nTopic/Content: ${sourceText}`,
+              system: 'You are a content generator. Follow the instruction exactly. Output only the content, no explanations or preamble.',
             })
 
             if (result.content?.trim()) {
