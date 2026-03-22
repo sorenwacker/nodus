@@ -146,8 +146,19 @@ nodus/
 │   └── PRODUCT_DESIGN.md       # Main spec
 ├── src/                        # Vue frontend
 │   ├── components/
-│   ├── canvas/                 # PixiJS logic
+│   ├── canvas/                 # PixiJS logic, composables
+│   │   ├── composables/        # Canvas-specific composables
+│   │   ├── components/         # Canvas sub-components
+│   │   ├── layout/             # Layout algorithms
+│   │   └── PixiCanvas.vue      # Main canvas component
+│   ├── llm/                    # LLM module (app-level)
+│   │   ├── providers/          # Provider adapters
+│   │   ├── tools/              # Agent tools
+│   │   └── *.ts                # Core LLM logic
+│   ├── composables/            # App-level composables
 │   ├── stores/                 # Pinia state
+│   ├── lib/                    # Utility libraries
+│   ├── types/                  # TypeScript types
 │   └── __tests__/
 ├── src-tauri/                  # Rust backend
 │   ├── src/
