@@ -3,7 +3,7 @@
  * Executes LLM agent tool calls using the ToolRegistry
  */
 import { toolRegistry, type ToolContext, type INodeStore } from './registry'
-import { registerCoreTools, resetPositionCounter } from './coreTools'
+import { registerCoreTools, resetPositionCounter } from './tools'
 import { agentLogger } from '../../lib/logger'
 
 // Re-export types for backwards compatibility

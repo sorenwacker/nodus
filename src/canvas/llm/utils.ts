@@ -5,7 +5,7 @@
 /**
  * Clean LLM-generated content: fix escape sequences
  */
-export function cleanContent(text: string): string {
+export function cleanContent(text: string | undefined | null): string {
   return (text || '')
     .replace(/\\\\n/g, '\n')
     .replace(/\\n/g, '\n')
