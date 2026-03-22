@@ -32,6 +32,7 @@ import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
 import CanvasContextMenu from './components/CanvasContextMenu.vue'
 import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
+import CanvasLLMBar from './components/CanvasLLMBar.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -1735,51 +1736,21 @@ useKeyboardShortcuts({
 <template>
   <div class="canvas-wrapper">
     <!-- Graph-level LLM prompt bar -->
-    <div v-if="llmEnabled" class="graph-llm-bar">
-      <div class="llm-input-row">
-        <input
-          v-model="graphPrompt"
-          type="text"
-          :placeholder="t('canvas.agent.placeholder')"
-          class="llm-input"
-          :disabled="isGraphLLMLoading"
-          @keydown.enter="sendGraphPrompt"
-          @keydown.up="onPromptKeydown"
-          @keydown.down="onPromptKeydown"
-        />
-        <button class="llm-clear-btn" :data-tooltip="t('canvas.agent.clearMemory')" :class="{ active: conversationHistory.length > 0 }" @click="clearConversation">
-          {{ conversationHistory.length || 'C' }}
-        </button>
-        <button v-if="!agentRunning" class="llm-send" data-tooltip="Send prompt" :disabled="isGraphLLMLoading || !graphPrompt.trim()" @click="sendGraphPrompt">
-          {{ isGraphLLMLoading ? '...' : 'Go' }}
-        </button>
-        <button v-else class="llm-stop" data-tooltip="Stop agent" @click="stopAgent">Stop</button>
-      </div>
-      <!-- Agent Task List -->
-      <div v-if="agentTasks.length > 0" class="agent-tasks">
-        <div v-for="task in agentTasks" :key="task.id" class="agent-task" :class="task.status">
-          <span class="task-status">{{ task.status === 'done' ? 'v' : task.status === 'running' ? '~' : 'o' }}</span>
-          <span class="task-desc">{{ task.description }}</span>
-        </div>
-      </div>
-      <!-- Agent activity log -->
-      <div v-if="agentLog.length > 0" class="agent-log">
-        <div class="log-buttons">
-          <button class="log-btn" title="Copy log" @click="navigator.clipboard.writeText(agentLog.join('\n'))">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-          </button>
-          <button class="log-btn" title="Clear log" @click="agentLog.length = 0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
-      </div>
-    </div>
+    <CanvasLLMBar
+      v-if="llmEnabled"
+      :graph-prompt="graphPrompt"
+      :is-loading="isGraphLLMLoading"
+      :is-running="agentRunning"
+      :conversation-history="conversationHistory"
+      :agent-tasks="agentTasks"
+      :agent-log="agentLog"
+      @update:graph-prompt="graphPrompt = $event"
+      @send="sendGraphPrompt"
+      @stop="stopAgent"
+      @clear-conversation="clearConversation"
+      @prompt-keydown="onPromptKeydown"
+      @clear-log="agentLog.length = 0"
+    />
 
     <div
       ref="canvasRef"
