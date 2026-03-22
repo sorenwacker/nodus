@@ -43,7 +43,7 @@ function handleImport() {
       <div class="modal-header">
         <h2>{{ t('import.options.title') }}</h2>
         <span class="filename">{{ filename }}</span>
-        <button class="close-btn" data-tooltip="Close" @click="emit('cancel')">x</button>
+        <button class="close-btn" :data-tooltip="t('common.close')" @click="emit('cancel')">x</button>
       </div>
 
       <div class="modal-body">

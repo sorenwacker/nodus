@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { BibEntry } from '../lib/bibtex'
 import { formatAuthors } from '../lib/bibtex'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   entries: BibEntry[]
@@ -53,9 +56,9 @@ function formatAuthorShort(entry: BibEntry): string {
   <div class="modal-overlay" @click.self="emit('cancel')">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Import Citations</h2>
+        <h2>{{ t('citations.importTitle') }}</h2>
         <span class="filename">{{ filename }}</span>
-        <button class="close-btn" data-tooltip="Close" @click="emit('cancel')">x</button>
+        <button class="close-btn" :data-tooltip="t('common.close')" @click="emit('cancel')">x</button>
       </div>
 
       <div class="selection-controls">
@@ -66,7 +69,7 @@ function formatAuthorShort(entry: BibEntry): string {
             :indeterminate="!allSelected && !noneSelected"
             @change="toggleAll"
           />
-          Select all ({{ entries.length }})
+          {{ t('citations.selectAll', { count: entries.length }) }}
         </label>
         <span class="selected-count">{{ selected.size }} selected</span>
       </div>
@@ -96,13 +99,13 @@ function formatAuthorShort(entry: BibEntry): string {
       </div>
 
       <div class="modal-footer">
-        <button class="btn-cancel" @click="emit('cancel')">Cancel</button>
+        <button class="btn-cancel" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button
           class="btn-import"
           :disabled="noneSelected"
           @click="importSelected"
         >
-          Import {{ selected.size }} citation{{ selected.size === 1 ? '' : 's' }}
+          {{ t('citations.importCount', { count: selected.size }) }}
         </button>
       </div>
     </div>

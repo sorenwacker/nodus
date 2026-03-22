@@ -297,6 +297,11 @@
     "untitled": "Sin título",
     "processing": "Procesando..."
   },
+  "citations": {
+    "importTitle": "Importar citas",
+    "selectAll": "Seleccionar todo ({count})",
+    "importCount": "Importar {count} cita | Importar {count} citas"
+  },
   "common": {
     "close": "Cerrar",
     "cancel": "Cancelar",
@@ -328,7 +333,22 @@
     "edgeColor": "Color de arista",
     "readMode": "Modo lectura",
     "newStoryline": "Nueva línea argumental",
-    "rename": "Renombrar"
+    "rename": "Renombrar",
+    "contents": "Contenido",
+    "loading": "Cargando..."
+  },
+  "nodePicker": {
+    "newNode": "Nuevo nodo",
+    "newComment": "Nuevo comentario",
+    "selectNode": "Seleccionar nodo",
+    "commentPlaceholder": "Texto del comentario...",
+    "nodeTitlePlaceholder": "Título del nodo...",
+    "createNode": "Crear nodo",
+    "addComment": "Agregar comentario",
+    "searchPlaceholder": "Buscar nodos...",
+    "noMatchingNodes": "No hay nodos coincidentes",
+    "noAvailableNodes": "No hay nodos disponibles",
+    "create": "Crear"
   },
   "nodePanel": {
     "closePanel": "Cerrar panel",

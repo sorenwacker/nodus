@@ -297,6 +297,11 @@
     "untitled": "Ohne Titel",
     "processing": "Verarbeitung..."
   },
+  "citations": {
+    "importTitle": "Zitate importieren",
+    "selectAll": "Alle auswählen ({count})",
+    "importCount": "{count} Zitat importieren | {count} Zitate importieren"
+  },
   "common": {
     "close": "Schließen",
     "cancel": "Abbrechen",
@@ -328,7 +333,22 @@
     "edgeColor": "Kantenfarbe",
     "readMode": "Lesemodus",
     "newStoryline": "Neuer Handlungsstrang",
-    "rename": "Umbenennen"
+    "rename": "Umbenennen",
+    "contents": "Inhalt",
+    "loading": "Laden..."
+  },
+  "nodePicker": {
+    "newNode": "Neuer Knoten",
+    "newComment": "Neuer Kommentar",
+    "selectNode": "Knoten auswählen",
+    "commentPlaceholder": "Kommentartext...",
+    "nodeTitlePlaceholder": "Knotentitel...",
+    "createNode": "Knoten erstellen",
+    "addComment": "Kommentar hinzufügen",
+    "searchPlaceholder": "Knoten suchen...",
+    "noMatchingNodes": "Keine passenden Knoten",
+    "noAvailableNodes": "Keine verfügbaren Knoten",
+    "create": "Erstellen"
   },
   "nodePanel": {
     "closePanel": "Panel schließen",

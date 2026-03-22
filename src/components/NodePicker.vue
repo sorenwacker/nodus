@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   excludeNodeIds?: string[]
@@ -100,8 +103,8 @@ function createComment() {
 <template>
   <div class="node-picker" :class="{ 'position-above': position === 'above' }">
     <div class="node-picker-header">
-      <span>{{ isCreating ? 'New node' : isCreatingComment ? 'New comment' : 'Select node' }}</span>
-      <button class="close-btn" data-tooltip="Close" @click="$emit('close')">
+      <span>{{ isCreating ? t('nodePicker.newNode') : isCreatingComment ? t('nodePicker.newComment') : t('nodePicker.selectNode') }}</span>
+      <button class="close-btn" :data-tooltip="t('common.close')" @click="$emit('close')">
         <Icon name="close" :size="10" />
       </button>
     </div>
@@ -110,7 +113,7 @@ function createComment() {
     <div v-if="isCreatingComment" class="node-picker-create">
       <textarea
         v-model="newCommentText"
-        placeholder="Comment text..."
+        :placeholder="t('nodePicker.commentPlaceholder')"
         class="create-input comment-input"
         rows="3"
         autofocus
@@ -118,8 +121,8 @@ function createComment() {
         @keydown.escape="cancelCreateComment"
       ></textarea>
       <div class="create-actions">
-        <button class="action-btn cancel" @click="cancelCreateComment">Cancel</button>
-        <button class="action-btn create" :disabled="!newCommentText.trim()" @click="createComment">Add</button>
+        <button class="action-btn cancel" @click="cancelCreateComment">{{ t('common.cancel') }}</button>
+        <button class="action-btn create" :disabled="!newCommentText.trim()" @click="createComment">{{ t('common.add') }}</button>
       </div>
     </div>
 
@@ -128,15 +131,15 @@ function createComment() {
       <input
         v-model="newNodeTitle"
         type="text"
-        placeholder="Node title..."
+        :placeholder="t('nodePicker.nodeTitlePlaceholder')"
         class="create-input"
         autofocus
         @keydown.enter="createNode"
         @keydown.escape="cancelCreate"
       />
       <div class="create-actions">
-        <button class="action-btn cancel" @click="cancelCreate">Cancel</button>
-        <button class="action-btn create" :disabled="!newNodeTitle.trim()" @click="createNode">Create</button>
+        <button class="action-btn cancel" @click="cancelCreate">{{ t('common.cancel') }}</button>
+        <button class="action-btn create" :disabled="!newNodeTitle.trim()" @click="createNode">{{ t('nodePicker.create') }}</button>
       </div>
     </div>
 
@@ -148,7 +151,7 @@ function createComment() {
           ref="searchInputRef"
           v-model="searchQuery"
           type="text"
-          placeholder="Search nodes..."
+          :placeholder="t('nodePicker.searchPlaceholder')"
           class="search-input"
           @keydown.escape="$emit('close')"
         />
@@ -158,16 +161,16 @@ function createComment() {
       <div v-if="allowCreate !== false" class="create-options">
         <button class="node-picker-item create-option" @click="startCreating">
           <Icon name="plus" :size="14" />
-          <span>Create node</span>
+          <span>{{ t('nodePicker.createNode') }}</span>
         </button>
         <button class="node-picker-item create-option comment-option" @click="startCreatingComment">
           <Icon name="comment" :size="14" />
-          <span>Add comment</span>
+          <span>{{ t('nodePicker.addComment') }}</span>
         </button>
       </div>
 
       <div v-if="availableNodes.length === 0" class="node-picker-empty">
-        {{ searchQuery ? 'No matching nodes' : 'No available nodes' }}
+        {{ searchQuery ? t('nodePicker.noMatchingNodes') : t('nodePicker.noAvailableNodes') }}
       </div>
       <div v-else class="node-picker-list">
         <button

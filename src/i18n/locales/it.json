@@ -297,6 +297,11 @@
     "untitled": "Senza titolo",
     "processing": "Elaborazione..."
   },
+  "citations": {
+    "importTitle": "Importa citazioni",
+    "selectAll": "Seleziona tutto ({count})",
+    "importCount": "Importa {count} citazione | Importa {count} citazioni"
+  },
   "common": {
     "close": "Chiudi",
     "cancel": "Annulla",
@@ -328,7 +333,22 @@
     "edgeColor": "Colore arco",
     "readMode": "Modalità lettura",
     "newStoryline": "Nuova trama",
-    "rename": "Rinomina"
+    "rename": "Rinomina",
+    "contents": "Indice",
+    "loading": "Caricamento..."
+  },
+  "nodePicker": {
+    "newNode": "Nuovo nodo",
+    "newComment": "Nuovo commento",
+    "selectNode": "Seleziona nodo",
+    "commentPlaceholder": "Testo del commento...",
+    "nodeTitlePlaceholder": "Titolo del nodo...",
+    "createNode": "Crea nodo",
+    "addComment": "Aggiungi commento",
+    "searchPlaceholder": "Cerca nodi...",
+    "noMatchingNodes": "Nessun nodo corrispondente",
+    "noAvailableNodes": "Nessun nodo disponibile",
+    "create": "Crea"
   },
   "nodePanel": {
     "closePanel": "Chiudi pannello",

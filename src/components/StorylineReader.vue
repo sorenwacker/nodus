@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import { invoke } from '@tauri-apps/api/core'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
 import type { Node, Storyline } from '../types'
+
+const { t } = useI18n()
 
 // Configure marked
 marked.use({
@@ -262,14 +265,14 @@ watch(() => props.storylineId, loadStoryline)
       <!-- Header -->
       <header class="reader-header">
         <div class="header-left">
-          <button class="toc-toggle" title="Toggle contents" @click="showToc = !showToc">
+          <button class="toc-toggle" :title="t('storyline.toggleContents')" @click="showToc = !showToc">
             <Icon name="menu" :size="18" />
           </button>
-          <h1 class="reader-title">{{ storyline?.title || 'Loading...' }}</h1>
+          <h1 class="reader-title">{{ storyline?.title || t('storyline.loading') }}</h1>
         </div>
         <div class="header-right">
           <span class="page-indicator">{{ activeNodeIndex + 1 }} / {{ nodes.length }}</span>
-          <button class="close-btn" data-tooltip="Close (Esc)" @click="$emit('close')">
+          <button class="close-btn" :data-tooltip="t('storyline.closeEsc')" @click="$emit('close')">
             <Icon name="close" :size="20" />
           </button>
         </div>
@@ -279,7 +282,7 @@ watch(() => props.storylineId, loadStoryline)
         <!-- Table of Contents Sidebar -->
         <aside v-if="showToc" class="toc-sidebar">
           <div class="toc-header">
-            <h2 class="toc-title">Contents</h2>
+            <h2 class="toc-title">{{ t('storyline.contents') }}</h2>
           </div>
           <div class="toc-nav">
             <StorylineNodeList

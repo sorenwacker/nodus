@@ -297,6 +297,11 @@
     "untitled": "Sans titre",
     "processing": "Traitement..."
   },
+  "citations": {
+    "importTitle": "Importer des citations",
+    "selectAll": "Tout sélectionner ({count})",
+    "importCount": "Importer {count} citation | Importer {count} citations"
+  },
   "common": {
     "close": "Fermer",
     "cancel": "Annuler",
@@ -328,7 +333,22 @@
     "edgeColor": "Couleur de l'arête",
     "readMode": "Mode lecture",
     "newStoryline": "Nouveau scénario",
-    "rename": "Renommer"
+    "rename": "Renommer",
+    "contents": "Sommaire",
+    "loading": "Chargement..."
+  },
+  "nodePicker": {
+    "newNode": "Nouveau nœud",
+    "newComment": "Nouveau commentaire",
+    "selectNode": "Sélectionner un nœud",
+    "commentPlaceholder": "Texte du commentaire...",
+    "nodeTitlePlaceholder": "Titre du nœud...",
+    "createNode": "Créer un nœud",
+    "addComment": "Ajouter un commentaire",
+    "searchPlaceholder": "Rechercher des nœuds...",
+    "noMatchingNodes": "Aucun nœud correspondant",
+    "noAvailableNodes": "Aucun nœud disponible",
+    "create": "Créer"
   },
   "nodePanel": {
     "closePanel": "Fermer le panneau",

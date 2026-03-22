@@ -297,6 +297,11 @@
     "untitled": "Untitled",
     "processing": "Processing..."
   },
+  "citations": {
+    "importTitle": "Import Citations",
+    "selectAll": "Select all ({count})",
+    "importCount": "Import {count} citation | Import {count} citations"
+  },
   "common": {
     "close": "Close",
     "cancel": "Cancel",
@@ -328,7 +333,22 @@
     "edgeColor": "Edge color",
     "readMode": "Read Mode",
     "newStoryline": "New Storyline",
-    "rename": "Rename"
+    "rename": "Rename",
+    "contents": "Contents",
+    "loading": "Loading..."
+  },
+  "nodePicker": {
+    "newNode": "New node",
+    "newComment": "New comment",
+    "selectNode": "Select node",
+    "commentPlaceholder": "Comment text...",
+    "nodeTitlePlaceholder": "Node title...",
+    "createNode": "Create node",
+    "addComment": "Add comment",
+    "searchPlaceholder": "Search nodes...",
+    "noMatchingNodes": "No matching nodes",
+    "noAvailableNodes": "No available nodes",
+    "create": "Create"
   },
   "nodePanel": {
     "closePanel": "Close panel",
