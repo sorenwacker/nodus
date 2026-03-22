@@ -1131,6 +1131,7 @@ const agentContext: AgentContext = {
       ? store.filteredNodes.filter(n => store.selectedNodeIds.includes(n.id))
       : store.filteredNodes
   },
+  filteredEdges: () => store.filteredEdges,
   cleanupOrphanEdges: () => store.cleanupOrphanEdges(),
   workspaceId: () => store.currentWorkspaceId || 'default',
   model: ollamaModel,

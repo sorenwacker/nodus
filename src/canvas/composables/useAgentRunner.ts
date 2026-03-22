@@ -41,6 +41,7 @@ function escapeForPrompt(text: string): string {
 export interface AgentContext {
   // Node store access
   filteredNodes: () => Array<{ id: string; title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>
+  filteredEdges: () => Array<{ source_node_id: string; target_node_id: string; label: string | null; link_type: string | null }>
   cleanupOrphanEdges: () => void
   workspaceId: () => string
 
@@ -71,12 +72,19 @@ interface SystemPromptMessage {
  * Uses XML-like structured separators to prevent prompt injection
  */
 function buildSystemPrompt(
-  nodes: Array<{ title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>,
+  nodes: Array<{ id: string; title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>,
+  edges: Array<{ source_node_id: string; target_node_id: string; label: string | null; link_type: string | null }>,
   workspaceId: string,
   mode: AgentMode,
   plan?: AgentPlan | null
 ): SystemPromptMessage {
   let nodeList = 'No nodes yet. Canvas is empty.'
+
+  // Build node ID to title map for edge display
+  const nodeIdToTitle = new Map<string, string>()
+  for (const n of nodes) {
+    nodeIdToTitle.set(n.id, n.title)
+  }
 
   if (nodes.length > 0 && nodes.length <= 30) {
     // Escape node titles to prevent prompt injection
@@ -86,6 +94,34 @@ function buildSystemPrompt(
   } else if (nodes.length > 30) {
     nodeList = nodes.slice(0, 20).map(n => `<node_title>${escapeForPrompt(n.title)}</node_title>`).join(', ') + `... (${nodes.length} total)`
   }
+
+  // Build edge list showing connections
+  let edgeList = 'No edges yet.'
+  if (edges.length > 0 && edges.length <= 50) {
+    edgeList = edges.map(e => {
+      const sourceTitle = nodeIdToTitle.get(e.source_node_id) || '?'
+      const targetTitle = nodeIdToTitle.get(e.target_node_id) || '?'
+      const label = e.label || e.link_type || 'related'
+      return `"${escapeForPrompt(sourceTitle)}" --[${label}]--> "${escapeForPrompt(targetTitle)}"`
+    }).join('\n')
+  } else if (edges.length > 50) {
+    edgeList = edges.slice(0, 30).map(e => {
+      const sourceTitle = nodeIdToTitle.get(e.source_node_id) || '?'
+      const targetTitle = nodeIdToTitle.get(e.target_node_id) || '?'
+      return `"${escapeForPrompt(sourceTitle)}" --> "${escapeForPrompt(targetTitle)}"`
+    }).join('\n') + `\n... (${edges.length} total edges)`
+  }
+
+  // Identify disconnected nodes (nodes with no edges)
+  const connectedNodeIds = new Set<string>()
+  for (const e of edges) {
+    connectedNodeIds.add(e.source_node_id)
+    connectedNodeIds.add(e.target_node_id)
+  }
+  const disconnectedNodes = nodes.filter(n => !connectedNodeIds.has(n.id))
+  const disconnectedList = disconnectedNodes.length > 0
+    ? `\nDISCONNECTED NODES (${disconnectedNodes.length}): ${disconnectedNodes.map(n => `"${escapeForPrompt(n.title)}"`).join(', ')}`
+    : ''
 
   const customRules = llmStorage.getAgentPrompt(DEFAULT_AGENT_PROMPT)
 
@@ -119,6 +155,9 @@ CANVAS: x right, y down.
 ${memorySection}
 NODES (${nodes.length}):
 ${nodeList}
+
+EDGES (${edges.length}):
+${edgeList}${disconnectedList}
 
 TOOLS:
 - create_node(title, content): Create one node
@@ -293,7 +332,7 @@ export function useAgentRunner(ctx: AgentContext) {
     // Include recent conversation history for context continuity
     const recentHistory = ctx.conversationHistory.value.slice(-6) // Last 3 exchanges
     const messages: ChatMessage[] = [
-      buildSystemPrompt(ctx.filteredNodes(), ctx.workspaceId(), mode.value, currentPlan.value),
+      buildSystemPrompt(ctx.filteredNodes(), ctx.filteredEdges(), ctx.workspaceId(), mode.value, currentPlan.value),
       ...recentHistory,
       { role: 'user', content: enhancedRequest },
     ]
