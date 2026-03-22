@@ -1258,7 +1258,7 @@ ${edgeDescriptions}`
 
             const result = await provider.generate({
               prompt,
-              system: 'You are a knowledgeable writer. Write specifically about the given topic. Be factual and focused. No preamble.',
+              system: `You are a knowledgeable writer. IMPORTANT: Write ONLY about "${node.title}" specifically - not about related or parent categories. Focus exclusively on this exact topic. Be factual, focused, and concise. No preamble.`,
             })
 
             if (result.content?.trim()) {
