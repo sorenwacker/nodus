@@ -7,7 +7,7 @@
 import { onMounted, onUnmounted, type Ref } from 'vue'
 import { uiStorage } from '../../lib/storage'
 
-export interface UseKeyboardShortcutsContext {
+export interface UseCanvasKeyboardShortcutsContext {
   // Frame operations
   pendingFramePlacement: Ref<boolean>
   cancelFramePlacement: () => void
@@ -41,11 +41,11 @@ export interface UseKeyboardShortcutsContext {
   exportGraphAsYaml: () => void
 }
 
-export interface UseKeyboardShortcutsReturn {
+export interface UseCanvasKeyboardShortcutsReturn {
   // No exposed state needed - all event-based
 }
 
-export function useKeyboardShortcuts(ctx: UseKeyboardShortcutsContext): UseKeyboardShortcutsReturn {
+export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContext): UseCanvasKeyboardShortcutsReturn {
   const {
     pendingFramePlacement,
     cancelFramePlacement,

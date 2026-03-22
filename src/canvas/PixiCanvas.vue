@@ -60,7 +60,7 @@ import { useEdgeVisibility } from './composables/useEdgeVisibility'
 import { useViewportCulling } from './composables/useViewportCulling'
 import { useGraphMetrics } from './composables/useGraphMetrics'
 import { useCanvasDisplay } from './composables/useCanvasDisplay'
-import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
+import { useCanvasKeyboardShortcuts } from './composables/useCanvasKeyboardShortcuts'
 import { useNodeHover } from './composables/useNodeHover'
 import { useUndoHandlers } from './composables/useUndoHandlers'
 
@@ -1621,7 +1621,7 @@ ${edges.map(e => `  - id: "${e.id}"
 ;(window as any).exportGraphAsYaml = exportGraphAsYaml
 
 // Keyboard shortcuts composable - handles global canvas shortcuts
-useKeyboardShortcuts({
+useCanvasKeyboardShortcuts({
   pendingFramePlacement: frames.pendingFramePlacement,
   cancelFramePlacement,
   selectedNodeIds: computed(() => store.selectedNodeIds),
