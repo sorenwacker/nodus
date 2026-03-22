@@ -45,6 +45,7 @@ import { useNodeDragging } from './composables/useNodeDragging'
 import { useCanvasZoom } from './composables/useCanvasZoom'
 import { useEdgeRouting } from './composables/useEdgeRouting'
 import { useEdgeVisibility } from './composables/useEdgeVisibility'
+import { useViewportCulling } from './composables/useViewportCulling'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -338,46 +339,6 @@ watch(() => store.currentWorkspaceId, () => {
   }, 200)
 })
 
-// Viewport size for culling (updated on resize)
-const viewportWidth = ref(window.innerWidth)
-const viewportHeight = ref(window.innerHeight)
-
-// Only render nodes visible in viewport (with margin for smooth scrolling)
-const visibleNodes = computed(() => {
-  const s = scale.value
-  const ox = offsetX.value
-  const oy = offsetY.value
-  // Scale margin inversely with zoom to maintain consistent screen-space buffer
-  // At zoom 1.0: 500px margin. At zoom 0.2: 2500px margin in canvas coords
-  const baseMargin = 500
-  const margin = baseMargin / Math.max(s, 0.1)
-
-  // Viewport bounds in canvas coordinates
-  const viewLeft = -ox / s - margin
-  const viewTop = -oy / s - margin
-  const viewRight = (viewportWidth.value - ox) / s + margin
-  const viewBottom = (viewportHeight.value - oy) / s + margin
-
-  // Use displayNodes which respects neighborhood mode
-  return displayNodes.value.filter(node => {
-    const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
-    const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
-    // Check if node intersects viewport
-    return nodeRight >= viewLeft &&
-           node.canvas_x <= viewRight &&
-           nodeBottom >= viewTop &&
-           node.canvas_y <= viewBottom
-  })
-})
-
-// Set of visible node IDs for quick lookup
-const visibleNodeIds = computed(() => new Set(visibleNodes.value.map(n => n.id)))
-
-// Graph size thresholds - defined after displayNodes so they use actual displayed count
-// (moved below displayNodes definition)
-
-// screenToCanvas is provided by useViewState composable
-
 // Neighborhood mode composable
 const neighborhood = useNeighborhoodMode({
   store: {
@@ -396,6 +357,15 @@ const neighborhood = useNeighborhoodMode({
 
 // Destructure for convenience
 const { neighborhoodMode, focusNodeId, displayNodes, neighborhoodDepth, setDepth } = neighborhood
+
+// Viewport culling composable - filters nodes visible in viewport
+const viewportCulling = useViewportCulling({
+  scale,
+  offsetX,
+  offsetY,
+  displayNodes,
+})
+const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
 // Expose functions with original names for compatibility
 function toggleNeighborhoodMode(nodeId?: string) {
