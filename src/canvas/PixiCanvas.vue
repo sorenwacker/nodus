@@ -46,6 +46,7 @@ import { useCanvasZoom } from './composables/useCanvasZoom'
 import { useEdgeRouting } from './composables/useEdgeRouting'
 import { useEdgeVisibility } from './composables/useEdgeVisibility'
 import { useViewportCulling } from './composables/useViewportCulling'
+import { useGraphMetrics } from './composables/useGraphMetrics'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -367,6 +368,25 @@ const viewportCulling = useViewportCulling({
 })
 const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
+// Graph metrics composable - computes graph size thresholds and LOD mode
+const graphMetrics = useGraphMetrics({
+  displayNodes,
+  visibleNodes,
+  filteredNodes: computed(() => store.filteredNodes),
+  filteredEdges: computed(() => store.filteredEdges),
+  neighborhoodMode,
+  scale,
+})
+const {
+  isLargeGraph,
+  isHugeGraph,
+  isMassiveGraph,
+  isSemanticZoomCollapsed,
+  isLODMode,
+  nodeDegree,
+  getLODRadius,
+} = graphMetrics
+
 // Expose functions with original names for compatibility
 function toggleNeighborhoodMode(nodeId?: string) {
   neighborhood.toggle(nodeId)
@@ -445,39 +465,6 @@ const {
   reverseEdge, isEdgeBidirectional, makeUnidirectional, makeBidirectional,
   insertNodeOnEdge,
 } = edgeManipulation
-
-// Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
-// In neighborhood mode, always use full routing since we have few nodes
-const isLargeGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 200 || store.filteredEdges.length > 500))
-const isHugeGraph = computed(() => !neighborhoodMode.value && displayNodes.value.length > 350)
-const isMassiveGraph = computed(() => !neighborhoodMode.value && (displayNodes.value.length > 300 || store.filteredEdges.length > 800))
-
-// Semantic zoom collapse - hide content for massive graphs when zoomed out
-const isSemanticZoomCollapsed = computed(() => isMassiveGraph.value && scale.value < 0.6)
-
-// LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
-const LOD_THRESHOLD = 500
-const isLODMode = computed(() => visibleNodes.value.length > LOD_THRESHOLD)
-
-// Node degree (edge count) for LOD circle sizing
-const nodeDegree = computed(() => {
-  const degree: Record<string, number> = {}
-  for (const node of store.filteredNodes) {
-    degree[node.id] = 0
-  }
-  for (const edge of store.filteredEdges) {
-    if (degree[edge.source_node_id] !== undefined) degree[edge.source_node_id]++
-    if (degree[edge.target_node_id] !== undefined) degree[edge.target_node_id]++
-  }
-  return degree
-})
-
-// Calculate LOD circle radius based on degree (min 8px, max 40px)
-function getLODRadius(nodeId: string): number {
-  const deg = nodeDegree.value[nodeId] || 0
-  // Log scale for better distribution: radius = 8 + log2(degree + 1) * 6
-  return Math.min(40, 8 + Math.log2(deg + 1) * 6)
-}
 
 // Extract first image URL from node content for zoomed-out thumbnail display
 const nodeFirstImage = computed(() => {
