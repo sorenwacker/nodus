@@ -269,7 +269,7 @@ describe('Nodes Store', () => {
       store.switchWorkspace(workspace.id)
       expect(store.currentWorkspaceId).toBe(workspace.id)
 
-      store.deleteWorkspace(workspace.id)
+      await store.deleteWorkspace(workspace.id)
       expect(store.workspaces).not.toContainEqual(workspace)
       expect(store.currentWorkspaceId).toBeNull() // Should switch to default
     })
