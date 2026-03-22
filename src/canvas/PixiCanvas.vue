@@ -5,7 +5,6 @@ import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
-import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
 import { llmStorage, memoryStorage } from '../lib/storage'
@@ -49,6 +48,7 @@ import {
   usePdfDrop,
   useStorylines,
   useUndoHandlers,
+  useGraphExport,
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
@@ -1498,67 +1498,15 @@ const { addNodeToStoryline, createStorylineFromNode, moveNodesToWorkspace } = st
 /// Computed: number of selected nodes for context menu display
 const contextMenuNodeCount = computed(() => contextMenu.nodeCount.value)
 
-// Export current graph/subgraph as YAML for debugging
-function exportGraphAsYaml() {
-  const selectedIds = store.selectedNodeIds
-  const selectedSet = new Set(selectedIds)
-  const hasSelection = selectedIds.length > 0
-
-  // Export selected nodes only, or all if no selection
-  const nodesToExport = hasSelection
-    ? displayNodes.value.filter(n => selectedSet.has(n.id))
-    : displayNodes.value
-
-  const nodes = nodesToExport.map(n => ({
-    id: n.id,
-    title: n.title,
-    x: n.canvas_x,
-    y: n.canvas_y,
-    width: n.width || NODE_DEFAULTS.WIDTH,
-    height: n.height || NODE_DEFAULTS.HEIGHT,
-  }))
-
-  // Export edges where both endpoints are in the export set
-  const nodeIdSet = new Set(nodesToExport.map(n => n.id))
-  const edges = edgeLines.value
-    .filter(e => nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id))
-    .map(e => ({
-      id: e.id,
-      source: e.source_node_id,
-      target: e.target_node_id,
-      path: e.path,
-      style: e.style,
-    }))
-
-  const yaml = `# Graph Export - ${new Date().toISOString()}
-# Nodes: ${nodes.length}, Edges: ${edges.length}
-# Selection: ${hasSelection ? 'subgraph' : 'all'}
-# Neighborhood mode: ${neighborhoodMode.value}
-
-nodes:
-${nodes.map(n => `  - id: "${n.id}"
-    title: "${n.title?.replace(/"/g, '\\"') || 'Untitled'}"
-    x: ${n.x}
-    y: ${n.y}
-    width: ${n.width}
-    height: ${n.height}`).join('\n')}
-
-edges:
-${edges.map(e => `  - id: "${e.id}"
-    source: "${e.source}"
-    target: "${e.target}"
-    style: "${e.style}"
-    path: "${e.path}"`).join('\n')}
-`
-
-  // Copy to clipboard
-  writeClipboard(yaml).then(() => {
-    showToast?.(`Copied ${nodes.length} nodes, ${edges.length} edges as YAML`, 'success')
-  }).catch(err => {
-    console.error('[EXPORT] Clipboard failed:', err)
-    showToast?.('Failed to copy to clipboard', 'error')
-  })
-}
+// Graph export composable
+const graphExport = useGraphExport({
+  getSelectedNodeIds: () => store.selectedNodeIds,
+  displayNodes,
+  edgeLines,
+  neighborhoodMode,
+  showToast,
+})
+const { exportGraphAsYaml } = graphExport
 
 // Expose export function globally for debugging
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

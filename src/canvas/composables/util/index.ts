@@ -19,3 +19,9 @@ export {
   type UseStorylinesReturn,
 } from './useStorylines'
 export { useUndoHandlers } from './useUndoHandlers'
+export {
+  useGraphExport,
+  type GraphNode,
+  type EdgeLine,
+  type GraphExportDeps,
+} from './useGraphExport'
