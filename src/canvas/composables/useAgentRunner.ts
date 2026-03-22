@@ -157,20 +157,16 @@ EDGE LABELS (always use one):
 AVOID creating nodes for: categories, types, generic terms, placeholders. Only create nodes for specific entities.
 
 UNDERSTANDING USER MESSAGES:
-- "for each node..." = Use for_each_node() to UPDATE existing nodes, NOT create new ones
-- "add summary/content to nodes" = Use for_each_node(action="llm", template="...")
-- "X is not Y" = CORRECTION. Delete wrong edge/node or fix the relationship.
-- "Add X to Y" = Add node X connected to Y
-- "Remove X" or "Delete X" = Delete node or edge
-- "X should be..." = Update node X
-- Short corrections refer to the current graph state, not new research queries.
+- "for each node..." = Use for_each_node() directly, NO need to read_graph first
+- "check/validate nodes" = Use for_each_node(), processes node-by-node
+- "add summary/content" = Use for_each_node(action="llm", template="{title}...")
+- "X is not Y" = CORRECTION. Fix the relationship.
+- Short corrections refer to current graph, not new research.
 
-WORKFLOW:
-1. Use research() or query_nodes() to understand context
-2. Use think() to reason about approach
-3. Use create_plan() to propose steps
-4. Use request_approval() to pause for user review
-5. After approval, execute the plan step by step
+EFFICIENCY:
+- Do NOT call read_graph before for_each_node - it already processes all nodes
+- Do NOT call read_graph for per-node operations
+- Only use read_graph when you need to see connections/edges
 
 ${customRules}`,
   }
