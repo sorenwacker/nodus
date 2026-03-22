@@ -369,18 +369,27 @@ NODE REQUIREMENTS:
  * Quick check if prompt needs enhancement
  */
 export function shouldEnhancePrompt(prompt: string): boolean {
-  // Enhance prompts that are creating graphs/maps
-  const graphKeywords = [
-    /mind\s*map/i,
-    /graph/i,
-    /diagram/i,
-    /hierarchy/i,
-    /map\s+(of|out|about)/i,
-    /visuali[sz]e/i,
-    /structure/i,
-    /connect.*nodes/i,
-    /create.*nodes/i,
+  // Skip maintenance/fix requests - these are NOT graph creation
+  const maintenanceKeywords = [
+    /fix|repair|correct|remove|delete|disconnected|orphan|broken|wrong/i,
+    /link the|connect the|update the/i,
+    /for each node/i,
+    /add.*summary|add.*content/i,
+  ]
+  if (maintenanceKeywords.some((p) => p.test(prompt))) {
+    return false
+  }
+
+  // Only enhance explicit graph CREATION requests
+  const creationKeywords = [
+    /^create\s+(a\s+)?mind\s*map/i,
+    /^create\s+(a\s+)?(graph|diagram|hierarchy)/i,
+    /^make\s+(a\s+)?mind\s*map/i,
+    /^build\s+(a\s+)?(graph|mindmap|hierarchy)/i,
+    /mind\s*map\s+(of|about|for)/i,
+    /hierarchy\s+(of|about|for)/i,
+    /concept\s*map\s+(of|about|for)/i,
   ]
 
-  return graphKeywords.some((p) => p.test(prompt))
+  return creationKeywords.some((p) => p.test(prompt))
 }
