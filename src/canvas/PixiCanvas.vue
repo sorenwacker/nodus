@@ -8,7 +8,7 @@ import { openExternal } from '../lib/tauri'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
-import { uiStorage, llmStorage, memoryStorage } from '../lib/storage'
+import { llmStorage, memoryStorage } from '../lib/storage'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
@@ -48,6 +48,7 @@ import { useEdgeVisibility } from './composables/useEdgeVisibility'
 import { useViewportCulling } from './composables/useViewportCulling'
 import { useGraphMetrics } from './composables/useGraphMetrics'
 import { useCanvasDisplay } from './composables/useCanvasDisplay'
+import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -153,117 +154,6 @@ onMounted(() => {
   }
   window.addEventListener('zoom-to-node', handleZoomToNode)
 
-  // Keyboard handler for Delete/Backspace
-  const handleKeydown = (e: KeyboardEvent) => {
-    // Escape cancels frame placement mode
-    if (e.key === 'Escape' && frames.pendingFramePlacement.value) {
-      e.preventDefault()
-      cancelFramePlacement()
-      return
-    }
-
-    // Cmd+E exports graph as YAML (works even in inputs)
-    if ((e.key === 'e' || e.key === 'E') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
-      e.preventDefault()
-      exportGraphAsYaml()
-      return
-    }
-
-    // Skip other shortcuts if user is typing in an input
-    const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      return
-    }
-
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault()
-      // Delete selected nodes
-      if (store.selectedNodeIds.length > 0) {
-        deleteSelectedNodes()
-      }
-      // Delete selected edge
-      else if (selectedEdge.value) {
-        deleteSelectedEdge()
-      }
-      // Delete selected frame
-      else if (store.selectedFrameId) {
-        deleteSelectedFrame()
-      }
-    }
-
-    // L key triggers force layout
-    if (e.key === 'l' || e.key === 'L') {
-      e.preventDefault()
-      store.layoutNodes()
-    }
-
-    // N key toggles neighborhood view
-    if (e.key === 'n' || e.key === 'N') {
-      e.preventDefault()
-      toggleNeighborhoodMode(store.selectedNodeIds[0])
-    }
-
-    // Shift+R resets all node sizes to default
-    if ((e.key === 'R' || e.key === 'r') && e.shiftKey) {
-      e.preventDefault()
-      resetAllNodeSizes()
-    }
-
-    // F key fits to content
-    if (e.key === 'f' || e.key === 'F') {
-      e.preventDefault()
-      fitToContent()
-    }
-
-    // Cmd+A / Ctrl+A selects all nodes
-    if ((e.key === 'a' || e.key === 'A') && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      selectAllNodes()
-    }
-
-    // Cmd+C / Ctrl+C copies selected nodes as JSON
-    if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
-      console.log('[KEYDOWN] Cmd+C detected, selected nodes:', store.selectedNodeIds.length)
-      if (store.selectedNodeIds.length > 0) {
-        e.preventDefault()
-        copySelectedNodes()
-      }
-    }
-
-    // Cmd+V / Ctrl+V pastes nodes from clipboard
-    if ((e.key === 'v' || e.key === 'V') && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      pasteNodes()
-    }
-
-    // Ctrl+Shift+R refreshes workspace from files
-    if ((e.key === 'R' || e.key === 'r') && e.ctrlKey && e.shiftKey) {
-      e.preventDefault()
-      refreshFromFiles()
-    }
-
-    // Cmd+Plus / Cmd+= increases font scale
-    if ((e.key === '+' || e.key === '=') && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      increaseFontScale()
-    }
-
-    // Cmd+Minus decreases font scale
-    if (e.key === '-' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      decreaseFontScale()
-    }
-
-    // Cmd+0 resets font scale
-    if (e.key === '0' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      fontScale.value = 1.0
-      uiStorage.setFontScale(1.0)
-      document.documentElement.style.setProperty('--font-scale', '1')
-    }
-  }
-  window.addEventListener('keydown', handleKeydown)
-
   // Listen for LLM enabled setting changes
   const handleLLMEnabledChange = (e: Event) => {
     llmEnabled.value = (e as CustomEvent).detail
@@ -276,7 +166,6 @@ onMounted(() => {
   onUnmounted(() => {
     observer.disconnect()
     window.removeEventListener('resize', updateViewportSize)
-    window.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('zoom-to-node', handleZoomToNode)
     window.removeEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
     pdfDrop.cleanup()
@@ -1907,6 +1796,30 @@ ${edges.map(e => `  - id: "${e.id}"
 // Expose export function globally for debugging
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(window as any).exportGraphAsYaml = exportGraphAsYaml
+
+// Keyboard shortcuts composable - handles global canvas shortcuts
+useKeyboardShortcuts({
+  pendingFramePlacement: frames.pendingFramePlacement,
+  cancelFramePlacement,
+  selectedNodeIds: computed(() => store.selectedNodeIds),
+  selectedEdge,
+  selectedFrameId: computed(() => store.selectedFrameId),
+  deleteSelectedNodes,
+  deleteSelectedEdge,
+  deleteSelectedFrame,
+  selectAllNodes,
+  copySelectedNodes,
+  pasteNodes,
+  resetAllNodeSizes,
+  layoutNodes: () => store.layoutNodes(),
+  fitToContent,
+  toggleNeighborhoodMode,
+  fontScale,
+  increaseFontScale,
+  decreaseFontScale,
+  refreshFromFiles,
+  exportGraphAsYaml,
+})
 </script>
 
 <template>
