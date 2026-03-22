@@ -43,9 +43,9 @@ export {
 } from './crossingReduction'
 
 // Internal imports
-import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
+import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle } from './types'
 import { getPortPoint, getStandoff } from './geometry'
-import { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, cachePortIndex } from './portAssignment'
+import { analyzeEdges, assignPorts, calculatePortOffset, cachePortIndex } from './portAssignment'
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
@@ -187,15 +187,6 @@ function pathToSvgString(path: Point[]): string {
   return svg
 }
 
-// EdgeInfo type (matches what analyzeEdges returns)
-interface EdgeInfo {
-  edge: EdgeDef
-  source: NodeRect
-  target: NodeRect
-  sourceSide: Side
-  targetSide: Side
-}
-
 /**
  * Route all edges with proper port spreading, grid tracking, and obstacle avoidance
  */
@@ -213,30 +204,6 @@ export function routeAllEdges(
 
   // Assign port indices for spreading
   const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
-
-  // Log sample assignments - all multi-edge groups
-  if (false) {  // Disabled logging
-    console.log(`[routeAllEdges] After optimization: ${result_crossing.swapsPerformed} swaps`)
-    // Show edges where multiple edges share a node+side (both source and target)
-    const byNodeSide = new Map<string, Array<{ id: string; isSource: boolean }>>()
-    for (const info of edgeInfos) {
-      const srcKey = `${info.source.id}:${info.sourceSide}`
-      const tgtKey = `${info.target.id}:${info.targetSide}`
-      if (!byNodeSide.has(srcKey)) byNodeSide.set(srcKey, [])
-      if (!byNodeSide.has(tgtKey)) byNodeSide.set(tgtKey, [])
-      byNodeSide.get(srcKey)!.push({ id: info.edge.id, isSource: true })
-      byNodeSide.get(tgtKey)!.push({ id: info.edge.id, isSource: false })
-    }
-    for (const [key, entries] of byNodeSide) {
-      if (entries.length > 1) {
-        const indices = entries.map(e => {
-          const a = e.isSource ? sourceAssignments.get(e.id) : targetAssignments.get(e.id)
-          return a ? `${e.id.slice(0,8)}:${a.index}` : `${e.id.slice(0,8)}:?`
-        }).sort()
-        console.log(`[Spread] ${key.slice(0,8)}...:${key.split(':')[1]} = [${indices.join(', ')}]`)
-      }
-    }
-  }
 
   // Create grid tracker for edge overlap prevention (PCB-style lane routing)
   // Grid size determines minimum spacing between parallel edges
@@ -484,20 +451,6 @@ export function routeAllEdges(
       })
     } else {
       // orthogonal (default)
-      // Calculate channel offset based on target position to avoid lane crossings.
-      // Edges going to higher targets (lower Y) should use higher lanes.
-      // Edges going to righter targets (higher X) should use righter lanes.
-      const sourceY = source.canvas_y + (source.height || 120) / 2
-      const targetY = target.canvas_y + (target.height || 120) / 2
-      const sourceX = source.canvas_x + (source.width || 200) / 2
-      const targetX = target.canvas_x + (target.width || 200) / 2
-
-      // Use target position relative to source to determine lane
-      // This ensures edges fan out in the direction of their targets
-      const dy = targetY - sourceY
-      const dx = targetX - sourceX
-      const isMainlyVertical = Math.abs(dy) > Math.abs(dx)
-
       // Channel offset to avoid orthogonal crossings.
       // For edges from same node: edge going FURTHER should use OUTER lane.
       // This prevents its horizontal from crossing closer edge's vertical turn.

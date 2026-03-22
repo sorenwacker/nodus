@@ -142,30 +142,13 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
   for (const [key, entries] of unifiedGroups) {
     const [, sideStr] = key.split(':')
     const side = sideStr as Side
-    const isHorizontalSide = side === 'left' || side === 'right'
 
-    // Get this node's center for angle calculation
-    const firstEntry = entries[0]
-    const thisNode = firstEntry.isSource ? firstEntry.info.source : firstEntry.info.target
-    const nodeCx = thisNode.canvas_x + (thisNode.width || 200) / 2
-    const nodeCy = thisNode.canvas_y + (thisNode.height || 120) / 2
-
-    // Sort by ANGLE from this node to the other node
-    // This ensures edges fan out in angular order, minimizing immediate crossings
+    // Sort edges by position relative to the side
+    // This ensures edges fan out in order, minimizing immediate crossings
     entries.sort((a, b) => {
-      const angleA = Math.atan2(a.otherNodeY - nodeCy, a.otherNodeX - nodeCx)
-      const angleB = Math.atan2(b.otherNodeY - nodeCy, b.otherNodeX - nodeCx)
-
-      // For different sides, we need different angular orderings:
-      // RIGHT side (-π/4 to π/4): sort by angle ascending (top to bottom)
-      // BOTTOM side (π/4 to 3π/4): sort by angle ascending (left to right)
-      // LEFT side (3π/4 to -3π/4): sort by angle ascending (bottom to top)
-      // TOP side (-3π/4 to -π/4): sort by angle ascending (right to left)
-
-      // Normalize angles based on side to get consistent port ordering
-      let normA = angleA
-      let normB = angleB
-
+      // Sort by position relative to the side:
+      // LEFT/RIGHT: sort by Y (vertical position)
+      // TOP/BOTTOM: sort by X (horizontal position)
       if (side === 'left') {
         // For left side, edges going up should be at top, edges going down at bottom
         // Angle to up-left is around -3π/4, angle to down-left is around 3π/4
@@ -428,9 +411,8 @@ export function optimizePortAssignments(
   for (const [key, edges] of nodeSideEdges) {
     if (edges.length <= 1) continue
 
-    const [nodeId, sideStr] = key.split(':')
+    const [, sideStr] = key.split(':')
     const side = sideStr as Side
-    const isHorizontalSide = side === 'left' || side === 'right'
 
     // Get node center
     const firstEdge = edges[0]

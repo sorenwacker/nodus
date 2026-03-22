@@ -4,7 +4,6 @@
  */
 
 import type { Side, NodeRect, EdgeDef, PortAssignment } from './types'
-import { calculatePortOffset } from './portAssignment'
 
 interface EdgeInfo {
   edge: EdgeDef
@@ -98,41 +97,6 @@ function edgesCrossOrthogonal(
   }
 
   return false
-}
-
-/**
- * Get edge path considering port offsets
- */
-function getEdgePath(
-  info: EdgeInfo,
-  sourceAssignments: Map<string, PortAssignment>,
-  targetAssignments: Map<string, PortAssignment>
-): { x1: number; y1: number; x2: number; y2: number } {
-  const srcAssign = sourceAssignments.get(info.edge.id)
-  const tgtAssign = targetAssignments.get(info.edge.id)
-
-  const srcCx = info.source.canvas_x + (info.source.width || 200) / 2
-  const srcCy = info.source.canvas_y + (info.source.height || 120) / 2
-  const tgtCx = info.target.canvas_x + (info.target.width || 200) / 2
-  const tgtCy = info.target.canvas_y + (info.target.height || 120) / 2
-
-  const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
-  const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
-
-  let x1 = srcCx, y1 = srcCy, x2 = tgtCx, y2 = tgtCy
-
-  if (info.sourceSide === 'left' || info.sourceSide === 'right') {
-    y1 += srcOffset
-  } else {
-    x1 += srcOffset
-  }
-  if (info.targetSide === 'left' || info.targetSide === 'right') {
-    y2 += tgtOffset
-  } else {
-    x2 += tgtOffset
-  }
-
-  return { x1, y1, x2, y2 }
 }
 
 /**
@@ -322,7 +286,7 @@ export class GreedySwapReduction implements CrossingReductionStrategy {
       improved = false
       iterations++
 
-      for (const [_key, entries] of groups) {
+      for (const [, entries] of groups) {
         if (entries.length < 2) continue
 
         const groupAssigns = entries

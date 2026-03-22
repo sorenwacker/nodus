@@ -19,7 +19,7 @@ import {
   setRoutingSpatialIndex,
   type NodeRect,
   type EdgeStyle,
-} from './edgeRouting'
+} from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
 import { uiStorage, llmStorage, canvasStorage, memoryStorage } from '../lib/storage'
 import { useMinimap } from './composables/useMinimap'
