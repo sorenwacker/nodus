@@ -342,7 +342,26 @@ export function enhancePrompt(userPrompt: string): string {
 2. Only create nodes for specific, concrete entities
 3. Do NOT create category nodes, meta-nodes, or placeholders
 4. Node titles should be proper names, not descriptions
-5. Use the edge labels suggested above for this graph type`)
+5. Use the edge labels suggested above for this graph type
+
+REQUIRED WORKFLOW:
+1. Use create_nodes_batch to create all nodes
+2. Use create_edges_batch to connect nodes (MANDATORY - graphs need edges!)
+   - Connect central topic to main branches
+   - Connect branches to their sub-items
+   - Every node should have at least one edge
+3. Use auto_layout to arrange the graph (use "force" for connected graphs)
+4. Call done() when finished
+
+EXAMPLE for a mindmap about "The Brain":
+- Step 1: create_nodes_batch([{title: "Brain"}, {title: "Cerebrum"}, {title: "Cerebellum"}, ...])
+- Step 2: create_edges_batch([
+    {from_title: "Brain", to_title: "Cerebrum", label: "contains"},
+    {from_title: "Brain", to_title: "Cerebellum", label: "contains"},
+    ...
+  ])
+- Step 3: auto_layout("force")
+- Step 4: done("Created brain anatomy mindmap with X nodes and Y edges")`)
 
   return sections.join('\n')
 }

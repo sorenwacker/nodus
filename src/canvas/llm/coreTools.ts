@@ -843,16 +843,29 @@ ${edgeDescriptions}`
 
   defineTool<{ summary: string }>(
     'done',
-    'Signal that the agent has completed all work',
+    'Signal that the agent has completed all work. IMPORTANT: Only call this AFTER creating edges for graph tasks.',
     {
       type: 'object',
       properties: {
-        summary: { type: 'string', description: 'Brief summary of what was accomplished' },
+        summary: { type: 'string', description: 'Brief summary including node count AND edge count' },
       },
       required: ['summary'],
     },
-    async (args, _ctx) => {
-      return `AGENT_DONE: ${args.summary || 'completed'}`
+    async (args, ctx) => {
+      const nodes = ctx.store.filteredNodes
+      const edges = ctx.store.filteredEdges
+
+      // Validate: if we have multiple nodes but no edges, warn the agent
+      if (nodes.length > 1 && edges.length === 0) {
+        return `WARNING: Graph has ${nodes.length} nodes but NO EDGES. For mindmaps, hierarchies, and connected graphs, you MUST create edges using create_edges_batch before calling done(). Please create edges first.`
+      }
+
+      // Validate: check edge-to-node ratio for complex graphs
+      if (nodes.length > 5 && edges.length < nodes.length / 2) {
+        return `WARNING: Graph has ${nodes.length} nodes but only ${edges.length} edges. Most graphs should have at least one edge per node. Consider adding more connections with create_edges_batch, or call done() again if this is intentional.`
+      }
+
+      return `AGENT_DONE: ${args.summary || 'completed'} (${nodes.length} nodes, ${edges.length} edges)`
     },
     { category: 'utility' }
   )
@@ -940,7 +953,7 @@ ${edgeDescriptions}`
 
   defineTool<{ title: string; steps: Array<{ description: string; details?: string }> }>(
     'create_plan',
-    'Create a detailed plan with steps for user approval. Use this to propose changes before making them.',
+    'Create a detailed plan with steps for user approval. IMPORTANT: Plans for graphs MUST include separate steps for: 1) Creating nodes, 2) Creating edges with labels, 3) Applying layout.',
     {
       type: 'object',
       properties: {
@@ -950,11 +963,11 @@ ${edgeDescriptions}`
           items: {
             type: 'object',
             properties: {
-              description: { type: 'string', description: 'What this step will do' },
-              details: { type: 'string', description: 'Optional implementation details' },
+              description: { type: 'string', description: 'Specific action (e.g., "Create 7 nodes for brain regions")' },
+              details: { type: 'string', description: 'Specific details (e.g., "Nodes: Cerebrum, Cerebellum, Brainstem, ...")' },
             },
           },
-          description: 'Array of steps to execute',
+          description: 'REQUIRED STEPS FOR GRAPHS: 1) Create nodes (list specific nodes), 2) Create edges with labels (specify connections), 3) Apply layout, 4) Done',
         },
       },
       required: ['title', 'steps'],
