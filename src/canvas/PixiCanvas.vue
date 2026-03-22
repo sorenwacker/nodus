@@ -31,6 +31,7 @@ import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
 import CanvasContextMenu from './components/CanvasContextMenu.vue'
+import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -2119,59 +2120,24 @@ useKeyboardShortcuts({
     </div>
 
     <!-- Edge edit panel -->
-    <div v-if="selectedEdge" class="edge-panel" @mousedown.stop @click.stop @dblclick.stop @pointerdown.stop>
-      <div class="edge-panel-header">
-        <span>Edge</span>
-        <button @click="selectedEdge = null">x</button>
-      </div>
-      <div class="edge-panel-content">
-        <label>Label:</label>
-        <input
-          type="text"
-          :value="store.filteredEdges.find(e => e.id === selectedEdge)?.label || ''"
-          :placeholder="t('canvas.edge.labelPlaceholder')"
-          class="edge-label-input"
-          @input="changeEdgeLabel(($event.target as HTMLInputElement).value)"
-        />
-        <label>Color:</label>
-        <div class="edge-color-picker">
-          <button
-            v-for="color in edgeColorPalette"
-            :key="color.value"
-            class="edge-color-dot"
-            :class="{ active: getEdgeColor(store.filteredEdges.find(e => e.id === selectedEdge) || { link_type: '' }) === color.value }"
-            :style="{ background: color.value }"
-            @click.stop="changeEdgeColor(color.value)"
-          ></button>
-        </div>
-        <label>Style:</label>
-        <div class="edge-style-picker">
-          <button
-            v-for="style in edgeStyles"
-            :key="style.value"
-            class="edge-style-btn"
-            :class="{ active: getEdgeStyle(selectedEdge || '') === style.value }"
-            @click.stop="setEdgeStyle(style.value)"
-          >{{ style.label }}</button>
-        </div>
-        <label>Direction:</label>
-        <div class="direction-btns">
-          <button :data-tooltip="t('canvas.edge.reverseDirection')" @click.stop="reverseEdge">{{ t('canvas.edge.flip') }}</button>
-          <button
-            v-if="isEdgeBidirectional(selectedEdge || '')"
-            :data-tooltip="t('canvas.edge.makeDirectional')"
-            @click.stop="makeUnidirectional"
-          >Directional</button>
-          <button
-            v-else
-            :data-tooltip="t('canvas.edge.makeNonDirectional')"
-            @click.stop="makeBidirectional"
-          >Non-directional</button>
-        </div>
-        <button class="insert-node-btn" data-tooltip="Insert a node on this edge" @click="insertNodeOnEdge">Insert Node</button>
-        <button class="delete-edge-btn" data-tooltip="Delete this edge" @click="deleteSelectedEdge">Delete Edge</button>
-      </div>
-    </div>
+    <CanvasEdgePanel
+      :selected-edge="selectedEdge"
+      :edges="store.filteredEdges"
+      :edge-color-palette="edgeColorPalette"
+      :edge-styles="edgeStyles"
+      :get-edge-color="getEdgeColor"
+      :get-edge-style="getEdgeStyle"
+      :is-edge-bidirectional="isEdgeBidirectional"
+      @close="selectedEdge = null"
+      @change-label="changeEdgeLabel"
+      @change-color="changeEdgeColor"
+      @set-style="setEdgeStyle"
+      @reverse="reverseEdge"
+      @make-unidirectional="makeUnidirectional"
+      @make-bidirectional="makeBidirectional"
+      @insert-node="insertNodeOnEdge"
+      @delete="deleteSelectedEdge"
+    />
 
     <!-- Controls -->
     <CanvasControls
