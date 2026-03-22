@@ -22,6 +22,7 @@ import {
   useNodeResizing,
   useNodeDragging,
   useNodeHover,
+  useLinkPicker,
 } from './composables/nodes'
 import {
   useEdgeManipulation,
@@ -382,27 +383,6 @@ onMounted(() => {
 // Help modal
 const showHelpModal = ref(false)
 
-// Link picker from context menu
-const showLinkPicker = ref(false)
-const linkPickerSourceNodeId = ref<string | null>(null)
-
-function openLinkPicker() {
-  linkPickerSourceNodeId.value = contextMenuNodeId.value
-  showLinkPicker.value = true
-  closeContextMenu()
-}
-
-function closeLinkPicker() {
-  showLinkPicker.value = false
-  linkPickerSourceNodeId.value = null
-}
-
-async function linkToNode(targetNodeId: string) {
-  if (!linkPickerSourceNodeId.value) return
-  await store.addEdge(linkPickerSourceNodeId.value, targetNodeId)
-  closeLinkPicker()
-}
-
 // Only render nodes visible within magnifier viewport for performance
 const magnifierVisibleNodes = computed(() => {
   if (!shouldShowMagnifier.value) return []
@@ -516,6 +496,14 @@ const contextMenuPosition = contextMenu.position
 const contextMenuNodeId = contextMenu.nodeId
 const contextMenuStorylineSubmenu = contextMenu.storylineSubmenu
 const contextMenuWorkspaceSubmenu = contextMenu.workspaceSubmenu
+
+// Link picker composable
+const linkPicker = useLinkPicker({
+  contextMenuNodeId,
+  closeContextMenu: () => contextMenu.close(),
+  createEdge: (sourceId, targetId) => store.createEdge({ source_node_id: sourceId, target_node_id: targetId, link_type: 'related' }),
+})
+const { showLinkPicker, linkPickerSourceNodeId, openLinkPicker, closeLinkPicker, linkToNode } = linkPicker
 
 // Node agent mode - always agent (tools enabled)
 const nodeAgentMode = ref<'simple' | 'agent'>('agent')

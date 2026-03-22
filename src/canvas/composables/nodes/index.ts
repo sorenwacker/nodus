@@ -34,3 +34,7 @@ export {
   type UseNodeVisibilityOptions,
   type UseNodeVisibilityReturn,
 } from './useNodeVisibility'
+export {
+  useLinkPicker,
+  type LinkPickerDeps,
+} from './useLinkPicker'
