@@ -6,9 +6,9 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { llmStorage } from '../../lib/storage'
-import { providerRegistry } from '../../canvas/llm/providers'
-import type { ProviderModel } from '../../canvas/llm/providers'
-import { DEFAULT_SYSTEM_PROMPT, DEFAULT_AGENT_PROMPT } from '../../canvas/llm/prompts'
+import { providerRegistry } from '../../llm/providers'
+import type { ProviderModel } from '../../llm/providers'
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_AGENT_PROMPT } from '../../llm/prompts'
 
 const { t } = useI18n()
 

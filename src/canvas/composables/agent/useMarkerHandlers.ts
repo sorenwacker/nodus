@@ -7,7 +7,7 @@
 
 import type { Ref } from 'vue'
 import type { Node } from '../../../types'
-import type { AgentPlan } from '../../llm/types'
+import type { AgentPlan } from '../../../llm/types'
 import {
   quickResearch,
   deepResearch,
@@ -15,7 +15,7 @@ import {
   fetchWikipediaArticle,
   validateClaim,
   assessCompleteness,
-} from '../../llm/research'
+} from '../../../llm/research'
 
 /**
  * Plan state interface (subset of usePlanState return type)

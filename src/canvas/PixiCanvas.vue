@@ -7,7 +7,7 @@ import { useThemesStore } from '../stores/themes'
 import { openExternal } from '../lib/tauri'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { optimizeNodeEntrypoints } from './routing'
-import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
+import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
 import { llmStorage, memoryStorage } from '../lib/storage'
 import {
   useMinimap,
@@ -69,7 +69,7 @@ import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
-import { usePlanState } from './llm/planState'
+import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 
 // Undo handlers

@@ -5,10 +5,10 @@
  */
 
 import type { Ref } from 'vue'
-import type { usePlanState } from '../../llm/planState'
+import type { usePlanState } from '../../../llm/planState'
 import type { useAgentRunner } from './useAgentRunner'
 import type { useAgentTasksStore } from '../../../stores/agentTasks'
-import type { PlanStep } from '../../llm/types'
+import type { PlanStep } from '../../../llm/types'
 
 export interface UsePlanHandlersContext {
   planState: ReturnType<typeof usePlanState>

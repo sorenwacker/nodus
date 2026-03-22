@@ -4,8 +4,8 @@
  */
 import { ref, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { ChatMessage } from '../../llm/types'
-import { llmQueue } from '../../llm/queue'
+import type { ChatMessage } from '../../../llm/types'
+import { llmQueue } from '../../../llm/queue'
 import { notifications$ } from '../../../composables/useNotifications'
 import { llmStorage } from '../../../lib/storage'
 import { convertLatexDocument } from '../../../lib/latex-to-typst'

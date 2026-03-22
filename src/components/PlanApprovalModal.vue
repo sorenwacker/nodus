@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { AgentPlan, PlanStep } from '../canvas/llm/types'
+import type { AgentPlan, PlanStep } from '../llm/types'
 
 const props = defineProps<{
   plan: AgentPlan | null

@@ -7,7 +7,7 @@ import { ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
 import { providerRegistry } from './providers'
 import { agentTools } from './tools'
-import { llmStorage } from '../../lib/storage'
+import { llmStorage } from '../lib/storage'
 import { DEFAULT_SYSTEM_PROMPT } from './prompts'
 import { llmQueue } from './queue'
 

@@ -15,7 +15,7 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import type { ResearchResult } from './types'
-import type { Node } from '../../types'
+import type { Node } from '../types'
 
 // Tavily search result from backend
 interface TavilyResult {

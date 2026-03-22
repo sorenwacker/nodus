@@ -7,7 +7,7 @@
  * - Single source of truth for tool definitions and execution
  */
 
-import type { Node, Edge } from '../../types'
+import type { Node, Edge } from '../types'
 
 // Tool parameter schema (JSON Schema subset)
 export interface ToolParameterSchema {

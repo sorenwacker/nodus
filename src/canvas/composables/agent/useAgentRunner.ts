@@ -9,21 +9,21 @@
  * - Execute: Make changes after approval
  */
 import { ref, type Ref } from 'vue'
-import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } from '../../llm/types'
+import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } from '../../../llm/types'
 import { llmStorage, memoryStorage } from '../../../lib/storage'
-import { DEFAULT_AGENT_PROMPT } from '../../llm/prompts'
-import { llmQueue } from '../../llm/queue'
+import { DEFAULT_AGENT_PROMPT } from '../../../llm/prompts'
+import { llmQueue } from '../../../llm/queue'
 import {
   filterToolsForMode,
   getModeSystemPrompt,
   getModeMaxIterations,
   DEFAULT_AGENT_MODE,
-} from '../../llm/agentModes'
+} from '../../../llm/agentModes'
 import {
   shouldEnhancePrompt,
   enhancePrompt,
   detectIntent,
-} from '../../llm/promptEnhancer'
+} from '../../../llm/promptEnhancer'
 
 /**
  * Escape special characters that could be used for prompt injection

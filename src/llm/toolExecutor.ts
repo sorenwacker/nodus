@@ -4,7 +4,7 @@
  */
 import { toolRegistry, type ToolContext, type INodeStore } from './registry'
 import { registerCoreTools, resetPositionCounter } from './tools'
-import { agentLogger } from '../../lib/logger'
+import { agentLogger } from '../lib/logger'
 
 // Re-export types for backwards compatibility
 export type { ToolContext, INodeStore }

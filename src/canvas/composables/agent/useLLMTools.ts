@@ -8,8 +8,8 @@
 import type { Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import type { Node } from '../../../types'
-import type { AgentTask, AgentPlan } from '../../llm/types'
-import { quickResearch } from '../../llm/research'
+import type { AgentTask, AgentPlan } from '../../../llm/types'
+import { quickResearch } from '../../../llm/research'
 
 /**
  * LLM Queue interface (subset of llmQueue)
