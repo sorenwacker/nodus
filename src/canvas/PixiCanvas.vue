@@ -462,8 +462,8 @@ const nodeEditor = useNodeEditor({
     updateNodeTitle: store.updateNodeTitle,
   },
 })
-// Note: startEditing, saveEditing, onEditorKeydown have local implementations with extra logic (auto-fit, mermaid render)
-const { editingNodeId, editContent, editingTitleId, editTitle, startEditingTitle, saveTitleEditing, cancelTitleEditing } = nodeEditor
+// Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit
+const { editingNodeId, editContent, editingTitleId, editTitle, startEditing, startEditingTitle, saveTitleEditing, cancelTitleEditing } = nodeEditor
 
 // Edge manipulation composable - handles edge creation, selection, modification
 const edgeManipulation = useEdgeManipulation({
@@ -2149,30 +2149,7 @@ function handleContentClick(e: MouseEvent) {
   }
 }
 
-// Inline editing
-function startEditing(nodeId: string) {
-  // Already editing this node - don't reset content (preserves unsaved edits)
-  if (editingNodeId.value === nodeId) {
-    return
-  }
-  // Save any current editing first
-  if (editingNodeId.value) {
-    saveEditing()
-  }
-  const node = store.getNode(nodeId)
-  if (!node) return
-  editingNodeId.value = nodeId
-  editContent.value = node.markdown_content || ''
-  // Focus the textarea after Vue updates the DOM
-  setTimeout(() => {
-    const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
-    if (textarea) {
-      textarea.focus()
-      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
-    }
-  }, 10)
-}
-
+// Custom saveEditing with mermaid render and auto-fit
 function saveEditing(e?: FocusEvent) {
   // Don't close if focus moved to LLM inputs, buttons, or color bar
   if (e?.relatedTarget) {

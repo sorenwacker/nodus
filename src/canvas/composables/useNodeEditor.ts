@@ -13,12 +13,13 @@ export interface NodeEditorStore {
 
 export interface UseNodeEditorOptions {
   store: NodeEditorStore
-  onAfterSave?: () => void
+  onAfterSave?: (nodeId: string) => void
+  onSaveComplete?: () => void
   autosaveDelay?: number
 }
 
 export function useNodeEditor(options: UseNodeEditorOptions) {
-  const { store, onAfterSave, autosaveDelay = 1000 } = options
+  const { store, onAfterSave, onSaveComplete, autosaveDelay = 1000 } = options
 
   // Content editing state
   const editingNodeId = ref<string | null>(null)
@@ -131,10 +132,11 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     const nodeId = editingNodeId.value
     if (nodeId) {
       store.updateNodeContent(nodeId, editContent.value)
-      onAfterSave?.()
+      onAfterSave?.(nodeId)
     }
     editingNodeId.value = null
     editContent.value = ''
+    onSaveComplete?.()
   }
 
   function onEditorKeydown(e: KeyboardEvent) {
