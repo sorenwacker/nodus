@@ -319,8 +319,20 @@ export function enhancePrompt(userPrompt: string): string {
   const practices = GRAPH_TYPE_PRACTICES[intent.graphType]
   const domainGuidance = DOMAIN_GUIDANCE[intent.domain]
 
-  // Build enhanced prompt
+  // Build enhanced prompt with MANDATORY instructions at TOP
   const sections: string[] = []
+
+  // CRITICAL: Put mandatory workflow at TOP so model sees it first
+  sections.push(`=== MANDATORY EXECUTION ORDER ===
+You MUST execute these steps IN ORDER:
+STEP 1: create_nodes_batch([...]) - Create ALL nodes first
+STEP 2: create_edges_batch([...]) - Connect ALL nodes with labeled edges
+STEP 3: auto_layout("force") - Arrange the graph
+STEP 4: done("summary") - Only after edges exist
+
+DO NOT skip STEP 2. DO NOT call done() before create_edges_batch().
+=====================================`)
+  sections.push('')
 
   sections.push(`USER REQUEST: ${userPrompt}`)
   sections.push('')
@@ -337,31 +349,14 @@ export function enhancePrompt(userPrompt: string): string {
     sections.push('')
   }
 
-  sections.push(`CRITICAL REQUIREMENTS:
-1. Every edge MUST have a semantic label (never blank or "related")
-2. Only create nodes for specific, concrete entities
-3. Do NOT create category nodes, meta-nodes, or placeholders
-4. Node titles should be proper names, not descriptions
-5. Use the edge labels suggested above for this graph type
+  sections.push(`EDGE REQUIREMENTS:
+- Every edge MUST have a semantic label (never "related" or blank)
+- Use labels like: "contains", "part of", "connects to", "regulates", "produces"
 
-REQUIRED WORKFLOW:
-1. Use create_nodes_batch to create all nodes
-2. Use create_edges_batch to connect nodes (MANDATORY - graphs need edges!)
-   - Connect central topic to main branches
-   - Connect branches to their sub-items
-   - Every node should have at least one edge
-3. Use auto_layout to arrange the graph (use "force" for connected graphs)
-4. Call done() when finished
-
-EXAMPLE for a mindmap about "The Brain":
-- Step 1: create_nodes_batch([{title: "Brain"}, {title: "Cerebrum"}, {title: "Cerebellum"}, ...])
-- Step 2: create_edges_batch([
-    {from_title: "Brain", to_title: "Cerebrum", label: "contains"},
-    {from_title: "Brain", to_title: "Cerebellum", label: "contains"},
-    ...
-  ])
-- Step 3: auto_layout("force")
-- Step 4: done("Created brain anatomy mindmap with X nodes and Y edges")`)
+NODE REQUIREMENTS:
+- Only create nodes for specific, concrete entities
+- Do NOT create category nodes like "Overview", "Types", "Functions"
+- Node titles = proper names, not descriptions`)
 
   return sections.join('\n')
 }
