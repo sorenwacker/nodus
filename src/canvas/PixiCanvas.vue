@@ -12,6 +12,7 @@ import { llmStorage, memoryStorage } from '../lib/storage'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
+import { findConnectedNodes, getImmediateNeighbors, buildChainContext } from './utils/graphTraversal'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
 import { useLasso } from './composables/useLasso'
@@ -972,16 +973,7 @@ async function sendNodePrompt() {
     // Use agent mode if enabled
     if (nodeAgentMode.value === 'agent') {
       // Get connected nodes for agent context
-      const connectedNodes: Array<{ title: string; content: string }> = []
-      for (const edge of store.filteredEdges) {
-        let neighborId: string | null = null
-        if (edge.source_node_id === nodeId) neighborId = edge.target_node_id
-        else if (edge.target_node_id === nodeId) neighborId = edge.source_node_id
-        if (neighborId) {
-          const n = store.getNode(neighborId)
-          if (n) connectedNodes.push({ title: n.title || 'Untitled', content: n.markdown_content || '' })
-        }
-      }
+      const connectedNodes = getImmediateNeighbors(nodeId, store.filteredEdges, store.getNode)
 
       const ctx: NodeAgentContext = {
         nodeId,
@@ -1016,63 +1008,12 @@ async function sendNodePrompt() {
 
     // Simple mode: direct LLM call
     // Traverse full chain of connected nodes (BFS)
-    const visited = new Set<string>([nodeId])
-    const queue = [nodeId]
-    const chainNodes: { id: string; title: string; content: string }[] = []
-
-    console.log(`Starting BFS from node ${nodeId}, total edges: ${store.filteredEdges.length}`)
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()!
-      for (const edge of store.filteredEdges) {
-        let neighborId: string | null = null
-        if (edge.source_node_id === currentId && !visited.has(edge.target_node_id)) {
-          neighborId = edge.target_node_id
-        } else if (edge.target_node_id === currentId && !visited.has(edge.source_node_id)) {
-          neighborId = edge.source_node_id
-        }
-        if (neighborId) {
-          visited.add(neighborId)
-          queue.push(neighborId)
-          const n = store.getNode(neighborId)
-          if (n) {
-            chainNodes.push({
-              id: neighborId,
-              title: n.title || 'Untitled',
-              content: n.markdown_content || '',
-            })
-            console.log(`Found connected node: ${n.title}, content length: ${(n.markdown_content || '').length}`)
-          }
-        }
-      }
-    }
-
+    const chainNodes = findConnectedNodes(nodeId, store.filteredEdges, store.getNode)
     console.log(`BFS complete: found ${chainNodes.length} connected nodes`)
 
     // Build context with content from chain (respecting limit)
     const contextLimit = llmStorage.getChainContextLimit()
-    console.log(`Chain context limit: ${contextLimit}`)
-    let chainContext = ''
-    if (chainNodes.length > 0 && contextLimit > 0) {
-      let totalChars = 0
-      const includedNodes: string[] = []
-      for (const n of chainNodes) {
-        if (totalChars + n.content.length > contextLimit) {
-          // Truncate this node's content to fit
-          const remaining = contextLimit - totalChars
-          if (remaining > 100) {
-            includedNodes.push(`--- ${n.title} ---\n${n.content.slice(0, remaining)}...(truncated)`)
-          }
-          break
-        }
-        includedNodes.push(`--- ${n.title} ---\n${n.content}`)
-        totalChars += n.content.length
-      }
-      if (includedNodes.length > 0) {
-        chainContext = `\nCONTEXT FROM ${includedNodes.length}/${chainNodes.length} CONNECTED NODES:\n` +
-          includedNodes.join('\n\n') + '\n'
-      }
-    }
+    const chainContext = buildChainContext(chainNodes, contextLimit)
 
     const nodeSystemPrompt = `Rewrite the note based on the user's request. Output content directly.
 
