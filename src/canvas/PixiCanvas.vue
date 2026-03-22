@@ -55,6 +55,7 @@ import { useStorylines } from './composables/useStorylines'
 import { useEdgeStyling } from './composables/useEdgeStyling'
 import { useNodeResizing } from './composables/useNodeResizing'
 import { useNodeDragging } from './composables/useNodeDragging'
+import { useCanvasZoom } from './composables/useCanvasZoom'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -542,10 +543,21 @@ const showImageThumbnail = computed(() => scale.value < 0.5)
 const MAGNIFIER_THRESHOLD = 0.4
 const MAGNIFIER_SIZE = 200
 const MAGNIFIER_ZOOM = 2.5
-const showMagnifier = ref(false)
-const isMouseOnCanvas = ref(false)
-const magnifierPos = ref({ x: 0, y: 0 })
 const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
+
+// Canvas zoom composable - handles wheel zoom/pan and magnifier
+const canvasZoom = useCanvasZoom({
+  canvasRef,
+  scale,
+  offsetX,
+  offsetY,
+  isZooming,
+  startZooming,
+  scheduleSaveViewState,
+  magnifierThreshold: MAGNIFIER_THRESHOLD,
+})
+const { showMagnifier, magnifierPos, onWheel, onCanvasMouseMove, onCanvasMouseEnter, onCanvasMouseLeave } = canvasZoom
+
 const shouldShowMagnifier = computed(() => magnifierEnabled.value && scale.value < MAGNIFIER_THRESHOLD && showMagnifier.value && !isLargeGraph.value)
 
 // Help modal
@@ -1823,110 +1835,6 @@ const transform = computed(() => {
   // Use translate3d for GPU acceleration
   return `translate3d(${offsetX.value}px, ${offsetY.value}px, 0) scale(${scale.value})`
 })
-
-// Zoom centered on mouse position
-function onWheel(e: WheelEvent) {
-  // Check if inside a scrollable element
-  const target = e.target as HTMLElement
-  const scrollable = target.closest('.node-content') || target.closest('.inline-editor')
-
-  if (scrollable) {
-    const el = scrollable as HTMLElement
-    const canScroll = el.scrollHeight > el.clientHeight
-
-    if (canScroll) {
-      // Check if at scroll boundaries
-      const atTop = el.scrollTop <= 0
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
-
-      // Let the element scroll if not at boundary
-      if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
-        return // Let the element scroll normally
-      }
-
-      // At boundary - prevent canvas zoom, just absorb the event
-      e.preventDefault()
-      e.stopPropagation()
-      return
-    }
-  }
-
-  e.preventDefault()
-
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return
-
-  const mouseX = e.clientX - rect.left
-  const mouseY = e.clientY - rect.top
-
-  // Two-finger vertical (up/down) = zoom
-  // Two-finger horizontal = pan
-  // Pinch = zoom (ctrlKey is set)
-  const isHorizontalPan = Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.3
-
-  if (isHorizontalPan && !e.ctrlKey) {
-    // Horizontal pan - disable smooth transitions
-    isZooming.value = false
-    offsetX.value -= e.deltaX
-    offsetY.value -= e.deltaY
-  } else {
-    // Smooth zoom - use deltaY magnitude for proportional zooming
-    startZooming()
-
-    const zoomIntensity = 0.003
-    const delta = Math.exp(-e.deltaY * zoomIntensity)
-    const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
-    const scaleChange = newScale / scale.value
-    offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
-    offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
-    scale.value = newScale
-
-    // Update magnifier visibility when zoom crosses threshold
-    if (isMouseOnCanvas.value) {
-      showMagnifier.value = newScale < MAGNIFIER_THRESHOLD
-    }
-  }
-
-  // Save view state (debounced)
-  scheduleSaveViewState()
-}
-
-// Magnifier mouse tracking (throttled for performance)
-let magnifierRafId: number | null = null
-
-function onCanvasMouseMove(e: MouseEvent) {
-  // Throttle magnifier updates using requestAnimationFrame
-  if (magnifierRafId) return
-
-  magnifierRafId = requestAnimationFrame(() => {
-    magnifierRafId = null
-    const rect = canvasRef.value?.getBoundingClientRect()
-    if (rect) {
-      magnifierPos.value = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      }
-    }
-    // Update magnifier visibility based on current zoom level
-    if (scale.value < MAGNIFIER_THRESHOLD && isMouseOnCanvas.value) {
-      showMagnifier.value = true
-    } else {
-      showMagnifier.value = false
-    }
-  })
-}
-
-function onCanvasMouseEnter() {
-  isMouseOnCanvas.value = true
-  if (scale.value < MAGNIFIER_THRESHOLD) {
-    showMagnifier.value = true
-  }
-}
-
-function onCanvasMouseLeave() {
-  isMouseOnCanvas.value = false
-  showMagnifier.value = false
-}
 
 // Pan with left mouse drag on empty canvas space
 function onCanvasMouseDown(e: MouseEvent) {
