@@ -46,6 +46,9 @@ const exploreMode: AgentModeConfig = {
     'create_edges_batch',
     'update_node',
     'auto_layout',
+    // Coloring
+    'smart_color',
+    'color_matching',
     // Thinking
     'think',
     'done',
@@ -99,6 +102,9 @@ const planMode: AgentModeConfig = {
     'create_edges_batch',
     'update_node',
     'auto_layout',
+    // Coloring
+    'smart_color',
+    'color_matching',
     // Planning
     'think',
     'create_plan',
