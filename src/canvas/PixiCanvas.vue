@@ -23,6 +23,7 @@ import {
   useNodeHover,
   useLinkPicker,
   useNodeCollision,
+  useNodeNavigation,
 } from './composables/nodes'
 import {
   useEdgeManipulation,
@@ -274,6 +275,20 @@ function layoutNeighborhood(focusId: string) {
 function getVisualNode(nodeId: string) {
   return neighborhood.getVisualNode(nodeId)
 }
+
+// Node navigation composable
+const nodeNavigation = useNodeNavigation({
+  getFilteredNodes: () => store.filteredNodes,
+  getNode: store.getNode,
+  getVisualNode,
+  selectNode: (id) => store.selectNode(id),
+  canvasRef,
+  scale,
+  offsetX,
+  offsetY,
+  neighborhoodMode,
+})
+const { navigateToNode, zoomToNode } = nodeNavigation
 
 // Lasso selection composable
 const lasso = useLasso({
@@ -638,67 +653,6 @@ async function resetAllNodeSizes() {
     await store.updateNodeSize(node.id, 200, 120)
   }
   store.nodeLayoutVersion++
-}
-
-// Zoom to node - animate view to center on node and fit it in viewport
-function zoomToNode(nodeId: string, requestedScale?: number) {
-  // Use visual node position (accounts for neighborhood mode)
-  const node = neighborhoodMode.value
-    ? neighborhood.getVisualNode(nodeId)
-    : store.getNode(nodeId)
-  if (!node) return
-
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (!rect) return
-
-  // Calculate node dimensions
-  const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-  const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-  const nodeCenterX = node.canvas_x + nodeWidth / 2
-  const nodeCenterY = node.canvas_y + nodeHeight / 2
-
-  // Calculate scale to fit node with padding (80% of viewport)
-  const padding = 0.8
-  const scaleToFitWidth = (rect.width * padding) / nodeWidth
-  const scaleToFitHeight = (rect.height * padding) / nodeHeight
-  const fitScale = Math.min(scaleToFitWidth, scaleToFitHeight, 2.0) // Cap at 2x zoom
-
-  // Use requested scale if provided, otherwise calculate based on node size
-  const targetScale = requestedScale ?? Math.max(0.5, Math.min(fitScale, 1.5))
-
-  // Calculate target offset to center the node
-  const targetOffsetX = rect.width / 2 - nodeCenterX * targetScale
-  const targetOffsetY = rect.height / 2 - nodeCenterY * targetScale
-
-  // Animate to the target position
-  const startScale = scale.value
-  const startOffsetX = offsetX.value
-  const startOffsetY = offsetY.value
-  const duration = 300
-  const startTime = performance.now()
-
-  function easeOutCubic(t: number): number {
-    return 1 - Math.pow(1 - t, 3)
-  }
-
-  function animate() {
-    const elapsed = performance.now() - startTime
-    const progress = Math.min(elapsed / duration, 1)
-    const eased = easeOutCubic(progress)
-
-    scale.value = startScale + (targetScale - startScale) * eased
-    offsetX.value = startOffsetX + (targetOffsetX - startOffsetX) * eased
-    offsetY.value = startOffsetY + (targetOffsetY - startOffsetY) * eased
-
-    if (progress < 1) {
-      requestAnimationFrame(animate)
-    } else {
-      // Select the node after zoom completes
-      store.selectNode(nodeId, false)
-    }
-  }
-
-  requestAnimationFrame(animate)
 }
 
 // Refresh all nodes from their source files
@@ -1191,31 +1145,6 @@ const nodeDragging = useNodeDragging({
   setLastDragEndTime: (time: number) => { lastDragEndTime = time },
 })
 const { draggingNode, onNodeMouseDown } = nodeDragging
-
-// Navigate to a node by title (for wikilinks)
-function navigateToNode(title: string) {
-  // Find node by title (case-insensitive)
-  const targetNode = store.filteredNodes.find(
-    n => n.title.toLowerCase() === title.toLowerCase()
-  )
-
-  if (!targetNode) {
-    console.warn(`Node not found: ${title}`)
-    return
-  }
-
-  // Center view on node
-  const rect = canvasRef.value?.getBoundingClientRect()
-  if (rect) {
-    const nodeCenterX = targetNode.canvas_x + (targetNode.width || NODE_DEFAULTS.WIDTH) / 2
-    const nodeCenterY = targetNode.canvas_y + (targetNode.height || NODE_DEFAULTS.HEIGHT) / 2
-    offsetX.value = rect.width / 2 - nodeCenterX * scale.value
-    offsetY.value = rect.height / 2 - nodeCenterY * scale.value
-  }
-
-  // Select the node
-  store.selectNode(targetNode.id)
-}
 
 // Handle clicks in node content (for external links and wikilinks)
 function handleContentClick(e: MouseEvent) {

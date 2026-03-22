@@ -42,3 +42,8 @@ export {
   useNodeCollision,
   type NodeCollisionDeps,
 } from './useNodeCollision'
+export {
+  useNodeNavigation,
+  type NodeLike,
+  type NodeNavigationDeps,
+} from './useNodeNavigation'
