@@ -38,3 +38,7 @@ export {
   useLinkPicker,
   type LinkPickerDeps,
 } from './useLinkPicker'
+export {
+  useNodeCollision,
+  type NodeCollisionDeps,
+} from './useNodeCollision'
