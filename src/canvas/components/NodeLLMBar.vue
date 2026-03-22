@@ -28,7 +28,7 @@ defineEmits<{
       transform: `translate(${nodeX}px, ${nodeY - 40}px)`,
       width: nodeWidth + 'px'
     }"
-    @mousedown.stop
+    @pointerdown.stop
     @click.stop
   >
     <input
@@ -40,7 +40,7 @@ defineEmits<{
       tabindex="0"
       :disabled="isLoading"
       @input="$emit('update:nodePrompt', ($event.target as HTMLInputElement).value)"
-      @mousedown.stop
+      @pointerdown.stop
       @keydown.enter.stop="$emit('send')"
       @keydown.up.prevent="$emit('keydown', $event)"
       @keydown.down.prevent="$emit('keydown', $event)"
@@ -51,7 +51,7 @@ defineEmits<{
       class="node-llm-send"
       tabindex="0"
       :disabled="!nodePrompt.trim()"
-      @mousedown.stop
+      @pointerdown.stop
       @click.stop="$emit('send')"
     >
       AI
@@ -60,7 +60,7 @@ defineEmits<{
       v-else
       class="node-llm-stop"
       tabindex="0"
-      @mousedown.stop
+      @pointerdown.stop
       @click.stop="$emit('stop')"
     >
       Stop

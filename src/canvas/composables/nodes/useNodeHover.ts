@@ -23,9 +23,9 @@ export interface UseNodeHoverReturn {
   tooltipContent: ComputedRef<string>
   activeNodeIds: ComputedRef<Set<string>>
   highlightedEdgeIds: ComputedRef<Set<string>>
-  onNodeMouseEnter: (e: MouseEvent, nodeId: string) => void
-  onNodeMouseMove: (e: MouseEvent) => void
-  onNodeMouseLeave: () => void
+  onNodePointerEnter: (e: PointerEvent, nodeId: string) => void
+  onNodePointerMove: (e: PointerEvent) => void
+  onNodePointerLeave: () => void
 }
 
 export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
@@ -83,16 +83,16 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
   })
 
   // Event handlers
-  function onNodeMouseEnter(e: MouseEvent, nodeId: string) {
+  function onNodePointerEnter(e: PointerEvent, nodeId: string) {
     hoveredNodeId.value = nodeId
     hoverMousePos.value = { x: e.clientX, y: e.clientY }
   }
 
-  function onNodeMouseMove(e: MouseEvent) {
+  function onNodePointerMove(e: PointerEvent) {
     hoverMousePos.value = { x: e.clientX, y: e.clientY }
   }
 
-  function onNodeMouseLeave() {
+  function onNodePointerLeave() {
     hoveredNodeId.value = null
   }
 
@@ -104,8 +104,8 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
     tooltipContent,
     activeNodeIds,
     highlightedEdgeIds,
-    onNodeMouseEnter,
-    onNodeMouseMove,
-    onNodeMouseLeave,
+    onNodePointerEnter,
+    onNodePointerMove,
+    onNodePointerLeave,
   }
 }

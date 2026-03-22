@@ -33,12 +33,12 @@ export function useLasso(options: UseLassoOptions) {
   const isLassoSelecting = ref(false)
   const lassoPoints = ref<Point[]>([])
 
-  function start(e: MouseEvent) {
+  function start(e: PointerEvent) {
     isLassoSelecting.value = true
     lassoPoints.value = [screenToCanvas(e.clientX, e.clientY)]
   }
 
-  function update(e: MouseEvent) {
+  function update(e: PointerEvent) {
     if (!isLassoSelecting.value) return
     lassoPoints.value.push(screenToCanvas(e.clientX, e.clientY))
   }

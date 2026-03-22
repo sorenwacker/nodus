@@ -41,7 +41,7 @@ export function useContextMenu(deps: ContextMenuDeps) {
   /**
    * Open context menu at the given position for the given node
    */
-  function open(e: MouseEvent, targetNodeId: string) {
+  function open(e: PointerEvent | MouseEvent, targetNodeId: string) {
     nodeId.value = targetNodeId
     position.value = { x: e.clientX, y: e.clientY }
     visible.value = true

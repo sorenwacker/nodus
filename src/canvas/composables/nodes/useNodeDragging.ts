@@ -40,8 +40,8 @@ export interface UseNodeDraggingContext {
   screenToCanvas: (clientX: number, clientY: number) => { x: number; y: number }
   zoomToNode: (nodeId: string) => void
   optimizeNodeEntrypoints: (nodeId: string, edges: Array<{ id: string; source_node_id: string; target_node_id: string }>, nodeMap: Map<string, { id: string; canvas_x: number; canvas_y: number; width: number; height: number }>) => void
-  onEdgePreviewMove: (e: MouseEvent) => void
-  onEdgeCreate: (e: MouseEvent) => void
+  onEdgePreviewMove: (e: PointerEvent) => void
+  onEdgeCreate: (e: PointerEvent) => void
   setLastDragEndTime: (time: number) => void
 }
 
@@ -52,9 +52,9 @@ export interface UseNodeDraggingReturn {
   multiDragInitial: Ref<Map<string, { x: number; y: number }>>
 
   // Functions
-  onNodeMouseDown: (e: MouseEvent, nodeId: string) => void
-  onNodeDrag: (e: MouseEvent) => void
-  stopNodeDrag: (e: MouseEvent) => void
+  onNodePointerDown: (e: PointerEvent, nodeId: string) => void
+  onNodeDrag: (e: PointerEvent) => void
+  stopNodeDrag: (e: PointerEvent) => void
 }
 
 export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingReturn {
@@ -85,7 +85,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
   const dragStart = ref({ x: 0, y: 0, nodeX: 0, nodeY: 0 })
   const multiDragInitial = ref<Map<string, { x: number; y: number }>>(new Map())
 
-  function onNodeMouseDown(e: MouseEvent, nodeId: string) {
+  function onNodePointerDown(e: PointerEvent, nodeId: string) {
     e.stopPropagation()
 
     // Prevent text selection on shift+click or alt+click
@@ -112,8 +112,8 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         edgeStartNode.value = nodeId
         const pos = screenToCanvas(e.clientX, e.clientY)
         edgePreviewEnd.value = pos
-        document.addEventListener('mousemove', onEdgePreviewMove)
-        document.addEventListener('mouseup', onEdgeCreate)
+        document.addEventListener('pointermove', onEdgePreviewMove)
+        document.addEventListener('pointerup', onEdgeCreate)
       }
       return
     }
@@ -193,11 +193,11 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       }
     }
 
-    document.addEventListener('mousemove', onNodeDrag)
-    document.addEventListener('mouseup', stopNodeDrag)
+    document.addEventListener('pointermove', onNodeDrag)
+    document.addEventListener('pointerup', stopNodeDrag)
   }
 
-  function onNodeDrag(e: MouseEvent) {
+  function onNodeDrag(e: PointerEvent) {
     if (!draggingNode.value) return
     const pos = screenToCanvas(e.clientX, e.clientY)
     const dx = pos.x - dragStart.value.x
@@ -217,7 +217,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     }
   }
 
-  function stopNodeDrag(e: MouseEvent) {
+  function stopNodeDrag(e: PointerEvent) {
     const draggedNodeId = draggingNode.value
     const draggedNodeIds = multiDragInitial.value.size > 0
       ? [...multiDragInitial.value.keys()]
@@ -289,15 +289,15 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     multiDragInitial.value.clear()
     setLastDragEndTime(Date.now())
     document.body.classList.remove('node-dragging')
-    document.removeEventListener('mousemove', onNodeDrag)
-    document.removeEventListener('mouseup', stopNodeDrag)
+    document.removeEventListener('pointermove', onNodeDrag)
+    document.removeEventListener('pointerup', stopNodeDrag)
   }
 
   return {
     draggingNode,
     dragStart,
     multiDragInitial,
-    onNodeMouseDown,
+    onNodePointerDown,
     onNodeDrag,
     stopNodeDrag,
   }

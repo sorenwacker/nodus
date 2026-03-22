@@ -33,8 +33,8 @@ export interface UseNodeResizingReturn {
   resizePreview: Ref<{ width: number; height: number; x: number; y: number }>
 
   // Functions
-  onResizeMouseDown: (e: MouseEvent, nodeId: string, direction?: string) => void
-  onResizeMove: (e: MouseEvent) => void
+  onResizePointerDown: (e: PointerEvent, nodeId: string, direction?: string) => void
+  onResizeMove: (e: PointerEvent) => void
   stopResize: () => void
 }
 
@@ -58,7 +58,7 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
   const resizePreview = ref({ width: 0, height: 0, x: 0, y: 0 })
   const multiResizeInitial = ref<Map<string, { width: number; height: number; x: number; y: number }>>(new Map())
 
-  function onResizeMouseDown(e: MouseEvent, nodeId: string, direction: string = 'se') {
+  function onResizePointerDown(e: PointerEvent, nodeId: string, direction: string = 'se') {
     e.stopPropagation()
     e.preventDefault()
 
@@ -98,11 +98,11 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
       }
     }
 
-    document.addEventListener('mousemove', onResizeMove)
-    document.addEventListener('mouseup', stopResize)
+    document.addEventListener('pointermove', onResizeMove)
+    document.addEventListener('pointerup', stopResize)
   }
 
-  function onResizeMove(e: MouseEvent) {
+  function onResizeMove(e: PointerEvent) {
     if (!resizingNode.value) return
 
     const dx = (e.clientX - resizeStart.value.x) / scale.value
@@ -183,8 +183,8 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     resizingNode.value = null
     multiResizeInitial.value.clear()
     setLastDragEndTime(Date.now())
-    document.removeEventListener('mousemove', onResizeMove)
-    document.removeEventListener('mouseup', stopResize)
+    document.removeEventListener('pointermove', onResizeMove)
+    document.removeEventListener('pointerup', stopResize)
   }
 
   return {
@@ -192,7 +192,7 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     resizeDirection,
     resizeStart,
     resizePreview,
-    onResizeMouseDown,
+    onResizePointerDown,
     onResizeMove,
     stopResize,
   }

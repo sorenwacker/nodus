@@ -25,9 +25,9 @@ export interface UseCanvasZoomReturn {
 
   // Functions
   onWheel: (e: WheelEvent) => void
-  onCanvasMouseMove: (e: MouseEvent) => void
-  onCanvasMouseEnter: () => void
-  onCanvasMouseLeave: () => void
+  onCanvasPointerMove: (e: PointerEvent) => void
+  onCanvasPointerEnter: () => void
+  onCanvasPointerLeave: () => void
 }
 
 export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
@@ -116,7 +116,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     scheduleSaveViewState()
   }
 
-  function onCanvasMouseMove(e: MouseEvent) {
+  function onCanvasPointerMove(e: PointerEvent) {
     // Throttle magnifier updates using requestAnimationFrame
     if (magnifierRafId) return
 
@@ -138,14 +138,14 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     })
   }
 
-  function onCanvasMouseEnter() {
+  function onCanvasPointerEnter() {
     isMouseOnCanvas.value = true
     if (scale.value < magnifierThreshold) {
       showMagnifier.value = true
     }
   }
 
-  function onCanvasMouseLeave() {
+  function onCanvasPointerLeave() {
     isMouseOnCanvas.value = false
     showMagnifier.value = false
   }
@@ -155,8 +155,8 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     isMouseOnCanvas,
     magnifierPos,
     onWheel,
-    onCanvasMouseMove,
-    onCanvasMouseEnter,
-    onCanvasMouseLeave,
+    onCanvasPointerMove,
+    onCanvasPointerEnter,
+    onCanvasPointerLeave,
   }
 }

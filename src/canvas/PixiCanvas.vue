@@ -299,8 +299,8 @@ const lasso = useLasso({
   screenToCanvas,
 })
 const { isLassoSelecting, lassoPoints } = lasso
-function startLasso(e: MouseEvent) { lasso.start(e) }
-function updateLasso(e: MouseEvent) { lasso.update(e) }
+function startLasso(e: PointerEvent) { lasso.start(e) }
+function updateLasso(e: PointerEvent) { lasso.update(e) }
 function endLasso() { lasso.end() }
 
 // Node clipboard composable
@@ -369,7 +369,7 @@ const canvasZoom = useCanvasZoom({
   scheduleSaveViewState,
   magnifierThreshold: 0.4, // MAGNIFIER_THRESHOLD
 })
-const { showMagnifier, magnifierPos, onWheel, onCanvasMouseMove, onCanvasMouseEnter, onCanvasMouseLeave } = canvasZoom
+const { showMagnifier, magnifierPos, onWheel, onCanvasPointerMove, onCanvasPointerEnter, onCanvasPointerLeave } = canvasZoom
 
 // Canvas display composable - handles magnifier, thumbnails, font scale
 const canvasDisplay = useCanvasDisplay({
@@ -494,9 +494,9 @@ const {
   hoveredNode,
   tooltipContent,
   highlightedEdgeIds,
-  onNodeMouseEnter,
-  onNodeMouseMove,
-  onNodeMouseLeave,
+  onNodePointerEnter,
+  onNodePointerMove,
+  onNodePointerLeave,
 } = nodeHover
 
 // Context menu composable
@@ -566,8 +566,8 @@ const frames = useFrames({
   snapToGrid,
 })
 const { editingFrameId, editFrameTitle } = frames
-function onFrameMouseDown(e: MouseEvent, frameId: string) { frames.onMouseDown(e, frameId) }
-function startFrameResize(e: MouseEvent, frameId: string) { frames.startResize(e, frameId) }
+function onFramePointerDown(e: PointerEvent, frameId: string) { frames.onPointerDown(e, frameId) }
+function startFrameResize(e: PointerEvent, frameId: string) { frames.startResize(e, frameId) }
 function startEditingFrameTitle(frameId: string) { frames.startEditingTitle(frameId) }
 function saveFrameTitleEditing() { frames.saveTitle() }
 function cancelFrameTitleEditing() { frames.cancelTitleEditing() }
@@ -1033,8 +1033,8 @@ const transform = computed(() => {
   return `translate3d(${offsetX.value}px, ${offsetY.value}px, 0) scale(${scale.value})`
 })
 
-// Pan with left mouse drag on empty canvas space
-function onCanvasMouseDown(e: MouseEvent) {
+// Pan with pointer drag on empty canvas space (supports mouse, touch, pen)
+function onCanvasPointerDown(e: PointerEvent) {
   // Handle frame placement mode
   if (frames.pendingFramePlacement.value && e.button === 0) {
     e.preventDefault()
@@ -1047,7 +1047,7 @@ function onCanvasMouseDown(e: MouseEvent) {
     return
   }
 
-  // Left click - start panning or lasso if not on a node
+  // Left click/primary touch - start panning or lasso if not on a node
   if (e.button === 0) {
     const target = e.target as HTMLElement
     // Don't pan if clicking on a node, edge, panel, frame, or node AI toolbar
@@ -1063,10 +1063,10 @@ function onCanvasMouseDown(e: MouseEvent) {
     // Shift+drag = lasso selection
     if (e.shiftKey) {
       startLasso(e)
-      document.addEventListener('mousemove', updateLasso)
-      document.addEventListener('mouseup', () => {
+      document.addEventListener('pointermove', updateLasso)
+      document.addEventListener('pointerup', () => {
         endLasso()
-        document.removeEventListener('mousemove', updateLasso)
+        document.removeEventListener('pointermove', updateLasso)
       }, { once: true })
       return
     }
@@ -1104,7 +1104,7 @@ const nodeResizing = useNodeResizing({
   pushOverlappingNodesAway,
   setLastDragEndTime: (time: number) => { lastDragEndTime = time },
 })
-const { resizingNode, resizePreview, onResizeMouseDown } = nodeResizing
+const { resizingNode, resizePreview, onResizePointerDown } = nodeResizing
 
 // Node dragging composable
 const nodeDragging = useNodeDragging({
@@ -1144,7 +1144,7 @@ const nodeDragging = useNodeDragging({
   onEdgeCreate,
   setLastDragEndTime: (time: number) => { lastDragEndTime = time },
 })
-const { draggingNode, onNodeMouseDown } = nodeDragging
+const { draggingNode, onNodePointerDown } = nodeDragging
 
 // Handle clicks in node content (for external links and wikilinks)
 function handleContentClick(e: MouseEvent) {
@@ -1491,10 +1491,10 @@ useCanvasKeyboardShortcuts({
       :class="{ panning: isPanning, 'frame-placement': frames.pendingFramePlacement.value }"
       :style="{ backgroundPosition: offsetX + 'px ' + offsetY + 'px' }"
       @wheel="onWheel"
-      @mousedown="onCanvasMouseDown"
-      @mousemove="onCanvasMouseMove"
-      @mouseenter="onCanvasMouseEnter"
-      @mouseleave="onCanvasMouseLeave"
+      @pointerdown="onCanvasPointerDown"
+      @pointermove="onCanvasPointerMove"
+      @pointerenter="onCanvasPointerEnter"
+      @pointerleave="onCanvasPointerLeave"
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
     >
@@ -1526,7 +1526,7 @@ useCanvasKeyboardShortcuts({
         :scale="scale"
         :frame-colors="frameColors"
         @update:edit-frame-title="editFrameTitle = $event"
-        @mousedown="onFrameMouseDown"
+        @pointerdown="onFramePointerDown"
         @dblclick="startEditingFrameTitle"
         @save-title="saveFrameTitleEditing"
         @cancel-title="cancelFrameTitleEditing"
@@ -1550,9 +1550,9 @@ useCanvasKeyboardShortcuts({
             background: node.color_theme || 'var(--primary-color)',
           }"
           :title="node.title + ' (' + (nodeDegree[node.id] || 0) + ' ' + t('canvas.node.connections') + ')'"
-          @mousedown="onNodeMouseDown($event, node.id)"
-          @mouseenter="onNodeMouseEnter($event, node.id)"
-          @mouseleave="onNodeMouseLeave"
+          @pointerdown="onNodePointerDown($event, node.id)"
+          @pointerenter="onNodePointerEnter($event, node.id)"
+          @pointerleave="onNodePointerLeave"
           @dblclick.stop="startEditing(node.id)"
         ></div>
       </template>
@@ -1580,10 +1580,10 @@ useCanvasKeyboardShortcuts({
           borderWidth: nodeBorderWidth + 'px',
           ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
         }"
-        @mousedown="onNodeMouseDown($event, node.id)"
-        @mouseenter="onNodeMouseEnter($event, node.id)"
-        @mousemove="onNodeMouseMove($event)"
-        @mouseleave="onNodeMouseLeave"
+        @pointerdown="onNodePointerDown($event, node.id)"
+        @pointerenter="onNodePointerEnter($event, node.id)"
+        @pointermove="onNodePointerMove($event)"
+        @pointerleave="onNodePointerLeave"
         @dblclick.stop="startEditing(node.id)"
       >
         <!-- Image thumbnail when zoomed out -->
@@ -1603,8 +1603,8 @@ useCanvasKeyboardShortcuts({
             @keydown.enter="saveTitleEditing"
             @keydown.escape="cancelTitleEditing"
             @click.stop
-            @mousedown.stop
-            @mouseup.stop
+            @pointerdown.stop
+            @pointerup.stop
           />
           <span v-else>{{ node.title || t('canvas.node.untitled') }}</span>
         </div>
@@ -1617,8 +1617,8 @@ useCanvasKeyboardShortcuts({
           spellcheck="false"
           autocorrect="off"
           autocapitalize="off"
-          @mousedown.stop
-          @mouseup.stop
+          @pointerdown.stop
+          @pointerup.stop
           @blur="saveEditing($event)"
           @keydown="onEditorKeydown"
         ></textarea>
@@ -1633,7 +1633,7 @@ useCanvasKeyboardShortcuts({
         <!-- eslint-enable vue/no-v-html -->
 
         <!-- Color palette and options (shown when selected or editing) -->
-        <div v-if="store.selectedNodeIds.includes(node.id) || editingNodeId === node.id" class="node-color-bar" @mousedown.prevent>
+        <div v-if="store.selectedNodeIds.includes(node.id) || editingNodeId === node.id" class="node-color-bar" @pointerdown.prevent>
           <button
             v-for="color in nodeColors"
             :key="color.value || 'default'"
@@ -1654,19 +1654,19 @@ useCanvasKeyboardShortcuts({
         <button
           v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id"
           class="delete-node-btn"
-          @mousedown.stop="deleteSelectedNodes"
+          @pointerdown.stop="deleteSelectedNodes"
         ></button>
 
         <!-- Resize handles - edges -->
-        <div class="resize-edge resize-edge-n" @mousedown.stop="onResizeMouseDown($event, node.id, 'n')"></div>
-        <div class="resize-edge resize-edge-s" @mousedown.stop="onResizeMouseDown($event, node.id, 's')"></div>
-        <div class="resize-edge resize-edge-e" @mousedown.stop="onResizeMouseDown($event, node.id, 'e')"></div>
-        <div class="resize-edge resize-edge-w" @mousedown.stop="onResizeMouseDown($event, node.id, 'w')"></div>
+        <div class="resize-edge resize-edge-n" @pointerdown.stop="onResizePointerDown($event, node.id, 'n')"></div>
+        <div class="resize-edge resize-edge-s" @pointerdown.stop="onResizePointerDown($event, node.id, 's')"></div>
+        <div class="resize-edge resize-edge-e" @pointerdown.stop="onResizePointerDown($event, node.id, 'e')"></div>
+        <div class="resize-edge resize-edge-w" @pointerdown.stop="onResizePointerDown($event, node.id, 'w')"></div>
         <!-- Resize handles - corners -->
-        <div class="resize-corner resize-corner-nw" @mousedown.stop="onResizeMouseDown($event, node.id, 'nw')"></div>
-        <div class="resize-corner resize-corner-ne" @mousedown.stop="onResizeMouseDown($event, node.id, 'ne')"></div>
-        <div class="resize-corner resize-corner-se" @mousedown.stop="onResizeMouseDown($event, node.id, 'se')"></div>
-        <div class="resize-corner resize-corner-sw" @mousedown.stop="onResizeMouseDown($event, node.id, 'sw')"></div>
+        <div class="resize-corner resize-corner-nw" @pointerdown.stop="onResizePointerDown($event, node.id, 'nw')"></div>
+        <div class="resize-corner resize-corner-ne" @pointerdown.stop="onResizePointerDown($event, node.id, 'ne')"></div>
+        <div class="resize-corner resize-corner-se" @pointerdown.stop="onResizePointerDown($event, node.id, 'se')"></div>
+        <div class="resize-corner resize-corner-sw" @pointerdown.stop="onResizePointerDown($event, node.id, 'sw')"></div>
       </div>
 
       <!-- Empty state (positioned in viewport, not canvas) -->

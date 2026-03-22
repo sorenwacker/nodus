@@ -21,7 +21,7 @@ defineProps<{
 }>()
 
 defineEmits<{
-  (e: 'edge-click', event: MouseEvent, edgeId: string): void
+  (e: 'edge-click', event: PointerEvent, edgeId: string): void
 }>()
 </script>
 

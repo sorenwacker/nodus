@@ -1,6 +1,6 @@
 /**
  * Canvas pan composable
- * Manages canvas panning with mouse drag
+ * Manages canvas panning with pointer events (supports mouse, touch, pen)
  */
 import { ref } from 'vue'
 
@@ -16,7 +16,7 @@ export function useCanvasPan(options: UseCanvasPanOptions) {
   const isPanning = ref(false)
   const panStart = ref({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
 
-  function startPan(e: MouseEvent) {
+  function startPan(e: PointerEvent) {
     const offset = getOffset()
     panStart.value = {
       x: e.clientX,
@@ -24,12 +24,12 @@ export function useCanvasPan(options: UseCanvasPanOptions) {
       offsetX: offset.x,
       offsetY: offset.y,
     }
-    document.addEventListener('mousemove', onPanMove)
-    document.addEventListener('mouseup', stopPan)
+    document.addEventListener('pointermove', onPanMove)
+    document.addEventListener('pointerup', stopPan)
   }
 
-  function onPanMove(e: MouseEvent) {
-    // Only set panning true after mouse actually moves (allows double-click to work)
+  function onPanMove(e: PointerEvent) {
+    // Only set panning true after pointer actually moves (allows double-click to work)
     const dx = e.clientX - panStart.value.x
     const dy = e.clientY - panStart.value.y
     if (!isPanning.value && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
@@ -44,8 +44,8 @@ export function useCanvasPan(options: UseCanvasPanOptions) {
       onPanEnd?.()
     }
     isPanning.value = false
-    document.removeEventListener('mousemove', onPanMove)
-    document.removeEventListener('mouseup', stopPan)
+    document.removeEventListener('pointermove', onPanMove)
+    document.removeEventListener('pointerup', stopPan)
   }
 
   return {

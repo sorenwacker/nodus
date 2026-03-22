@@ -16,13 +16,13 @@ defineProps<{
 
 defineEmits<{
   (e: 'update:editFrameTitle', value: string): void
-  (e: 'mousedown', event: MouseEvent, frameId: string): void
+  (e: 'pointerdown', event: PointerEvent, frameId: string): void
   (e: 'dblclick', frameId: string): void
   (e: 'save-title'): void
   (e: 'cancel-title'): void
   (e: 'update-color', frameId: string, color: string | null): void
   (e: 'delete'): void
-  (e: 'start-resize', event: MouseEvent, frameId: string): void
+  (e: 'start-resize', event: PointerEvent, frameId: string): void
 }>()
 </script>
 
@@ -39,7 +39,7 @@ defineEmits<{
       borderColor: frame.color || 'var(--border-default)',
       borderWidth: frameBorderWidth + 'px',
     }"
-    @mousedown.stop="$emit('mousedown', $event, frame.id)"
+    @pointerdown.stop="$emit('pointerdown', $event, frame.id)"
     @dblclick.stop="$emit('dblclick', frame.id)"
   >
     <div class="frame-header" :style="{ transform: `scale(${1/scale})`, transformOrigin: 'left center' }">
@@ -52,10 +52,10 @@ defineEmits<{
         @keydown.enter="$emit('save-title')"
         @keydown.escape="$emit('cancel-title')"
         @click.stop
-        @mousedown.stop
+        @pointerdown.stop
       />
       <span v-else class="frame-title">{{ frame.title }}</span>
-      <div v-if="selectedFrameId === frame.id && editingFrameId !== frame.id" class="frame-color-picker" @mousedown.stop>
+      <div v-if="selectedFrameId === frame.id && editingFrameId !== frame.id" class="frame-color-picker" @pointerdown.stop>
         <button
           v-for="color in frameColors"
           :key="color.value || 'default'"
@@ -72,6 +72,6 @@ defineEmits<{
         @click.stop="$emit('delete')"
       >x</button>
     </div>
-    <div class="frame-resize-handle" @mousedown.stop="$emit('start-resize', $event, frame.id)"></div>
+    <div class="frame-resize-handle" @pointerdown.stop="$emit('start-resize', $event, frame.id)"></div>
   </div>
 </template>

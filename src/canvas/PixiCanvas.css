@@ -29,13 +29,14 @@
 .agent-log {
   margin-top: 8px;
   padding: 8px;
-  background: #1a1a2e;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
   font-family: monospace;
   font-size: 11px;
   max-height: 120px;
   overflow-y: auto;
-  color: #4ade80;
+  color: var(--text-secondary);
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
@@ -60,20 +61,21 @@
 }
 
 .log-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
+  background: var(--bg-surface-alt);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 4px;
   cursor: pointer;
-  color: #888;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .log-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  background: var(--bg-elevated);
+  border-color: var(--primary-color);
+  color: var(--text-main);
 }
 
 .clear-log-btn {

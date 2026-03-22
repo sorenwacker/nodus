@@ -32,13 +32,13 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
   // Edge selection state
   const selectedEdge = ref<string | null>(null)
 
-  function onEdgePreviewMove(e: MouseEvent) {
+  function onEdgePreviewMove(e: PointerEvent) {
     edgePreviewEnd.value = screenToCanvas(e.clientX, e.clientY)
   }
 
-  function onEdgeCreate(e: MouseEvent) {
-    document.removeEventListener('mousemove', onEdgePreviewMove)
-    document.removeEventListener('mouseup', onEdgeCreate)
+  function onEdgeCreate(e: PointerEvent) {
+    document.removeEventListener('pointermove', onEdgePreviewMove)
+    document.removeEventListener('pointerup', onEdgeCreate)
 
     if (!edgeStartNode.value) {
       isCreatingEdge.value = false
@@ -66,11 +66,11 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
   function startEdgeCreation(nodeId: string) {
     isCreatingEdge.value = true
     edgeStartNode.value = nodeId
-    document.addEventListener('mousemove', onEdgePreviewMove)
-    document.addEventListener('mouseup', onEdgeCreate)
+    document.addEventListener('pointermove', onEdgePreviewMove)
+    document.addEventListener('pointerup', onEdgeCreate)
   }
 
-  function onEdgeClick(e: MouseEvent, edgeId: string) {
+  function onEdgeClick(e: PointerEvent, edgeId: string) {
     e.stopPropagation()
     selectedEdge.value = edgeId
     store.selectNode(null)

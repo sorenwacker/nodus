@@ -5,7 +5,7 @@
  */
 
 import { defineTool } from '../registry'
-import { applyForceLayout } from '../../layout'
+import { applyForceLayout } from '../../canvas/layout'
 
 export function registerLayoutTools(): void {
   defineTool<{ layout: string; sort?: string }>(

@@ -69,7 +69,7 @@ export function useFrames(options: UseFramesOptions) {
   const editFrameTitle = ref('')
   const pendingFramePlacement = ref(false)
 
-  function onMouseDown(e: MouseEvent, frameId: string) {
+  function onPointerDown(e: PointerEvent, frameId: string) {
     e.preventDefault()
     store.selectFrame(frameId)
     store.selectNode(null)
@@ -105,11 +105,11 @@ export function useFrames(options: UseFramesOptions) {
       }
     }
 
-    document.addEventListener('mousemove', onDrag)
-    document.addEventListener('mouseup', stopDrag)
+    document.addEventListener('pointermove', onDrag)
+    document.addEventListener('pointerup', stopDrag)
   }
 
-  function onDrag(e: MouseEvent) {
+  function onDrag(e: PointerEvent) {
     if (!draggingFrame.value) return
     const pos = screenToCanvas(e.clientX, e.clientY)
     const dx = pos.x - frameDragStart.value.x
@@ -129,11 +129,11 @@ export function useFrames(options: UseFramesOptions) {
   function stopDrag() {
     draggingFrame.value = null
     frameContainedNodes.value.clear()
-    document.removeEventListener('mousemove', onDrag)
-    document.removeEventListener('mouseup', stopDrag)
+    document.removeEventListener('pointermove', onDrag)
+    document.removeEventListener('pointerup', stopDrag)
   }
 
-  function startResize(e: MouseEvent, frameId: string) {
+  function startResize(e: PointerEvent, frameId: string) {
     e.preventDefault()
     const frame = store.frames.find(f => f.id === frameId)
     if (!frame) return
@@ -146,11 +146,11 @@ export function useFrames(options: UseFramesOptions) {
       height: frame.height,
     }
 
-    document.addEventListener('mousemove', onResize)
-    document.addEventListener('mouseup', stopResize)
+    document.addEventListener('pointermove', onResize)
+    document.addEventListener('pointerup', stopResize)
   }
 
-  function onResize(e: MouseEvent) {
+  function onResize(e: PointerEvent) {
     if (!resizingFrame.value) return
     const dx = (e.clientX - frameResizeStart.value.x) / viewState.scale.value
     const dy = (e.clientY - frameResizeStart.value.y) / viewState.scale.value
@@ -161,8 +161,8 @@ export function useFrames(options: UseFramesOptions) {
 
   function stopResize() {
     resizingFrame.value = null
-    document.removeEventListener('mousemove', onResize)
-    document.removeEventListener('mouseup', stopResize)
+    document.removeEventListener('pointermove', onResize)
+    document.removeEventListener('pointerup', stopResize)
   }
 
   function startEditingTitle(frameId: string) {
@@ -251,7 +251,7 @@ export function useFrames(options: UseFramesOptions) {
     pendingFramePlacement,
 
     // Functions
-    onMouseDown,
+    onPointerDown,
     startResize,
     startEditingTitle,
     saveTitle,
