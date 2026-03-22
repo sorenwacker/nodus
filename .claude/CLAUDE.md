@@ -146,8 +146,36 @@ nodus/
 │   └── PRODUCT_DESIGN.md       # Main spec
 ├── src/                        # Vue frontend
 │   ├── components/
+│   │   ├── settings/           # Settings modal panels
+│   │   │   ├── LLMSettingsPanel.vue
+│   │   │   ├── CanvasSettingsPanel.vue
+│   │   │   ├── ThemeSettingsPanel.vue
+│   │   │   └── WorkspaceDiagnosticsSection.vue
+│   │   └── *.vue               # Other components
 │   ├── canvas/                 # PixiJS logic, composables
 │   │   ├── composables/        # Canvas-specific composables
+│   │   │   ├── nodes/          # Node manipulation
+│   │   │   │   ├── useNodeClipboard.ts
+│   │   │   │   ├── useNodeDragging.ts
+│   │   │   │   ├── useNodeEditor.ts
+│   │   │   │   ├── useNodeHover.ts
+│   │   │   │   ├── useNodeResizing.ts
+│   │   │   │   ├── useNodeCollision.ts
+│   │   │   │   ├── useNodeNavigation.ts
+│   │   │   │   ├── useLinkPicker.ts
+│   │   │   │   └── useNodeVisibility.ts
+│   │   │   ├── edges/          # Edge routing and styling
+│   │   │   ├── viewport/       # Pan, zoom, minimap
+│   │   │   ├── selection/      # Lasso, context menu
+│   │   │   ├── rendering/      # Content rendering, culling
+│   │   │   ├── layout/         # Layout algorithms
+│   │   │   ├── frames/         # Frame operations
+│   │   │   ├── agent/          # LLM agent composables
+│   │   │   └── util/           # Utilities (undo, export, etc.)
+│   │   │       ├── useUndoHandlers.ts
+│   │   │       ├── useGraphExport.ts
+│   │   │       ├── useStorylines.ts
+│   │   │       └── usePdfDrop.ts
 │   │   ├── components/         # Canvas sub-components
 │   │   ├── layout/             # Layout algorithms
 │   │   └── PixiCanvas.vue      # Main canvas component
@@ -156,6 +184,14 @@ nodus/
 │   │   ├── tools/              # Agent tools
 │   │   └── *.ts                # Core LLM logic
 │   ├── composables/            # App-level composables
+│   │   ├── useFileSync.ts
+│   │   ├── useImport.ts
+│   │   ├── useNodeEditLocking.ts
+│   │   ├── useNotifications.ts
+│   │   ├── useTagNodes.ts
+│   │   ├── useTypst.ts
+│   │   ├── useUndoRedo.ts
+│   │   └── useZotero.ts
 │   ├── stores/                 # Pinia state
 │   ├── lib/                    # Utility libraries
 │   ├── types/                  # TypeScript types
@@ -171,6 +207,13 @@ nodus/
 └── .claude/
     └── CLAUDE.md               # This file
 ```
+
+### Code Organization Guidelines
+
+- **Max file size:** No file should exceed 1000 lines
+- **Composables:** Extract reusable logic into composables
+- **Settings panels:** Each settings tab should be a separate component
+- **Canvas composables:** Organized by domain (nodes/, edges/, viewport/, etc.)
 
 ---
 
