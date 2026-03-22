@@ -1193,13 +1193,13 @@ ${edgeDescriptions}`
 
   defineTool<{ filter?: string; action: string; template: string }>(
     'for_each_node',
-    'Process nodes: set/append content with templates, or use LLM to transform content.',
+    'Process nodes: set/append content with templates, or use LLM to generate/transform content.',
     {
       type: 'object',
       properties: {
         filter: { type: 'string', description: '"all", "empty", "has_content", or search term' },
-        action: { type: 'string', description: '"set", "append", or "llm" (LLM transforms each node)' },
-        template: { type: 'string', description: 'For set/append: math template with {title}, {n}. For llm: instruction like "clean up this text"' },
+        action: { type: 'string', description: '"set", "append", or "llm" (LLM generates content)' },
+        template: { type: 'string', description: 'Template with {title}, {content}, {n}. Examples: "What is {title}? 100 words max" or "Summarize: {content}"' },
       },
       required: ['action', 'template'],
     },
@@ -1227,18 +1227,34 @@ ${edgeDescriptions}`
         const provider = providerRegistry.getActiveProvider()
         let processed = 0
 
-        for (const node of nodes) {
+        for (let i = 0; i < nodes.length; i++) {
+          const node = nodes[i]
+          const n = i + 1
           ctx.log(`> Processing "${node.title}"...`)
+
+          // Apply template variables to the instruction
+          const instruction = template
+            .replace(/\{title\}/g, node.title)
+            .replace(/\{content\}/g, node.markdown_content || '')
+            .replace(/\{n\}/g, String(n))
 
           // Use existing content if available, otherwise use title for generation
           const hasContent = !!node.markdown_content?.trim()
-          const sourceText = hasContent ? node.markdown_content : node.title
 
           try {
-            // Build a clear prompt that focuses on the node's topic
-            const prompt = hasContent
-              ? `${template}\n\nExisting content to process:\n${sourceText}`
-              : `Write about "${node.title}". Instruction: ${template}`
+            // Build prompt - if template has {title}, use it directly; otherwise add context
+            const hasTemplateVars = /\{title\}|\{content\}/.test(template)
+            let prompt: string
+            if (hasTemplateVars) {
+              // User provided explicit template like "What is {title}?"
+              prompt = instruction
+            } else if (hasContent) {
+              // Transform existing content
+              prompt = `${instruction}\n\nContent:\n${node.markdown_content}`
+            } else {
+              // Generate from title
+              prompt = `Write about "${node.title}". ${instruction}`
+            }
 
             const result = await provider.generate({
               prompt,
