@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { VisibleEdgeLine } from '../composables/useEdgeVisibility'
+import type { VisibleEdgeLine } from '../composables/edges'
 
 export interface MarkerColor {
   value: string

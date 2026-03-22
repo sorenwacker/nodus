@@ -9,25 +9,49 @@ import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manage
 import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
 import { llmStorage, memoryStorage } from '../lib/storage'
-import { useMinimap } from './composables/useMinimap'
+import {
+  useMinimap,
+  useViewState,
+  useCanvasPan,
+  useCanvasZoom,
+  useCanvasDisplay,
+} from './composables/viewport'
+import {
+  useNodeClipboard,
+  useNodeEditor,
+  useNodeResizing,
+  useNodeDragging,
+  useNodeHover,
+} from './composables/nodes'
+import {
+  useEdgeManipulation,
+  useEdgeRouting,
+  useEdgeStyling,
+  useEdgeVisibility,
+} from './composables/edges'
+import { useLasso, useContextMenu } from './composables/selection'
+import {
+  useAgentRunner,
+  useNodeAgent,
+  useLLMTools,
+  useMarkerHandlers,
+  usePlanHandlers,
+  type AgentContext,
+  type NodeAgentContext,
+} from './composables/agent'
+import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
+import { useLayout, useNeighborhoodMode } from './composables/layout'
+import { useFrames } from './composables/frames'
+import {
+  useCanvasKeyboardShortcuts,
+  usePdfDrop,
+  useStorylines,
+  useUndoHandlers,
+} from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
 import { findConnectedNodes, getImmediateNeighbors, buildChainContext } from './utils/graphTraversal'
-import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
-import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
-import { useLasso } from './composables/useLasso'
-import { useFrames } from './composables/useFrames'
-import { useLayout } from './composables/useLayout'
-import { usePdfDrop } from './composables/usePdfDrop'
-import { useNodeAgent, type NodeAgentContext } from './composables/useNodeAgent'
-import { useViewState } from './composables/useViewState'
-import { useNodeClipboard } from './composables/useNodeClipboard'
-import { useNodeEditor } from './composables/useNodeEditor'
-import { useEdgeManipulation } from './composables/useEdgeManipulation'
-import { useContentRenderer } from './composables/useContentRenderer'
 import ImportOptionsModal from '../components/ImportOptionsModal.vue'
-import { useCanvasPan } from './composables/useCanvasPan'
-import { useContextMenu } from './composables/useContextMenu'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
@@ -47,22 +71,6 @@ import PlanApprovalModal from '../components/PlanApprovalModal.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
 import { usePlanState } from './llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
-import { useMarkerHandlers } from './composables/useMarkerHandlers'
-import { useLLMTools } from './composables/useLLMTools'
-import { usePlanHandlers } from './composables/usePlanHandlers'
-import { useStorylines } from './composables/useStorylines'
-import { useEdgeStyling } from './composables/useEdgeStyling'
-import { useNodeResizing } from './composables/useNodeResizing'
-import { useNodeDragging } from './composables/useNodeDragging'
-import { useCanvasZoom } from './composables/useCanvasZoom'
-import { useEdgeRouting } from './composables/useEdgeRouting'
-import { useEdgeVisibility } from './composables/useEdgeVisibility'
-import { useViewportCulling } from './composables/useViewportCulling'
-import { useGraphMetrics } from './composables/useGraphMetrics'
-import { useCanvasDisplay } from './composables/useCanvasDisplay'
-import { useCanvasKeyboardShortcuts } from './composables/useCanvasKeyboardShortcuts'
-import { useNodeHover } from './composables/useNodeHover'
-import { useUndoHandlers } from './composables/useUndoHandlers'
 
 // Undo handlers
 const { pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo } = useUndoHandlers()
