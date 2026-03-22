@@ -61,46 +61,10 @@ import { useGraphMetrics } from './composables/useGraphMetrics'
 import { useCanvasDisplay } from './composables/useCanvasDisplay'
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNodeHover } from './composables/useNodeHover'
+import { useUndoHandlers } from './composables/useUndoHandlers'
 
-// Undo injection for position, content, and deletion changes
-import type { Node, Edge } from '../types'
-
-const injectedPushUndo = inject<(() => void) | undefined>('pushUndo')
-const injectedPushContentUndo = inject<((nodeId: string, oldContent: string | null, oldTitle: string) => void) | undefined>('pushContentUndo')
-const injectedPushDeletionUndo = inject<((node: Node, edges: Edge[]) => void) | undefined>('pushDeletionUndo')
-const injectedPushCreationUndo = inject<((nodeIds: string[]) => void) | undefined>('pushCreationUndo')
-
-const pushUndo = () => {
-  if (injectedPushUndo) {
-    injectedPushUndo()
-  } else {
-    console.warn('pushUndo not provided - undo will not work')
-  }
-}
-
-const pushContentUndo = (nodeId: string, oldContent: string | null, oldTitle: string) => {
-  if (injectedPushContentUndo) {
-    injectedPushContentUndo(nodeId, oldContent, oldTitle)
-  } else {
-    console.warn('pushContentUndo not provided - content undo will not work')
-  }
-}
-
-const pushDeletionUndo = (node: Node, edges: Edge[]) => {
-  if (injectedPushDeletionUndo) {
-    injectedPushDeletionUndo(node, edges)
-  } else {
-    console.warn('pushDeletionUndo not provided - deletion undo will not work')
-  }
-}
-
-const pushCreationUndo = (nodeIds: string[]) => {
-  if (injectedPushCreationUndo) {
-    injectedPushCreationUndo(nodeIds)
-  } else {
-    console.warn('pushCreationUndo not provided - creation undo will not work')
-  }
-}
+// Undo handlers
+const { pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo } = useUndoHandlers()
 
 // Content renderer is configured via composable
 
