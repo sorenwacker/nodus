@@ -389,6 +389,42 @@ pub mod edges {
         Ok(edges)
     }
 
+    /// Get edges filtered by workspace (both source and target nodes must be in workspace)
+    pub async fn get_by_workspace(
+        pool: &DbPool,
+        workspace_id: Option<&str>,
+    ) -> Result<Vec<Edge>, DatabaseError> {
+        let edges = match workspace_id {
+            Some(ws_id) => {
+                sqlx::query_as::<_, Edge>(
+                    r#"
+                    SELECT DISTINCT e.* FROM edges e
+                    INNER JOIN nodes n1 ON e.source_node_id = n1.id
+                    INNER JOIN nodes n2 ON e.target_node_id = n2.id
+                    WHERE n1.workspace_id = ? AND n2.workspace_id = ?
+                    "#,
+                )
+                .bind(ws_id)
+                .bind(ws_id)
+                .fetch_all(pool)
+                .await?
+            }
+            None => {
+                sqlx::query_as::<_, Edge>(
+                    r#"
+                    SELECT DISTINCT e.* FROM edges e
+                    INNER JOIN nodes n1 ON e.source_node_id = n1.id
+                    INNER JOIN nodes n2 ON e.target_node_id = n2.id
+                    WHERE n1.workspace_id IS NULL AND n2.workspace_id IS NULL
+                    "#,
+                )
+                .fetch_all(pool)
+                .await?
+            }
+        };
+        Ok(edges)
+    }
+
     pub async fn create(pool: &DbPool, edge: &Edge) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"

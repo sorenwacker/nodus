@@ -25,12 +25,13 @@ export const useEdgesStore = defineStore('edges', () => {
 
   /**
    * Initialize edges from database
+   * @param workspaceId - Optional workspace ID to filter edges
    */
-  async function initialize(): Promise<void> {
+  async function initialize(workspaceId?: string | null): Promise<void> {
     loading.value = true
     error.value = null
     try {
-      const fetchedEdges = await invoke<Edge[]>('get_edges')
+      const fetchedEdges = await invoke<Edge[]>('get_edges', { workspaceId: workspaceId ?? null })
       // Deduplicate edges on load
       edges.value = deduplicateEdgesLocal(fetchedEdges)
     } catch (e) {

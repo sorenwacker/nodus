@@ -1264,13 +1264,9 @@ const {
 } = edgeStyling
 
 // Edge routing composable - computes edge paths with routing, port assignments, and optimization
+// Note: Pass store directly so computed properties remain reactive
 const { edgeLines } = useEdgeRouting({
-  store: {
-    nodeLayoutVersion: store.nodeLayoutVersion,
-    nodes: store.nodes,
-    edges: store.edges,
-    filteredEdges: store.filteredEdges,
-  },
+  store,
   displayNodes,
   neighborhoodMode,
   focusNodeId,

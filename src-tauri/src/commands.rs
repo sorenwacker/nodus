@@ -184,11 +184,16 @@ pub async fn update_node_position(id: String, x: f64, y: f64) -> Result<(), Stri
 // ============================================================================
 
 #[tauri::command]
-pub async fn get_edges() -> Result<Vec<Edge>, String> {
+pub async fn get_edges(workspace_id: Option<String>) -> Result<Vec<Edge>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    database::edges::get_all(pool)
-        .await
-        .map_err(|e| e.to_string())
+    match workspace_id {
+        Some(ref ws_id) => database::edges::get_by_workspace(pool, Some(ws_id))
+            .await
+            .map_err(|e| e.to_string()),
+        None => database::edges::get_by_workspace(pool, None)
+            .await
+            .map_err(|e| e.to_string()),
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -127,9 +127,10 @@ export const useNodesStore = defineStore('nodes', () => {
       // Initialize workspace store (syncs localStorage with database)
       await workspaceStore.initialize()
 
-      // Initialize edges and frames stores
+      // Initialize edges and frames stores with current workspace
+      const currentWorkspace = workspaceStore.currentWorkspaceId
       await Promise.all([
-        edgesStore.initialize(),
+        edgesStore.initialize(currentWorkspace),
         framesStore.initialize(),
       ])
 
