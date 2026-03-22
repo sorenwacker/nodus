@@ -33,6 +33,13 @@ import CanvasControls from './components/CanvasControls.vue'
 import CanvasContextMenu from './components/CanvasContextMenu.vue'
 import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
 import CanvasLLMBar from './components/CanvasLLMBar.vue'
+import CanvasMagnifier from './components/CanvasMagnifier.vue'
+import CanvasHoverTooltip from './components/CanvasHoverTooltip.vue'
+import CanvasMinimap from './components/CanvasMinimap.vue'
+import NodeAgentLogPanel from './components/NodeAgentLogPanel.vue'
+import NodeLLMBar from './components/NodeLLMBar.vue'
+import CanvasFrames from './components/CanvasFrames.vue'
+import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -1767,145 +1774,40 @@ useKeyboardShortcuts({
     >
     <div class="canvas-content" :style="{ transform }">
       <!-- SVG for edges -->
-      <svg class="edges-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;">
-        <defs>
-          <marker v-for="color in allMarkerColors" :id="getArrowMarkerId(color.value)" :key="color.value" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="10" refY="5" orient="auto">
-            <path d="M0,0 L10,5 L0,10 z" :fill="color.value" />
-          </marker>
-        </defs>
-
-        <!-- Existing edges (simplified for large graphs) -->
-        <template v-if="isLargeGraph">
-          <!-- Fast rendering: paths without hit areas, markers only for highlighted -->
-          <path
-            v-for="edge in visibleEdgeLines"
-            :key="edge.id + '-' + edge.arrowMarkerId"
-            :d="edge.path"
-            :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
-            :stroke-width="edge.isHighlighted ? edgeStrokeWidth * 2 : edgeStrokeWidth"
-            :stroke-opacity="edge.opacity"
-            :marker-end="edge.isHighlighted && !edge.isBidirectional && !edge.isShortEdge ? `url(#${edge.arrowMarkerId})` : undefined"
-            fill="none"
-            class="edge-line-fast"
-            :class="{ 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged', 'edge-neighbor': edge.isNeighborEdge }"
-          />
-        </template>
-        <template v-else>
-          <g v-for="edge in visibleEdgeLines" :key="edge.id + '-' + edge.arrowMarkerId">
-            <!-- Invisible wider hit area -->
-            <path
-              :d="edge.path"
-              stroke="transparent"
-              stroke-width="12"
-              fill="none"
-              class="edge-hit-area"
-              @click="onEdgeClick($event, edge.id)"
-            />
-            <!-- Glow effect for selected edge -->
-            <path
-              v-if="edge.isSelected"
-              :d="edge.path"
-              :stroke="edge.color"
-              :stroke-width="edge.glowStrokeWidth"
-              stroke-linecap="round"
-              fill="none"
-              class="edge-glow"
-              opacity="0.3"
-              pointer-events="none"
-            />
-            <!-- Visible edge path (branch for bundled, full path for unbundled) -->
-            <path
-              :d="edge.path"
-              :stroke="edge.isHighlighted ? edge.edgeHighlightColor : edge.color"
-              :stroke-width="edge.renderStrokeWidth"
-              :stroke-opacity="edge.opacity"
-              :marker-end="edge.isBidirectional || edge.isShortEdge ? undefined : `url(#${edge.arrowMarkerId})`"
-              stroke-linecap="round"
-              fill="none"
-              class="edge-line-visible"
-              :class="{ 'edge-selected': edge.isSelected, 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged', 'edge-neighbor': edge.isNeighborEdge }"
-              pointer-events="none"
-            />
-            <text
-              v-if="edge.label"
-              :x="edge.labelX || (edge.x1 + edge.x2) / 2"
-              :y="(edge.labelY || (edge.y1 + edge.y2) / 2) - 8"
-              class="edge-label"
-            >{{ edge.label }}</text>
-          </g>
-        </template>
-
-        <!-- Lasso selection -->
-        <polygon
-          v-if="isLassoSelecting && lassoPoints.length > 2"
-          :points="lassoPoints.map(p => `${p.x},${p.y}`).join(' ')"
-          :fill="currentTheme === 'cyber' ? 'rgba(0, 255, 204, 0.1)' : 'rgba(59, 130, 246, 0.1)'"
-          :stroke="highlightColor"
-          stroke-width="2"
-          stroke-dasharray="4,4"
-        />
-
-        <!-- Edge preview while creating -->
-        <line
-          v-if="isCreatingEdge && edgeStartNode"
-          :x1="(store.getNode(edgeStartNode)?.canvas_x || 0) + 100"
-          :y1="(store.getNode(edgeStartNode)?.canvas_y || 0) + 40"
-          :x2="edgePreviewEnd.x"
-          :y2="edgePreviewEnd.y"
-          :stroke="highlightColor"
-          stroke-width="2"
-          stroke-dasharray="8,4"
-          style="pointer-events: none"
-        />
-      </svg>
+      <CanvasEdgesSVG
+        :edges="visibleEdgeLines"
+        :marker-colors="allMarkerColors"
+        :is-large-graph="isLargeGraph"
+        :edge-stroke-width="edgeStrokeWidth"
+        :lasso-points="lassoPoints"
+        :is-lasso-selecting="isLassoSelecting"
+        :current-theme="currentTheme"
+        :highlight-color="highlightColor"
+        :is-creating-edge="isCreatingEdge"
+        :edge-preview-start="edgeStartNode ? { x: (store.getNode(edgeStartNode)?.canvas_x || 0) + 100, y: (store.getNode(edgeStartNode)?.canvas_y || 0) + 40 } : null"
+        :edge-preview-end="edgePreviewEnd"
+        :get-arrow-marker-id="getArrowMarkerId"
+        @edge-click="onEdgeClick"
+      />
 
       <!-- Frames -->
-      <div
-        v-for="frame in store.filteredFrames"
-        :key="'frame-' + frame.id"
-        class="canvas-frame"
-        :class="{ selected: store.selectedFrameId === frame.id }"
-        :style="{
-          transform: `translate(${frame.canvas_x}px, ${frame.canvas_y}px)`,
-          width: frame.width + 'px',
-          height: frame.height + 'px',
-          borderColor: frame.color || 'var(--border-default)',
-          borderWidth: frameBorderWidth + 'px',
-        }"
-        @mousedown.stop="onFrameMouseDown($event, frame.id)"
-        @dblclick.stop="startEditingFrameTitle(frame.id)"
-      >
-        <div class="frame-header" :style="{ transform: `scale(${1/scale})`, transformOrigin: 'left center' }">
-          <input
-            v-if="editingFrameId === frame.id"
-            v-model="editFrameTitle"
-            class="frame-title-editor"
-            @blur="saveFrameTitleEditing"
-            @keydown.enter="saveFrameTitleEditing"
-            @keydown.escape="cancelFrameTitleEditing"
-            @click.stop
-            @mousedown.stop
-          />
-          <span v-else class="frame-title">{{ frame.title }}</span>
-          <div v-if="store.selectedFrameId === frame.id && editingFrameId !== frame.id" class="frame-color-picker" @mousedown.stop>
-            <button
-              v-for="color in frameColors"
-              :key="color.value || 'default'"
-              class="frame-color-dot"
-              :class="{ active: frame.color === color.value }"
-              :style="{ background: color.value || 'var(--border-default)' }"
-              @click.stop="store.updateFrameColor(frame.id, color.value)"
-            ></button>
-          </div>
-          <button
-            v-if="store.selectedFrameId === frame.id && editingFrameId !== frame.id"
-            class="frame-delete-btn"
-            :title="t('canvas.frame.delete')"
-            @click.stop="deleteSelectedFrame"
-          >x</button>
-        </div>
-        <div class="frame-resize-handle" @mousedown.stop="startFrameResize($event, frame.id)"></div>
-      </div>
+      <CanvasFrames
+        :frames="store.filteredFrames"
+        :selected-frame-id="store.selectedFrameId"
+        :editing-frame-id="editingFrameId"
+        :edit-frame-title="editFrameTitle"
+        :frame-border-width="frameBorderWidth"
+        :scale="scale"
+        :frame-colors="frameColors"
+        @update:edit-frame-title="editFrameTitle = $event"
+        @mousedown="onFrameMouseDown"
+        @dblclick="startEditingFrameTitle"
+        @save-title="saveFrameTitleEditing"
+        @cancel-title="cancelFrameTitleEditing"
+        @update-color="store.updateFrameColor"
+        @delete="deleteSelectedFrame"
+        @start-resize="startFrameResize"
+      />
 
       <!-- LOD Mode: Render non-selected nodes as circles -->
       <template v-if="isLODMode">
@@ -2044,50 +1946,19 @@ useKeyboardShortcuts({
       <!-- Empty state (positioned in viewport, not canvas) -->
 
       <!-- Floating Node LLM bar (above selected/editing node) -->
-      <div
-        v-if="llmEnabled && (store.selectedNodeIds.length === 1 || editingNodeId) && getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
-        class="node-llm-bar-floating"
-        :style="{
-          transform: `translate(${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x}px, ${getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y - 40}px)`,
-          width: (getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || NODE_DEFAULTS.WIDTH) + 'px'
-        }"
-        @mousedown.stop
-        @click.stop
-      >
-        <input
-          v-model="nodePrompt"
-          type="text"
-          :placeholder="isNodeLLMLoading ? t('canvas.node.processing') : t('canvas.node.askPlaceholder')"
-          class="node-llm-input"
-          :class="{ loading: isNodeLLMLoading }"
-          tabindex="0"
-          :disabled="isNodeLLMLoading"
-          @mousedown.stop
-          @keydown.enter.stop="sendNodePrompt"
-          @keydown.up.prevent="onNodePromptKeydown($event)"
-          @keydown.down.prevent="onNodePromptKeydown($event)"
-          @keydown.stop
-        />
-        <button
-          v-if="!isNodeLLMLoading"
-          class="node-llm-send"
-          tabindex="0"
-          :disabled="!nodePrompt.trim()"
-          @mousedown.stop
-          @click.stop="sendNodePrompt"
-        >
-          AI
-        </button>
-        <button
-          v-else
-          class="node-llm-stop"
-          tabindex="0"
-          @mousedown.stop
-          @click.stop="stopNodeLLM"
-        >
-          Stop
-        </button>
-      </div>
+      <NodeLLMBar
+        v-if="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
+        :visible="llmEnabled && (store.selectedNodeIds.length === 1 || !!editingNodeId)"
+        :node-prompt="nodePrompt"
+        :is-loading="isNodeLLMLoading"
+        :node-x="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x"
+        :node-y="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y"
+        :node-width="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || NODE_DEFAULTS.WIDTH"
+        @update:node-prompt="nodePrompt = $event"
+        @send="sendNodePrompt"
+        @stop="stopNodeLLM"
+        @keydown="onNodePromptKeydown"
+      />
     </div>
 
     <!-- Edge edit panel -->
@@ -2154,19 +2025,11 @@ useKeyboardShortcuts({
     />
 
     <!-- Node agent log panel (fixed position) -->
-    <div
-      v-if="showNodeAgentLog && nodeAgentLog.length > 0"
-      class="node-agent-log-panel"
-      @mousedown.stop
-    >
-      <div class="log-header">
-        <span>Agent Log</span>
-        <button @click="showNodeAgentLog = false">x</button>
-      </div>
-      <div class="log-content">
-        <div v-for="(line, i) in nodeAgentLog" :key="i" class="log-line">{{ line }}</div>
-      </div>
-    </div>
+    <NodeAgentLogPanel
+      :visible="showNodeAgentLog"
+      :log="nodeAgentLog"
+      @close="showNodeAgentLog = false"
+    />
 
     <!-- SVG filter for fisheye warp effect -->
     <svg width="0" height="0" style="position: absolute;">
@@ -2186,84 +2049,40 @@ useKeyboardShortcuts({
     </svg>
 
     <!-- Magnifying lens (when zoomed out far) -->
-    <div
-      v-if="shouldShowMagnifier && magnifierVisibleNodes.length > 0"
-      class="magnifier"
-      :style="{
-        left: (magnifierPos.x - MAGNIFIER_SIZE / 2) + 'px',
-        top: (magnifierPos.y - MAGNIFIER_SIZE / 2) + 'px',
-        width: MAGNIFIER_SIZE + 'px',
-        height: MAGNIFIER_SIZE + 'px',
-      }"
-    >
-      <div class="magnifier-warp">
-        <div
-          v-for="node in magnifierVisibleNodes"
-          :key="'mag-' + node.id"
-          class="magnifier-node"
-          :style="[
-            {
-              left: ((node.canvas_x - (magnifierPos.x - offsetX) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
-              top: ((node.canvas_y - (magnifierPos.y - offsetY) / scale) * MAGNIFIER_ZOOM + MAGNIFIER_SIZE / 2) + 'px',
-              width: ((node.width || NODE_DEFAULTS.WIDTH) * MAGNIFIER_ZOOM) + 'px',
-              height: ((node.height || NODE_DEFAULTS.HEIGHT) * MAGNIFIER_ZOOM) + 'px',
-            },
-            node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}
-          ]"
-        >
-          <span class="magnifier-node-title">{{ node.title || 'Untitled' }}</span>
-          <span v-if="node.markdown_content" class="magnifier-node-body">{{ node.markdown_content }}</span>
-        </div>
-      </div>
-    </div>
+    <CanvasMagnifier
+      :visible="shouldShowMagnifier"
+      :position="magnifierPos"
+      :nodes="magnifierVisibleNodes"
+      :magnifier-size="MAGNIFIER_SIZE"
+      :magnifier-zoom="MAGNIFIER_ZOOM"
+      :offset-x="offsetX"
+      :offset-y="offsetY"
+      :scale="scale"
+      :node-defaults="NODE_DEFAULTS"
+      :get-node-background="getNodeBackground"
+    />
 
     <!-- Hover tooltip (when zoomed out) -->
-    <div
-      v-if="showHoverTooltip && hoveredNode"
-      class="hover-tooltip"
-      :style="{
-        left: (hoverMousePos.x + 16) + 'px',
-        top: (hoverMousePos.y + 16) + 'px',
-      }"
-    >
-      <div class="hover-tooltip-title">{{ hoveredNode.title || t('canvas.node.untitled') }}</div>
-      <div v-if="tooltipContent" class="hover-tooltip-content">
-        {{ tooltipContent }}{{ tooltipContent.length >= 200 ? '...' : '' }}
-      </div>
-    </div>
+    <CanvasHoverTooltip
+      :visible="showHoverTooltip"
+      :position="hoverMousePos"
+      :node="hoveredNode"
+      :content="tooltipContent"
+    />
 
     <!-- Minimap -->
-    <div
-      v-if="store.filteredNodes.length > 0"
-      class="minimap"
+    <CanvasMinimap
+      :visible="store.filteredNodes.length > 0"
+      :nodes="store.filteredNodes"
+      :minimap-size="minimap.MINIMAP_SIZE"
+      :get-node-position="minimap.getNodePosition"
+      :is-selected="minimap.isSelected"
+      :viewport-x="minimap.viewport.x"
+      :viewport-y="minimap.viewport.y"
+      :viewport-width="minimap.viewport.width"
+      :viewport-height="minimap.viewport.height"
       @click="onMinimapClick"
-    >
-      <svg :width="minimap.MINIMAP_SIZE" :height="minimap.MINIMAP_SIZE">
-        <!-- Nodes -->
-        <rect
-          v-for="node in store.filteredNodes"
-          :key="'mm-' + node.id"
-          :x="minimap.getNodePosition(node).x"
-          :y="minimap.getNodePosition(node).y"
-          :width="minimap.getNodePosition(node).width"
-          :height="minimap.getNodePosition(node).height"
-          :fill="node.color_theme || 'var(--text-muted)'"
-          :opacity="minimap.isSelected(node.id) ? 1 : 0.6"
-          rx="1"
-        />
-        <!-- Viewport indicator -->
-        <rect
-          :x="minimap.viewport.x"
-          :y="minimap.viewport.y"
-          :width="minimap.viewport.width"
-          :height="minimap.viewport.height"
-          fill="none"
-          stroke="var(--primary-color)"
-          stroke-width="2"
-          rx="2"
-        />
-      </svg>
-    </div>
+    />
 
     <!-- Context Menu -->
     <CanvasContextMenu
