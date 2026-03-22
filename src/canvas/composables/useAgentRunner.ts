@@ -133,7 +133,7 @@ TOOLS:
 - auto_layout("grid"|"horizontal"|"vertical"|"circle"|"clock"|"star"|"force"): Arrange nodes. "force" uses edge-based physics.
 - query_nodes(filter): Query DB. filter="all"|"empty"|"has_content"|"search term". Returns node list.
 - read_graph(): Read current graph state with nodes, content, and edges
-- for_each_node(action, template, filter?): action="set"|"append"|"llm". For "llm": template is the instruction.
+- for_each_node(action, template, filter?): UPDATE existing nodes. action="llm" generates content. template="What is {title}?" uses variables.
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}].
 - smart_move(instruction): Move nodes by semantic criteria.
 - smart_color(instruction): Color nodes by semantic criteria.
@@ -157,7 +157,9 @@ EDGE LABELS (always use one):
 AVOID creating nodes for: categories, types, generic terms, placeholders. Only create nodes for specific entities.
 
 UNDERSTANDING USER MESSAGES:
-- "X is not Y" or "X are not Y" = CORRECTION. Delete wrong edge/node or fix the relationship.
+- "for each node..." = Use for_each_node() to UPDATE existing nodes, NOT create new ones
+- "add summary/content to nodes" = Use for_each_node(action="llm", template="...")
+- "X is not Y" = CORRECTION. Delete wrong edge/node or fix the relationship.
 - "Add X to Y" = Add node X connected to Y
 - "Remove X" or "Delete X" = Delete node or edge
 - "X should be..." = Update node X
