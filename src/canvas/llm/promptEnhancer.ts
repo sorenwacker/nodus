@@ -323,14 +323,18 @@ export function enhancePrompt(userPrompt: string): string {
   const sections: string[] = []
 
   // CRITICAL: Put mandatory workflow at TOP so model sees it first
-  sections.push(`=== MANDATORY EXECUTION ORDER ===
-You MUST execute these steps IN ORDER:
-STEP 1: create_nodes_batch([...]) - Create ALL nodes first
-STEP 2: create_edges_batch([...]) - Connect ALL nodes with labeled edges
-STEP 3: auto_layout("force") - Arrange the graph
-STEP 4: done("summary") - Only after edges exist
+  sections.push(`=== MANDATORY GRAPH CREATION STEPS ===
+This is a GRAPH task. You MUST include ALL these steps:
 
-DO NOT skip STEP 2. DO NOT call done() before create_edges_batch().
+1. CREATE NODES: Use create_nodes_batch to create all nodes
+2. CREATE EDGES: Use create_edges_batch to connect nodes with LABELED edges
+   - This step is REQUIRED - a graph without edges is incomplete
+   - Every node should connect to at least one other node
+3. LAYOUT: Use auto_layout("force") to arrange the graph
+4. DONE: Call done() only after edges are created
+
+If in plan mode: Your plan MUST include a step for edge creation.
+If executing: Call create_edges_batch BEFORE calling done().
 =====================================`)
   sections.push('')
 
