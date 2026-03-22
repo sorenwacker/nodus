@@ -49,6 +49,7 @@ import { useViewportCulling } from './composables/useViewportCulling'
 import { useGraphMetrics } from './composables/useGraphMetrics'
 import { useCanvasDisplay } from './composables/useCanvasDisplay'
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
+import { useNodeHover } from './composables/useNodeHover'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -497,8 +498,26 @@ const canvasPan = useCanvasPan({
   },
 })
 const { isPanning, startPan } = canvasPan
-const hoveredNodeId = ref<string | null>(null)
-const hoverMousePos = ref({ x: 0, y: 0 })
+
+// Node hover composable - handles hover state, tooltips, and active node tracking
+const nodeHover = useNodeHover({
+  scale,
+  isLODMode,
+  selectedNodeIds: computed(() => store.selectedNodeIds),
+  filteredEdges: computed(() => store.filteredEdges),
+  getNode: store.getNode,
+})
+const {
+  hoveredNodeId,
+  hoverMousePos,
+  showHoverTooltip,
+  hoveredNode,
+  tooltipContent,
+  highlightedEdgeIds,
+  onNodeMouseEnter,
+  onNodeMouseMove,
+  onNodeMouseLeave,
+} = nodeHover
 
 // Context menu composable
 const contextMenu = useContextMenu({
@@ -520,53 +539,6 @@ const showNodeAgentLog = ref(false)
 const nodeAgent = useNodeAgent()
 // Computed for proper reactivity tracking of agent log
 const nodeAgentLog = computed(() => nodeAgent.log.value)
-
-// Tooltip for zoomed-out hover - shows node info when scale is low or in LOD mode
-const showHoverTooltip = computed(() => {
-  return hoveredNodeId.value && (scale.value < 0.5 || isLODMode.value)
-})
-
-const hoveredNode = computed(() => {
-  if (!hoveredNodeId.value) return null
-  return store.getNode(hoveredNodeId.value)
-})
-
-// Strip markdown for tooltip preview
-const tooltipContent = computed(() => {
-  const content = hoveredNode.value?.markdown_content
-  if (!content) return ''
-  return content
-    .replace(/!\[.*?\]\(.*?\)/g, '[image]')  // Replace images with [image]
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Links -> just text
-    .replace(/#{1,6}\s*/g, '')               // Remove headings
-    .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1') // Bold/italic -> plain
-    .replace(/`{1,3}[^`]*`{1,3}/g, '')       // Remove code blocks
-    .replace(/^\s*[-*+]\s+/gm, '- ')         // Normalize lists
-    .replace(/\n{2,}/g, '\n')                // Collapse multiple newlines
-    .trim()
-    .slice(0, 200)
-})
-
-// Cached active node IDs for highlight detection (avoids recreating Set on every edge)
-const activeNodeIds = computed(() => {
-  const ids = new Set<string>()
-  if (hoveredNodeId.value) ids.add(hoveredNodeId.value)
-  for (const id of store.selectedNodeIds) ids.add(id)
-  return ids
-})
-
-// Pre-computed set of highlighted edge IDs for O(1) lookup in template
-const highlightedEdgeIds = computed(() => {
-  const ids = new Set<string>()
-  const active = activeNodeIds.value
-  if (active.size === 0) return ids
-  for (const edge of store.filteredEdges) {
-    if (active.has(edge.source_node_id) || active.has(edge.target_node_id)) {
-      ids.add(edge.id)
-    }
-  }
-  return ids
-})
 
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
@@ -1238,16 +1210,6 @@ function onCanvasMouseDown(e: MouseEvent) {
     startPan(e)
     return
   }
-}
-
-// Node hover handlers for tooltip
-function onNodeMouseEnter(e: MouseEvent, nodeId: string) {
-  hoveredNodeId.value = nodeId
-  hoverMousePos.value = { x: e.clientX, y: e.clientY }
-}
-
-function onNodeMouseMove(e: MouseEvent) {
-  hoverMousePos.value = { x: e.clientX, y: e.clientY }
 }
 
 /**
@@ -2042,8 +2004,8 @@ useKeyboardShortcuts({
           }"
           :title="node.title + ' (' + (nodeDegree[node.id] || 0) + ' ' + t('canvas.node.connections') + ')'"
           @mousedown="onNodeMouseDown($event, node.id)"
-          @mouseenter="hoveredNodeId = node.id"
-          @mouseleave="hoveredNodeId = null"
+          @mouseenter="onNodeMouseEnter($event, node.id)"
+          @mouseleave="onNodeMouseLeave"
           @dblclick.stop="startEditing(node.id)"
         ></div>
       </template>
@@ -2074,7 +2036,7 @@ useKeyboardShortcuts({
         @mousedown="onNodeMouseDown($event, node.id)"
         @mouseenter="onNodeMouseEnter($event, node.id)"
         @mousemove="onNodeMouseMove($event)"
-        @mouseleave="hoveredNodeId = null"
+        @mouseleave="onNodeMouseLeave"
         @dblclick.stop="startEditing(node.id)"
       >
         <!-- Image thumbnail when zoomed out -->
