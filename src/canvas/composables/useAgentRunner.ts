@@ -156,6 +156,13 @@ EDGE LABELS (always use one):
 
 AVOID creating nodes for: categories, types, generic terms, placeholders. Only create nodes for specific entities.
 
+UNDERSTANDING USER MESSAGES:
+- "X is not Y" or "X are not Y" = CORRECTION. Delete wrong edge/node or fix the relationship.
+- "Add X to Y" = Add node X connected to Y
+- "Remove X" or "Delete X" = Delete node or edge
+- "X should be..." = Update node X
+- Short corrections refer to the current graph state, not new research queries.
+
 WORKFLOW:
 1. Use research() or query_nodes() to understand context
 2. Use think() to reason about approach
@@ -291,10 +298,16 @@ export function useAgentRunner(ctx: AgentContext) {
     }
 
     // Build initial messages with current node state, memories, and mode
+    // Include recent conversation history for context continuity
+    const recentHistory = ctx.conversationHistory.value.slice(-6) // Last 3 exchanges
     const messages: ChatMessage[] = [
       buildSystemPrompt(ctx.filteredNodes(), ctx.workspaceId(), mode.value, currentPlan.value),
+      ...recentHistory,
       { role: 'user', content: enhancedRequest },
     ]
+
+    // Add current request to conversation history
+    ctx.conversationHistory.value.push({ role: 'user', content: userRequest })
 
     const maxIterations = getModeMaxIterations(mode.value)
     const pruneEvery = 10
