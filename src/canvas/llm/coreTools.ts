@@ -1231,12 +1231,18 @@ ${edgeDescriptions}`
           ctx.log(`> Processing "${node.title}"...`)
 
           // Use existing content if available, otherwise use title for generation
-          const sourceText = node.markdown_content?.trim() || node.title
+          const hasContent = !!node.markdown_content?.trim()
+          const sourceText = hasContent ? node.markdown_content : node.title
 
           try {
+            // Build a clear prompt that focuses on the node's topic
+            const prompt = hasContent
+              ? `${template}\n\nExisting content to process:\n${sourceText}`
+              : `Write about "${node.title}". Instruction: ${template}`
+
             const result = await provider.generate({
-              prompt: `${template}\n\nTopic/Content: ${sourceText}`,
-              system: 'You are a content generator. Follow the instruction exactly. Output only the content, no explanations or preamble.',
+              prompt,
+              system: 'You are a knowledgeable writer. Write specifically about the given topic. Be factual and focused. No preamble.',
             })
 
             if (result.content?.trim()) {
