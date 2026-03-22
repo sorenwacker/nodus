@@ -151,6 +151,30 @@
   background: var(--text-muted);
 }
 
+::-webkit-scrollbar-corner {
+  background: var(--bg-surface);
+}
+
+/* Dark theme scrollbar overrides - explicit colors for Windows */
+[data-theme='dark'] ::-webkit-scrollbar-track,
+[data-theme='pitch-black'] ::-webkit-scrollbar-track,
+[data-theme='cyber'] ::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb,
+[data-theme='pitch-black'] ::-webkit-scrollbar-thumb,
+[data-theme='cyber'] ::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-color: var(--bg-surface);
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover,
+[data-theme='pitch-black'] ::-webkit-scrollbar-thumb:hover,
+[data-theme='cyber'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;
@@ -164,6 +188,17 @@ html, body, #app {
   background: var(--bg-canvas);
   color: var(--text-main);
   transition: background 0.2s, color 0.2s;
+}
+
+/* Theme-aware color scheme for native controls (scrollbars, inputs, etc.) */
+:root {
+  color-scheme: light;
+}
+
+[data-theme='dark'],
+[data-theme='pitch-black'],
+[data-theme='cyber'] {
+  color-scheme: dark;
 }
 
 
