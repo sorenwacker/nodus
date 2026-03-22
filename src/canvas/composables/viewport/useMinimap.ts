@@ -72,7 +72,10 @@ export function useMinimap(options: MinimapOptions) {
 
   const viewport = computed(() => {
     const viewportSize = getViewportSize()
-    if (!viewportSize) return { x: 0, y: 0, width: 50, height: 40 }
+    // Guard against missing or invalid viewport size
+    if (!viewportSize || !viewportSize.width || !viewportSize.height) {
+      return { x: 0, y: 0, width: 50, height: 40 }
+    }
 
     const b = bounds.value
     const mScale = minimapScale.value

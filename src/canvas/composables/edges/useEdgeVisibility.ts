@@ -67,7 +67,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
     // For small graphs, show all edges regardless of viewport visibility
     // Only filter by viewport for larger graphs to improve performance
-    if (edges.length > EDGE_VIEWPORT_FILTER_THRESHOLD) {
+    // Also skip filtering if visibleNodeIds is empty (viewport not ready yet)
+    if (edges.length > EDGE_VIEWPORT_FILTER_THRESHOLD && visIds.size > 0) {
       // Filter to edges that should be rendered:
       // 1. Edges connected to hovered/selected nodes (always show, even if other endpoint is off-screen)
       // 2. Edges where BOTH endpoints are visible

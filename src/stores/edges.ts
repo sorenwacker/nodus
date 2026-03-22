@@ -61,6 +61,15 @@ export const useEdgesStore = defineStore('edges', () => {
       throw new Error('Cannot create self-referencing edge')
     }
 
+    // Check for existing edge with same source and target
+    const existingEdge = edges.value.find(
+      e => e.source_node_id === data.source_node_id && e.target_node_id === data.target_node_id
+    )
+    if (existingEdge) {
+      storeLogger.debug(`Edge already exists: ${data.source_node_id} -> ${data.target_node_id}`)
+      return existingEdge
+    }
+
     // Validate node existence if callback is set
     if (nodeExistsCallback) {
       if (!nodeExistsCallback(data.source_node_id)) {
