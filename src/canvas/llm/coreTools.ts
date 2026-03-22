@@ -841,13 +841,14 @@ ${edgeDescriptions}`
     { category: 'utility' }
   )
 
-  defineTool<{ summary: string }>(
+  defineTool<{ summary: string; force?: boolean }>(
     'done',
-    'Signal that the agent has completed all work. IMPORTANT: Only call this AFTER creating edges for graph tasks.',
+    'Signal that the agent has completed all work. For graph tasks, include edges before calling done.',
     {
       type: 'object',
       properties: {
-        summary: { type: 'string', description: 'Brief summary including node count AND edge count' },
+        summary: { type: 'string', description: 'Brief summary of what was accomplished' },
+        force: { type: 'boolean', description: 'Set to true to complete without edges (for non-graph tasks)' },
       },
       required: ['summary'],
     },
@@ -855,14 +856,10 @@ ${edgeDescriptions}`
       const nodes = ctx.store.filteredNodes
       const edges = ctx.store.filteredEdges
 
-      // Validate: if we have multiple nodes but no edges, warn the agent
-      if (nodes.length > 1 && edges.length === 0) {
-        return `WARNING: Graph has ${nodes.length} nodes but NO EDGES. For mindmaps, hierarchies, and connected graphs, you MUST create edges using create_edges_batch before calling done(). Please create edges first.`
-      }
-
-      // Validate: check edge-to-node ratio for complex graphs
-      if (nodes.length > 5 && edges.length < nodes.length / 2) {
-        return `WARNING: Graph has ${nodes.length} nodes but only ${edges.length} edges. Most graphs should have at least one edge per node. Consider adding more connections with create_edges_batch, or call done() again if this is intentional.`
+      // Only warn about missing edges if not forced and we have many nodes
+      // This catches graph-creation tasks while allowing simple node creation
+      if (!args.force && nodes.length > 3 && edges.length === 0) {
+        return `NOTE: Graph has ${nodes.length} nodes but no edges. If this is a mindmap/hierarchy, use create_edges_batch to connect them. If standalone nodes are intended, call done(summary, force=true).`
       }
 
       return `AGENT_DONE: ${args.summary || 'completed'} (${nodes.length} nodes, ${edges.length} edges)`
