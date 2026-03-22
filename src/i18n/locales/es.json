@@ -11,7 +11,12 @@
     "agent": {
       "placeholder": "Preguntar sobre el grafo...",
       "clearMemory": "Borrar memoria de conversación",
-      "clearLog": "Borrar registro"
+      "clearLog": "Borrar registro",
+      "sendPrompt": "Enviar",
+      "stopAgent": "Detener agente",
+      "stop": "Detener",
+      "go": "Ir",
+      "copyLog": "Copiar registro"
     },
     "node": {
       "writePlaceholder": "Escribir markdown...",
@@ -26,7 +31,18 @@
       "flip": "Invertir",
       "reverseDirection": "Invertir dirección",
       "makeDirectional": "Hacer direccional (un sentido)",
-      "makeNonDirectional": "Hacer no direccional (bidireccional)"
+      "makeNonDirectional": "Hacer no direccional (bidireccional)",
+      "edge": "Arista",
+      "label": "Etiqueta:",
+      "color": "Color:",
+      "style": "Estilo:",
+      "direction": "Dirección:",
+      "directional": "Direccional",
+      "nonDirectional": "No direccional",
+      "insertNode": "Insertar nodo",
+      "insertNodeTooltip": "Insertar un nodo en esta arista",
+      "deleteEdge": "Eliminar arista",
+      "deleteEdgeTooltip": "Eliminar esta arista"
     },
     "frame": {
       "delete": "Eliminar marco",
@@ -286,7 +302,37 @@
     "cancel": "Cancelar",
     "save": "Guardar",
     "delete": "Eliminar",
-    "edit": "Editar"
+    "edit": "Editar",
+    "remove": "Quitar",
+    "add": "Agregar"
+  },
+  "plan": {
+    "reviewPlan": "Revisar plan",
+    "editStep": "Editar paso",
+    "removeStep": "Eliminar paso",
+    "addStep": "Agregar paso",
+    "newStepPlaceholder": "Describir el nuevo paso...",
+    "step": "paso",
+    "steps": "pasos",
+    "reject": "Rechazar",
+    "approve": "Aprobar",
+    "approveShortcut": "Aprobar (Cmd+Enter)"
+  },
+  "storyline": {
+    "insertNode": "Insertar nodo",
+    "removeFromStoryline": "Quitar de la línea argumental",
+    "addNode": "Agregar nodo",
+    "toggleContents": "Mostrar/ocultar contenido",
+    "closeEsc": "Cerrar (Esc)",
+    "backToList": "Volver a la lista",
+    "edgeColor": "Color de arista",
+    "readMode": "Modo lectura",
+    "newStoryline": "Nueva línea argumental",
+    "rename": "Renombrar"
+  },
+  "nodePanel": {
+    "closePanel": "Cerrar panel",
+    "deleteNode": "Eliminar este nodo"
   },
   "toolbar": {
     "editWorkspace": "Editar espacio de trabajo",

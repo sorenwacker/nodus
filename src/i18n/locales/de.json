@@ -11,7 +11,12 @@
     "agent": {
       "placeholder": "Frage zum Graph stellen...",
       "clearMemory": "Konversationsspeicher löschen",
-      "clearLog": "Protokoll löschen"
+      "clearLog": "Protokoll löschen",
+      "sendPrompt": "Anfrage senden",
+      "stopAgent": "Agent stoppen",
+      "stop": "Stopp",
+      "go": "Los",
+      "copyLog": "Protokoll kopieren"
     },
     "node": {
       "writePlaceholder": "Markdown schreiben...",
@@ -26,7 +31,18 @@
       "flip": "Umkehren",
       "reverseDirection": "Richtung umkehren",
       "makeDirectional": "Gerichtet machen (einweg)",
-      "makeNonDirectional": "Ungerichtet machen (bidirektional)"
+      "makeNonDirectional": "Ungerichtet machen (bidirektional)",
+      "edge": "Kante",
+      "label": "Bezeichnung:",
+      "color": "Farbe:",
+      "style": "Stil:",
+      "direction": "Richtung:",
+      "directional": "Gerichtet",
+      "nonDirectional": "Ungerichtet",
+      "insertNode": "Knoten einfügen",
+      "insertNodeTooltip": "Einen Knoten auf dieser Kante einfügen",
+      "deleteEdge": "Kante löschen",
+      "deleteEdgeTooltip": "Diese Kante löschen"
     },
     "frame": {
       "delete": "Rahmen löschen",
@@ -286,7 +302,37 @@
     "cancel": "Abbrechen",
     "save": "Speichern",
     "delete": "Löschen",
-    "edit": "Bearbeiten"
+    "edit": "Bearbeiten",
+    "remove": "Entfernen",
+    "add": "Hinzufügen"
+  },
+  "plan": {
+    "reviewPlan": "Plan überprüfen",
+    "editStep": "Schritt bearbeiten",
+    "removeStep": "Schritt entfernen",
+    "addStep": "Schritt hinzufügen",
+    "newStepPlaceholder": "Neuen Schritt beschreiben...",
+    "step": "Schritt",
+    "steps": "Schritte",
+    "reject": "Ablehnen",
+    "approve": "Genehmigen",
+    "approveShortcut": "Genehmigen (Cmd+Enter)"
+  },
+  "storyline": {
+    "insertNode": "Knoten einfügen",
+    "removeFromStoryline": "Aus Handlungsstrang entfernen",
+    "addNode": "Knoten hinzufügen",
+    "toggleContents": "Inhalte umschalten",
+    "closeEsc": "Schließen (Esc)",
+    "backToList": "Zurück zur Liste",
+    "edgeColor": "Kantenfarbe",
+    "readMode": "Lesemodus",
+    "newStoryline": "Neuer Handlungsstrang",
+    "rename": "Umbenennen"
+  },
+  "nodePanel": {
+    "closePanel": "Panel schließen",
+    "deleteNode": "Diesen Knoten löschen"
   },
   "toolbar": {
     "editWorkspace": "Arbeitsbereich bearbeiten",

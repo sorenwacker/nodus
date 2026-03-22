@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { AgentPlan, PlanStep } from '../llm/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   plan: AgentPlan | null
@@ -109,8 +112,8 @@ watch(() => props.visible, (visible) => {
     >
       <div class="plan-modal" @click.stop>
         <header class="plan-modal-header">
-          <h2>Review Plan</h2>
-          <button class="close-btn" aria-label="Close" @click.stop="emit('close')">
+          <h2>{{ t('plan.reviewPlan') }}</h2>
+          <button class="close-btn" :aria-label="t('common.close')" @click.stop="emit('close')">
             X
           </button>
         </header>
@@ -135,8 +138,8 @@ watch(() => props.visible, (visible) => {
                   @keydown.enter="saveEdit"
                   @keydown.escape="cancelEdit"
                 />
-                <button class="btn-sm btn-primary" @click="saveEdit">Save</button>
-                <button class="btn-sm btn-secondary" @click="cancelEdit">Cancel</button>
+                <button class="btn-sm btn-primary" @click="saveEdit">{{ t('common.save') }}</button>
+                <button class="btn-sm btn-secondary" @click="cancelEdit">{{ t('common.cancel') }}</button>
               </div>
 
               <div v-else class="step-content">
@@ -144,17 +147,17 @@ watch(() => props.visible, (visible) => {
                 <div class="step-actions">
                   <button
                     class="btn-icon"
-                    title="Edit step"
+                    :title="t('plan.editStep')"
                     @click="startEdit(step)"
                   >
-                    Edit
+                    {{ t('common.edit') }}
                   </button>
                   <button
                     class="btn-icon btn-danger"
-                    title="Remove step"
+                    :title="t('plan.removeStep')"
                     @click="emit('removeStep', step.id)"
                   >
-                    Remove
+                    {{ t('common.remove') }}
                   </button>
                 </div>
               </div>
@@ -170,34 +173,34 @@ watch(() => props.visible, (visible) => {
               class="btn-add-step"
               @click="toggleAddStep"
             >
-              + Add Step
+              + {{ t('plan.addStep') }}
             </button>
             <div v-else class="add-step-form">
               <input
                 v-model="newStepText"
                 type="text"
                 class="step-input"
-                placeholder="Describe the new step..."
+                :placeholder="t('plan.newStepPlaceholder')"
                 autofocus
                 @keydown.enter="submitNewStep"
                 @keydown.escape="toggleAddStep"
               />
-              <button class="btn-sm btn-primary" @click="submitNewStep">Add</button>
-              <button class="btn-sm btn-secondary" @click="toggleAddStep">Cancel</button>
+              <button class="btn-sm btn-primary" @click="submitNewStep">{{ t('common.add') }}</button>
+              <button class="btn-sm btn-secondary" @click="toggleAddStep">{{ t('common.cancel') }}</button>
             </div>
           </div>
         </div>
 
         <footer class="plan-modal-footer">
           <div class="footer-info">
-            {{ stepCount }} step{{ stepCount === 1 ? '' : 's' }}
+            {{ stepCount }} {{ stepCount === 1 ? t('plan.step') : t('plan.steps') }}
           </div>
           <div class="footer-actions">
             <button class="btn btn-secondary" @click.stop="handleReject">
-              Reject
+              {{ t('plan.reject') }}
             </button>
             <button class="btn btn-primary" @click.stop="handleApprove">
-              Approve (Cmd+Enter)
+              {{ t('plan.approveShortcut') }}
             </button>
           </div>
         </footer>

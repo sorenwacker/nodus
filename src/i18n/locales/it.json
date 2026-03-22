@@ -11,7 +11,12 @@
     "agent": {
       "placeholder": "Chiedi informazioni sul grafo...",
       "clearMemory": "Cancella memoria conversazione",
-      "clearLog": "Cancella registro"
+      "clearLog": "Cancella registro",
+      "sendPrompt": "Invia",
+      "stopAgent": "Ferma agente",
+      "stop": "Ferma",
+      "go": "Vai",
+      "copyLog": "Copia registro"
     },
     "node": {
       "writePlaceholder": "Scrivi markdown...",
@@ -26,7 +31,18 @@
       "flip": "Inverti",
       "reverseDirection": "Inverti direzione",
       "makeDirectional": "Rendi direzionale (unidirezionale)",
-      "makeNonDirectional": "Rendi non direzionale (bidirezionale)"
+      "makeNonDirectional": "Rendi non direzionale (bidirezionale)",
+      "edge": "Arco",
+      "label": "Etichetta:",
+      "color": "Colore:",
+      "style": "Stile:",
+      "direction": "Direzione:",
+      "directional": "Direzionale",
+      "nonDirectional": "Non direzionale",
+      "insertNode": "Inserisci nodo",
+      "insertNodeTooltip": "Inserisci un nodo su questo arco",
+      "deleteEdge": "Elimina arco",
+      "deleteEdgeTooltip": "Elimina questo arco"
     },
     "frame": {
       "delete": "Elimina cornice",
@@ -286,7 +302,37 @@
     "cancel": "Annulla",
     "save": "Salva",
     "delete": "Elimina",
-    "edit": "Modifica"
+    "edit": "Modifica",
+    "remove": "Rimuovi",
+    "add": "Aggiungi"
+  },
+  "plan": {
+    "reviewPlan": "Rivedi piano",
+    "editStep": "Modifica passaggio",
+    "removeStep": "Rimuovi passaggio",
+    "addStep": "Aggiungi passaggio",
+    "newStepPlaceholder": "Descrivi il nuovo passaggio...",
+    "step": "passaggio",
+    "steps": "passaggi",
+    "reject": "Rifiuta",
+    "approve": "Approva",
+    "approveShortcut": "Approva (Cmd+Invio)"
+  },
+  "storyline": {
+    "insertNode": "Inserisci nodo",
+    "removeFromStoryline": "Rimuovi dalla trama",
+    "addNode": "Aggiungi nodo",
+    "toggleContents": "Mostra/nascondi contenuti",
+    "closeEsc": "Chiudi (Esc)",
+    "backToList": "Torna alla lista",
+    "edgeColor": "Colore arco",
+    "readMode": "Modalità lettura",
+    "newStoryline": "Nuova trama",
+    "rename": "Rinomina"
+  },
+  "nodePanel": {
+    "closePanel": "Chiudi pannello",
+    "deleteNode": "Elimina questo nodo"
   },
   "toolbar": {
     "editWorkspace": "Modifica spazio di lavoro",

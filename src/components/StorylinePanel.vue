@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, inject, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
 import type { Node, Storyline } from '../types'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'open-reader', storylineId: string): void
@@ -281,11 +284,11 @@ watch(() => store.currentWorkspaceId, () => {
     <!-- Storyline View (when a storyline is selected) -->
     <template v-if="selectedStoryline">
       <header class="panel-header storyline-view-header">
-        <button class="back-btn" data-tooltip="Back to list" @click="exitStorylineView">
+        <button class="back-btn" :data-tooltip="t('storyline.backToList')" @click="exitStorylineView">
           <Icon name="back" :size="16" />
         </button>
         <span class="panel-title">{{ selectedStoryline.title }}</span>
-        <label class="color-picker" data-tooltip="Edge color">
+        <label class="color-picker" :data-tooltip="t('storyline.edgeColor')">
           <span
             class="color-swatch"
             :style="{ backgroundColor: selectedStoryline.color || '#94a3b8' }"
@@ -296,7 +299,7 @@ watch(() => store.currentWorkspaceId, () => {
             @input="updateStorylineColor($event)"
           />
         </label>
-        <button class="icon-btn" data-tooltip="Read Mode" @click="openReader">
+        <button class="icon-btn" :data-tooltip="t('storyline.readMode')" @click="openReader">
           <Icon name="book" :size="14" />
         </button>
       </header>
@@ -324,11 +327,11 @@ watch(() => store.currentWorkspaceId, () => {
     <!-- Storyline List (default view) -->
     <template v-else>
       <header class="panel-header">
-        <span class="panel-title">Storylines</span>
+        <span class="panel-title">{{ t('toolbar.storylines') }}</span>
         <button
           v-if="!isCreating"
           class="add-btn"
-          data-tooltip="New Storyline"
+          :data-tooltip="t('storyline.newStoryline')"
           @click="isCreating = true"
         >
           <Icon name="plus" :size="14" />
@@ -380,7 +383,7 @@ watch(() => store.currentWorkspaceId, () => {
               @keydown.enter="saveEdit"
               @keydown.escape="cancelEdit"
             />
-            <button class="icon-btn" data-tooltip="Save" @click.stop="saveEdit">
+            <button class="icon-btn" :data-tooltip="t('common.save')" @click.stop="saveEdit">
               <Icon name="check" :size="12" />
             </button>
           </template>
@@ -394,14 +397,14 @@ watch(() => store.currentWorkspaceId, () => {
           <div class="storyline-actions" @click.stop>
             <button
               class="icon-btn"
-              data-tooltip="Rename"
+              :data-tooltip="t('storyline.rename')"
               @click="startEditing(storyline)"
             >
               <Icon name="edit" :size="12" />
             </button>
             <button
               class="icon-btn danger"
-              data-tooltip="Delete"
+              :data-tooltip="t('common.delete')"
               @click="deleteStoryline(storyline.id)"
             >
               <Icon name="trash" :size="12" />

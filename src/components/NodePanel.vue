@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 
+const { t } = useI18n()
 const store = useNodesStore()
 
 const selectedNode = computed(() => store.selectedNode)
@@ -78,7 +80,7 @@ async function deleteNode() {
           @click="updateNodeColor(color.value)"
         ></button>
       </div>
-      <button class="close-btn" data-tooltip="Close panel" data-tooltip-pos="left" @click="closePanel">x</button>
+      <button class="close-btn" :data-tooltip="t('nodePanel.closePanel')" data-tooltip-pos="left" @click="closePanel">x</button>
     </header>
 
     <div class="panel-content">
@@ -95,7 +97,7 @@ async function deleteNode() {
       <span v-if="selectedNode.file_path" class="file-path">
         {{ selectedNode.file_path.split('/').pop() }}
       </span>
-      <button class="delete-btn" data-tooltip="Delete this node" data-tooltip-pos="left" @click="deleteNode">Delete</button>
+      <button class="delete-btn" :data-tooltip="t('nodePanel.deleteNode')" data-tooltip-pos="left" @click="deleteNode">{{ t('common.delete') }}</button>
     </footer>
   </aside>
 </template>

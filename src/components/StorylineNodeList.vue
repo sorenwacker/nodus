@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Icon from './Icon.vue'
 import NodePicker from './NodePicker.vue'
 import type { Node } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   nodes: Node[]
@@ -166,7 +169,7 @@ function onDragEnd() {
           @mouseenter="hoveringInsertIndex = index"
           @mouseleave="hoveringInsertIndex = null"
         >
-          <button class="insert-btn" data-tooltip="Insert node" @click="toggleInsertPicker(index)">
+          <button class="insert-btn" :data-tooltip="t('storyline.insertNode')" @click="toggleInsertPicker(index)">
             <Icon name="plus" :size="compact ? 10 : 12" />
           </button>
           <NodePicker
@@ -205,7 +208,7 @@ function onDragEnd() {
           </span>
           <span v-else class="node-order">{{ index + 1 }}</span>
           <span class="node-title">{{ node.node_type === 'comment' ? (node.markdown_content || 'Comment') : node.title }}</span>
-          <button class="remove-btn" data-tooltip="Remove from storyline" @click.stop="handleRemove(node.id)">
+          <button class="remove-btn" :data-tooltip="t('storyline.removeFromStoryline')" @click.stop="handleRemove(node.id)">
             <Icon name="close" :size="compact ? 8 : 10" />
           </button>
         </div>
@@ -218,7 +221,7 @@ function onDragEnd() {
         @mouseenter="hoveringInsertIndex = nodes.length"
         @mouseleave="hoveringInsertIndex = null"
       >
-        <button class="insert-btn" data-tooltip="Add node" @click="toggleInsertPicker(nodes.length)">
+        <button class="insert-btn" :data-tooltip="t('storyline.addNode')" @click="toggleInsertPicker(nodes.length)">
           <Icon name="plus" :size="compact ? 10 : 12" />
         </button>
         <NodePicker

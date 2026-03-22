@@ -11,7 +11,12 @@
     "agent": {
       "placeholder": "Ask about the graph...",
       "clearMemory": "Clear conversation memory",
-      "clearLog": "Clear log"
+      "clearLog": "Clear log",
+      "sendPrompt": "Send prompt",
+      "stopAgent": "Stop agent",
+      "stop": "Stop",
+      "go": "Go",
+      "copyLog": "Copy log"
     },
     "node": {
       "writePlaceholder": "Write markdown...",
@@ -26,7 +31,18 @@
       "flip": "Flip",
       "reverseDirection": "Reverse direction",
       "makeDirectional": "Make directional (one-way)",
-      "makeNonDirectional": "Make non-directional (both ways)"
+      "makeNonDirectional": "Make non-directional (both ways)",
+      "edge": "Edge",
+      "label": "Label:",
+      "color": "Color:",
+      "style": "Style:",
+      "direction": "Direction:",
+      "directional": "Directional",
+      "nonDirectional": "Non-directional",
+      "insertNode": "Insert Node",
+      "insertNodeTooltip": "Insert a node on this edge",
+      "deleteEdge": "Delete Edge",
+      "deleteEdgeTooltip": "Delete this edge"
     },
     "frame": {
       "delete": "Delete frame",
@@ -286,7 +302,37 @@
     "cancel": "Cancel",
     "save": "Save",
     "delete": "Delete",
-    "edit": "Edit"
+    "edit": "Edit",
+    "remove": "Remove",
+    "add": "Add"
+  },
+  "plan": {
+    "reviewPlan": "Review Plan",
+    "editStep": "Edit step",
+    "removeStep": "Remove step",
+    "addStep": "Add Step",
+    "newStepPlaceholder": "Describe the new step...",
+    "step": "step",
+    "steps": "steps",
+    "reject": "Reject",
+    "approve": "Approve",
+    "approveShortcut": "Approve (Cmd+Enter)"
+  },
+  "storyline": {
+    "insertNode": "Insert node",
+    "removeFromStoryline": "Remove from storyline",
+    "addNode": "Add node",
+    "toggleContents": "Toggle contents",
+    "closeEsc": "Close (Esc)",
+    "backToList": "Back to list",
+    "edgeColor": "Edge color",
+    "readMode": "Read Mode",
+    "newStoryline": "New Storyline",
+    "rename": "Rename"
+  },
+  "nodePanel": {
+    "closePanel": "Close panel",
+    "deleteNode": "Delete this node"
   },
   "toolbar": {
     "editWorkspace": "Edit Workspace",

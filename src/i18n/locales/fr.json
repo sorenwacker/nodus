@@ -11,7 +11,12 @@
     "agent": {
       "placeholder": "Poser une question sur le graphe...",
       "clearMemory": "Effacer la mémoire de conversation",
-      "clearLog": "Effacer le journal"
+      "clearLog": "Effacer le journal",
+      "sendPrompt": "Envoyer",
+      "stopAgent": "Arrêter l'agent",
+      "stop": "Arrêter",
+      "go": "Go",
+      "copyLog": "Copier le journal"
     },
     "node": {
       "writePlaceholder": "Écrire en markdown...",
@@ -26,7 +31,18 @@
       "flip": "Inverser",
       "reverseDirection": "Inverser la direction",
       "makeDirectional": "Rendre directionnel (sens unique)",
-      "makeNonDirectional": "Rendre non-directionnel (bidirectionnel)"
+      "makeNonDirectional": "Rendre non-directionnel (bidirectionnel)",
+      "edge": "Arête",
+      "label": "Libellé :",
+      "color": "Couleur :",
+      "style": "Style :",
+      "direction": "Direction :",
+      "directional": "Directionnel",
+      "nonDirectional": "Non-directionnel",
+      "insertNode": "Insérer un nœud",
+      "insertNodeTooltip": "Insérer un nœud sur cette arête",
+      "deleteEdge": "Supprimer l'arête",
+      "deleteEdgeTooltip": "Supprimer cette arête"
     },
     "frame": {
       "delete": "Supprimer le cadre",
@@ -286,7 +302,37 @@
     "cancel": "Annuler",
     "save": "Enregistrer",
     "delete": "Supprimer",
-    "edit": "Modifier"
+    "edit": "Modifier",
+    "remove": "Retirer",
+    "add": "Ajouter"
+  },
+  "plan": {
+    "reviewPlan": "Examiner le plan",
+    "editStep": "Modifier l'étape",
+    "removeStep": "Supprimer l'étape",
+    "addStep": "Ajouter une étape",
+    "newStepPlaceholder": "Décrire la nouvelle étape...",
+    "step": "étape",
+    "steps": "étapes",
+    "reject": "Rejeter",
+    "approve": "Approuver",
+    "approveShortcut": "Approuver (Cmd+Entrée)"
+  },
+  "storyline": {
+    "insertNode": "Insérer un nœud",
+    "removeFromStoryline": "Retirer du scénario",
+    "addNode": "Ajouter un nœud",
+    "toggleContents": "Afficher/masquer le contenu",
+    "closeEsc": "Fermer (Échap)",
+    "backToList": "Retour à la liste",
+    "edgeColor": "Couleur de l'arête",
+    "readMode": "Mode lecture",
+    "newStoryline": "Nouveau scénario",
+    "rename": "Renommer"
+  },
+  "nodePanel": {
+    "closePanel": "Fermer le panneau",
+    "deleteNode": "Supprimer ce nœud"
   },
   "toolbar": {
     "editWorkspace": "Modifier l'espace de travail",
