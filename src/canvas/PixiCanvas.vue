@@ -11,6 +11,7 @@ import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
 import { llmStorage, memoryStorage } from '../lib/storage'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
+import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
 import { useNeighborhoodMode } from './composables/useNeighborhoodMode'
 import { useLasso } from './composables/useLasso'
@@ -1585,59 +1586,9 @@ async function deleteSelectedNodes() {
   }
 }
 
-// Map legacy color values to current colors
-const legacyColorMap: Record<string, string> = {
-  // Old solid pastels
-  '#fecaca': 'rgba(239, 68, 68, 0.08)',
-  '#fed7aa': 'rgba(249, 115, 22, 0.08)',
-  '#fef08a': 'rgba(234, 179, 8, 0.08)',
-  '#bbf7d0': 'rgba(34, 197, 94, 0.08)',
-  '#bfdbfe': 'rgba(59, 130, 246, 0.08)',
-  '#e9d5ff': 'rgba(168, 85, 247, 0.08)',
-  '#fbcfe8': 'rgba(236, 72, 153, 0.08)',
-  // Old very light pastels
-  '#fef2f2': 'rgba(239, 68, 68, 0.08)',
-  '#fff7ed': 'rgba(249, 115, 22, 0.08)',
-  '#fefce8': 'rgba(234, 179, 8, 0.08)',
-  '#f0fdf4': 'rgba(34, 197, 94, 0.08)',
-  '#eff6ff': 'rgba(59, 130, 246, 0.08)',
-  '#faf5ff': 'rgba(168, 85, 247, 0.08)',
-  '#fdf2f8': 'rgba(236, 72, 153, 0.08)',
-  // Old rgba values with different alphas
-  'rgba(239, 68, 68, 0.15)': 'rgba(239, 68, 68, 0.08)',
-  'rgba(249, 115, 22, 0.15)': 'rgba(249, 115, 22, 0.08)',
-  'rgba(234, 179, 8, 0.15)': 'rgba(234, 179, 8, 0.08)',
-  'rgba(34, 197, 94, 0.15)': 'rgba(34, 197, 94, 0.08)',
-  'rgba(59, 130, 246, 0.15)': 'rgba(59, 130, 246, 0.08)',
-  'rgba(168, 85, 247, 0.15)': 'rgba(168, 85, 247, 0.08)',
-  'rgba(236, 72, 153, 0.15)': 'rgba(236, 72, 153, 0.08)',
-}
-
-// Get node background - layers transparent color over solid base
+// Get node background - wrapper for utility function with current theme
 function getNodeBackground(colorTheme: string | null): string | undefined {
-  if (!colorTheme) return undefined
-  // Normalize legacy colors to current format
-  const normalizedColor = legacyColorMap[colorTheme] || colorTheme
-
-  // Check if color is problematic for current theme
-  // In dark mode, don't use very light colors; in light mode, don't use very dark colors
-  if (normalizedColor.startsWith('#')) {
-    const hex = normalizedColor.replace('#', '')
-    const r = parseInt(hex.substr(0, 2), 16)
-    const g = parseInt(hex.substr(2, 2), 16)
-    const b = parseInt(hex.substr(4, 2), 16)
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000
-
-    const isDarkTheme = currentTheme.value === 'dark' || currentTheme.value === 'pitch-black' || currentTheme.value === 'cyber'
-
-    // If color is too bright for dark mode (>200) or too dark for light mode (<50), skip it
-    if ((isDarkTheme && brightness > 200) || (!isDarkTheme && brightness < 50)) {
-      return undefined
-    }
-  }
-
-  // Use linear-gradient to layer transparent color over solid background
-  return `linear-gradient(${normalizedColor}, ${normalizedColor}), var(--bg-surface)`
+  return getNodeBackgroundUtil(colorTheme, currentTheme.value)
 }
 
 // Context menu handler
