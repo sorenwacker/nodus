@@ -1,11 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import {
-  invoke,
-  acquireEditLock,
-  releaseEditLock,
-  checkFileAvailable,
-} from '../lib/tauri'
+import { invoke } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
 import { getStarterTemplates, getStarterTitles } from '../lib/templates'
@@ -18,6 +13,7 @@ import { useWorkspaceStore } from './workspaces'
 import { useFileSync } from '../composables/useFileSync'
 import { useImport } from '../composables/useImport'
 import { useTagNodes } from '../composables/useTagNodes'
+import { useNodeEditLocking } from '../composables/useNodeEditLocking'
 import type {
   Node,
   Edge,
@@ -62,8 +58,6 @@ export const useNodesStore = defineStore('nodes', () => {
   const error = ref<string | null>(null)
   // Version counter to trigger edge re-routing when node positions/sizes change
   const nodeLayoutVersion = ref(0)
-  // Track which nodes have edit locks held by this session
-  const lockedNodeIds = ref<Set<string>>(new Set())
 
   // Separate stores with their own state
   const storylinesStore = useStorylinesStore()
@@ -831,71 +825,11 @@ export const useNodesStore = defineStore('nodes', () => {
     nodeLayoutVersion.value++
   }
 
-  /**
-   * Check if a node's file is available for editing
-   * Returns true if available, false if locked by another process
-   */
-  async function isNodeEditable(nodeId: string): Promise<boolean> {
-    const node = nodes.value.find(n => n.id === nodeId)
-    if (!node?.file_path) return true // No file = always editable
-
-    try {
-      return await checkFileAvailable(node.file_path)
-    } catch (e) {
-      storeLogger.error('Failed to check file availability:', e)
-      return true // Assume editable on error
-    }
-  }
-
-  /**
-   * Acquire an edit lock for a node before editing
-   * Shows notification if the file is locked by another application
-   * Returns false if lock could not be acquired
-   */
-  async function startEditing(nodeId: string): Promise<boolean> {
-    const node = nodes.value.find(n => n.id === nodeId)
-    if (!node?.file_path) return true // No file to lock
-
-    try {
-      await acquireEditLock(nodeId)
-      lockedNodeIds.value.add(nodeId)
-      storeLogger.debug(`Acquired edit lock for node: ${node.title}`)
-      return true
-    } catch (e) {
-      const errorMsg = String(e)
-      if (errorMsg.includes('being edited')) {
-        notifications$.error(
-          `Cannot edit "${node.title}"`,
-          'File is open in another application'
-        )
-        return false
-      }
-      notifications$.error('Failed to acquire edit lock', String(e))
-      return false
-    }
-  }
-
-  /**
-   * Release an edit lock after editing is complete
-   */
-  async function stopEditing(nodeId: string): Promise<void> {
-    if (!lockedNodeIds.value.has(nodeId)) return
-
-    try {
-      await releaseEditLock(nodeId)
-      lockedNodeIds.value.delete(nodeId)
-      storeLogger.debug(`Released edit lock for node: ${nodeId}`)
-    } catch (e) {
-      storeLogger.error('Failed to release edit lock:', e)
-    }
-  }
-
-  /**
-   * Check if we currently hold an edit lock for a node
-   */
-  function hasEditLock(nodeId: string): boolean {
-    return lockedNodeIds.value.has(nodeId)
-  }
+  // Edit locking composable
+  const editLocking = useNodeEditLocking({
+    getNode: (id: string) => nodes.value.find(n => n.id === id),
+  })
+  const { isNodeEditable, startEditing, stopEditing, hasEditLock } = editLocking
 
   // Storyline functions - forwarded to storylines store
   const loadStorylines = () => storylinesStore.loadStorylines()
