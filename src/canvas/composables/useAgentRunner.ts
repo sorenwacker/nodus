@@ -19,6 +19,11 @@ import {
   getModeMaxIterations,
   DEFAULT_AGENT_MODE,
 } from '../llm/agentModes'
+import {
+  shouldEnhancePrompt,
+  enhancePrompt,
+  detectIntent,
+} from '../llm/promptEnhancer'
 
 /**
  * Escape special characters that could be used for prompt injection
@@ -268,10 +273,18 @@ export function useAgentRunner(ctx: AgentContext) {
     ctx.log.value.push(`User: ${userRequest}`)
     ctx.log.value.push(`> Mode: ${mode.value}`)
 
+    // Enhance prompt if it's a graph creation request
+    let enhancedRequest = userRequest
+    if (shouldEnhancePrompt(userRequest)) {
+      const intent = detectIntent(userRequest)
+      ctx.log.value.push(`> Detected: ${intent.graphType} (${intent.domain})`)
+      enhancedRequest = enhancePrompt(userRequest)
+    }
+
     // Build initial messages with current node state, memories, and mode
     const messages: ChatMessage[] = [
       buildSystemPrompt(ctx.filteredNodes(), ctx.workspaceId(), mode.value, currentPlan.value),
-      { role: 'user', content: userRequest },
+      { role: 'user', content: enhancedRequest },
     ]
 
     const maxIterations = getModeMaxIterations(mode.value)

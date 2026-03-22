@@ -15,3 +15,12 @@ export { registerCoreTools } from './coreTools'
 
 // LLM Queue - all LLM calls MUST go through this
 export { llmQueue, useLLMQueue } from './queue'
+
+// Prompt enhancement
+export {
+  enhancePrompt,
+  detectIntent,
+  shouldEnhancePrompt,
+  type GraphType,
+  type Domain,
+} from './promptEnhancer'
