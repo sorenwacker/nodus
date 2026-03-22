@@ -1692,18 +1692,22 @@ const edgeLines = computed(() => {
     const strokeWidth = routed?.strokeWidth || 1.5
 
     // Compute label position based on actual path, not just endpoints
-    // For routed paths, use the middle of the path array if available
-    let labelX = (x1 + x2) / 2
-    let labelY = (y1 + y2) / 2
-    if (routed?.path && routed.path.length > 0) {
-      // Use the middle point of the path
+    // The visual center of a routed edge is between the standoff points
+    let labelX: number
+    let labelY: number
+    if (routed?.path && routed.path.length >= 2) {
+      // Use the middle point of the explicit path array
       const midIndex = Math.floor(routed.path.length / 2)
       labelX = routed.path[midIndex].x
       labelY = routed.path[midIndex].y
-    } else if (!isHugeGraph.value && !routed?.svgPath) {
-      // Fallback path uses standoffs - use midpoint of the two standoffs
+    } else if (!isHugeGraph.value) {
+      // For routed edges, use midpoint between standoff points (visual center of the curve)
       labelX = (startStandoff.x + endStandoff.x) / 2
       labelY = (startStandoff.y + endStandoff.y) / 2
+    } else {
+      // Huge graphs use straight lines - endpoint midpoint is correct
+      labelX = (x1 + x2) / 2
+      labelY = (y1 + y2) / 2
     }
 
     return {
