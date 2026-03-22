@@ -165,108 +165,6 @@ const DOMAIN_PATTERNS: Record<Domain, RegExp[]> = {
 }
 
 /**
- * Best practices by graph type
- * Based on established visualization standards
- */
-const GRAPH_TYPE_PRACTICES: Record<GraphType, string> = {
-  mindmap: `MINDMAP BEST PRACTICES (Buzan):
-- Central topic in the middle, branches radiate outward
-- Use single keywords or short phrases for nodes (not sentences)
-- Main branches = major themes, sub-branches = details
-- Edge labels: use associative words ("triggers", "inspires", "leads to")
-- Limit to 5-7 main branches from center
-- Each branch should have a distinct focus`,
-
-  hierarchy: `HIERARCHY BEST PRACTICES:
-- Root node at top, children below (or center with radial layout)
-- Use "contains", "includes", "has" for parent→child edges
-- Use "part of", "belongs to" for child→parent edges
-- Each level should be same type of thing (don't mix categories and instances)
-- Leaf nodes are concrete items, internal nodes are groupings
-- Maximum 7±2 children per parent for readability`,
-
-  concept_map: `CONCEPT MAP BEST PRACTICES (Novak & Cañas):
-- Nodes = concepts (nouns), Edges = relationships (verbs/linking phrases)
-- EVERY edge MUST have a label forming a proposition: "Node1 - label → Node2"
-- Read as sentences: "The brain contains the cerebrum"
-- Cross-links between branches show deep understanding
-- Hierarchical with most general concepts at top
-- Use specific labels: "causes", "requires", "produces", "is a", "has"`,
-
-  flowchart: `FLOWCHART BEST PRACTICES:
-- Start/End nodes clearly marked
-- Decision nodes (diamonds) have Yes/No branches
-- Process nodes (rectangles) describe actions
-- Edge labels: "yes", "no", "if X", "then", "next"
-- Flow direction: top-to-bottom or left-to-right
-- One entry, one exit per process block`,
-
-  network: `NETWORK GRAPH BEST PRACTICES:
-- Nodes = entities, Edges = relationships
-- Edge labels describe relationship type
-- Use bidirectional edges for mutual relationships
-- Cluster related nodes visually
-- Weight edges by strength if applicable`,
-
-  timeline: `TIMELINE BEST PRACTICES:
-- Nodes arranged chronologically (left-to-right or top-to-bottom)
-- Edge labels: dates, durations, "followed by", "preceded"
-- Group by era or period
-- Include key dates in node content`,
-
-  comparison: `COMPARISON BEST PRACTICES:
-- Parallel structure: same attributes for each item being compared
-- Use "differs from", "similar to", "unlike", "shares with" for edges
-- Group by attribute, not by item
-- Highlight key differences and similarities`,
-
-  unknown: `GENERAL GRAPH PRACTICES:
-- Use descriptive edge labels (never leave blank)
-- Keep node titles short and specific
-- Only create nodes for concrete entities
-- Avoid category/meta nodes`,
-}
-
-/**
- * Domain-specific guidance
- */
-const DOMAIN_GUIDANCE: Record<Domain, string> = {
-  anatomy: `ANATOMY STANDARDS:
-- Use established anatomical hierarchy: System → Organ → Tissue → Cell
-- Edge labels: "contains", "connects to", "innervates", "supplies blood to"
-- Include functional relationships: "controls", "regulates", "responds to"
-- Reference: Terminologia Anatomica (TA) for standard naming`,
-
-  biology: `BIOLOGY STANDARDS:
-- Use taxonomic hierarchy: Kingdom → Phylum → Class → Order → Family → Genus → Species
-- Edge labels: "evolves from", "preys on", "symbiotic with", "produces"
-- Include ecological relationships: "habitat", "food source", "predator"`,
-
-  software: `SOFTWARE ARCHITECTURE STANDARDS:
-- Use UML-style relationships: "uses", "implements", "extends", "depends on"
-- Edge labels: "calls", "returns", "contains", "imports"
-- Separate concerns: UI, Logic, Data layers
-- Reference: C4 model for system context`,
-
-  organization: `ORGANIZATIONAL STANDARDS:
-- Use reporting hierarchy: "reports to", "manages", "supervises"
-- Edge labels: "responsible for", "collaborates with", "delegates to"
-- Include functional relationships: "advises", "supports"`,
-
-  process: `PROCESS STANDARDS:
-- Use BPMN-style relationships: "triggers", "follows", "parallel with"
-- Edge labels: "leads to", "requires", "produces", "validates"
-- Include decision points and branches`,
-
-  knowledge: `KNOWLEDGE MAPPING STANDARDS:
-- Use epistemological relationships: "is a", "has property", "exemplifies"
-- Edge labels: "defines", "contradicts", "supports", "derives from"
-- Connect theories to evidence and applications`,
-
-  general: ``,
-}
-
-/**
  * Detect the intent from user prompt
  */
 export function detectIntent(prompt: string): DetectedIntent {
@@ -316,53 +214,11 @@ export function detectIntent(prompt: string): DetectedIntent {
 export function enhancePrompt(userPrompt: string): string {
   const intent = detectIntent(userPrompt)
 
-  const practices = GRAPH_TYPE_PRACTICES[intent.graphType]
-  const domainGuidance = DOMAIN_GUIDANCE[intent.domain]
+  // Simple enhancement - just add key reminders
+  return `${userPrompt}
 
-  // Build enhanced prompt with MANDATORY instructions at TOP
-  const sections: string[] = []
-
-  // CRITICAL: Put mandatory workflow at TOP so model sees it first
-  sections.push(`=== MANDATORY GRAPH CREATION STEPS ===
-This is a GRAPH task. You MUST include ALL these steps:
-
-1. CREATE NODES: Use create_nodes_batch to create all nodes
-2. CREATE EDGES: Use create_edges_batch to connect nodes with LABELED edges
-   - This step is REQUIRED - a graph without edges is incomplete
-   - Every node should connect to at least one other node
-3. LAYOUT: Use auto_layout("force") to arrange the graph
-4. DONE: Call done() only after edges are created
-
-If in plan mode: Your plan MUST include a step for edge creation.
-If executing: Call create_edges_batch BEFORE calling done().
-=====================================`)
-  sections.push('')
-
-  sections.push(`USER REQUEST: ${userPrompt}`)
-  sections.push('')
-  sections.push(`DETECTED: ${intent.graphType} graph about ${intent.centralTopic} (${intent.domain} domain)`)
-  sections.push('')
-
-  if (practices) {
-    sections.push(practices)
-    sections.push('')
-  }
-
-  if (domainGuidance) {
-    sections.push(domainGuidance)
-    sections.push('')
-  }
-
-  sections.push(`EDGE REQUIREMENTS:
-- Every edge MUST have a semantic label (never "related" or blank)
-- Use labels like: "contains", "part of", "connects to", "regulates", "produces"
-
-NODE REQUIREMENTS:
-- Only create nodes for specific, concrete entities
-- Do NOT create category nodes like "Overview", "Types", "Functions"
-- Node titles = proper names, not descriptions`)
-
-  return sections.join('\n')
+Type: ${intent.graphType} (${intent.domain})
+Steps: create_nodes_batch → create_edges_batch (with labels) → auto_layout → done`
 }
 
 /**
