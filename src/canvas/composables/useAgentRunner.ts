@@ -156,17 +156,11 @@ EDGE LABELS (always use one):
 
 AVOID creating nodes for: categories, types, generic terms, placeholders. Only create nodes for specific entities.
 
-UNDERSTANDING USER MESSAGES:
-- "for each node..." = Use for_each_node() directly, NO need to read_graph first
-- "check/validate nodes" = Use for_each_node(), processes node-by-node
-- "add summary/content" = Use for_each_node(action="llm", template="{title}...")
-- "X is not Y" = CORRECTION. Fix the relationship.
-- Short corrections refer to current graph, not new research.
+IMPORTANT - YOU ALREADY HAVE THE NODE LIST ABOVE. Do not call read_graph.
 
-EFFICIENCY:
-- Do NOT call read_graph before for_each_node - it already processes all nodes
-- Do NOT call read_graph for per-node operations
-- Only use read_graph when you need to see connections/edges
+"connect disconnected nodes" = Use create_edges_batch only. Do NOT create new nodes.
+"for each node" = Use for_each_node directly.
+"X is not Y" = Fix the edge/relationship.
 
 ${customRules}`,
   }
