@@ -671,13 +671,13 @@ export function registerCoreTools(): void {
       type: 'object',
       properties: {
         include_content: { type: 'boolean', description: 'Include node content (default: true)' },
-        max_content_length: { type: 'number', description: 'Max chars per node content (default: 500)' },
+        max_content_length: { type: 'number', description: 'Max chars per node content (default: 200, max: 300)' },
       },
       required: [],
     },
     async (args, ctx) => {
       const includeContent = args.include_content !== false
-      const maxLen = args.max_content_length || 500
+      const maxLen = Math.min(args.max_content_length || 200, 300) // Cap at 300 chars
       const nodes = ctx.store.filteredNodes
       const edges = ctx.store.filteredEdges
 
