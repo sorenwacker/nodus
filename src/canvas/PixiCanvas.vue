@@ -21,7 +21,7 @@ import {
   type EdgeStyle,
 } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
-import { uiStorage, llmStorage, canvasStorage, memoryStorage } from '../lib/storage'
+import { uiStorage, llmStorage, memoryStorage } from '../lib/storage'
 import { useMinimap } from './composables/useMinimap'
 import { measureNodeContent } from './utils/nodeSizing'
 import { useAgentRunner, type AgentContext } from './composables/useAgentRunner'
@@ -50,6 +50,9 @@ import { usePlanState } from './llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 import { useMarkerHandlers } from './composables/useMarkerHandlers'
 import { useLLMTools } from './composables/useLLMTools'
+import { usePlanHandlers } from './composables/usePlanHandlers'
+import { useStorylines } from './composables/useStorylines'
+import { useEdgeStyling } from './composables/useEdgeStyling'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -1150,55 +1153,21 @@ function stopAgent() {
   agentRunner.stop()
 }
 
-// Plan approval handlers
-async function handlePlanApprove() {
-  console.log('[PixiCanvas] handlePlanApprove called')
-  const success = planState.approvePlan()
-  console.log('[PixiCanvas] approvePlan result:', success)
-  if (success) {
-    agentLog.value.push('> Plan approved')
-    // Set tasks in store
-    if (planState.currentPlan.value) {
-      agentTasksStore.setTasks(
-        planState.currentPlan.value.steps.map(s => ({
-          description: s.description,
-          details: s.details,
-        }))
-      )
-      // Start execution
-      planState.startExecution()
-      // Resume agent with approval
-      await agentRunner.resume({ approved: true })
-    }
-  }
-}
-
-function handlePlanReject(reason?: string) {
-  console.log('[PixiCanvas] handlePlanReject called')
-  planState.rejectPlan(reason)
-  agentLog.value.push(`> Plan rejected${reason ? ': ' + reason : ''}`)
-  // Resume agent to revise plan
-  agentRunner.resume({ approved: false, message: reason })
-}
-
-function handlePlanModify(stepId: string, newDescription: string) {
-  planState.modifyStep(stepId, { description: newDescription })
-  agentLog.value.push(`> Step modified: ${newDescription.slice(0, 40)}...`)
-}
-
-function handlePlanAddStep(description: string, afterStepId?: string) {
-  planState.addStep(description, undefined, afterStepId)
-  agentLog.value.push(`> Step added: ${description.slice(0, 40)}...`)
-}
-
-function handlePlanRemoveStep(stepId: string) {
-  planState.removeStep(stepId)
-  agentLog.value.push('> Step removed')
-}
-
-function closePlanModal() {
-  planShowApprovalModal.value = false
-}
+// Plan approval handlers (via composable)
+const planHandlers = usePlanHandlers({
+  planState,
+  agentRunner,
+  agentLog,
+  agentTasksStore,
+})
+const {
+  handlePlanApprove,
+  handlePlanReject,
+  handlePlanModify,
+  handlePlanAddStep,
+  handlePlanRemoveStep,
+  closePlanModal,
+} = planHandlers
 
 async function sendGraphPrompt() {
   if (!graphPrompt.value.trim() || isGraphLLMLoading.value) return
@@ -2557,198 +2526,41 @@ async function onCanvasDoubleClick(e: MouseEvent) {
   })
 }
 
-// Edge color palettes per theme
-const defaultEdgeColors = [
-  { value: '#94a3b8' }, // gray (default)
-  { value: '#3b82f6' }, // blue
-  { value: '#22c55e' }, // green
-  { value: '#f97316' }, // orange
-  { value: '#ef4444' }, // red
-  { value: '#8b5cf6' }, // purple
-  { value: '#ec4899' }, // pink
-]
-
-const cyberEdgeColors = [
-  { value: '#00ffcc' }, // neon cyan (default)
-  { value: '#ff00ff' }, // neon magenta
-  { value: '#00ccff' }, // neon blue
-  { value: '#ffff00' }, // neon yellow
-  { value: '#ff3366' }, // neon red
-  { value: '#9933ff' }, // neon purple
-  { value: '#00ff66' }, // neon green
-]
-
 // Track current theme name for reactive palette switching
 const currentTheme = ref(document.documentElement.getAttribute('data-theme') || 'light')
 
-// Reactive edge color palette based on theme
-const edgeColorPalette = computed(() => {
-  return currentTheme.value === 'cyber' ? cyberEdgeColors : defaultEdgeColors
+// Edge styling composable - handles colors, styles, and theme-aware highlighting
+const edgeStyling = useEdgeStyling({
+  store: {
+    updateEdgeLinkType: store.updateEdgeLinkType,
+  },
+  selectedEdgeId: selectedEdge,
+  currentTheme,
 })
-
-// Default edge color (first in palette)
-const defaultEdgeColor = computed(() => edgeColorPalette.value[0].value)
-
-// Highlight color for hover - matches theme accent
-const highlightColor = computed(() => {
-  return currentTheme.value === 'cyber' ? '#00ffcc' : '#3b82f6'
-})
-
-// Selected color - matches selected node border
-const selectedColor = computed(() => {
-  return currentTheme.value === 'cyber' ? '#ff00ff' : '#3b82f6'
-})
-
-// Map pastel node colors to neon equivalents for cyber theme edge highlights
-const cyberHighlightColors: Record<string, string> = {
-  '#fee2e2': '#ff3366', // red pastel -> neon red
-  '#ffedd5': '#ffaa00', // orange pastel -> neon orange
-  '#fef9c3': '#ffff00', // yellow pastel -> neon yellow
-  '#dcfce7': '#00ff66', // green pastel -> neon green
-  '#dbeafe': '#00ccff', // blue pastel -> neon blue
-  '#f3e8ff': '#9933ff', // purple pastel -> neon purple
-  '#fce7f3': '#ff00ff', // pink pastel -> neon magenta
-}
-
-// Get edge highlight color, mapping to cyber neon if needed
-// Avoids using light colors in light mode (would be invisible)
-function getEdgeHighlightColor(nodeColor: string | null): string {
-  if (!nodeColor) return highlightColor.value
-  if (currentTheme.value === 'cyber' && cyberHighlightColors[nodeColor]) {
-    return cyberHighlightColors[nodeColor]
-  }
-  // For non-cyber themes, check if the node color is too light for visibility
-  // Skip white and very light colors in light mode
-  if (currentTheme.value !== 'dark' && currentTheme.value !== 'pitch-black') {
-    const hex = nodeColor.replace('#', '')
-    const r = parseInt(hex.substr(0, 2), 16)
-    const g = parseInt(hex.substr(2, 2), 16)
-    const b = parseInt(hex.substr(4, 2), 16)
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000
-    // If color is too bright (>200), use the default highlight color instead
-    if (brightness > 200) {
-      return highlightColor.value
-    }
-  }
-  return nodeColor
-}
-
-// Edge style types
-type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'
-const edgeStyles: { value: EdgeStyleType; label: string }[] = [
-  { value: 'orthogonal', label: '⌐' },
-  { value: 'diagonal', label: '∠' },
-  { value: 'curved', label: '∿' },
-  { value: 'hyperbolic', label: '∼' },
-  { value: 'straight', label: '/' },
-]
-
-// Store edge styles (edgeId -> style)
-const edgeStyleMap = ref<Record<string, string>>({})
-const globalEdgeStyle = ref<EdgeStyleType>(canvasStorage.getEdgeStyle())
+const {
+  edgeStyles,
+  edgeStyleMap,
+  globalEdgeStyle,
+  edgeColorPalette,
+  defaultEdgeColor,
+  highlightColor,
+  selectedColor,
+  nodeColors,
+  allMarkerColors,
+  frameColors,
+  cycleEdgeStyle,
+  getEdgeStyle,
+  setEdgeStyle,
+  getEdgeColor,
+  getEdgeHighlightColor,
+  getArrowMarkerId,
+  changeEdgeColor,
+} = edgeStyling
 
 function toggleMagnifier() {
   magnifierEnabled.value = !magnifierEnabled.value
   uiStorage.setMagnifierEnabled(magnifierEnabled.value)
 }
-
-function cycleEdgeStyle() {
-  const styles: EdgeStyleType[] = ['orthogonal', 'diagonal', 'curved', 'hyperbolic', 'straight']
-  const idx = styles.indexOf(globalEdgeStyle.value)
-  globalEdgeStyle.value = styles[(idx + 1) % styles.length]
-  canvasStorage.setEdgeStyle(globalEdgeStyle.value)
-}
-
-function getEdgeStyle(edgeId: string): string {
-  return edgeStyleMap.value[edgeId] || 'diagonal'
-}
-
-function setEdgeStyle(style: string) {
-  if (selectedEdge.value) {
-    edgeStyleMap.value[selectedEdge.value] = style
-  }
-}
-
-function getEdgeColor(edge: { link_type: string; color?: string | null; debugInfo?: { srcOffset: number } }): string {
-  // Prefer explicit color field, then check link_type, then default to gray
-  if (edge.color && edge.color.startsWith('#')) return edge.color
-  if (edge.link_type && edge.link_type.startsWith('#')) return edge.link_type
-  return '#94a3b8'
-}
-
-function getArrowMarkerId(color: string): string {
-  // Create a safe ID from the color
-  return `arrow-${color.replace('#', '')}`
-}
-
-function changeEdgeColor(color: string) {
-  if (selectedEdge.value) {
-    store.updateEdgeLinkType(selectedEdge.value, color)
-  }
-}
-
-// Node colors for the color picker (transparent tints layered over solid bg)
-const defaultNodeColors = [
-  { value: null, display: null },
-  { value: 'rgba(239, 68, 68, 0.08)', display: '#fecaca' }, // red
-  { value: 'rgba(249, 115, 22, 0.08)', display: '#fed7aa' }, // orange
-  { value: 'rgba(234, 179, 8, 0.08)', display: '#fef08a' }, // yellow
-  { value: 'rgba(34, 197, 94, 0.08)', display: '#bbf7d0' }, // green
-  { value: 'rgba(59, 130, 246, 0.08)', display: '#bfdbfe' }, // blue
-  { value: 'rgba(168, 85, 247, 0.08)', display: '#e9d5ff' }, // purple
-  { value: 'rgba(236, 72, 153, 0.08)', display: '#fbcfe8' }, // pink
-]
-
-const cyberNodeColors = [
-  { value: null, display: null },
-  { value: '#4d1f30', display: '#ff3366' }, // neon red (dark bg)
-  { value: '#4d3300', display: '#ffaa00' }, // neon orange
-  { value: '#4d4d00', display: '#ffff00' }, // neon yellow
-  { value: '#004d20', display: '#00ff66' }, // neon green
-  { value: '#003d4d', display: '#00ccff' }, // neon blue
-  { value: '#2e194d', display: '#9933ff' }, // neon purple
-  { value: '#4d004d', display: '#ff00ff' }, // neon magenta
-]
-
-const nodeColors = computed(() => {
-  return currentTheme.value === 'cyber' ? cyberNodeColors : defaultNodeColors
-})
-
-// All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
-const allMarkerColors = computed(() => {
-  const colors = new Set<string>()
-  // Edge colors
-  for (const c of edgeColorPalette.value) {
-    if (c.value) colors.add(c.value)
-  }
-  // Node colors (both default and cyber for highlighted edges)
-  for (const c of defaultNodeColors) {
-    if (c.value) colors.add(c.value)
-  }
-  for (const c of cyberNodeColors) {
-    if (c.value) colors.add(c.value)
-  }
-  // Cyber highlight colors (neon equivalents of pastels)
-  for (const neon of Object.values(cyberHighlightColors)) {
-    colors.add(neon)
-  }
-  // Highlight and selected colors
-  colors.add(highlightColor.value)
-  colors.add(selectedColor.value)
-  return Array.from(colors).map(v => ({ value: v }))
-})
-
-// Frame border colors (more saturated for visibility)
-const frameColors = [
-  { value: null },
-  { value: '#ef4444' },
-  { value: '#f97316' },
-  { value: '#eab308' },
-  { value: '#22c55e' },
-  { value: '#3b82f6' },
-  { value: '#8b5cf6' },
-  { value: '#ec4899' },
-]
 
 function updateNodeColor(nodeId: string, color: string | null) {
   // Use store method to persist to database
@@ -2911,52 +2723,21 @@ function closeContextMenu() {
   contextMenu.close()
 }
 
-async function addNodeToStoryline(storylineId: string) {
-  if (!contextMenuNodeId.value) return
-
-  // Get all nodes to add (selected nodes if multi-select, otherwise just the context menu node)
-  const nodeIds = store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)
-    ? [...store.selectedNodeIds]
-    : [contextMenuNodeId.value]
-
-  try {
-    for (const nodeId of nodeIds) {
-      await store.addNodeToStoryline(storylineId, nodeId)
-    }
-    showToast?.(`Added ${nodeIds.length} node(s) to storyline`, 'success')
-    closeContextMenu()
-  } catch (e) {
-    console.error('Failed to add nodes to storyline:', e)
-    showToast?.(`Failed to add: ${e}`, 'error')
-  }
-}
-
-async function createStorylineFromNode() {
-  if (!contextMenuNodeId.value) return
-
-  // Get all nodes to add (selected nodes if multi-select, otherwise just the context menu node)
-  const nodeIds = store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)
-    ? [...store.selectedNodeIds]
-    : [contextMenuNodeId.value]
-
-  const firstNode = store.getNode(nodeIds[0])
-  if (!firstNode) return
-
-  try {
-    const title = nodeIds.length > 1
-      ? `Story: ${nodeIds.length} nodes`
-      : `Story: ${firstNode.title}`
-    const storyline = await store.createStoryline(title)
-    for (const nodeId of nodeIds) {
-      await store.addNodeToStoryline(storyline.id, nodeId)
-    }
-    showToast?.(`Created storyline with ${nodeIds.length} node(s)`, 'success')
-    closeContextMenu()
-  } catch (e) {
-    console.error('Failed to create storyline:', e)
-    showToast?.(`Failed: ${e}`, 'error')
-  }
-}
+// Storylines composable for storyline and workspace operations
+const storylines = useStorylines({
+  store: {
+    selectedNodeIds: store.selectedNodeIds,
+    getNode: store.getNode,
+    addNodeToStoryline: store.addNodeToStoryline,
+    createStoryline: store.createStoryline,
+    moveNodesToWorkspace: store.moveNodesToWorkspace,
+    workspaces: store.workspaces,
+  },
+  contextMenuNodeId,
+  closeContextMenu,
+  showToast,
+})
+const { addNodeToStoryline, createStorylineFromNode, moveNodesToWorkspace } = storylines
 
 /// Computed: number of selected nodes for context menu display
 const contextMenuNodeCount = computed(() => contextMenu.nodeCount.value)
@@ -2965,28 +2746,6 @@ const contextMenuNodeCount = computed(() => contextMenu.nodeCount.value)
 const otherWorkspaces = computed(() => {
   return store.workspaces.filter(w => w.id !== store.currentWorkspaceId)
 })
-
-// Move selected nodes to a different workspace
-async function moveNodesToWorkspace(workspaceId: string | null) {
-  if (!contextMenuNodeId.value) return
-
-  // Get all nodes to move (selected nodes if multi-select, otherwise just the context menu node)
-  const nodeIds = store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(contextMenuNodeId.value)
-    ? [...store.selectedNodeIds]
-    : [contextMenuNodeId.value]
-
-  try {
-    await store.moveNodesToWorkspace(nodeIds, workspaceId)
-    const targetName = workspaceId
-      ? store.workspaces.find(w => w.id === workspaceId)?.name || 'workspace'
-      : 'Default Workspace'
-    showToast?.(`Moved ${nodeIds.length} node(s) to ${targetName}`, 'success')
-    closeContextMenu()
-  } catch (e) {
-    console.error('Failed to move nodes:', e)
-    showToast?.(`Failed: ${e}`, 'error')
-  }
-}
 
 // Export current graph/subgraph as YAML for debugging
 function exportGraphAsYaml() {
