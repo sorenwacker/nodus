@@ -314,7 +314,6 @@ export function detectIntent(prompt: string): DetectedIntent {
  * Enhance user prompt with best practices and standards
  */
 export function enhancePrompt(userPrompt: string): string {
-  console.log('[promptEnhancer] enhancePrompt called')
   const intent = detectIntent(userPrompt)
 
   const practices = GRAPH_TYPE_PRACTICES[intent.graphType]
@@ -363,9 +362,7 @@ NODE REQUIREMENTS:
 - Do NOT create category nodes like "Overview", "Types", "Functions"
 - Node titles = proper names, not descriptions`)
 
-  const result = sections.join('\n')
-  console.log('[promptEnhancer] Output starts with:', result.slice(0, 100))
-  return result
+  return sections.join('\n')
 }
 
 /**
