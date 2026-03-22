@@ -47,6 +47,7 @@ import { useEdgeRouting } from './composables/useEdgeRouting'
 import { useEdgeVisibility } from './composables/useEdgeVisibility'
 import { useViewportCulling } from './composables/useViewportCulling'
 import { useGraphMetrics } from './composables/useGraphMetrics'
+import { useCanvasDisplay } from './composables/useCanvasDisplay'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -466,31 +467,6 @@ const {
   insertNodeOnEdge,
 } = edgeManipulation
 
-// Extract first image URL from node content for zoomed-out thumbnail display
-const nodeFirstImage = computed(() => {
-  const imageMap: Record<string, string | null> = {}
-  for (const node of store.filteredNodes) {
-    if (!node.markdown_content) {
-      imageMap[node.id] = null
-      continue
-    }
-    // Match markdown image: ![alt](url) or HTML img: <img src="url">
-    const mdMatch = node.markdown_content.match(/!\[.*?\]\(([^)]+)\)/)
-    const htmlMatch = node.markdown_content.match(/<img[^>]+src=["']([^"']+)["']/)
-    imageMap[node.id] = mdMatch?.[1] || htmlMatch?.[1] || null
-  }
-  return imageMap
-})
-
-// Show image thumbnail when zoomed out (scale < 0.5) and node has an image
-const showImageThumbnail = computed(() => scale.value < 0.5)
-
-// Magnifying lens - shows when zoomed out far
-const MAGNIFIER_THRESHOLD = 0.4
-const MAGNIFIER_SIZE = 200
-const MAGNIFIER_ZOOM = 2.5
-const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
-
 // Canvas zoom composable - handles wheel zoom/pan and magnifier
 const canvasZoom = useCanvasZoom({
   canvasRef,
@@ -500,36 +476,37 @@ const canvasZoom = useCanvasZoom({
   isZooming,
   startZooming,
   scheduleSaveViewState,
-  magnifierThreshold: MAGNIFIER_THRESHOLD,
+  magnifierThreshold: 0.4, // MAGNIFIER_THRESHOLD
 })
 const { showMagnifier, magnifierPos, onWheel, onCanvasMouseMove, onCanvasMouseEnter, onCanvasMouseLeave } = canvasZoom
 
-const shouldShowMagnifier = computed(() => magnifierEnabled.value && scale.value < MAGNIFIER_THRESHOLD && showMagnifier.value && !isLargeGraph.value)
-
-// Help modal
-const showHelpModal = ref(false)
-
-// Font scale (Cmd+/Cmd-)
-const fontScale = ref(uiStorage.getFontScale())
-const MIN_FONT_SCALE = 0.7
-const MAX_FONT_SCALE = 1.5
-
-function increaseFontScale() {
-  fontScale.value = Math.min(MAX_FONT_SCALE, fontScale.value + 0.1)
-  uiStorage.setFontScale(fontScale.value)
-  document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
-}
-
-function decreaseFontScale() {
-  fontScale.value = Math.max(MIN_FONT_SCALE, fontScale.value - 0.1)
-  uiStorage.setFontScale(fontScale.value)
-  document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
-}
+// Canvas display composable - handles magnifier, thumbnails, font scale
+const canvasDisplay = useCanvasDisplay({
+  scale,
+  filteredNodes: computed(() => store.filteredNodes),
+  isLargeGraph,
+  showMagnifier,
+})
+const {
+  magnifierEnabled,
+  shouldShowMagnifier,
+  toggleMagnifier,
+  MAGNIFIER_SIZE,
+  MAGNIFIER_ZOOM,
+  nodeFirstImage,
+  showImageThumbnail,
+  fontScale,
+  increaseFontScale,
+  decreaseFontScale,
+} = canvasDisplay
 
 // Initialize font scale on mount
 onMounted(() => {
   document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
 })
+
+// Help modal
+const showHelpModal = ref(false)
 
 // Link picker from context menu
 const showLinkPicker = ref(false)
@@ -1679,11 +1656,6 @@ const { visibleEdgeLines } = useEdgeVisibility({
   getEdgeHighlightColor,
   getNode: store.getNode,
 })
-
-function toggleMagnifier() {
-  magnifierEnabled.value = !magnifierEnabled.value
-  uiStorage.setMagnifierEnabled(magnifierEnabled.value)
-}
 
 function updateNodeColor(nodeId: string, color: string | null) {
   // Use store method to persist to database
