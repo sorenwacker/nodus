@@ -6,20 +6,7 @@ import { useThemesStore } from '../stores/themes'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
-import {
-  routeAllEdges,
-  optimizeNodeEntrypoints,
-  assignPorts,
-  calculatePortOffset,
-  getSide,
-  getPortPoint,
-  getStandoff,
-  getAngledStandoff,
-  SpatialIndex,
-  setRoutingSpatialIndex,
-  type NodeRect,
-  type EdgeStyle,
-} from './routing'
+import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from './llm'
 import { uiStorage, llmStorage, memoryStorage } from '../lib/storage'
 import { useMinimap } from './composables/useMinimap'
@@ -56,6 +43,7 @@ import { useEdgeStyling } from './composables/useEdgeStyling'
 import { useNodeResizing } from './composables/useNodeResizing'
 import { useNodeDragging } from './composables/useNodeDragging'
 import { useCanvasZoom } from './composables/useCanvasZoom'
+import { useEdgeRouting } from './composables/useEdgeRouting'
 
 // Undo injection for position, content, and deletion changes
 import type { Node, Edge } from '../types'
@@ -1376,342 +1364,6 @@ function getNodeHeight(node: { height?: number; markdown_content: string | null 
   return Math.max(120, Math.min(600, contentHeight + 80))
 }
 
-const edgeLines = computed(() => {
-  // Force dependency on node positions, edge properties, and layout version
-  // nodeLayoutVersion is incremented when nodes move, edges change, or layout is recalculated
-  const _layoutVersion = store.nodeLayoutVersion
-  const _nodeTrigger = store.nodes.reduce((sum, n) => sum + n.canvas_x + n.canvas_y + (n.width || 0) + (n.height || 0), 0)
-  const _edgeTrigger = store.filteredEdges.reduce((sum, e) => sum + (e.link_type?.length || 0), 0)
-  const _edgeCount = store.edges.length // Track edge additions/removals
-  void _layoutVersion
-  void _nodeTrigger
-  void _edgeTrigger
-  void _edgeCount
-
-  let edges = store.filteredEdges
-
-  // Deduplicate only exact duplicate edges (same source AND target AND id)
-  // Keep bidirectional edges (A→B and B→A are different edges)
-  const seenEdgeIds = new Set<string>()
-  edges = edges.filter(e => {
-    if (seenEdgeIds.has(e.id)) return false
-    seenEdgeIds.add(e.id)
-    return true
-  })
-
-  // Filter edges for neighborhood mode - only show edges connected to focus node
-  if (neighborhoodMode.value && focusNodeId.value) {
-    const focusId = focusNodeId.value
-    edges = edges.filter(e => e.source_node_id === focusId || e.target_node_id === focusId)
-  }
-
-  // MASSIVE GRAPH OPTIMIZATION: Skip all expensive routing, use simple center-to-center lines
-  if (isMassiveGraph.value) {
-    // Build simple node lookup
-    const nodeMap = new Map(displayNodes.value.map(n => [n.id, n]))
-
-    return edges.map(edge => {
-      const source = nodeMap.get(edge.source_node_id)
-      const target = nodeMap.get(edge.target_node_id)
-      if (!source || !target) return null
-
-      const sw = source.width || NODE_DEFAULTS.WIDTH
-      const sh = source.height || NODE_DEFAULTS.HEIGHT
-      const tw = target.width || NODE_DEFAULTS.WIDTH
-      const th = target.height || NODE_DEFAULTS.HEIGHT
-
-      // Simple center-to-center coordinates
-      const x1 = source.canvas_x + sw / 2
-      const y1 = source.canvas_y + sh / 2
-      const x2 = target.canvas_x + tw / 2
-      const y2 = target.canvas_y + th / 2
-
-      // Simple straight line
-      const path = `M${x1},${y1} L${x2},${y2}`
-
-      return {
-        id: edge.id,
-        source_node_id: edge.source_node_id,
-        target_node_id: edge.target_node_id,
-        x1, y1, x2, y2,
-        labelX: (x1 + x2) / 2,
-        labelY: (y1 + y2) / 2,
-        path,
-        style: 'straight' as const,
-        strokeWidth: 1,
-        hitX1: x1, hitY1: y1, hitX2: x2, hitY2: y2,
-        link_type: edge.link_type,
-        label: edge.label,
-        isBidirectional: false,
-        isShortEdge: Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) < 50,
-        debugInfo: undefined,
-      }
-    }).filter((e): e is NonNullable<typeof e> => e !== null)
-  }
-
-  // NOTE: Don't filter by visibleNodeIds here - that would make routing
-  // recalculate on every pan/zoom! Visibility filtering happens at render time.
-
-  // Build node map for efficient lookup
-  // IMPORTANT: Use actual heights for routing obstacle detection
-  // Use displayNodes so hidden nodes (in neighborhood mode) aren't included
-  const nodeMap = new Map<string, NodeRect>()
-  for (const node of displayNodes.value) {
-    nodeMap.set(node.id, {
-      id: node.id,
-      canvas_x: node.canvas_x,
-      canvas_y: node.canvas_y,
-      width: node.width || NODE_DEFAULTS.WIDTH,
-      height: getNodeHeight(node, false),  // false = use real height for routing
-    })
-  }
-
-  // Filter edges to only those with valid source and target nodes
-  edges = edges.filter(e => nodeMap.has(e.source_node_id) && nodeMap.has(e.target_node_id))
-
-  // Deduplicate edges by source-target pair (keep first occurrence)
-  // Also handles bidirectional duplicates (A->B and B->A count as same pair)
-  // Exception: storyline edges are never deduplicated (they have storyline_id)
-  const seenPairs = new Set<string>()
-  edges = edges.filter(e => {
-    // Storyline edges are always kept - they need to show even if another edge exists
-    if (e.storyline_id) return true
-    const ids = [e.source_node_id, e.target_node_id].sort()
-    const key = `${ids[0]}:${ids[1]}`
-    if (seenPairs.has(key)) return false
-    seenPairs.add(key)
-    return true
-  })
-
-  // Get edge style
-  const style = globalEdgeStyle.value
-
-  // Convert edges to EdgeDef format for routing analysis
-  const edgeDefs = edges.map(e => ({
-    id: e.id,
-    source_node_id: e.source_node_id,
-    target_node_id: e.target_node_id,
-  }))
-  // IMPORTANT: Use actual heights for routing, NOT collapsed heights
-  // Otherwise edges route through nodes when zoomed out
-  // Use displayNodes for routing so hidden nodes (in neighborhood mode) aren't obstacles
-  const nodeRects = displayNodes.value.map(n => ({
-    id: n.id,
-    canvas_x: n.canvas_x,
-    canvas_y: n.canvas_y,
-    width: n.width || NODE_DEFAULTS.WIDTH,
-    height: getNodeHeight(n, false),  // false = ignore collapse, use real height
-  }))
-
-  // Compute port assignments for ALL edges (for proper port spreading)
-  // Remove internal deduplication since we already deduplicate above
-  const edgeInfos: Array<{
-    edge: { id: string; source_node_id: string; target_node_id: string }
-    source: NodeRect
-    target: NodeRect
-    sourceSide: 'left' | 'right' | 'top' | 'bottom'
-    targetSide: 'left' | 'right' | 'top' | 'bottom'
-  }> = []
-
-  for (const edge of edgeDefs) {
-    const source = nodeMap.get(edge.source_node_id)!
-    const target = nodeMap.get(edge.target_node_id)!
-    const targetCx = target.canvas_x + (target.width || NODE_DEFAULTS.WIDTH) / 2
-    const targetCy = target.canvas_y + (target.height || NODE_DEFAULTS.HEIGHT) / 2
-    const sourceCx = source.canvas_x + (source.width || NODE_DEFAULTS.WIDTH) / 2
-    const sourceCy = source.canvas_y + (source.height || NODE_DEFAULTS.HEIGHT) / 2
-
-    const sourceSide = getSide(source, targetCx, targetCy)
-    const targetSide = getSide(target, sourceCx, sourceCy)
-
-    edgeInfos.push({ edge, source, target, sourceSide, targetSide })
-  }
-
-  const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
-
-  // Use batch routing for all edge styles
-  // The routing modules handle grid tracking, obstacle avoidance, and path generation
-  const effectiveStyle: EdgeStyle = style
-  let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; path?: Array<{x: number; y: number}>; debugInfo?: { srcOffset: number; tgtOffset: number; srcSide: string; tgtSide: string } }> | null = null
-
-  // Build spatial index for fast obstacle detection (O(log n) instead of O(n))
-  const spatialIndex = new SpatialIndex()
-  spatialIndex.build(nodeMap)
-  setRoutingSpatialIndex(spatialIndex)
-
-  try {
-    routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
-  } finally {
-    // Clear spatial index after routing
-    setRoutingSpatialIndex(null)
-  }
-
-  // Sort edges to minimize crossings
-  // Edges are sorted by their midpoint position so parallel edges don't cross
-  // Use nodeMap for O(1) lookups instead of store.getNode()
-  const sortedEdges = [...edges].sort((a, b) => {
-    const sourceA = nodeMap.get(a.source_node_id)
-    const targetA = nodeMap.get(a.target_node_id)
-    const sourceB = nodeMap.get(b.source_node_id)
-    const targetB = nodeMap.get(b.target_node_id)
-    if (!sourceA || !targetA || !sourceB || !targetB) return 0
-
-    const midAx = (sourceA.canvas_x + targetA.canvas_x) / 2
-    const midAy = (sourceA.canvas_y + targetA.canvas_y) / 2
-    const midBx = (sourceB.canvas_x + targetB.canvas_x) / 2
-    const midBy = (sourceB.canvas_y + targetB.canvas_y) / 2
-
-    // Sort by Y first (top to bottom), then by X (left to right)
-    if (Math.abs(midAy - midBy) > 50) return midAy - midBy
-    return midAx - midBx
-  })
-
-  return sortedEdges.map(edge => {
-    const source = nodeMap.get(edge.source_node_id)
-    const target = nodeMap.get(edge.target_node_id)
-    if (!source || !target) return null
-
-    // Use pre-computed dimensions from nodeMap
-    const sw = source.width
-    const sh = source.height
-    const tw = target.width
-    const th = target.height
-
-    // Center points
-    const sourceCx = source.canvas_x + sw / 2
-    const sourceCy = source.canvas_y + sh / 2
-    const targetCx = target.canvas_x + tw / 2
-    const targetCy = target.canvas_y + th / 2
-
-    // Get port assignments for edge spreading
-    const srcAssign = sourceAssignments.get(edge.id)
-    const tgtAssign = targetAssignments.get(edge.id)
-    const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
-    const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
-
-    // Determine which side each edge exits/enters
-    const sourceRect = nodeMap.get(edge.source_node_id)
-    const targetRect = nodeMap.get(edge.target_node_id)
-    const sourceSide = sourceRect ? getSide(sourceRect, targetCx, targetCy) : 'right'
-    const targetSide = targetRect ? getSide(targetRect, sourceCx, sourceCy) : 'left'
-
-    // Get fixed port positions at center of each side (with offset for spreading)
-    const startPort = sourceRect
-      ? getPortPoint(sourceRect, sourceSide, srcOffset)
-      : { x: sourceCx, y: sourceCy }
-    const endPort = targetRect
-      ? getPortPoint(targetRect, targetSide, tgtOffset)
-      : { x: targetCx, y: targetCy }
-
-    // Get standoff points with angled entry for natural flow
-    const STANDOFF_DIST = 120
-    const ANGLE_OFFSET = 12 // Perpendicular offset for angled entry
-    const rawStartStandoff = getStandoff(startPort, sourceSide, STANDOFF_DIST)
-    const rawEndStandoff = getStandoff(endPort, targetSide, STANDOFF_DIST)
-
-    // Apply angled offset based on edge direction (avoid 0-degree entries)
-    const startStandoff = getAngledStandoff(startPort, rawStartStandoff, sourceSide, rawEndStandoff, ANGLE_OFFSET)
-    const endStandoff = getAngledStandoff(endPort, rawEndStandoff, targetSide, rawStartStandoff, ANGLE_OFFSET)
-
-    // Check if this edge is bidirectional (reverse edge exists)
-    // Use store.filteredEdges, not the deduplicated edges array
-    const isBidirectional = store.filteredEdges.some(
-      e => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
-    )
-
-    // Arrow offset for non-bidirectional edges
-    const arrowOffset = isBidirectional ? 0 : 6
-
-    // Adjust end port for arrow head
-    let endEdge = { ...endPort }
-    if (arrowOffset > 0) {
-      // Pull back along the standoff direction
-      if (targetSide === 'left') endEdge.x += arrowOffset
-      else if (targetSide === 'right') endEdge.x -= arrowOffset
-      else if (targetSide === 'top') endEdge.y += arrowOffset
-      else if (targetSide === 'bottom') endEdge.y -= arrowOffset
-    }
-
-    // For hit detection, use the original port positions
-    const x1 = startPort.x
-    const y1 = startPort.y
-    const x2 = endPort.x
-    const y2 = endPort.y
-
-    // Check if edge is too short for arrow (distance < 50px)
-    const edgeLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-    const isShortEdge = edgeLength < 50
-
-    // Get edge style - respect user choice
-    const edgeStyle = edgeStyleMap.value[edge.id] || style
-
-    // Generate path based on style
-    // Pre-routed paths for diagonal/orthogonal/straight, manual routing for curved
-    let path = ''
-    const routed = routedEdges?.get(edge.id)
-
-    // For huge graphs (400+ nodes), use simple straight lines for performance
-    if (isHugeGraph.value) {
-      path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
-    } else if (routed?.svgPath) {
-      // Use pre-routed path from routing modules (diagonal or orthogonal)
-      path = routed.svgPath
-    } else {
-      // Fallback: simple line via standoff points
-      path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
-    }
-
-    // Get stroke width from routing or default
-    const strokeWidth = routed?.strokeWidth || 1.5
-
-    // Compute label position based on actual path, not just endpoints
-    // The visual center of a routed edge is between the standoff points
-    let labelX: number
-    let labelY: number
-    if (routed?.path && routed.path.length >= 2) {
-      // Use the middle point of the explicit path array
-      const midIndex = Math.floor(routed.path.length / 2)
-      labelX = routed.path[midIndex].x
-      labelY = routed.path[midIndex].y
-    } else if (!isHugeGraph.value) {
-      // For routed edges, use midpoint between standoff points (visual center of the curve)
-      labelX = (startStandoff.x + endStandoff.x) / 2
-      labelY = (startStandoff.y + endStandoff.y) / 2
-    } else {
-      // Huge graphs use straight lines - endpoint midpoint is correct
-      labelX = (x1 + x2) / 2
-      labelY = (y1 + y2) / 2
-    }
-
-    return {
-      id: edge.id,
-      source_node_id: edge.source_node_id,
-      target_node_id: edge.target_node_id,
-      x1,
-      y1,
-      x2,
-      y2,
-      labelX,
-      labelY,
-      path,
-      style: edgeStyle,
-      strokeWidth,
-      // Full extent for hit area (includes arrow)
-      hitX1: startPort.x,
-      hitY1: startPort.y,
-      hitX2: endPort.x,
-      hitY2: endPort.y,
-      link_type: edge.link_type,
-      color: edge.color,
-      label: edge.label,
-      isBidirectional,
-      isShortEdge,
-      // Debug: port offset info
-      debugInfo: routed?.debugInfo,
-    }
-  }).filter(Boolean)
-})
-
 // Threshold for "edges on hover only" mode (based on visible edges, not total)
 const EDGE_HOVER_ONLY_THRESHOLD = 500
 
@@ -2153,6 +1805,24 @@ const {
   getArrowMarkerId,
   changeEdgeColor,
 } = edgeStyling
+
+// Edge routing composable - computes edge paths with routing, port assignments, and optimization
+const { edgeLines } = useEdgeRouting({
+  store: {
+    nodeLayoutVersion: store.nodeLayoutVersion,
+    nodes: store.nodes,
+    edges: store.edges,
+    filteredEdges: store.filteredEdges,
+  },
+  displayNodes,
+  neighborhoodMode,
+  focusNodeId,
+  isMassiveGraph,
+  isHugeGraph,
+  globalEdgeStyle,
+  edgeStyleMap,
+  getNodeHeight,
+})
 
 function toggleMagnifier() {
   magnifierEnabled.value = !magnifierEnabled.value
