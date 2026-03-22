@@ -19,10 +19,3 @@ export {
   type UseStorylinesReturn,
 } from './useStorylines'
 export { useUndoHandlers } from './useUndoHandlers'
-export {
-  useZotero,
-  type ZoteroCollection,
-  type ZoteroCreator,
-  type ZoteroAttachment,
-  type ZoteroItem,
-} from './useZotero'

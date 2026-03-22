@@ -122,13 +122,12 @@ export {
 // Frames: spatial grouping
 export { useFrames, type UseFramesOptions } from './frames'
 
-// Utilities: keyboard shortcuts, undo, PDF, Zotero, storylines
+// Utilities: keyboard shortcuts, undo, PDF, storylines
 export {
   useCanvasKeyboardShortcuts,
   usePdfDrop,
   useStorylines,
   useUndoHandlers,
-  useZotero,
   type UseCanvasKeyboardShortcutsContext,
   type UseCanvasKeyboardShortcutsReturn,
   type BibEntry,
@@ -136,8 +135,4 @@ export {
   type UsePdfDropOptions,
   type UseStorylinesContext,
   type UseStorylinesReturn,
-  type ZoteroCollection,
-  type ZoteroCreator,
-  type ZoteroAttachment,
-  type ZoteroItem,
 } from './util'

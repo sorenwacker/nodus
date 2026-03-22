@@ -5,7 +5,7 @@
  * and collections directly into Nodus.
  */
 import { ref, computed } from 'vue'
-import { invoke } from '../../../lib/tauri'
+import { invoke } from '../lib/tauri'
 
 /**
  * Zotero collection

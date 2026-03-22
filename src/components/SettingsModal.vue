@@ -10,7 +10,7 @@ import { useThemesStore } from '../stores/themes'
 import { useNodesStore } from '../stores/nodes'
 import { setLocale, getLocale, loadLocale } from '../i18n'
 import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
-import { useZotero } from '../canvas/composables/util'
+import { useZotero } from '../composables/useZotero'
 
 const { t } = useI18n()
 const themesStore = useThemesStore()
