@@ -70,7 +70,7 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     document.addEventListener('pointerup', onEdgeCreate)
   }
 
-  function onEdgeClick(e: PointerEvent, edgeId: string) {
+  function onEdgeClick(e: MouseEvent, edgeId: string) {
     e.stopPropagation()
     selectedEdge.value = edgeId
     store.selectNode(null)
