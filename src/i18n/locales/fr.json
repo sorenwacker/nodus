@@ -58,7 +58,8 @@
       "hideAgentLog": "Masquer le journal de l'agent",
       "showAgentLog": "Afficher le journal de l'agent",
       "log": "Journal",
-      "hint": "Défiler haut/bas: zoom | Défiler latéralement: déplacer | Alt+glisser: lier | Double-clic: nouveau"
+      "hint": "Défiler haut/bas: zoom | Défiler latéralement: déplacer | Alt+glisser: lier | Double-clic: nouveau",
+      "cancelPdf": "Annuler le traitement PDF"
     },
     "controls": {
       "zoomIn": "Zoom avant",

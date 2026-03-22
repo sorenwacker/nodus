@@ -58,7 +58,8 @@
       "hideAgentLog": "Agenten-Protokoll verbergen",
       "showAgentLog": "Agenten-Protokoll anzeigen",
       "log": "Log",
-      "hint": "Hoch/runter scrollen: Zoom | Seitwärts scrollen: Verschieben | Alt+Ziehen: Verknüpfen | Doppelklick: Neu"
+      "hint": "Hoch/runter scrollen: Zoom | Seitwärts scrollen: Verschieben | Alt+Ziehen: Verknüpfen | Doppelklick: Neu",
+      "cancelPdf": "PDF-Verarbeitung abbrechen"
     },
     "controls": {
       "zoomIn": "Vergrößern",

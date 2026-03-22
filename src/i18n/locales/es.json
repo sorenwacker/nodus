@@ -58,7 +58,8 @@
       "hideAgentLog": "Ocultar registro del agente",
       "showAgentLog": "Mostrar registro del agente",
       "log": "Registro",
-      "hint": "Desplazar arriba/abajo: zoom | Desplazar lateralmente: mover | Alt+arrastrar: enlazar | Doble clic: nuevo"
+      "hint": "Desplazar arriba/abajo: zoom | Desplazar lateralmente: mover | Alt+arrastrar: enlazar | Doble clic: nuevo",
+      "cancelPdf": "Cancelar procesamiento PDF"
     },
     "controls": {
       "zoomIn": "Acercar",

@@ -58,7 +58,8 @@
       "hideAgentLog": "Nascondi registro agente",
       "showAgentLog": "Mostra registro agente",
       "log": "Registro",
-      "hint": "Scorri su/giù: zoom | Scorri lateralmente: sposta | Alt+trascina: collega | Doppio clic: nuovo"
+      "hint": "Scorri su/giù: zoom | Scorri lateralmente: sposta | Alt+trascina: collega | Doppio clic: nuovo",
+      "cancelPdf": "Annulla elaborazione PDF"
     },
     "controls": {
       "zoomIn": "Ingrandisci",

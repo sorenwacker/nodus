@@ -58,7 +58,8 @@
       "hideAgentLog": "Hide agent log",
       "showAgentLog": "Show agent log",
       "log": "Log",
-      "hint": "Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new"
+      "hint": "Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new",
+      "cancelPdf": "Cancel PDF processing"
     },
     "controls": {
       "zoomIn": "Zoom In",

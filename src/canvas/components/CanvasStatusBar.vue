@@ -42,7 +42,7 @@ const emit = defineEmits<{
     <span v-if="isLayouting" class="sep">|</span>
     <span v-if="isPdfProcessing" class="pdf-processing">
       PDF: {{ pdfStatus }}
-      <button class="stop-btn" data-tooltip="Cancel PDF processing" data-tooltip-pos="top" @click="emit('stopPdf')">{{ t('canvas.status.stop') }}</button>
+      <button class="stop-btn" :data-tooltip="t('canvas.status.cancelPdf')" data-tooltip-pos="top" @click="emit('stopPdf')">{{ t('canvas.status.stop') }}</button>
     </span>
     <span v-if="isPdfProcessing" class="sep">|</span>
     <span v-if="isLargeGraph" class="perf-mode">{{ t('canvas.status.perfMode') }}</span>
