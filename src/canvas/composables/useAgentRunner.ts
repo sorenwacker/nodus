@@ -119,13 +119,15 @@ TOOLS:
 - create_node(title, content): Create one node
 - generate_sequence(count, title_pattern, content_pattern?, layout?, connect?): Generate N nodes. {n}=number. connect=true links 1->2->3...
 - create_nodes_batch(nodes): Create/update up to ~50 nodes. nodes=[{title, content}]. Updates existing.
-- create_edge(from_title, to_title): Connect two nodes
+- create_edge(from_title, to_title, label?, color?): Connect two nodes with semantic label
+- create_edges_batch(edges): Create multiple edges. edges=[{from_title, to_title, label?, color?}]. ALWAYS include labels!
 - delete_edges(filter): Delete edges. filter="all" or node title
 - update_node(title, new_content): Edit a node's content
 - delete_node(title): Remove a single node
 - delete_matching(filter): Delete multiple nodes. filter="all"|"even"|"odd"|"empty"|term
-- auto_layout("grid"|"horizontal"|"vertical"|"circle"|"clock"|"star"): Arrange all nodes
+- auto_layout("grid"|"horizontal"|"vertical"|"circle"|"clock"|"star"|"force"): Arrange nodes. "force" uses edge-based physics.
 - query_nodes(filter): Query DB. filter="all"|"empty"|"has_content"|"search term". Returns node list.
+- read_graph(): Read current graph state with nodes, content, and edges
 - for_each_node(action, template, filter?): action="set"|"append"|"llm". For "llm": template is the instruction.
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}].
 - smart_move(instruction): Move nodes by semantic criteria.
@@ -140,6 +142,14 @@ TOOLS:
 - update_task(task_index, status): Update task status.
 - remember(message): Store important info for this workspace's memory
 - done(summary): Call when finished
+
+EDGE LABELS (always use one):
+- Hierarchy: "contains", "part of", "includes", "has"
+- Relations: "connects to", "related to", "associated with"
+- Causation: "causes", "leads to", "produces", "regulates"
+- Types: "type of", "instance of", "example of"
+
+AVOID creating nodes for: categories, types, generic terms, placeholders. Only create nodes for specific entities.
 
 WORKFLOW:
 1. Use research() or query_nodes() to understand context
