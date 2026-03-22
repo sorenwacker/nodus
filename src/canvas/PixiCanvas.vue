@@ -1461,6 +1461,8 @@ const edgeLines = computed(() => {
         source_node_id: edge.source_node_id,
         target_node_id: edge.target_node_id,
         x1, y1, x2, y2,
+        labelX: (x1 + x2) / 2,
+        labelY: (y1 + y2) / 2,
         path,
         style: 'straight' as const,
         strokeWidth: 1,
@@ -1689,6 +1691,21 @@ const edgeLines = computed(() => {
     // Get stroke width from routing or default
     const strokeWidth = routed?.strokeWidth || 1.5
 
+    // Compute label position based on actual path, not just endpoints
+    // For routed paths, use the middle of the path array if available
+    let labelX = (x1 + x2) / 2
+    let labelY = (y1 + y2) / 2
+    if (routed?.path && routed.path.length > 0) {
+      // Use the middle point of the path
+      const midIndex = Math.floor(routed.path.length / 2)
+      labelX = routed.path[midIndex].x
+      labelY = routed.path[midIndex].y
+    } else if (!isHugeGraph.value && !routed?.svgPath) {
+      // Fallback path uses standoffs - use midpoint of the two standoffs
+      labelX = (startStandoff.x + endStandoff.x) / 2
+      labelY = (startStandoff.y + endStandoff.y) / 2
+    }
+
     return {
       id: edge.id,
       source_node_id: edge.source_node_id,
@@ -1697,6 +1714,8 @@ const edgeLines = computed(() => {
       y1,
       x2,
       y2,
+      labelX,
+      labelY,
       path,
       style: edgeStyle,
       strokeWidth,
@@ -3148,8 +3167,8 @@ ${edges.map(e => `  - id: "${e.id}"
             />
             <text
               v-if="edge.label"
-              :x="(edge.x1 + edge.x2) / 2"
-              :y="(edge.y1 + edge.y2) / 2 - 8"
+              :x="edge.labelX || (edge.x1 + edge.x2) / 2"
+              :y="(edge.labelY || (edge.y1 + edge.y2) / 2) - 8"
               class="edge-label"
             >{{ edge.label }}</text>
           </g>
