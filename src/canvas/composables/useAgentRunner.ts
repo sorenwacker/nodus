@@ -279,6 +279,15 @@ export function useAgentRunner(ctx: AgentContext) {
       const intent = detectIntent(userRequest)
       ctx.log.value.push(`> Detected: ${intent.graphType} (${intent.domain})`)
       enhancedRequest = enhancePrompt(userRequest)
+      // Log enhanced prompt in agent log
+      ctx.log.value.push(`--- ENHANCED PROMPT ---`)
+      for (const line of enhancedRequest.split('\n').slice(0, 20)) {
+        ctx.log.value.push(line)
+      }
+      if (enhancedRequest.split('\n').length > 20) {
+        ctx.log.value.push('... (truncated)')
+      }
+      ctx.log.value.push(`-----------------------`)
     }
 
     // Build initial messages with current node state, memories, and mode
@@ -382,6 +391,12 @@ export function useAgentRunner(ctx: AgentContext) {
           const allowedToolNames = new Set(tools.map(t => t.function.name))
 
           for (const tc of msg.tool_calls) {
+            // Log tool call in agent log
+            const argsPreview = typeof tc.function.arguments === 'string'
+              ? tc.function.arguments.slice(0, 150)
+              : JSON.stringify(tc.function.arguments).slice(0, 150)
+            ctx.log.value.push(`> ${tc.function.name}(${argsPreview}${argsPreview.length >= 150 ? '...' : ''})`)
+
             // Validate tool is allowed in current mode
             if (!allowedToolNames.has(tc.function.name)) {
               ctx.log.value.push(`> Rejected: ${tc.function.name} (not allowed in ${mode.value} mode)`)
