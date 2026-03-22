@@ -23,6 +23,7 @@ export interface UseNodeHoverReturn {
   tooltipContent: ComputedRef<string>
   activeNodeIds: ComputedRef<Set<string>>
   highlightedEdgeIds: ComputedRef<Set<string>>
+  highlightedNodeIds: ComputedRef<Set<string>>
   onNodePointerEnter: (e: PointerEvent, nodeId: string) => void
   onNodePointerMove: (e: PointerEvent) => void
   onNodePointerLeave: () => void
@@ -82,6 +83,22 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
     return ids
   })
 
+  // Pre-computed set of neighbor node IDs (nodes connected to selected/hovered)
+  const highlightedNodeIds = computed(() => {
+    const ids = new Set<string>()
+    const active = activeNodeIds.value
+    if (active.size === 0) return ids
+    for (const edge of filteredEdges.value) {
+      if (active.has(edge.source_node_id)) {
+        ids.add(edge.target_node_id)
+      }
+      if (active.has(edge.target_node_id)) {
+        ids.add(edge.source_node_id)
+      }
+    }
+    return ids
+  })
+
   // Event handlers
   function onNodePointerEnter(e: PointerEvent, nodeId: string) {
     hoveredNodeId.value = nodeId
@@ -104,6 +121,7 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
     tooltipContent,
     activeNodeIds,
     highlightedEdgeIds,
+    highlightedNodeIds,
     onNodePointerEnter,
     onNodePointerMove,
     onNodePointerLeave,

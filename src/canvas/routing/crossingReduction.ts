@@ -206,7 +206,6 @@ export class BarycentricReduction implements CrossingReductionStrategy {
       entries.push(...combined)
 
       // Reassign indices based on sorted order
-      console.log(`[Barycentric] Group ${key}: reassigning ${entries.length} edges`)
       entries.forEach((entry, idx) => {
         const assignments = entry.isSource ? sourceAssignments : targetAssignments
         const assign = assignments.get(entry.edgeId)
@@ -215,7 +214,6 @@ export class BarycentricReduction implements CrossingReductionStrategy {
           if (oldIdx !== idx) {
             assign.index = idx
             swapsPerformed++
-            console.log(`[Barycentric] Edge ${entry.edgeId}: index ${oldIdx} -> ${idx}`)
           }
           assign.total = entries.length
         } else {
@@ -227,7 +225,6 @@ export class BarycentricReduction implements CrossingReductionStrategy {
     const finalCrossings = countCrossings()
     const improved = finalCrossings < initialCrossings
 
-    console.log(`[Barycentric] ${initialCrossings} -> ${finalCrossings} crossings (${swapsPerformed} reassignments)`)
 
     return { improved, initialCrossings, finalCrossings, swapsPerformed }
   }
@@ -317,7 +314,6 @@ export class GreedySwapReduction implements CrossingReductionStrategy {
             if (after < before) {
               improved = true
               swapsPerformed++
-              console.log(`[GreedySwap] Swap improved: ${before} -> ${after} crossings`)
             } else {
               // Revert
               a.assign.index = origA
@@ -329,7 +325,6 @@ export class GreedySwapReduction implements CrossingReductionStrategy {
     }
 
     const finalCrossings = countCrossings()
-    console.log(`[GreedySwap] ${initialCrossings} -> ${finalCrossings} crossings (${swapsPerformed} swaps, ${iterations} iterations)`)
 
     return {
       improved: finalCrossings < initialCrossings,
@@ -374,7 +369,6 @@ let currentStrategy: CrossingReductionStrategy = new CombinedReduction()
 
 export function setStrategy(strategy: CrossingReductionStrategy): void {
   currentStrategy = strategy
-  console.log(`[CrossingReduction] Strategy set to: ${strategy.name}`)
 }
 
 export function getStrategy(): CrossingReductionStrategy {
@@ -386,6 +380,5 @@ export function reduceCrossings(
   sourceAssignments: Map<string, PortAssignment>,
   targetAssignments: Map<string, PortAssignment>
 ): CrossingReductionResult {
-  console.log(`[CrossingReduction] Running ${currentStrategy.name} on ${edgeInfos.length} edges`)
   return currentStrategy.reduce(edgeInfos, sourceAssignments, targetAssignments)
 }

@@ -420,10 +420,9 @@ const magnifierVisibleNodes = computed(() => {
   })
 })
 
-// Edge stroke width - scale inversely to maintain constant visual width
-// Minimum 0.5px to keep edges visible at high zoom
+// Edge stroke width - keep edges visible when zoomed out (2 screen pixels)
 const edgeStrokeWidth = computed(() => {
-  return Math.max(0.5, 1 / scale.value)
+  return Math.max(1, 2 / scale.value)
 })
 
 // Node border width - scale inversely to maintain constant visual width
@@ -494,10 +493,16 @@ const {
   hoveredNode,
   tooltipContent,
   highlightedEdgeIds,
+  highlightedNodeIds,
   onNodePointerEnter,
   onNodePointerMove,
   onNodePointerLeave,
 } = nodeHover
+
+// Helper to check if a node is a highlighted neighbor (for template reactivity)
+function isNeighborHighlighted(nodeId: string): boolean {
+  return highlightedNodeIds.value.has(nodeId)
+}
 
 // Context menu composable
 const contextMenu = useContextMenu({
@@ -1071,9 +1076,24 @@ function onCanvasPointerDown(e: PointerEvent) {
       return
     }
 
-    store.selectNode(null)
-    store.selectFrame(null)
-    selectedEdge.value = null
+    // Track click position to detect click vs drag
+    const startX = e.clientX
+    const startY = e.clientY
+
+    // Clear selection on click (not drag) - check on pointerup
+    const onPointerUp = (upEvent: PointerEvent) => {
+      const dx = Math.abs(upEvent.clientX - startX)
+      const dy = Math.abs(upEvent.clientY - startY)
+      // If barely moved, treat as click and clear selection
+      if (dx < 5 && dy < 5) {
+        store.selectNode(null)
+        store.selectFrame(null)
+        selectedEdge.value = null
+      }
+      document.removeEventListener('pointerup', onPointerUp)
+    }
+    document.addEventListener('pointerup', onPointerUp)
+
     startPan(e)
     return
   }
@@ -1085,7 +1105,30 @@ const nodeCollision = useNodeCollision({
   getFilteredNodes: () => store.filteredNodes,
   updateNodePosition: store.updateNodePosition,
 })
-const { pushOverlappingNodesAway } = nodeCollision
+const { pushOverlappingNodesAway, pushOverlappingNodesAwayExcept } = nodeCollision
+
+// When node is selected, push non-neighbors away from neighbors
+watch(() => store.selectedNodeIds, (selectedIds) => {
+  if (selectedIds.length === 0) return
+
+  // Get all neighbor IDs for selected nodes
+  const protectedIds = new Set<string>(selectedIds)
+  for (const edge of store.filteredEdges) {
+    if (selectedIds.includes(edge.source_node_id)) {
+      protectedIds.add(edge.target_node_id)
+    }
+    if (selectedIds.includes(edge.target_node_id)) {
+      protectedIds.add(edge.source_node_id)
+    }
+  }
+
+  // For each neighbor, push away overlapping non-neighbors
+  for (const neighborId of protectedIds) {
+    if (!selectedIds.includes(neighborId)) {
+      pushOverlappingNodesAwayExcept(neighborId, protectedIds)
+    }
+  }
+}, { deep: true })
 
 // Node resizing composable
 const nodeResizing = useNodeResizing({
@@ -1567,7 +1610,8 @@ useCanvasKeyboardShortcuts({
           editing: editingNodeId === node.id,
           collapsed: isSemanticZoomCollapsed,
           'neighborhood-mode': neighborhoodMode,
-          'neighborhood-focus': neighborhoodMode && node.id === focusNodeId
+          'neighborhood-focus': neighborhoodMode && node.id === focusNodeId,
+          'neighbor-highlighted': isNeighborHighlighted(node.id)
         }"
         :style="{
           transform: `translate3d(${resizingNode === node.id ? resizePreview.x : node.canvas_x}px, ${resizingNode === node.id ? resizePreview.y : node.canvas_y}px, 0)`,

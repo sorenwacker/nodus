@@ -72,7 +72,65 @@ export function useNodeCollision(deps: NodeCollisionDeps) {
     }
   }
 
+  /**
+   * Push nodes that overlap with the given node away, except for protected nodes
+   */
+  function pushOverlappingNodesAwayExcept(sourceId: string, protectedIds: Set<string>) {
+    const PADDING = 50
+
+    const sourceNode = deps.getNode(sourceId)
+    if (!sourceNode) return
+
+    const sw = sourceNode.width || NODE_DEFAULTS.WIDTH
+    const sh = sourceNode.height || NODE_DEFAULTS.HEIGHT
+    const sx = sourceNode.canvas_x
+    const sy = sourceNode.canvas_y
+    const scx = sx + sw / 2
+    const scy = sy + sh / 2
+
+    for (const node of deps.getFilteredNodes()) {
+      if (node.id === sourceId) continue
+      if (protectedIds.has(node.id)) continue // Skip protected nodes
+
+      const nw = node.width || NODE_DEFAULTS.WIDTH
+      const nh = node.height || NODE_DEFAULTS.HEIGHT
+      const nx = node.canvas_x
+      const ny = node.canvas_y
+
+      const overlapX = sx < nx + nw + PADDING && sx + sw + PADDING > nx
+      const overlapY = sy < ny + nh + PADDING && sy + sh + PADDING > ny
+
+      if (overlapX && overlapY) {
+        const ncx = nx + nw / 2
+        const ncy = ny + nh / 2
+
+        const dx = ncx - scx
+        const dy = ncy - scy
+
+        let newX = nx
+        let newY = ny
+
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          if (dx >= 0) {
+            newX = sx + sw + PADDING
+          } else {
+            newX = sx - nw - PADDING
+          }
+        } else {
+          if (dy >= 0) {
+            newY = sy + sh + PADDING
+          } else {
+            newY = sy - nh - PADDING
+          }
+        }
+
+        deps.updateNodePosition(node.id, newX, newY)
+      }
+    }
+  }
+
   return {
     pushOverlappingNodesAway,
+    pushOverlappingNodesAwayExcept,
   }
 }

@@ -609,7 +609,11 @@ export const useNodesStore = defineStore('nodes', () => {
 
   // Workspace functions - forwarded to workspace store
   const createWorkspace = (name: string) => workspaceStore.createWorkspace(name)
-  const switchWorkspace = (workspaceId: string | null) => workspaceStore.switchWorkspace(workspaceId)
+  const switchWorkspace = async (workspaceId: string | null) => {
+    workspaceStore.switchWorkspace(workspaceId)
+    // Reload edges for the new workspace
+    await edgesStore.initialize(workspaceId)
+  }
   const deleteWorkspace = (id: string, deleteFiles?: boolean) => workspaceStore.deleteWorkspace(id, deleteFiles)
   const recoverWorkspace = (id: string) => workspaceStore.recoverWorkspace(id)
   const getOrphanedWorkspaceIds = () => workspaceStore.getOrphanedWorkspaceIds(nodes.value)

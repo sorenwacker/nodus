@@ -132,8 +132,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       const color = (e.color && e.color.startsWith('#')) ? e.color
         : (e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value)
       const effectiveStrokeWidth = baseStrokeWidth
-      // Use multiplier for highlight to scale properly with zoom
-      const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth * 2 : effectiveStrokeWidth
+      // Use smaller multiplier for highlight
+      const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth * 1.5 : effectiveStrokeWidth
 
       // Get highlight color based on whether connected node is selected or just hovered
       let edgeHighlightColor = highlightColor.value
@@ -169,6 +169,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         arrowMarkerId: isHighlighted ? `arrow-${edgeHighlightColor.replace('#', '')}` : `arrow-${color.replace('#', '')}`,
       }
     })
+    // Sort so highlighted edges render last (on top in SVG)
+    .sort((a, b) => (a.isHighlighted ? 1 : 0) - (b.isHighlighted ? 1 : 0))
   })
 
   return {

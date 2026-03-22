@@ -86,3 +86,176 @@ async function copyLog(log: string[]) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.graph-llm-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.llm-input-row {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.llm-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.llm-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.llm-input::placeholder {
+  color: var(--text-muted);
+}
+
+.llm-send {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--primary-color);
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.llm-send:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.llm-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.llm-stop {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #dc2626;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.llm-stop:hover {
+  background: #b91c1c;
+}
+
+.llm-clear-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 32px;
+}
+
+.llm-clear-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--warning-color, #f59e0b);
+}
+
+.llm-clear-btn.active {
+  background: var(--warning-color, #f59e0b);
+  color: white;
+  border-color: var(--warning-color, #f59e0b);
+}
+
+.agent-tasks {
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg-surface-alt);
+  border-radius: 6px;
+  font-size: 12px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.agent-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  color: var(--text-secondary);
+}
+
+.agent-task.done {
+  color: var(--success-color, #22c55e);
+}
+
+.agent-task.running {
+  color: var(--primary-color);
+}
+
+.task-status {
+  font-family: monospace;
+  width: 16px;
+}
+
+.agent-log {
+  position: relative;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 11px;
+  max-height: 120px;
+  overflow-y: auto;
+  color: var(--text-secondary);
+}
+
+.log-buttons {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 4px;
+}
+
+.log-btn {
+  background: var(--bg-surface-alt);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.log-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--primary-color);
+  color: var(--text-main);
+}
+
+.log-line {
+  padding: 2px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>

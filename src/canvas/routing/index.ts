@@ -196,7 +196,6 @@ export function routeAllEdges(
   nodeMap: Map<string, NodeRect>,
   style: EdgeStyle = 'orthogonal'
 ): Map<string, RoutedEdge> {
-  console.log('[routeAllEdges] Called with', edges.length, 'edges')
   const result = new Map<string, RoutedEdge>()
 
   // Analyze edges and determine sides
@@ -273,11 +272,6 @@ export function routeAllEdges(
 
     const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
     const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
-
-    // Debug: log edges with spreading (total > 1)
-    if ((srcAssign && srcAssign.total > 1) || (tgtAssign && tgtAssign.total > 1)) {
-      console.log(`[Edge] ${edge.id.slice(0,8)}: src=${sourceSide} idx=${srcAssign?.index}/${srcAssign?.total} off=${srcOffset.toFixed(0)}, tgt=${targetSide} idx=${tgtAssign?.index}/${tgtAssign?.total} off=${tgtOffset.toFixed(0)}`)
-    }
 
     const sourcePort = getPortPoint(source, sourceSide, srcOffset)
     const targetPort = getPortPoint(target, targetSide, tgtOffset)
@@ -505,11 +499,8 @@ export function optimizeNodeEntrypoints(
   const nodeEdges = edges.filter(e => e.source_node_id === nodeId || e.target_node_id === nodeId)
 
   if (nodeEdges.length < 2) {
-    console.log(`[optimizeNodeEntrypoints] Node ${nodeId.slice(0,8)}... has ${nodeEdges.length} edges, skipping`)
     return { improved: false, initialCrossings: 0, finalCrossings: 0, swapsPerformed: 0 }
   }
-
-  console.log(`[optimizeNodeEntrypoints] Optimizing ${nodeEdges.length} edges for node ${nodeId.slice(0,8)}...`)
 
   // Analyze edges and determine sides
   const edgeInfos = analyzeEdges(nodeEdges, nodeMap)
@@ -528,10 +519,7 @@ export function optimizeNodeEntrypoints(
     for (const [edgeId, assign] of targetAssignments) {
       cachePortIndex(edgeId, false, assign.index, assign.total)
     }
-    console.log(`[optimizeNodeEntrypoints] Cached ${sourceAssignments.size + targetAssignments.size} port assignments`)
   }
-
-  console.log(`[optimizeNodeEntrypoints] Result: ${result.initialCrossings} -> ${result.finalCrossings} crossings (${result.swapsPerformed} swaps)`)
 
   return result
 }

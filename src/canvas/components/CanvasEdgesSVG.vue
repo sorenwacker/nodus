@@ -128,3 +128,73 @@ defineEmits<{
     />
   </svg>
 </template>
+
+<style scoped>
+.edges-layer {
+  pointer-events: none;
+  overflow: visible;
+  background: none;
+}
+
+.edge-hit-area {
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.edge-line-visible {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+}
+
+.edge-line-fast {
+  stroke-linecap: round;
+  shape-rendering: optimizeSpeed;
+  pointer-events: none;
+}
+
+.edge-hit-area:hover + .edge-glow + .edge-line-visible,
+.edge-hit-area:hover + .edge-line-visible {
+  stroke-width: 4px !important;
+}
+
+.edge-label {
+  font-size: 11px;
+  font-weight: 500;
+  fill: var(--text-main);
+  text-anchor: middle;
+  pointer-events: none;
+  user-select: none;
+}
+
+.edge-glow {
+  pointer-events: none;
+}
+
+.edge-highlighted {
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
+}
+
+.edge-line-visible:not(.edge-highlighted) {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* Dim non-highlighted edges when a node is hovered/selected */
+.edges-layer:has(.edge-highlighted) .edge-line-visible:not(.edge-highlighted) {
+  opacity: 0.25;
+}
+
+.edge-tagged {
+  stroke-dasharray: 6, 4;
+  opacity: 0.7;
+}
+
+.edge-tagged:not(.edge-highlighted) {
+  stroke: var(--text-muted) !important;
+}
+
+.edge-neighbor {
+  opacity: 0.25;
+}
+</style>
