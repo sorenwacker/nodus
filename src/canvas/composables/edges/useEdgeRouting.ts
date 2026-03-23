@@ -249,11 +249,11 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       } finally {
         setRoutingSpatialIndex(null)
       }
-    } else if (!isDragging?.value) {
-      // Use cached routing
+    } else {
+      // During drag OR cache is valid - use cached routing
+      // This keeps edges stable during drag instead of falling back to simple lines
       routedEdges = cachedRoutedEdges.value
     }
-    // During drag, routedEdges stays null - simple lines will be used
 
     // Sort edges to minimize crossings
     const sortedEdges = [...edges].sort((a, b) => {
