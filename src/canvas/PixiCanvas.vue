@@ -1549,21 +1549,6 @@ useCanvasKeyboardShortcuts({
       @clear-log="agentLog.length = 0"
     />
 
-    <!-- Fixed color bar below LLM bar (shown when zoomed out/collapsed and node selected) -->
-    <div
-      v-if="isSemanticZoomCollapsed && store.selectedNodeIds.length > 0"
-      class="collapsed-color-bar"
-    >
-      <button
-        v-for="color in nodeColors"
-        :key="color.value || 'default'"
-        class="color-dot"
-        :class="{ active: store.filteredNodes.find(n => n.id === store.selectedNodeIds[0])?.color_theme === color.value }"
-        :style="{ background: color.display || 'var(--bg-surface)' }"
-        @click.stop="updateNodeColor(store.selectedNodeIds[0], color.value)"
-      ></button>
-    </div>
-
     <div
       ref="canvasRef"
       class="canvas-viewport"
@@ -1577,6 +1562,21 @@ useCanvasKeyboardShortcuts({
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
     >
+      <!-- Floating color bar (shown when zoomed out/collapsed and node selected) -->
+      <div
+        v-if="isSemanticZoomCollapsed && store.selectedNodeIds.length > 0"
+        class="collapsed-color-bar"
+      >
+        <button
+          v-for="color in nodeColors"
+          :key="color.value || 'default'"
+          class="color-dot"
+          :class="{ active: store.filteredNodes.find(n => n.id === store.selectedNodeIds[0])?.color_theme === color.value }"
+          :style="{ background: color.display || 'var(--bg-surface)' }"
+          @click.stop="updateNodeColor(store.selectedNodeIds[0], color.value)"
+        ></button>
+      </div>
+
     <div class="canvas-content" :style="{ transform }">
       <!-- SVG for edges -->
       <CanvasEdgesSVG

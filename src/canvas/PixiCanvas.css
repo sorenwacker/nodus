@@ -817,15 +817,20 @@
   z-index: 10;
 }
 
-/* Color bar below LLM bar when zoomed out */
+/* Color bar floating over canvas when zoomed out */
 .collapsed-color-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  justify-content: center;
   gap: 6px;
   padding: 6px 10px;
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-  flex-shrink: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 50;
 }
 
 .color-dot {
