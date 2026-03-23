@@ -341,6 +341,9 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
       if (isHugeGraph.value) {
         path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
+      } else if (isDragging?.value) {
+        // During drag, use simple paths for performance (cached paths have stale coordinates)
+        path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
       } else if (routed?.svgPath) {
         path = routed.svgPath
       } else {

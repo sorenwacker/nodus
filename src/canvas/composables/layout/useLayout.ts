@@ -377,8 +377,12 @@ export function useLayout(options: UseLayoutOptions) {
         gap: 360,
       })
 
+      // Push nodes out of frames to avoid overlaps
+      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+      const finalPositions = pushNodesOutOfFrames(positions, nodeMap)
+
       // Batch update positions to avoid blocking UI
-      await batchUpdatePositions(positions, store.updateNodePosition, 200)
+      await batchUpdatePositions(finalPositions, store.updateNodePosition, 200)
       console.log(`Fast layout complete for ${nodes.length} nodes`)
       return
     }
@@ -521,12 +525,16 @@ export function useLayout(options: UseLayoutOptions) {
         }
       }
 
+      // Push nodes out of frames to avoid overlaps
+      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+      const finalTargets = pushNodesOutOfFrames(nodeTargets, nodeMap)
+
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
-        console.log(`Batch updating ${nodeTargets.size} node positions (skipping animation)`)
-        await batchUpdatePositions(nodeTargets, store.updateNodePosition, 200)
+        console.log(`Batch updating ${finalTargets.size} node positions (skipping animation)`)
+        await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
       } else {
-        animateToPositions(nodeTargets, 800)
+        animateToPositions(finalTargets, 800)
       }
       return
     }
@@ -584,7 +592,12 @@ export function useLayout(options: UseLayoutOptions) {
           nodeTargets.set(id, pos)
         }
       }
-      animateToPositions(nodeTargets, 600)
+
+      // Push nodes out of frames to avoid overlaps
+      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+      const finalTargets = pushNodesOutOfFrames(nodeTargets, nodeMap)
+
+      animateToPositions(finalTargets, 600)
       return
     }
 
@@ -698,8 +711,12 @@ export function useLayout(options: UseLayoutOptions) {
       }
     }
 
-    console.log('Calling animateToPositions with', targets.size, 'targets')
-    animateToPositions(targets, 500)
+    // Push nodes out of frames to avoid overlaps
+    const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+    const finalTargets = pushNodesOutOfFrames(targets, nodeMap)
+
+    console.log('Calling animateToPositions with', finalTargets.size, 'targets')
+    animateToPositions(finalTargets, 500)
   }
 
   function fitToContent() {
