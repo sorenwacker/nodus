@@ -418,9 +418,9 @@ const magnifierVisibleNodes = computed(() => {
   })
 })
 
-// Node border width - scale inversely to maintain constant visual width
+// Node border width - scale inversely to maintain constant visual width (2px on screen)
 const nodeBorderWidth = computed(() => {
-  return 1 / scale.value
+  return Math.max(1, 2 / scale.value)
 })
 
 // Frame border width - scale inversely to maintain constant visual width (2px on screen)
