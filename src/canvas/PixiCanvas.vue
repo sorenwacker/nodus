@@ -1566,6 +1566,8 @@ useCanvasKeyboardShortcuts({
       <div
         v-if="isSemanticZoomCollapsed && store.selectedNodeIds.length > 0"
         class="collapsed-color-bar"
+        @pointerdown.stop
+        @click.stop
       >
         <button
           v-for="color in nodeColors"
