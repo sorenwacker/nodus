@@ -592,7 +592,7 @@ const frames = useFrames({
 })
 const { editingFrameId, editFrameTitle } = frames
 function onFramePointerDown(e: PointerEvent, frameId: string) { frames.onPointerDown(e, frameId) }
-function startFrameResize(e: PointerEvent, frameId: string) { frames.startResize(e, frameId) }
+function startFrameResize(e: PointerEvent, frameId: string, direction = 'se') { frames.startResize(e, frameId, direction) }
 function startEditingFrameTitle(frameId: string) { frames.startEditingTitle(frameId) }
 function saveFrameTitleEditing() { frames.saveTitle() }
 function cancelFrameTitleEditing() { frames.cancelTitleEditing() }

@@ -64,7 +64,8 @@ export function useFrames(options: UseFramesOptions) {
   const frameDragStart = ref({ x: 0, y: 0, frameX: 0, frameY: 0 })
   const frameContainedNodes = ref<Map<string, { x: number; y: number }>>(new Map())
   const resizingFrame = ref<string | null>(null)
-  const frameResizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
+  const resizeDirection = ref<string>('se')
+  const frameResizeStart = ref({ x: 0, y: 0, width: 0, height: 0, frameX: 0, frameY: 0 })
   const editingFrameId = ref<string | null>(null)
   const editFrameTitle = ref('')
   const pendingFramePlacement = ref(false)
@@ -133,17 +134,20 @@ export function useFrames(options: UseFramesOptions) {
     document.removeEventListener('pointerup', stopDrag)
   }
 
-  function startResize(e: PointerEvent, frameId: string) {
+  function startResize(e: PointerEvent, frameId: string, direction = 'se') {
     e.preventDefault()
     const frame = store.frames.find(f => f.id === frameId)
     if (!frame) return
 
     resizingFrame.value = frameId
+    resizeDirection.value = direction
     frameResizeStart.value = {
       x: e.clientX,
       y: e.clientY,
       width: frame.width,
       height: frame.height,
+      frameX: frame.canvas_x,
+      frameY: frame.canvas_y,
     }
 
     document.addEventListener('pointermove', onResize)
@@ -154,8 +158,34 @@ export function useFrames(options: UseFramesOptions) {
     if (!resizingFrame.value) return
     const dx = (e.clientX - frameResizeStart.value.x) / viewState.scale.value
     const dy = (e.clientY - frameResizeStart.value.y) / viewState.scale.value
-    const newWidth = Math.max(200, frameResizeStart.value.width + dx)
-    const newHeight = Math.max(100, frameResizeStart.value.height + dy)
+    const dir = resizeDirection.value
+    const minWidth = 200
+    const minHeight = 100
+
+    let newX = frameResizeStart.value.frameX
+    let newY = frameResizeStart.value.frameY
+    let newWidth = frameResizeStart.value.width
+    let newHeight = frameResizeStart.value.height
+
+    // Handle horizontal resize
+    if (dir.includes('e')) {
+      newWidth = Math.max(minWidth, frameResizeStart.value.width + dx)
+    } else if (dir.includes('w')) {
+      const widthChange = Math.min(dx, frameResizeStart.value.width - minWidth)
+      newWidth = frameResizeStart.value.width - widthChange
+      newX = frameResizeStart.value.frameX + widthChange
+    }
+
+    // Handle vertical resize
+    if (dir.includes('s')) {
+      newHeight = Math.max(minHeight, frameResizeStart.value.height + dy)
+    } else if (dir.includes('n')) {
+      const heightChange = Math.min(dy, frameResizeStart.value.height - minHeight)
+      newHeight = frameResizeStart.value.height - heightChange
+      newY = frameResizeStart.value.frameY + heightChange
+    }
+
+    store.updateFramePosition(resizingFrame.value, newX, newY)
     store.updateFrameSize(resizingFrame.value, newWidth, newHeight)
   }
 
