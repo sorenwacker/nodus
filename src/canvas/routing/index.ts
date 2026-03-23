@@ -445,19 +445,9 @@ export function routeAllEdges(
       })
     } else {
       // orthogonal (default)
-      // Channel offset to avoid orthogonal crossings.
-      // For edges from same node: edge going FURTHER should use OUTER lane.
-      // This prevents its horizontal from crossing closer edge's vertical turn.
-      //
-      // For left/right exits: further target = more negative dx
-      //   - Further target needs HIGHER Y lane (positive offset) to pass below verticals
-      // For top/bottom exits: further target = more negative dy
-      //   - Further target needs lane away from turn direction
-
-      // Reverse the port offset direction: outer port → outer lane
-      // Port offset is already ordered by target position, but for orthogonal
-      // we need the OPPOSITE: far targets get far lanes
       const channelOffset = -(srcOffset + tgtOffset) * 3
+
+      console.log('[ROUTE] Orthogonal edge', edge.id, 'nodes passed:', nodes.length)
 
       routeResult = routeOrthogonal({
         startPort: sourcePort,

@@ -315,6 +315,12 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       let path = ''
       const routed = routedEdges?.get(edge.id)
 
+      if (routed) {
+        console.log('[EDGE] Using routed path for', edge.id, routed.svgPath?.substring(0, 50))
+      } else {
+        console.log('[EDGE] No routed path for', edge.id, 'routedEdges size:', routedEdges?.size)
+      }
+
       if (isHugeGraph.value) {
         path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
       } else if (routed?.svgPath) {
