@@ -124,16 +124,16 @@ const frameColors = [
 ]
 
 // Stroke width constants
-const EDGE_SCREEN_WIDTH = 2 // Target screen pixels
+const EDGE_SCREEN_WIDTH = 1 // Target screen pixels
 const HIGHLIGHTED_STROKE_MULTIPLIER = 1.3
 
 export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn {
   const { store, selectedEdgeId, currentTheme, scale } = ctx
 
-  // Edge stroke width - constant 2px on screen at any zoom level
+  // Edge stroke width - constant 1px on screen at any zoom level
   const edgeStrokeWidth = computed(() => {
     const canvasWidth = EDGE_SCREEN_WIDTH / scale.value
-    return Math.max(1, Math.min(30, canvasWidth))
+    return Math.max(0.5, Math.min(30, canvasWidth))
   })
 
   // Edge style options
