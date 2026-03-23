@@ -48,7 +48,7 @@ defineEmits<{
       <!-- Fast rendering: paths without hit areas, markers only for highlighted -->
       <path
         v-for="edge in edges"
-        :key="edge.id + '-' + edge.arrowMarkerId"
+        :key="edge.id"
         :d="edge.path"
         :stroke="edge.isHighlighted ? edge.edgeHighlightColor : (edge.color ?? undefined)"
         :stroke-width="edge.isHighlighted ? edgeStrokeWidth * 1.3 : edgeStrokeWidth"
@@ -60,7 +60,7 @@ defineEmits<{
       />
     </template>
     <template v-else>
-      <g v-for="edge in edges" :key="edge.id + '-' + edge.arrowMarkerId">
+      <g v-for="edge in edges" :key="edge.id">
         <!-- Invisible wider hit area -->
         <path
           :d="edge.path"
