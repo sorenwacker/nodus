@@ -26,6 +26,48 @@ import {
 } from '../../../llm/promptEnhancer'
 
 /**
+ * Extract a balanced JSON object from a string starting with {
+ * Handles nested braces correctly
+ */
+function extractBalancedJson(str: string): string | null {
+  if (!str.startsWith('{')) return null
+  let depth = 0
+  let inString = false
+  let escape = false
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i]
+
+    if (escape) {
+      escape = false
+      continue
+    }
+
+    if (char === '\\' && inString) {
+      escape = true
+      continue
+    }
+
+    if (char === '"') {
+      inString = !inString
+      continue
+    }
+
+    if (!inString) {
+      if (char === '{') depth++
+      else if (char === '}') {
+        depth--
+        if (depth === 0) {
+          return str.slice(0, i + 1)
+        }
+      }
+    }
+  }
+
+  return null // Unbalanced
+}
+
+/**
  * Escape special characters that could be used for prompt injection
  * Replaces XML-like tags and control characters
  */
@@ -413,7 +455,7 @@ export function useAgentRunner(ctx: AgentContext) {
         // Check if content has embedded tool calls that should be processed BEFORE native tool calls
         // Some models output both text with tool JSON AND a native done() call
         if (msg.content && msg.tool_calls?.length) {
-          const hasEmbeddedTools = /<\|channel\|>.*?to=functions\.\w+/.test(msg.content) ||
+          const hasEmbeddedTools = /<\|channel\|>.*?to=\w+/.test(msg.content) ||
                                    /<\|constrain\|>json<\|message\|>\{/.test(msg.content) ||
                                    /```json[\s\S]*?"name"\s*:/.test(msg.content)
 
@@ -426,7 +468,7 @@ export function useAgentRunner(ctx: AgentContext) {
 
         // Handle native tool calls (skip if we detected embedded tools above)
         const hasEmbeddedToolsInContent = msg.content && (
-          /<\|channel\|>.*?to=functions\.\w+/.test(msg.content) ||
+          /<\|channel\|>.*?to=\w+/.test(msg.content) ||
           /<\|constrain\|>json<\|message\|>\{/.test(msg.content)
         )
 
@@ -541,27 +583,20 @@ export function useAgentRunner(ctx: AgentContext) {
           const pythonTagMatch = msg.content.match(/<\|python_tag\|>\s*(\{[\s\S]*\})/)
           if (!toolJson && pythonTagMatch) toolJson = pythonTagMatch[1]
 
-          // Handle Ollama channel format: <|channel|>commentary to=functions.XXX<|message|>{...}
-          const channelMatch = msg.content.match(/<\|channel\|>.*?to=functions\.(\w+).*?<\|message\|>(\{[\s\S]*?\})/)
+          // Handle Ollama/Qwen channel format: <|channel|>commentary to=XXX<|message|>{...}
+          // or: <|channel|>...to=XXX<|constrain|>json<|message|>{...}
+          const channelMatch = msg.content.match(/<\|channel\|>.*?to=(\w+).*?<\|message\|>(\{[\s\S]*)/)
           if (!toolJson && channelMatch) {
             const funcName = channelMatch[1]
-            const funcArgs = channelMatch[2]
-            try {
-              toolJson = JSON.stringify({ name: funcName, arguments: JSON.parse(funcArgs) })
-            } catch {
-              ctx.log.value.push(`> Failed to parse channel JSON`)
-            }
-          }
-
-          // Also try: <|channel|>...<|constrain|>json<|message|>{...}
-          const constrainMatch = msg.content.match(/<\|channel\|>.*?to=functions\.(\w+).*?<\|constrain\|>json<\|message\|>(\{[\s\S]*?\})/)
-          if (!toolJson && constrainMatch) {
-            const funcName = constrainMatch[1]
-            const funcArgs = constrainMatch[2]
-            try {
-              toolJson = JSON.stringify({ name: funcName, arguments: JSON.parse(funcArgs) })
-            } catch {
-              ctx.log.value.push(`> Failed to parse constrain JSON`)
+            // Extract JSON by finding balanced braces
+            const jsonStr = channelMatch[2]
+            const extracted = extractBalancedJson(jsonStr)
+            if (extracted) {
+              try {
+                toolJson = JSON.stringify({ name: funcName, arguments: JSON.parse(extracted) })
+              } catch {
+                ctx.log.value.push(`> Failed to parse channel JSON`)
+              }
             }
           }
 

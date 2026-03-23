@@ -183,6 +183,16 @@ export class OpenAICompatibleProvider implements ILLMProvider {
         }))
     }
 
+    // Fallback: extract tool calls from content if model outputs raw format
+    // Handles models that output <|channel|>commentary to=func_name ... {"args"}
+    if (!message.tool_calls?.length && message.content) {
+      const extracted = this.extractToolCallsFromContent(message.content)
+      if (extracted.length > 0) {
+        message.tool_calls = extracted
+        message.content = ''
+      }
+    }
+
     return { message }
   }
 }
