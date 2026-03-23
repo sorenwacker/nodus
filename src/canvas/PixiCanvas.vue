@@ -1863,16 +1863,16 @@ useCanvasKeyboardShortcuts({
 
     <!-- Minimap -->
     <CanvasMinimap
-      v-if="minimap.viewport"
+      v-if="minimap.viewport.value"
       :visible="store.filteredNodes.length > 0"
       :nodes="store.filteredNodes"
       :minimap-size="minimap.MINIMAP_SIZE"
       :get-node-position="minimap.getNodePosition"
       :is-selected="minimap.isSelected"
-      :viewport-x="minimap.viewport.x || 0"
-      :viewport-y="minimap.viewport.y || 0"
-      :viewport-width="minimap.viewport.width || 50"
-      :viewport-height="minimap.viewport.height || 40"
+      :viewport-x="minimap.viewport.value.x || 0"
+      :viewport-y="minimap.viewport.value.y || 0"
+      :viewport-width="minimap.viewport.value.width || 50"
+      :viewport-height="minimap.viewport.value.height || 40"
       @click="onMinimapClick"
     />
 
