@@ -1669,10 +1669,10 @@
   left: 0;
   border: 2px dashed var(--border-default);
   border-radius: 12px;
-  background: rgba(128, 128, 128, 0.02);
+  background: rgba(128, 128, 128, 0.05);
   pointer-events: auto;
   cursor: move;
-  z-index: 0;
+  z-index: 2;
 }
 
 .canvas-frame:hover {
