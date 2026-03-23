@@ -1643,7 +1643,7 @@ useCanvasKeyboardShortcuts({
           width: (resizingNode === node.id ? resizePreview.width : (node.width || NODE_DEFAULTS.WIDTH)) + 'px',
           height: (resizingNode === node.id ? resizePreview.height : (node.height || NODE_DEFAULTS.HEIGHT)) + 'px',
           borderWidth: nodeBorderWidth + 'px',
-          ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : isSemanticZoomCollapsed.value ? { background: 'var(--bg-canvas)', borderColor: 'var(--text-muted)' } : {}),
+          ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : isSemanticZoomCollapsed ? { background: 'var(--bg-canvas)', borderColor: 'var(--text-muted)' } : {}),
         }"
         @pointerdown="onNodePointerDown($event, node.id)"
         @pointerenter="onNodePointerEnter($event, node.id)"
@@ -1699,7 +1699,7 @@ useCanvasKeyboardShortcuts({
 
         <!-- Color palette and options (shown when selected or editing, hidden when collapsed - see fixed bar) -->
         <div
-          v-if="(store.selectedNodeIds.includes(node.id) || editingNodeId === node.id) && !isSemanticZoomCollapsed.value"
+          v-if="(store.selectedNodeIds.includes(node.id) || editingNodeId === node.id) && !isSemanticZoomCollapsed"
           class="node-color-bar"
           :style="{ transform: `scale(${1/scale}) translateY(100%)`, transformOrigin: 'left bottom' }"
           @pointerdown.prevent
@@ -1722,7 +1722,7 @@ useCanvasKeyboardShortcuts({
 
         <!-- Delete button (shown when selected but not editing, hidden when collapsed) -->
         <button
-          v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id && !isSemanticZoomCollapsed.value"
+          v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id && !isSemanticZoomCollapsed"
           class="delete-node-btn"
           :style="{ transform: `scale(${1/scale})`, transformOrigin: 'center center' }"
           @pointerdown.stop="deleteSelectedNodes"
@@ -1804,7 +1804,7 @@ useCanvasKeyboardShortcuts({
 
     <!-- Fixed color bar at top of canvas (shown when zoomed out/collapsed and node selected) -->
     <div
-      v-if="isSemanticZoomCollapsed.value && store.selectedNodeIds.length > 0"
+      v-if="isSemanticZoomCollapsed && store.selectedNodeIds.length > 0"
       class="collapsed-color-bar"
     >
       <button
