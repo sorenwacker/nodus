@@ -1643,7 +1643,7 @@ useCanvasKeyboardShortcuts({
           width: (resizingNode === node.id ? resizePreview.width : (node.width || NODE_DEFAULTS.WIDTH)) + 'px',
           height: (resizingNode === node.id ? resizePreview.height : (node.height || NODE_DEFAULTS.HEIGHT)) + 'px',
           borderWidth: nodeBorderWidth + 'px',
-          ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : {}),
+          ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : isSemanticZoomCollapsed ? { background: 'var(--bg-canvas)', borderColor: 'var(--text-muted)' } : {}),
         }"
         @pointerdown="onNodePointerDown($event, node.id)"
         @pointerenter="onNodePointerEnter($event, node.id)"

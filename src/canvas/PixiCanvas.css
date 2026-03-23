@@ -529,6 +529,7 @@
   /* Center text */
   text-align: center;
   width: 100%;
+  background: transparent;
 }
 
 .node-card.collapsed .node-content,
