@@ -818,6 +818,11 @@
   z-index: 10;
 }
 
+/* Override positioning for frames - uses transform instead */
+.canvas-frame .node-color-bar {
+  bottom: 0;
+}
+
 .color-dot {
   width: 16px;
   height: 16px;
