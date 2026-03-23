@@ -69,19 +69,19 @@ defineEmits<{
       @pointerdown.stop
     ></button>
 
-    <!-- Color bar below frame -->
+    <!-- Color bar below frame (reuses node color bar styling) -->
     <div
       v-if="selectedFrameId === frame.id && editingFrameId !== frame.id"
-      class="frame-color-bar"
+      class="node-color-bar"
       :style="{ transform: `scale(${1/scale}) translateY(100%)`, transformOrigin: 'left bottom' }"
       @pointerdown.stop
     >
       <button
         v-for="color in frameColors"
         :key="color.value || 'default'"
-        class="frame-color-dot"
+        class="color-dot"
         :class="{ active: frame.color === color.value }"
-        :style="{ background: color.value || 'var(--border-default)' }"
+        :style="{ backgroundColor: color.value || 'var(--border-default)' }"
         @click.stop="$emit('update-color', frame.id, color.value)"
       ></button>
     </div>

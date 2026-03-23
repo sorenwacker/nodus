@@ -1792,37 +1792,6 @@
   color: white;
 }
 
-.frame-color-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  gap: 4px;
-  padding: 4px 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px var(--shadow-sm);
-  z-index: 10;
-}
-
-.frame-color-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: transform 0.1s, border-color 0.1s;
-}
-
-.frame-color-dot:hover {
-  transform: scale(1.2);
-}
-
-.frame-color-dot.active {
-  border-color: var(--text-main);
-}
-
 /* Hover tooltip for zoomed-out view */
 .hover-tooltip {
   position: fixed;
