@@ -74,8 +74,8 @@ export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplay
     return imageMap
   })
 
-  // Show image thumbnail when zoomed out (scale < 0.5) and node has an image
-  const showImageThumbnail = computed(() => scale.value < 0.5)
+  // Show image thumbnail when zoomed out (scale < 0.3) and node has an image
+  const showImageThumbnail = computed(() => scale.value < 0.3)
 
   // Font scale state
   const fontScale = ref(uiStorage.getFontScale())

@@ -98,8 +98,9 @@ export const useNodesStore = defineStore('nodes', () => {
   // Filtered nodes/edges for current workspace
   const filteredNodes = computed(() => {
     const wsId = workspaceStore.currentWorkspaceId
-    if (!wsId) {
-      // Default workspace: show nodes with no workspace_id
+    // Treat null, undefined, and "default" as the default workspace
+    // Default workspace shows nodes with no workspace_id (null)
+    if (!wsId || wsId === 'default') {
       return nodes.value.filter(n => !n.workspace_id)
     }
     return nodes.value.filter(n => n.workspace_id === wsId)
@@ -128,15 +129,24 @@ export const useNodesStore = defineStore('nodes', () => {
       await workspaceStore.initialize()
 
       // Initialize edges and frames stores with current workspace
+      // Convert "default" to null for backend compatibility
       const currentWorkspace = workspaceStore.currentWorkspaceId
+      const workspaceForBackend = currentWorkspace === 'default' ? null : currentWorkspace
+      storeLogger.info(`[Nodes] Current workspace after init: ${currentWorkspace} (backend: ${workspaceForBackend})`)
+
       await Promise.all([
-        edgesStore.initialize(currentWorkspace),
+        edgesStore.initialize(workspaceForBackend),
         framesStore.initialize(),
       ])
 
       // Load nodes
       const fetchedNodes = await invoke<Node[]>('get_nodes')
       nodes.value = fetchedNodes
+
+      storeLogger.info(`[Nodes] Loaded ${fetchedNodes.length} total nodes`)
+      const workspaceIds = [...new Set(fetchedNodes.map(n => n.workspace_id))]
+      storeLogger.info(`[Nodes] Workspace IDs in nodes: ${JSON.stringify(workspaceIds)}`)
+      storeLogger.info(`[Nodes] Filtered nodes count: ${filteredNodes.value.length}`)
 
       // Set up node existence callback for edge validation
       edgesStore.setNodeExistsCallback((id) => nodes.value.some(n => n.id === id))
@@ -512,11 +522,21 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function createNode(data: CreateNodeInput): Promise<Node> {
-    // Only use workspace_id if it exists in known workspaces, otherwise use null
-    const validWorkspaceId = data.workspace_id
-      ?? (currentWorkspaceId.value && workspaces.value.some(w => w.id === currentWorkspaceId.value)
-          ? currentWorkspaceId.value
-          : null)
+    // Determine workspace_id for the new node
+    // "default" maps to null (the default workspace uses null in the database)
+    let validWorkspaceId = data.workspace_id
+    if (validWorkspaceId === undefined) {
+      // Use current workspace, but convert "default" to null
+      if (currentWorkspaceId.value === 'default') {
+        validWorkspaceId = null
+      } else if (currentWorkspaceId.value && workspaces.value.some(w => w.id === currentWorkspaceId.value)) {
+        validWorkspaceId = currentWorkspaceId.value
+      } else {
+        validWorkspaceId = null
+      }
+    } else if (validWorkspaceId === 'default') {
+      validWorkspaceId = null
+    }
 
     const inputWithWorkspace = {
       ...data,
@@ -724,8 +744,12 @@ export const useNodesStore = defineStore('nodes', () => {
   const deduplicateEdges = () => edgesStore.deduplicateEdges()
 
   // Frame functions - forwarded to frames store (with node cleanup for delete)
-  const createFrame = (x: number, y: number, width = 400, height = 300, title = 'Frame') =>
-    framesStore.createFrame(x, y, width, height, title, workspaceStore.currentWorkspaceId)
+  // Convert "default" to null for backend compatibility
+  const createFrame = (x: number, y: number, width = 400, height = 300, title = 'Frame') => {
+    const wsId = workspaceStore.currentWorkspaceId
+    const workspaceForBackend = wsId === 'default' ? null : wsId
+    return framesStore.createFrame(x, y, width, height, title, workspaceForBackend)
+  }
   const updateFramePosition = (id: string, x: number, y: number) => framesStore.updateFramePosition(id, x, y)
   const updateFrameSize = (id: string, width: number, height: number) => framesStore.updateFrameSize(id, width, height)
   const updateFrameTitle = (id: string, title: string) => framesStore.updateFrameTitle(id, title)

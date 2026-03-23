@@ -4,7 +4,7 @@
  * Computes edge paths with routing, port assignments, and optimization for large graphs
  */
 
-import { computed, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, watch, type Ref, type ComputedRef } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import {
   routeAllEdges,
@@ -61,6 +61,8 @@ export interface UseEdgeRoutingContext {
   globalEdgeStyle: Ref<string>
   edgeStyleMap: Ref<Record<string, string>>
   getNodeHeight: (node: { height?: number; markdown_content: string | null }, respectCollapse?: boolean) => number
+  /** When true, skip complex routing and use simple lines (for drag performance) */
+  isDragging?: Ref<boolean>
 }
 
 export interface UseEdgeRoutingReturn {
@@ -78,17 +80,26 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     globalEdgeStyle,
     edgeStyleMap,
     getNodeHeight,
+    isDragging,
   } = ctx
 
+  // Cache for routed edges - only recalculate when not dragging
+  const cachedRoutedEdges = ref<Map<string, { svgPath: string; strokeWidth?: number; path?: Array<{x: number; y: number}>; debugInfo?: unknown }> | null>(null)
+  const lastRoutingKey = ref('')
+
+  // Recalculate routing when drag ends
+  watch(() => isDragging?.value, (dragging, wasDragging) => {
+    if (wasDragging && !dragging) {
+      // Drag ended - invalidate cache to trigger re-routing
+      lastRoutingKey.value = ''
+    }
+  })
+
   const edgeLines = computed((): EdgeLine[] => {
-    // Force dependency on node positions, edge properties, and layout version
+    // Only track edge count and layout version for routing triggers (not every position)
     const _layoutVersion = store.nodeLayoutVersion
-    const _nodeTrigger = store.nodes.reduce((sum, n) => sum + n.canvas_x + n.canvas_y + (n.width || 0) + (n.height || 0), 0)
-    const _edgeTrigger = store.filteredEdges.reduce((sum, e) => sum + (e.link_type?.length || 0), 0)
     const _edgeCount = store.edges.length
     void _layoutVersion
-    void _nodeTrigger
-    void _edgeTrigger
     void _edgeCount
 
     let edges = store.filteredEdges
@@ -218,18 +229,31 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
 
     // Build spatial index and route edges
+    // Skip complex routing during drag for performance - use cached or simple lines
     const effectiveStyle: EdgeStyle = style as EdgeStyle
     let routedEdges: Map<string, { svgPath: string; strokeWidth?: number; path?: Array<{x: number; y: number}>; debugInfo?: unknown }> | null = null
 
-    const spatialIndex = new SpatialIndex()
-    spatialIndex.build(nodeMap)
-    setRoutingSpatialIndex(spatialIndex)
+    // Create a key to detect when routing needs recalculation
+    const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}`
 
-    try {
-      routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
-    } finally {
-      setRoutingSpatialIndex(null)
+    if (!isDragging?.value && routingKey !== lastRoutingKey.value) {
+      // Not dragging and cache is stale - recalculate routing
+      const spatialIndex = new SpatialIndex()
+      spatialIndex.build(nodeMap)
+      setRoutingSpatialIndex(spatialIndex)
+
+      try {
+        routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
+        cachedRoutedEdges.value = routedEdges
+        lastRoutingKey.value = routingKey
+      } finally {
+        setRoutingSpatialIndex(null)
+      }
+    } else if (!isDragging?.value) {
+      // Use cached routing
+      routedEdges = cachedRoutedEdges.value
     }
+    // During drag, routedEdges stays null - simple lines will be used
 
     // Sort edges to minimize crossings
     const sortedEdges = [...edges].sort((a, b) => {
@@ -314,12 +338,6 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
       let path = ''
       const routed = routedEdges?.get(edge.id)
-
-      if (routed) {
-        console.log('[EDGE] Using routed path for', edge.id, routed.svgPath?.substring(0, 50))
-      } else {
-        console.log('[EDGE] No routed path for', edge.id, 'routedEdges size:', routedEdges?.size)
-      }
 
       if (isHugeGraph.value) {
         path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`

@@ -298,18 +298,11 @@ function routeSegmentAroundObstacles(
 
   const obstacles = findObstacles(start.x, start.y, end.x, end.y, nodes, excludeIds)
 
-  if (obstacles.length > 0) {
-    console.log('[ORTHO] Found', obstacles.length, 'obstacles on segment',
-      { start, end, isHorizontal, obstacles: obstacles.map(o => ({ id: o.id, x: o.canvas_x, y: o.canvas_y, w: o.width, h: o.height })) })
-  }
-
   if (obstacles.length === 0) return []
 
   // Get obstacle bounds with extra margin for clearance
   const EXTRA_MARGIN = 30
   const bounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + EXTRA_MARGIN)
-
-  console.log('[ORTHO] Obstacle bounds:', bounds)
 
   if (isHorizontal) {
     // Horizontal segment blocked - find shortest vertical detour

@@ -207,14 +207,14 @@ describe('Edge Routing Rules', () => {
         height: 100,
       }
 
-      // Segment that passes through node
-      expect(segmentIntersectsNode(100, 100, 300, 100, node)).toBe(true)
+      // Segment that passes through node (no margin needed - clearly intersects)
+      expect(segmentIntersectsNode(100, 100, 300, 100, node, 0)).toBe(true)
 
-      // Segment that passes above node
-      expect(segmentIntersectsNode(100, 10, 300, 10, node)).toBe(false)
+      // Segment that passes above node (use margin=0 for precise test)
+      expect(segmentIntersectsNode(100, 10, 300, 10, node, 0)).toBe(false)
 
-      // Segment that passes below node
-      expect(segmentIntersectsNode(100, 200, 300, 200, node)).toBe(false)
+      // Segment that passes below node (use margin=0 for precise test)
+      expect(segmentIntersectsNode(100, 200, 300, 200, node, 0)).toBe(false)
     })
 
     it('finds all obstacles in path', () => {

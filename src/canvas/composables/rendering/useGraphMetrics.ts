@@ -53,10 +53,16 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     !neighborhoodMode.value && (displayNodes.value.length > 300 || filteredEdges.value.length > 800)
   )
 
-  // Semantic zoom collapse - hide content for massive graphs when zoomed out
-  const isSemanticZoomCollapsed = computed(() =>
-    isMassiveGraph.value && scale.value < 0.6
-  )
+  // Semantic zoom collapse - show title only when zoomed out
+  // Triggers at 30% zoom for any graph, or 50% for massive graphs
+  const isSemanticZoomCollapsed = computed(() => {
+    const s = scale.value
+    // Always collapse below 30% zoom
+    if (s < 0.3) return true
+    // Collapse massive graphs below 50% zoom
+    if (isMassiveGraph.value && s < 0.5) return true
+    return false
+  })
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   const isLODMode = computed(() => visibleNodes.value.length > LOD_THRESHOLD)

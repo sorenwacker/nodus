@@ -131,9 +131,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       // Use explicit color field first, then link_type as fallback, then default
       const color = (e.color && e.color.startsWith('#')) ? e.color
         : (e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value)
-      const effectiveStrokeWidth = baseStrokeWidth
-      // Use smaller multiplier for highlight
-      const renderStrokeWidth = isSelected || isHighlighted ? effectiveStrokeWidth * 1.5 : effectiveStrokeWidth
+      // Simple stroke width: base for normal, slightly thicker for selected/highlighted
+      const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * 1.3 : baseStrokeWidth
 
       // Get highlight color based on whether connected node is selected or just hovered
       let edgeHighlightColor = highlightColor.value

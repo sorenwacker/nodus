@@ -186,10 +186,11 @@ onMounted(() => {
 // centerGrid is provided by useViewState composable
 
 // Center view when nodes are first loaded, or center grid when empty
-// But only if there's no saved view state
+// Always fit to content on initial load to ensure nodes are visible
 watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
-  if (newLen > 0 && !hasInitiallyCentered && !savedView) {
+  if (newLen > 0 && !hasInitiallyCentered) {
     hasInitiallyCentered = true
+    // Always fit to content on initial load - saved view may be for different workspace
     setTimeout(fitToContent, 50)
     // Render mermaid diagrams after initial load (use arrow fn to defer lookup)
     setTimeout(() => renderMermaidDiagrams?.(), 500)
@@ -197,10 +198,6 @@ watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
     // Empty workspace - center the grid
     hasInitiallyCentered = false
     setTimeout(centerGrid, 50)
-  } else if (newLen > 0 && !hasInitiallyCentered) {
-    hasInitiallyCentered = true
-    // Render mermaid diagrams after initial load (even with saved view)
-    setTimeout(() => renderMermaidDiagrams?.(), 500)
   }
 }, { immediate: true })
 
@@ -419,12 +416,6 @@ const magnifierVisibleNodes = computed(() => {
     const dy = centerY - closestY
     return (dx * dx + dy * dy) < (viewRadius * viewRadius * 4) // 2x radius for margin
   })
-})
-
-// Edge stroke width - thin lines that stay visible but don't get too thick
-const edgeStrokeWidth = computed(() => {
-  // At normal zoom: 1.5px, zoomed out: max 3px canvas units
-  return Math.max(1, Math.min(3, 1.5 / scale.value))
 })
 
 // Node border width - scale inversely to maintain constant visual width
@@ -1309,18 +1300,20 @@ async function onCanvasDoubleClick(e: MouseEvent) {
 // Track current theme name for reactive palette switching
 const currentTheme = ref(document.documentElement.getAttribute('data-theme') || 'light')
 
-// Edge styling composable - handles colors, styles, and theme-aware highlighting
+// Edge styling composable - handles colors, styles, stroke width, and theme-aware highlighting
 const edgeStyling = useEdgeStyling({
   store: {
     updateEdgeLinkType: store.updateEdgeLinkType,
   },
   selectedEdgeId: selectedEdge,
   currentTheme,
+  scale,
 })
 const {
   edgeStyles,
   edgeStyleMap,
   globalEdgeStyle,
+  edgeStrokeWidth,
   edgeColorPalette,
   defaultEdgeColor,
   highlightColor,
@@ -1339,6 +1332,8 @@ const {
 
 // Edge routing composable - computes edge paths with routing, port assignments, and optimization
 // Note: Pass store directly so computed properties remain reactive
+// isDragging skips complex routing during drag for performance
+const isDraggingRef = computed(() => draggingNode.value !== null)
 const { edgeLines } = useEdgeRouting({
   store,
   displayNodes,
@@ -1349,6 +1344,7 @@ const { edgeLines } = useEdgeRouting({
   globalEdgeStyle,
   edgeStyleMap,
   getNodeHeight,
+  isDragging: isDraggingRef,
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties

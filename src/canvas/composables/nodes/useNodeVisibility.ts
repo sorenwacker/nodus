@@ -98,10 +98,16 @@ export function useNodeVisibility(options: UseNodeVisibilityOptions) {
     () => nodes.value.length > MASSIVE_GRAPH_NODES || edges.value.length > MASSIVE_GRAPH_EDGES
   )
 
-  // Semantic zoom collapse - hide content for massive graphs when zoomed out
-  const isSemanticZoomCollapsed = computed(
-    () => isMassiveGraph.value && viewState.scale.value < 0.6
-  )
+  // Semantic zoom collapse - show title only when zoomed out
+  // Triggers at 50% zoom for any graph, or 60% for massive graphs
+  const isSemanticZoomCollapsed = computed(() => {
+    const scale = viewState.scale.value
+    // Always collapse below 50% zoom
+    if (scale < 0.5) return true
+    // Collapse massive graphs below 60% zoom
+    if (isMassiveGraph.value && scale < 0.6) return true
+    return false
+  })
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   const isLODMode = computed(() => visibleNodes.value.length > LOD_THRESHOLD)

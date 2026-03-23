@@ -51,7 +51,7 @@ defineEmits<{
         :key="edge.id + '-' + edge.arrowMarkerId"
         :d="edge.path"
         :stroke="edge.isHighlighted ? edge.edgeHighlightColor : (edge.color ?? undefined)"
-        :stroke-width="edge.isHighlighted ? edgeStrokeWidth * 2 : edgeStrokeWidth"
+        :stroke-width="edge.isHighlighted ? edgeStrokeWidth * 1.3 : edgeStrokeWidth"
         :stroke-opacity="edge.opacity"
         :marker-end="edge.isHighlighted && !edge.isBidirectional && !edge.isShortEdge ? `url(#${edge.arrowMarkerId})` : undefined"
         fill="none"
@@ -98,7 +98,7 @@ defineEmits<{
         <text
           v-if="edge.label"
           :x="edge.labelX || (edge.x1 + edge.x2) / 2"
-          :y="(edge.labelY || (edge.y1 + edge.y2) / 2) - 8"
+          :y="(edge.labelY || (edge.y1 + edge.y2) / 2) - 2"
           class="edge-label"
         >{{ edge.label }}</text>
       </g>

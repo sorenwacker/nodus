@@ -21,6 +21,7 @@ function sanitizeWorkspaceName(name: string): string {
   // Remove HTML/script tags
   sanitized = sanitized.replace(/<[^>]*>/g, '')
   // Remove control characters
+  // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\x00-\x1f\x7f]/g, '')
   // Truncate to max length
   if (sanitized.length > MAX_WORKSPACE_NAME_LENGTH) {
@@ -59,11 +60,12 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     workspaceStorage.setCurrent(currentWorkspaceId.value)
   }
 
-  // Sync workspaces between localStorage and database (bidirectional)
+  // Sync workspaces from localStorage to database (localStorage is source of truth)
   async function syncWorkspacesToDatabase() {
     const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
+    storeLogger.info(`[Workspace] DB workspaces: ${JSON.stringify(dbWorkspaces.map(w => ({ id: w.id, name: w.name })))}`)
+
     const dbIds = new Set(dbWorkspaces.map((w) => w.id))
-    const localIds = new Set(workspaces.value.map((w) => w.id))
 
     // Create any localStorage workspaces that don't exist in the database
     for (const ws of workspaces.value) {
@@ -80,18 +82,12 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
       }
     }
 
-    // Load any database workspaces that don't exist in localStorage
-    for (const dbWs of dbWorkspaces) {
-      if (!localIds.has(dbWs.id)) {
-        storeLogger.info(`Loading workspace from database: ${dbWs.name} (${dbWs.id})`)
-        workspaces.value.push({
-          id: dbWs.id,
-          name: dbWs.name,
-        })
-      }
-    }
+    // NOTE: We intentionally do NOT auto-restore workspaces from DB that aren't in localStorage.
+    // localStorage is the source of truth for workspace existence.
+    // If a workspace was deleted locally, it should stay deleted.
+    // Use recoverWorkspace() explicitly if recovery is needed.
 
-    // Persist updated workspaces to localStorage
+    // Persist workspaces to localStorage (in case any were created)
     saveWorkspacesToStorage()
   }
 
@@ -99,7 +95,27 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     loading.value = true
     error.value = null
     try {
+      storeLogger.info('[Workspace] Starting initialization...')
+      storeLogger.info(`[Workspace] localStorage workspaces: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
+      storeLogger.info(`[Workspace] localStorage currentWorkspaceId: ${currentWorkspaceId.value}`)
+
       await syncWorkspacesToDatabase()
+
+      storeLogger.info(`[Workspace] After sync, workspaces: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
+
+      // Validate currentWorkspaceId exists in workspaces list
+      const storedId = currentWorkspaceId.value
+      if (storedId && !workspaces.value.some((w) => w.id === storedId)) {
+        // Stored workspace ID is invalid - fallback to null (default workspace)
+        // This ensures nodes without workspace_id are displayed
+        currentWorkspaceId.value = null
+        workspaceStorage.setCurrent(null)
+        storeLogger.warn(
+          `Invalid workspace ID "${storedId}" in storage, falling back to default workspace`
+        )
+      }
+
+      storeLogger.info(`[Workspace] Final currentWorkspaceId: ${currentWorkspaceId.value}`)
     } catch (e) {
       error.value = String(e)
       storeLogger.error('Failed to sync workspaces:', e)

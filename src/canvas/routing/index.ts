@@ -447,8 +447,6 @@ export function routeAllEdges(
       // orthogonal (default)
       const channelOffset = -(srcOffset + tgtOffset) * 3
 
-      console.log('[ROUTE] Orthogonal edge', edge.id, 'nodes passed:', nodes.length)
-
       routeResult = routeOrthogonal({
         startPort: sourcePort,
         startStandoff: sourceStandoff,

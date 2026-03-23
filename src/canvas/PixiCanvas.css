@@ -1669,10 +1669,14 @@
   left: 0;
   border: 2px dashed var(--border-default);
   border-radius: 12px;
-  background: transparent;
+  background: rgba(128, 128, 128, 0.02);
   pointer-events: auto;
   cursor: move;
   z-index: 0;
+}
+
+.canvas-frame:hover {
+  z-index: 5;
 }
 
 .canvas-frame.selected {
@@ -1688,6 +1692,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  z-index: 10;
 }
 
 .frame-title {

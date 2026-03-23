@@ -542,6 +542,35 @@ pub mod workspaces {
     }
 
     pub async fn delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
+        // Delete edges connected to nodes in this workspace
+        sqlx::query(
+            "DELETE FROM edges WHERE source_node_id IN (SELECT id FROM nodes WHERE workspace_id = ?)
+             OR target_node_id IN (SELECT id FROM nodes WHERE workspace_id = ?)"
+        )
+            .bind(id)
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        // Delete all nodes in this workspace (cuts link to Obsidian vault)
+        sqlx::query("DELETE FROM nodes WHERE workspace_id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        // Delete storylines in this workspace
+        sqlx::query("DELETE FROM storylines WHERE workspace_id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        // Delete frames in this workspace
+        sqlx::query("DELETE FROM frames WHERE workspace_id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        // Finally delete the workspace
         sqlx::query("DELETE FROM workspaces WHERE id = ?")
             .bind(id)
             .execute(pool)
