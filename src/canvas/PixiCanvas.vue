@@ -1698,7 +1698,12 @@ useCanvasKeyboardShortcuts({
         <!-- eslint-enable vue/no-v-html -->
 
         <!-- Color palette and options (shown when selected or editing) -->
-        <div v-if="store.selectedNodeIds.includes(node.id) || editingNodeId === node.id" class="node-color-bar" @pointerdown.prevent>
+        <div
+          v-if="store.selectedNodeIds.includes(node.id) || editingNodeId === node.id"
+          class="node-color-bar"
+          :style="{ transform: `scale(${1/scale}) translateY(100%)`, transformOrigin: 'left bottom' }"
+          @pointerdown.prevent
+        >
           <button
             v-for="color in nodeColors"
             :key="color.value || 'default'"
@@ -1719,6 +1724,7 @@ useCanvasKeyboardShortcuts({
         <button
           v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id"
           class="delete-node-btn"
+          :style="{ transform: `scale(${1/scale})`, transformOrigin: 'center center' }"
           @pointerdown.stop="deleteSelectedNodes"
         ></button>
 
