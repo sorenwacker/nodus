@@ -164,7 +164,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         color,
         edgeHighlightColor,
         renderStrokeWidth,
-        glowStrokeWidth: effectiveStrokeWidth * 4,
+        glowStrokeWidth: renderStrokeWidth * 4,
         arrowMarkerId: isHighlighted ? `arrow-${edgeHighlightColor.replace('#', '')}` : `arrow-${color.replace('#', '')}`,
       }
     })
