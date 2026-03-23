@@ -594,11 +594,7 @@
   z-index: 20;
 }
 
-.node-card.neighbor-highlighted:not(.selected) {
-  z-index: 15 !important;
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
-}
+/* neighbor-highlighted styles moved to main.css for proper theme support */
 
 .node-card.dragging,
 .node-card.resizing {

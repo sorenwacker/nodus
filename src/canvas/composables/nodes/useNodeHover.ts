@@ -11,7 +11,7 @@ export interface UseNodeHoverContext {
   scale: Ref<number>
   isLODMode: ComputedRef<boolean>
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
-  filteredEdges: ComputedRef<Edge[]>
+  filteredEdges: Ref<Edge[]> | ComputedRef<Edge[]>
   getNode: (id: string) => Node | undefined
 }
 
@@ -65,8 +65,7 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
   const activeNodeIds = computed(() => {
     const ids = new Set<string>()
     if (hoveredNodeId.value) ids.add(hoveredNodeId.value)
-    const selectedIds = Array.isArray(selectedNodeIds.value) ? selectedNodeIds.value : []
-    for (const id of selectedIds) ids.add(id)
+    for (const id of selectedNodeIds.value) ids.add(id)
     return ids
   })
 
@@ -88,7 +87,8 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
     const ids = new Set<string>()
     const active = activeNodeIds.value
     if (active.size === 0) return ids
-    for (const edge of filteredEdges.value) {
+    const edges = filteredEdges.value
+    for (const edge of edges) {
       if (active.has(edge.source_node_id)) {
         ids.add(edge.target_node_id)
       }

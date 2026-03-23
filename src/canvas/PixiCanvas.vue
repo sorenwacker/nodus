@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 // marked is imported in useContentRenderer composable
@@ -478,12 +479,15 @@ const canvasPan = useCanvasPan({
 })
 const { isPanning, startPan } = canvasPan
 
+// Get reactive refs from store for the hover composable
+const { selectedNodeIds: storeSelectedNodeIds, filteredEdges: storeFilteredEdges } = storeToRefs(store)
+
 // Node hover composable - handles hover state, tooltips, and active node tracking
 const nodeHover = useNodeHover({
   scale,
   isLODMode,
-  selectedNodeIds: computed(() => store.selectedNodeIds),
-  filteredEdges: computed(() => store.filteredEdges),
+  selectedNodeIds: storeSelectedNodeIds,
+  filteredEdges: storeFilteredEdges,
   getNode: store.getNode,
 })
 const {
@@ -493,16 +497,42 @@ const {
   hoveredNode,
   tooltipContent,
   highlightedEdgeIds,
-  highlightedNodeIds,
   onNodePointerEnter,
   onNodePointerMove,
   onNodePointerLeave,
 } = nodeHover
 
-// Helper to check if a node is a highlighted neighbor (for template reactivity)
-function isNeighborHighlighted(nodeId: string): boolean {
-  return highlightedNodeIds.value.has(nodeId)
-}
+// Watch selection changes and compute neighbors
+const neighborHighlightedMap = ref<Record<string, boolean>>({})
+
+watch(
+  [storeSelectedNodeIds, storeFilteredEdges],
+  ([selectedIds, edges]) => {
+    const map: Record<string, boolean> = {}
+
+    console.log('[NEIGHBOR SELECT] selectedIds:', selectedIds, 'edges:', edges.length)
+
+    if (selectedIds.length === 0) {
+      neighborHighlightedMap.value = map
+      return
+    }
+
+    const activeIds = new Set<string>(selectedIds)
+
+    for (const edge of edges) {
+      if (activeIds.has(edge.source_node_id)) {
+        map[edge.target_node_id] = true
+      }
+      if (activeIds.has(edge.target_node_id)) {
+        map[edge.source_node_id] = true
+      }
+    }
+
+    console.log('[NEIGHBOR SELECT] neighbors found:', Object.keys(map).length)
+    neighborHighlightedMap.value = map
+  },
+  { immediate: true, deep: true }
+)
 
 // Context menu composable
 const contextMenu = useContextMenu({
@@ -1611,7 +1641,7 @@ useCanvasKeyboardShortcuts({
           collapsed: isSemanticZoomCollapsed,
           'neighborhood-mode': neighborhoodMode,
           'neighborhood-focus': neighborhoodMode && node.id === focusNodeId,
-          'neighbor-highlighted': isNeighborHighlighted(node.id)
+          'neighbor-highlighted': neighborHighlightedMap[node.id]
         }"
         :style="{
           transform: `translate3d(${resizingNode === node.id ? resizePreview.x : node.canvas_x}px, ${resizingNode === node.id ? resizePreview.y : node.canvas_y}px, 0)`,

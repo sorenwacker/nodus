@@ -53,7 +53,22 @@ export function findConnectedNodes(
 }
 
 /**
- * Get immediate neighbors of a node (1 hop away)
+ * Get immediate neighbor IDs of a node (1 hop away)
+ */
+export function getNeighborIds(nodeId: string, edges: Edge[]): string[] {
+  const neighbors: string[] = []
+  for (const edge of edges) {
+    if (edge.source_node_id === nodeId) {
+      neighbors.push(edge.target_node_id)
+    } else if (edge.target_node_id === nodeId) {
+      neighbors.push(edge.source_node_id)
+    }
+  }
+  return neighbors
+}
+
+/**
+ * Get immediate neighbors of a node with content (1 hop away)
  */
 export function getImmediateNeighbors(
   nodeId: string,
@@ -62,19 +77,13 @@ export function getImmediateNeighbors(
 ): Array<{ title: string; content: string }> {
   const neighbors: Array<{ title: string; content: string }> = []
 
-  for (const edge of edges) {
-    let neighborId: string | null = null
-    if (edge.source_node_id === nodeId) neighborId = edge.target_node_id
-    else if (edge.target_node_id === nodeId) neighborId = edge.source_node_id
-
-    if (neighborId) {
-      const node = getNode(neighborId)
-      if (node) {
-        neighbors.push({
-          title: node.title || 'Untitled',
-          content: node.markdown_content || '',
-        })
-      }
+  for (const neighborId of getNeighborIds(nodeId, edges)) {
+    const node = getNode(neighborId)
+    if (node) {
+      neighbors.push({
+        title: node.title || 'Untitled',
+        content: node.markdown_content || '',
+      })
     }
   }
 

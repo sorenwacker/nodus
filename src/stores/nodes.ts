@@ -214,6 +214,21 @@ export const useNodesStore = defineStore('nodes', () => {
     return nodes.value.find(n => n.id === id)
   }
 
+  /**
+   * Get IDs of all nodes directly connected to the given node
+   */
+  function getNeighborIds(nodeId: string): string[] {
+    const neighbors: string[] = []
+    for (const edge of edgesStore.edges) {
+      if (edge.source_node_id === nodeId) {
+        neighbors.push(edge.target_node_id)
+      } else if (edge.target_node_id === nodeId) {
+        neighbors.push(edge.source_node_id)
+      }
+    }
+    return neighbors
+  }
+
   async function updateNodePosition(id: string, x: number, y: number) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
@@ -875,6 +890,7 @@ export const useNodesStore = defineStore('nodes', () => {
     storylineNodesVersion,
     initialize,
     getNode,
+    getNeighborIds,
     findNodeByTitle,
     updateNodePosition,
     updateNodeSize,

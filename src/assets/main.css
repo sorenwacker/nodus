@@ -20,6 +20,9 @@
   --shadow-sm: rgba(0, 0, 0, 0.04);
   --shadow-md: rgba(0, 0, 0, 0.08);
   --shadow-lg: rgba(0, 0, 0, 0.12);
+  /* Neighbor highlight */
+  --neighbor-highlight: rgba(59, 130, 246, 0.6);
+  --neighbor-glow: rgba(59, 130, 246, 0.4);
   /* Refined radius and spacing */
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -50,6 +53,8 @@
   --shadow-sm: rgba(0, 0, 0, 0.2);
   --shadow-md: rgba(0, 0, 0, 0.3);
   --shadow-lg: rgba(0, 0, 0, 0.4);
+  --neighbor-highlight: rgba(96, 165, 250, 0.7);
+  --neighbor-glow: rgba(96, 165, 250, 0.5);
 }
 
 /* Pitch Black - OLED optimized */
@@ -69,6 +74,8 @@
   --dot-color: #0a0a0a;
   --shadow-sm: rgba(255, 255, 255, 0.03);
   --shadow-md: rgba(255, 255, 255, 0.05);
+  --neighbor-highlight: rgba(96, 165, 250, 0.7);
+  --neighbor-glow: rgba(96, 165, 250, 0.5);
 }
 
 /* Cyber - Hologram/Laser/Steampunk fusion */
@@ -95,6 +102,9 @@
   --neon-pink: #ff00ff;
   --neon-cyan: #00ffcc;
   --neon-blue: #00ccff;
+  /* Neighbor highlight - magenta for cyber (contrast with cyan borders) */
+  --neighbor-highlight: rgba(255, 0, 255, 0.8);
+  --neighbor-glow: rgba(255, 0, 255, 0.5);
 }
 
 /* Cyber theme special effects */
@@ -113,10 +123,11 @@
   z-index: 20;
 }
 
-[data-theme='cyber'] .node-card.neighbor-highlighted:not(.selected) {
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.5), 0 0 20px rgba(0, 255, 204, 0.2);
-  border-color: rgba(0, 255, 204, 0.7);
+/* Neighbor highlighting - uses theme variables */
+.node-card.neighbor-highlighted:not(.selected) {
   z-index: 15;
+  border-color: var(--neighbor-highlight);
+  box-shadow: 0 0 8px var(--neighbor-glow), 0 0 16px var(--neighbor-glow);
 }
 
 [data-theme='cyber'] .edge-line-visible,
