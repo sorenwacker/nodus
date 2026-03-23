@@ -8,8 +8,8 @@
 import type { Point, NodeRect } from './types'
 import { SpatialIndex } from './spatialIndex'
 
-// Increased margin to account for node height estimation inaccuracies
-export const OBSTACLE_MARGIN = 25
+// Margin around nodes for obstacle detection - larger = edges route further from nodes
+export const OBSTACLE_MARGIN = 40
 
 // Cached spatial index for the current routing pass
 let currentSpatialIndex: SpatialIndex | null = null

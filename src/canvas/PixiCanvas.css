@@ -587,7 +587,7 @@
 
 .node-card.selected {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.2), 0 4px 12px var(--shadow-md);
+  box-shadow: var(--selection-glow);
   /* Override paint containment so color bar below is visible */
   contain: layout style;
   overflow: visible;

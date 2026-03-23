@@ -20,7 +20,8 @@
   --shadow-sm: rgba(0, 0, 0, 0.04);
   --shadow-md: rgba(0, 0, 0, 0.08);
   --shadow-lg: rgba(0, 0, 0, 0.12);
-  /* Neighbor highlight */
+  /* Selection and neighbor highlight */
+  --selection-glow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
   --neighbor-highlight: rgba(59, 130, 246, 0.6);
   --neighbor-glow: rgba(59, 130, 246, 0.4);
   /* Refined radius and spacing */
@@ -53,6 +54,7 @@
   --shadow-sm: rgba(0, 0, 0, 0.2);
   --shadow-md: rgba(0, 0, 0, 0.3);
   --shadow-lg: rgba(0, 0, 0, 0.4);
+  --selection-glow: 0 0 0 3px rgba(96, 165, 250, 0.4), 0 0 20px rgba(96, 165, 250, 0.2);
   --neighbor-highlight: rgba(96, 165, 250, 0.7);
   --neighbor-glow: rgba(96, 165, 250, 0.5);
 }
@@ -74,6 +76,7 @@
   --dot-color: #0a0a0a;
   --shadow-sm: rgba(255, 255, 255, 0.03);
   --shadow-md: rgba(255, 255, 255, 0.05);
+  --selection-glow: 0 0 0 3px rgba(96, 165, 250, 0.5), 0 0 25px rgba(96, 165, 250, 0.3);
   --neighbor-highlight: rgba(96, 165, 250, 0.7);
   --neighbor-glow: rgba(96, 165, 250, 0.5);
 }
@@ -102,6 +105,8 @@
   --neon-pink: #ff00ff;
   --neon-cyan: #00ffcc;
   --neon-blue: #00ccff;
+  /* Selection - strong magenta glow */
+  --selection-glow: 0 0 20px rgba(255, 0, 255, 0.7), 0 0 40px rgba(255, 0, 255, 0.4), 0 0 60px rgba(255, 0, 255, 0.2);
   /* Neighbor highlight - magenta for cyber (contrast with cyan borders) */
   --neighbor-highlight: rgba(255, 0, 255, 0.8);
   --neighbor-glow: rgba(255, 0, 255, 0.5);
@@ -117,11 +122,7 @@
   box-shadow: 0 0 15px rgba(0, 255, 204, 0.5), 0 0 30px rgba(255, 0, 255, 0.2);
 }
 
-[data-theme='cyber'] .node-card.selected {
-  box-shadow: 0 0 20px rgba(255, 0, 255, 0.6), 0 0 40px rgba(255, 0, 255, 0.3);
-  border-color: #ff00ff;
-  z-index: 20;
-}
+/* cyber .node-card.selected now uses --selection-glow variable */
 
 /* Neighbor highlighting - uses theme variables */
 .node-card.neighbor-highlighted:not(.selected) {

@@ -281,7 +281,108 @@ function trySimplePath(
 }
 
 /**
- * Route with 3 segments - generic for both horizontal and vertical start
+ * Route a segment around obstacles - finds shortest detour
+ * Returns waypoints between start and end (not including start/end)
+ */
+function routeSegmentAroundObstacles(
+  start: Point,
+  end: Point,
+  isHorizontal: boolean,
+  nodes: NodeRect[] | Map<string, NodeRect>,
+  excludeIds: Set<string>,
+  depth: number = 0
+): Point[] {
+  const MAX_DEPTH = 2 // Limit recursion to avoid overly complex paths
+
+  if (depth >= MAX_DEPTH) return []
+
+  const obstacles = findObstacles(start.x, start.y, end.x, end.y, nodes, excludeIds)
+  if (obstacles.length === 0) return []
+
+  // Get obstacle bounds with extra margin for clearance
+  const EXTRA_MARGIN = 30
+  const bounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + EXTRA_MARGIN)
+
+  if (isHorizontal) {
+    // Horizontal segment blocked - find shortest vertical detour
+    // Calculate distance to go above vs below
+    const distAbove = Math.abs(start.y - bounds.minY) + Math.abs(end.y - bounds.minY)
+    const distBelow = Math.abs(start.y - bounds.maxY) + Math.abs(end.y - bounds.maxY)
+
+    const detourY = distAbove <= distBelow ? bounds.minY : bounds.maxY
+
+    // Simple 2-point detour: go to detour level, then back
+    const wp1: Point = { x: start.x, y: detourY }
+    const wp2: Point = { x: end.x, y: detourY }
+
+    // Check if this detour is clear
+    const seg1Obs = findObstacles(start.x, start.y, wp1.x, wp1.y, nodes, excludeIds)
+    const seg2Obs = findObstacles(wp1.x, wp1.y, wp2.x, wp2.y, nodes, excludeIds)
+    const seg3Obs = findObstacles(wp2.x, wp2.y, end.x, end.y, nodes, excludeIds)
+
+    if (seg1Obs.length === 0 && seg2Obs.length === 0 && seg3Obs.length === 0) {
+      return [wp1, wp2]
+    }
+
+    // Try the other side
+    const altDetourY = distAbove <= distBelow ? bounds.maxY : bounds.minY
+    const altWp1: Point = { x: start.x, y: altDetourY }
+    const altWp2: Point = { x: end.x, y: altDetourY }
+
+    const altSeg1Obs = findObstacles(start.x, start.y, altWp1.x, altWp1.y, nodes, excludeIds)
+    const altSeg2Obs = findObstacles(altWp1.x, altWp1.y, altWp2.x, altWp2.y, nodes, excludeIds)
+    const altSeg3Obs = findObstacles(altWp2.x, altWp2.y, end.x, end.y, nodes, excludeIds)
+
+    if (altSeg1Obs.length === 0 && altSeg2Obs.length === 0 && altSeg3Obs.length === 0) {
+      return [altWp1, altWp2]
+    }
+
+    // Use the path with fewer obstacles
+    const firstTotal = seg1Obs.length + seg2Obs.length + seg3Obs.length
+    const altTotal = altSeg1Obs.length + altSeg2Obs.length + altSeg3Obs.length
+    return firstTotal <= altTotal ? [wp1, wp2] : [altWp1, altWp2]
+
+  } else {
+    // Vertical segment blocked - find shortest horizontal detour
+    const distLeft = Math.abs(start.x - bounds.minX) + Math.abs(end.x - bounds.minX)
+    const distRight = Math.abs(start.x - bounds.maxX) + Math.abs(end.x - bounds.maxX)
+
+    const detourX = distLeft <= distRight ? bounds.minX : bounds.maxX
+
+    const wp1: Point = { x: detourX, y: start.y }
+    const wp2: Point = { x: detourX, y: end.y }
+
+    // Check if this detour is clear
+    const seg1Obs = findObstacles(start.x, start.y, wp1.x, wp1.y, nodes, excludeIds)
+    const seg2Obs = findObstacles(wp1.x, wp1.y, wp2.x, wp2.y, nodes, excludeIds)
+    const seg3Obs = findObstacles(wp2.x, wp2.y, end.x, end.y, nodes, excludeIds)
+
+    if (seg1Obs.length === 0 && seg2Obs.length === 0 && seg3Obs.length === 0) {
+      return [wp1, wp2]
+    }
+
+    // Try the other side
+    const altDetourX = distLeft <= distRight ? bounds.maxX : bounds.minX
+    const altWp1: Point = { x: altDetourX, y: start.y }
+    const altWp2: Point = { x: altDetourX, y: end.y }
+
+    const altSeg1Obs = findObstacles(start.x, start.y, altWp1.x, altWp1.y, nodes, excludeIds)
+    const altSeg2Obs = findObstacles(altWp1.x, altWp1.y, altWp2.x, altWp2.y, nodes, excludeIds)
+    const altSeg3Obs = findObstacles(altWp2.x, altWp2.y, end.x, end.y, nodes, excludeIds)
+
+    if (altSeg1Obs.length === 0 && altSeg2Obs.length === 0 && altSeg3Obs.length === 0) {
+      return [altWp1, altWp2]
+    }
+
+    // Use the path with fewer obstacles
+    const firstTotal = seg1Obs.length + seg2Obs.length + seg3Obs.length
+    const altTotal = altSeg1Obs.length + altSeg2Obs.length + altSeg3Obs.length
+    return firstTotal <= altTotal ? [wp1, wp2] : [altWp1, altWp2]
+  }
+}
+
+/**
+ * Route with multiple segments - adds turns as needed to avoid obstacles
  * Uses lane-based routing to prevent edge overlaps (like PCB traces)
  */
 function routeThreeSegment(
@@ -307,7 +408,7 @@ function routeThreeSegment(
     if (result) return result
   }
 
-  // Standard 3-segment routing
+  // Standard 3-segment routing with obstacle avoidance
   const startPrimary = getAxis(startStandoff, primaryAxis)
   const startSecondary = getAxis(startStandoff, secondaryAxis)
   const endSecondary = getAxis(endStandoff, secondaryAxis)
@@ -315,71 +416,107 @@ function routeThreeSegment(
   // Ideal midpoint on primary axis
   const idealMid = gridTracker.snap(startPrimary + delta / 2 + channelOffset)
 
-  // Check for obstacles and find clear route
-  const checkPath = (mid: number): NodeRect[] => {
-    const mid1 = setAxis(startStandoff, primaryAxis, mid)
-    const mid2 = setAxis(endStandoff, primaryAxis, mid)
-    return [
-      ...findObstacles(startStandoff.x, startStandoff.y, mid1.x, mid1.y, nodes, excludeIds),
-      ...findObstacles(mid1.x, mid1.y, mid2.x, mid2.y, nodes, excludeIds),
-      ...findObstacles(mid2.x, mid2.y, endStandoff.x, endStandoff.y, nodes, excludeIds),
-    ]
-  }
-
-  // Find a free channel using the grid tracker (lane-based routing)
-  // This prevents edges from overlapping by finding unused "lanes"
-  const isHorizontalMid = primaryAxis === 'y' // Middle segment is horizontal if we're moving in Y first
+  // Find a free channel using the grid tracker
+  const isHorizontalMid = primaryAxis === 'y'
   const rangeStart = Math.min(startSecondary, endSecondary)
   const rangeEnd = Math.max(startSecondary, endSecondary)
 
-  // Use grid tracker to find a free channel for the middle segment
   let adjustedMid = gridTracker.findFreeChannel(
     idealMid,
     isHorizontalMid,
     rangeStart,
     rangeEnd,
-    15 // Try up to 15 alternative lanes
+    15
   )
 
-  // Check for obstacles at the chosen channel
-  const obstacles = checkPath(adjustedMid)
+  // Build initial 3-segment path
+  let mid1 = setAxis(startStandoff, primaryAxis, adjustedMid)
+  let mid2 = setAxis(endStandoff, primaryAxis, adjustedMid)
 
-  // If obstacles found, try to route around them
-  if (obstacles.length > 0) {
-    const bounds = getObstacleBounds(obstacles, OBSTACLE_MARGIN + DETOUR_MARGIN)
-    const tryLow = primaryAxis === 'x' ? bounds.minX : bounds.minY
-    const tryHigh = primaryAxis === 'x' ? bounds.maxX : bounds.maxY
+  // Check if the middle channel goes through obstacles and find a clear one
+  const nodeList = nodes instanceof Map ? Array.from(nodes.values()) : nodes
+  const checkMidClear = (): boolean => {
+    for (const node of nodeList) {
+      if (excludeIds.has(node.id)) continue
+      const left = node.canvas_x - OBSTACLE_MARGIN
+      const right = node.canvas_x + (node.width || 200) + OBSTACLE_MARGIN
+      const top = node.canvas_y - OBSTACLE_MARGIN
+      const bottom = node.canvas_y + (node.height || 120) + OBSTACLE_MARGIN
 
-    // Try both sides and pick the one that's clearer
-    const lowObs = checkPath(tryLow)
-    const highObs = checkPath(tryHigh)
+      // Check if mid1->mid2 segment goes through this node
+      const midLeft = Math.min(mid1.x, mid2.x)
+      const midRight = Math.max(mid1.x, mid2.x)
+      const midTop = Math.min(mid1.y, mid2.y)
+      const midBottom = Math.max(mid1.y, mid2.y)
 
-    if (lowObs.length === 0) {
-      adjustedMid = gridTracker.findFreeChannel(tryLow, isHorizontalMid, rangeStart, rangeEnd, 10)
-      usedDetour = true
-    } else if (highObs.length === 0) {
-      adjustedMid = gridTracker.findFreeChannel(tryHigh, isHorizontalMid, rangeStart, rangeEnd, 10)
-      usedDetour = true
-    } else if (lowObs.length < obstacles.length) {
-      adjustedMid = gridTracker.findFreeChannel(tryLow, isHorizontalMid, rangeStart, rangeEnd, 10)
-      usedDetour = true
-    } else if (highObs.length < obstacles.length) {
-      adjustedMid = gridTracker.findFreeChannel(tryHigh, isHorizontalMid, rangeStart, rangeEnd, 10)
-      usedDetour = true
+      if (midRight >= left && midLeft <= right && midBottom >= top && midTop <= bottom) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // Try to find a clear channel by moving the midpoint
+  if (!checkMidClear()) {
+    // Find obstacles in the region between start and end
+    const regionMinX = Math.min(startStandoff.x, endStandoff.x) - 50
+    const regionMaxX = Math.max(startStandoff.x, endStandoff.x) + 50
+    const regionMinY = Math.min(startStandoff.y, endStandoff.y) - 50
+    const regionMaxY = Math.max(startStandoff.y, endStandoff.y) + 50
+
+    const obstaclesInRegion = nodeList.filter(node => {
+      if (excludeIds.has(node.id)) return false
+      const nodeRight = node.canvas_x + (node.width || 200)
+      const nodeBottom = node.canvas_y + (node.height || 120)
+      return nodeRight >= regionMinX && node.canvas_x <= regionMaxX &&
+             nodeBottom >= regionMinY && node.canvas_y <= regionMaxY
+    })
+
+    if (obstaclesInRegion.length > 0) {
+      const bounds = getObstacleBounds(obstaclesInRegion, OBSTACLE_MARGIN + 20)
+      // Try routing above or below all obstacles
+      const tryAbove = primaryAxis === 'x' ? bounds.minX - 20 : bounds.minY - 20
+      const tryBelow = primaryAxis === 'x' ? bounds.maxX + 20 : bounds.maxY + 20
+
+      // Pick the one closer to the current mid
+      if (Math.abs(adjustedMid - tryAbove) < Math.abs(adjustedMid - tryBelow)) {
+        adjustedMid = tryAbove
+      } else {
+        adjustedMid = tryBelow
+      }
+
+      mid1 = setAxis(startStandoff, primaryAxis, adjustedMid)
+      mid2 = setAxis(endStandoff, primaryAxis, adjustedMid)
     }
   }
 
-  // Build the path with the final channel
-  const mid1 = setAxis(startStandoff, primaryAxis, adjustedMid)
-  const mid2 = setAxis(endStandoff, primaryAxis, adjustedMid)
+  // Check each segment for obstacles and add waypoints as needed
+  const isFirstSegHorizontal = primaryAxis === 'x'
+  const seg1Extra = routeSegmentAroundObstacles(startStandoff, mid1, !isFirstSegHorizontal, nodes, excludeIds)
+  const seg2Extra = routeSegmentAroundObstacles(mid1, mid2, isFirstSegHorizontal, nodes, excludeIds)
+  const seg3Extra = routeSegmentAroundObstacles(mid2, endStandoff, !isFirstSegHorizontal, nodes, excludeIds)
 
-  // Mark all segments in the grid tracker to prevent future overlaps
-  gridTracker.mark(startStandoff.x, startStandoff.y, mid1.x, mid1.y)
-  gridTracker.mark(mid1.x, mid1.y, mid2.x, mid2.y)
-  gridTracker.mark(mid2.x, mid2.y, endStandoff.x, endStandoff.y)
+  usedDetour = seg1Extra.length > 0 || seg2Extra.length > 0 || seg3Extra.length > 0
 
-  const path = [startPort, startStandoff, mid1, mid2, endStandoff, endEdge]
-  return { path, svgPath: buildSvgPath(path), usedDetour }
+  // Build complete path with all waypoints
+  const path = [
+    startPort,
+    startStandoff,
+    ...seg1Extra,
+    mid1,
+    ...seg2Extra,
+    mid2,
+    ...seg3Extra,
+    endStandoff,
+    endEdge
+  ]
+
+  // Mark all segments in the grid tracker
+  for (let i = 0; i < path.length - 1; i++) {
+    gridTracker.mark(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y)
+  }
+
+  return { path: cleanPath(path), svgPath: buildSvgPath(cleanPath(path)), usedDetour }
 }
 
 /**

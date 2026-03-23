@@ -150,31 +150,36 @@ function routeAroundObstacles(
 }
 
 /**
- * Clean a path by removing redundant points
+ * Clean a path by removing redundant points and back-and-forth segments
  */
 export function cleanPath(path: Point[]): Point[] {
   if (path.length <= 2) return path
 
-  const result: Point[] = [path[0]]
-
+  // First pass: remove duplicate/near-duplicate points
+  const points: Point[] = [path[0]]
   for (let i = 1; i < path.length; i++) {
-    const prev = result[result.length - 1]
+    const prev = points[points.length - 1]
     const curr = path[i]
-
-    // Skip points too close to previous
-    if (Math.abs(curr.x - prev.x) < 1 && Math.abs(curr.y - prev.y) < 1) {
-      continue
+    if (Math.abs(curr.x - prev.x) >= 1 || Math.abs(curr.y - prev.y) >= 1) {
+      points.push(curr)
     }
+  }
 
-    // Skip collinear middle points
-    if (i < path.length - 1 && result.length >= 1) {
-      const next = path[i + 1]
+  // Second pass: remove collinear middle points
+  let result: Point[] = [points[0]]
+  for (let i = 1; i < points.length; i++) {
+    const prev = result[result.length - 1]
+    const curr = points[i]
+
+    if (i < points.length - 1) {
+      const next = points[i + 1]
       const dx1 = curr.x - prev.x
       const dy1 = curr.y - prev.y
       const dx2 = next.x - curr.x
       const dy2 = next.y - curr.y
       const cross = dx1 * dy2 - dy1 * dx2
 
+      // Skip collinear points
       if (Math.abs(cross) < 1) {
         continue
       }
@@ -183,11 +188,43 @@ export function cleanPath(path: Point[]): Point[] {
     result.push(curr)
   }
 
-  // Ensure last point is included
-  const last = path[path.length - 1]
-  const resultLast = result[result.length - 1]
-  if (Math.abs(last.x - resultLast.x) > 1 || Math.abs(last.y - resultLast.y) > 1) {
-    result.push(last)
+  // Third pass: remove back-and-forth patterns (U-turns)
+  // A U-turn is when segment i goes one direction and segment i+1 goes opposite
+  let cleaned = true
+  while (cleaned && result.length > 2) {
+    cleaned = false
+    const newResult: Point[] = [result[0]]
+
+    for (let i = 1; i < result.length - 1; i++) {
+      const p0 = newResult[newResult.length - 1]
+      const p1 = result[i]
+      const p2 = result[i + 1]
+
+      const dx1 = p1.x - p0.x
+      const dy1 = p1.y - p0.y
+      const dx2 = p2.x - p1.x
+      const dy2 = p2.y - p1.y
+
+      // Check for horizontal U-turn (goes right then left, or vice versa)
+      const isHorizontalUturn = Math.abs(dy1) < 1 && Math.abs(dy2) < 1 &&
+                                 ((dx1 > 5 && dx2 < -5) || (dx1 < -5 && dx2 > 5))
+
+      // Check for vertical U-turn (goes down then up, or vice versa)
+      const isVerticalUturn = Math.abs(dx1) < 1 && Math.abs(dx2) < 1 &&
+                               ((dy1 > 5 && dy2 < -5) || (dy1 < -5 && dy2 > 5))
+
+      if (isHorizontalUturn || isVerticalUturn) {
+        // Skip this point - it creates a U-turn
+        cleaned = true
+        continue
+      }
+
+      newResult.push(p1)
+    }
+
+    // Always include last point
+    newResult.push(result[result.length - 1])
+    result = newResult
   }
 
   return result

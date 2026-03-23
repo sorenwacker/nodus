@@ -421,9 +421,10 @@ const magnifierVisibleNodes = computed(() => {
   })
 })
 
-// Edge stroke width - keep edges visible when zoomed out (2 screen pixels)
+// Edge stroke width - thin lines that stay visible but don't get too thick
 const edgeStrokeWidth = computed(() => {
-  return Math.max(1, 2 / scale.value)
+  // At normal zoom: 1.5px, zoomed out: max 3px canvas units
+  return Math.max(1, Math.min(3, 1.5 / scale.value))
 })
 
 // Node border width - scale inversely to maintain constant visual width
