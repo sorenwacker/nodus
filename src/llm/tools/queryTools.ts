@@ -14,13 +14,13 @@ export function registerQueryTools(): void {
       type: 'object',
       properties: {
         include_content: { type: 'boolean', description: 'Include node content (default: true)' },
-        max_content_length: { type: 'number', description: 'Max chars per node (default 100, max 200)' },
+        max_content_length: { type: 'number', description: 'Max chars per node content (default 200, max 5000)' },
       },
       required: [],
     },
     async (args, ctx) => {
       const includeContent = args.include_content !== false
-      const maxLen = Math.min(args.max_content_length || 100, 200) // Enforce max 200
+      const maxLen = Math.min(args.max_content_length || 200, 5000)
       const nodes = ctx.store.filteredNodes
       const edges = ctx.store.filteredEdges
 
