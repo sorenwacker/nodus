@@ -43,7 +43,8 @@ defineEmits<{
     @pointerdown.stop="$emit('pointerdown', $event, frame.id)"
     @dblclick.stop="$emit('dblclick', frame.id)"
   >
-    <div class="frame-header" :style="{ transform: `scale(${1/scale})`, transformOrigin: 'left center' }">
+    <!-- Title label on top -->
+    <div class="frame-header" :style="{ transform: `scale(${1/scale}) translateY(-100%)`, transformOrigin: 'left top' }">
       <input
         v-if="editingFrameId === frame.id"
         :value="editFrameTitle"
@@ -56,23 +57,35 @@ defineEmits<{
         @pointerdown.stop
       />
       <span v-else class="frame-title">{{ frame.title }}</span>
-      <div v-if="selectedFrameId === frame.id && editingFrameId !== frame.id" class="frame-color-picker" @pointerdown.stop>
-        <button
-          v-for="color in frameColors"
-          :key="color.value || 'default'"
-          class="frame-color-dot"
-          :class="{ active: frame.color === color.value }"
-          :style="{ background: color.value || 'var(--border-default)' }"
-          @click.stop="$emit('update-color', frame.id, color.value)"
-        ></button>
-      </div>
-      <button
-        v-if="selectedFrameId === frame.id && editingFrameId !== frame.id"
-        class="frame-delete-btn"
-        :title="t('canvas.frame.delete')"
-        @click.stop="$emit('delete')"
-      >x</button>
     </div>
+
+    <!-- Delete button top-right (like nodes) -->
+    <button
+      v-if="selectedFrameId === frame.id && editingFrameId !== frame.id"
+      class="frame-delete-btn"
+      :style="{ transform: `scale(${1/scale})`, transformOrigin: 'center center' }"
+      :title="t('canvas.frame.delete')"
+      @click.stop="$emit('delete')"
+      @pointerdown.stop
+    ></button>
+
+    <!-- Color bar below frame -->
+    <div
+      v-if="selectedFrameId === frame.id && editingFrameId !== frame.id"
+      class="frame-color-bar"
+      :style="{ transform: `scale(${1/scale}) translateY(100%)`, transformOrigin: 'left bottom' }"
+      @pointerdown.stop
+    >
+      <button
+        v-for="color in frameColors"
+        :key="color.value || 'default'"
+        class="frame-color-dot"
+        :class="{ active: frame.color === color.value }"
+        :style="{ background: color.value || 'var(--border-default)' }"
+        @click.stop="$emit('update-color', frame.id, color.value)"
+      ></button>
+    </div>
+
     <div class="frame-resize-handle" @pointerdown.stop="$emit('start-resize', $event, frame.id)"></div>
   </div>
 </template>

@@ -1686,7 +1686,7 @@
 
 .frame-header {
   position: absolute;
-  top: -28px;
+  top: 0;
   left: 8px;
   display: flex;
   align-items: center;
@@ -1751,44 +1751,68 @@
 }
 
 .frame-delete-btn {
-  margin-left: 8px;
-  width: 20px;
-  height: 20px;
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   border: none;
-  border-radius: 4px;
-  background: var(--danger-color);
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
+  background: transparent;
+  color: var(--danger-color);
   cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.8;
+  z-index: 10;
 }
 
-.frame-delete-btn:hover {
-  opacity: 1;
-}
-
-.frame-color-picker {
+.frame-delete-btn::before {
+  content: 'x';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-color);
   display: flex;
   align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px var(--shadow-sm);
+  transition: background 0.1s, color 0.1s;
+}
+
+.frame-delete-btn:hover::before {
+  background: var(--danger-color);
+  color: white;
+}
+
+.frame-color-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
   gap: 4px;
-  margin-left: 8px;
   padding: 4px 6px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 10;
 }
 
 .frame-color-dot {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform 0.1s, border-color 0.1s;
 }
 
 .frame-color-dot:hover {
