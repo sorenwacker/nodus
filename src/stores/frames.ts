@@ -65,7 +65,8 @@ export const useFramesStore = defineStore('frames', () => {
   function getFramesForWorkspace(workspaceId: string | null): Frame[] {
     // Treat "default" as null - the default workspace uses null in the database
     if (!workspaceId || workspaceId === 'default') {
-      return frames.value.filter((f) => !f.workspace_id)
+      // Match frames with null, undefined, empty string, or "default" workspace_id
+      return frames.value.filter((f) => !f.workspace_id || f.workspace_id === 'default')
     }
     return frames.value.filter((f) => f.workspace_id === workspaceId)
   }
