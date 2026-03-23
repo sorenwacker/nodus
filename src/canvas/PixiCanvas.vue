@@ -1697,9 +1697,9 @@ useCanvasKeyboardShortcuts({
         ></div>
         <!-- eslint-enable vue/no-v-html -->
 
-        <!-- Color palette and options (shown when selected or editing) -->
+        <!-- Color palette and options (shown when selected or editing, hidden when collapsed - see fixed bar) -->
         <div
-          v-if="store.selectedNodeIds.includes(node.id) || editingNodeId === node.id"
+          v-if="(store.selectedNodeIds.includes(node.id) || editingNodeId === node.id) && !isSemanticZoomCollapsed.value"
           class="node-color-bar"
           :style="{ transform: `scale(${1/scale}) translateY(100%)`, transformOrigin: 'left bottom' }"
           @pointerdown.prevent
@@ -1720,9 +1720,9 @@ useCanvasKeyboardShortcuts({
           >Fit</button>
         </div>
 
-        <!-- Delete button (shown when selected but not editing) -->
+        <!-- Delete button (shown when selected but not editing, hidden when collapsed) -->
         <button
-          v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id"
+          v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id && !isSemanticZoomCollapsed.value"
           class="delete-node-btn"
           :style="{ transform: `scale(${1/scale})`, transformOrigin: 'center center' }"
           @pointerdown.stop="deleteSelectedNodes"
@@ -1801,6 +1801,21 @@ useCanvasKeyboardShortcuts({
       @create-frame="createFrameAtCenter"
       @show-help="showHelpModal = true"
     />
+
+    <!-- Fixed color bar at top of canvas (shown when zoomed out/collapsed and node selected) -->
+    <div
+      v-if="isSemanticZoomCollapsed.value && store.selectedNodeIds.length > 0"
+      class="collapsed-color-bar"
+    >
+      <button
+        v-for="color in nodeColors"
+        :key="color.value || 'default'"
+        class="color-dot"
+        :class="{ active: store.nodes.find(n => n.id === store.selectedNodeIds[0])?.color_theme === color.value }"
+        :style="{ background: color.display || 'var(--bg-surface)' }"
+        @click.stop="updateNodeColor(store.selectedNodeIds[0], color.value)"
+      ></button>
+    </div>
 
     <!-- Help Modal -->
     <KeyboardShortcutsModal :show="showHelpModal" @close="showHelpModal = false" />

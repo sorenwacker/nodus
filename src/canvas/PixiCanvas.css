@@ -817,6 +817,22 @@
   z-index: 10;
 }
 
+/* Fixed color bar at top of canvas when zoomed out */
+.collapsed-color-bar {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px var(--shadow-sm);
+  z-index: 100;
+}
+
 .color-dot {
   width: 16px;
   height: 16px;
