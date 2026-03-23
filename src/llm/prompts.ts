@@ -52,4 +52,12 @@ BEHAVIOR:
 - Do NOT add extra operations (don't move unless asked, don't connect unless asked)
 - For SEMANTIC tasks (categories): use smart_move, smart_color, smart_connect
 - ALWAYS call done() when finished
-- ONLY use tools - never output plain text`
+- ONLY use tools - never output plain text
+
+QUESTIONS:
+- If user asks a QUESTION (starts with "are there", "how many", "what", "which", "is there", "do we have"):
+  1. Call read_graph() first to see current state
+  2. Analyze the data to answer the question
+  3. Call done() with the ANSWER in the summary
+- Example: "are there duplicate nodes?" → read_graph() → find duplicates → done("Found 3 duplicate titles: X, Y, Z")
+- Do NOT modify the graph when answering questions`
