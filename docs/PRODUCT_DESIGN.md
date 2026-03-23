@@ -371,7 +371,7 @@ Users want the node on the canvas to be the "source of truth." They dislike clic
 - Node auto-resizes to fit content
 - **Multi-directional resize:** All edges and corners (8 handles)
 - Minimap navigation
-- Frames/areas for grouping
+- **Frames:** Spatial grouping containers (see Frames section below)
 - **Undo/Redo system:** Full support including node deletion with edge restoration
 - **Cmd/Ctrl+Click:** Zoom-to-fit on specific node (auto-scales based on node size)
 - **External links:** Open in default system browser
@@ -403,6 +403,33 @@ Drag and drop files directly onto the canvas to import them. Supported formats:
   - Create nodes for individuals/instances
 - Nodes are auto-laid out after import
 - RDF properties become edges between nodes
+
+### Frames
+
+Frames are spatial grouping containers that organize related nodes on the canvas.
+
+**Creating Frames:**
+- Press `Shift+F` to create a frame:
+  - If nodes are selected: creates frame around selected nodes with padding
+  - If no selection: enters placement mode (click to place frame center)
+- Frames auto-size when created around existing nodes
+
+**Frame Interactions:**
+- Click frame to select (shows controls)
+- Drag frame to move it along with contained nodes
+- Double-click title to rename
+- Resize using bottom-right handle
+
+**Frame Controls (when selected):**
+- Title label (top): displays frame name, editable on double-click
+- Delete button (top-right): circular x button (same style as nodes)
+- Color bar (bottom): color picker dots to change border color
+- Resize handle (bottom-right): drag to resize frame
+
+**Containment Rules:**
+- Nodes are considered "inside" a frame if >50% of node area overlaps the frame
+- Moving a frame moves all contained nodes
+- Nodes can be moved independently in/out of frames
 
 ### Zotero Integration
 
@@ -441,6 +468,7 @@ Two methods for importing citations from Zotero:
 | `F` | Fit to content |
 | `Shift+R` | Reset all node sizes to default |
 | `Shift+E` | Export graph as YAML (debug) |
+| `Shift+F` | Create frame (around selection or placement mode) |
 | `Cmd/Ctrl+A` | Select all nodes |
 | `Cmd/Ctrl+C` | Copy selected nodes as JSON |
 | `Cmd/Ctrl+V` | Paste nodes from clipboard |
@@ -1434,4 +1462,4 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 ---
 
 *Document: `/docs/PRODUCT_DESIGN.md`*
-*Version: 0.16.0 — Added: Zotero integration (BibTeX/CSL-JSON import with collection-to-frame mapping, direct Zotero library access via Settings, ImportOptionsModal). Updated Phase 2 roadmap to reflect Zotero completion.*
+*Version: 0.17.0 — Added: Frames documentation section with creation, interaction, and controls. Added Shift+F shortcut.*
