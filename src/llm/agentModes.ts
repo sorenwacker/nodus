@@ -46,6 +46,10 @@ const exploreMode: AgentModeConfig = {
     'create_edges_batch',
     'update_node',
     'auto_layout',
+    // Deleting (for corrections)
+    'delete_node',
+    'delete_edges',
+    'delete_matching',
     // Coloring
     'smart_color',
     'color_matching',
@@ -105,6 +109,10 @@ const planMode: AgentModeConfig = {
     'create_edges_batch',
     'update_node',
     'auto_layout',
+    // Deleting (for corrections)
+    'delete_node',
+    'delete_edges',
+    'delete_matching',
     // Coloring
     'smart_color',
     'color_matching',
