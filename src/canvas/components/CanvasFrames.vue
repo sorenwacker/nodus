@@ -38,6 +38,7 @@ defineEmits<{
       height: frame.height + 'px',
       borderColor: frame.color || 'var(--border-default)',
       borderWidth: frameBorderWidth + 'px',
+      borderStyle: 'dashed',
     }"
     @pointerdown.stop="$emit('pointerdown', $event, frame.id)"
     @dblclick.stop="$emit('dblclick', frame.id)"

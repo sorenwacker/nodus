@@ -423,9 +423,9 @@ const nodeBorderWidth = computed(() => {
   return 1 / scale.value
 })
 
-// Frame border width - scale inversely to maintain constant visual width
+// Frame border width - scale inversely to maintain constant visual width (2px on screen)
 const frameBorderWidth = computed(() => {
-  return 1 / scale.value
+  return Math.max(1, 2 / scale.value)
 })
 
 // Minimap - using composable
@@ -1286,6 +1286,7 @@ async function onCanvasDoubleClick(e: MouseEvent) {
   if (Date.now() - lastDragEndTime < 200) return
 
   const pos = screenToCanvas(e.clientX, e.clientY)
+  console.log('[DEBUG] Click:', e.clientX, e.clientY, '-> Canvas:', pos.x, pos.y, 'scale:', scale.value, 'offset:', offsetX.value, offsetY.value)
   await store.createNode({
     title: '',
     node_type: 'note',
