@@ -376,8 +376,7 @@
   backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
   contain: layout style;
-  /* Allow clicks to pass through to canvas-viewport */
-  pointer-events: none;
+  /* Children handle their own pointer-events */
 }
 
 .canvas-viewport {
