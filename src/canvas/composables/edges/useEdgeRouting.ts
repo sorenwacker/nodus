@@ -342,8 +342,24 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       if (isHugeGraph.value) {
         path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
       } else if (isDragging?.value) {
-        // During drag, use simple paths for performance (cached paths have stale coordinates)
-        path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+        // During drag, use simple paths that match the edge style
+        if (edgeStyle === 'straight') {
+          path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
+        } else if (edgeStyle === 'orthogonal') {
+          // Simple orthogonal: horizontal then vertical (or vice versa based on direction)
+          const midX = (startPort.x + endEdge.x) / 2
+          path = `M${startPort.x},${startPort.y} L${midX},${startPort.y} L${midX},${endEdge.y} L${endEdge.x},${endEdge.y}`
+        } else if (edgeStyle === 'curved') {
+          // Bezier curve
+          const cx1 = startStandoff.x
+          const cy1 = startPort.y
+          const cx2 = endStandoff.x
+          const cy2 = endEdge.y
+          path = `M${startPort.x},${startPort.y} C${cx1},${cy1} ${cx2},${cy2} ${endEdge.x},${endEdge.y}`
+        } else {
+          // diagonal/hyperbolic - use standoff points
+          path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
+        }
       } else if (routed?.svgPath) {
         path = routed.svgPath
       } else {
