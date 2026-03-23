@@ -534,9 +534,7 @@
 
 .node-card.collapsed .node-content,
 .node-card.collapsed .inline-editor,
-.node-card.collapsed .node-color-bar,
-.node-card.collapsed .resize-handle,
-.node-card.collapsed .delete-node-btn {
+.node-card.collapsed .resize-handle {
   display: none;
 }
 
