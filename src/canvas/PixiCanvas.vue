@@ -1286,7 +1286,6 @@ async function onCanvasDoubleClick(e: MouseEvent) {
   if (Date.now() - lastDragEndTime < 200) return
 
   const pos = screenToCanvas(e.clientX, e.clientY)
-  console.log('[DEBUG] Click:', e.clientX, e.clientY, '-> Canvas:', pos.x, pos.y, 'scale:', scale.value, 'offset:', offsetX.value, offsetY.value)
   await store.createNode({
     title: '',
     node_type: 'note',
