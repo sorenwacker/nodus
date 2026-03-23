@@ -56,7 +56,7 @@ defineEmits<{
         @click.stop
         @pointerdown.stop
       />
-      <span v-else class="frame-title">{{ frame.title }}</span>
+      <span v-else class="frame-title" :style="{ color: frame.color || undefined, borderColor: frame.color || undefined }">{{ frame.title }}</span>
     </div>
 
     <!-- Delete button top-right (like nodes) -->
@@ -130,14 +130,11 @@ defineEmits<{
   background: var(--bg-surface);
   padding: 4px 10px;
   border-radius: 4px;
-  border: 1px solid var(--border-subtle);
+  border: 2px solid var(--border-subtle);
   white-space: nowrap;
 }
 
-.canvas-frame.selected .frame-title {
-  color: var(--primary-color);
-  border-color: var(--primary-color);
-}
+/* Title color is set via inline style to match frame color */
 
 .frame-title-editor {
   font-size: 14px;
