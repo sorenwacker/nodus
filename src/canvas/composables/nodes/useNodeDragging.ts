@@ -82,8 +82,10 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
   // State
   const draggingNode = ref<string | null>(null)
+  const pendingDragNode = ref<string | null>(null) // Set on mousedown, promoted to draggingNode on movement
   const dragStart = ref({ x: 0, y: 0, nodeX: 0, nodeY: 0 })
   const multiDragInitial = ref<Map<string, { x: number; y: number }>>(new Map())
+  const DRAG_THRESHOLD = 3 // Pixels of movement before we consider it a drag
 
   function onNodePointerDown(e: PointerEvent, nodeId: string) {
     e.stopPropagation()
@@ -127,8 +129,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     // Capture undo state before dragging
     pushUndo()
 
-    draggingNode.value = nodeId
-    document.body.classList.add('node-dragging')
+    pendingDragNode.value = nodeId
 
     // If node is already selected, don't change selection (allows multi-drag)
     // Only select if not already selected
@@ -136,11 +137,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       store.selectNode(nodeId, e.shiftKey || e.metaKey)
     }
     selectedEdge.value = null
-
-    // Log clicked node info for debugging port assignments
-    const clickedNode = store.getNode(nodeId)
-    const nodeEdges = store.filteredEdges.filter(edge => edge.source_node_id === nodeId || edge.target_node_id === nodeId)
-    console.log(`[Click] "${clickedNode?.title}" - ${nodeEdges.length} edges`)
 
     // Optimize entry points for this node (wrapped in try-catch to not break click handling)
     try {
@@ -163,9 +159,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     } catch (err) {
       console.error('[optimizeNodeEntrypoints] Error:', err)
     }
-
-    // Trigger edge re-routing
-    ;(store as { nodeLayoutVersion: number }).nodeLayoutVersion++
 
     // In neighborhood mode, clicking a neighbor navigates to its neighborhood
     if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
@@ -198,10 +191,22 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
   }
 
   function onNodeDrag(e: PointerEvent) {
-    if (!draggingNode.value) return
     const pos = screenToCanvas(e.clientX, e.clientY)
     const dx = pos.x - dragStart.value.x
     const dy = pos.y - dragStart.value.y
+
+    // Promote pending drag to actual drag once movement threshold is exceeded
+    if (pendingDragNode.value && !draggingNode.value) {
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      if (distance < DRAG_THRESHOLD) return // Not enough movement yet
+
+      // Start actual drag
+      draggingNode.value = pendingDragNode.value
+      pendingDragNode.value = null
+      document.body.classList.add('node-dragging')
+    }
+
+    if (!draggingNode.value) return
 
     // Move all selected nodes if multi-dragging
     if (multiDragInitial.value.size > 0) {
@@ -218,6 +223,11 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
   }
 
   function stopNodeDrag(e: PointerEvent) {
+    // Clear pending drag if no actual drag started
+    if (pendingDragNode.value) {
+      pendingDragNode.value = null
+    }
+
     const draggedNodeId = draggingNode.value
     const draggedNodeIds = multiDragInitial.value.size > 0
       ? [...multiDragInitial.value.keys()]

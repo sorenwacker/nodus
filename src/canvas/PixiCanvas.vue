@@ -498,11 +498,10 @@ const {
 const neighborHighlightedMap = ref<Record<string, boolean>>({})
 
 watch(
-  [storeSelectedNodeIds, storeFilteredEdges],
-  ([selectedIds, edges]) => {
+  [storeSelectedNodeIds, () => storeFilteredEdges.value.length],
+  ([selectedIds]) => {
+    const edges = storeFilteredEdges.value
     const map: Record<string, boolean> = {}
-
-    console.log('[NEIGHBOR SELECT] selectedIds:', selectedIds, 'edges:', edges.length)
 
     if (selectedIds.length === 0) {
       neighborHighlightedMap.value = map
@@ -520,10 +519,9 @@ watch(
       }
     }
 
-    console.log('[NEIGHBOR SELECT] neighbors found:', Object.keys(map).length)
     neighborHighlightedMap.value = map
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 )
 
 // Context menu composable
