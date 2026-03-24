@@ -419,13 +419,6 @@ pub mod edges {
         pub created_at: i64,
     }
 
-    pub async fn get_all(pool: &DbPool) -> Result<Vec<Edge>, DatabaseError> {
-        let edges = sqlx::query_as::<_, Edge>("SELECT * FROM edges")
-            .fetch_all(pool)
-            .await?;
-        Ok(edges)
-    }
-
     /// Get edges filtered by workspace (both source and target nodes must be in workspace)
     pub async fn get_by_workspace(
         pool: &DbPool,
