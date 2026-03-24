@@ -558,9 +558,8 @@
   flex: 1;
   min-height: 0; /* Required for flex child to scroll */
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
   padding: 16px;
-  padding-left: 20px; /* Extra space for bullet points */
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-main);
@@ -587,13 +586,14 @@
 
 .preview-content :deep(ul),
 .preview-content :deep(ol) {
-  padding-left: 1.5em;
+  padding-left: 0;
   margin: 0.5em 0;
-  margin-left: 0.5em;
+  list-style-position: inside;
 }
 
 .preview-content :deep(li) {
   margin-bottom: 0.25em;
+  padding-left: 0.5em;
 }
 
 .preview-content :deep(code) {
