@@ -498,16 +498,16 @@
 
 /* Node Preview Panel - shown when zoomed out */
 .node-preview-panel {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  width: 350px;
-  max-height: calc(100vh - 160px);
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  width: 320px;
+  max-height: calc(100% - 120px);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 8000;
+  z-index: 200;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -520,6 +520,7 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-surface-alt);
+  flex-shrink: 0;
 }
 
 .preview-header h3 {
@@ -557,11 +558,11 @@
   flex: 1;
   min-height: 0; /* Required for flex child to scroll */
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-main);
-  max-height: 60vh;
 }
 
 .preview-content :deep(h1),
@@ -610,6 +611,7 @@
   border-top: 1px solid var(--border-default);
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .preview-actions button {
