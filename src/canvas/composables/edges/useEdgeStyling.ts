@@ -158,13 +158,19 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   const defaultEdgeColor = computed(() => edgeColorPalette.value[0].value)
 
   // Highlight color for hover - matches theme accent
+  // Light themes use black for visibility, dark themes use blue, cyber uses neon cyan
   const highlightColor = computed(() => {
-    return currentTheme.value === 'cyber' ? '#00ffcc' : '#3b82f6'
+    if (currentTheme.value === 'cyber') return '#00ffcc'
+    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black') return '#3b82f6'
+    return '#1a1a1a' // Black/near-black for light themes
   })
 
   // Selected color - matches selected node border
+  // Light themes use black for visibility, dark themes use blue, cyber uses neon magenta
   const selectedColor = computed(() => {
-    return currentTheme.value === 'cyber' ? '#ff00ff' : '#3b82f6'
+    if (currentTheme.value === 'cyber') return '#ff00ff'
+    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black') return '#3b82f6'
+    return '#1a1a1a' // Black/near-black for light themes
   })
 
   const nodeColors = computed(() => {

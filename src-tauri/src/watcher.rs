@@ -170,7 +170,8 @@ impl VaultWatcher {
             .into_iter()
             .filter_entry(|e| {
                 // Skip hidden files and directories (starting with .)
-                !e.file_name().to_string_lossy().starts_with('.')
+                // But don't filter the root directory itself (depth 0)
+                e.depth() == 0 || !e.file_name().to_string_lossy().starts_with('.')
             })
             .filter_map(|e| e.ok())
         {
