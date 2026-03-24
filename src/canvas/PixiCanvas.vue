@@ -1349,6 +1349,7 @@ const currentTheme = ref(document.documentElement.getAttribute('data-theme') || 
 const edgeStyling = useEdgeStyling({
   store: {
     updateEdgeLinkType: store.updateEdgeLinkType,
+    updateEdgeColor: store.updateEdgeColor,
   },
   selectedEdgeId: selectedEdge,
   currentTheme,

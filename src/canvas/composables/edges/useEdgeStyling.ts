@@ -21,6 +21,7 @@ export interface EdgeColorOption {
 export interface UseEdgeStylingContext {
   store: {
     updateEdgeLinkType: (edgeId: string, linkType: string) => void
+    updateEdgeColor: (edgeId: string, color: string | null) => Promise<void>
   }
   selectedEdgeId: Ref<string | null>
   currentTheme: Ref<string>
@@ -257,7 +258,7 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
 
   function changeEdgeColor(color: string) {
     if (selectedEdgeId.value) {
-      store.updateEdgeLinkType(selectedEdgeId.value, color)
+      store.updateEdgeColor(selectedEdgeId.value, color)
     }
   }
 
