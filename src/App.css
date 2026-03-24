@@ -596,6 +596,115 @@
   margin-top: 8px;
 }
 
+/* Vault sync settings in workspace editor */
+.vault-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-default);
+}
+
+.vault-settings > label:first-child {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.vault-path-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vault-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-surface-alt);
+  border-radius: 6px;
+}
+
+.vault-path code {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-main);
+  word-break: break-all;
+}
+
+.clear-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.clear-btn:hover {
+  background: var(--bg-surface-alt);
+  color: var(--text-main);
+}
+
+.select-folder-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.select-folder-btn:hover {
+  opacity: 0.9;
+}
+
+.sync-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.sync-toggle input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.vault-settings .hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sync-files-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  background: var(--bg-surface-alt);
+  color: var(--text-main);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sync-files-btn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.sync-files-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .stat-sep {
   color: var(--border-default);
 }

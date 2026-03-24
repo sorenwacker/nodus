@@ -100,15 +100,32 @@ impl VaultWatcher {
 
         let watcher = RecommendedWatcher::new(
             move |res: Result<Event, notify::Error>| {
-                if let Ok(event) = res {
-                    for path in event.paths {
-                        // Only process .md files
-                        if path.extension().map_or(false, |ext| ext == "md") {
-                            let change = detect_change(&path, &checksums_clone);
-                            if let Some(change) = change {
-                                on_change(change);
+                match res {
+                    Ok(event) => {
+                        for path in event.paths {
+                            // Skip hidden files/directories (any component starting with .)
+                            let is_hidden = path
+                                .components()
+                                .any(|c| c.as_os_str().to_string_lossy().starts_with('.'));
+                            if is_hidden {
+                                continue;
+                            }
+
+                            // Only process .md files
+                            if path.extension().map_or(false, |ext| ext == "md") {
+                                let change = detect_change(&path, &checksums_clone);
+                                if let Some(change) = change {
+                                    println!(
+                                        "[Watcher] File change: {:?} - {:?}",
+                                        change.change_type, path
+                                    );
+                                    on_change(change);
+                                }
                             }
                         }
+                    }
+                    Err(e) => {
+                        eprintln!("[Watcher] Error from notify: {:?}", e);
                     }
                 }
             },
@@ -142,19 +159,32 @@ impl VaultWatcher {
     /// Scan existing files and compute checksums
     fn scan_existing_files(&self) -> Result<(), WatcherError> {
         let mut checksums = self.checksums.lock().unwrap();
+        let mut count = 0;
+
+        println!(
+            "[Watcher] Scanning existing files in: {:?}",
+            self.watched_path
+        );
 
         for entry in walkdir::WalkDir::new(&self.watched_path)
             .into_iter()
+            .filter_entry(|e| {
+                // Skip hidden files and directories (starting with .)
+                !e.file_name().to_string_lossy().starts_with('.')
+            })
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "md") {
                 if let Ok(hash) = checksum::compute_file(path) {
                     checksums.insert(path.to_path_buf(), hash);
+                    count += 1;
                 }
             }
         }
 
+        println!("[Watcher] Initial scan complete: {} md files found", count);
+        println!("[Watcher] Checksums map has {} entries", checksums.len());
         Ok(())
     }
 }

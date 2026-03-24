@@ -286,6 +286,21 @@ pub mod nodes {
         Ok(())
     }
 
+    pub async fn update_file_path_only(
+        pool: &DbPool,
+        id: &str,
+        file_path: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET file_path = ?, checksum = NULL, updated_at = ? WHERE id = ?")
+            .bind(file_path)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn update_size(
         pool: &DbPool,
         id: &str,
@@ -592,6 +607,21 @@ pub mod workspaces {
         let now = chrono::Utc::now().timestamp();
         sqlx::query("UPDATE workspaces SET sync_enabled = ?, updated_at = ? WHERE id = ?")
             .bind(sync_enabled)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_vault_path(
+        pool: &DbPool,
+        id: &str,
+        vault_path: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE workspaces SET vault_path = ?, updated_at = ? WHERE id = ?")
+            .bind(vault_path)
             .bind(now)
             .bind(id)
             .execute(pool)

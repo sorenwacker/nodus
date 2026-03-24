@@ -29,12 +29,35 @@ export interface NodeNavigationDeps {
 export function useNodeNavigation(deps: NodeNavigationDeps) {
   /**
    * Navigate to a node by title (for wikilinks)
+   * Handles paths like "concepts/FAIR-Digital-Objects" by falling back to filename match
    */
   function navigateToNode(title: string) {
-    // Find node by title (case-insensitive)
-    const targetNode = deps.getFilteredNodes().find(
-      n => n.title.toLowerCase() === title.toLowerCase()
-    )
+    const nodes = deps.getFilteredNodes()
+    const titleLower = title.toLowerCase()
+
+    // Try exact title match first
+    let targetNode = nodes.find(n => n.title.toLowerCase() === titleLower)
+
+    // Fallback: extract filename from path and try matching
+    if (!targetNode && title.includes('/')) {
+      const filename = title.split('/').pop()?.toLowerCase()
+      if (filename) {
+        targetNode = nodes.find(n => n.title.toLowerCase() === filename)
+      }
+    }
+
+    // Fallback: try partial match (filename anywhere in nodes)
+    if (!targetNode) {
+      const searchTerm = title.includes('/')
+        ? title.split('/').pop()?.toLowerCase()
+        : titleLower
+      if (searchTerm) {
+        targetNode = nodes.find(n =>
+          n.title.toLowerCase() === searchTerm ||
+          n.title.toLowerCase().replace(/-/g, ' ') === searchTerm.replace(/-/g, ' ')
+        )
+      }
+    }
 
     if (!targetNode) {
       console.warn(`Node not found: ${title}`)

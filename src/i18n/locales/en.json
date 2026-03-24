@@ -310,7 +310,9 @@
     "delete": "Delete",
     "edit": "Edit",
     "remove": "Remove",
-    "add": "Add"
+    "add": "Add",
+    "clear": "Clear",
+    "loading": "Loading"
   },
   "plan": {
     "reviewPlan": "Review Plan",
@@ -374,7 +376,9 @@
     "cannotDeleteDefault": "Cannot delete default workspace",
     "workspaceReset": "Default workspace reset to starter content",
     "importSuccess": "Imported {count} nodes",
-    "importFailed": "Failed to import vault"
+    "importFailed": "Failed to import vault",
+    "syncedFiles": "Synced {count} files",
+    "noMissingFiles": "All files are already synced"
   },
   "settings": {
     "title": "Settings",
@@ -430,6 +434,15 @@
     "version": "Version",
     "themeCount": "available",
     "themeHint": "Use the AI agent to create custom themes",
-    "deleteTheme": "Delete this custom theme?"
+    "deleteTheme": "Delete this custom theme?",
+    "vaultSync": "Vault Synchronization",
+    "selectFolder": "Select Folder",
+    "changeFolder": "Change Folder",
+    "selectVaultFolder": "Select Vault Folder",
+    "syncEnabled": "Enable file synchronization",
+    "vaultSyncHint": "When enabled, new files in the vault are added as nodes and file changes are synced.",
+    "noWorkspaceSelected": "No workspace selected",
+    "syncMissingFiles": "Sync Missing Files",
+    "syncing": "Syncing..."
   }
 }

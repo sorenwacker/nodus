@@ -36,7 +36,12 @@ const currentTheme = computed(() => themesStore.currentThemeName)
 const showStorylinePanel = ref(false)
 const readerStorylineId = ref<string | null>(null)
 const newWorkspaceName = ref('')
-const editingWorkspace = ref<{ id: string; name: string; description: string } | null>(null)
+const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
+
+// Tauri workspace functions
+import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks } from './lib/tauri'
+
+const syncingFiles = ref(false)
 
 // Toast notifications
 interface Toast {
@@ -115,23 +120,92 @@ async function createNewWorkspace() {
   }
 }
 
-function openWorkspaceEditor() {
+async function openWorkspaceEditor() {
   const current = store.workspaces.find(w => w.id === store.currentWorkspaceId)
   if (current) {
-    editingWorkspace.value = { id: current.id, name: current.name, description: '' }
+    // Load vault settings from database
+    const wsSettings = await getWorkspace(current.id)
+    editingWorkspace.value = {
+      id: current.id,
+      name: current.name,
+      description: '',
+      vault_path: wsSettings?.vault_path ?? null,
+      sync_enabled: wsSettings?.sync_enabled ?? false,
+    }
   } else {
-    editingWorkspace.value = { id: '', name: 'Default Workspace', description: '' }
+    editingWorkspace.value = { id: '', name: 'Default Workspace', description: '', vault_path: null, sync_enabled: false }
   }
   showWorkspaceEditor.value = true
 }
 
-function saveWorkspaceChanges() {
+async function saveWorkspaceChanges() {
   if (!editingWorkspace.value) return
   if (editingWorkspace.value.id) {
     store.renameWorkspace(editingWorkspace.value.id, editingWorkspace.value.name)
+
+    // Save vault settings
+    await setWorkspaceVaultPath(editingWorkspace.value.id, editingWorkspace.value.vault_path)
+    await setWorkspaceSync(editingWorkspace.value.id, editingWorkspace.value.sync_enabled)
+
+    // Start/stop watcher based on sync setting
+    if (editingWorkspace.value.sync_enabled && editingWorkspace.value.vault_path) {
+      await store.watchVault(editingWorkspace.value.vault_path)
+    } else {
+      await store.stopWatching()
+    }
   }
   showWorkspaceEditor.value = false
   showToast(t('toasts.workspaceUpdated'), 'success')
+}
+
+async function selectVaultFolder() {
+  if (!editingWorkspace.value) return
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: t('settings.selectVaultFolder'),
+    })
+    if (selected && typeof selected === 'string') {
+      editingWorkspace.value.vault_path = selected
+    }
+  } catch (e) {
+    console.error('Failed to select folder:', e)
+  }
+}
+
+function clearVaultPath() {
+  if (!editingWorkspace.value) return
+  editingWorkspace.value.vault_path = null
+  editingWorkspace.value.sync_enabled = false
+}
+
+async function syncVaultFiles() {
+  if (!editingWorkspace.value?.id || !editingWorkspace.value?.vault_path) return
+  syncingFiles.value = true
+  try {
+    // Sync missing files
+    const newNodes = await syncMissingFiles(editingWorkspace.value.id, editingWorkspace.value.vault_path) as unknown[]
+    if (newNodes.length > 0) {
+      await store.loadNodes()
+    }
+
+    // Sync all wikilinks to create edges
+    const edgesCreated = await syncAllWikilinks(editingWorkspace.value.id)
+
+    if (newNodes.length > 0 || edgesCreated > 0) {
+      await store.loadEdges()
+      showToast(t('toasts.syncedFiles', { count: newNodes.length }) + (edgesCreated > 0 ? `, ${edgesCreated} links` : ''), 'success')
+    } else {
+      showToast(t('toasts.noMissingFiles'), 'info')
+    }
+  } catch (e) {
+    console.error('[App] Failed to sync files:', e)
+    showToast(String(e), 'error')
+  } finally {
+    syncingFiles.value = false
+  }
 }
 
 function deleteCurrentWorkspace() {
@@ -227,6 +301,23 @@ onMounted(async () => {
       })
       if (workspace?.sync_enabled && workspace?.vault_path) {
         console.log('[App] Starting file watcher for workspace:', store.currentWorkspaceId)
+        // First sync any missing files (added while Nodus was closed)
+        try {
+          const newNodes = await syncMissingFiles(store.currentWorkspaceId!, workspace.vault_path)
+          if (newNodes.length > 0) {
+            console.log('[App] Synced', newNodes.length, 'missing files')
+            await store.loadNodes()
+          }
+          // Sync wikilinks to create edges
+          const edgesCreated = await syncAllWikilinks(store.currentWorkspaceId!)
+          if (edgesCreated > 0) {
+            console.log('[App] Created', edgesCreated, 'wikilink edges')
+            await store.loadEdges()
+          }
+        } catch (e) {
+          console.error('[App] Failed to sync:', e)
+        }
+        // Then start watching for future changes
         await store.watchVault(workspace.vault_path)
       } else {
         console.log('[App] File watcher NOT started - sync_enabled:', workspace?.sync_enabled, 'vault_path:', workspace?.vault_path)
@@ -515,6 +606,42 @@ async function openFolderDialog() {
               rows="3"
             ></textarea>
           </label>
+
+          <!-- Vault Sync Settings -->
+          <div v-if="editingWorkspace.id" class="vault-settings">
+            <label>{{ t('settings.vaultSync') }}:</label>
+            <div class="vault-path-row">
+              <div v-if="editingWorkspace.vault_path" class="vault-path">
+                <code>{{ editingWorkspace.vault_path }}</code>
+                <button class="clear-btn" type="button" :title="t('common.clear')" @click="clearVaultPath">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <button class="select-folder-btn" type="button" @click="selectVaultFolder">
+                {{ editingWorkspace.vault_path ? t('settings.changeFolder') : t('settings.selectFolder') }}
+              </button>
+            </div>
+            <label v-if="editingWorkspace.vault_path" class="checkbox-label sync-toggle">
+              <input
+                v-model="editingWorkspace.sync_enabled"
+                type="checkbox"
+              />
+              {{ t('settings.syncEnabled') }}
+            </label>
+            <button
+              v-if="editingWorkspace.vault_path"
+              class="sync-files-btn"
+              type="button"
+              :disabled="syncingFiles"
+              @click="syncVaultFiles"
+            >
+              {{ syncingFiles ? t('settings.syncing') : t('settings.syncMissingFiles') }}
+            </button>
+            <span class="hint">{{ t('settings.vaultSyncHint') }}</span>
+          </div>
+
           <div class="workspace-stats">
             <span>{{ store.filteredNodes.length }} {{ t('canvas.status.nodes') }}</span>
             <span class="stat-sep">|</span>

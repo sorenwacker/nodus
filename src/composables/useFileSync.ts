@@ -22,16 +22,34 @@ export interface FileSyncDeps {
   getCurrentWorkspaceId: () => string | null
 }
 
+// Extract filename from path
+function getFilename(filePath: string): string {
+  return filePath.split('/').pop() || filePath
+}
+
+// Pending deletion for move detection
+interface PendingDeletion {
+  filePath: string
+  filename: string
+  nodeId: string
+  timeoutId: ReturnType<typeof setTimeout>
+}
+
 export function useFileSync(deps: FileSyncDeps) {
   let watcherUnlisten: (() => void) | null = null
   const isWatching = ref(false)
 
+  // Buffer for detecting file moves (delete + create with same filename)
+  const pendingDeletions = new Map<string, PendingDeletion>()
+  const MOVE_DETECTION_DELAY = 500 // ms to wait for matching create event
+
   async function watchVault(path: string): Promise<void> {
     console.log('[FileSync] Starting vault watcher for:', path)
     await stopWatching()
+    // Note: listen() wrapper already extracts payload, so event IS the FileChangeEvent
     watcherUnlisten = await listen<FileChangeEvent>('vault-file-changed', (event) => {
       console.log('[FileSync] Raw event received:', event)
-      handleFileChange(event.payload)
+      handleFileChange(event)
     })
     await invoke('watch_vault', { path })
     isWatching.value = true
@@ -71,9 +89,29 @@ export function useFileSync(deps: FileSyncDeps) {
     switch (event.change_type) {
       case 'Created': {
         console.log('[FileSync] New file detected:', filePath)
+        const filename = getFilename(filePath)
+
+        // Check if this is a move (matching pending deletion by filename)
+        const pendingDeletion = pendingDeletions.get(filename)
+        if (pendingDeletion) {
+          // This is a move! Cancel the deletion and update the path
+          clearTimeout(pendingDeletion.timeoutId)
+          pendingDeletions.delete(filename)
+
+          console.log('[FileSync] Detected file move:', pendingDeletion.filePath, '->', filePath)
+          deps.updateNodeInPlace(pendingDeletion.nodeId, {
+            file_path: filePath,
+            updated_at: Date.now(),
+          })
+          // Update file_path in database
+          await invoke('update_node_file_path', { id: pendingDeletion.nodeId, filePath })
+          storeLogger.info(`File moved: ${pendingDeletion.filePath} -> ${filePath}`)
+          break
+        }
+
+        // Not a move - create new node if sync is enabled
         const syncEnabled = await isSyncEnabled()
         console.log('[FileSync] Sync enabled:', syncEnabled)
-        // Create node if sync is enabled
         if (syncEnabled) {
           const workspaceId = deps.getCurrentWorkspaceId()
           console.log('[FileSync] Creating node for workspace:', workspaceId)
@@ -92,9 +130,11 @@ export function useFileSync(deps: FileSyncDeps) {
         break
       }
       case 'Modified': {
+        console.log('[FileSync] File modified:', filePath)
         const node = nodes.find((n) => n.file_path === filePath)
+        console.log('[FileSync] Found node:', node?.id, node?.title, 'checksum match:', node?.checksum === event.new_checksum)
         if (node && event.new_checksum && node.checksum !== event.new_checksum) {
-          storeLogger.debug(`File modified externally: ${filePath}`)
+          console.log('[FileSync] Updating node content for:', node.title)
           try {
             const content = await readTextFile(filePath)
             deps.updateNodeInPlace(node.id, {
@@ -103,12 +143,14 @@ export function useFileSync(deps: FileSyncDeps) {
               updated_at: Date.now(),
             })
             await invoke<string | null>('update_node_content', { id: node.id, content })
+            console.log('[FileSync] Node content updated successfully')
             // Sync wikilinks to create edges for new links
             const edgesCreated = await syncNodeWikilinks(node.id)
             if (edgesCreated > 0) {
               storeLogger.info(`Created ${edgesCreated} new edges from wikilinks`)
             }
           } catch (e) {
+            console.error('[FileSync] Failed to reload file content:', e)
             storeLogger.error('Failed to reload file content:', e)
             deps.updateNodeInPlace(node.id, {
               checksum: event.new_checksum,
@@ -119,24 +161,36 @@ export function useFileSync(deps: FileSyncDeps) {
       }
       case 'Deleted': {
         console.log('[FileSync] Looking for node with file_path:', filePath)
-        console.log('[FileSync] Available nodes with file_paths:', nodes.filter(n => n.file_path).map(n => ({ id: n.id, title: n.title, file_path: n.file_path })))
         const node = nodes.find((n) => n.file_path === filePath)
         if (node) {
-          console.log('[FileSync] Found node to delete:', node.id, node.title)
-          // If sync is enabled, delete the node entirely
-          // Otherwise just clear the file path
-          const syncEnabled = await isSyncEnabled()
-          console.log('[FileSync] Sync enabled:', syncEnabled)
-          if (syncEnabled) {
-            deps.removeNode(node.id)
-            console.log('[FileSync] Deleted node for removed file:', filePath)
-          } else {
-            deps.updateNodeInPlace(node.id, {
-              file_path: null,
-              updated_at: Date.now(),
-            })
-            console.log('[FileSync] Cleared file_path for node:', node.id)
-          }
+          console.log('[FileSync] Found node for deleted file:', node.id, node.title)
+          const filename = getFilename(filePath)
+
+          // Buffer deletion to detect moves (delete + create with same filename)
+          const timeoutId = setTimeout(async () => {
+            pendingDeletions.delete(filename)
+            console.log('[FileSync] Processing delayed deletion for:', filePath)
+
+            const syncEnabled = await isSyncEnabled()
+            if (syncEnabled) {
+              deps.removeNode(node.id)
+              console.log('[FileSync] Deleted node for removed file:', filePath)
+            } else {
+              deps.updateNodeInPlace(node.id, {
+                file_path: null,
+                updated_at: Date.now(),
+              })
+              console.log('[FileSync] Cleared file_path for node:', node.id)
+            }
+          }, MOVE_DETECTION_DELAY)
+
+          pendingDeletions.set(filename, {
+            filePath,
+            filename,
+            nodeId: node.id,
+            timeoutId,
+          })
+          console.log('[FileSync] Buffered deletion, waiting for potential move:', filename)
         } else {
           console.log('[FileSync] No node found for deleted file:', filePath)
         }

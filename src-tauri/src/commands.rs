@@ -186,6 +186,43 @@ pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
     sync_wikilinks_for_node(pool, &node_id, &links).await
 }
 
+/// Sync all wikilinks for all nodes in a workspace
+#[tauri::command]
+pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    let all_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut total_created = 0;
+
+    for node in &all_nodes {
+        // Filter by workspace if specified
+        if let Some(ref ws_id) = workspace_id {
+            if node.workspace_id.as_ref() != Some(ws_id) {
+                continue;
+            }
+        }
+
+        let content = node.markdown_content.clone().unwrap_or_default();
+        let links = import_helpers::extract_wikilinks(&content);
+
+        if !links.is_empty() {
+            match sync_wikilinks_for_node(pool, &node.id, &links).await {
+                Ok(count) => total_created += count,
+                Err(e) => eprintln!("Failed to sync wikilinks for {}: {}", node.title, e),
+            }
+        }
+    }
+
+    println!(
+        "[SyncWikilinks] Created {} edges for workspace {:?}",
+        total_created, workspace_id
+    );
+    Ok(total_created)
+}
+
 /// Helper to sync wikilinks for a node
 async fn sync_wikilinks_for_node(
     pool: &database::DbPool,
@@ -193,6 +230,7 @@ async fn sync_wikilinks_for_node(
     links: &[String],
 ) -> Result<usize, String> {
     // Build title to id map for all nodes
+    // Maps both title and relative path (from file_path) for disambiguation
     let all_nodes = database::nodes::get_all(pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -200,7 +238,25 @@ async fn sync_wikilinks_for_node(
     let mut title_to_id: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
     for node in &all_nodes {
+        // Map by title
         title_to_id.insert(node.title.to_lowercase(), node.id.clone());
+
+        // Also map by relative path (e.g., "concepts/FAIR-Digital-Objects")
+        if let Some(ref file_path) = node.file_path {
+            // Extract relative path without extension
+            // e.g., "/vault/concepts/FAIR.md" -> "concepts/fair"
+            if let Some(stem) = std::path::Path::new(file_path).file_stem() {
+                let stem_str = stem.to_string_lossy().to_lowercase();
+                // Get parent folder name if exists
+                if let Some(parent) = std::path::Path::new(file_path).parent() {
+                    if let Some(folder) = parent.file_name() {
+                        let folder_str = folder.to_string_lossy().to_lowercase();
+                        let path_key = format!("{}/{}", folder_str, stem_str);
+                        title_to_id.insert(path_key, node.id.clone());
+                    }
+                }
+            }
+        }
     }
 
     // Get existing edges from this node
@@ -225,10 +281,10 @@ async fn sync_wikilinks_for_node(
         })
         .collect();
 
-    for link in unique_links {
+    for link in &unique_links {
         // Try exact match first, then filename-only match
         let target_id = title_to_id
-            .get(&link)
+            .get(link)
             .or_else(|| {
                 link.rsplit('/')
                     .next()
@@ -569,6 +625,16 @@ pub async fn update_node_title(id: String, title: String) -> Result<(), String> 
 }
 
 #[tauri::command]
+pub async fn update_node_file_path(id: String, file_path: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    // Treat empty string as None (clear file_path)
+    let file_path = file_path.filter(|p| !p.is_empty());
+    database::nodes::update_file_path_only(pool, &id, file_path.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn update_node_size(id: String, width: f64, height: f64) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_size(pool, &id, width, height)
@@ -610,13 +676,20 @@ pub async fn watch_vault(
     app_handle: AppHandle,
     watcher_state: State<'_, WatcherState>,
 ) -> Result<(), String> {
+    let path_clone = path.clone();
     let path = PathBuf::from(path);
 
     if !path.exists() {
         return Err("Vault path does not exist".to_string());
     }
 
+    println!("[Watcher] Starting vault watcher for: {}", path_clone);
+
     let mut watcher = VaultWatcher::new(path, move |event: FileChangeEvent| {
+        println!(
+            "[Watcher] File change detected: {:?} - {:?}",
+            event.change_type, event.path
+        );
         if let Err(e) = app_handle.emit("vault-file-changed", &event) {
             eprintln!("Failed to emit file change event: {}", e);
         }
@@ -624,6 +697,7 @@ pub async fn watch_vault(
     .map_err(|e| e.to_string())?;
 
     watcher.start().map_err(|e| e.to_string())?;
+    println!("[Watcher] Vault watcher started successfully");
 
     let mut state = watcher_state.0.lock().unwrap();
     *state = Some(watcher);
@@ -641,6 +715,126 @@ pub async fn stop_watching(watcher_state: State<'_, WatcherState>) -> Result<(),
 
     *state = None;
     Ok(())
+}
+
+/// Sync missing files - create nodes for vault files that don't have nodes yet
+#[tauri::command]
+pub async fn sync_missing_files(
+    workspace_id: String,
+    vault_path: String,
+) -> Result<Vec<Node>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let vault_path = std::path::Path::new(&vault_path);
+
+    if !vault_path.exists() {
+        return Err("Vault path does not exist".to_string());
+    }
+
+    // Get all existing file paths for this workspace
+    let existing_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    let existing_paths: std::collections::HashSet<String> = existing_nodes
+        .iter()
+        .filter(|n| n.workspace_id.as_deref() == Some(&workspace_id))
+        .filter_map(|n| n.file_path.clone())
+        .collect();
+
+    println!(
+        "[SyncMissing] Found {} existing nodes with file paths",
+        existing_paths.len()
+    );
+
+    // Scan vault for all .md files
+    let mut created_nodes = Vec::new();
+    let mut node_count = existing_nodes
+        .iter()
+        .filter(|n| n.workspace_id.as_deref() == Some(&workspace_id))
+        .count();
+
+    for entry in walkdir::WalkDir::new(vault_path)
+        .into_iter()
+        .filter_entry(|e| {
+            // Skip hidden files and directories
+            !e.file_name().to_string_lossy().starts_with('.')
+        })
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.extension().map_or(false, |ext| ext == "md") {
+            continue;
+        }
+
+        let path_str = path.to_string_lossy().to_string();
+        if existing_paths.contains(&path_str) {
+            continue; // Already has a node
+        }
+
+        println!("[SyncMissing] Creating node for: {}", path_str);
+
+        // Read file content
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[SyncMissing] Failed to read {}: {}", path_str, e);
+                continue;
+            }
+        };
+
+        // Extract title from filename
+        let title = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Untitled")
+            .to_string();
+
+        // Compute checksum
+        let checksum = crate::checksum::compute_string(&content);
+
+        // Position in grid
+        let x = (node_count % 5) as f64 * 250.0 + 100.0;
+        let y = (node_count / 5) as f64 * 200.0 + 100.0;
+        node_count += 1;
+
+        let now = chrono::Utc::now().timestamp();
+        let node_id = uuid::Uuid::new_v4().to_string();
+
+        let node = Node {
+            id: node_id.clone(),
+            title,
+            file_path: Some(path_str),
+            markdown_content: Some(content.clone()),
+            node_type: "note".to_string(),
+            canvas_x: x,
+            canvas_y: y,
+            width: 200.0,
+            height: 120.0,
+            z_index: 0,
+            frame_id: None,
+            color_theme: None,
+            is_collapsed: false,
+            tags: None,
+            workspace_id: Some(workspace_id.clone()),
+            checksum: Some(checksum),
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
+        };
+
+        if let Err(e) = database::nodes::create(pool, &node).await {
+            eprintln!("[SyncMissing] Failed to create node: {}", e);
+            continue;
+        }
+
+        // Create edges for wikilinks
+        let links = import_helpers::extract_wikilinks(&content);
+        let _ = sync_wikilinks_for_node(pool, &node_id, &links).await;
+
+        created_nodes.push(node);
+    }
+
+    println!("[SyncMissing] Created {} new nodes", created_nodes.len());
+    Ok(created_nodes)
 }
 
 #[tauri::command]
@@ -979,6 +1173,17 @@ pub async fn create_workspace(
 pub async fn set_workspace_sync(id: String, sync_enabled: bool) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::workspaces::update_sync_enabled(pool, &id, sync_enabled)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_workspace_vault_path(
+    id: String,
+    vault_path: Option<String>,
+) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::workspaces::update_vault_path(pool, &id, vault_path.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

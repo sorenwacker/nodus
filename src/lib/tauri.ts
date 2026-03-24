@@ -63,12 +63,8 @@ export async function listen<T>(
 }
 
 export async function readTextFile(path: string): Promise<string> {
-  try {
-    const { readTextFile } = await import('@tauri-apps/plugin-fs')
-    return await readTextFile(path)
-  } catch {
-    throw new Error(`Cannot read file: ${path}`)
-  }
+  // Use Rust backend to read files - avoids Tauri plugin-fs scope restrictions
+  return invoke<string>('read_file_content', { path })
 }
 
 export async function extractPdfText(path: string): Promise<string> {
@@ -114,6 +110,10 @@ export async function setWorkspaceSync(id: string, syncEnabled: boolean): Promis
   return invoke<void>('set_workspace_sync', { id, syncEnabled })
 }
 
+export async function setWorkspaceVaultPath(id: string, vaultPath: string | null): Promise<void> {
+  return invoke<void>('set_workspace_vault_path', { id, vaultPath })
+}
+
 export async function getWorkspace(id: string): Promise<{ sync_enabled: boolean; vault_path: string | null } | null> {
   return invoke('get_workspace', { id })
 }
@@ -124,6 +124,14 @@ export async function createNodeFromFile(filePath: string, workspaceId: string |
 
 export async function syncNodeWikilinks(nodeId: string): Promise<number> {
   return invoke<number>('sync_node_wikilinks', { nodeId })
+}
+
+export async function syncAllWikilinks(workspaceId: string | null): Promise<number> {
+  return invoke<number>('sync_all_wikilinks', { workspaceId })
+}
+
+export async function syncMissingFiles(workspaceId: string, vaultPath: string): Promise<unknown[]> {
+  return invoke<unknown[]>('sync_missing_files', { workspaceId, vaultPath })
 }
 
 export async function createFileForNode(nodeId: string): Promise<string> {

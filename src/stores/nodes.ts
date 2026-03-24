@@ -438,7 +438,22 @@ export const useNodesStore = defineStore('nodes', () => {
         console.log('[refresh] Content unchanged')
       }
     } catch (e) {
-      console.error('[refresh] Failed to read file:', e)
+      const errorMsg = String(e)
+      // If file doesn't exist, clear the file_path
+      if (errorMsg.includes('No such file') || errorMsg.includes('not found')) {
+        console.warn('[refresh] File not found, clearing file_path:', node.file_path)
+        node.file_path = null
+        node.checksum = null
+        node.updated_at = Date.now()
+        // Persist the change
+        try {
+          await invoke('update_node_file_path', { id, filePath: '' })
+        } catch {
+          // Ignore - just log
+        }
+      } else {
+        console.error('[refresh] Failed to read file:', e)
+      }
     }
     return false
   }
