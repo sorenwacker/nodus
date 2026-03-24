@@ -387,10 +387,33 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
           labelX = mid.x
           labelY = mid.y
         } else {
-          // For orthogonal/straight/diagonal paths, use waypoint midpoint
-          const midIndex = Math.floor(routed.path.length / 2)
-          labelX = routed.path[midIndex].x
-          labelY = routed.path[midIndex].y
+          // For orthogonal/straight/diagonal paths, find point at half total path length
+          const pts = routed.path
+          let totalLen = 0
+          const segLens: number[] = []
+          for (let i = 1; i < pts.length; i++) {
+            const segLen = Math.sqrt((pts[i].x - pts[i-1].x) ** 2 + (pts[i].y - pts[i-1].y) ** 2)
+            segLens.push(segLen)
+            totalLen += segLen
+          }
+          const halfLen = totalLen / 2
+          let accumulated = 0
+          for (let i = 0; i < segLens.length; i++) {
+            if (accumulated + segLens[i] >= halfLen) {
+              // Midpoint is on this segment
+              const remaining = halfLen - accumulated
+              const t = segLens[i] > 0 ? remaining / segLens[i] : 0
+              labelX = pts[i].x + t * (pts[i+1].x - pts[i].x)
+              labelY = pts[i].y + t * (pts[i+1].y - pts[i].y)
+              break
+            }
+            accumulated += segLens[i]
+          }
+          // Fallback if loop didn't set values
+          if (labelX === undefined) {
+            labelX = (pts[0].x + pts[pts.length-1].x) / 2
+            labelY = (pts[0].y + pts[pts.length-1].y) / 2
+          }
         }
       } else if (isDragging?.value || !routed) {
         // Calculate label position based on edge style to match visual path
