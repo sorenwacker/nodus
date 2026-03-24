@@ -25,7 +25,7 @@ export interface UseEdgeVisibilityContext {
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
   selectedEdge: Ref<string | null>
   highlightedEdgeIds: ComputedRef<Set<string>>
-  highlightAllEdges: Ref<boolean>
+  highlightAllEdges?: Ref<boolean>
   edgeStrokeWidth: ComputedRef<number>
   highlightColor: ComputedRef<string>
   selectedColor: ComputedRef<string>
@@ -117,7 +117,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     const highlighted = highlightedEdgeIds.value
     const selected = selectedEdge.value
     const baseStrokeWidth = edgeStrokeWidth.value
-    const allHighlighted = highlightAllEdges.value
+    const allHighlighted = highlightAllEdges?.value ?? false
 
     return edges.map(e => {
       const isHighlighted = allHighlighted || highlighted.has(e.id)
