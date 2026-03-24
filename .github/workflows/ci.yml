@@ -25,6 +25,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libglib2.0-dev
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+        working-directory: .
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: .
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
