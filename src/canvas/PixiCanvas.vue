@@ -68,6 +68,7 @@ import CanvasMinimap from './components/CanvasMinimap.vue'
 import NodeLLMBar from './components/NodeLLMBar.vue'
 import CanvasFrames from './components/CanvasFrames.vue'
 import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
+import CanvasNodeCard from './components/CanvasNodeCard.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -1734,94 +1735,42 @@ useCanvasKeyboardShortcuts({
       </template>
 
       <!-- Node cards - shown for all nodes in normal mode, or selected/editing nodes in LOD mode -->
-      <div
+      <CanvasNodeCard
         v-for="node in isLODMode ? visibleNodes.filter(n => store.selectedNodeIds.includes(n.id) || n.id === editingNodeId) : visibleNodes"
         :key="node.id"
-        :data-node-id="node.id"
-        :data-node-type="node.node_type"
-        class="node-card"
-        :class="{
-          selected: store.selectedNodeIds.includes(node.id),
-          dragging: draggingNode === node.id,
-          resizing: resizingNode === node.id,
-          editing: editingNodeId === node.id,
-          collapsed: isSemanticZoomCollapsed,
-          'neighborhood-mode': neighborhoodMode,
-          'neighborhood-focus': neighborhoodMode && node.id === focusNodeId,
-          'neighbor-highlighted': neighborHighlightedMap[node.id]
-        }"
+        :node="node"
         :style="getNodeStyle(node)"
+        :is-selected="store.selectedNodeIds.includes(node.id)"
+        :is-dragging="draggingNode === node.id"
+        :is-resizing="resizingNode === node.id"
+        :is-editing="editingNodeId === node.id"
+        :is-collapsed="isSemanticZoomCollapsed"
+        :is-neighborhood-mode="neighborhoodMode"
+        :is-neighborhood-focus="neighborhoodMode && node.id === focusNodeId"
+        :is-neighbor-highlighted="!!neighborHighlightedMap[node.id]"
+        :show-thumbnail="showImageThumbnail"
+        :thumbnail-src="nodeFirstImage[node.id]"
+        :rendered-content="nodeRenderedContent[node.id] || ''"
+        :editing-title-id="editingTitleId"
+        :edit-title="editTitle"
+        :edit-content="editContent"
+        :scale="scale"
         @pointerdown="onNodePointerDown($event, node.id)"
         @pointerenter="onNodePointerEnter($event, node.id)"
         @pointermove="onNodePointerMove($event)"
         @pointerleave="onNodePointerLeave"
-        @dblclick.stop="startEditing(node.id)"
-      >
-        <!-- Image thumbnail when zoomed out -->
-        <div
-          v-if="showImageThumbnail && nodeFirstImage[node.id]"
-          class="node-thumbnail"
-        >
-          <img :src="nodeFirstImage[node.id]!" :alt="node.title" />
-        </div>
-        <!-- Node title header (hidden when showing thumbnail) -->
-        <div v-else class="node-header" @dblclick.stop="startEditingTitle(node.id)">
-          <input
-            v-if="editingTitleId === node.id"
-            v-model="editTitle"
-            class="title-editor"
-            @blur="saveTitleEditing"
-            @keydown.enter="saveTitleEditing"
-            @keydown.escape="cancelTitleEditing"
-            @click.stop
-            @pointerdown.stop
-            @pointerup.stop
-          />
-          <span v-else>{{ node.title || t('canvas.node.untitled') }}</span>
-        </div>
-        <!-- Editing mode (disabled when collapsed) -->
-        <textarea
-          v-if="editingNodeId === node.id && !isSemanticZoomCollapsed"
-          v-model="editContent"
-          class="inline-editor"
-          :placeholder="t('canvas.node.writePlaceholder')"
-          spellcheck="false"
-          autocorrect="off"
-          autocapitalize="off"
-          @pointerdown.stop
-          @pointerup.stop
-          @blur="saveEditing($event)"
-          @keydown="onEditorKeydown"
-        ></textarea>
-        <!-- View mode - hidden when collapsed for performance, v-html required for markdown -->
-        <!-- eslint-disable vue/no-v-html -->
-        <div
-          v-else-if="!isSemanticZoomCollapsed"
-          class="node-content"
-          @click="handleContentClick"
-          v-html="nodeRenderedContent[node.id] || ''"
-        ></div>
-        <!-- eslint-enable vue/no-v-html -->
-
-        <!-- Delete button (shown when selected but not editing, hidden when collapsed) -->
-        <button
-          v-if="store.selectedNodeIds.includes(node.id) && editingNodeId !== node.id && !isSemanticZoomCollapsed"
-          class="delete-node-btn"
-          :style="{ transform: `scale(${1/scale})`, transformOrigin: 'center center' }"
-          @pointerdown.stop="deleteSelectedNodes"
-        ></button>
-
-        <!-- Resize handles - edges -->
-        <div class="resize-edge resize-edge-n" @pointerdown.stop="onResizePointerDown($event, node.id, 'n')"></div>
-        <div class="resize-edge resize-edge-s" @pointerdown.stop="onResizePointerDown($event, node.id, 's')"></div>
-        <div class="resize-edge resize-edge-e" @pointerdown.stop="onResizePointerDown($event, node.id, 'e')"></div>
-        <div class="resize-edge resize-edge-w" @pointerdown.stop="onResizePointerDown($event, node.id, 'w')"></div>
-        <!-- Resize handles - corners -->
-        <div class="resize-corner resize-corner-nw" @pointerdown.stop="onResizePointerDown($event, node.id, 'nw')"></div>
-        <div class="resize-corner resize-corner-ne" @pointerdown.stop="onResizePointerDown($event, node.id, 'ne')"></div>
-        <div class="resize-corner resize-corner-se" @pointerdown.stop="onResizePointerDown($event, node.id, 'se')"></div>
-        <div class="resize-corner resize-corner-sw" @pointerdown.stop="onResizePointerDown($event, node.id, 'sw')"></div>
-      </div>
+        @dblclick="startEditing(node.id)"
+        @start-editing-title="startEditingTitle(node.id)"
+        @save-title="saveTitleEditing"
+        @cancel-title="cancelTitleEditing"
+        @update:edit-title="editTitle = $event"
+        @update:edit-content="editContent = $event"
+        @save-editing="saveEditing($event)"
+        @editor-keydown="onEditorKeydown"
+        @content-click="handleContentClick"
+        @delete="deleteSelectedNodes"
+        @resize-start="(e, dir) => onResizePointerDown(e, node.id, dir)"
+      />
 
       <!-- Empty state (positioned in viewport, not canvas) -->
 
