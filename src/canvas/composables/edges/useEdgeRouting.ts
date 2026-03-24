@@ -374,9 +374,29 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         const midIndex = Math.floor(routed.path.length / 2)
         labelX = routed.path[midIndex].x
         labelY = routed.path[midIndex].y
-      } else if (!isHugeGraph.value) {
-        labelX = (startStandoff.x + endStandoff.x) / 2
-        labelY = (startStandoff.y + endStandoff.y) / 2
+      } else if (isDragging?.value || !routed) {
+        // Calculate label position based on edge style to match visual path
+        if (edgeStyle === 'straight' || isHugeGraph.value) {
+          labelX = (startPort.x + endEdge.x) / 2
+          labelY = (startPort.y + endEdge.y) / 2
+        } else if (edgeStyle === 'orthogonal') {
+          // Midpoint of orthogonal path (middle of the vertical segment)
+          const midX = (startPort.x + endEdge.x) / 2
+          labelX = midX
+          labelY = (startPort.y + endEdge.y) / 2
+        } else if (edgeStyle === 'curved') {
+          // Cubic Bezier midpoint at t=0.5: B(0.5) = 0.125*P0 + 0.375*P1 + 0.375*P2 + 0.125*P3
+          const cx1 = startStandoff.x
+          const cy1 = startPort.y
+          const cx2 = endStandoff.x
+          const cy2 = endEdge.y
+          labelX = 0.125 * startPort.x + 0.375 * cx1 + 0.375 * cx2 + 0.125 * endEdge.x
+          labelY = 0.125 * startPort.y + 0.375 * cy1 + 0.375 * cy2 + 0.125 * endEdge.y
+        } else {
+          // diagonal/hyperbolic - midpoint of standoff segment
+          labelX = (startStandoff.x + endStandoff.x) / 2
+          labelY = (startStandoff.y + endStandoff.y) / 2
+        }
       } else {
         labelX = (x1 + x2) / 2
         labelY = (y1 + y2) / 2
