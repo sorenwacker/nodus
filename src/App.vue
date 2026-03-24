@@ -220,9 +220,16 @@ onMounted(async () => {
   if (store.currentWorkspaceId) {
     try {
       const workspace = await import('./lib/tauri').then(m => m.getWorkspace(store.currentWorkspaceId!))
+      console.log('[App] Workspace settings:', {
+        id: store.currentWorkspaceId,
+        sync_enabled: workspace?.sync_enabled,
+        vault_path: workspace?.vault_path
+      })
       if (workspace?.sync_enabled && workspace?.vault_path) {
         console.log('[App] Starting file watcher for workspace:', store.currentWorkspaceId)
         await store.watchVault(workspace.vault_path)
+      } else {
+        console.log('[App] File watcher NOT started - sync_enabled:', workspace?.sync_enabled, 'vault_path:', workspace?.vault_path)
       }
     } catch (e) {
       console.error('[App] Failed to start file watcher:', e)
