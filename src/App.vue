@@ -215,6 +215,19 @@ onMounted(async () => {
   await themesStore.initialize()
   // Then initialize data
   await store.initialize()
+
+  // Start file watcher if current workspace has sync enabled
+  if (store.currentWorkspaceId) {
+    try {
+      const workspace = await import('./lib/tauri').then(m => m.getWorkspace(store.currentWorkspaceId!))
+      if (workspace?.sync_enabled && workspace?.vault_path) {
+        console.log('[App] Starting file watcher for workspace:', store.currentWorkspaceId)
+        await store.watchVault(workspace.vault_path)
+      }
+    } catch (e) {
+      console.error('[App] Failed to start file watcher:', e)
+    }
+  }
 })
 
 async function importVault() {
