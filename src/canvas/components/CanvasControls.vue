@@ -23,6 +23,8 @@ defineProps<{
   neighborhoodDepth: number
   /** Whether frame placement mode is active */
   pendingFramePlacement: boolean
+  /** Whether all edges are highlighted */
+  highlightAllEdges: boolean
 }>()
 
 const emit = defineEmits<{
@@ -38,6 +40,7 @@ const emit = defineEmits<{
   (e: 'setNeighborhoodDepth', depth: number): void
   (e: 'createFrame'): void
   (e: 'showHelp'): void
+  (e: 'toggleHighlightEdges'): void
 }>()
 </script>
 
@@ -168,6 +171,18 @@ const emit = defineEmits<{
       </svg>
       <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 20 L20 4" />
+      </svg>
+    </button>
+    <button
+      data-tooltip-pos="top-left"
+      :class="{ active: highlightAllEdges }"
+      :data-tooltip="t('canvas.controls.highlightEdges')"
+      @click="emit('toggleHighlightEdges')"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="4" y1="20" x2="20" y2="4" stroke-width="3" />
+        <line x1="4" y1="12" x2="12" y2="4" />
+        <line x1="12" y1="20" x2="20" y2="12" />
       </svg>
     </button>
     <button

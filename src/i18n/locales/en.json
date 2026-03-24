@@ -71,6 +71,7 @@
       "hierarchicalLayout": "Hierarchical Layout - Arrange as tree (for DAGs/ontologies)",
       "fitNodesToContent": "Fit Nodes to Content - Resize all nodes to show full content",
       "edgeStyle": "Edge Style",
+      "highlightEdges": "Highlight All Edges - Make all edges more visible",
       "magnifier": "Magnifier - Show magnified view when zoomed out",
       "neighborhoodView": "Neighborhood View - Show only selected node and neighbors (N)",
       "neighborhoodDepth": "Neighborhood depth (hops)",

@@ -25,6 +25,7 @@ export interface UseEdgeVisibilityContext {
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
   selectedEdge: Ref<string | null>
   highlightedEdgeIds: ComputedRef<Set<string>>
+  highlightAllEdges: Ref<boolean>
   edgeStrokeWidth: ComputedRef<number>
   highlightColor: ComputedRef<string>
   selectedColor: ComputedRef<string>
@@ -51,6 +52,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     selectedNodeIds,
     selectedEdge,
     highlightedEdgeIds,
+    highlightAllEdges,
     edgeStrokeWidth,
     highlightColor,
     selectedColor,
@@ -115,9 +117,10 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     const highlighted = highlightedEdgeIds.value
     const selected = selectedEdge.value
     const baseStrokeWidth = edgeStrokeWidth.value
+    const allHighlighted = highlightAllEdges.value
 
     return edges.map(e => {
-      const isHighlighted = highlighted.has(e.id)
+      const isHighlighted = allHighlighted || highlighted.has(e.id)
       const isSelected = selected === e.id
 
       // Determine if this is a direct edge or a 2nd-hop neighbor edge
@@ -127,6 +130,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
       // Opacity: highlighted edges are full, others are dimmed by default
       // Neighbor edges (2nd hop) are even more transparent
+      // When all edges are highlighted, show full opacity
       const opacity = isHighlighted ? 1.0 : (isNeighborEdge ? 0.2 : 0.3)
 
       // Use explicit color field first, then link_type as fallback, then default

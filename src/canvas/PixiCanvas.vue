@@ -590,6 +590,9 @@ let lastDragEndTime = 0
 const gridLockEnabled = ref(false)
 const gridSize = 20 // Snap to 20px grid
 
+// Highlight all edges toggle
+const highlightAllEdges = ref(false)
+
 function snapToGrid(value: number): number {
   if (!gridLockEnabled.value) return value
   return Math.round(value / gridSize) * gridSize
@@ -1397,6 +1400,7 @@ const { visibleEdgeLines } = useEdgeVisibility({
   selectedNodeIds: computed(() => store.selectedNodeIds),
   selectedEdge,
   highlightedEdgeIds,
+  highlightAllEdges,
   edgeStrokeWidth,
   highlightColor,
   selectedColor,
@@ -1830,6 +1834,7 @@ useCanvasKeyboardShortcuts({
       :neighborhood-mode="neighborhoodMode"
       :neighborhood-depth="neighborhoodDepth"
       :pending-frame-placement="frames.pendingFramePlacement.value"
+      :highlight-all-edges="highlightAllEdges"
       @zoom-in="scale = Math.min(scale * 1.25, 3)"
       @zoom-out="scale = Math.max(scale * 0.8, 0.01)"
       @fit-to-content="fitToContent"
@@ -1842,6 +1847,7 @@ useCanvasKeyboardShortcuts({
       @set-neighborhood-depth="setDepth"
       @create-frame="createFrameAtCenter"
       @show-help="showHelpModal = true"
+      @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
     />
 
     <!-- Help Modal -->
