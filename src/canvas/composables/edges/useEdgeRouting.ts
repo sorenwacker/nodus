@@ -421,6 +421,17 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         labelY = (y1 + y2) / 2
       }
 
+      // Offset label perpendicular to edge direction (beside the path, not on top)
+      const LABEL_OFFSET = 12
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const len = Math.sqrt(dx * dx + dy * dy) || 1
+      // Perpendicular vector (normalized), offset to the "left" of the edge direction
+      const perpX = -dy / len
+      const perpY = dx / len
+      labelX += perpX * LABEL_OFFSET
+      labelY += perpY * LABEL_OFFSET
+
       return {
         id: edge.id,
         source_node_id: edge.source_node_id,
