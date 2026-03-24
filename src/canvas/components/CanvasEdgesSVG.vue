@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { VisibleEdgeLine } from '../composables/edges'
 
 export interface MarkerColor {
   value: string
 }
 
-defineProps<{
+const props = defineProps<{
   edges: VisibleEdgeLine[]
   markerColors: MarkerColor[]
   isLargeGraph: boolean
@@ -20,6 +21,10 @@ defineProps<{
   getArrowMarkerId: (color: string) => string
 }>()
 
+// Compute marker size based on stroke width to scale with zoom
+// Base marker size is 6 for stroke width of 1
+const markerSize = computed(() => Math.max(4, Math.min(12, props.edgeStrokeWidth * 6)))
+
 defineEmits<{
   (e: 'edge-click', event: MouseEvent, edgeId: string): void
 }>()
@@ -33,8 +38,8 @@ defineEmits<{
         :id="getArrowMarkerId(color.value)"
         :key="color.value"
         viewBox="0 0 10 10"
-        markerWidth="6"
-        markerHeight="6"
+        :markerWidth="markerSize"
+        :markerHeight="markerSize"
         refX="10"
         refY="5"
         orient="auto"
