@@ -567,50 +567,50 @@
   overflow-wrap: break-word;
 }
 
-.preview-content :deep(h1),
-.preview-content :deep(h2),
-.preview-content :deep(h3) {
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
   margin-top: 1em;
   margin-bottom: 0.5em;
 }
 
-.preview-content :deep(h1:first-child),
-.preview-content :deep(h2:first-child),
-.preview-content :deep(h3:first-child) {
+.preview-content h1:first-child,
+.preview-content h2:first-child,
+.preview-content h3:first-child {
   margin-top: 0;
 }
 
-.preview-content :deep(p) {
+.preview-content p {
   margin: 0.5em 0;
 }
 
-.preview-content :deep(ul),
-.preview-content :deep(ol) {
+.preview-content ul,
+.preview-content ol {
   padding-left: 1.5em;
   margin: 0.5em 0;
   list-style-position: outside;
 }
 
-.preview-content :deep(li) {
+.preview-content li {
   margin-bottom: 0.25em;
   padding-left: 0;
 }
 
-.preview-content :deep(code) {
+.preview-content code {
   background: var(--bg-surface-alt);
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 12px;
 }
 
-.preview-content :deep(pre) {
+.preview-content pre {
   background: var(--bg-surface-alt);
   padding: 12px;
   border-radius: 6px;
   overflow-x: auto;
 }
 
-.preview-content :deep(a) {
+.preview-content a {
   color: var(--primary-color);
 }
 
