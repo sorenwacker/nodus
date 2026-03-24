@@ -1,0 +1,22 @@
+/**
+ * Canvas Styles Index
+ * Imports all canvas-related CSS modules
+ */
+
+/* LLM interface, agent tasks, settings grid */
+@import './llm-interface.css';
+
+/* Canvas viewport, edges layer */
+@import './canvas-viewport.css';
+
+/* Node cards, circles, resize handles */
+@import './node-card.css';
+
+/* Node content typography, code, math, mermaid */
+@import './node-content.css';
+
+/* Edge panel, zoom controls, status bar */
+@import './canvas-panels.css';
+
+/* Magnifier, minimap, frames, context menu, tooltips, preview */
+@import './canvas-overlays.css';

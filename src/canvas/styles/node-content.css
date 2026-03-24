@@ -1,0 +1,326 @@
+
+.node-content {
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text-main);
+  line-height: 1.5;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  padding: 8px 12px;
+  padding-bottom: 8px;
+  border-radius: 0 0 7px 7px;
+  cursor: inherit;
+  overscroll-behavior: contain;
+}
+
+.node-content-minimal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.node-content-minimal .minimal-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: 0;
+  opacity: 0.7;
+}
+
+.node-content :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.node-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.node-content :deep(h1) {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-main);
+}
+
+.node-content :deep(h2) {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  color: var(--text-main);
+}
+
+.node-content :deep(h3) {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--text-secondary);
+}
+
+.node-content :deep(ul),
+.node-content :deep(ol) {
+  margin: 0 0 8px 0;
+  padding-left: 18px;
+}
+
+.node-content :deep(li) {
+  margin-bottom: 2px;
+}
+
+.node-content :deep(code) {
+  background: var(--bg-elevated);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.node-content :deep(pre) {
+  background: var(--bg-elevated);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0 0 8px 0;
+}
+
+.node-content :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+
+.node-content :deep(strong) {
+  font-weight: 600;
+}
+
+.node-content :deep(em) {
+  font-style: italic;
+}
+
+.node-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.node-content :deep(a) {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+/* Wikilink styling */
+.node-content :deep(.wikilink) {
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--primary-color);
+}
+
+.node-content :deep(.wikilink:hover) {
+  border-bottom-style: solid;
+}
+
+/* Missing wikilink (target node doesn't exist) */
+.node-content :deep(.wikilink.missing) {
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+}
+
+.node-content :deep(blockquote) {
+  border-left: 3px solid var(--border-default);
+  margin: 0 0 8px 0;
+  padding-left: 12px;
+  color: var(--text-muted);
+}
+
+/* Table styling */
+.node-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+  background: transparent;
+}
+
+.node-content :deep(th),
+.node-content :deep(td) {
+  border: 1px solid var(--border-default);
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: middle;
+  background: transparent;
+  color: var(--text-main);
+  height: auto;
+  line-height: 1.6;
+}
+
+.node-content :deep(th) {
+  background: var(--bg-elevated);
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.node-content :deep(tr) {
+  background: transparent;
+}
+
+.node-content :deep(tr:nth-child(even)) {
+  background: var(--bg-surface-alt, transparent);
+}
+
+/* Math inside tables needs more space */
+.node-content :deep(td .typst-inline),
+.node-content :deep(th .typst-inline) {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  min-height: 1.2em;
+}
+
+.node-content :deep(td .typst-display),
+.node-content :deep(th .typst-display) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.node-content :deep(td svg),
+.node-content :deep(th svg) {
+  display: inline-block;
+  vertical-align: middle;
+  height: auto !important;
+  max-height: none !important;
+  width: auto;
+  max-width: 100%;
+}
+
+/* Table fits within node boundary with text wrapping */
+.node-content :deep(table) {
+  table-layout: fixed;
+  word-wrap: break-word;
+}
+
+.node-content :deep(td),
+.node-content :deep(th) {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.node-content :deep(.mermaid-wrapper) {
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.node-content :deep(.mermaid) {
+  display: flex;
+  justify-content: center;
+}
+
+.node-content :deep(.mermaid svg) {
+  max-width: 100%;
+  height: auto;
+  /* Prevent blurry SVG in scaled containers */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.node-content :deep(.mermaid svg text) {
+  /* Keep text crisp */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typst math rendering */
+.node-content :deep(.typst-math) {
+  font-family: 'Computer Modern', serif;
+}
+
+.node-content :deep(.typst-display) {
+  display: block;
+  text-align: center;
+  margin: 16px 0;
+  padding: 12px 4px;
+  overflow: visible;
+  /* Ensure enough space for fractions, sums, integrals */
+  min-height: 2.5em;
+}
+
+.node-content :deep(.typst-inline) {
+  display: inline;
+  vertical-align: middle;
+}
+
+.node-content :deep(.typst-pending) {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.node-content :deep(.typst-error) {
+  color: var(--error-text, #dc2626);
+  font-family: monospace;
+  font-size: 0.85em;
+  background: var(--error-bg, #fef2f2);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.node-content :deep(.typst-display svg),
+.node-content :deep(.typst-inline svg) {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  overflow: visible;
+}
+
+.node-content :deep(.typst-display svg) {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Make Typst SVG adapt to dark theme */
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-display svg),
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-inline svg) {
+  filter: invert(1);
+}
+
+/* Ensure SVG background is transparent */
+.node-content :deep(.typst-display svg),
+.node-content :deep(.typst-inline svg) {
+  background: transparent;
+}
+
+.empty-state-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.empty-state-box {
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 24px 32px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  box-shadow: 0 4px 12px var(--shadow-sm);
+}
+
+.empty-state-box h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.empty-state-box p {
+  font-size: 14px;
+  margin: 0;
+}
+

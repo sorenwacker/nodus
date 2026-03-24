@@ -1,0 +1,445 @@
+
+.node-card {
+  position: absolute;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-default);
+  border-radius: 8px;
+  cursor: grab;
+  box-shadow: 0 2px 6px var(--shadow-sm), 0 1px 2px var(--shadow-md);
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 60px;
+  z-index: 1;
+  /* GPU acceleration */
+  will-change: transform;
+  contain: layout style paint;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  /* Re-enable pointer events (parent has none) */
+  pointer-events: auto;
+}
+
+/* Neighborhood mode transitions */
+.node-card.neighborhood-mode {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.node-card.neighborhood-focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-color-alpha), 0 4px 12px var(--shadow-md);
+}
+
+/* Semantic zoom: collapsed state when zoomed out */
+.node-card.collapsed {
+  overflow: hidden;
+  border-width: 3px;
+  box-shadow: 0 3px 8px var(--shadow-md);
+  /* Center content vertically */
+  justify-content: center;
+  align-items: center;
+}
+
+.node-card.collapsed .node-header {
+  border-bottom: none;
+  border-radius: 5px;
+  font-size: 36px;
+  font-weight: 700;
+  padding: 20px 24px;
+  color: var(--text-main);
+  letter-spacing: -0.5px;
+  text-shadow: 0 1px 3px var(--shadow-sm);
+  /* Center text */
+  text-align: center;
+  line-height: 1.15;
+  width: 100%;
+  background: transparent;
+}
+
+.node-card.collapsed .node-content,
+.node-card.collapsed .inline-editor,
+.node-card.collapsed .resize-handle {
+  display: none;
+}
+
+.node-header {
+  padding: 8px 12px;
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface-alt);
+  border-radius: 7px 7px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: inherit;
+}
+
+.title-editor {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  outline: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Image thumbnail for zoomed-out view */
+.node-thumbnail {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 7px;
+}
+
+.node-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.node-card:hover {
+  border-color: var(--text-muted);
+}
+
+.node-card.selected {
+  border-color: var(--primary-color);
+  box-shadow: var(--selection-glow);
+  /* Override paint containment so color bar below is visible */
+  contain: layout style;
+  overflow: visible;
+  z-index: 20;
+  /* Highlight background for multi-select visibility */
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-surface));
+}
+
+/* Collapsed selected nodes - more prominent highlight */
+.node-card.collapsed.selected {
+  background: color-mix(in srgb, var(--primary-color) 15%, var(--bg-surface));
+  border-width: 4px;
+}
+
+/* neighbor-highlighted styles moved to main.css for proper theme support */
+
+.node-card.dragging,
+.node-card.resizing {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px var(--shadow-md);
+  z-index: 1000;
+}
+
+/* Resize handles - edges and corners */
+.resize-edge,
+.resize-corner {
+  position: absolute;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.node-card:hover .resize-edge,
+.node-card:hover .resize-corner {
+  opacity: 0.3;
+}
+
+.resize-edge:hover,
+.resize-corner:hover {
+  opacity: 1 !important;
+}
+
+/* Edge handles */
+.resize-edge-n,
+.resize-edge-s {
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.resize-edge-n { top: -3px; }
+.resize-edge-s { bottom: -3px; }
+
+.resize-edge-e,
+.resize-edge-w {
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.resize-edge-e { right: -3px; }
+.resize-edge-w { left: -3px; }
+
+/* Corner handles */
+.resize-corner {
+  width: 10px;
+  height: 10px;
+}
+
+.resize-corner-nw { top: -3px; left: -3px; cursor: nwse-resize; }
+.resize-corner-ne { top: -3px; right: -3px; cursor: nesw-resize; }
+.resize-corner-se { bottom: -3px; right: -3px; cursor: nwse-resize; }
+.resize-corner-sw { bottom: -3px; left: -3px; cursor: nesw-resize; }
+
+/* Visual indicator for SE corner (most common) */
+.resize-corner-se::before,
+.resize-corner-se::after {
+  content: '';
+  position: absolute;
+  background: var(--text-muted);
+  border-radius: 1px;
+}
+
+.resize-corner-se::before {
+  bottom: 3px;
+  right: 3px;
+  width: 6px;
+  height: 2px;
+}
+
+.resize-corner-se::after {
+  bottom: 3px;
+  right: 3px;
+  width: 2px;
+  height: 6px;
+}
+
+.node-card.editing {
+  cursor: text;
+  /* Override paint containment so color bar below is visible */
+  contain: layout style;
+  overflow: visible;
+}
+
+.node-llm-bar-floating {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 1001;
+  pointer-events: auto;
+}
+
+.node-llm-mode {
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface-alt);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.node-llm-mode:hover {
+  background: var(--bg-elevated);
+  border-color: var(--primary-color);
+}
+
+.node-llm-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  min-width: 0;
+}
+
+.node-llm-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.node-llm-input::placeholder {
+  color: var(--text-muted);
+}
+
+.node-llm-send {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: var(--primary-color);
+  color: white;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.node-llm-send:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.node-llm-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.node-llm-stop {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: var(--danger-color);
+  color: white;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.node-llm-stop:hover {
+  filter: brightness(1.1);
+}
+
+.node-llm-input.loading {
+  background: var(--bg-elevated);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.inline-editor {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  overflow-y: auto;
+  padding: 12px;
+  padding-bottom: 20px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.inline-editor::placeholder {
+  color: var(--text-muted);
+}
+
+/* Floating color bar at top of canvas (shown when nodes selected) */
+.collapsed-color-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 50;
+}
+
+.color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-default);
+  cursor: pointer;
+  padding: 0;
+  background-color: white;
+}
+
+.color-dot:hover {
+  border-color: var(--text-muted);
+  transform: scale(1.1);
+}
+
+.color-dot.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.color-bar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-default);
+  margin: 0 2px;
+  align-self: center;
+}
+
+.autofit-toggle {
+  padding: 2px 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.autofit-toggle:hover {
+  border-color: var(--text-muted);
+}
+
+.autofit-toggle.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.delete-node-btn {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--danger-color);
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+/* Visible circle is smaller than clickable area */
+.delete-node-btn::before {
+  content: 'x';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px var(--shadow-sm);
+  transition: background 0.1s, color 0.1s;
+}
+
+.delete-node-btn:hover::before {
+  background: var(--danger-color);
+  color: white;
+}

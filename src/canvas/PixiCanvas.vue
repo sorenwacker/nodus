@@ -2007,4 +2007,4 @@ useCanvasKeyboardShortcuts({
   </div>
 </template>
 
-<style src="./PixiCanvas.css" scoped></style>
+<style src="./styles/index.css"></style>

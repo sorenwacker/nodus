@@ -1,0 +1,130 @@
+.canvas-viewport {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-canvas);
+  cursor: default;
+}
+
+.canvas-viewport.panning {
+  cursor: grabbing;
+}
+
+.canvas-viewport.frame-placement {
+  cursor: crosshair;
+}
+
+.canvas-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  transform-origin: 0 0;
+  /* GPU acceleration */
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  contain: layout style;
+  /* Children handle their own pointer-events */
+}
+
+.canvas-viewport {
+  background-color: var(--bg-canvas);
+  background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.edges-layer {
+  pointer-events: none;
+  overflow: visible;
+  background: none;
+}
+
+.edge-hit-area {
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.edge-line-visible {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+}
+
+/* Fast edge rendering for large graphs */
+.edge-line-fast {
+  stroke-linecap: round;
+  shape-rendering: optimizeSpeed;
+  pointer-events: none;
+}
+
+.edge-hit-area:hover + .edge-line-visible {
+  stroke-width: 4px !important;
+}
+
+.edge-label {
+  font-size: 11px;
+  font-weight: 500;
+  fill: var(--text-main);
+  text-anchor: middle;
+  pointer-events: none;
+  paint-order: stroke fill;
+  stroke: var(--bg-canvas);
+  stroke-width: 3px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.edge-highlighted {
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
+}
+
+:is([data-theme='cyber']) .edge-highlighted {
+  filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.8));
+}
+
+.edge-line-visible:not(.edge-highlighted) {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* Dim non-highlighted edges when a node is hovered/selected */
+.edges-layer:has(.edge-highlighted) .edge-line-visible:not(.edge-highlighted) {
+  opacity: 0.25;
+}
+
+/* LOD (Level of Detail) mode - circles for large graphs */
+.node-circle {
+  position: absolute;
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 2px 6px var(--shadow-sm);
+  user-select: none;
+  will-change: transform;
+  contain: layout style paint;
+  backface-visibility: hidden;
+  pointer-events: auto;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.node-circle:hover {
+  box-shadow: 0 4px 12px var(--shadow-md);
+  z-index: 10;
+}
+
+.node-circle.selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4), 0 4px 12px var(--shadow-md);
+  z-index: 20;
+}
+
+.node-circle.dragging {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px var(--shadow-md);
+  z-index: 1000;
+}

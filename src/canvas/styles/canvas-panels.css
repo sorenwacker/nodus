@@ -1,0 +1,343 @@
+.edge-panel {
+  position: absolute;
+  top: 16px;
+  right: 180px;
+  width: 180px;
+  background: var(--bg-surface-alt);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 100;
+  animation: fadeIn 0.1s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.edge-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-default);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.edge-panel-header button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.edge-panel-content {
+  padding: 10px;
+}
+
+.edge-panel-content label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.edge-panel-content select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.edge-label-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.edge-label-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.edge-color-picker {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.edge-color-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default);
+  cursor: pointer;
+  padding: 0;
+}
+
+.edge-color-dot:hover {
+  border-color: var(--text-muted);
+}
+
+.edge-color-dot.active {
+  border-color: var(--text-main);
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
+.edge-style-picker {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.edge-style-btn {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.edge-style-btn:hover {
+  background: var(--bg-elevated);
+}
+
+.edge-style-btn.active {
+  border-color: var(--primary-color);
+  background: var(--bg-elevated);
+}
+
+.direction-btns {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.direction-btns button {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-main);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.direction-btns button:hover {
+  background: var(--bg-elevated);
+}
+
+.insert-node-btn {
+  width: 100%;
+  padding: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  color: var(--primary-color);
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.insert-node-btn:hover {
+  background: var(--bg-elevated);
+}
+
+.delete-edge-btn {
+  width: 100%;
+  padding: 8px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: 4px;
+  color: var(--danger-color);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.delete-edge-btn:hover {
+  opacity: 0.9;
+}
+
+.zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 4px 8px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 50;
+}
+
+.zoom-controls button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+}
+
+/* Zoom controls tooltips appear above (bottom of screen) */
+.zoom-controls [data-tooltip]:hover::after {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
+}
+
+.zoom-controls button svg {
+  flex-shrink: 0;
+}
+
+.zoom-controls button:hover {
+  background: var(--bg-elevated);
+}
+
+.zoom-controls button.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.zoom-controls .depth-select {
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.zoom-controls .depth-select:hover {
+  border-color: var(--primary-color);
+}
+
+.zoom-controls span {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: center;
+}
+
+.status-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  box-shadow: 0 2px 8px var(--shadow-sm);
+  z-index: 50;
+}
+
+.status-bar .sep {
+  color: #e2e8f0;
+}
+
+.status-bar .hint {
+  color: #94a3b8;
+}
+
+.status-bar .layout-running {
+  color: var(--primary-color);
+  font-weight: 600;
+  animation: pulse 1s infinite;
+}
+
+.status-bar .ai-btn {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface-alt);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-bar .ai-btn:hover {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.status-bar .perf-mode {
+  background: #f97316;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.status-bar .pdf-processing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.status-bar .stop-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.status-bar .stop-btn:hover {
+  filter: brightness(1.1);
+}
+
+.status-bar .undo-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: var(--text-muted);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.status-bar .undo-btn:hover {
+  background: var(--danger-color);
+}
+
