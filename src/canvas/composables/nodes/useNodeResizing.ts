@@ -23,6 +23,7 @@ export interface UseNodeResizingContext {
   layoutNeighborhood: (focusId: string) => void
   pushOverlappingNodesAway: (sourceId: string) => void
   setLastDragEndTime: (time: number) => void
+  pushSizeUndo?: (sizes: Map<string, { width: number; height: number; x: number; y: number }>) => void
 }
 
 export interface UseNodeResizingReturn {
@@ -49,6 +50,7 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     layoutNeighborhood,
     pushOverlappingNodesAway,
     setLastDragEndTime,
+    pushSizeUndo,
   } = ctx
 
   // State
@@ -64,6 +66,34 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
 
     const node = store.getNode(nodeId)
     if (!node) return
+
+    // Capture old sizes for undo before resize starts
+    if (pushSizeUndo) {
+      const oldSizes = new Map<string, { width: number; height: number; x: number; y: number }>()
+      if (store.selectedNodeIds.includes(nodeId) && store.selectedNodeIds.length > 1) {
+        // Multi-select resize: capture all selected nodes
+        for (const id of store.selectedNodeIds) {
+          const n = store.getNode(id)
+          if (n) {
+            oldSizes.set(id, {
+              width: n.width || NODE_DEFAULTS.WIDTH,
+              height: n.height || NODE_DEFAULTS.HEIGHT,
+              x: n.canvas_x,
+              y: n.canvas_y,
+            })
+          }
+        }
+      } else {
+        // Single node resize
+        oldSizes.set(nodeId, {
+          width: node.width || NODE_DEFAULTS.WIDTH,
+          height: node.height || NODE_DEFAULTS.HEIGHT,
+          x: node.canvas_x,
+          y: node.canvas_y,
+        })
+      }
+      pushSizeUndo(oldSizes)
+    }
 
     resizingNode.value = nodeId
     resizeDirection.value = direction

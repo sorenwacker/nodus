@@ -3,13 +3,23 @@
  * Manages vault file watching and synchronization
  */
 import { ref } from 'vue'
-import { invoke, listen, readTextFile } from '../lib/tauri'
+import {
+  invoke,
+  listen,
+  readTextFile,
+  createNodeFromFile,
+  syncNodeWikilinks,
+  getWorkspace,
+} from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import type { Node, FileChangeEvent } from '../types'
 
 export interface FileSyncDeps {
   getNodes: () => Node[]
   updateNodeInPlace: (id: string, updates: Partial<Node>) => void
+  addNode: (node: Node) => void
+  removeNode: (id: string) => void
+  getCurrentWorkspaceId: () => string | null
 }
 
 export function useFileSync(deps: FileSyncDeps) {
@@ -36,17 +46,41 @@ export function useFileSync(deps: FileSyncDeps) {
     isWatching.value = false
   }
 
+  async function isSyncEnabled(): Promise<boolean> {
+    const workspaceId = deps.getCurrentWorkspaceId()
+    if (!workspaceId) return false
+    try {
+      const workspace = await getWorkspace(workspaceId)
+      return workspace?.sync_enabled ?? false
+    } catch {
+      return false
+    }
+  }
+
   async function handleFileChange(event: FileChangeEvent) {
     const filePath = event.path
     const nodes = deps.getNodes()
 
+    console.log('[FileSync] Received file change event:', event.change_type, filePath)
+
     switch (event.change_type) {
       case 'Created': {
         storeLogger.debug(`New file detected: ${filePath}`)
+        // Create node if sync is enabled
+        if (await isSyncEnabled()) {
+          const workspaceId = deps.getCurrentWorkspaceId()
+          try {
+            const node = (await createNodeFromFile(filePath, workspaceId)) as Node
+            deps.addNode(node)
+            storeLogger.info(`Created node from new file: ${filePath}`)
+          } catch (e) {
+            storeLogger.error('Failed to create node from file:', e)
+          }
+        }
         break
       }
       case 'Modified': {
-        const node = nodes.find(n => n.file_path === filePath)
+        const node = nodes.find((n) => n.file_path === filePath)
         if (node && event.new_checksum && node.checksum !== event.new_checksum) {
           storeLogger.debug(`File modified externally: ${filePath}`)
           try {
@@ -57,6 +91,11 @@ export function useFileSync(deps: FileSyncDeps) {
               updated_at: Date.now(),
             })
             await invoke<string | null>('update_node_content', { id: node.id, content })
+            // Sync wikilinks to create edges for new links
+            const edgesCreated = await syncNodeWikilinks(node.id)
+            if (edgesCreated > 0) {
+              storeLogger.info(`Created ${edgesCreated} new edges from wikilinks`)
+            }
           } catch (e) {
             storeLogger.error('Failed to reload file content:', e)
             deps.updateNodeInPlace(node.id, {
@@ -67,13 +106,27 @@ export function useFileSync(deps: FileSyncDeps) {
         break
       }
       case 'Deleted': {
-        const node = nodes.find(n => n.file_path === filePath)
+        console.log('[FileSync] Looking for node with file_path:', filePath)
+        console.log('[FileSync] Available nodes with file_paths:', nodes.filter(n => n.file_path).map(n => ({ id: n.id, title: n.title, file_path: n.file_path })))
+        const node = nodes.find((n) => n.file_path === filePath)
         if (node) {
-          storeLogger.debug(`File deleted externally: ${filePath}`)
-          deps.updateNodeInPlace(node.id, {
-            file_path: null,
-            updated_at: Date.now(),
-          })
+          console.log('[FileSync] Found node to delete:', node.id, node.title)
+          // If sync is enabled, delete the node entirely
+          // Otherwise just clear the file path
+          const syncEnabled = await isSyncEnabled()
+          console.log('[FileSync] Sync enabled:', syncEnabled)
+          if (syncEnabled) {
+            deps.removeNode(node.id)
+            console.log('[FileSync] Deleted node for removed file:', filePath)
+          } else {
+            deps.updateNodeInPlace(node.id, {
+              file_path: null,
+              updated_at: Date.now(),
+            })
+            console.log('[FileSync] Cleared file_path for node:', node.id)
+          }
+        } else {
+          console.log('[FileSync] No node found for deleted file:', filePath)
         }
         break
       }

@@ -3,7 +3,7 @@
  * Handles vault, citation, and ontology imports
  */
 import { ref } from 'vue'
-import { invoke, readTextFile, refreshWorkspace as refreshWorkspaceApi } from '../lib/tauri'
+import { invoke, readTextFile, refreshWorkspace as refreshWorkspaceApi, setWorkspaceSync } from '../lib/tauri'
 import { parseReferences, citationToMarkdown } from '../lib/bibtex'
 import { storeLogger } from '../lib/logger'
 import { handleAsyncError } from '../lib/errorHandling'
@@ -16,6 +16,7 @@ export interface ImportDeps {
   setNodes: (nodes: Node[]) => void
   addNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
+  reloadFrames: () => Promise<void>
   createNode: (data: {
     title: string
     markdown_content?: string
@@ -56,7 +57,7 @@ export function useImport(deps: ImportDeps) {
       deps.addNodes(importedNodes)
 
       // Fetch all edges to include newly created wikilink edges
-      const fetchedEdges = await invoke<Edge[]>('get_edges')
+      const fetchedEdges = await invoke<Edge[]>('get_edges', { workspaceId })
 
       // Deduplicate edges (handles bidirectional duplicates)
       const seenPairs = new Set<string>()
@@ -73,6 +74,15 @@ export function useImport(deps: ImportDeps) {
         storeLogger.info(`Frontend deduplication removed ${removed} duplicate edges`)
       }
       deps.setEdges(deduplicatedEdges)
+
+      // Reload frames to include newly created ones
+      await deps.reloadFrames()
+
+      // Enable sync mode for this workspace
+      if (workspaceId) {
+        await setWorkspaceSync(workspaceId, true)
+        storeLogger.info(`Enabled sync mode for workspace: ${workspaceId}`)
+      }
 
       // Start watching the vault for external changes
       await deps.watchVault(path)

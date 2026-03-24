@@ -16,10 +16,11 @@ export interface UseNodeEditorOptions {
   onAfterSave?: (nodeId: string) => void
   onSaveComplete?: () => void
   autosaveDelay?: number
+  pushContentUndo?: (nodeId: string, oldContent: string | null, oldTitle: string) => void
 }
 
 export function useNodeEditor(options: UseNodeEditorOptions) {
-  const { store, onAfterSave, onSaveComplete, autosaveDelay = 1000 } = options
+  const { store, onAfterSave, onSaveComplete, autosaveDelay = 1000, pushContentUndo } = options
 
   // Content editing state
   const editingNodeId = ref<string | null>(null)
@@ -66,6 +67,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     }
     const node = store.getNode(nodeId)
     if (!node) return
+
+    // Capture undo state before editing starts
+    if (pushContentUndo) {
+      pushContentUndo(nodeId, node.markdown_content, node.title)
+    }
+
     editingNodeId.value = nodeId
     editContent.value = node.markdown_content || ''
     // Focus the textarea after Vue updates the DOM
@@ -81,6 +88,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   function startEditingTitle(nodeId: string) {
     const node = store.getNode(nodeId)
     if (!node) return
+
+    // Capture undo state before editing starts
+    if (pushContentUndo) {
+      pushContentUndo(nodeId, node.markdown_content, node.title)
+    }
+
     editingTitleId.value = nodeId
     editTitle.value = node.title || ''
     setTimeout(() => {

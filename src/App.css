@@ -48,14 +48,14 @@
 }
 
 .workspace-selector select {
-  padding: 6px 10px;
+  padding: 4px 8px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-secondary);
   background: var(--bg-surface);
   cursor: pointer;
-  min-width: 140px;
+  min-width: 120px;
 }
 
 .workspace-selector select:hover {

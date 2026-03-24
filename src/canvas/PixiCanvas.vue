@@ -77,7 +77,7 @@ import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 
 // Undo handlers
-const { pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo } = useUndoHandlers()
+const { pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo } = useUndoHandlers()
 
 // Content renderer is configured via composable
 
@@ -331,6 +331,7 @@ const nodeEditor = useNodeEditor({
     updateNodeContent: store.updateNodeContent,
     updateNodeTitle: store.updateNodeTitle,
   },
+  pushContentUndo,
 })
 // Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit
 const { editingNodeId, editContent, editingTitleId, editTitle, startEditing, startEditingTitle, saveTitleEditing, cancelTitleEditing } = nodeEditor
@@ -591,7 +592,10 @@ const frames = useFrames({
   snapToGrid,
 })
 const { editingFrameId, editFrameTitle } = frames
-function onFramePointerDown(e: PointerEvent, frameId: string) { frames.onPointerDown(e, frameId) }
+function onFramePointerDown(e: PointerEvent, frameId: string) {
+  console.log('[PixiCanvas] onFramePointerDown received:', frameId)
+  frames.onPointerDown(e, frameId)
+}
 function startFrameResize(e: PointerEvent, frameId: string, direction = 'se') { frames.startResize(e, frameId, direction) }
 function startEditingFrameTitle(frameId: string) { frames.startEditingTitle(frameId) }
 function saveFrameTitleEditing() { frames.saveTitle() }
@@ -625,9 +629,15 @@ const isLayouting = ref(false)
 
 async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid') {
   isLayouting.value = true
-  console.log(`[LAYOUT] Starting ${type} layout...`)
+  const frameId = store.selectedFrameId
+  console.log(`[LAYOUT] Starting ${type} layout...`, frameId ? `(frame: ${frameId})` : '(canvas)')
   try {
-    await layout.autoLayout(type)
+    // If force layout and a frame is selected, use the frame-aware layoutNodes
+    if (type === 'force' && frameId) {
+      await store.layoutNodes(undefined, { frameId })
+    } else {
+      await layout.autoLayout(type, frameId ?? undefined)
+    }
     console.log(`[LAYOUT] ${type} layout complete`)
   } finally {
     isLayouting.value = false
@@ -1166,6 +1176,7 @@ const nodeResizing = useNodeResizing({
   layoutNeighborhood,
   pushOverlappingNodesAway,
   setLastDragEndTime: (time: number) => { lastDragEndTime = time },
+  pushSizeUndo,
 })
 const { resizingNode, resizePreview, onResizePointerDown } = nodeResizing
 
@@ -1235,7 +1246,7 @@ function saveEditing(e?: FocusEvent) {
   if (e?.relatedTarget) {
     const related = e.relatedTarget as HTMLElement
     if (related.closest('.node-llm-bar-floating') ||
-        related.closest('.node-color-bar') ||
+        related.closest('.collapsed-color-bar') ||
         related.closest('.graph-llm-bar')) {
       return
     }
@@ -1361,9 +1372,28 @@ const { visibleEdgeLines } = useEdgeVisibility({
   getNode: store.getNode,
 })
 
-function updateNodeColor(nodeId: string, color: string | null) {
-  // Use store method to persist to database
-  store.updateNodeColor(nodeId, color)
+function updateSelectedNodesColor(color: string | null) {
+  // Capture old colors for undo
+  const oldColors = new Map<string, string | null>()
+  for (const nodeId of store.selectedNodeIds) {
+    const node = store.getNode(nodeId)
+    if (node) {
+      oldColors.set(nodeId, node.color_theme ?? null)
+    }
+  }
+  pushColorUndo(oldColors)
+
+  // Apply color to all selected nodes
+  for (const nodeId of store.selectedNodeIds) {
+    store.updateNodeColor(nodeId, color)
+  }
+}
+
+function fitSelectedNodes() {
+  // Fit all selected nodes to their content
+  for (const nodeId of store.selectedNodeIds) {
+    fitNodeNow(nodeId)
+  }
 }
 
 // One-shot fit to content (does NOT enable auto_fit)
@@ -1519,7 +1549,7 @@ useCanvasKeyboardShortcuts({
   copySelectedNodes,
   pasteNodes,
   resetAllNodeSizes,
-  layoutNodes: () => store.layoutNodes(),
+  layoutNodes: () => store.layoutNodes(undefined, { frameId: store.selectedFrameId ?? undefined }),
   fitToContent,
   toggleNeighborhoodMode,
   fontScale,
@@ -1562,9 +1592,9 @@ useCanvasKeyboardShortcuts({
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
     >
-      <!-- Floating color bar (shown when zoomed out/collapsed and node selected) -->
+      <!-- Floating color bar (shown when nodes are selected) -->
       <div
-        v-if="isSemanticZoomCollapsed && store.selectedNodeIds.length > 0"
+        v-if="store.selectedNodeIds.length > 0"
         class="collapsed-color-bar"
         @pointerdown.stop
         @click.stop
@@ -1573,10 +1603,16 @@ useCanvasKeyboardShortcuts({
           v-for="color in nodeColors"
           :key="color.value || 'default'"
           class="color-dot"
-          :class="{ active: store.filteredNodes.find(n => n.id === store.selectedNodeIds[0])?.color_theme === color.value }"
+          :class="{ active: store.selectedNodeIds.every(id => store.filteredNodes.find(n => n.id === id)?.color_theme === color.value) }"
           :style="{ background: color.display || 'var(--bg-surface)' }"
-          @click.stop="updateNodeColor(store.selectedNodeIds[0], color.value)"
+          @click.stop="updateSelectedNodesColor(color.value)"
         ></button>
+        <span class="color-bar-sep"></span>
+        <button
+          class="autofit-toggle"
+          :title="t('canvas.node.fitContent')"
+          @click.stop="fitSelectedNodes"
+        >Fit</button>
       </div>
 
     <div class="canvas-content" :style="{ transform }">
@@ -1713,29 +1749,6 @@ useCanvasKeyboardShortcuts({
           v-html="nodeRenderedContent[node.id] || ''"
         ></div>
         <!-- eslint-enable vue/no-v-html -->
-
-        <!-- Color palette and options (shown when selected or editing, hidden when collapsed - see fixed bar) -->
-        <div
-          v-if="(store.selectedNodeIds.includes(node.id) || editingNodeId === node.id) && !isSemanticZoomCollapsed"
-          class="node-color-bar"
-          :style="{ transform: `scale(${1/scale}) translateY(100%)`, transformOrigin: 'left bottom' }"
-          @pointerdown.prevent
-        >
-          <button
-            v-for="color in nodeColors"
-            :key="color.value || 'default'"
-            class="color-dot"
-            :class="{ active: node.color_theme === color.value }"
-            :style="{ background: color.display || 'var(--bg-surface)' }"
-            @click.stop="updateNodeColor(node.id, color.value)"
-          ></button>
-          <span class="color-bar-sep"></span>
-          <button
-            class="autofit-toggle"
-            :title="t('canvas.node.fitContent')"
-            @click.stop="fitNodeNow(node.id)"
-          >Fit</button>
-        </div>
 
         <!-- Delete button (shown when selected but not editing, hidden when collapsed) -->
         <button

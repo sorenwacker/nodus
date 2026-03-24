@@ -175,26 +175,17 @@ defineEmits<{
   filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
 }
 
-.edge-line-visible:not(.edge-highlighted) {
-  opacity: 1;
-  transition: opacity 0.15s ease;
-}
-
-/* Dim non-highlighted edges when a node is hovered/selected */
-.edges-layer:has(.edge-highlighted) .edge-line-visible:not(.edge-highlighted) {
-  opacity: 0.25;
+/* Smooth opacity transitions (stroke-opacity is set inline from JS) */
+.edge-line-visible,
+.edge-line-fast {
+  transition: stroke-opacity 0.15s ease;
 }
 
 .edge-tagged {
   stroke-dasharray: 6, 4;
-  opacity: 0.7;
 }
 
 .edge-tagged:not(.edge-highlighted) {
   stroke: var(--text-muted) !important;
-}
-
-.edge-neighbor {
-  opacity: 0.25;
 }
 </style>

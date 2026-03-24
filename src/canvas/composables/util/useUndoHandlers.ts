@@ -10,6 +10,8 @@ export function useUndoHandlers() {
   const injectedPushContentUndo = inject<((nodeId: string, oldContent: string | null, oldTitle: string) => void) | undefined>('pushContentUndo')
   const injectedPushDeletionUndo = inject<((node: Node, edges: Edge[]) => void) | undefined>('pushDeletionUndo')
   const injectedPushCreationUndo = inject<((nodeIds: string[]) => void) | undefined>('pushCreationUndo')
+  const injectedPushColorUndo = inject<((colors: Map<string, string | null>) => void) | undefined>('pushColorUndo')
+  const injectedPushSizeUndo = inject<((sizes: Map<string, { width: number; height: number; x: number; y: number }>) => void) | undefined>('pushSizeUndo')
 
   const pushUndo = () => {
     if (injectedPushUndo) {
@@ -43,10 +45,28 @@ export function useUndoHandlers() {
     }
   }
 
+  const pushColorUndo = (colors: Map<string, string | null>) => {
+    if (injectedPushColorUndo) {
+      injectedPushColorUndo(colors)
+    } else {
+      console.warn('pushColorUndo not provided - color undo will not work')
+    }
+  }
+
+  const pushSizeUndo = (sizes: Map<string, { width: number; height: number; x: number; y: number }>) => {
+    if (injectedPushSizeUndo) {
+      injectedPushSizeUndo(sizes)
+    } else {
+      console.warn('pushSizeUndo not provided - size undo will not work')
+    }
+  }
+
   return {
     pushUndo,
     pushContentUndo,
     pushDeletionUndo,
     pushCreationUndo,
+    pushColorUndo,
+    pushSizeUndo,
   }
 }

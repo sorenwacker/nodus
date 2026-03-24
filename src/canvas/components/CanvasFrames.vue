@@ -113,9 +113,11 @@ defineEmits<{
 }
 
 .canvas-frame.selected {
-  border-style: solid;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-style: solid !important;
+  border-color: var(--primary-color) !important;
+  border-width: 3px !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .frame-header {
@@ -129,28 +131,28 @@ defineEmits<{
 }
 
 .frame-title {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
   background: var(--bg-surface);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 4px;
-  border: 2px solid var(--border-subtle);
+  border: 1.5px solid var(--border-subtle);
   white-space: nowrap;
 }
 
 /* Title color is set via inline style to match frame color */
 
 .frame-title-editor {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-main);
   background: var(--bg-surface);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 4px;
   border: 1px solid var(--primary-color);
   outline: none;
-  min-width: 100px;
+  min-width: 80px;
 }
 
 .frame-delete-btn {

@@ -109,6 +109,27 @@ export async function getLockedNodes(): Promise<string[]> {
   return invoke<string[]>('get_locked_nodes')
 }
 
+// Workspace sync functions
+export async function setWorkspaceSync(id: string, syncEnabled: boolean): Promise<void> {
+  return invoke<void>('set_workspace_sync', { id, syncEnabled })
+}
+
+export async function getWorkspace(id: string): Promise<{ sync_enabled: boolean; vault_path: string | null } | null> {
+  return invoke('get_workspace', { id })
+}
+
+export async function createNodeFromFile(filePath: string, workspaceId: string | null): Promise<unknown> {
+  return invoke('create_node_from_file', { filePath, workspaceId })
+}
+
+export async function syncNodeWikilinks(nodeId: string): Promise<number> {
+  return invoke<number>('sync_node_wikilinks', { nodeId })
+}
+
+export async function createFileForNode(nodeId: string): Promise<string> {
+  return invoke<string>('create_file_for_node', { nodeId })
+}
+
 // Convert local file path to URL that webview can access
 let convertFileSrcFunc: ((path: string) => string) | null = null
 

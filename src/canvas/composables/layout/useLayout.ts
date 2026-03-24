@@ -332,14 +332,48 @@ export function useLayout(options: UseLayoutOptions) {
     return targets
   }
 
-  async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid') {
-    console.log('autoLayout called with:', layout)
+  async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid', frameId?: string) {
+    console.log('autoLayout called with:', layout, frameId ? `(frame: ${frameId})` : '')
     const selectedIds = store.getSelectedNodeIds()
     const allNodes = store.getFilteredNodes()
     const allFrames = store.getFilteredFrames()
-    const nodes = selectedIds.length > 0
-      ? allNodes.filter(n => selectedIds.includes(n.id))
-      : allNodes
+
+    // If frameId is provided, only layout nodes inside that frame
+    let nodes: Node[]
+    let targetFrame: Frame | undefined
+
+    if (frameId) {
+      targetFrame = allFrames.find(f => f.id === frameId)
+      if (!targetFrame) {
+        console.log('autoLayout: frame not found:', frameId)
+        return
+      }
+
+      // Helper to check if a node is inside the target frame (50%+ overlap)
+      const isNodeInTargetFrame = (node: Node): boolean => {
+        if (node.frame_id === frameId) return true
+
+        const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+        const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+        const nodeArea = nodeWidth * nodeHeight
+
+        const overlapX = Math.max(0,
+          Math.min(node.canvas_x + nodeWidth, targetFrame!.canvas_x + targetFrame!.width) -
+          Math.max(node.canvas_x, targetFrame!.canvas_x))
+        const overlapY = Math.max(0,
+          Math.min(node.canvas_y + nodeHeight, targetFrame!.canvas_y + targetFrame!.height) -
+          Math.max(node.canvas_y, targetFrame!.canvas_y))
+
+        return overlapX * overlapY > nodeArea * 0.5
+      }
+
+      nodes = allNodes.filter(n => isNodeInTargetFrame(n))
+      console.log('autoLayout frame-scoped:', nodes.length, 'nodes in frame', targetFrame.title)
+    } else {
+      nodes = selectedIds.length > 0
+        ? allNodes.filter(n => selectedIds.includes(n.id))
+        : allNodes
+    }
 
     console.log('autoLayout nodes:', nodes.length, 'selected:', selectedIds.length, 'frames:', allFrames.length)
     if (nodes.length === 0) return

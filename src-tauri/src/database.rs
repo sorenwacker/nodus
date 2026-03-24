@@ -101,6 +101,11 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         .execute(pool)
         .await;
 
+    // Add sync_enabled to workspaces
+    let _ = sqlx::query(include_str!("../migrations/009_workspace_sync.sql"))
+        .execute(pool)
+        .await;
+
     Ok(())
 }
 
@@ -246,6 +251,23 @@ pub mod nodes {
         let now = chrono::Utc::now().timestamp();
         sqlx::query("UPDATE nodes SET markdown_content = ?, updated_at = ? WHERE id = ?")
             .bind(content)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_file_path(
+        pool: &DbPool,
+        id: &str,
+        file_path: &str,
+        checksum: &str,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE nodes SET file_path = ?, checksum = ?, updated_at = ? WHERE id = ?")
+            .bind(file_path)
+            .bind(checksum)
             .bind(now)
             .bind(id)
             .execute(pool)
@@ -425,6 +447,14 @@ pub mod edges {
         Ok(edges)
     }
 
+    pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Edge>, DatabaseError> {
+        let edge = sqlx::query_as::<_, Edge>("SELECT * FROM edges WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+        Ok(edge)
+    }
+
     pub async fn create(pool: &DbPool, edge: &Edge) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
@@ -482,6 +512,17 @@ pub mod edges {
         Ok(())
     }
 
+    pub async fn get_edges_from_node(
+        pool: &DbPool,
+        node_id: &str,
+    ) -> Result<Vec<Edge>, DatabaseError> {
+        let edges = sqlx::query_as::<_, Edge>("SELECT * FROM edges WHERE source_node_id = ?")
+            .bind(node_id)
+            .fetch_all(pool)
+            .await?;
+        Ok(edges)
+    }
+
     /// Remove duplicate edges, keeping only the first one for each source-target pair
     pub async fn deduplicate(pool: &DbPool) -> Result<u64, DatabaseError> {
         let result = sqlx::query(
@@ -511,6 +552,7 @@ pub mod workspaces {
         pub name: String,
         pub color: Option<String>,
         pub vault_path: Option<String>,
+        pub sync_enabled: bool,
         pub created_at: i64,
         pub updated_at: i64,
     }
@@ -526,19 +568,43 @@ pub mod workspaces {
     pub async fn create(pool: &DbPool, workspace: &Workspace) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO workspaces (id, name, color, vault_path, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO workspaces (id, name, color, vault_path, sync_enabled, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&workspace.id)
         .bind(&workspace.name)
         .bind(&workspace.color)
         .bind(&workspace.vault_path)
+        .bind(workspace.sync_enabled)
         .bind(workspace.created_at)
         .bind(workspace.updated_at)
         .execute(pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn update_sync_enabled(
+        pool: &DbPool,
+        id: &str,
+        sync_enabled: bool,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE workspaces SET sync_enabled = ?, updated_at = ? WHERE id = ?")
+            .bind(sync_enabled)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Workspace>, DatabaseError> {
+        let workspace = sqlx::query_as::<_, Workspace>("SELECT * FROM workspaces WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+        Ok(workspace)
     }
 
     pub async fn delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {

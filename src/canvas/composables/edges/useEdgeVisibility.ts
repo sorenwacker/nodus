@@ -125,8 +125,9 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
       const isNeighborEdge = !isDirect && (neighborIds.has(e.source_node_id) || neighborIds.has(e.target_node_id))
 
-      // Opacity: direct edges are full, neighbor edges are transparent
-      const opacity = isNeighborEdge ? 0.25 : 1.0
+      // Opacity: highlighted edges are full, others are dimmed by default
+      // Neighbor edges (2nd hop) are even more transparent
+      const opacity = isHighlighted ? 1.0 : (isNeighborEdge ? 0.2 : 0.3)
 
       // Use explicit color field first, then link_type as fallback, then default
       const color = (e.color && e.color.startsWith('#')) ? e.color

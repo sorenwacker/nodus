@@ -69,11 +69,30 @@ export const useNodesStore = defineStore('nodes', () => {
   const fileSync = useFileSync({
     getNodes: () => nodes.value,
     updateNodeInPlace: (id: string, updates: Partial<Node>) => {
-      const node = nodes.value.find(n => n.id === id)
+      const node = nodes.value.find((n) => n.id === id)
       if (node) {
         Object.assign(node, updates)
       }
     },
+    addNode: (node: Node) => {
+      nodes.value.push(node)
+    },
+    removeNode: (id: string) => {
+      // Remove connected edges first
+      const connectedEdges = edgesStore.edges.filter(
+        (e) => e.source_node_id === id || e.target_node_id === id
+      )
+      for (const edge of connectedEdges) {
+        edgesStore.deleteEdge(edge.id)
+      }
+      // Remove from local state
+      nodes.value = nodes.value.filter((n) => n.id !== id)
+      // Delete from database
+      invoke('delete_node', { id }).catch((e) => {
+        storeLogger.error('Failed to delete node:', e)
+      })
+    },
+    getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
   })
 
   // Import composable (initialized after createNode is defined)
@@ -107,12 +126,20 @@ export const useNodesStore = defineStore('nodes', () => {
   })
 
   const filteredFrames = computed(() => {
-    return framesStore.getFramesForWorkspace(workspaceStore.currentWorkspaceId)
+    const wsId = workspaceStore.currentWorkspaceId
+    // Filter frames by workspace, treating null/undefined/"default" as the default workspace
+    if (!wsId || wsId === 'default') {
+      return framesStore.frames.filter(f => !f.workspace_id || f.workspace_id === 'default')
+    }
+    return framesStore.frames.filter(f => f.workspace_id === wsId)
   })
 
   const filteredEdges = computed(() => {
     const nodeIds = new Set(filteredNodes.value.map(n => n.id))
-    return edgesStore.getEdgesForNodes(nodeIds)
+    // Filter edges to only include those connecting nodes in the current workspace
+    return edgesStore.edges.filter(
+      e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
+    )
   })
 
   // Storylines are managed by separate store - expose computed for compatibility
@@ -600,7 +627,8 @@ export const useNodesStore = defineStore('nodes', () => {
     getNodes: () => nodes.value,
     setNodes: (n) => { nodes.value = n },
     addNodes: (n) => { nodes.value.push(...n) },
-    setEdges: (e) => { edgesStore.edges.length = 0; edgesStore.edges.push(...e) },
+    setEdges: (e) => { edgesStore.edges.splice(0, edgesStore.edges.length, ...e) },
+    reloadFrames: () => framesStore.initialize(),
     createNode,
     watchVault: (path) => fileSync.watchVault(path),
   })
@@ -646,8 +674,11 @@ export const useNodesStore = defineStore('nodes', () => {
   const createWorkspace = (name: string) => workspaceStore.createWorkspace(name)
   const switchWorkspace = async (workspaceId: string | null) => {
     workspaceStore.switchWorkspace(workspaceId)
-    // Reload edges for the new workspace
-    await edgesStore.initialize(workspaceId)
+    // Reload edges and frames for the new workspace
+    await Promise.all([
+      edgesStore.initialize(workspaceId),
+      framesStore.initialize(),
+    ])
   }
   const deleteWorkspace = (id: string, deleteFiles?: boolean) => workspaceStore.deleteWorkspace(id, deleteFiles)
   const recoverWorkspace = (id: string) => workspaceStore.recoverWorkspace(id)
@@ -656,7 +687,7 @@ export const useNodesStore = defineStore('nodes', () => {
 
   function clearCanvas() {
     nodes.value = []
-    edgesStore.edges.length = 0
+    edgesStore.edges.splice(0, edgesStore.edges.length)
     selectedNodeIds.value = []
   }
 
@@ -782,7 +813,8 @@ export const useNodesStore = defineStore('nodes', () => {
 
   /**
    * Apply force-directed layout to all nodes or a subset
-   * Nodes inside frames are excluded from layout
+   * When frameId is provided, layout only nodes inside that frame
+   * Otherwise, nodes inside frames are excluded from layout
    */
   async function layoutNodes(
     nodeIds?: string[],
@@ -791,38 +823,63 @@ export const useNodesStore = defineStore('nodes', () => {
       centerY?: number
       chargeStrength?: number
       linkDistance?: number
+      frameId?: string  // If provided, layout only nodes inside this frame
+      fitToFrame?: boolean  // If true, resize nodes to fit frame
     }
   ) {
-    // Helper to check if a node is inside any frame (50%+ overlap)
-    const isNodeInFrame = (node: Node): boolean => {
-      if (node.frame_id) return true
+    const frameId = options?.frameId
+    const fitToFrame = options?.fitToFrame ?? true
+
+    // Helper to check if a node is inside a specific frame (50%+ overlap)
+    const isNodeInSpecificFrame = (node: Node, frame: Frame): boolean => {
+      if (node.frame_id === frame.id) return true
 
       const nodeWidth = node.width || 200
       const nodeHeight = node.height || 120
       const nodeArea = nodeWidth * nodeHeight
 
+      const overlapX = Math.max(0,
+        Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
+        Math.max(node.canvas_x, frame.canvas_x))
+      const overlapY = Math.max(0,
+        Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
+        Math.max(node.canvas_y, frame.canvas_y))
+      return overlapX * overlapY > nodeArea * 0.5
+    }
+
+    // Helper to check if a node is inside any frame
+    const isNodeInAnyFrame = (node: Node): boolean => {
       for (const frame of filteredFrames.value) {
-        const overlapX = Math.max(0,
-          Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
-          Math.max(node.canvas_x, frame.canvas_x))
-        const overlapY = Math.max(0,
-          Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
-          Math.max(node.canvas_y, frame.canvas_y))
-        if (overlapX * overlapY > nodeArea * 0.5) return true
+        if (isNodeInSpecificFrame(node, frame)) return true
       }
       return false
     }
 
-    const allTargetNodes = nodeIds
-      ? filteredNodes.value.filter(n => nodeIds.includes(n.id))
-      : filteredNodes.value
+    let targetNodes: Node[]
+    let targetFrame: Frame | undefined
 
-    // Exclude nodes inside frames from layout
-    const targetNodes = allTargetNodes.filter(n => !isNodeInFrame(n))
-    const excludedCount = allTargetNodes.length - targetNodes.length
+    if (frameId) {
+      // Frame-scoped layout: only nodes inside the selected frame
+      targetFrame = filteredFrames.value.find(f => f.id === frameId)
+      if (!targetFrame) {
+        console.log('[Layout] Frame not found:', frameId)
+        return
+      }
 
-    console.log('[Layout] Frames:', filteredFrames.value.length)
-    console.log('[Layout] All nodes:', allTargetNodes.length, 'Excluded:', excludedCount, 'To layout:', targetNodes.length)
+      targetNodes = filteredNodes.value.filter(n => isNodeInSpecificFrame(n, targetFrame!))
+      console.log('[Layout] Frame-scoped layout:', targetFrame.title, 'Nodes:', targetNodes.length)
+    } else {
+      // Canvas layout: exclude nodes inside frames
+      const allTargetNodes = nodeIds
+        ? filteredNodes.value.filter(n => nodeIds.includes(n.id))
+        : filteredNodes.value
+
+      targetNodes = allTargetNodes.filter(n => !isNodeInAnyFrame(n))
+      const excludedCount = allTargetNodes.length - targetNodes.length
+
+      console.log('[Layout] Frames:', filteredFrames.value.length)
+      console.log('[Layout] All nodes:', allTargetNodes.length, 'Excluded:', excludedCount, 'To layout:', targetNodes.length)
+    }
 
     if (targetNodes.length === 0) return
 
@@ -834,11 +891,20 @@ export const useNodesStore = defineStore('nodes', () => {
       height: n.height || 120,
     }))
 
-    // Calculate centroid based on nodes being laid out
-    const centroidX = layoutNodesList.reduce((sum, n) => sum + n.x, 0) / layoutNodesList.length
-    const centroidY = layoutNodesList.reduce((sum, n) => sum + n.y, 0) / layoutNodesList.length
+    // Calculate layout center
+    let centerX: number, centerY: number
 
-    // Only include edges where BOTH endpoints are outside frames
+    if (targetFrame) {
+      // Center within frame
+      centerX = targetFrame.canvas_x + targetFrame.width / 2
+      centerY = targetFrame.canvas_y + targetFrame.height / 2
+    } else {
+      // Use centroid of nodes being laid out
+      centerX = layoutNodesList.reduce((sum, n) => sum + n.x, 0) / layoutNodesList.length
+      centerY = layoutNodesList.reduce((sum, n) => sum + n.y, 0) / layoutNodesList.length
+    }
+
+    // Get edges between target nodes
     const layoutNodeIds = new Set(targetNodes.map(n => n.id))
     const layoutEdges = filteredEdges.value
       .filter(e => layoutNodeIds.has(e.source_node_id) && layoutNodeIds.has(e.target_node_id))
@@ -851,20 +917,65 @@ export const useNodesStore = defineStore('nodes', () => {
     const nodeCount = layoutNodesList.length
     const iterations = nodeCount > 300 ? 150 : nodeCount > 100 ? 250 : 400
 
+    // Adjust charge and link distance for frame-scoped layout
+    let chargeStrength = options?.chargeStrength
+    let linkDistance = options?.linkDistance
+
+    if (targetFrame && !chargeStrength && !linkDistance) {
+      // Tighter layout for frame-scoped
+      const frameArea = targetFrame.width * targetFrame.height
+      const nodeArea = nodeCount * 200 * 120 // Approximate average node size
+      const density = nodeArea / frameArea
+
+      // Stronger repulsion and shorter links for denser layouts
+      chargeStrength = density > 0.5 ? -200 : -300
+      linkDistance = density > 0.5 ? 80 : 120
+    }
+
     const positions = await applyForceLayout(layoutNodesList, layoutEdges, {
-      centerX: options?.centerX ?? centroidX,
-      centerY: options?.centerY ?? centroidY,
-      chargeStrength: options?.chargeStrength,
-      linkDistance: options?.linkDistance,
+      centerX: options?.centerX ?? centerX,
+      centerY: options?.centerY ?? centerY,
+      chargeStrength,
+      linkDistance,
       iterations,
     })
 
-    // Update positions
-    const updates: Promise<void>[] = []
-    for (const [id, pos] of positions) {
-      updates.push(updateNodePosition(id, pos.x, pos.y))
+    // If frame-scoped, constrain positions to frame bounds and optionally resize nodes
+    if (targetFrame && fitToFrame) {
+      const padding = 30
+      const frameLeft = targetFrame.canvas_x + padding
+      const frameTop = targetFrame.canvas_y + padding + 30 // Extra space for title
+      const frameRight = targetFrame.canvas_x + targetFrame.width - padding
+      const frameBottom = targetFrame.canvas_y + targetFrame.height - padding
+
+      // Calculate available space and optimal node size
+      const availableWidth = frameRight - frameLeft
+      const availableHeight = frameBottom - frameTop
+      const cols = Math.ceil(Math.sqrt(nodeCount * availableWidth / availableHeight))
+      const rows = Math.ceil(nodeCount / cols)
+
+      const nodeWidth = Math.min(200, Math.max(100, (availableWidth - (cols - 1) * 20) / cols))
+      const nodeHeight = Math.min(120, Math.max(60, (availableHeight - (rows - 1) * 20) / rows))
+
+      // Resize nodes and constrain positions
+      const updates: Promise<void>[] = []
+      for (const [id, pos] of positions) {
+        // Constrain position to frame bounds
+        const constrainedX = Math.max(frameLeft, Math.min(frameRight - nodeWidth, pos.x))
+        const constrainedY = Math.max(frameTop, Math.min(frameBottom - nodeHeight, pos.y))
+
+        updates.push(updateNodePosition(id, constrainedX, constrainedY))
+        updates.push(updateNodeSize(id, nodeWidth, nodeHeight))
+      }
+      await Promise.all(updates)
+    } else {
+      // Standard position update
+      const updates: Promise<void>[] = []
+      for (const [id, pos] of positions) {
+        updates.push(updateNodePosition(id, pos.x, pos.y))
+      }
+      await Promise.all(updates)
     }
-    await Promise.all(updates)
 
     nodeLayoutVersion.value++
   }

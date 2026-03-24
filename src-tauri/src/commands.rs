@@ -94,6 +94,217 @@ pub async fn create_node(input: CreateNodeInput) -> Result<Node, String> {
     Ok(node)
 }
 
+/// Create a node from a vault file (used during sync)
+#[tauri::command]
+pub async fn create_node_from_file(
+    file_path: String,
+    workspace_id: Option<String>,
+) -> Result<Node, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let path = std::path::Path::new(&file_path);
+
+    // Check if node already exists for this file
+    if let Ok(Some(_)) = database::nodes::get_by_file_path(pool, &file_path).await {
+        return Err("Node already exists for this file".to_string());
+    }
+
+    // Read file content
+    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+
+    // Extract title from filename
+    let title = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Untitled")
+        .to_string();
+
+    // Compute checksum
+    let checksum = crate::checksum::compute_string(&content);
+
+    // Get count of existing nodes to position new node
+    let existing_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    let node_count = existing_nodes
+        .iter()
+        .filter(|n| n.workspace_id == workspace_id)
+        .count();
+
+    // Position in grid
+    let x = (node_count % 5) as f64 * 250.0 + 100.0;
+    let y = (node_count / 5) as f64 * 200.0 + 100.0;
+
+    let now = chrono::Utc::now().timestamp();
+    let node_id = uuid::Uuid::new_v4().to_string();
+
+    let node = Node {
+        id: node_id.clone(),
+        title,
+        file_path: Some(file_path),
+        markdown_content: Some(content.clone()),
+        node_type: "note".to_string(),
+        canvas_x: x,
+        canvas_y: y,
+        width: 200.0,
+        height: 120.0,
+        z_index: 0,
+        frame_id: None,
+        color_theme: None,
+        is_collapsed: false,
+        tags: None,
+        workspace_id,
+        checksum: Some(checksum),
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
+    };
+
+    database::nodes::create(pool, &node)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Create edges for wikilinks
+    let links = import_helpers::extract_wikilinks(&content);
+    sync_wikilinks_for_node(pool, &node_id, &links).await?;
+
+    Ok(node)
+}
+
+/// Sync wikilinks for a node - creates edges for new links
+#[tauri::command]
+pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    let node = database::nodes::get_by_id(pool, &node_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Node not found")?;
+
+    let content = node.markdown_content.unwrap_or_default();
+    let links = import_helpers::extract_wikilinks(&content);
+
+    sync_wikilinks_for_node(pool, &node_id, &links).await
+}
+
+/// Helper to sync wikilinks for a node
+async fn sync_wikilinks_for_node(
+    pool: &database::DbPool,
+    source_id: &str,
+    links: &[String],
+) -> Result<usize, String> {
+    // Build title to id map for all nodes
+    let all_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut title_to_id: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    for node in &all_nodes {
+        title_to_id.insert(node.title.to_lowercase(), node.id.clone());
+    }
+
+    // Get existing edges from this node
+    let existing_edges = database::edges::get_edges_from_node(pool, source_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let existing_targets: std::collections::HashSet<String> = existing_edges
+        .iter()
+        .filter(|e| e.link_type == "wikilink")
+        .map(|e| e.target_node_id.clone())
+        .collect();
+
+    let now = chrono::Utc::now().timestamp();
+    let mut created_count = 0;
+
+    // Process each link
+    let unique_links: std::collections::HashSet<String> = links
+        .iter()
+        .map(|l| {
+            let without_anchor = l.split('#').next().unwrap_or(l);
+            without_anchor.to_lowercase()
+        })
+        .collect();
+
+    for link in unique_links {
+        // Try exact match first, then filename-only match
+        let target_id = title_to_id
+            .get(&link)
+            .or_else(|| {
+                link.rsplit('/')
+                    .next()
+                    .and_then(|name| title_to_id.get(name))
+            })
+            .cloned();
+
+        if let Some(target_id) = target_id {
+            if source_id != target_id && !existing_targets.contains(&target_id) {
+                let edge = database::edges::Edge {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    source_node_id: source_id.to_string(),
+                    target_node_id: target_id,
+                    label: None,
+                    link_type: "wikilink".to_string(),
+                    weight: 1.0,
+                    color: None,
+                    storyline_id: None,
+                    created_at: now,
+                };
+                if database::edges::create(pool, &edge).await.is_ok() {
+                    created_count += 1;
+                }
+            }
+        }
+    }
+
+    Ok(created_count)
+}
+
+/// Create a file in the vault for a node
+#[tauri::command]
+pub async fn create_file_for_node(node_id: String) -> Result<String, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    let node = database::nodes::get_by_id(pool, &node_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Node not found")?;
+
+    // Node already has a file
+    if node.file_path.is_some() {
+        return Err("Node already has a file".to_string());
+    }
+
+    // Get workspace to find vault path
+    let workspace_id = node.workspace_id.as_ref().ok_or("Node has no workspace")?;
+    let workspace = database::workspaces::get_by_id(pool, workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Workspace not found")?;
+
+    let vault_path = workspace.vault_path.ok_or("Workspace has no vault path")?;
+
+    // Create file path
+    let safe_title = node
+        .title
+        .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let file_path = std::path::Path::new(&vault_path).join(format!("{}.md", safe_title));
+    let file_path_str = file_path.to_string_lossy().to_string();
+
+    // Write content to file
+    let content = node.markdown_content.unwrap_or_default();
+    std::fs::write(&file_path, &content).map_err(|e| e.to_string())?;
+
+    // Compute checksum
+    let checksum = crate::checksum::compute_string(&content);
+
+    // Update node with file path
+    database::nodes::update_file_path(pool, &node_id, &file_path_str, &checksum)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(file_path_str)
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct UpdateNodeInput {
@@ -232,6 +443,41 @@ pub async fn create_edge(input: CreateEdgeInput) -> Result<Edge, String> {
 #[tauri::command]
 pub async fn delete_edge(id: String) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Get the edge first to check if it's a wikilink
+    let edge = database::edges::get_by_id(pool, &id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(edge) = edge {
+        // If this is a wikilink edge, transform the wikilinks in source node to plain text
+        if edge.link_type == "wikilink" {
+            // Get source and target nodes
+            let source = database::nodes::get_by_id(pool, &edge.source_node_id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let target = database::nodes::get_by_id(pool, &edge.target_node_id)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            if let (Some(source), Some(target)) = (source, target) {
+                if let Some(content) = &source.markdown_content {
+                    // Transform wikilinks to target into plain text
+                    let new_content =
+                        import_helpers::remove_wikilinks_to_target(content, &target.title);
+
+                    if new_content != *content {
+                        // Update content in database and file
+                        update_node_content(source.id.clone(), new_content)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+        }
+    }
+
+    // Delete the edge
     database::edges::delete(pool, &id)
         .await
         .map_err(|e| e.to_string())
@@ -423,11 +669,12 @@ pub async fn import_vault(
     let mut skipped = 0;
 
     // Track folders and their frames
-    // Key: relative folder path, Value: (frame_id, nodes_in_folder count)
-    let mut folder_frames: std::collections::HashMap<String, (String, usize)> =
+    // Key: relative folder path, Value: (frame_id, frame_x, frame_y)
+    let mut folder_frames: std::collections::HashMap<String, (String, f64, f64)> =
         std::collections::HashMap::new();
-    // Track which node belongs to which folder
-    let mut node_folders: Vec<(String, String)> = Vec::new(); // (node_id, folder_path)
+    // Track folder file counts separately
+    let mut folder_file_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     // First pass: collect all files and create frames for folders
     let now = chrono::Utc::now().timestamp_millis();
@@ -437,30 +684,31 @@ pub async fn import_vault(
         .map(|f| (f.path, f.folder))
         .collect();
 
-    // Initialize folder_frames from counts
-    for (folder, count) in folder_counts {
-        folder_frames.insert(folder, (String::new(), count));
+    // Store folder file counts
+    for (folder, count) in &folder_counts {
+        folder_file_counts.insert(folder.clone(), *count);
     }
 
     // Create frames for non-root folders with multiple files
     let mut frame_count = 0;
-    for (folder, (frame_id_slot, count)) in folder_frames.iter_mut() {
+    for (folder, count) in folder_counts {
         // Skip root folder (empty string) and single-file folders
-        if folder.is_empty() || *count < 2 {
+        if folder.is_empty() || count < 2 {
             continue;
         }
 
         // Check if frame already exists
-        let frame_title = folder.split('/').last().unwrap_or(folder);
+        let frame_title = folder.split('/').last().unwrap_or(&folder);
         if let Ok(Some(existing)) =
             database::frames::get_by_title_and_workspace(pool, frame_title, workspace_id.as_deref())
                 .await
         {
-            *frame_id_slot = existing.id;
+            // Use existing frame's position
+            folder_frames.insert(folder, (existing.id, existing.canvas_x, existing.canvas_y));
             continue;
         }
 
-        // Create new frame
+        // Create new frame with size based on node count
         let frame_id = uuid::Uuid::new_v4().to_string();
         let frame_x = (frame_count % layout_config::FRAME_COLS) as f64
             * layout_config::FRAME_SPACING
@@ -468,14 +716,15 @@ pub async fn import_vault(
         let frame_y = (frame_count / layout_config::FRAME_COLS) as f64
             * layout_config::FRAME_SPACING
             + layout_config::FRAME_ORIGIN;
+        let (frame_width, frame_height) = layout_config::calculate_frame_size(count);
 
         let frame = database::frames::Frame {
             id: frame_id.clone(),
             title: frame_title.to_string(),
             canvas_x: frame_x,
             canvas_y: frame_y,
-            width: layout_config::FRAME_WIDTH,
-            height: layout_config::FRAME_HEIGHT,
+            width: frame_width,
+            height: frame_height,
             color: None,
             workspace_id: workspace_id.clone(),
             created_at: now,
@@ -483,7 +732,8 @@ pub async fn import_vault(
         };
 
         if database::frames::create(pool, &frame).await.is_ok() {
-            *frame_id_slot = frame_id;
+            // Store frame position for node placement
+            folder_frames.insert(folder, (frame_id, frame_x, frame_y));
             frame_count += 1;
         }
     }
@@ -523,31 +773,14 @@ pub async fn import_vault(
         // Compute checksum
         let checksum = crate::checksum::compute_string(&content);
 
-        // Get frame info for this folder
-        let frame_id = folder_frames.get(&folder).and_then(|(fid, _)| {
-            if fid.is_empty() {
-                None
-            } else {
-                Some(fid.clone())
-            }
-        });
+        // Get frame info for this folder (frame_id, frame_x, frame_y)
+        let frame_info = folder_frames.get(&folder).cloned();
+        let frame_id = frame_info.as_ref().map(|(fid, _, _)| fid.clone());
 
         // Calculate position within frame or on canvas
         let node_idx = folder_node_counts.entry(folder.clone()).or_insert(0);
-        let (initial_x, initial_y) = if frame_id.is_some() {
-            // Position within frame
-            let frame_info = folder_frames.get(&folder);
-            let (frame_x, frame_y) = if let Some((_, _)) = frame_info {
-                // Find frame position
-                let fi = folder_frames.keys().position(|k| k == &folder).unwrap_or(0);
-                let fx = (fi % layout_config::FRAME_COLS) as f64 * layout_config::FRAME_SPACING
-                    + layout_config::FRAME_ORIGIN;
-                let fy = (fi / layout_config::FRAME_COLS) as f64 * layout_config::FRAME_SPACING
-                    + layout_config::FRAME_ORIGIN;
-                (fx, fy)
-            } else {
-                (layout_config::FRAME_ORIGIN, layout_config::FRAME_ORIGIN)
-            };
+        let (initial_x, initial_y) = if let Some((_, frame_x, frame_y)) = frame_info {
+            // Position within frame using stored frame position
             let x = frame_x
                 + layout_config::FRAME_NODE_X_OFFSET
                 + (*node_idx % layout_config::FRAME_NODE_COLS) as f64
@@ -610,11 +843,13 @@ pub async fn import_vault(
             files_to_delete.push(file_path);
         }
 
-        if let Some(fid) = &frame_id {
-            node_folders.push((node_id.clone(), fid.clone()));
-        }
-
+        // Map both filename and relative path for wikilink resolution
+        // e.g., "note" and "subfolder/note" both map to the same node
         title_to_id.insert(title.to_lowercase(), node_id.clone());
+        if !folder.is_empty() {
+            let path_key = format!("{}/{}", folder, title).to_lowercase();
+            title_to_id.insert(path_key, node_id.clone());
+        }
         node_links.push((node_id, links));
         nodes.push(node);
     }
@@ -626,12 +861,30 @@ pub async fn import_vault(
         std::collections::HashSet::new();
 
     for (source_id, links) in node_links {
-        let unique_links: std::collections::HashSet<String> =
-            links.into_iter().map(|l| l.to_lowercase()).collect();
+        let unique_links: std::collections::HashSet<String> = links
+            .into_iter()
+            .map(|l| {
+                // Strip section anchors (e.g., "Note#Section" -> "Note")
+                let without_anchor = l.split('#').next().unwrap_or(&l);
+                without_anchor.to_lowercase()
+            })
+            .collect();
 
         for link in unique_links {
-            if let Some(target_id) = title_to_id.get(&link) {
-                if source_id != *target_id {
+            // Try exact match first, then fall back to filename-only match
+            // This handles [[note]], [[folder/note]], and [[note#section]] style links
+            let target_id = title_to_id
+                .get(&link)
+                .or_else(|| {
+                    // Extract filename from path (e.g., "folder/note" -> "note")
+                    link.rsplit('/')
+                        .next()
+                        .and_then(|name| title_to_id.get(name))
+                })
+                .cloned();
+
+            if let Some(target_id) = target_id {
+                if source_id != target_id {
                     let edge_key = (source_id.clone(), target_id.clone());
                     if seen_edges.contains(&edge_key) {
                         continue;
@@ -710,6 +963,7 @@ pub async fn create_workspace(
         name: input.name,
         color: input.color,
         vault_path: input.vault_path,
+        sync_enabled: false,
         created_at: now,
         updated_at: now,
     };
@@ -719,6 +973,22 @@ pub async fn create_workspace(
         .map_err(|e| e.to_string())?;
 
     Ok(workspace)
+}
+
+#[tauri::command]
+pub async fn set_workspace_sync(id: String, sync_enabled: bool) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::workspaces::update_sync_enabled(pool, &id, sync_enabled)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_workspace(id: String) -> Result<Option<database::workspaces::Workspace>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::workspaces::get_by_id(pool, &id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

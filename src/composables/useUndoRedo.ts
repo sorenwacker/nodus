@@ -25,14 +25,26 @@ interface CreationSnapshot {
   creation: { nodeIds: string[] }
 }
 
-export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot
+interface ColorSnapshot {
+  type: 'color'
+  colors: Map<string, string | null>
+}
+
+interface SizeSnapshot {
+  type: 'size'
+  sizes: Map<string, { width: number; height: number; x: number; y: number }>
+}
+
+export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot
 
 export interface UndoRedoStore {
   getNode: (id: string) => Node | undefined
   getFilteredNodes: () => Node[]
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
+  updateNodeSize: (id: string, width: number, height: number) => Promise<void>
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
+  updateNodeColor: (id: string, color: string | null) => Promise<void>
   restoreNode: (node: Node) => Promise<void>
   restoreEdge: (edge: Edge) => Promise<void>
   deleteNode: (id: string) => Promise<void>
@@ -104,6 +116,30 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     redoStack.value = []
   }
 
+  function pushColorUndo(nodeColors: Map<string, string | null>) {
+    if (nodeColors.size === 0) return
+    undoStack.value.push({
+      type: 'color',
+      colors: new Map(nodeColors),
+    })
+    if (undoStack.value.length > maxUndo) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
+  function pushSizeUndo(nodeSizes: Map<string, { width: number; height: number; x: number; y: number }>) {
+    if (nodeSizes.size === 0) return
+    undoStack.value.push({
+      type: 'size',
+      sizes: new Map(nodeSizes),
+    })
+    if (undoStack.value.length > maxUndo) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
   async function undo() {
     if (undoStack.value.length === 0) {
       showToast('Nothing to undo', 'info')
@@ -149,6 +185,42 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.deleteNode(nodeId)
       }
       showToast(`Undo: deleted ${snapshot.creation.nodeIds.length} nodes`, 'info')
+    } else if (snapshot.type === 'color') {
+      // Save current colors for redo
+      const currentColors = new Map<string, string | null>()
+      for (const [id] of snapshot.colors) {
+        const node = store.getNode(id)
+        if (node) {
+          currentColors.set(id, node.color_theme ?? null)
+        }
+      }
+      redoStack.value.push({ type: 'color', colors: currentColors })
+      // Restore old colors
+      for (const [id, color] of snapshot.colors) {
+        await store.updateNodeColor(id, color)
+      }
+      showToast('Undo color', 'info')
+    } else if (snapshot.type === 'size') {
+      // Save current sizes for redo
+      const currentSizes = new Map<string, { width: number; height: number; x: number; y: number }>()
+      for (const [id] of snapshot.sizes) {
+        const node = store.getNode(id)
+        if (node) {
+          currentSizes.set(id, {
+            width: node.width ?? 200,
+            height: node.height ?? 100,
+            x: node.canvas_x,
+            y: node.canvas_y,
+          })
+        }
+      }
+      redoStack.value.push({ type: 'size', sizes: currentSizes })
+      // Restore old sizes
+      for (const [id, size] of snapshot.sizes) {
+        await store.updateNodeSize(id, size.width, size.height)
+        await store.updateNodePosition(id, size.x, size.y)
+      }
+      showToast('Undo resize', 'info')
     }
   }
 
@@ -179,6 +251,42 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
         showToast('Redo content', 'info')
       }
+    } else if (snapshot.type === 'color') {
+      // Save current colors for undo
+      const currentColors = new Map<string, string | null>()
+      for (const [id] of snapshot.colors) {
+        const node = store.getNode(id)
+        if (node) {
+          currentColors.set(id, node.color_theme ?? null)
+        }
+      }
+      undoStack.value.push({ type: 'color', colors: currentColors })
+      // Apply redo colors
+      for (const [id, color] of snapshot.colors) {
+        await store.updateNodeColor(id, color)
+      }
+      showToast('Redo color', 'info')
+    } else if (snapshot.type === 'size') {
+      // Save current sizes for undo
+      const currentSizes = new Map<string, { width: number; height: number; x: number; y: number }>()
+      for (const [id] of snapshot.sizes) {
+        const node = store.getNode(id)
+        if (node) {
+          currentSizes.set(id, {
+            width: node.width ?? 200,
+            height: node.height ?? 100,
+            x: node.canvas_x,
+            y: node.canvas_y,
+          })
+        }
+      }
+      undoStack.value.push({ type: 'size', sizes: currentSizes })
+      // Apply redo sizes
+      for (const [id, size] of snapshot.sizes) {
+        await store.updateNodeSize(id, size.width, size.height)
+        await store.updateNodePosition(id, size.x, size.y)
+      }
+      showToast('Redo resize', 'info')
     }
   }
 
@@ -202,6 +310,8 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     pushContentUndo,
     pushDeletionUndo,
     pushCreationUndo,
+    pushColorUndo,
+    pushSizeUndo,
     undo,
     redo,
     canUndo,

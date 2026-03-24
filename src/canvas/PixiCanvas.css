@@ -4,6 +4,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .graph-llm-bar {
@@ -803,27 +804,14 @@
   color: var(--text-muted);
 }
 
-.node-color-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  gap: 4px;
-  padding: 4px 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px var(--shadow-sm);
-  z-index: 10;
-}
-
-/* Color bar floating over canvas when zoomed out */
+/* Floating color bar at top of canvas (shown when nodes selected) */
 .collapsed-color-bar {
   position: absolute;
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: 6px;
   padding: 6px 10px;
   background: var(--bg-surface);
@@ -855,9 +843,10 @@
 
 .color-bar-sep {
   width: 1px;
-  height: 12px;
+  height: 16px;
   background: var(--border-default);
-  margin: 0 4px;
+  margin: 0 2px;
+  align-self: center;
 }
 
 .autofit-toggle {

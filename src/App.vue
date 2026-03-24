@@ -66,8 +66,10 @@ const undoRedo = useUndoRedo({
     getNode: store.getNode,
     getFilteredNodes: () => store.filteredNodes,
     updateNodePosition: store.updateNodePosition,
+    updateNodeSize: store.updateNodeSize,
     updateNodeContent: store.updateNodeContent,
     updateNodeTitle: store.updateNodeTitle,
+    updateNodeColor: store.updateNodeColor,
     restoreNode: store.restoreNode,
     restoreEdge: store.restoreEdge,
     deleteNode: store.deleteNode,
@@ -75,13 +77,15 @@ const undoRedo = useUndoRedo({
   showToast,
 })
 
-const { undoStack, redoStack, pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, undo, redo } = undoRedo
+const { undoStack, redoStack, pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, undo, redo } = undoRedo
 
 // Expose undo functions to child components
 provide('pushUndo', pushUndo)
 provide('pushContentUndo', pushContentUndo)
 provide('pushDeletionUndo', pushDeletionUndo)
 provide('pushCreationUndo', pushCreationUndo)
+provide('pushColorUndo', pushColorUndo)
+provide('pushSizeUndo', pushSizeUndo)
 
 // Reset all nodes to default size
 async function resetAllNodeSizes() {
@@ -219,12 +223,17 @@ async function importVault() {
 
   try {
     // Create new workspace if requested
+    let targetWorkspaceId: string | undefined
     if (importTarget.value === 'new') {
       const ws = await store.createWorkspace(importWorkspaceName.value.trim())
-      store.switchWorkspace(ws.id)
+      targetWorkspaceId = ws.id
+      await store.switchWorkspace(ws.id)
     }
 
-    const imported = await store.importVault(vaultPath.value.trim(), !keepOriginalFiles.value)
+    const imported = await store.importVault(vaultPath.value.trim(), !keepOriginalFiles.value, targetWorkspaceId)
+
+    // Force refresh to ensure frames and edges are visible
+    await store.switchWorkspace(store.currentWorkspaceId)
     showImportDialog.value = false
     vaultPath.value = ''
     importWorkspaceName.value = ''
