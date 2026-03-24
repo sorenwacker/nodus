@@ -472,18 +472,33 @@ mod tests {
     #[test]
     fn test_watcher_initial_scan() {
         let dir = tempdir().unwrap();
+        let dir_path = dir.path().to_path_buf();
 
         // Create files before starting watcher
-        fs::write(dir.path().join("existing1.md"), "content 1").unwrap();
-        fs::write(dir.path().join("existing2.md"), "content 2").unwrap();
+        let file1 = dir_path.join("existing1.md");
+        let file2 = dir_path.join("existing2.md");
+        fs::write(&file1, "content 1").unwrap();
+        fs::write(&file2, "content 2").unwrap();
 
-        let mut watcher = VaultWatcher::new(dir.path().to_path_buf(), |_| {}).unwrap();
+        // Ensure files are flushed to disk
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Verify files exist before starting watcher
+        assert!(file1.exists(), "File 1 should exist");
+        assert!(file2.exists(), "File 2 should exist");
+
+        let mut watcher = VaultWatcher::new(dir_path.clone(), |_| {}).unwrap();
         watcher.start().unwrap(); // scan_existing_files is called in start()
 
         // Checksums should be populated after start()
         {
             let checksums = watcher.checksums.lock().unwrap();
-            assert!(checksums.len() >= 2);
+            assert!(
+                checksums.len() >= 2,
+                "Expected at least 2 checksums, got {}. Dir: {:?}",
+                checksums.len(),
+                dir_path
+            );
         }
 
         watcher.stop().unwrap();
