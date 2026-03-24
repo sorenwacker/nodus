@@ -26,46 +26,46 @@
   opacity: 0.7;
 }
 
-.node-content :deep(p) {
+.node-content p {
   margin: 0 0 8px 0;
 }
 
-.node-content :deep(p:last-child) {
+.node-content p:last-child {
   margin-bottom: 0;
 }
 
-.node-content :deep(h1) {
+.node-content h1 {
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 8px 0;
   color: var(--text-main);
 }
 
-.node-content :deep(h2) {
+.node-content h2 {
   font-size: 14px;
   font-weight: 600;
   margin: 0 0 6px 0;
   color: var(--text-main);
 }
 
-.node-content :deep(h3) {
+.node-content h3 {
   font-size: 13px;
   font-weight: 600;
   margin: 0 0 4px 0;
   color: var(--text-secondary);
 }
 
-.node-content :deep(ul),
-.node-content :deep(ol) {
+.node-content ul,
+.node-content ol {
   margin: 0 0 8px 0;
   padding-left: 18px;
 }
 
-.node-content :deep(li) {
+.node-content li {
   margin-bottom: 2px;
 }
 
-.node-content :deep(code) {
+.node-content code {
   background: var(--bg-elevated);
   padding: 1px 4px;
   border-radius: 3px;
@@ -73,7 +73,7 @@
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
-.node-content :deep(pre) {
+.node-content pre {
   background: var(--bg-elevated);
   padding: 8px;
   border-radius: 4px;
@@ -81,50 +81,50 @@
   margin: 0 0 8px 0;
 }
 
-.node-content :deep(pre code) {
+.node-content pre code {
   background: none;
   padding: 0;
 }
 
-.node-content :deep(strong) {
+.node-content strong {
   font-weight: 600;
 }
 
-.node-content :deep(em) {
+.node-content em {
   font-style: italic;
 }
 
-.node-content :deep(img) {
+.node-content img {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
   margin: 4px 0;
 }
 
-.node-content :deep(a) {
+.node-content a {
   color: var(--primary-color);
   text-decoration: none;
 }
 
 /* Wikilink styling */
-.node-content :deep(.wikilink) {
+.node-content .wikilink {
   color: var(--primary-color);
   cursor: pointer;
   text-decoration: none;
   border-bottom: 1px dashed var(--primary-color);
 }
 
-.node-content :deep(.wikilink:hover) {
+.node-content .wikilink:hover {
   border-bottom-style: solid;
 }
 
 /* Missing wikilink (target node doesn't exist) */
-.node-content :deep(.wikilink.missing) {
+.node-content .wikilink.missing {
   color: var(--text-muted);
   border-color: var(--text-muted);
 }
 
-.node-content :deep(blockquote) {
+.node-content blockquote {
   border-left: 3px solid var(--border-default);
   margin: 0 0 8px 0;
   padding-left: 12px;
@@ -132,7 +132,7 @@
 }
 
 /* Table styling */
-.node-content :deep(table) {
+.node-content table {
   width: 100%;
   border-collapse: collapse;
   margin: 8px 0;
@@ -140,8 +140,8 @@
   background: transparent;
 }
 
-.node-content :deep(th),
-.node-content :deep(td) {
+.node-content th,
+.node-content td {
   border: 1px solid var(--border-default);
   padding: 8px 12px;
   text-align: left;
@@ -152,39 +152,39 @@
   line-height: 1.6;
 }
 
-.node-content :deep(th) {
+.node-content th {
   background: var(--bg-elevated);
   font-weight: 600;
   color: var(--text-main);
 }
 
-.node-content :deep(tr) {
+.node-content tr {
   background: transparent;
 }
 
-.node-content :deep(tr:nth-child(even)) {
+.node-content tr:nth-child(even) {
   background: var(--bg-surface-alt, transparent);
 }
 
 /* Math inside tables needs more space */
-.node-content :deep(td .typst-inline),
-.node-content :deep(th .typst-inline) {
+.node-content td .typst-inline,
+.node-content th .typst-inline {
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
   min-height: 1.2em;
 }
 
-.node-content :deep(td .typst-display),
-.node-content :deep(th .typst-display) {
+.node-content td .typst-display,
+.node-content th .typst-display {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px 0;
 }
 
-.node-content :deep(td svg),
-.node-content :deep(th svg) {
+.node-content td svg,
+.node-content th svg {
   display: inline-block;
   vertical-align: middle;
   height: auto !important;
@@ -194,29 +194,29 @@
 }
 
 /* Table fits within node boundary with text wrapping */
-.node-content :deep(table) {
+.node-content table {
   table-layout: fixed;
   word-wrap: break-word;
 }
 
-.node-content :deep(td),
-.node-content :deep(th) {
+.node-content td,
+.node-content th {
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
-.node-content :deep(.mermaid-wrapper) {
+.node-content .mermaid-wrapper {
   margin: 8px 0;
   overflow-x: auto;
 }
 
-.node-content :deep(.mermaid) {
+.node-content .mermaid {
   display: flex;
   justify-content: center;
 }
 
-.node-content :deep(.mermaid svg) {
+.node-content .mermaid svg {
   max-width: 100%;
   height: auto;
   /* Prevent blurry SVG in scaled containers */
@@ -224,18 +224,18 @@
   -webkit-transform: translateZ(0);
 }
 
-.node-content :deep(.mermaid svg text) {
+.node-content .mermaid svg text {
   /* Keep text crisp */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* Typst math rendering */
-.node-content :deep(.typst-math) {
+.node-content .typst-math {
   font-family: 'Computer Modern', serif;
 }
 
-.node-content :deep(.typst-display) {
+.node-content .typst-display {
   display: block;
   text-align: center;
   margin: 16px 0;
@@ -245,18 +245,18 @@
   min-height: 2.5em;
 }
 
-.node-content :deep(.typst-inline) {
+.node-content .typst-inline {
   display: inline;
   vertical-align: middle;
 }
 
-.node-content :deep(.typst-pending) {
+.node-content .typst-pending {
   color: var(--text-muted);
   font-style: italic;
   font-size: 0.9em;
 }
 
-.node-content :deep(.typst-error) {
+.node-content .typst-error {
   color: var(--error-text, #dc2626);
   font-family: monospace;
   font-size: 0.85em;
@@ -265,28 +265,28 @@
   border-radius: 3px;
 }
 
-.node-content :deep(.typst-display svg),
-.node-content :deep(.typst-inline svg) {
+.node-content .typst-display svg,
+.node-content .typst-inline svg {
   max-width: 100%;
   height: auto;
   vertical-align: middle;
   overflow: visible;
 }
 
-.node-content :deep(.typst-display svg) {
+.node-content .typst-display svg {
   display: block;
   margin: 0 auto;
 }
 
 /* Make Typst SVG adapt to dark theme */
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-display svg),
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content :deep(.typst-inline svg) {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content .typst-display svg,
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .node-content .typst-inline svg {
   filter: invert(1);
 }
 
 /* Ensure SVG background is transparent */
-.node-content :deep(.typst-display svg),
-.node-content :deep(.typst-inline svg) {
+.node-content .typst-display svg,
+.node-content .typst-inline svg {
   background: transparent;
 }
 
