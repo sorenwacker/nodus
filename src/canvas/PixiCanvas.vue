@@ -65,7 +65,6 @@ import CanvasLLMBar from './components/CanvasLLMBar.vue'
 import CanvasMagnifier from './components/CanvasMagnifier.vue'
 import CanvasHoverTooltip from './components/CanvasHoverTooltip.vue'
 import CanvasMinimap from './components/CanvasMinimap.vue'
-import NodeAgentLogPanel from './components/NodeAgentLogPanel.vue'
 import NodeLLMBar from './components/NodeLLMBar.vue'
 import CanvasFrames from './components/CanvasFrames.vue'
 import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
@@ -549,10 +548,7 @@ const { showLinkPicker, linkPickerSourceNodeId, openLinkPicker, closeLinkPicker,
 
 // Node agent mode - always agent (tools enabled)
 const nodeAgentMode = ref<'simple' | 'agent'>('agent')
-const showNodeAgentLog = ref(false)
 const nodeAgent = useNodeAgent()
-// Computed for proper reactivity tracking of agent log
-const nodeAgentLog = computed(() => nodeAgent.log.value)
 
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
@@ -978,8 +974,12 @@ async function sendNodePrompt() {
         },
       }
 
-      showNodeAgentLog.value = true
+      // Node agent logs go to global log
+      nodeAgent.log.value.forEach(msg => agentLog.value.push(msg))
+      nodeAgent.log.value = []
       await nodeAgent.run(prompt, ctx)
+      // Merge any new logs to global
+      nodeAgent.log.value.forEach(msg => agentLog.value.push(msg))
       setTimeout(renderMermaidDiagrams, 100)
 
       // Auto-fit after agent updates
@@ -1845,17 +1845,10 @@ useCanvasKeyboardShortcuts({
       :is-large-graph="isLargeGraph"
       :is-pdf-processing="pdfDrop.isProcessing.value"
       :pdf-status="pdfDrop.processingStatus.value"
-      :agent-log="nodeAgentLog"
-      :show-agent-log="showNodeAgentLog"
+      :agent-log="agentLog"
+      :show-agent-log="agentLog.length > 0"
       @stop-pdf="pdfDrop.stop()"
-      @toggle-agent-log="showNodeAgentLog = !showNodeAgentLog"
-    />
-
-    <!-- Node agent log panel (fixed position) -->
-    <NodeAgentLogPanel
-      :visible="showNodeAgentLog"
-      :log="nodeAgentLog"
-      @close="showNodeAgentLog = false"
+      @toggle-agent-log="agentLog.length = 0"
     />
 
     <!-- SVG filter for fisheye warp effect -->
