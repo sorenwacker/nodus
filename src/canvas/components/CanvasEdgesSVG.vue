@@ -21,14 +21,13 @@ const props = defineProps<{
   getArrowMarkerId: (color: string) => string
 }>()
 
-// Compute marker size - scale down when zoomed out for visual consistency
-// edgeStrokeWidth increases when zoomed out, so we use inverse relationship
-// Base marker size is 6 at normal zoom (strokeWidth ~1)
+// Compute marker size - moderate scaling when zoomed out
+// Use square root for gentler scaling effect
 const markerSize = computed(() => {
-  // Clamp stroke width effect - at very zoomed out, markers stay small
   const baseSize = 6
-  const scaleFactor = Math.min(1, 1 / props.edgeStrokeWidth)
-  return Math.max(2, baseSize * scaleFactor)
+  // sqrt gives gentler scaling: at strokeWidth=4, factor=0.5 instead of 0.25
+  const scaleFactor = Math.min(1, 1 / Math.sqrt(props.edgeStrokeWidth))
+  return Math.max(3, baseSize * scaleFactor)
 })
 
 defineEmits<{
