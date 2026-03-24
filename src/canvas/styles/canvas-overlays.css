@@ -614,6 +614,14 @@
   color: var(--primary-color);
 }
 
+.preview-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 8px 0;
+  display: block;
+}
+
 .preview-actions {
   padding: 12px 16px;
   border-top: 1px solid var(--border-default);
