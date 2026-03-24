@@ -140,9 +140,10 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * 1.3 : baseStrokeWidth
 
       // Get highlight color based on whether connected node is selected or just hovered
-      let edgeHighlightColor = highlightColor.value
-      if (isHighlighted) {
-        // Check if connected to a selected node (not just hovered)
+      // When "highlight all edges" is on, keep original color - don't change to highlight color
+      let edgeHighlightColor = color // Default to edge's own color
+      if (isHighlighted && !allHighlighted) {
+        // Only change color when highlighting due to hover/selection, not "highlight all"
         const isConnectedToSelected =
           selectedNodes.includes(e.source_node_id) ||
           selectedNodes.includes(e.target_node_id)
@@ -156,8 +157,13 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
           if (hoveredNode) {
             const node = getNode(hoveredNode)
             edgeHighlightColor = getEdgeHighlightColor(node?.color_theme || null)
+          } else {
+            edgeHighlightColor = highlightColor.value
           }
         }
+      } else if (isHighlighted && allHighlighted) {
+        // "Highlight all edges" mode - keep original color
+        edgeHighlightColor = color
       }
 
       return {
