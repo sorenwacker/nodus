@@ -216,27 +216,36 @@ async function copyLog(log: string[]) {
 .agent-log {
   position: relative;
   margin-top: 8px;
-  padding: 8px;
-  background: var(--bg-elevated);
+  padding: 10px 12px;
+  background: var(--bg-surface-alt);
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  font-family: monospace;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 11px;
-  max-height: 120px;
+  line-height: 1.5;
+  max-height: 180px;
   overflow-y: auto;
-  color: var(--text-secondary);
+  color: var(--text-main);
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .log-buttons {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  position: sticky;
+  top: 0;
+  float: right;
   display: flex;
   gap: 4px;
+  margin-left: 8px;
+  margin-bottom: 4px;
+  background: var(--bg-surface-alt);
+  padding: 2px;
+  border-radius: 4px;
 }
 
 .log-btn {
-  background: var(--bg-surface-alt);
+  background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 4px;
@@ -254,8 +263,14 @@ async function copyLog(log: string[]) {
 }
 
 .log-line {
-  padding: 2px 0;
+  padding: 4px 8px;
+  margin: 2px 0;
   white-space: pre-wrap;
   word-break: break-word;
+  border-radius: 4px;
+}
+
+.log-line:nth-child(odd) {
+  background: var(--bg-surface);
 }
 </style>
