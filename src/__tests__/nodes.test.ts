@@ -237,7 +237,7 @@ describe('Nodes Store', () => {
       expect(workspace.name).toBe('My Workspace')
       expect(store.workspaces).toContainEqual(workspace)
 
-      store.switchWorkspace(workspace.id)
+      await store.switchWorkspace(workspace.id)
       expect(store.currentWorkspaceId).toBe(workspace.id)
     })
 
@@ -256,7 +256,7 @@ describe('Nodes Store', () => {
       expect(store.filteredNodes.length).toBe(1)
 
       // Switch to new workspace
-      store.switchWorkspace(workspace.id)
+      await store.switchWorkspace(workspace.id)
       expect(store.filteredNodes.length).toBe(1)
       expect(store.filteredNodes[0].id).toBe('1')
     })
@@ -266,7 +266,7 @@ describe('Nodes Store', () => {
       await store.initialize()
 
       const workspace = await store.createWorkspace('To Delete')
-      store.switchWorkspace(workspace.id)
+      await store.switchWorkspace(workspace.id)
       expect(store.currentWorkspaceId).toBe(workspace.id)
 
       await store.deleteWorkspace(workspace.id)

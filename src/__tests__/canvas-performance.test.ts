@@ -108,7 +108,7 @@ describe('Canvas Performance', () => {
       expect(maxTime).toBeLessThan(33)
     })
 
-    it('should filter nodes by workspace efficiently', () => {
+    it('should filter nodes by workspace efficiently', async () => {
       const store = useNodesStore()
       const mockNodes = generateMockNodes(500)
       // Assign half to workspace A, half to workspace B
@@ -118,7 +118,7 @@ describe('Canvas Performance', () => {
       store.nodes.push(...mockNodes)
 
       const startFilter = performance.now()
-      store.switchWorkspace('workspace-a')
+      await store.switchWorkspace('workspace-a')
       const filterTime = performance.now() - startFilter
 
       expect(store.filteredNodes.length).toBe(250)
@@ -246,8 +246,9 @@ describe('Canvas Performance', () => {
       const store = useNodesStore()
       const mockNodes = generateMockNodes(1000)
 
-      const beforeHeap =
-        (performance as any).memory?.usedJSHeapSize || 0
+      // Chrome-specific memory API
+      const perfWithMemory = performance as Performance & { memory?: { usedJSHeapSize: number } }
+      const beforeHeap = perfWithMemory.memory?.usedJSHeapSize || 0
 
       store.nodes.push(...mockNodes)
 
@@ -256,8 +257,7 @@ describe('Canvas Performance', () => {
         node.markdown_content = `# Node ${i}\n\n${'Lorem ipsum '.repeat(50)}`
       })
 
-      const afterHeap =
-        (performance as any).memory?.usedJSHeapSize || 0
+      const afterHeap = perfWithMemory.memory?.usedJSHeapSize || 0
 
       // If memory API available, check growth is reasonable
       if (beforeHeap > 0) {
