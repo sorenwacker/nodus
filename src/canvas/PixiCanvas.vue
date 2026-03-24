@@ -69,6 +69,7 @@ import NodeLLMBar from './components/NodeLLMBar.vue'
 import CanvasFrames from './components/CanvasFrames.vue'
 import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
 import CanvasNodeCard from './components/CanvasNodeCard.vue'
+import CanvasPreviewPanel from './components/CanvasPreviewPanel.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -1811,24 +1812,13 @@ useCanvasKeyboardShortcuts({
     />
 
     <!-- Node Preview Panel (shown when zoomed out and node selected) -->
-    <Transition name="slide-in">
-      <div
-        v-if="showPreviewPanel && previewNode"
-        class="node-preview-panel"
-        @wheel.stop
-        @pointerdown.stop
-      >
-        <div class="preview-header">
-          <h3>{{ previewNode.title }}</h3>
-          <button class="preview-close" @click="closePreviewPanel">&times;</button>
-        </div>
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div class="preview-content" v-html="nodeRenderedContent[previewNode.id] || ''"></div>
-        <div class="preview-actions">
-          <button @click="zoomToPreviewNode">Zoom to Node</button>
-        </div>
-      </div>
-    </Transition>
+    <CanvasPreviewPanel
+      :visible="showPreviewPanel && !!previewNode"
+      :title="previewNode?.title || ''"
+      :content="previewNode ? (nodeRenderedContent[previewNode.id] || '') : ''"
+      @close="closePreviewPanel"
+      @zoom-to-node="zoomToPreviewNode"
+    />
 
     <!-- Controls -->
     <CanvasControls

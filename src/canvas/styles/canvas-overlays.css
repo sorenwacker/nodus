@@ -586,14 +586,14 @@
 
 .preview-content :deep(ul),
 .preview-content :deep(ol) {
-  padding-left: 0;
+  padding-left: 1.5em;
   margin: 0.5em 0;
-  list-style-position: inside;
+  list-style-position: outside;
 }
 
 .preview-content :deep(li) {
   margin-bottom: 0.25em;
-  padding-left: 0.5em;
+  padding-left: 0;
 }
 
 .preview-content :deep(code) {
