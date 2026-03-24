@@ -1354,6 +1354,7 @@ const edgeStyling = useEdgeStyling({
   selectedEdgeId: selectedEdge,
   currentTheme,
   scale,
+  workspaceId: computed(() => store.currentWorkspaceId),
 })
 const {
   edgeStyles,

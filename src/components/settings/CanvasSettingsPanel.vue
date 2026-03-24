@@ -2,26 +2,32 @@
 /**
  * Canvas Settings Panel
  * Configures grid, edges, and tag display options
+ * Settings are workspace-specific
  */
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { canvasStorage, tagStorage } from '../../lib/storage'
+import { useNodesStore } from '../../stores/nodes'
 
 const { t } = useI18n()
+const store = useNodesStore()
 
-// Canvas Settings
-const gridSnap = ref(canvasStorage.getGridSnap())
-const gridSize = ref(canvasStorage.getGridSize())
-const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'>(canvasStorage.getEdgeStyle())
+// Get current workspace ID for workspace-specific settings
+const workspaceId = computed(() => store.currentWorkspaceId || undefined)
+
+// Canvas Settings (workspace-specific)
+const gridSnap = ref(canvasStorage.getGridSnap(workspaceId.value))
+const gridSize = ref(canvasStorage.getGridSize(workspaceId.value))
+const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'>(canvasStorage.getEdgeStyle(workspaceId.value))
 
 // Tag Settings
 const showTagNodes = ref(tagStorage.getShowTagNodes())
 
-// Save Canvas settings
+// Save Canvas settings (workspace-specific)
 function saveCanvasSettings() {
-  canvasStorage.setGridSnap(gridSnap.value)
-  canvasStorage.setGridSize(gridSize.value)
-  canvasStorage.setEdgeStyle(edgeStyle.value)
+  canvasStorage.setGridSnap(gridSnap.value, workspaceId.value)
+  canvasStorage.setGridSize(gridSize.value, workspaceId.value)
+  canvasStorage.setEdgeStyle(edgeStyle.value, workspaceId.value)
 }
 
 // Save Tag settings
@@ -33,6 +39,13 @@ function saveTagSettings() {
 // Auto-save on changes
 watch([gridSnap, gridSize, edgeStyle], saveCanvasSettings)
 watch(showTagNodes, saveTagSettings)
+
+// Reload settings when workspace changes
+watch(workspaceId, (newId) => {
+  gridSnap.value = canvasStorage.getGridSnap(newId)
+  gridSize.value = canvasStorage.getGridSize(newId)
+  edgeStyle.value = canvasStorage.getEdgeStyle(newId)
+})
 </script>
 
 <template>

@@ -161,30 +161,35 @@ export const llmStorage = {
 }
 
 /**
- * Canvas settings storage
+ * Canvas settings storage (workspace-specific)
  */
 export const canvasStorage = {
-  getGridSnap(): boolean {
-    return localStorage.getItem(KEYS.canvasGridSnap) !== 'false'
+  // Helper to get workspace-specific key
+  _key(base: string, workspaceId?: string): string {
+    return workspaceId ? `${base}_${workspaceId}` : base
   },
-  setGridSnap(value: boolean): void {
-    localStorage.setItem(KEYS.canvasGridSnap, String(value))
+
+  getGridSnap(workspaceId?: string): boolean {
+    return localStorage.getItem(this._key(KEYS.canvasGridSnap, workspaceId)) !== 'false'
   },
-  getGridSize(): number {
-    return parseInt(localStorage.getItem(KEYS.canvasGridSize) || '20', 10)
+  setGridSnap(value: boolean, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasGridSnap, workspaceId), String(value))
   },
-  setGridSize(value: number): void {
-    localStorage.setItem(KEYS.canvasGridSize, String(value))
+  getGridSize(workspaceId?: string): number {
+    return parseInt(localStorage.getItem(this._key(KEYS.canvasGridSize, workspaceId)) || '20', 10)
   },
-  getEdgeStyle(): 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' {
-    const value = localStorage.getItem(KEYS.canvasEdgeStyle)
+  setGridSize(value: number, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasGridSize, workspaceId), String(value))
+  },
+  getEdgeStyle(workspaceId?: string): 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' {
+    const value = localStorage.getItem(this._key(KEYS.canvasEdgeStyle, workspaceId))
     if (value === 'diagonal' || value === 'curved' || value === 'hyperbolic' || value === 'straight') {
       return value
     }
     return 'orthogonal'
   },
-  setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'): void {
-    localStorage.setItem(KEYS.canvasEdgeStyle, value)
+  setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight', workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasEdgeStyle, workspaceId), value)
   },
 }
 

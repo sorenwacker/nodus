@@ -4,7 +4,7 @@
  * Handles edge colors, styles, and theme-aware highlighting
  */
 
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { canvasStorage } from '../../../lib/storage'
 
 export type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'
@@ -26,6 +26,7 @@ export interface UseEdgeStylingContext {
   selectedEdgeId: Ref<string | null>
   currentTheme: Ref<string>
   scale: Ref<number>
+  workspaceId: Ref<string | null>
 }
 
 export interface UseEdgeStylingReturn {
@@ -129,7 +130,7 @@ const EDGE_SCREEN_WIDTH = 1 // Target screen pixels
 const HIGHLIGHTED_STROKE_MULTIPLIER = 1.3
 
 export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn {
-  const { store, selectedEdgeId, currentTheme, scale } = ctx
+  const { store, selectedEdgeId, currentTheme, scale, workspaceId } = ctx
 
   // Edge stroke width - constant 1px on screen at any zoom level
   const edgeStrokeWidth = computed(() => {
@@ -148,7 +149,12 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
 
   // Store edge styles (edgeId -> style)
   const edgeStyleMap = ref<Record<string, string>>({})
-  const globalEdgeStyle = ref<EdgeStyleType>(canvasStorage.getEdgeStyle())
+  const globalEdgeStyle = ref<EdgeStyleType>(canvasStorage.getEdgeStyle(workspaceId.value || undefined))
+
+  // Update edge style when workspace changes
+  watch(workspaceId, (newId) => {
+    globalEdgeStyle.value = canvasStorage.getEdgeStyle(newId || undefined)
+  })
 
   // Reactive edge color palette based on theme
   const edgeColorPalette = computed(() => {
@@ -206,7 +212,7 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     const styles: EdgeStyleType[] = ['orthogonal', 'diagonal', 'curved', 'hyperbolic', 'straight']
     const idx = styles.indexOf(globalEdgeStyle.value)
     globalEdgeStyle.value = styles[(idx + 1) % styles.length]
-    canvasStorage.setEdgeStyle(globalEdgeStyle.value)
+    canvasStorage.setEdgeStyle(globalEdgeStyle.value, workspaceId.value || undefined)
   }
 
   function getEdgeStyle(edgeId: string): string {
