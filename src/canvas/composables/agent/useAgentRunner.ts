@@ -646,6 +646,7 @@ export function useAgentRunner(ctx: AgentContext) {
           return { status: 'stopped', message: 'Agent stopped by user' }
         }
         console.error('Agent error:', e)
+        ctx.log.value.push(`> Error: ${String(e)}`)
         ctx.isRunning.value = false
         return { status: 'error', message: String(e) }
       }
