@@ -2,7 +2,7 @@
  * Lasso selection composable
  * Handles free-form selection of nodes by drawing a polygon
  */
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
 
 interface Point {
   x: number
@@ -25,13 +25,25 @@ interface Store {
 export interface UseLassoOptions {
   store: Store
   screenToCanvas: (screenX: number, screenY: number) => Point
+  neighborhoodMode?: Ref<boolean>
+  neighborhoodPositions?: Ref<Map<string, { x: number; y: number }>>
+  getDisplayNodes?: () => Node[]
 }
 
 export function useLasso(options: UseLassoOptions) {
-  const { store, screenToCanvas } = options
+  const { store, screenToCanvas, neighborhoodMode, neighborhoodPositions, getDisplayNodes } = options
 
   const isLassoSelecting = ref(false)
   const lassoPoints = ref<Point[]>([])
+
+  // Get visual position for a node (neighborhood position if in neighborhood mode)
+  function getVisualPosition(node: Node): { x: number; y: number } {
+    if (neighborhoodMode?.value && neighborhoodPositions?.value) {
+      const pos = neighborhoodPositions.value.get(node.id)
+      if (pos) return pos
+    }
+    return { x: node.canvas_x, y: node.canvas_y }
+  }
 
   function start(e: PointerEvent) {
     isLassoSelecting.value = true
@@ -50,11 +62,16 @@ export function useLasso(options: UseLassoOptions) {
       }
 
       // Find nodes inside lasso polygon
+      // In neighborhood mode, only select from displayed nodes
       const selected: string[] = []
       const points = lassoPoints.value
-      for (const node of store.getFilteredNodes()) {
-        const cx = node.canvas_x + node.width / 2
-        const cy = node.canvas_y + node.height / 2
+      const nodesToCheck = (neighborhoodMode?.value && getDisplayNodes)
+        ? getDisplayNodes()
+        : store.getFilteredNodes()
+      for (const node of nodesToCheck) {
+        const pos = getVisualPosition(node)
+        const cx = pos.x + node.width / 2
+        const cy = pos.y + node.height / 2
         if (pointInPolygon(cx, cy, points)) {
           selected.push(node.id)
         }

@@ -232,7 +232,7 @@ const neighborhood = useNeighborhoodMode({
 })
 
 // Destructure for convenience
-const { neighborhoodMode, focusNodeId, displayNodes, neighborhoodDepth, setDepth } = neighborhood
+const { neighborhoodMode, focusNodeId, displayNodes, neighborhoodDepth, neighborhoodPositions, setDepth } = neighborhood
 
 // Viewport culling composable - filters nodes visible in viewport
 const viewportCulling = useViewportCulling({
@@ -262,6 +262,14 @@ const {
   getLODRadius,
 } = graphMetrics
 
+// Preview panel state (functions defined after nodeNavigation)
+const showPreviewPanel = ref(false)
+const previewNode = computed(() => {
+  if (!isSemanticZoomCollapsed.value) return null
+  if (store.selectedNodeIds.length !== 1) return null
+  return store.getNode(store.selectedNodeIds[0]) || null
+})
+
 // Expose functions with original names for compatibility
 function toggleNeighborhoodMode(nodeId?: string) {
   neighborhood.toggle(nodeId)
@@ -287,6 +295,26 @@ const nodeNavigation = useNodeNavigation({
 })
 const { navigateToNode, zoomToNode } = nodeNavigation
 
+// Preview panel functions (need zoomToNode from above)
+watch([() => store.selectedNodeIds, isSemanticZoomCollapsed], ([ids, collapsed]) => {
+  if (collapsed && ids.length === 1) {
+    showPreviewPanel.value = true
+  }
+}, { immediate: true })
+
+function closePreviewPanel() {
+  showPreviewPanel.value = false
+}
+
+function zoomToPreviewNode() {
+  const nodeId = store.selectedNodeIds[0]
+  if (!nodeId) return
+  showPreviewPanel.value = false
+  nextTick(() => {
+    zoomToNode(nodeId, 1)
+  })
+}
+
 // Lasso selection composable
 const lasso = useLasso({
   store: {
@@ -294,6 +322,9 @@ const lasso = useLasso({
     setSelectedNodeIds: (ids: string[]) => { store.selectedNodeIds = ids },
   },
   screenToCanvas,
+  neighborhoodMode,
+  neighborhoodPositions,
+  getDisplayNodes: () => [...displayNodes.value],
 })
 const { isLassoSelecting, lassoPoints } = lasso
 function startLasso(e: PointerEvent) { lasso.start(e) }
@@ -1696,7 +1727,7 @@ useCanvasKeyboardShortcuts({
           width: (resizingNode === node.id ? resizePreview.width : (node.width || NODE_DEFAULTS.WIDTH)) + 'px',
           height: (resizingNode === node.id ? resizePreview.height : (node.height || NODE_DEFAULTS.HEIGHT)) + 'px',
           borderWidth: nodeBorderWidth + 'px',
-          ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : isSemanticZoomCollapsed ? { background: 'var(--bg-canvas)', borderColor: 'var(--text-muted)' } : {}),
+          ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : isSemanticZoomCollapsed && !store.selectedNodeIds.includes(node.id) ? { background: 'var(--bg-canvas)', borderColor: 'var(--text-muted)' } : {}),
         }"
         @pointerdown="onNodePointerDown($event, node.id)"
         @pointerenter="onNodePointerEnter($event, node.id)"
@@ -1807,6 +1838,26 @@ useCanvasKeyboardShortcuts({
       @insert-node="insertNodeOnEdge"
       @delete="deleteSelectedEdge"
     />
+
+    <!-- Node Preview Panel (shown when zoomed out and node selected) -->
+    <Transition name="slide-in">
+      <div
+        v-if="showPreviewPanel && previewNode"
+        class="node-preview-panel"
+        @wheel.stop
+        @pointerdown.stop
+      >
+        <div class="preview-header">
+          <h3>{{ previewNode.title }}</h3>
+          <button class="preview-close" @click="closePreviewPanel">&times;</button>
+        </div>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div class="preview-content" v-html="nodeRenderedContent[previewNode.id] || ''"></div>
+        <div class="preview-actions">
+          <button @click="zoomToPreviewNode">Zoom to Node</button>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Controls -->
     <CanvasControls

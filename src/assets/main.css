@@ -240,8 +240,8 @@ html, body, #app {
 }
 
 .node-editor {
-  background: var(--bg-node);
-  border: 1px solid var(--border-node);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 12px;
   font-size: 14px;
