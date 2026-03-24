@@ -4,7 +4,7 @@
  * Filters edges for viewport visibility and pre-computes rendering properties
  */
 
-import { computed, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, type Ref, type ComputedRef } from 'vue'
 import type { EdgeLine } from './useEdgeRouting'
 
 export interface VisibleEdgeLine extends EdgeLine {
@@ -52,7 +52,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     selectedNodeIds,
     selectedEdge,
     highlightedEdgeIds,
-    highlightAllEdges,
+    highlightAllEdges = ref(false), // Default to false if not provided
     edgeStrokeWidth,
     highlightColor,
     selectedColor,
