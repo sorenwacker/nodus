@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { invoke } from '../lib/tauri'
+import { invoke, getWorkspace } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
 import { getStarterTemplates, getStarterTitles } from '../lib/templates'
@@ -673,12 +673,28 @@ export const useNodesStore = defineStore('nodes', () => {
   // Workspace functions - forwarded to workspace store
   const createWorkspace = (name: string) => workspaceStore.createWorkspace(name)
   const switchWorkspace = async (workspaceId: string | null) => {
+    // Stop any existing file watcher
+    await fileSync.stopWatching()
+
     workspaceStore.switchWorkspace(workspaceId)
     // Reload edges and frames for the new workspace
     await Promise.all([
       edgesStore.initialize(workspaceId),
       framesStore.initialize(),
     ])
+
+    // Start file watcher if workspace has sync enabled and vault path
+    if (workspaceId) {
+      try {
+        const workspace = await getWorkspace(workspaceId)
+        if (workspace?.sync_enabled && workspace?.vault_path) {
+          await fileSync.watchVault(workspace.vault_path)
+          storeLogger.info(`Started watching vault: ${workspace.vault_path}`)
+        }
+      } catch (e) {
+        storeLogger.error('Failed to start file watcher:', e)
+      }
+    }
   }
   const deleteWorkspace = (id: string, deleteFiles?: boolean) => workspaceStore.deleteWorkspace(id, deleteFiles)
   const recoverWorkspace = (id: string) => workspaceStore.recoverWorkspace(id)
