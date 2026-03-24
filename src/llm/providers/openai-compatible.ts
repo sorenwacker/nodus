@@ -195,4 +195,64 @@ export class OpenAICompatibleProvider implements ILLMProvider {
 
     return { message }
   }
+
+  /**
+   * Extract tool calls from raw content when model outputs special tokens
+   * Handles formats like: <|channel|>commentary to=function_name <|constrain|>json<|message|>{"args"...}
+   */
+  private extractToolCallsFromContent(content: string): Array<{
+    id: string
+    type: 'function'
+    function: { name: string; arguments: string }
+  }> {
+    const toolCalls: Array<{
+      id: string
+      type: 'function'
+      function: { name: string; arguments: string }
+    }> = []
+
+    // Pattern for Qwen-style tool calls: to=function_name ... <|message|>{json}
+    const qwenPattern = /to=(\w+)[^{]*(\{[\s\S]*?\}(?=\s*(?:<\||$)))/g
+    let match
+    let idx = 0
+    while ((match = qwenPattern.exec(content)) !== null) {
+      const [, funcName, argsJson] = match
+      try {
+        JSON.parse(argsJson) // Validate JSON
+        toolCalls.push({
+          id: `call_${idx++}`,
+          type: 'function',
+          function: {
+            name: funcName,
+            arguments: argsJson,
+          },
+        })
+      } catch {
+        // Invalid JSON, skip
+      }
+    }
+
+    // Also try to find plain JSON tool calls like {"name": "func", "arguments": {...}}
+    if (toolCalls.length === 0) {
+      const jsonPattern = /\{[^{}]*"name"\s*:\s*"(\w+)"[^{}]*"arguments"\s*:\s*(\{[^{}]*\})[^{}]*\}/g
+      while ((match = jsonPattern.exec(content)) !== null) {
+        const [, funcName, argsJson] = match
+        try {
+          JSON.parse(argsJson)
+          toolCalls.push({
+            id: `call_${idx++}`,
+            type: 'function',
+            function: {
+              name: funcName,
+              arguments: argsJson,
+            },
+          })
+        } catch {
+          // Invalid JSON, skip
+        }
+      }
+    }
+
+    return toolCalls
+  }
 }
