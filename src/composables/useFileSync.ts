@@ -27,10 +27,15 @@ export function useFileSync(deps: FileSyncDeps) {
   const isWatching = ref(false)
 
   async function watchVault(path: string): Promise<void> {
+    console.log('[FileSync] Starting vault watcher for:', path)
     await stopWatching()
-    watcherUnlisten = await listen<FileChangeEvent>('vault-file-changed', handleFileChange)
+    watcherUnlisten = await listen<FileChangeEvent>('vault-file-changed', (event) => {
+      console.log('[FileSync] Raw event received:', event)
+      handleFileChange(event.payload)
+    })
     await invoke('watch_vault', { path })
     isWatching.value = true
+    console.log('[FileSync] Watcher started successfully')
   }
 
   async function stopWatching(): Promise<void> {
@@ -65,17 +70,24 @@ export function useFileSync(deps: FileSyncDeps) {
 
     switch (event.change_type) {
       case 'Created': {
-        storeLogger.debug(`New file detected: ${filePath}`)
+        console.log('[FileSync] New file detected:', filePath)
+        const syncEnabled = await isSyncEnabled()
+        console.log('[FileSync] Sync enabled:', syncEnabled)
         // Create node if sync is enabled
-        if (await isSyncEnabled()) {
+        if (syncEnabled) {
           const workspaceId = deps.getCurrentWorkspaceId()
+          console.log('[FileSync] Creating node for workspace:', workspaceId)
           try {
             const node = (await createNodeFromFile(filePath, workspaceId)) as Node
+            console.log('[FileSync] Node created:', node.id, node.title)
             deps.addNode(node)
             storeLogger.info(`Created node from new file: ${filePath}`)
           } catch (e) {
+            console.error('[FileSync] Failed to create node from file:', e)
             storeLogger.error('Failed to create node from file:', e)
           }
+        } else {
+          console.log('[FileSync] Sync not enabled, skipping node creation')
         }
         break
       }
