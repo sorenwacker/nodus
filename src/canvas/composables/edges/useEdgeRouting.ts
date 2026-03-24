@@ -370,10 +370,28 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
       let labelX: number
       let labelY: number
+
+      // Helper: compute cubic Bezier point at t=0.5
+      const bezierMidpoint = (p0: {x: number; y: number}, p1: {x: number; y: number}, p2: {x: number; y: number}, p3: {x: number; y: number}) => {
+        // B(0.5) = 0.125*P0 + 0.375*P1 + 0.375*P2 + 0.125*P3
+        return {
+          x: 0.125 * p0.x + 0.375 * p1.x + 0.375 * p2.x + 0.125 * p3.x,
+          y: 0.125 * p0.y + 0.375 * p1.y + 0.375 * p2.y + 0.125 * p3.y
+        }
+      }
+
       if (routed?.path && routed.path.length >= 2) {
-        const midIndex = Math.floor(routed.path.length / 2)
-        labelX = routed.path[midIndex].x
-        labelY = routed.path[midIndex].y
+        // For curved/hyperbolic with 4 control points, compute actual Bezier midpoint
+        if ((edgeStyle === 'curved' || edgeStyle === 'hyperbolic') && routed.path.length === 4) {
+          const mid = bezierMidpoint(routed.path[0], routed.path[1], routed.path[2], routed.path[3])
+          labelX = mid.x
+          labelY = mid.y
+        } else {
+          // For orthogonal/straight/diagonal paths, use waypoint midpoint
+          const midIndex = Math.floor(routed.path.length / 2)
+          labelX = routed.path[midIndex].x
+          labelY = routed.path[midIndex].y
+        }
       } else if (isDragging?.value || !routed) {
         // Calculate label position based on edge style to match visual path
         if (edgeStyle === 'straight' || isHugeGraph.value) {
@@ -384,16 +402,17 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
           const midX = (startPort.x + endEdge.x) / 2
           labelX = midX
           labelY = (startPort.y + endEdge.y) / 2
-        } else if (edgeStyle === 'curved') {
-          // Cubic Bezier midpoint at t=0.5: B(0.5) = 0.125*P0 + 0.375*P1 + 0.375*P2 + 0.125*P3
+        } else if (edgeStyle === 'curved' || edgeStyle === 'hyperbolic') {
+          // Cubic Bezier midpoint at t=0.5
           const cx1 = startStandoff.x
           const cy1 = startPort.y
           const cx2 = endStandoff.x
           const cy2 = endEdge.y
-          labelX = 0.125 * startPort.x + 0.375 * cx1 + 0.375 * cx2 + 0.125 * endEdge.x
-          labelY = 0.125 * startPort.y + 0.375 * cy1 + 0.375 * cy2 + 0.125 * endEdge.y
+          const mid = bezierMidpoint(startPort, { x: cx1, y: cy1 }, { x: cx2, y: cy2 }, endEdge)
+          labelX = mid.x
+          labelY = mid.y
         } else {
-          // diagonal/hyperbolic - midpoint of standoff segment
+          // diagonal - midpoint of standoff segment
           labelX = (startStandoff.x + endStandoff.x) / 2
           labelY = (startStandoff.y + endStandoff.y) / 2
         }
