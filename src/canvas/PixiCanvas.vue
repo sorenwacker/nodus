@@ -1504,6 +1504,34 @@ function getNodeBackground(colorTheme: string | null): string | undefined {
   return getNodeBackgroundUtil(colorTheme, currentTheme.value)
 }
 
+// Get computed style for a node card (simplifies template binding)
+function getNodeStyle(node: { id: string; canvas_x: number; canvas_y: number; width?: number; height?: number; color_theme?: string | null }) {
+  const isResizing = resizingNode.value === node.id
+  const x = isResizing ? resizePreview.value.x : node.canvas_x
+  const y = isResizing ? resizePreview.value.y : node.canvas_y
+  const width = isResizing ? resizePreview.value.width : (node.width || NODE_DEFAULTS.WIDTH)
+  const height = isResizing ? resizePreview.value.height : (node.height || NODE_DEFAULTS.HEIGHT)
+
+  const style: Record<string, string> = {
+    transform: `translate3d(${x}px, ${y}px, 0)`,
+    width: width + 'px',
+    height: height + 'px',
+    borderWidth: nodeBorderWidth.value + 'px',
+  }
+
+  // Apply color theme background if set
+  if (node.color_theme) {
+    const bg = getNodeBackground(node.color_theme)
+    if (bg) style.background = bg
+  } else if (isSemanticZoomCollapsed.value && !store.selectedNodeIds.includes(node.id)) {
+    // Collapsed non-selected nodes get canvas background
+    style.background = 'var(--bg-canvas)'
+    style.borderColor = 'var(--text-muted)'
+  }
+
+  return style
+}
+
 // Context menu handler
 function onContextMenu(e: MouseEvent) {
   e.preventDefault()
@@ -1722,13 +1750,7 @@ useCanvasKeyboardShortcuts({
           'neighborhood-focus': neighborhoodMode && node.id === focusNodeId,
           'neighbor-highlighted': neighborHighlightedMap[node.id]
         }"
-        :style="{
-          transform: `translate3d(${resizingNode === node.id ? resizePreview.x : node.canvas_x}px, ${resizingNode === node.id ? resizePreview.y : node.canvas_y}px, 0)`,
-          width: (resizingNode === node.id ? resizePreview.width : (node.width || NODE_DEFAULTS.WIDTH)) + 'px',
-          height: (resizingNode === node.id ? resizePreview.height : (node.height || NODE_DEFAULTS.HEIGHT)) + 'px',
-          borderWidth: nodeBorderWidth + 'px',
-          ...(node.color_theme ? { background: getNodeBackground(node.color_theme) } : isSemanticZoomCollapsed && !store.selectedNodeIds.includes(node.id) ? { background: 'var(--bg-canvas)', borderColor: 'var(--text-muted)' } : {}),
-        }"
+        :style="getNodeStyle(node)"
         @pointerdown="onNodePointerDown($event, node.id)"
         @pointerenter="onNodePointerEnter($event, node.id)"
         @pointermove="onNodePointerMove($event)"

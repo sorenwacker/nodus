@@ -28,6 +28,7 @@
 }
 
 .agent-log {
+  position: relative;
   margin-top: 8px;
   padding: 8px;
   background: var(--bg-elevated);
@@ -47,10 +48,6 @@
   padding: 2px 0;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.agent-log {
-  position: relative;
 }
 
 .log-buttons {
