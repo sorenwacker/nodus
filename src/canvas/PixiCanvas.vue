@@ -1474,15 +1474,15 @@ function updateSelectedFrameColor(color: string | null) {
   }
 }
 
-function fitSelectedNodes() {
-  // Fit all selected nodes to their content
+async function fitSelectedNodes() {
+  // Fit all selected nodes to their content sequentially
   for (const nodeId of store.selectedNodeIds) {
-    fitNodeNow(nodeId)
+    await fitNodeNow(nodeId)
   }
 }
 
 // One-shot fit to content (does NOT enable auto_fit)
-async function fitNodeNow(nodeId: string) {
+async function fitNodeNow(nodeId: string): Promise<void> {
   // Exit edit mode first to measure rendered view, not textarea
   const wasEditing = editingNodeId.value === nodeId
   if (wasEditing) {
@@ -1512,21 +1512,29 @@ async function fitNodeNow(nodeId: string) {
   const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`)
   if (!cardEl) return
 
-  let attempts = 0
-  const waitForContent = () => {
-    const contentEl = cardEl.querySelector('.node-content')
-    const editorEl = cardEl.querySelector('.inline-editor')
+  return new Promise<void>((resolve) => {
+    let attempts = 0
+    const waitForContent = () => {
+      const contentEl = cardEl.querySelector('.node-content')
+      const editorEl = cardEl.querySelector('.inline-editor')
 
-    if (contentEl && !editorEl) {
-      // Content element exists, editor gone - safe to measure
-      renderMermaidDiagrams()
-      setTimeout(() => fitNodeToContent(nodeId), 100)
-    } else if (attempts < 10) {
-      attempts++
-      setTimeout(waitForContent, 50)
+      if (contentEl && !editorEl) {
+        // Content element exists, editor gone - safe to measure
+        renderMermaidDiagrams()
+        setTimeout(() => {
+          fitNodeToContent(nodeId)
+          resolve()
+        }, 100)
+      } else if (attempts < 10) {
+        attempts++
+        setTimeout(waitForContent, 50)
+      } else {
+        // Timeout - resolve anyway
+        resolve()
+      }
     }
-  }
-  waitForContent()
+    waitForContent()
+  })
 }
 
 function selectAllNodes() {
@@ -1727,9 +1735,9 @@ useCanvasKeyboardShortcuts({
           :style="{ background: color.display || 'var(--bg-surface)' }"
           @click.stop="store.selectedFrameId ? updateSelectedFrameColor(color.display) : updateSelectedNodesColor(color.value)"
         ></button>
-        <span v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId && !isSemanticZoomCollapsed" class="color-bar-sep"></span>
+        <span v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId" class="color-bar-sep"></span>
         <button
-          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId && !isSemanticZoomCollapsed"
+          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
           class="autofit-toggle"
           :title="t('canvas.node.fitContent')"
           @click.stop="fitSelectedNodes"
