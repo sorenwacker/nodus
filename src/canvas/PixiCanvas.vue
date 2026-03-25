@@ -1475,10 +1475,16 @@ function updateSelectedFrameColor(color: string | null) {
 }
 
 async function fitSelectedNodes() {
+  // Copy the array to avoid issues with reactive changes during iteration
+  const nodeIds = [...store.selectedNodeIds]
+  console.log('[FitSelectedNodes] Fitting', nodeIds.length, 'nodes:', nodeIds)
+
   // Fit all selected nodes to their content sequentially
-  for (const nodeId of store.selectedNodeIds) {
+  for (const nodeId of nodeIds) {
+    console.log('[FitSelectedNodes] Fitting node:', nodeId)
     await fitNodeNow(nodeId)
   }
+  console.log('[FitSelectedNodes] Done fitting all nodes')
 }
 
 // One-shot fit to content (does NOT enable auto_fit)
@@ -1510,7 +1516,10 @@ async function fitNodeNow(nodeId: string): Promise<void> {
 
   // Poll until .node-content exists (max 500ms)
   const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`)
-  if (!cardEl) return
+  if (!cardEl) {
+    console.log('[fitNodeNow] No card element for', nodeId)
+    return
+  }
 
   return new Promise<void>((resolve) => {
     let attempts = 0
@@ -1522,6 +1531,7 @@ async function fitNodeNow(nodeId: string): Promise<void> {
         // Content element exists, editor gone - safe to measure
         renderMermaidDiagrams()
         setTimeout(() => {
+          console.log('[fitNodeNow] Fitting content for', nodeId)
           fitNodeToContent(nodeId)
           resolve()
         }, 100)
@@ -1530,6 +1540,7 @@ async function fitNodeNow(nodeId: string): Promise<void> {
         setTimeout(waitForContent, 50)
       } else {
         // Timeout - resolve anyway
+        console.log('[fitNodeNow] Timeout waiting for content', nodeId, 'contentEl:', !!contentEl, 'editorEl:', !!editorEl)
         resolve()
       }
     }
