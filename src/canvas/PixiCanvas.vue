@@ -1850,9 +1850,10 @@ useCanvasKeyboardShortcuts({
     </div>
 
     <!-- Floating Node LLM bar (positioned in screen coordinates, outside canvas transform) -->
+    <!-- Hidden when zoomed out (semantic zoom collapsed) since node content isn't editable -->
     <NodeLLMBar
       v-if="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
-      :visible="llmEnabled && (store.selectedNodeIds.length === 1 || !!editingNodeId)"
+      :visible="llmEnabled && !isSemanticZoomCollapsed && (store.selectedNodeIds.length === 1 || !!editingNodeId)"
       :node-prompt="nodePrompt"
       :is-loading="isNodeLLMLoading"
       :node-x="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x * scale + offsetX"
