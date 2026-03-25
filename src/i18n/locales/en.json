@@ -59,7 +59,8 @@
       "showAgentLog": "Show agent log",
       "log": "Log",
       "hint": "Scroll up/down: zoom | Scroll sideways: pan | Alt+drag: link | Dbl-click: new",
-      "cancelPdf": "Cancel PDF processing"
+      "cancelPdf": "Cancel PDF processing",
+      "cancelImport": "Cancel import"
     },
     "controls": {
       "zoomIn": "Zoom In",
