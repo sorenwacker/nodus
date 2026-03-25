@@ -22,36 +22,6 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'start-resize', event: PointerEvent, frameId: string, direction: string): void
 }>()
-
-function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
-  // Check if there's a node at the click position
-  const elementsAtPoint = document.elementsFromPoint(event.clientX, event.clientY)
-  const nodeAtPoint = elementsAtPoint.find(el => el.classList.contains('node-card')) as HTMLElement | undefined
-  if (nodeAtPoint) {
-    // Forward the event to the node - create a new event and dispatch it
-    const newEvent = new PointerEvent('pointerdown', {
-      bubbles: true,
-      cancelable: true,
-      clientX: event.clientX,
-      clientY: event.clientY,
-      pointerId: event.pointerId,
-      pointerType: event.pointerType,
-      button: event.button,
-      buttons: event.buttons,
-      ctrlKey: event.ctrlKey,
-      shiftKey: event.shiftKey,
-      altKey: event.altKey,
-      metaKey: event.metaKey,
-    })
-    nodeAtPoint.dispatchEvent(newEvent)
-    event.stopPropagation()
-    return
-  }
-  // We're handling this - stop propagation to prevent canvas pan
-  event.stopPropagation()
-  console.log('[CanvasFrames] Frame pointerdown:', frameId)
-  emit('pointerdown', event, frameId)
-}
 </script>
 
 <template>
@@ -68,11 +38,14 @@ function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
       borderWidth: '1.5px',
       backgroundColor: frame.color ? frame.color + '30' : 'rgba(128, 128, 128, 0.08)',
     }"
-    @pointerdown="handleFrameBorderPointerDown($event, frame.id)"
     @dblclick.stop="$emit('dblclick', frame.id)"
   >
-    <!-- Title label on top -->
-    <div class="frame-header" :style="{ transform: `scale(${1/scale}) translateY(-100%)`, transformOrigin: 'left top' }">
+    <!-- Title label on top - drag handle -->
+    <div
+      class="frame-header"
+      :style="{ transform: `scale(${1/scale}) translateY(-100%)`, transformOrigin: 'left top' }"
+      @pointerdown.stop="emit('pointerdown', $event, frame.id)"
+    >
       <input
         v-if="editingFrameId === frame.id"
         :value="editFrameTitle"
@@ -119,8 +92,7 @@ function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
   border: 1.5px solid var(--border-subtle);
   border-radius: 12px;
   background: transparent;
-  pointer-events: auto;
-  cursor: move;
+  pointer-events: none;
   z-index: 0;
 }
 
@@ -139,6 +111,8 @@ function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
   align-items: center;
   gap: 8px;
   z-index: 10;
+  pointer-events: auto;
+  cursor: move;
 }
 
 .frame-title {
@@ -187,6 +161,7 @@ function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
   align-items: center;
   justify-content: center;
   z-index: 10;
+  pointer-events: auto;
 }
 
 .frame-delete-btn::before {
@@ -210,7 +185,7 @@ function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
   color: white;
 }
 
-/* Resize handles */
+/* Resize handles - only show when selected */
 .resize-edge,
 .resize-corner {
   position: absolute;
@@ -220,23 +195,15 @@ function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
   pointer-events: none;
 }
 
-.canvas-frame:hover .resize-edge,
-.canvas-frame:hover .resize-corner,
 .canvas-frame.selected .resize-edge,
 .canvas-frame.selected .resize-corner {
   pointer-events: auto;
+  opacity: 0.4;
 }
 
-.canvas-frame:hover .resize-edge,
-.canvas-frame:hover .resize-corner,
-.canvas-frame.selected .resize-edge,
-.canvas-frame.selected .resize-corner {
-  opacity: 0.3;
-}
-
-.resize-edge:hover,
-.resize-corner:hover {
-  opacity: 1 !important;
+.canvas-frame.selected .resize-edge:hover,
+.canvas-frame.selected .resize-corner:hover {
+  opacity: 1;
 }
 
 /* Edge handles */
