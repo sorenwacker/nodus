@@ -1,14 +1,14 @@
 :root {
-  /* Professional Light Theme - Clean, sophisticated neutrals */
-  --bg-canvas: #f8f9fb;
+  /* Professional Light Theme - Higher contrast */
+  --bg-canvas: #e8eaed;
   --bg-surface: #ffffff;
-  --bg-surface-alt: #f3f4f6;
+  --bg-surface-alt: #f5f6f8;
   --bg-elevated: #ffffff;
-  --text-main: #1f2937;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
-  --border-default: #e5e7eb;
-  --border-subtle: #f3f4f6;
+  --text-main: #1a1a1a;
+  --text-secondary: #404040;
+  --text-muted: #6b7280;
+  --border-default: #c9cdd4;
+  --border-subtle: #e5e7eb;
   --primary-color: #2563eb;
   --primary-hover: #1d4ed8;
   --success-color: #059669;
@@ -16,10 +16,10 @@
   --danger-color: #dc2626;
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
-  --dot-color: #e5e7eb;
-  --shadow-sm: rgba(0, 0, 0, 0.04);
-  --shadow-md: rgba(0, 0, 0, 0.08);
-  --shadow-lg: rgba(0, 0, 0, 0.12);
+  --dot-color: #d1d5db;
+  --shadow-sm: rgba(0, 0, 0, 0.06);
+  --shadow-md: rgba(0, 0, 0, 0.10);
+  --shadow-lg: rgba(0, 0, 0, 0.15);
   /* Selection and neighbor highlight */
   --selection-glow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
   --neighbor-highlight: rgba(59, 130, 246, 0.6);
