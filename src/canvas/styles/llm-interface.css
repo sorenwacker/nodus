@@ -17,6 +17,12 @@
   flex-shrink: 0;
 }
 
+/* Light mode: stronger AI bar contrast */
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .graph-llm-bar {
+  border-bottom-color: #94a3b8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
 .agent-tasks {
   margin-top: 8px;
   padding: 8px;
@@ -124,6 +130,12 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
+}
+
+/* Light mode: stronger toggle button */
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .llm-toggle {
+  border-color: #94a3b8;
+  color: var(--text-main);
 }
 
 .llm-toggle:hover {
