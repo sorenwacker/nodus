@@ -5,6 +5,7 @@
  */
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getVersion } from '@tauri-apps/api/app'
 import { llmStorage } from '../lib/storage'
 import { useThemesStore } from '../stores/themes'
 import { setLocale, getLocale, loadLocale } from '../i18n'
@@ -27,6 +28,9 @@ const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general' | 'zotero'>('gener
 // Zotero integration
 const zotero = useZotero()
 
+// App version
+const appVersion = ref('')
+
 // LLM enabled toggle
 const llmEnabled = ref(llmStorage.getLLMEnabled())
 
@@ -40,6 +44,7 @@ watch(selectedLanguage, async (locale) => {
 
 onMounted(async () => {
   await themesStore.initialize()
+  appVersion.value = await getVersion()
 })
 
 // Watch LLM enabled toggle
@@ -137,7 +142,7 @@ function handleClose() {
             <label>{{ t('settings.about') }}</label>
             <div class="about-info">
               <p><strong>{{ t('app.name') }}</strong> - {{ t('settings.aboutDescription') }}</p>
-              <p class="version">{{ t('settings.version') }} 0.2.2</p>
+              <p class="version">{{ t('settings.version') }} {{ appVersion }}</p>
             </div>
           </div>
         </div>
