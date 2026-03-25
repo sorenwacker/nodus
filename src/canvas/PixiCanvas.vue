@@ -372,9 +372,9 @@ const { editingNodeId, editContent, editingTitleId, editTitle, startEditing, sta
 const edgeManipulation = useEdgeManipulation({
   store: {
     getNode: store.getNode,
-    edges: store.edges,
-    filteredEdges: store.filteredEdges,
-    filteredNodes: store.filteredNodes,
+    getEdges: () => store.edges,
+    getFilteredEdges: () => store.filteredEdges,
+    getFilteredNodes: () => store.filteredNodes,
     createNode: store.createNode,
     createEdge: store.createEdge,
     deleteEdge: store.deleteEdge,

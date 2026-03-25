@@ -7,9 +7,9 @@ import type { Node, Edge, CreateEdgeInput } from '../../../types'
 
 export interface EdgeManipulationStore {
   getNode: (id: string) => Node | undefined
-  edges: Edge[]
-  filteredEdges: Edge[]
-  filteredNodes: Node[]
+  getEdges: () => Edge[]
+  getFilteredEdges: () => Edge[]
+  getFilteredNodes: () => Node[]
   createNode: (data: { title: string; node_type: string; markdown_content: string; canvas_x: number; canvas_y: number }) => Promise<Node>
   createEdge: (data: CreateEdgeInput) => Promise<Edge>
   deleteEdge: (id: string) => Promise<void>
@@ -56,7 +56,7 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     console.log('[EdgeCreate] Node card found:', !!nodeCard, nodeCard?.dataset.nodeId)
     const targetNodeId = nodeCard?.dataset.nodeId
     // Check both filteredNodes and use getNode as fallback (handles edge cases)
-    let finalTarget = targetNodeId ? store.filteredNodes.find((n) => n.id === targetNodeId) : null
+    let finalTarget = targetNodeId ? store.getFilteredNodes().find((n) => n.id === targetNodeId) : null
     if (!finalTarget && targetNodeId) {
       // Fallback: the node card exists in DOM, so get it directly
       finalTarget = store.getNode(targetNodeId)
@@ -101,7 +101,7 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
 
   function changeEdgeLabel(label: string) {
     if (selectedEdge.value) {
-      const edge = store.filteredEdges.find((e) => e.id === selectedEdge.value)
+      const edge = store.getFilteredEdges().find((e) => e.id === selectedEdge.value)
       if (edge) {
         edge.label = label || null
       }
@@ -110,7 +110,7 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
 
   async function reverseEdge() {
     if (!selectedEdge.value) return
-    const edge = store.filteredEdges.find((e) => e.id === selectedEdge.value)
+    const edge = store.getFilteredEdges().find((e) => e.id === selectedEdge.value)
     if (!edge) return
 
     // Delete old edge and create new one with swapped source/target
@@ -131,20 +131,22 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
   }
 
   function isEdgeBidirectional(edgeId: string): boolean {
-    const edge = store.edges.find((e) => e.id === edgeId)
+    const edges = store.getEdges()
+    const edge = edges.find((e) => e.id === edgeId)
     if (!edge) return false
-    return store.edges.some(
+    return edges.some(
       (e) => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
     )
   }
 
   async function makeUnidirectional() {
     if (!selectedEdge.value) return
-    const edge = store.edges.find((e) => e.id === selectedEdge.value)
+    const edges = store.getEdges()
+    const edge = edges.find((e) => e.id === selectedEdge.value)
     if (!edge) return
 
     // Find and delete the reverse edge
-    const reverseEdge = store.edges.find(
+    const reverseEdge = edges.find(
       (e) => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
     )
 
@@ -155,11 +157,12 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
 
   async function makeBidirectional() {
     if (!selectedEdge.value) return
-    const edge = store.edges.find((e) => e.id === selectedEdge.value)
+    const edges = store.getEdges()
+    const edge = edges.find((e) => e.id === selectedEdge.value)
     if (!edge) return
 
     // Check if reverse edge already exists
-    const reverseExists = store.edges.some(
+    const reverseExists = edges.some(
       (e) => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
     )
 
@@ -176,7 +179,7 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
   async function insertNodeOnEdge() {
     if (!selectedEdge.value) return
 
-    const edge = store.filteredEdges.find((e) => e.id === selectedEdge.value)
+    const edge = store.getFilteredEdges().find((e) => e.id === selectedEdge.value)
     if (!edge) return
 
     const sourceNode = store.getNode(edge.source_node_id)
