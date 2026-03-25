@@ -255,8 +255,10 @@ export function useContentRenderer(options: UseContentRendererOptions) {
   }
 
   async function renderMermaidDiagrams() {
+    console.log('[Mermaid] renderMermaidDiagrams called')
     // If already rendering, queue another render for when it's done
     if (mermaidRenderPending) {
+      console.log('[Mermaid] Already rendering, queuing')
       mermaidRenderQueued = true
       return
     }
@@ -266,6 +268,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     await nextTick()
 
     const elements = document.querySelectorAll('.mermaid')
+    console.log('[Mermaid] Found', elements.length, 'mermaid elements')
     if (elements.length === 0) {
       mermaidRenderPending = false
       // Check if another render was queued
@@ -278,12 +281,14 @@ export function useContentRenderer(options: UseContentRendererOptions) {
 
     // Lazy load mermaid only when needed
     if (!mermaidLoaded) {
+      console.log('[Mermaid] Loading mermaid library...')
       try {
         const mod = await import('mermaid')
         let api = mod.default || mod
         if (api.default) api = api.default
 
         mermaidApi = api
+        console.log('[Mermaid] Mermaid API loaded, initialize:', typeof mermaidApi.initialize)
         if (typeof mermaidApi.initialize === 'function') {
           mermaidApi.initialize({
             startOnLoad: false,
@@ -292,8 +297,9 @@ export function useContentRenderer(options: UseContentRendererOptions) {
           })
         }
         mermaidLoaded = true
+        console.log('[Mermaid] Mermaid initialized successfully')
       } catch (e) {
-        console.error('Mermaid load error:', e)
+        console.error('[Mermaid] Load error:', e)
         mermaidRenderPending = false
         return
       }
@@ -302,13 +308,22 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     let didRenderNew = false
     for (const el of elements) {
       // Skip if already contains SVG (already rendered in DOM)
-      if (el.querySelector('svg')) continue
+      if (el.querySelector('svg')) {
+        console.log('[Mermaid] Element already has SVG, skipping')
+        continue
+      }
 
       const code = el.textContent?.trim() || ''
-      if (!code) continue
+      if (!code) {
+        console.log('[Mermaid] Element has no code, skipping')
+        continue
+      }
+
+      console.log('[Mermaid] Rendering code:', code.substring(0, 50) + '...')
 
       // Check cache first
       if (mermaidCache.has(code)) {
+        console.log('[Mermaid] Using cached result')
         el.innerHTML = mermaidCache.get(code)!
         didRenderNew = true
         continue
@@ -316,12 +331,15 @@ export function useContentRenderer(options: UseContentRendererOptions) {
 
       try {
         const id = `m${Date.now()}${Math.random().toString(36).substr(2, 5)}`
+        console.log('[Mermaid] Calling mermaid.render with id:', id)
         const { svg } = await mermaidApi.render(id, code)
+        console.log('[Mermaid] Render successful, SVG length:', svg?.length)
         mermaidCache.set(code, svg)
         el.innerHTML = svg
         didRenderNew = true
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
+        console.error('[Mermaid] Render error:', e)
         const msg = e.message || String(e)
         const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${msg.substring(0, 100)}</div>`
         mermaidCache.set(code, errorHtml)
