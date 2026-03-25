@@ -42,6 +42,9 @@ export interface UseCanvasKeyboardShortcutsContext {
 
   // Search
   showSearch: () => void
+
+  // Help
+  showHelp: () => void
 }
 
 export interface UseCanvasKeyboardShortcutsReturn {
@@ -71,6 +74,7 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     refreshFromFiles,
     exportGraphAsYaml,
     showSearch,
+    showHelp,
   } = ctx
 
   function handleKeydown(e: KeyboardEvent) {
@@ -98,6 +102,13 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     // Skip other shortcuts if user is typing in an input
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return
+    }
+
+    // ? key toggles help modal
+    if (e.key === '?') {
+      e.preventDefault()
+      showHelp()
       return
     }
 

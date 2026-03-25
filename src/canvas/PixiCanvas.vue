@@ -1671,6 +1671,7 @@ useCanvasKeyboardShortcuts({
   refreshFromFiles,
   exportGraphAsYaml,
   showSearch,
+  showHelp: () => { showHelpModal.value = true },
 })
 </script>
 
