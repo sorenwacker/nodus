@@ -124,8 +124,8 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       resetAllNodeSizes()
     }
 
-    // F key fits to content
-    if (e.key === 'f' || e.key === 'F') {
+    // F key fits to content (without Cmd/Ctrl - allow Cmd+F for browser search)
+    if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       fitToContent()
     }
