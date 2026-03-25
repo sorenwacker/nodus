@@ -776,6 +776,15 @@ export const useNodesStore = defineStore('nodes', () => {
       height: 620,
     })
 
+    const mermaidDemo = await createNode({
+      title: titles.mermaidDemo,
+      markdown_content: templates.mermaidDemo,
+      canvas_x: 700,
+      canvas_y: 900,
+      width: 520,
+      height: 800,
+    })
+
     // Create demo edges with different styles and labels
     await createEdge({
       source_node_id: gettingStarted.id,
@@ -796,6 +805,13 @@ export const useNodesStore = defineStore('nodes', () => {
       target_node_id: gettingStarted.id,
       link_type: 'supports',
       label: 'extends',
+    })
+
+    await createEdge({
+      source_node_id: gettingStarted.id,
+      target_node_id: mermaidDemo.id,
+      link_type: 'related',
+      label: 'diagrams',
     })
 
     storeLogger.info('Default workspace reset complete')
