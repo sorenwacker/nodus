@@ -231,35 +231,35 @@
 }
 
 /* Light mode Mermaid overrides - force light backgrounds */
-:root .node-content .mermaid svg .node rect,
-:root .node-content .mermaid svg .node circle,
-:root .node-content .mermaid svg .node ellipse,
-:root .node-content .mermaid svg .node polygon,
-:root .node-content .mermaid svg .node path {
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node rect,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node circle,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node ellipse,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node polygon,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node path {
   fill: #ffffff !important;
   stroke: #333333 !important;
 }
 
-:root .node-content .mermaid svg .node .label,
-:root .node-content .mermaid svg text {
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node .label,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg text {
   fill: #1a1a1a !important;
 }
 
-:root .node-content .mermaid svg .edgePath path {
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .edgePath path {
   stroke: #666666 !important;
 }
 
-:root .node-content .mermaid svg .edgeLabel {
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .edgeLabel {
   background-color: #ffffff !important;
   color: #1a1a1a !important;
 }
 
-:root .node-content .mermaid svg .cluster rect {
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .cluster rect {
   fill: #f5f5f5 !important;
   stroke: #999999 !important;
 }
 
-/* Dark themes - let Mermaid dark theme work naturally */
+/* Dark themes - use theme variables */
 [data-theme='dark'] .node-content .mermaid svg .node rect,
 [data-theme='dark'] .node-content .mermaid svg .node circle,
 [data-theme='dark'] .node-content .mermaid svg .node ellipse,
@@ -289,6 +289,20 @@
 [data-theme='pitch-black'] .node-content .mermaid svg .edgePath path,
 [data-theme='cyber'] .node-content .mermaid svg .edgePath path {
   stroke: var(--text-muted) !important;
+}
+
+[data-theme='dark'] .node-content .mermaid svg .edgeLabel,
+[data-theme='pitch-black'] .node-content .mermaid svg .edgeLabel,
+[data-theme='cyber'] .node-content .mermaid svg .edgeLabel {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme='dark'] .node-content .mermaid svg .cluster rect,
+[data-theme='pitch-black'] .node-content .mermaid svg .cluster rect,
+[data-theme='cyber'] .node-content .mermaid svg .cluster rect {
+  fill: var(--bg-surface-alt) !important;
+  stroke: var(--border-default) !important;
 }
 
 /* Typst math rendering */
