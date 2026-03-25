@@ -69,15 +69,15 @@ const cyberEdgeColors: EdgeColorOption[] = [
   { value: '#00ff66' }, // neon green
 ]
 
-// Light mode edge colors - darker, professional tones
+// Light mode edge colors - high contrast, professional tones
 const lightEdgeColors: EdgeColorOption[] = [
-  { value: '#64748b' }, // slate gray (default)
-  { value: '#475569' }, // darker slate
-  { value: '#0369a1' }, // blue
-  { value: '#0891b2' }, // cyan
-  { value: '#059669' }, // green
-  { value: '#7c3aed' }, // purple
-  { value: '#db2777' }, // pink
+  { value: '#475569' }, // slate gray (default)
+  { value: '#334155' }, // darker slate
+  { value: '#0c4a6e' }, // blue
+  { value: '#0e7490' }, // cyan
+  { value: '#047857' }, // green
+  { value: '#6d28d9' }, // purple
+  { value: '#be185d' }, // pink
 ]
 
 // Node colors for the color picker (transparent tints layered over solid bg)
@@ -127,8 +127,8 @@ const frameColors = [
 ]
 
 // Stroke width constants
-const EDGE_SCREEN_WIDTH = 1 // Target screen pixels
-const HIGHLIGHTED_STROKE_MULTIPLIER = 1.3
+const EDGE_SCREEN_WIDTH = 1.5 // Target screen pixels
+const HIGHLIGHTED_STROKE_MULTIPLIER = 1.4
 
 export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn {
   const { store, selectedEdgeId, currentTheme, scale, workspaceId } = ctx
