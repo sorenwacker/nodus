@@ -13,6 +13,7 @@ export interface UseViewportCullingContext {
   offsetX: Ref<number>
   offsetY: Ref<number>
   displayNodes: ComputedRef<Node[]>
+  selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
 }
 
 export interface UseViewportCullingReturn {
@@ -23,7 +24,7 @@ export interface UseViewportCullingReturn {
 }
 
 export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportCullingReturn {
-  const { scale, offsetX, offsetY, displayNodes } = ctx
+  const { scale, offsetX, offsetY, displayNodes, selectedNodeIds } = ctx
 
   // Viewport size for culling (updated on resize)
   const viewportWidth = ref(window.innerWidth)
@@ -44,6 +45,7 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   })
 
   // Only render nodes visible in viewport (with margin for smooth scrolling)
+  // Always include selected nodes so they can be measured/fitted even if off-screen
   const visibleNodes = computed(() => {
     const s = scale.value
     const ox = offsetX.value
@@ -59,8 +61,14 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     const viewRight = (viewportWidth.value - ox) / s + margin
     const viewBottom = (viewportHeight.value - oy) / s + margin
 
+    // Selected nodes should always be rendered (for fitting, etc.)
+    const selectedSet = new Set(selectedNodeIds.value)
+
     // Use displayNodes which respects neighborhood mode
     return displayNodes.value.filter(node => {
+      // Always include selected nodes
+      if (selectedSet.has(node.id)) return true
+
       const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
       const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
       // Check if node intersects viewport

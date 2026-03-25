@@ -237,11 +237,13 @@ const neighborhood = useNeighborhoodMode({
 const { neighborhoodMode, focusNodeId, displayNodes, neighborhoodDepth, neighborhoodPositions, setDepth } = neighborhood
 
 // Viewport culling composable - filters nodes visible in viewport
+// selectedNodeIds ensures selected nodes are always rendered (for fitting, etc.)
 const viewportCulling = useViewportCulling({
   scale,
   offsetX,
   offsetY,
   displayNodes,
+  selectedNodeIds: computed(() => store.selectedNodeIds),
 })
 const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
@@ -1475,14 +1477,12 @@ function updateSelectedFrameColor(color: string | null) {
 }
 
 async function fitSelectedNodes() {
-  // Only fit nodes that are currently visible in the viewport (in DOM)
-  const visibleNodeIdSet = new Set(visibleNodes.value.map(n => n.id))
-  const nodeIds = store.selectedNodeIds.filter(id => visibleNodeIdSet.has(id))
+  // Selected nodes are always included in visibleNodes via viewport culling,
+  // so they're guaranteed to be in the DOM when zoomed in
+  if (store.selectedNodeIds.length === 0) return
 
-  if (nodeIds.length === 0) return
-
-  // Fit all visible selected nodes to their content sequentially
-  for (const nodeId of nodeIds) {
+  // Fit all selected nodes to their content sequentially
+  for (const nodeId of store.selectedNodeIds) {
     await fitNodeNow(nodeId)
   }
 }
