@@ -4,6 +4,7 @@ import { invoke, getWorkspace } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
 import { getStarterTemplates, getStarterTitles } from '../lib/templates'
+import { canvasStorage } from '../lib/storage'
 import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
 import { useStorylinesStore } from './storylines'
@@ -813,6 +814,9 @@ export const useNodesStore = defineStore('nodes', () => {
       link_type: 'related',
       label: 'diagrams',
     })
+
+    // Set hyperbolic edge style for starter content
+    canvasStorage.setEdgeStyle('hyperbolic')
 
     storeLogger.info('Default workspace reset complete')
   }
