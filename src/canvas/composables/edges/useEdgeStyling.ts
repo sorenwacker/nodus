@@ -83,13 +83,13 @@ const lightEdgeColors: EdgeColorOption[] = [
 // Node colors for the color picker (transparent tints layered over solid bg)
 const defaultNodeColors = [
   { value: null, display: null },
-  { value: 'rgba(239, 68, 68, 0.08)', display: '#fecaca' }, // red
-  { value: 'rgba(249, 115, 22, 0.08)', display: '#fed7aa' }, // orange
-  { value: 'rgba(234, 179, 8, 0.08)', display: '#fef08a' }, // yellow
-  { value: 'rgba(34, 197, 94, 0.08)', display: '#bbf7d0' }, // green
-  { value: 'rgba(59, 130, 246, 0.08)', display: '#bfdbfe' }, // blue
-  { value: 'rgba(168, 85, 247, 0.08)', display: '#e9d5ff' }, // purple
-  { value: 'rgba(236, 72, 153, 0.08)', display: '#fbcfe8' }, // pink
+  { value: 'rgba(239, 68, 68, 0.18)', display: '#fecaca' }, // red
+  { value: 'rgba(249, 115, 22, 0.18)', display: '#fed7aa' }, // orange
+  { value: 'rgba(234, 179, 8, 0.18)', display: '#fef08a' }, // yellow
+  { value: 'rgba(34, 197, 94, 0.18)', display: '#bbf7d0' }, // green
+  { value: 'rgba(59, 130, 246, 0.18)', display: '#bfdbfe' }, // blue
+  { value: 'rgba(168, 85, 247, 0.18)', display: '#e9d5ff' }, // purple
+  { value: 'rgba(236, 72, 153, 0.18)', display: '#fbcfe8' }, // pink
 ]
 
 const cyberNodeColors = [
