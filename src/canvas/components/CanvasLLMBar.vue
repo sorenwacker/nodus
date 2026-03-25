@@ -11,6 +11,7 @@ defineProps<{
   conversationHistory: unknown[]
   agentTasks: Array<{ id: string; status: string; description: string }>
   agentLog: string[]
+  showLog: boolean
 }>()
 
 defineEmits<{
@@ -68,7 +69,7 @@ async function copyLog(log: string[]) {
       </div>
     </div>
     <!-- Agent activity log -->
-    <div v-if="agentLog.length > 0" class="agent-log">
+    <div v-if="showLog && agentLog.length > 0" class="agent-log">
       <div class="log-buttons">
         <button class="log-btn" :title="t('canvas.agent.copyLog')" @click="copyLog(agentLog)">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

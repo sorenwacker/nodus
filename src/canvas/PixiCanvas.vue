@@ -1679,6 +1679,7 @@ useCanvasKeyboardShortcuts({
       :conversation-history="conversationHistory"
       :agent-tasks="agentTasks"
       :agent-log="agentLog"
+      :show-log="showAgentLogPanel"
       @update:graph-prompt="graphPrompt = $event"
       @send="sendGraphPrompt"
       @stop="stopAgent"
