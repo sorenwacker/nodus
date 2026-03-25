@@ -1727,9 +1727,9 @@ useCanvasKeyboardShortcuts({
           :style="{ background: color.display || 'var(--bg-surface)' }"
           @click.stop="store.selectedFrameId ? updateSelectedFrameColor(color.display) : updateSelectedNodesColor(color.value)"
         ></button>
-        <span v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId" class="color-bar-sep"></span>
+        <span v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId && !isSemanticZoomCollapsed" class="color-bar-sep"></span>
         <button
-          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
+          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId && !isSemanticZoomCollapsed"
           class="autofit-toggle"
           :title="t('canvas.node.fitContent')"
           @click.stop="fitSelectedNodes"

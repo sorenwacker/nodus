@@ -19,12 +19,6 @@ import { registerThemeTools } from './themeTools'
 export { resetPositionCounter } from './nodeTools'
 
 /**
- * @deprecated Use toolRegistry.getToolDefinitions() instead
- * Maintained for backwards compatibility
- */
-export const agentTools: AgentTool[] = toolRegistry.getToolDefinitions()
-
-/**
  * Register all core tools
  * Call this once at app startup
  */
@@ -44,3 +38,20 @@ export function registerCoreTools(): void {
   registerAgentTools()
   registerThemeTools()
 }
+
+// Ensure tools are registered before exporting
+registerCoreTools()
+
+/**
+ * Get current agent tools from registry
+ * This is a getter to ensure tools are always up-to-date
+ */
+export function getAgentTools(): AgentTool[] {
+  return toolRegistry.getToolDefinitions()
+}
+
+/**
+ * @deprecated Use getAgentTools() instead
+ * Maintained for backwards compatibility - now returns fresh data
+ */
+export const agentTools: AgentTool[] = toolRegistry.getToolDefinitions()
