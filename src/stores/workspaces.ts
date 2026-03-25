@@ -44,6 +44,7 @@ interface DbWorkspace {
 }
 
 export const useWorkspaceStore = defineStore('workspaces', () => {
+  // Initialize from localStorage for quick startup, but database is source of truth
   const workspaces = ref<Workspace[]>(workspaceStorage.getAll())
   const currentWorkspaceId = ref<string | null>(workspaceStorage.getCurrent())
   const loading = ref(false)
@@ -54,40 +55,28 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     workspaces.value.find((w) => w.id === currentWorkspaceId.value)
   )
 
-  // Persist workspaces to localStorage
+  // Persist workspaces to localStorage (cache for quick startup)
   function saveWorkspacesToStorage() {
     workspaceStorage.setAll(workspaces.value)
     workspaceStorage.setCurrent(currentWorkspaceId.value)
   }
 
-  // Sync workspaces from localStorage to database (localStorage is source of truth)
-  async function syncWorkspacesToDatabase() {
+  // Load workspaces from database (database is source of truth)
+  async function loadWorkspacesFromDatabase() {
     const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
     storeLogger.info(`[Workspace] DB workspaces: ${JSON.stringify(dbWorkspaces.map(w => ({ id: w.id, name: w.name })))}`)
 
-    const dbIds = new Set(dbWorkspaces.map((w) => w.id))
+    // Convert database workspaces to frontend format
+    const loadedWorkspaces: Workspace[] = dbWorkspaces.map((w) => ({
+      id: w.id,
+      name: w.name,
+      created_at: w.created_at,
+    }))
 
-    // Create any localStorage workspaces that don't exist in the database
-    for (const ws of workspaces.value) {
-      if (!dbIds.has(ws.id)) {
-        storeLogger.info(`Syncing workspace to database: ${ws.name} (${ws.id})`)
-        await invoke('create_workspace', {
-          input: {
-            id: ws.id,
-            name: ws.name,
-            color: null,
-            vaultPath: null,
-          },
-        })
-      }
-    }
+    // Update local state from database
+    workspaces.value = loadedWorkspaces
 
-    // NOTE: We intentionally do NOT auto-restore workspaces from DB that aren't in localStorage.
-    // localStorage is the source of truth for workspace existence.
-    // If a workspace was deleted locally, it should stay deleted.
-    // Use recoverWorkspace() explicitly if recovery is needed.
-
-    // Persist workspaces to localStorage (in case any were created)
+    // Cache to localStorage for quick startup next time
     saveWorkspacesToStorage()
   }
 
@@ -96,12 +85,13 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     error.value = null
     try {
       storeLogger.info('[Workspace] Starting initialization...')
-      storeLogger.info(`[Workspace] localStorage workspaces: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
+      storeLogger.info(`[Workspace] localStorage cache: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
       storeLogger.info(`[Workspace] localStorage currentWorkspaceId: ${currentWorkspaceId.value}`)
 
-      await syncWorkspacesToDatabase()
+      // Load workspaces from database (source of truth)
+      await loadWorkspacesFromDatabase()
 
-      storeLogger.info(`[Workspace] After sync, workspaces: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
+      storeLogger.info(`[Workspace] After load, workspaces: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
 
       // Validate currentWorkspaceId exists in workspaces list
       const storedId = currentWorkspaceId.value
@@ -118,7 +108,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
       storeLogger.info(`[Workspace] Final currentWorkspaceId: ${currentWorkspaceId.value}`)
     } catch (e) {
       error.value = String(e)
-      storeLogger.error('Failed to sync workspaces:', e)
+      storeLogger.error('Failed to load workspaces:', e)
     } finally {
       loading.value = false
     }
@@ -245,7 +235,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     recoverWorkspace,
     getOrphanedWorkspaceIds,
     saveWorkspacesToStorage,
-    syncWorkspacesToDatabase,
+    loadWorkspacesFromDatabase,
   }
 })
 
