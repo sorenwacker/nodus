@@ -666,7 +666,7 @@ async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force
   try {
     // If force layout and a frame is selected, use the frame-aware layoutNodes
     if (type === 'force' && frameId) {
-      await store.layoutNodes(undefined, { frameId })
+      await store.layoutNodes(undefined, { frameId, fitToFrame: false })
     } else {
       await layout.autoLayout(type, frameId ?? undefined)
     }
