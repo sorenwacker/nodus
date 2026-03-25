@@ -720,7 +720,7 @@ function fitNodeToContent(nodeId: string) {
   }
 }
 
-// Fit all visible nodes to their content (auto-expand to show all content)
+// Fit nodes to their content (selected nodes if any, otherwise all visible)
 async function fitAllNodesToContent() {
   // Exit any active editing first
   if (editingNodeId.value) {
@@ -731,8 +731,12 @@ async function fitAllNodesToContent() {
   renderMermaidDiagrams()
   // Wait longer for Mermaid SVGs to render (they're async)
   setTimeout(() => {
-    for (const node of store.filteredNodes) {
-      fitNodeToContent(node.id)
+    // Fit selected nodes if any, otherwise all visible nodes
+    const nodesToFit = store.selectedNodeIds.length > 0
+      ? store.selectedNodeIds
+      : store.filteredNodes.map(n => n.id)
+    for (const nodeId of nodesToFit) {
+      fitNodeToContent(nodeId)
     }
     // Trigger edge re-routing after sizes change
     store.nodeLayoutVersion++
