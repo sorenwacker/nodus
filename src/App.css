@@ -69,7 +69,7 @@
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,6 +78,11 @@
 
 .icon-btn:hover:not(:disabled) {
   background: var(--bg-surface-alt);
+  color: var(--text-main);
+}
+
+/* Stronger icons for light theme */
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .icon-btn {
   color: var(--text-main);
 }
 
@@ -164,7 +169,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -172,7 +177,7 @@
 .search-placeholder {
   flex: 1;
   text-align: left;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
