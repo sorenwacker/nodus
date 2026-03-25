@@ -192,6 +192,8 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   // All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
   const allMarkerColors = computed(() => {
     const colors = new Set<string>()
+    // Default gray color (fallback)
+    colors.add('#94a3b8')
     // Edge colors (both palettes)
     for (const c of cyberEdgeColors) {
       if (c.value) colors.add(c.value)

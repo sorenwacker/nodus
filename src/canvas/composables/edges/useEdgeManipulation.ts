@@ -108,14 +108,26 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     }
   }
 
-  function reverseEdge() {
+  async function reverseEdge() {
     if (!selectedEdge.value) return
     const edge = store.filteredEdges.find((e) => e.id === selectedEdge.value)
     if (!edge) return
-    // Swap source and target
-    const temp = edge.source_node_id
-    edge.source_node_id = edge.target_node_id
-    edge.target_node_id = temp
+
+    // Delete old edge and create new one with swapped source/target
+    const oldId = edge.id
+    await store.deleteEdge(oldId)
+
+    const newEdge = await store.createEdge({
+      source_node_id: edge.target_node_id,
+      target_node_id: edge.source_node_id,
+      link_type: edge.link_type,
+      label: edge.label || undefined,
+    })
+
+    // Select the new edge
+    if (newEdge) {
+      selectedEdge.value = newEdge.id
+    }
   }
 
   function isEdgeBidirectional(edgeId: string): boolean {
