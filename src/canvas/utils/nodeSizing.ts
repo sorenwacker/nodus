@@ -90,8 +90,9 @@ function measureViewModeContent(
     cardEl.style.cssText = savedCardStyle
   }
 
-  // Check for fixed-size content that needs more width
+  // Check for fixed-size content that needs more width/height
   let requiredWidth = currentWidth
+  let extraHeight = 0
   const images = contentEl.querySelectorAll('img')
   const mermaidSvgs = contentEl.querySelectorAll('.mermaid svg')
 
@@ -103,15 +104,50 @@ function measureViewModeContent(
   }
 
   for (const svg of mermaidSvgs) {
-    const svgWidth = (svg as SVGElement).getBoundingClientRect().width
+    const svgEl = svg as SVGSVGElement
+    // Get intrinsic size from viewBox or width/height attributes (not constrained by CSS max-width)
+    let svgWidth = 0
+    let svgHeight = 0
+    const viewBox = svgEl.getAttribute('viewBox')
+    if (viewBox) {
+      const parts = viewBox.split(/[\s,]+/)
+      if (parts.length >= 4) {
+        svgWidth = parseFloat(parts[2]) // viewBox width
+        svgHeight = parseFloat(parts[3]) // viewBox height
+      }
+    }
+    // Fallback to width/height attributes
+    if (!svgWidth) {
+      const widthAttr = svgEl.getAttribute('width')
+      if (widthAttr) svgWidth = parseFloat(widthAttr)
+    }
+    if (!svgHeight) {
+      const heightAttr = svgEl.getAttribute('height')
+      if (heightAttr) svgHeight = parseFloat(heightAttr)
+    }
+    // Last resort: bounding rect
+    if (!svgWidth || !svgHeight) {
+      const rect = svgEl.getBoundingClientRect()
+      if (!svgWidth) svgWidth = rect.width
+      if (!svgHeight) svgHeight = rect.height
+    }
+
     if (svgWidth > 0) {
-      requiredWidth = Math.max(requiredWidth, Math.min(svgWidth + 24, opts.maxDiagramWidth))
+      requiredWidth = Math.max(requiredWidth, Math.min(svgWidth + 40, opts.maxDiagramWidth))
+    }
+    // If SVG is being scaled down, calculate the actual height it needs at full width
+    if (svgWidth > 0 && svgHeight > 0) {
+      const currentRect = svgEl.getBoundingClientRect()
+      if (currentRect.height < svgHeight) {
+        // SVG is constrained - add the difference to extraHeight
+        extraHeight += svgHeight - currentRect.height + 20
+      }
     }
   }
 
   return {
     width: Math.max(requiredWidth, opts.minWidth),
-    height: Math.min(opts.maxHeight, Math.max(contentScrollHeight + headerHeight + border, opts.minHeight)),
+    height: Math.min(opts.maxHeight, Math.max(contentScrollHeight + headerHeight + border + extraHeight, opts.minHeight)),
   }
 }
 
