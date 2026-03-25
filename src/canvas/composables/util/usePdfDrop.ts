@@ -472,9 +472,13 @@ ${rawText}`
 
         for (const path of paths) {
           const dropY = canvasPos.y + offsetY
+          const lowerPath = path.toLowerCase()
           console.log('[FileDrop] Processing file:', path)
+          console.log('[FileDrop] Lower path:', lowerPath)
+          console.log('[FileDrop] Is PDF?', lowerPath.endsWith('.pdf'))
+          console.log('[FileDrop] Is Ontology?', isOntologyFile(path))
 
-          if (path.toLowerCase().endsWith('.pdf')) {
+          if (lowerPath.endsWith('.pdf')) {
             await processPdfDrop(path, canvasPos.x, dropY)
             offsetY += FILE_SPACING
           } else if (isOntologyFile(path)) {
