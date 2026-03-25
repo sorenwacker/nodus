@@ -1481,9 +1481,28 @@ async function fitSelectedNodes() {
   // so they're guaranteed to be in the DOM when zoomed in
   if (store.selectedNodeIds.length === 0) return
 
+  // Capture old sizes for undo
+  const oldSizes = new Map<string, { width: number; height: number; x: number; y: number }>()
+  for (const nodeId of store.selectedNodeIds) {
+    const node = store.getNode(nodeId)
+    if (node) {
+      oldSizes.set(nodeId, {
+        width: node.width || NODE_DEFAULTS.WIDTH,
+        height: node.height || NODE_DEFAULTS.HEIGHT,
+        x: node.canvas_x,
+        y: node.canvas_y,
+      })
+    }
+  }
+
   // Fit all selected nodes to their content sequentially
   for (const nodeId of store.selectedNodeIds) {
     await fitNodeNow(nodeId)
+  }
+
+  // Push undo if any sizes were captured
+  if (oldSizes.size > 0) {
+    pushSizeUndo(oldSizes)
   }
 }
 

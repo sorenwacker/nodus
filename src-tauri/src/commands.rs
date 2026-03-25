@@ -2018,12 +2018,18 @@ pub async fn import_ontology(
 
     let total_entities = ontology_data.classes.len() + ontology_data.individuals.len();
     println!(
-        "Parsed ontology: {} individuals, {} object properties, {} classes ({} total)",
+        "Parsed ontology: {} individuals, {} object properties, {} classes, {} subclass relations, {} property defs ({} total)",
         ontology_data.individuals.len(),
         ontology_data.object_properties.len(),
         ontology_data.classes.len(),
+        ontology_data.subclass_relations.len(),
+        ontology_data.property_definitions.len(),
         total_entities
     );
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    println!("DEBUG: About to check layout...");
+    let _ = std::io::stdout().flush();
 
     // Force grid layout for large ontologies (hierarchical is too slow)
     let layout = if total_entities > 500 {
@@ -2037,15 +2043,35 @@ pub async fn import_ontology(
     };
 
     // Transform to nodes and edges
+    println!("DEBUG: Creating TransformOptions with layout={:?}", layout);
+    let _ = std::io::stdout().flush();
+
     let options = TransformOptions {
         create_class_nodes: input.create_class_nodes,
         create_individual_nodes: input.create_individual_nodes,
-        workspace_id: input.workspace_id,
+        workspace_id: input.workspace_id.clone(),
         layout,
         ..Default::default()
     };
 
+    println!("DEBUG: Calling transform_to_nodus...");
+    let _ = std::io::stdout().flush();
+
     let result = transform_to_nodus(&ontology_data, &options);
+
+    println!("DEBUG: transform_to_nodus returned");
+    let _ = std::io::stdout().flush();
+
+    println!(
+        "Transform result: {} nodes, {} edges, {} class nodes",
+        result.nodes.len(),
+        result.edges.len(),
+        result.class_nodes_created
+    );
+    println!(
+        "Options: create_class_nodes={}, create_individual_nodes={}, workspace_id={:?}",
+        options.create_class_nodes, options.create_individual_nodes, options.workspace_id
+    );
 
     // Save nodes to database
     let pool = database::get_pool().map_err(|e| e.to_string())?;

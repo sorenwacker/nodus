@@ -417,28 +417,33 @@ fn apply_hierarchical_layout(nodes: &mut [Node], edges: &[Edge], start_x: f64, s
         .map(|n| n.id.clone())
         .collect();
 
-    // Assign layers using BFS
+    // Assign layers using BFS with cycle detection
     let mut layers: HashMap<String, usize> = HashMap::new();
     let mut queue: VecDeque<(String, usize)> = VecDeque::new();
+    let mut visited: HashSet<String> = HashSet::new();
+    let max_depth = 100; // Prevent infinite loops
 
     for root in &roots {
         queue.push_back((root.clone(), 0));
     }
 
     while let Some((id, layer)) = queue.pop_front() {
-        if layers.contains_key(&id) {
-            // Update to deeper layer if found via longer path
-            if layer > *layers.get(&id).unwrap() {
-                layers.insert(id.clone(), layer);
-            } else {
-                continue;
-            }
-        } else {
+        // Skip if already visited or too deep (cycle protection)
+        if visited.contains(&id) || layer > max_depth {
+            continue;
+        }
+        visited.insert(id.clone());
+
+        // Update layer (keep max depth for node)
+        let current_layer = layers.get(&id).copied().unwrap_or(0);
+        if layer > current_layer {
             layers.insert(id.clone(), layer);
         }
 
         for child in children.get(&id).unwrap_or(&Vec::new()) {
-            queue.push_back((child.clone(), layer + 1));
+            if !visited.contains(child) {
+                queue.push_back((child.clone(), layer + 1));
+            }
         }
     }
 
