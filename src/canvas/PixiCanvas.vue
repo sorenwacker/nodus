@@ -870,8 +870,8 @@ const llmTools = useLLMTools({
   llmQueue,
   callOllama,
   store: {
-    filteredNodes: store.filteredNodes,
-    filteredEdges: store.filteredEdges,
+    getFilteredNodes: () => store.filteredNodes,
+    getFilteredEdges: () => store.filteredEdges,
     updateNodeContent: store.updateNodeContent,
     updateNodePosition: store.updateNodePosition,
     updateNodeColor: store.updateNodeColor,

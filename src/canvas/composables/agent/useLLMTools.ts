@@ -30,10 +30,11 @@ export interface LLMToolsEdge {
 
 /**
  * Node store interface for LLM tools
+ * Uses getter functions for reactive data to ensure fresh values
  */
 export interface LLMToolsNodeStore {
-  filteredNodes: Node[]
-  filteredEdges?: LLMToolsEdge[]
+  getFilteredNodes: () => Node[]
+  getFilteredEdges: () => LLMToolsEdge[]
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
   updateNodeColor: (id: string, color: string) => Promise<void>
@@ -124,7 +125,7 @@ export function useLLMTools(ctx: LLMToolsContext) {
   ): Promise<string | null> {
     switch (name) {
       case 'for_each_node': {
-        let nodes = [...store.filteredNodes]
+        let nodes = [...store.getFilteredNodes()]
         const filter = (args.filter as string) || 'all'
         if (filter === 'empty') {
           nodes = nodes.filter((n) => !n.markdown_content?.trim())
@@ -192,7 +193,7 @@ export function useLLMTools(ctx: LLMToolsContext) {
       }
 
       case 'smart_move': {
-        const nodes = store.filteredNodes
+        const nodes = store.getFilteredNodes()
         if (nodes.length === 0) return 'No nodes to move'
         const instruction = (args.instruction as string) || ''
         log(`> Smart move: ${nodes.length} nodes`)
@@ -238,7 +239,7 @@ export function useLLMTools(ctx: LLMToolsContext) {
       }
 
       case 'smart_connect': {
-        const nodes = store.filteredNodes
+        const nodes = store.getFilteredNodes()
         if (nodes.length < 2) return 'Need at least 2 nodes'
         const groupsArg = (args.groups as string) || ''
         log(`> Smart connect: ${nodes.length} nodes`)
@@ -274,7 +275,7 @@ export function useLLMTools(ctx: LLMToolsContext) {
       }
 
       case 'smart_color': {
-        const nodes = store.filteredNodes
+        const nodes = store.getFilteredNodes()
         if (nodes.length === 0) return 'No nodes to color'
         const instruction = (args.instruction as string) || ''
         log(`> Smart color: ${nodes.length} nodes`)
@@ -317,7 +318,7 @@ Output ONLY the JSON array:`
         const color = (args.color as string) || '#ef4444'
         if (!pattern) return 'Pattern required'
 
-        const nodes = store.filteredNodes
+        const nodes = store.getFilteredNodes()
         let colored = 0
         const matchedTitles: string[] = []
         for (const node of nodes) {
@@ -334,10 +335,10 @@ Output ONLY the JSON array:`
       }
 
       case 'reset_edge_colors': {
-        if (!store.filteredEdges || !store.updateEdgeColor) {
+        if (!store.updateEdgeColor) {
           return 'Edge operations not available'
         }
-        const edges = store.filteredEdges
+        const edges = store.getFilteredEdges()
         let reset = 0
         for (const edge of edges) {
           if (edge.color) {
@@ -649,7 +650,7 @@ Apply the changes and output the complete updated YAML. Output ONLY the YAML, no
         log(`> Researching: ${query}`)
 
         try {
-          const results = await quickResearch(query, store.filteredNodes, sources)
+          const results = await quickResearch(query, store.getFilteredNodes(), sources)
           return results
         } catch (e) {
           return `Research failed: ${e}`
