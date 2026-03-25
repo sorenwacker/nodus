@@ -184,9 +184,12 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     return '#1a1a1a' // Black for light themes (visibility)
   })
 
-  // Node colors - use neon colors for all themes
+  // Node colors - use appropriate colors for theme
   const nodeColors = computed(() => {
-    return cyberNodeColors
+    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black' || currentTheme.value === 'cyber') {
+      return cyberNodeColors
+    }
+    return defaultNodeColors
   })
 
   // All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
