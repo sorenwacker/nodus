@@ -39,6 +39,9 @@ export interface UseCanvasKeyboardShortcutsContext {
   // Workspace
   refreshFromFiles: () => void
   exportGraphAsYaml: () => void
+
+  // Search
+  showSearch: () => void
 }
 
 export interface UseCanvasKeyboardShortcutsReturn {
@@ -67,6 +70,7 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     decreaseFontScale,
     refreshFromFiles,
     exportGraphAsYaml,
+    showSearch,
   } = ctx
 
   function handleKeydown(e: KeyboardEvent) {
@@ -81,6 +85,13 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     if ((e.key === 'e' || e.key === 'E') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault()
       exportGraphAsYaml()
+      return
+    }
+
+    // Cmd+F opens node search (works even in inputs)
+    if ((e.key === 'f' || e.key === 'F') && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      showSearch()
       return
     }
 

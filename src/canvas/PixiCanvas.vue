@@ -430,6 +430,29 @@ onMounted(() => {
 // Help modal
 const showHelpModal = ref(false)
 
+// Search modal
+const showSearchModal = ref(false)
+const searchQuery = ref('')
+
+const searchResults = computed(() => {
+  if (!searchQuery.value.trim()) return []
+  const q = searchQuery.value.toLowerCase()
+  return store.filteredNodes.filter(n =>
+    n.title.toLowerCase().includes(q) ||
+    (n.markdown_content && n.markdown_content.toLowerCase().includes(q))
+  ).slice(0, 20) // Limit to 20 results
+})
+
+function showSearch() {
+  showSearchModal.value = true
+  searchQuery.value = ''
+}
+
+function searchNavigateToNode(nodeId: string) {
+  showSearchModal.value = false
+  navigateToNode(nodeId)
+}
+
 // Only render nodes visible within magnifier viewport for performance
 const magnifierVisibleNodes = computed(() => {
   if (!shouldShowMagnifier.value) return []
@@ -1640,6 +1663,7 @@ useCanvasKeyboardShortcuts({
   decreaseFontScale,
   refreshFromFiles,
   exportGraphAsYaml,
+  showSearch,
 })
 </script>
 
@@ -1873,6 +1897,37 @@ useCanvasKeyboardShortcuts({
 
     <!-- Help Modal -->
     <KeyboardShortcutsModal :show="showHelpModal" @close="showHelpModal = false" />
+
+    <!-- Search Modal -->
+    <div v-if="showSearchModal" class="search-modal-overlay" @click="showSearchModal = false">
+      <div class="search-modal" @click.stop>
+        <input
+          v-model="searchQuery"
+          type="text"
+          class="search-input"
+          :placeholder="t('canvas.search.placeholder')"
+          autofocus
+          @keydown.escape="showSearchModal = false"
+          @keydown.enter="searchResults.length > 0 && searchNavigateToNode(searchResults[0].id)"
+        />
+        <div v-if="searchResults.length > 0" class="search-results">
+          <button
+            v-for="node in searchResults"
+            :key="node.id"
+            class="search-result-item"
+            @click="searchNavigateToNode(node.id)"
+          >
+            <span class="result-title">{{ node.title }}</span>
+            <span v-if="node.markdown_content" class="result-preview">
+              {{ node.markdown_content.slice(0, 80) }}{{ node.markdown_content.length > 80 ? '...' : '' }}
+            </span>
+          </button>
+        </div>
+        <div v-else-if="searchQuery.trim()" class="search-empty">
+          {{ t('canvas.search.noResults') }}
+        </div>
+      </div>
+    </div>
 
     <!-- Status Bar -->
     <CanvasStatusBar

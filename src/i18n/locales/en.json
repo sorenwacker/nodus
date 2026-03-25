@@ -78,6 +78,10 @@
       "hop": "hop",
       "hops": "hops",
       "help": "Help - Keyboard shortcuts and usage"
+    },
+    "search": {
+      "placeholder": "Search nodes...",
+      "noResults": "No matching nodes found"
     }
   },
   "llm": {
