@@ -53,6 +53,7 @@ const exploreMode: AgentModeConfig = {
     // Coloring
     'smart_color',
     'color_matching',
+    'reset_edge_colors',
     // Batch operations
     'for_each_node',
     'batch_update',
@@ -116,6 +117,7 @@ const planMode: AgentModeConfig = {
     // Coloring
     'smart_color',
     'color_matching',
+    'reset_edge_colors',
     // Batch operations
     'for_each_node',
     'batch_update',
@@ -179,6 +181,7 @@ const executeMode: AgentModeConfig = {
     'smart_connect',
     'smart_color',
     'color_matching',
+    'reset_edge_colors',
     'web_search',
     'research',
     'deep_research',

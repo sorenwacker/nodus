@@ -22,8 +22,7 @@ export interface PendingBibImport {
   y: number
 }
 
-const CHUNK_SIZE = 3000 // Characters per chunk for LLM processing (smaller = faster LLM responses)
-const NODE_SPACING = 350 // Vertical spacing between nodes
+const MAX_CLEANUP_SIZE = 15000 // Max characters to send to LLM for cleanup
 const MAX_FILENAME_LENGTH = 100
 
 /**
@@ -146,121 +145,68 @@ ${rawText}`
     isProcessing.value = true
     processingStatus.value = 'Extracting text...'
 
-    // Create loading node
-    const loadingNode = await store.createNode({
-      title: 'Processing PDF...',
-      node_type: 'note',
-      markdown_content: '_Extracting text..._',
-      canvas_x: x,
-      canvas_y: y,
-    })
-    lastImportNodeIds.push(loadingNode.id)
-
     try {
       // Extract text from PDF
       const rawText = await extractPdfText(filePath)
 
       if (aborted) {
-        await store.updateNodeContent(loadingNode.id, '_Processing stopped_')
         return
       }
 
       if (!rawText.trim()) {
-        await store.updateNodeContent(loadingNode.id, '_PDF has no extractable text (may be image-only)_')
-        await store.updateNodeTitle(loadingNode.id, 'Empty PDF')
+        const emptyNode = await store.createNode({
+          title: filename,
+          node_type: 'note',
+          markdown_content: '_PDF has no extractable text (may be image-only)_',
+          canvas_x: x,
+          canvas_y: y,
+        })
+        lastImportNodeIds.push(emptyNode.id)
         return
       }
 
-      // Calculate chunks needed
-      const chunks: string[] = []
-      for (let i = 0; i < rawText.length; i += CHUNK_SIZE) {
-        chunks.push(rawText.slice(i, i + CHUNK_SIZE))
+      // Create a single node with loading state
+      const loadingNode = await store.createNode({
+        title: 'Processing PDF...',
+        node_type: 'note',
+        markdown_content: '_Cleaning up text with AI..._',
+        canvas_x: x,
+        canvas_y: y,
+      })
+      lastImportNodeIds.push(loadingNode.id)
+
+      processingStatus.value = 'Cleaning up text...'
+
+      // Clean up text with AI (truncate if too long for LLM)
+      let cleanedText: string
+      if (rawText.length <= MAX_CLEANUP_SIZE) {
+        cleanedText = await cleanupChunk(rawText, true)
+      } else {
+        // For large PDFs, clean up the first part and keep the rest raw
+        const firstPart = await cleanupChunk(rawText.slice(0, MAX_CLEANUP_SIZE), true)
+        const remainingText = rawText.slice(MAX_CLEANUP_SIZE)
+        cleanedText = firstPart + '\n\n---\n\n' + remainingText
       }
 
-      // Single chunk - process directly
-      if (chunks.length === 1) {
-        await store.updateNodeContent(loadingNode.id, '_Cleaning up text with AI..._')
-        const cleanedText = await cleanupChunk(chunks[0], true)
+      // Extract title from cleaned text or use filename
+      const headingMatch = cleanedText.match(/^#\s+(.+)$/m)
+      const title = headingMatch ? headingMatch[1] : filename
 
-        const headingMatch = cleanedText.match(/^#\s+(.+)$/m)
-        const title = headingMatch ? headingMatch[1] : filename
-
-        await store.updateNodeTitle(loadingNode.id, title)
-        await store.updateNodeContent(loadingNode.id, cleanedText)
-        return
-      }
-
-      // Multiple chunks - create multiple nodes
-      processingStatus.value = `Processing ${chunks.length} sections...`
-      await store.updateNodeContent(loadingNode.id, `_Processing ${chunks.length} sections..._`)
-
-      let currentY = y
-      const nodeIds: string[] = []
-
-      for (let i = 0; i < chunks.length; i++) {
-        // Check for abort
-        if (aborted) {
-          processingStatus.value = ''
-          return
-        }
-
-        processingStatus.value = `Section ${i + 1}/${chunks.length}`
-        const isFirst = i === 0
-        let nodeId: string
-
-        try {
-          if (isFirst) {
-            nodeId = loadingNode.id
-          } else {
-            const newNode = await store.createNode({
-              title: `${filename} (${i + 1}/${chunks.length})`,
-              node_type: 'note',
-              markdown_content: `_Processing section ${i + 1}..._`,
-              canvas_x: x,
-              canvas_y: currentY,
-            })
-            nodeId = newNode.id
-            lastImportNodeIds.push(nodeId)
-          }
-
-          nodeIds.push(nodeId)
-
-          if (!isFirst) currentY += NODE_SPACING
-
-          const cleanedText = await cleanupChunk(chunks[i], isFirst)
-
-          if (isFirst) {
-            const headingMatch = cleanedText.match(/^#\s+(.+)$/m)
-            const title = headingMatch ? headingMatch[1] : filename
-            await store.updateNodeTitle(nodeId, `${title} (1/${chunks.length})`)
-          }
-
-          await store.updateNodeContent(nodeId, cleanedText)
-
-          // Connect to previous node
-          if (i > 0 && nodeIds.length >= 2) {
-            await store.createEdge({
-              source_node_id: nodeIds[i - 1],
-              target_node_id: nodeId,
-              link_type: 'related',
-            })
-          }
-        } catch (err) {
-          // On error, keep raw text so user doesn't lose content
-          if (nodeId!) {
-            await store.updateNodeContent(nodeId, `_Section ${i + 1} failed: ${err}. Raw text:_\n\n${chunks[i]}`)
-          }
-        }
-      }
+      await store.updateNodeTitle(loadingNode.id, title)
+      await store.updateNodeContent(loadingNode.id, cleanedText)
 
     } catch (error) {
-      // Only update first node on fatal errors (like PDF extraction failing)
-      await store.updateNodeContent(loadingNode.id, `Error: ${error}`)
-      await store.updateNodeTitle(loadingNode.id, 'PDF Error')
+      const errorNode = await store.createNode({
+        title: 'PDF Error',
+        node_type: 'note',
+        markdown_content: `Error importing PDF: ${error}`,
+        canvas_x: x,
+        canvas_y: y,
+      })
+      lastImportNodeIds.push(errorNode.id)
     } finally {
       isProcessing.value = false
       processingStatus.value = ''
-      // Push to undo stack if any nodes were created
       if (lastImportNodeIds.length > 0 && pushCreationUndo) {
         pushCreationUndo(lastImportNodeIds)
       }

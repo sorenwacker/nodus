@@ -662,7 +662,7 @@ const isLayouting = ref(false)
 async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid') {
   isLayouting.value = true
   const frameId = store.selectedFrameId
-  console.log(`[LAYOUT] Starting ${type} layout...`, frameId ? `(frame: ${frameId})` : '(canvas)')
+  console.log(`[LAYOUT] autoLayoutNodes called, type=${type}, store.selectedFrameId=${store.selectedFrameId}, frameId=${frameId}`)
   try {
     // If force layout and a frame is selected, use the frame-aware layoutNodes
     if (type === 'force' && frameId) {
@@ -839,9 +839,11 @@ const llmTools = useLLMTools({
   callOllama,
   store: {
     filteredNodes: store.filteredNodes,
+    filteredEdges: store.filteredEdges,
     updateNodeContent: store.updateNodeContent,
     updateNodePosition: store.updateNodePosition,
     updateNodeColor: store.updateNodeColor,
+    updateEdgeColor: store.updateEdgeColor,
     createEdge: store.createEdge,
     currentWorkspaceId: store.currentWorkspaceId,
   },
@@ -1367,7 +1369,6 @@ const {
   selectedColor,
   nodeColors,
   allMarkerColors,
-  frameColors,
   cycleEdgeStyle,
   getEdgeStyle,
   setEdgeStyle,
@@ -1425,6 +1426,12 @@ function updateSelectedNodesColor(color: string | null) {
   // Apply color to all selected nodes
   for (const nodeId of store.selectedNodeIds) {
     store.updateNodeColor(nodeId, color)
+  }
+}
+
+function updateSelectedFrameColor(color: string | null) {
+  if (store.selectedFrameId) {
+    store.updateFrameColor(store.selectedFrameId, color)
   }
 }
 
@@ -1659,9 +1666,9 @@ useCanvasKeyboardShortcuts({
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
     >
-      <!-- Floating color bar (shown when nodes are selected) -->
+      <!-- Floating color bar (shown when nodes or frame is selected) -->
       <div
-        v-if="store.selectedNodeIds.length > 0"
+        v-if="store.selectedNodeIds.length > 0 || store.selectedFrameId"
         class="collapsed-color-bar"
         @pointerdown.stop
         @click.stop
@@ -1670,12 +1677,17 @@ useCanvasKeyboardShortcuts({
           v-for="color in nodeColors"
           :key="color.value || 'default'"
           class="color-dot"
-          :class="{ active: store.selectedNodeIds.every(id => store.filteredNodes.find(n => n.id === id)?.color_theme === color.value) }"
+          :class="{
+            active: store.selectedFrameId
+              ? store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color === color.value
+              : store.selectedNodeIds.every(id => store.filteredNodes.find(n => n.id === id)?.color_theme === color.value)
+          }"
           :style="{ background: color.display || 'var(--bg-surface)' }"
-          @click.stop="updateSelectedNodesColor(color.value)"
+          @click.stop="store.selectedFrameId ? updateSelectedFrameColor(color.value) : updateSelectedNodesColor(color.value)"
         ></button>
-        <span class="color-bar-sep"></span>
+        <span v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId" class="color-bar-sep"></span>
         <button
+          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
           class="autofit-toggle"
           :title="t('canvas.node.fitContent')"
           @click.stop="fitSelectedNodes"
@@ -1708,13 +1720,11 @@ useCanvasKeyboardShortcuts({
         :edit-frame-title="editFrameTitle"
         :frame-border-width="frameBorderWidth"
         :scale="scale"
-        :frame-colors="frameColors"
         @update:edit-frame-title="editFrameTitle = $event"
         @pointerdown="onFramePointerDown"
         @dblclick="startEditingFrameTitle"
         @save-title="saveFrameTitleEditing"
         @cancel-title="cancelFrameTitleEditing"
-        @update-color="store.updateFrameColor"
         @delete="deleteSelectedFrame"
         @start-resize="startFrameResize"
       />

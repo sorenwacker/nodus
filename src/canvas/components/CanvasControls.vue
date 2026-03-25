@@ -45,7 +45,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="zoom-controls" @mousedown.stop>
+  <div class="zoom-controls" @mousedown.stop @pointerdown.stop>
     <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.zoomIn')" @click="emit('zoomIn')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19" />

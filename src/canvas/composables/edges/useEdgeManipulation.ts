@@ -40,23 +40,39 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     document.removeEventListener('pointermove', onEdgePreviewMove)
     document.removeEventListener('pointerup', onEdgeCreate)
 
+    console.log('[EdgeCreate] onEdgeCreate called')
+    console.log('[EdgeCreate] edgeStartNode.value:', edgeStartNode.value)
+
     if (!edgeStartNode.value) {
+      console.warn('[EdgeCreate] No start node, aborting')
       isCreatingEdge.value = false
       return
     }
 
     // Find node under cursor using DOM hit testing
     const target = document.elementFromPoint(e.clientX, e.clientY)
+    console.log('[EdgeCreate] Element under cursor:', target?.tagName, target?.className)
     const nodeCard = target?.closest('.node-card') as HTMLElement | null
+    console.log('[EdgeCreate] Node card found:', !!nodeCard, nodeCard?.dataset.nodeId)
     const targetNodeId = nodeCard?.dataset.nodeId
-    const finalTarget = targetNodeId ? store.filteredNodes.find((n) => n.id === targetNodeId) : null
+    // Check both filteredNodes and use getNode as fallback (handles edge cases)
+    let finalTarget = targetNodeId ? store.filteredNodes.find((n) => n.id === targetNodeId) : null
+    if (!finalTarget && targetNodeId) {
+      // Fallback: the node card exists in DOM, so get it directly
+      finalTarget = store.getNode(targetNodeId)
+      console.log('[EdgeCreate] Using getNode fallback:', finalTarget?.id)
+    }
+    console.log('[EdgeCreate] Final target:', finalTarget?.id, finalTarget?.title)
 
     if (finalTarget && finalTarget.id !== edgeStartNode.value) {
+      console.log('[EdgeCreate] Creating edge from', edgeStartNode.value, 'to', finalTarget.id)
       store.createEdge({
         source_node_id: edgeStartNode.value,
         target_node_id: finalTarget.id,
         link_type: 'related',
       })
+    } else {
+      console.log('[EdgeCreate] No valid target or same as source')
     }
 
     isCreatingEdge.value = false

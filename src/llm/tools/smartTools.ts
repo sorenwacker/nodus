@@ -72,4 +72,18 @@ export function registerSmartTools(): void {
     },
     { category: 'smart' }
   )
+
+  defineTool<Record<string, never>>(
+    'reset_edge_colors',
+    'Reset all edge colors to default. Removes custom colors from all edges.',
+    {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:reset_edge_colors`
+    },
+    { category: 'smart' }
+  )
 }

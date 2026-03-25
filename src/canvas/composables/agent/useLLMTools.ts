@@ -19,13 +19,25 @@ export interface LLMQueueInterface {
 }
 
 /**
+ * Edge interface for LLM tools
+ */
+export interface LLMToolsEdge {
+  id: string
+  source_node_id: string
+  target_node_id: string
+  color?: string | null
+}
+
+/**
  * Node store interface for LLM tools
  */
 export interface LLMToolsNodeStore {
   filteredNodes: Node[]
+  filteredEdges?: LLMToolsEdge[]
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
   updateNodeColor: (id: string, color: string) => Promise<void>
+  updateEdgeColor?: (id: string, color: string | null) => Promise<void>
   createEdge: (data: {
     source_node_id: string
     target_node_id: string
@@ -319,6 +331,21 @@ Output ONLY the JSON array:`
         }
         const preview = matchedTitles.slice(0, 5).join(', ')
         return `Colored ${colored}/${nodes.length} nodes matching "${pattern}": ${preview}${colored > 5 ? '...' : ''}`
+      }
+
+      case 'reset_edge_colors': {
+        if (!store.filteredEdges || !store.updateEdgeColor) {
+          return 'Edge operations not available'
+        }
+        const edges = store.filteredEdges
+        let reset = 0
+        for (const edge of edges) {
+          if (edge.color) {
+            await store.updateEdgeColor(edge.id, null)
+            reset++
+          }
+        }
+        return `Reset ${reset}/${edges.length} edge colors to default`
       }
 
       case 'web_search': {

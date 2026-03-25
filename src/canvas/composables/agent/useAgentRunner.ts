@@ -218,7 +218,8 @@ TOOLS:
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}].
 - smart_move(instruction): Move nodes by semantic criteria.
 - smart_color(instruction): Color nodes by semantic criteria.
-- color_matching(pattern, color): Fast grep-style coloring.
+- color_matching(pattern, color): Fast grep-style node coloring.
+- reset_edge_colors(): Reset all edge colors to default.
 - smart_connect(groups): Connect nodes within groups.
 - research(query, sources?): Research topic across web + local nodes. sources=["local","web","wikipedia"]
 - create_plan(title, steps): Create a plan for user approval. steps=[{description, details?}]

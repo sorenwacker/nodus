@@ -11,19 +11,47 @@ defineProps<{
   editFrameTitle: string
   frameBorderWidth: number
   scale: number
-  frameColors: Array<{ value: string | null; label: string }>
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'update:editFrameTitle', value: string): void
   (e: 'pointerdown', event: PointerEvent, frameId: string): void
   (e: 'dblclick', frameId: string): void
   (e: 'save-title'): void
   (e: 'cancel-title'): void
-  (e: 'update-color', frameId: string, color: string | null): void
   (e: 'delete'): void
   (e: 'start-resize', event: PointerEvent, frameId: string, direction: string): void
 }>()
+
+function handleFrameBorderPointerDown(event: PointerEvent, frameId: string) {
+  // Check if there's a node at the click position
+  const elementsAtPoint = document.elementsFromPoint(event.clientX, event.clientY)
+  const nodeAtPoint = elementsAtPoint.find(el => el.classList.contains('node-card')) as HTMLElement | undefined
+  if (nodeAtPoint) {
+    // Forward the event to the node - create a new event and dispatch it
+    const newEvent = new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      button: event.button,
+      buttons: event.buttons,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+      metaKey: event.metaKey,
+    })
+    nodeAtPoint.dispatchEvent(newEvent)
+    event.stopPropagation()
+    return
+  }
+  // We're handling this - stop propagation to prevent canvas pan
+  event.stopPropagation()
+  console.log('[CanvasFrames] Frame pointerdown:', frameId)
+  emit('pointerdown', event, frameId)
+}
 </script>
 
 <template>
@@ -36,11 +64,11 @@ defineEmits<{
       transform: `translate(${frame.canvas_x}px, ${frame.canvas_y}px)`,
       width: frame.width + 'px',
       height: frame.height + 'px',
-      borderColor: frame.color || 'var(--border-default)',
-      borderWidth: frameBorderWidth + 'px',
-      borderStyle: 'dashed',
+      borderColor: frame.color || 'var(--border-subtle)',
+      borderWidth: '1.5px',
+      backgroundColor: frame.color ? frame.color + '30' : 'rgba(128, 128, 128, 0.08)',
     }"
-    @pointerdown.stop="$emit('pointerdown', $event, frame.id)"
+    @pointerdown="handleFrameBorderPointerDown($event, frame.id)"
     @dblclick.stop="$emit('dblclick', frame.id)"
   >
     <!-- Title label on top -->
@@ -56,7 +84,7 @@ defineEmits<{
         @click.stop
         @pointerdown.stop
       />
-      <span v-else class="frame-title" :style="{ color: frame.color || undefined, borderColor: frame.color || undefined }">{{ frame.title }}</span>
+      <span v-else class="frame-title" :style="{ borderColor: frame.color || undefined }">{{ frame.title }}</span>
     </div>
 
     <!-- Delete button top-right (like nodes) -->
@@ -69,22 +97,6 @@ defineEmits<{
       @pointerdown.stop
     ></button>
 
-    <!-- Color bar below frame -->
-    <div
-      v-if="selectedFrameId === frame.id && editingFrameId !== frame.id"
-      class="frame-color-bar"
-      :style="{ transform: `scale(${1/scale}) translateY(100%)`, transformOrigin: 'left bottom' }"
-      @pointerdown.stop
-    >
-      <button
-        v-for="color in frameColors"
-        :key="color.value || 'default'"
-        class="color-dot"
-        :class="{ active: frame.color === color.value }"
-        :style="{ backgroundColor: color.value || 'var(--border-default)' }"
-        @click.stop="$emit('update-color', frame.id, color.value)"
-      ></button>
-    </div>
 
     <!-- Resize handles - edges -->
     <div class="resize-edge resize-edge-n" @pointerdown.stop="$emit('start-resize', $event, frame.id, 'n')"></div>
@@ -104,20 +116,19 @@ defineEmits<{
   position: absolute;
   top: 0;
   left: 0;
-  border: 2px dashed var(--border-default);
+  border: 1.5px solid var(--border-subtle);
   border-radius: 12px;
-  background: rgba(128, 128, 128, 0.05);
+  background: transparent;
   pointer-events: auto;
   cursor: move;
   z-index: 0;
 }
 
 .canvas-frame.selected {
-  border-style: solid !important;
   border-color: var(--primary-color) !important;
-  border-width: 3px !important;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.2);
-  background: rgba(59, 130, 246, 0.05);
+  border-width: 2px !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25), 0 0 16px rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.06);
 }
 
 .frame-header {
@@ -131,14 +142,16 @@ defineEmits<{
 }
 
 .frame-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-surface);
-  padding: 3px 8px;
+  color: var(--text-main);
+  background: var(--bg-node);
+  padding: 4px 10px;
   border-radius: 4px;
-  border: 1.5px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   white-space: nowrap;
+  box-shadow: 0 2px 6px var(--shadow-sm);
+  opacity: 1;
 }
 
 /* Title color is set via inline style to match frame color */
@@ -195,39 +208,6 @@ defineEmits<{
 .frame-delete-btn:hover::before {
   background: var(--danger-color);
   color: white;
-}
-
-.frame-color-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  gap: 4px;
-  padding: 4px 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px var(--shadow-sm);
-  z-index: 10;
-}
-
-.color-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-default);
-  cursor: pointer;
-  padding: 0;
-}
-
-.color-dot:hover {
-  border-color: var(--text-muted);
-  transform: scale(1.1);
-}
-
-.color-dot.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
 /* Resize handles */
