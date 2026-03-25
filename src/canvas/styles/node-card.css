@@ -427,6 +427,12 @@
   border-color: var(--primary-color);
 }
 
+.autofit-toggle.disabled,
+.autofit-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .delete-node-btn {
   position: absolute;
   top: -16px;

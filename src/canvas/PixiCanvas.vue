@@ -703,27 +703,15 @@ function fitToContent() { layout.fitToContent() }
 // Auto-fit is per-node (stored on node.auto_fit)
 
 function fitNodeToContent(nodeId: string) {
-  console.log('[FIT] fitNodeToContent called for:', nodeId)
   const node = store.getNode(nodeId)
-  if (!node) {
-    console.log('[FIT] node not found')
-    return
-  }
+  if (!node) return
 
   const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`) as HTMLElement
-  if (!cardEl) {
-    console.log('[FIT] card element not found')
-    return
-  }
+  if (!cardEl) return
 
   const result = measureNodeContent(cardEl, node.width || NODE_DEFAULTS.WIDTH)
-  console.log('[FIT] measure result:', result)
-  if (!result) {
-    console.log('[FIT] measurement failed')
-    return
-  }
+  if (!result) return
 
-  console.log('[FIT] updating node size to:', result.width, 'x', result.height)
   store.updateNodeSize(nodeId, result.width, result.height)
 
   // In neighborhood mode, re-layout to adapt to new sizes
@@ -1487,27 +1475,20 @@ function updateSelectedFrameColor(color: string | null) {
 }
 
 async function fitSelectedNodes() {
-  console.log('[FIT] fitSelectedNodes called, selected:', store.selectedNodeIds.length, 'visible:', visibleNodes.value.length)
-
   // Only fit nodes that are currently visible in the viewport (in DOM)
   const visibleNodeIdSet = new Set(visibleNodes.value.map(n => n.id))
   const nodeIds = store.selectedNodeIds.filter(id => visibleNodeIdSet.has(id))
-
-  console.log('[FIT] nodes to fit:', nodeIds.length)
 
   if (nodeIds.length === 0) return
 
   // Fit all visible selected nodes to their content sequentially
   for (const nodeId of nodeIds) {
-    console.log('[FIT] fitting node:', nodeId)
     await fitNodeNow(nodeId)
   }
-  console.log('[FIT] done')
 }
 
 // One-shot fit to content (does NOT enable auto_fit)
 async function fitNodeNow(nodeId: string): Promise<void> {
-  console.log('[FIT] fitNodeNow called for:', nodeId)
   // Exit edit mode first to measure rendered view, not textarea
   const wasEditing = editingNodeId.value === nodeId
   if (wasEditing) {
@@ -1764,7 +1745,9 @@ useCanvasKeyboardShortcuts({
         <button
           v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
           class="autofit-toggle"
-          :title="t('canvas.node.fitContent')"
+          :class="{ disabled: isSemanticZoomCollapsed }"
+          :disabled="isSemanticZoomCollapsed"
+          :title="isSemanticZoomCollapsed ? 'Zoom in to fit nodes' : t('canvas.node.fitContent')"
           @click.stop="fitSelectedNodes"
         >Fit</button>
       </div>
