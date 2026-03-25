@@ -192,8 +192,11 @@ ${rawText}`
       const headingMatch = cleanedText.match(/^#\s+(.+)$/m)
       const title = headingMatch ? headingMatch[1] : filename
 
+      // Add source reference with PDF filename at the top
+      const contentWithSource = `> Source: ${filename}.pdf\n\n${cleanedText}`
+
       await store.updateNodeTitle(loadingNode.id, title)
-      await store.updateNodeContent(loadingNode.id, cleanedText)
+      await store.updateNodeContent(loadingNode.id, contentWithSource)
 
     } catch (error) {
       const errorNode = await store.createNode({
