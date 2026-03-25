@@ -58,7 +58,7 @@ export interface UseEdgeStylingReturn {
   changeEdgeColor: (color: string) => void
 }
 
-// Color palettes - neon colors for all themes
+// Color palettes - neon colors for dark themes
 const cyberEdgeColors: EdgeColorOption[] = [
   { value: '#00ffcc' }, // neon cyan (default)
   { value: '#ff00ff' }, // neon magenta
@@ -67,6 +67,17 @@ const cyberEdgeColors: EdgeColorOption[] = [
   { value: '#ff3366' }, // neon red
   { value: '#9933ff' }, // neon purple
   { value: '#00ff66' }, // neon green
+]
+
+// Light mode edge colors - darker, professional tones
+const lightEdgeColors: EdgeColorOption[] = [
+  { value: '#64748b' }, // slate gray (default)
+  { value: '#475569' }, // darker slate
+  { value: '#0369a1' }, // blue
+  { value: '#0891b2' }, // cyan
+  { value: '#059669' }, // green
+  { value: '#7c3aed' }, // purple
+  { value: '#db2777' }, // pink
 ]
 
 // Node colors for the color picker (transparent tints layered over solid bg)
@@ -146,9 +157,12 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     globalEdgeStyle.value = canvasStorage.getEdgeStyle(newId || undefined)
   })
 
-  // Reactive edge color palette - use neon colors for all themes
+  // Reactive edge color palette - neon for dark themes, professional for light
   const edgeColorPalette = computed(() => {
-    return cyberEdgeColors
+    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black' || currentTheme.value === 'cyber') {
+      return cyberEdgeColors
+    }
+    return lightEdgeColors
   })
 
   // Default edge color (first in palette)
@@ -178,8 +192,11 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   // All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
   const allMarkerColors = computed(() => {
     const colors = new Set<string>()
-    // Edge colors
-    for (const c of edgeColorPalette.value) {
+    // Edge colors (both palettes)
+    for (const c of cyberEdgeColors) {
+      if (c.value) colors.add(c.value)
+    }
+    for (const c of lightEdgeColors) {
       if (c.value) colors.add(c.value)
     }
     // Node colors (both default and cyber for highlighted edges)

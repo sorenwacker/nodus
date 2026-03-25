@@ -9,6 +9,7 @@ interface StarterTemplates {
   gettingStarted: string
   importingFiles: string
   mathReference: string
+  mermaidDemo: string
 }
 
 const templates: Record<SupportedLocale, StarterTemplates> = {
@@ -78,6 +79,45 @@ Use \`$...$\` for inline and \`$$...$$\` for display math.
 See also: [[Getting Started]]
 
 Full reference: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`,
+
+    mermaidDemo: `# Mermaid Diagrams
+
+Nodus supports Mermaid diagrams for flowcharts, sequences, and more.
+
+## Flowchart
+
+\`\`\`mermaid
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Action 1]
+    B -->|No| D[Action 2]
+    C --> E[End]
+    D --> E
+\`\`\`
+
+## Sequence Diagram
+
+\`\`\`mermaid
+sequenceDiagram
+    User->>App: Request
+    App->>Database: Query
+    Database-->>App: Result
+    App-->>User: Response
+\`\`\`
+
+## Class Diagram
+
+\`\`\`mermaid
+classDiagram
+    Node <|-- NoteNode
+    Node <|-- CitationNode
+    Node : +id
+    Node : +title
+    NoteNode : +content
+    CitationNode : +authors
+\`\`\`
+
+See [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) for full syntax.`,
   },
 
   de: {
@@ -146,6 +186,33 @@ Verwende \`$...$\` fur Inline- und \`$$...$$\` fur Block-Formeln.
 Siehe auch: [[Erste Schritte mit Nodus]]
 
 Vollstandige Referenz: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`,
+
+    mermaidDemo: `# Mermaid-Diagramme
+
+Nodus unterstutzt Mermaid-Diagramme fur Flussdiagramme, Sequenzen und mehr.
+
+## Flussdiagramm
+
+\`\`\`mermaid
+graph TD
+    A[Start] --> B{Entscheidung}
+    B -->|Ja| C[Aktion 1]
+    B -->|Nein| D[Aktion 2]
+    C --> E[Ende]
+    D --> E
+\`\`\`
+
+## Sequenzdiagramm
+
+\`\`\`mermaid
+sequenceDiagram
+    Benutzer->>App: Anfrage
+    App->>Datenbank: Abfrage
+    Datenbank-->>App: Ergebnis
+    App-->>Benutzer: Antwort
+\`\`\`
+
+Siehe [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) fur vollstandige Syntax.`,
   },
 
   fr: {
@@ -214,6 +281,33 @@ Utilisez \`$...$\` pour inline et \`$$...$$\` pour les blocs.
 Voir aussi: [[Premiers pas avec Nodus]]
 
 Reference complete: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`,
+
+    mermaidDemo: `# Diagrammes Mermaid
+
+Nodus supporte les diagrammes Mermaid pour les organigrammes, sequences et plus.
+
+## Organigramme
+
+\`\`\`mermaid
+graph TD
+    A[Debut] --> B{Decision}
+    B -->|Oui| C[Action 1]
+    B -->|Non| D[Action 2]
+    C --> E[Fin]
+    D --> E
+\`\`\`
+
+## Diagramme de sequence
+
+\`\`\`mermaid
+sequenceDiagram
+    Utilisateur->>App: Requete
+    App->>Base: Requete
+    Base-->>App: Resultat
+    App-->>Utilisateur: Reponse
+\`\`\`
+
+Voir [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) pour la syntaxe complete.`,
   },
 
   es: {
@@ -282,6 +376,33 @@ Usa \`$...$\` para inline y \`$$...$$\` para bloques.
 Ver tambien: [[Primeros pasos con Nodus]]
 
 Referencia completa: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`,
+
+    mermaidDemo: `# Diagramas Mermaid
+
+Nodus soporta diagramas Mermaid para diagramas de flujo, secuencias y mas.
+
+## Diagrama de flujo
+
+\`\`\`mermaid
+graph TD
+    A[Inicio] --> B{Decision}
+    B -->|Si| C[Accion 1]
+    B -->|No| D[Accion 2]
+    C --> E[Fin]
+    D --> E
+\`\`\`
+
+## Diagrama de secuencia
+
+\`\`\`mermaid
+sequenceDiagram
+    Usuario->>App: Solicitud
+    App->>Base: Consulta
+    Base-->>App: Resultado
+    App-->>Usuario: Respuesta
+\`\`\`
+
+Ver [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) para sintaxis completa.`,
   },
 
   it: {
@@ -350,6 +471,33 @@ Usa \`$...$\` per inline e \`$$...$$\` per blocchi.
 Vedi anche: [[Primi passi con Nodus]]
 
 Riferimento completo: [typst.app/docs/reference/math](https://typst.app/docs/reference/math/)`,
+
+    mermaidDemo: `# Diagrammi Mermaid
+
+Nodus supporta i diagrammi Mermaid per diagrammi di flusso, sequenze e altro.
+
+## Diagramma di flusso
+
+\`\`\`mermaid
+graph TD
+    A[Inizio] --> B{Decisione}
+    B -->|Si| C[Azione 1]
+    B -->|No| D[Azione 2]
+    C --> E[Fine]
+    D --> E
+\`\`\`
+
+## Diagramma di sequenza
+
+\`\`\`mermaid
+sequenceDiagram
+    Utente->>App: Richiesta
+    App->>Database: Query
+    Database-->>App: Risultato
+    App-->>Utente: Risposta
+\`\`\`
+
+Vedi [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) per la sintassi completa.`,
   },
 }
 
@@ -364,13 +512,13 @@ export function getStarterTemplates(locale: string): StarterTemplates {
 /**
  * Get localized node titles
  */
-export function getStarterTitles(locale: string): { gettingStarted: string; importingFiles: string; mathReference: string } {
-  const titles: Record<SupportedLocale, { gettingStarted: string; importingFiles: string; mathReference: string }> = {
-    en: { gettingStarted: 'Getting Started', importingFiles: 'Importing Files', mathReference: 'Typst Math Reference' },
-    de: { gettingStarted: 'Erste Schritte mit Nodus', importingFiles: 'Dateien importieren', mathReference: 'Typst Mathe-Referenz' },
-    fr: { gettingStarted: 'Premiers pas avec Nodus', importingFiles: 'Importer des fichiers', mathReference: 'Reference Typst Math' },
-    es: { gettingStarted: 'Primeros pasos con Nodus', importingFiles: 'Importar archivos', mathReference: 'Referencia Typst Math' },
-    it: { gettingStarted: 'Primi passi con Nodus', importingFiles: 'Importare file', mathReference: 'Riferimento Typst Math' },
+export function getStarterTitles(locale: string): { gettingStarted: string; importingFiles: string; mathReference: string; mermaidDemo: string } {
+  const titles: Record<SupportedLocale, { gettingStarted: string; importingFiles: string; mathReference: string; mermaidDemo: string }> = {
+    en: { gettingStarted: 'Getting Started', importingFiles: 'Importing Files', mathReference: 'Typst Math Reference', mermaidDemo: 'Mermaid Diagrams' },
+    de: { gettingStarted: 'Erste Schritte mit Nodus', importingFiles: 'Dateien importieren', mathReference: 'Typst Mathe-Referenz', mermaidDemo: 'Mermaid-Diagramme' },
+    fr: { gettingStarted: 'Premiers pas avec Nodus', importingFiles: 'Importer des fichiers', mathReference: 'Reference Typst Math', mermaidDemo: 'Diagrammes Mermaid' },
+    es: { gettingStarted: 'Primeros pasos con Nodus', importingFiles: 'Importar archivos', mathReference: 'Referencia Typst Math', mermaidDemo: 'Diagramas Mermaid' },
+    it: { gettingStarted: 'Primi passi con Nodus', importingFiles: 'Importare file', mathReference: 'Riferimento Typst Math', mermaidDemo: 'Diagrammi Mermaid' },
   }
   const supported = locale as SupportedLocale
   return titles[supported] || titles.en
@@ -380,3 +528,4 @@ export function getStarterTitles(locale: string): { gettingStarted: string; impo
 export const TYPST_MATH_REFERENCE = templates.en.mathReference
 export const GETTING_STARTED = templates.en.gettingStarted
 export const IMPORTING_FILES = templates.en.importingFiles
+export const MERMAID_DEMO = templates.en.mermaidDemo
