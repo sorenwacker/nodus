@@ -727,14 +727,16 @@ async function fitAllNodesToContent() {
     saveEditing()
     await nextTick()
   }
-  // Wait for DOM to render
+  // Render Mermaid diagrams first, then wait for them to complete
+  renderMermaidDiagrams()
+  // Wait longer for Mermaid SVGs to render (they're async)
   setTimeout(() => {
     for (const node of store.filteredNodes) {
       fitNodeToContent(node.id)
     }
     // Trigger edge re-routing after sizes change
     store.nodeLayoutVersion++
-  }, 100)
+  }, 500)
 }
 
 // Reset all nodes to default size (200x120)
