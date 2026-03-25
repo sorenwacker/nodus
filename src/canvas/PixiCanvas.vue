@@ -1039,12 +1039,21 @@ async function sendNodePrompt() {
     const contextLimit = llmStorage.getChainContextLimit()
     const chainContext = buildChainContext(chainNodes, contextLimit)
 
-    const nodeSystemPrompt = `Rewrite the note based on the user's request. Output content directly.
+    const hasContext = chainContext.length > 0
+    const nodeSystemPrompt = `You are editing a note in a knowledge graph. ${hasContext ? 'IMPORTANT: Consider the CONNECTED NODES context below - they provide relevant information that may disambiguate or enrich the current note.' : ''}
 
-NO preamble ("Here is", "Sure", etc). NO code fences unless content IS code.
+CRITICAL: Do NOT fabricate information. Do NOT invent citations, organizations, frameworks, dates, or facts. Only use information from:
+1. The user's request
+2. The current note content
+3. The connected nodes context (if provided)
+If you don't have information, say so or omit it - never make things up.
+
+Output the updated note content directly. NO preamble ("Here is", "Sure", etc). NO code fences unless content IS code.
 Format: Obsidian markdown with [[wikilinks]], #tags, **bold**, lists.
 ${chainContext}
-CURRENT NODE:
+CURRENT NOTE TO EDIT:
+Title: ${node.title || 'Untitled'}
+Content:
 ${currentContent || '(empty)'}`
 
     // Track context size
@@ -1679,11 +1688,11 @@ useCanvasKeyboardShortcuts({
           class="color-dot"
           :class="{
             active: store.selectedFrameId
-              ? store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color === color.value
+              ? store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color === color.display
               : store.selectedNodeIds.every(id => store.filteredNodes.find(n => n.id === id)?.color_theme === color.value)
           }"
           :style="{ background: color.display || 'var(--bg-surface)' }"
-          @click.stop="store.selectedFrameId ? updateSelectedFrameColor(color.value) : updateSelectedNodesColor(color.value)"
+          @click.stop="store.selectedFrameId ? updateSelectedFrameColor(color.display) : updateSelectedNodesColor(color.value)"
         ></button>
         <span v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId" class="color-bar-sep"></span>
         <button
@@ -1695,24 +1704,7 @@ useCanvasKeyboardShortcuts({
       </div>
 
     <div class="canvas-content" :style="{ transform }">
-      <!-- SVG for edges -->
-      <CanvasEdgesSVG
-        :edges="visibleEdgeLines"
-        :marker-colors="allMarkerColors"
-        :is-large-graph="isLargeGraph"
-        :edge-stroke-width="edgeStrokeWidth"
-        :lasso-points="lassoPoints"
-        :is-lasso-selecting="isLassoSelecting"
-        :current-theme="currentTheme"
-        :highlight-color="highlightColor"
-        :is-creating-edge="isCreatingEdge"
-        :edge-preview-start="edgeStartNode ? { x: (store.getNode(edgeStartNode)?.canvas_x || 0) + 100, y: (store.getNode(edgeStartNode)?.canvas_y || 0) + 40 } : null"
-        :edge-preview-end="edgePreviewEnd"
-        :get-arrow-marker-id="getArrowMarkerId"
-        @edge-click="onEdgeClick"
-      />
-
-      <!-- Frames -->
+      <!-- Frames (rendered first, below edges) -->
       <CanvasFrames
         :frames="store.filteredFrames"
         :selected-frame-id="store.selectedFrameId"
@@ -1727,6 +1719,23 @@ useCanvasKeyboardShortcuts({
         @cancel-title="cancelFrameTitleEditing"
         @delete="deleteSelectedFrame"
         @start-resize="startFrameResize"
+      />
+
+      <!-- SVG for edges (above frames) -->
+      <CanvasEdgesSVG
+        :edges="visibleEdgeLines"
+        :marker-colors="allMarkerColors"
+        :is-large-graph="isLargeGraph"
+        :edge-stroke-width="edgeStrokeWidth"
+        :lasso-points="lassoPoints"
+        :is-lasso-selecting="isLassoSelecting"
+        :current-theme="currentTheme"
+        :highlight-color="highlightColor"
+        :is-creating-edge="isCreatingEdge"
+        :edge-preview-start="edgeStartNode ? { x: (store.getNode(edgeStartNode)?.canvas_x || 0) + 100, y: (store.getNode(edgeStartNode)?.canvas_y || 0) + 40 } : null"
+        :edge-preview-end="edgePreviewEnd"
+        :get-arrow-marker-id="getArrowMarkerId"
+        @edge-click="onEdgeClick"
       />
 
       <!-- LOD Mode: Render non-selected nodes as circles -->
@@ -1789,23 +1798,23 @@ useCanvasKeyboardShortcuts({
         @resize-start="(e, dir) => onResizePointerDown(e, node.id, dir)"
       />
 
-      <!-- Empty state (positioned in viewport, not canvas) -->
-
-      <!-- Floating Node LLM bar (above selected/editing node) -->
-      <NodeLLMBar
-        v-if="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
-        :visible="llmEnabled && (store.selectedNodeIds.length === 1 || !!editingNodeId)"
-        :node-prompt="nodePrompt"
-        :is-loading="isNodeLLMLoading"
-        :node-x="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x"
-        :node-y="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y"
-        :node-width="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || NODE_DEFAULTS.WIDTH"
-        @update:node-prompt="nodePrompt = $event"
-        @send="sendNodePrompt"
-        @stop="stopNodeLLM"
-        @keydown="onNodePromptKeydown"
-      />
     </div>
+
+    <!-- Floating Node LLM bar (positioned in screen coordinates, outside canvas transform) -->
+    <NodeLLMBar
+      v-if="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
+      :visible="llmEnabled && (store.selectedNodeIds.length === 1 || !!editingNodeId)"
+      :node-prompt="nodePrompt"
+      :is-loading="isNodeLLMLoading"
+      :node-x="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x * scale + offsetX"
+      :node-y="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y * scale + offsetY"
+      :node-width="(getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || NODE_DEFAULTS.WIDTH) * scale"
+      :scale="1"
+      @update:node-prompt="nodePrompt = $event"
+      @send="sendNodePrompt"
+      @stop="stopNodeLLM"
+      @keydown="onNodePromptKeydown"
+    />
 
     <!-- Edge edit panel -->
     <CanvasEdgePanel

@@ -10,6 +10,7 @@ defineProps<{
   nodeX: number
   nodeY: number
   nodeWidth: number
+  scale: number
 }>()
 
 defineEmits<{
@@ -25,7 +26,9 @@ defineEmits<{
     v-if="visible"
     class="node-llm-bar-floating"
     :style="{
-      transform: `translate(${nodeX}px, ${nodeY - 40}px)`,
+      left: nodeX + 'px',
+      top: nodeY + 'px',
+      transform: 'translateY(-100%)',
       width: nodeWidth + 'px'
     }"
     @pointerdown.stop

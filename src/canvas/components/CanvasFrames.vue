@@ -57,7 +57,14 @@ const emit = defineEmits<{
         @click.stop
         @pointerdown.stop
       />
-      <span v-else class="frame-title" :style="{ borderColor: frame.color || undefined }">{{ frame.title }}</span>
+      <span
+        v-else
+        class="frame-title"
+        :style="{
+          borderColor: frame.color || undefined,
+          color: frame.color || undefined
+        }"
+      >{{ frame.title }}</span>
     </div>
 
     <!-- Delete button top-right (like nodes) -->
@@ -94,6 +101,7 @@ const emit = defineEmits<{
   background: transparent;
   pointer-events: none;
   z-index: 0;
+  overflow: visible;
 }
 
 .canvas-frame.selected {
@@ -101,6 +109,7 @@ const emit = defineEmits<{
   border-width: 2px !important;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25), 0 0 16px rgba(59, 130, 246, 0.15);
   background: rgba(59, 130, 246, 0.06);
+  z-index: 100;
 }
 
 .frame-header {
@@ -198,47 +207,51 @@ const emit = defineEmits<{
 .canvas-frame.selected .resize-edge,
 .canvas-frame.selected .resize-corner {
   pointer-events: auto;
-  opacity: 0.4;
+  opacity: 0.5;
+  z-index: 101;
+  background: var(--primary-color);
 }
 
 .canvas-frame.selected .resize-edge:hover,
 .canvas-frame.selected .resize-corner:hover {
   opacity: 1;
+  background: var(--primary-color);
+  border-radius: 2px;
 }
 
-/* Edge handles */
+/* Edge handles - larger hit areas for easier resizing */
 .resize-edge-n,
 .resize-edge-s {
-  left: 8px;
-  right: 8px;
-  height: 6px;
+  left: 16px;
+  right: 16px;
+  height: 12px;
   cursor: ns-resize;
 }
 
-.resize-edge-n { top: -3px; }
-.resize-edge-s { bottom: -3px; }
+.resize-edge-n { top: -6px; }
+.resize-edge-s { bottom: -6px; }
 
 .resize-edge-e,
 .resize-edge-w {
-  top: 8px;
-  bottom: 8px;
-  width: 6px;
+  top: 16px;
+  bottom: 16px;
+  width: 12px;
   cursor: ew-resize;
 }
 
-.resize-edge-e { right: -3px; }
-.resize-edge-w { left: -3px; }
+.resize-edge-e { right: -6px; }
+.resize-edge-w { left: -6px; }
 
-/* Corner handles */
+/* Corner handles - larger for easier grabbing */
 .resize-corner {
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
 }
 
-.resize-corner-nw { top: -3px; left: -3px; cursor: nwse-resize; }
-.resize-corner-ne { top: -3px; right: -3px; cursor: nesw-resize; }
-.resize-corner-se { bottom: -3px; right: -3px; cursor: nwse-resize; }
-.resize-corner-sw { bottom: -3px; left: -3px; cursor: nesw-resize; }
+.resize-corner-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.resize-corner-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.resize-corner-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.resize-corner-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
 
 /* Visual indicator for SE corner */
 .resize-corner-se::before,

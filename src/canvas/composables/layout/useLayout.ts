@@ -126,6 +126,39 @@ export function useLayout(options: UseLayoutOptions) {
     return result
   }
 
+  /**
+   * Constrain nodes to stay within a frame's boundaries.
+   * Used for frame-scoped layout to prevent nodes from leaving the frame.
+   */
+  function constrainNodesToFrame(
+    positions: Map<string, { x: number; y: number }>,
+    nodeMap: Map<string, { width?: number; height?: number }>,
+    frame: Frame
+  ): Map<string, { x: number; y: number }> {
+    const result = new Map<string, { x: number; y: number }>()
+    const padding = 20 // Padding from frame edges
+
+    for (const [nodeId, pos] of positions) {
+      const nodeInfo = nodeMap.get(nodeId)
+      const nodeWidth = nodeInfo?.width || NODE_DEFAULTS.WIDTH
+      const nodeHeight = nodeInfo?.height || NODE_DEFAULTS.HEIGHT
+
+      // Constrain X position
+      const minX = frame.canvas_x + padding
+      const maxX = frame.canvas_x + frame.width - nodeWidth - padding
+      const newX = Math.max(minX, Math.min(maxX, pos.x))
+
+      // Constrain Y position
+      const minY = frame.canvas_y + padding
+      const maxY = frame.canvas_y + frame.height - nodeHeight - padding
+      const newY = Math.max(minY, Math.min(maxY, pos.y))
+
+      result.set(nodeId, { x: newX, y: newY })
+    }
+
+    return result
+  }
+
   function animateToPositions(targets: Map<string, { x: number; y: number }>, duration = 400) {
     stopAnimation()
 
@@ -422,9 +455,11 @@ export function useLayout(options: UseLayoutOptions) {
         gap: 360,
       })
 
-      // Push nodes out of frames to avoid overlaps (but not when layouting inside a frame)
+      // Push nodes out of frames OR constrain to frame boundaries
       const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-      const finalPositions = targetFrame ? positions : pushNodesOutOfFrames(positions, nodeMap)
+      const finalPositions = targetFrame
+        ? constrainNodesToFrame(positions, nodeMap, targetFrame)
+        : pushNodesOutOfFrames(positions, nodeMap)
 
       // Batch update positions to avoid blocking UI
       await batchUpdatePositions(finalPositions, store.updateNodePosition, 200)
@@ -589,9 +624,11 @@ export function useLayout(options: UseLayoutOptions) {
         }
       }
 
-      // Push nodes out of frames to avoid overlaps (but not when layouting inside a frame)
+      // Push nodes out of frames OR constrain to frame boundaries
       const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-      const finalTargets = targetFrame ? nodeTargets : pushNodesOutOfFrames(nodeTargets, nodeMap)
+      const finalTargets = targetFrame
+        ? constrainNodesToFrame(nodeTargets, nodeMap, targetFrame)
+        : pushNodesOutOfFrames(nodeTargets, nodeMap)
 
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
@@ -657,9 +694,11 @@ export function useLayout(options: UseLayoutOptions) {
         }
       }
 
-      // Push nodes out of frames to avoid overlaps (but not when layouting inside a frame)
+      // Push nodes out of frames OR constrain to frame boundaries
       const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-      const finalTargets = targetFrame ? nodeTargets : pushNodesOutOfFrames(nodeTargets, nodeMap)
+      const finalTargets = targetFrame
+        ? constrainNodesToFrame(nodeTargets, nodeMap, targetFrame)
+        : pushNodesOutOfFrames(nodeTargets, nodeMap)
 
       animateToPositions(finalTargets, 600)
       return
@@ -775,9 +814,11 @@ export function useLayout(options: UseLayoutOptions) {
       }
     }
 
-    // Push nodes out of frames to avoid overlaps (but not when layouting inside a frame)
+    // Push nodes out of frames OR constrain to frame boundaries
     const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-    const finalTargets = targetFrame ? targets : pushNodesOutOfFrames(targets, nodeMap)
+    const finalTargets = targetFrame
+      ? constrainNodesToFrame(targets, nodeMap, targetFrame)
+      : pushNodesOutOfFrames(targets, nodeMap)
 
     console.log('Calling animateToPositions with', finalTargets.size, 'targets')
     animateToPositions(finalTargets, 500)

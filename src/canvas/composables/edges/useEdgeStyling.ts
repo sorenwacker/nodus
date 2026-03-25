@@ -58,17 +58,7 @@ export interface UseEdgeStylingReturn {
   changeEdgeColor: (color: string) => void
 }
 
-// Color palettes
-const defaultEdgeColors: EdgeColorOption[] = [
-  { value: '#94a3b8' }, // gray (default)
-  { value: '#3b82f6' }, // blue
-  { value: '#22c55e' }, // green
-  { value: '#f97316' }, // orange
-  { value: '#ef4444' }, // red
-  { value: '#8b5cf6' }, // purple
-  { value: '#ec4899' }, // pink
-]
-
+// Color palettes - neon colors for all themes
 const cyberEdgeColors: EdgeColorOption[] = [
   { value: '#00ffcc' }, // neon cyan (default)
   { value: '#ff00ff' }, // neon magenta
@@ -113,16 +103,16 @@ const cyberHighlightColors: Record<string, string> = {
   '#fce7f3': '#ff00ff', // pink pastel -> neon magenta
 }
 
-// Frame border colors (more saturated for visibility)
+// Frame border colors - neon palette
 const frameColors = [
   { value: null },
-  { value: '#ef4444' },
-  { value: '#f97316' },
-  { value: '#eab308' },
-  { value: '#22c55e' },
-  { value: '#3b82f6' },
-  { value: '#8b5cf6' },
-  { value: '#ec4899' },
+  { value: '#ff3366' }, // neon red
+  { value: '#ffaa00' }, // neon orange
+  { value: '#ffff00' }, // neon yellow
+  { value: '#00ff66' }, // neon green
+  { value: '#00ccff' }, // neon blue
+  { value: '#9933ff' }, // neon purple
+  { value: '#ff00ff' }, // neon magenta
 ]
 
 // Stroke width constants
@@ -156,32 +146,33 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     globalEdgeStyle.value = canvasStorage.getEdgeStyle(newId || undefined)
   })
 
-  // Reactive edge color palette based on theme
+  // Reactive edge color palette - use neon colors for all themes
   const edgeColorPalette = computed(() => {
-    return currentTheme.value === 'cyber' ? cyberEdgeColors : defaultEdgeColors
+    return cyberEdgeColors
   })
 
   // Default edge color (first in palette)
   const defaultEdgeColor = computed(() => edgeColorPalette.value[0].value)
 
-  // Highlight color for hover - matches theme accent
-  // Light themes use black for visibility, dark themes use blue, cyber uses neon cyan
+  // Highlight color for hover - neon cyan for dark themes, black for light themes
   const highlightColor = computed(() => {
-    if (currentTheme.value === 'cyber') return '#00ffcc'
-    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black') return '#3b82f6'
-    return '#1a1a1a' // Black/near-black for light themes
+    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black' || currentTheme.value === 'cyber') {
+      return '#00ffcc' // neon cyan
+    }
+    return '#1a1a1a' // Black for light themes (visibility)
   })
 
-  // Selected color - matches selected node border
-  // Light themes use black for visibility, dark themes use blue, cyber uses neon magenta
+  // Selected color - neon magenta for dark themes, black for light themes
   const selectedColor = computed(() => {
-    if (currentTheme.value === 'cyber') return '#ff00ff'
-    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black') return '#3b82f6'
-    return '#1a1a1a' // Black/near-black for light themes
+    if (currentTheme.value === 'dark' || currentTheme.value === 'pitch-black' || currentTheme.value === 'cyber') {
+      return '#ff00ff' // neon magenta
+    }
+    return '#1a1a1a' // Black for light themes (visibility)
   })
 
+  // Node colors - use neon colors for all themes
   const nodeColors = computed(() => {
-    return currentTheme.value === 'cyber' ? cyberNodeColors : defaultNodeColors
+    return cyberNodeColors
   })
 
   // All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
