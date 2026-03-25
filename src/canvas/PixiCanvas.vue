@@ -775,6 +775,7 @@ const nodePrompt = ref('')
 const isGraphLLMLoading = ref(false)
 const isNodeLLMLoading = ref(false)
 const lastContextSize = ref(0) // Track context size of last request
+const showAgentLogPanel = ref(false) // User-controlled visibility of agent log
 const llmEnabled = ref(llmStorage.getLLMEnabled())
 let nodeLLMAbortController: AbortController | null = null
 
@@ -1940,9 +1941,9 @@ useCanvasKeyboardShortcuts({
       :is-pdf-processing="pdfDrop.isProcessing.value"
       :pdf-status="pdfDrop.processingStatus.value"
       :agent-log="agentLog"
-      :show-agent-log="agentLog.length > 0"
+      :show-agent-log="showAgentLogPanel"
       @stop-pdf="pdfDrop.stop()"
-      @toggle-agent-log="agentLog.length = 0"
+      @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
     />
 
     <!-- SVG filter for fisheye warp effect -->
