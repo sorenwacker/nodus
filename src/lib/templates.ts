@@ -36,26 +36,27 @@ const templates: Record<SupportedLocale, StarterTemplates> = {
 
     importingFiles: `# Importing Files
 
-## Drag and Drop
+## Drag and Drop (No LLM required)
 - **Markdown files** (.md) become nodes directly
-- **PDF files** extract text and annotations
 - **BibTeX files** (.bib) create citation nodes
 - **Folders** import all markdown files inside
+- **Ontologies** (.ttl, .rdf, .owl) create linked nodes
+
+## PDF Import (Requires LLM)
+- **PDF files** extract text using AI
+- Enable LLM in Settings > LLM to use this feature
+- Supports text extraction and annotation parsing
 
 ## Import Vault
-Use **File > Import Vault** to import an entire Obsidian vault or folder of markdown files.
-
-Options:
-- Keep files synced (edits update the original)
-- Copy content only (no file link)
+Use **File > Import Vault** to import an Obsidian vault or markdown folder.
 
 ## Supported Formats
-| Format | Result |
-|--------|--------|
-| .md | Note node with content |
-| .pdf | Note with extracted text |
-| .bib | Citation nodes |
-| .ttl/.owl | Ontology import |
+| Format | LLM Required | Result |
+|--------|--------------|--------|
+| .md | No | Note node with content |
+| .bib | No | Citation nodes |
+| .ttl/.owl | No | Ontology nodes |
+| .pdf | Yes | Note with extracted text |
 
 See [[Getting Started]] for basic navigation.`,
 
@@ -143,26 +144,27 @@ See [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) for full synt
 
     importingFiles: `# Dateien importieren
 
-## Drag and Drop
+## Drag and Drop (Kein LLM erforderlich)
 - **Markdown-Dateien** (.md) werden direkt zu Knoten
-- **PDF-Dateien** extrahieren Text und Anmerkungen
 - **BibTeX-Dateien** (.bib) erstellen Zitationsknoten
 - **Ordner** importieren alle Markdown-Dateien
+- **Ontologien** (.ttl, .rdf, .owl) erstellen verknupfte Knoten
+
+## PDF-Import (LLM erforderlich)
+- **PDF-Dateien** extrahieren Text mit KI
+- Aktiviere LLM unter Einstellungen > LLM
+- Unterstutzt Textextraktion und Anmerkungen
 
 ## Vault importieren
-Verwende **Datei > Vault importieren**, um einen gesamten Obsidian-Vault oder Ordner mit Markdown-Dateien zu importieren.
-
-Optionen:
-- Dateien synchron halten (Anderungen aktualisieren das Original)
-- Nur Inhalt kopieren (keine Dateiverknupfung)
+Verwende **Datei > Vault importieren** fur Obsidian-Vaults oder Markdown-Ordner.
 
 ## Unterstutzte Formate
-| Format | Ergebnis |
-|--------|----------|
-| .md | Notizknoten mit Inhalt |
-| .pdf | Notiz mit extrahiertem Text |
-| .bib | Zitationsknoten |
-| .ttl/.owl | Ontologie-Import |
+| Format | LLM erforderlich | Ergebnis |
+|--------|------------------|----------|
+| .md | Nein | Notizknoten mit Inhalt |
+| .bib | Nein | Zitationsknoten |
+| .ttl/.owl | Nein | Ontologie-Knoten |
+| .pdf | Ja | Notiz mit extrahiertem Text |
 
 Siehe [[Erste Schritte mit Nodus]] fur grundlegende Navigation.`,
 
@@ -238,26 +240,27 @@ Siehe [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) fur vollsta
 
     importingFiles: `# Importer des fichiers
 
-## Glisser-deposer
+## Glisser-deposer (Sans LLM)
 - **Fichiers Markdown** (.md) deviennent des noeuds directement
-- **Fichiers PDF** extraient le texte et les annotations
 - **Fichiers BibTeX** (.bib) creent des noeuds de citation
 - **Dossiers** importent tous les fichiers markdown
+- **Ontologies** (.ttl, .rdf, .owl) creent des noeuds lies
+
+## Import PDF (LLM requis)
+- **Fichiers PDF** extraient le texte avec l'IA
+- Activez LLM dans Parametres > LLM
+- Supporte l'extraction de texte et annotations
 
 ## Importer un vault
-Utilisez **Fichier > Importer Vault** pour importer un vault Obsidian entier.
-
-Options:
-- Garder les fichiers synchronises
-- Copier le contenu uniquement
+Utilisez **Fichier > Importer Vault** pour les vaults Obsidian ou dossiers markdown.
 
 ## Formats supportes
-| Format | Resultat |
-|--------|----------|
-| .md | Noeud note avec contenu |
-| .pdf | Note avec texte extrait |
-| .bib | Noeuds de citation |
-| .ttl/.owl | Import d'ontologie |
+| Format | LLM requis | Resultat |
+|--------|------------|----------|
+| .md | Non | Noeud note avec contenu |
+| .bib | Non | Noeuds de citation |
+| .ttl/.owl | Non | Noeuds d'ontologie |
+| .pdf | Oui | Note avec texte extrait |
 
 Voir [[Premiers pas avec Nodus]] pour la navigation de base.`,
 
@@ -333,26 +336,27 @@ Voir [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) pour la synt
 
     importingFiles: `# Importar archivos
 
-## Arrastrar y soltar
+## Arrastrar y soltar (Sin LLM)
 - **Archivos Markdown** (.md) se convierten en nodos directamente
-- **Archivos PDF** extraen texto y anotaciones
 - **Archivos BibTeX** (.bib) crean nodos de citas
 - **Carpetas** importan todos los archivos markdown
+- **Ontologias** (.ttl, .rdf, .owl) crean nodos enlazados
+
+## Importar PDF (Requiere LLM)
+- **Archivos PDF** extraen texto usando IA
+- Activa LLM en Ajustes > LLM
+- Soporta extraccion de texto y anotaciones
 
 ## Importar Vault
-Usa **Archivo > Importar Vault** para importar un vault de Obsidian completo.
-
-Opciones:
-- Mantener archivos sincronizados
-- Copiar solo contenido
+Usa **Archivo > Importar Vault** para vaults de Obsidian o carpetas markdown.
 
 ## Formatos soportados
-| Formato | Resultado |
-|---------|-----------|
-| .md | Nodo nota con contenido |
-| .pdf | Nota con texto extraido |
-| .bib | Nodos de citas |
-| .ttl/.owl | Importacion de ontologia |
+| Formato | LLM requerido | Resultado |
+|---------|---------------|-----------|
+| .md | No | Nodo nota con contenido |
+| .bib | No | Nodos de citas |
+| .ttl/.owl | No | Nodos de ontologia |
+| .pdf | Si | Nota con texto extraido |
 
 Ver [[Primeros pasos con Nodus]] para navegacion basica.`,
 
@@ -428,26 +432,27 @@ Ver [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) para sintaxis
 
     importingFiles: `# Importare file
 
-## Trascina e rilascia
+## Trascina e rilascia (Senza LLM)
 - **File Markdown** (.md) diventano nodi direttamente
-- **File PDF** estraggono testo e annotazioni
 - **File BibTeX** (.bib) creano nodi di citazione
 - **Cartelle** importano tutti i file markdown
+- **Ontologie** (.ttl, .rdf, .owl) creano nodi collegati
+
+## Importa PDF (Richiede LLM)
+- **File PDF** estraggono testo usando IA
+- Attiva LLM in Impostazioni > LLM
+- Supporta estrazione testo e annotazioni
 
 ## Importa Vault
-Usa **File > Importa Vault** per importare un intero vault Obsidian.
-
-Opzioni:
-- Mantieni file sincronizzati
-- Copia solo contenuto
+Usa **File > Importa Vault** per vault Obsidian o cartelle markdown.
 
 ## Formati supportati
-| Formato | Risultato |
-|---------|-----------|
-| .md | Nodo nota con contenuto |
-| .pdf | Nota con testo estratto |
-| .bib | Nodi di citazione |
-| .ttl/.owl | Importazione ontologia |
+| Formato | LLM richiesto | Risultato |
+|---------|---------------|-----------|
+| .md | No | Nodo nota con contenuto |
+| .bib | No | Nodi di citazione |
+| .ttl/.owl | No | Nodi ontologia |
+| .pdf | Si | Nota con testo estratto |
 
 Vedi [[Primi passi con Nodus]] per la navigazione di base.`,
 
