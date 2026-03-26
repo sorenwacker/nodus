@@ -33,6 +33,7 @@ const OWL_NAMED_INDIVIDUAL: &str = "http://www.w3.org/2002/07/owl#NamedIndividua
 #[allow(dead_code)] // Used for documentation, matching done via blank nodes
 const OWL_RESTRICTION: &str = "http://www.w3.org/2002/07/owl#Restriction";
 const OWL_ON_PROPERTY: &str = "http://www.w3.org/2002/07/owl#onProperty";
+const OWL_SOME_VALUES_FROM: &str = "http://www.w3.org/2002/07/owl#someValuesFrom";
 const DC_DESCRIPTION: &str = "http://purl.org/dc/elements/1.1/description";
 const DC_TERMS_DESCRIPTION: &str = "http://purl.org/dc/terms/description";
 const SKOS_PREF_LABEL: &str = "http://www.w3.org/2004/02/skos/core#prefLabel";
@@ -117,6 +118,8 @@ struct TripleCollector {
     property_definitions: RefCell<HashMap<String, PropertyDefinition>>,
     /// Blank nodes representing owl:Restriction - maps blank node ID to property IRI
     restriction_properties: RefCell<HashMap<String, String>>,
+    /// Blank nodes representing owl:Restriction - maps blank node ID to someValuesFrom class IRI
+    restriction_values: RefCell<HashMap<String, String>>,
     /// Class to blank node restriction mappings (class IRI -> restriction blank node IDs)
     class_restrictions: RefCell<HashMap<String, Vec<String>>>,
 }
@@ -139,6 +142,7 @@ impl TripleCollector {
             subclass_relations: RefCell::new(Vec::new()),
             property_definitions: RefCell::new(HashMap::new()),
             restriction_properties: RefCell::new(HashMap::new()),
+            restriction_values: RefCell::new(HashMap::new()),
             class_restrictions: RefCell::new(HashMap::new()),
         }
     }
@@ -162,6 +166,12 @@ impl TripleCollector {
                     // Track owl:onProperty for restrictions
                     if predicate_iri == OWL_ON_PROPERTY {
                         self.restriction_properties
+                            .borrow_mut()
+                            .insert(subject_iri.clone(), obj_iri.clone());
+                    }
+                    // Track owl:someValuesFrom for restrictions
+                    if predicate_iri == OWL_SOME_VALUES_FROM {
+                        self.restriction_values
                             .borrow_mut()
                             .insert(subject_iri.clone(), obj_iri);
                     }
@@ -287,15 +297,26 @@ impl TripleCollector {
         let mut classes = self.classes.into_inner();
         let prop_defs = self.property_definitions.into_inner();
         let restriction_properties = self.restriction_properties.into_inner();
+        let restriction_values = self.restriction_values.into_inner();
         let class_restrictions = self.class_restrictions.into_inner();
+        let mut object_properties = self.object_properties.into_inner();
 
-        // Connect class restrictions to their properties
+        // Connect class restrictions to their properties and create object property edges
         for (class_iri, restriction_ids) in &class_restrictions {
             if let Some(class) = classes.get_mut(class_iri) {
                 for restriction_id in restriction_ids {
                     if let Some(prop_iri) = restriction_properties.get(restriction_id) {
                         if !class.restricted_properties.contains(prop_iri) {
                             class.restricted_properties.push(prop_iri.clone());
+                        }
+
+                        // If this restriction also has someValuesFrom, create an object property edge
+                        if let Some(value_class_iri) = restriction_values.get(restriction_id) {
+                            object_properties.push(ObjectProperty {
+                                subject_iri: class_iri.clone(),
+                                predicate_local_name: local_name(prop_iri),
+                                object_iri: value_class_iri.clone(),
+                            });
                         }
                     }
                 }
@@ -345,7 +366,7 @@ impl TripleCollector {
 
         OntologyData {
             individuals,
-            object_properties: self.object_properties.into_inner(),
+            object_properties,
             classes: classes.into_values().collect(),
             subclass_relations: self.subclass_relations.into_inner(),
             property_definitions,
