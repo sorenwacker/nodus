@@ -2027,6 +2027,7 @@ useCanvasKeyboardShortcuts({
       :position="hoverMousePos"
       :node="hoveredNode"
       :content="tooltipContent"
+      :rendered-content="hoveredNode ? (nodeRenderedContent[hoveredNode.id] || '') : ''"
     />
 
     <!-- Minimap -->
