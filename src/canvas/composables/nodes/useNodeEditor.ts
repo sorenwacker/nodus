@@ -30,6 +30,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   const editingTitleId = ref<string | null>(null)
   const editTitle = ref('')
 
+  // In-node search state
+  const showNodeSearch = ref(false)
+  const nodeSearchQuery = ref('')
+  const nodeSearchIndex = ref(0)
+  const nodeSearchMatches = ref<number[]>([]) // Start positions of matches
+
   // Autosave timers
   let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
   let autosaveTitleTimer: ReturnType<typeof setTimeout> | null = null
@@ -153,8 +159,19 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   }
 
   function onEditorKeydown(e: KeyboardEvent) {
+    // Cmd/Ctrl+F to open in-node search
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault()
+      openNodeSearch()
+      return
+    }
     if (e.key === 'Escape') {
-      saveEditing()
+      if (showNodeSearch.value) {
+        closeNodeSearch()
+      } else {
+        saveEditing()
+      }
+      return
     }
     // Cmd/Ctrl+Enter to save and exit
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -162,6 +179,84 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     }
     // Don't propagate to prevent canvas shortcuts
     e.stopPropagation()
+  }
+
+  function openNodeSearch() {
+    showNodeSearch.value = true
+    nodeSearchQuery.value = ''
+    nodeSearchMatches.value = []
+    nodeSearchIndex.value = 0
+    // Focus the search input after Vue updates
+    setTimeout(() => {
+      const input = document.querySelector('.node-search-input') as HTMLInputElement
+      if (input) input.focus()
+    }, 10)
+  }
+
+  function closeNodeSearch() {
+    showNodeSearch.value = false
+    nodeSearchQuery.value = ''
+    nodeSearchMatches.value = []
+    nodeSearchIndex.value = 0
+    // Refocus the textarea
+    setTimeout(() => {
+      const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
+      if (textarea) textarea.focus()
+    }, 10)
+  }
+
+  function updateNodeSearch(query: string) {
+    nodeSearchQuery.value = query
+    if (!query) {
+      nodeSearchMatches.value = []
+      nodeSearchIndex.value = 0
+      return
+    }
+    // Find all matches (case-insensitive)
+    const content = editContent.value.toLowerCase()
+    const searchLower = query.toLowerCase()
+    const matches: number[] = []
+    let pos = 0
+    while ((pos = content.indexOf(searchLower, pos)) !== -1) {
+      matches.push(pos)
+      pos += 1
+    }
+    nodeSearchMatches.value = matches
+    nodeSearchIndex.value = matches.length > 0 ? 0 : -1
+    // Select first match
+    if (matches.length > 0) {
+      selectMatch(0)
+    }
+  }
+
+  function selectMatch(index: number) {
+    const matches = nodeSearchMatches.value
+    if (matches.length === 0 || index < 0 || index >= matches.length) return
+    const pos = matches[index]
+    const len = nodeSearchQuery.value.length
+    const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
+    if (textarea) {
+      textarea.focus()
+      textarea.setSelectionRange(pos, pos + len)
+      // Scroll to selection
+      const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20
+      const linesBefore = editContent.value.substring(0, pos).split('\n').length - 1
+      textarea.scrollTop = linesBefore * lineHeight - textarea.clientHeight / 2
+    }
+  }
+
+  function findNextMatch() {
+    const matches = nodeSearchMatches.value
+    if (matches.length === 0) return
+    nodeSearchIndex.value = (nodeSearchIndex.value + 1) % matches.length
+    selectMatch(nodeSearchIndex.value)
+  }
+
+  function findPrevMatch() {
+    const matches = nodeSearchMatches.value
+    if (matches.length === 0) return
+    nodeSearchIndex.value = (nodeSearchIndex.value - 1 + matches.length) % matches.length
+    selectMatch(nodeSearchIndex.value)
   }
 
   function isEditing(nodeId: string): boolean {
@@ -190,6 +285,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     editingTitleId,
     editTitle,
 
+    // In-node search state
+    showNodeSearch,
+    nodeSearchQuery,
+    nodeSearchIndex,
+    nodeSearchMatches,
+
     // Methods
     startEditing,
     startEditingTitle,
@@ -200,5 +301,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     isEditing,
     isEditingTitle,
     clearAutosaveTimers,
+
+    // In-node search methods
+    openNodeSearch,
+    closeNodeSearch,
+    updateNodeSearch,
+    findNextMatch,
+    findPrevMatch,
   }
 }

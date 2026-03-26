@@ -369,7 +369,13 @@ const nodeEditor = useNodeEditor({
   pushContentUndo,
 })
 // Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit
-const { editingNodeId, editContent, editingTitleId, editTitle, startEditing, startEditingTitle, saveTitleEditing, cancelTitleEditing } = nodeEditor
+const {
+  editingNodeId, editContent, editingTitleId, editTitle,
+  startEditing, startEditingTitle, saveTitleEditing, cancelTitleEditing,
+  // In-node search
+  showNodeSearch, nodeSearchQuery, nodeSearchIndex, nodeSearchMatches,
+  updateNodeSearch, findNextMatch, findPrevMatch, closeNodeSearch,
+} = nodeEditor
 
 // Edge manipulation composable - handles edge creation, selection, modification
 const edgeManipulation = useEdgeManipulation({
@@ -1354,8 +1360,19 @@ function saveEditing(e?: FocusEvent) {
 }
 
 function onEditorKeydown(e: KeyboardEvent) {
+  // Cmd/Ctrl+F to open in-node search
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {
+    e.preventDefault()
+    nodeEditor.openNodeSearch()
+    return
+  }
   if (e.key === 'Escape') {
-    saveEditing()
+    if (showNodeSearch.value) {
+      closeNodeSearch()
+    } else {
+      saveEditing()
+    }
+    return
   }
   // Cmd/Ctrl+Enter to save and exit
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -1861,6 +1878,10 @@ useCanvasKeyboardShortcuts({
         :edit-title="editTitle"
         :edit-content="editContent"
         :scale="scale"
+        :show-node-search="showNodeSearch"
+        :node-search-query="nodeSearchQuery"
+        :node-search-index="nodeSearchIndex"
+        :node-search-match-count="nodeSearchMatches.length"
         @pointerdown="onNodePointerDown($event, node.id)"
         @pointerenter="onNodePointerEnter($event, node.id)"
         @pointermove="onNodePointerMove($event)"
@@ -1876,6 +1897,10 @@ useCanvasKeyboardShortcuts({
         @content-click="handleContentClick"
         @delete="deleteSelectedNodes"
         @resize-start="(e, dir) => onResizePointerDown(e, node.id, dir)"
+        @search-input="updateNodeSearch"
+        @search-next="findNextMatch"
+        @search-prev="findPrevMatch"
+        @search-close="closeNodeSearch"
       />
 
     </div>
