@@ -21,6 +21,9 @@ help:
 	@echo "Build:"
 	@echo "  make build        Production build"
 	@echo "  make clean        Clean build artifacts"
+	@echo ""
+	@echo "Release:"
+	@echo "  make release VERSION=x.y.z   Bump version, tag, and push"
 
 # =============================================================================
 # Setup
@@ -150,17 +153,17 @@ docs:
 # Release
 # =============================================================================
 
-release-patch:
-	npm version patch
-	cd src-tauri && cargo set-version --bump patch
-
-release-minor:
-	npm version minor
-	cd src-tauri && cargo set-version --bump minor
-
-release-major:
-	npm version major
-	cd src-tauri && cargo set-version --bump major
+# Bump version: make release VERSION=0.4.8
+release:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release VERSION=0.4.8)
+endif
+	./scripts/bump-version.sh $(VERSION)
+	git add -A
+	git commit -m "Bump version to $(VERSION)"
+	git tag v$(VERSION)
+	git push && git push --tags
+	@echo "Released v$(VERSION)"
 
 # =============================================================================
 # Utilities
