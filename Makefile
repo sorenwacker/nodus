@@ -23,7 +23,9 @@ help:
 	@echo "  make clean        Clean build artifacts"
 	@echo ""
 	@echo "Release:"
-	@echo "  make release VERSION=x.y.z   Bump version, tag, and push"
+	@echo "  make release-patch   0.4.7 -> 0.4.8"
+	@echo "  make release-minor   0.4.7 -> 0.5.0"
+	@echo "  make release-major   0.4.7 -> 1.0.0"
 
 # =============================================================================
 # Setup
@@ -153,17 +155,30 @@ docs:
 # Release
 # =============================================================================
 
-# Bump version: make release VERSION=0.4.8
-release:
-ifndef VERSION
-	$(error VERSION is required. Usage: make release VERSION=0.4.8)
-endif
-	./scripts/bump-version.sh $(VERSION)
-	git add -A
-	git commit -m "Bump version to $(VERSION)"
-	git tag v$(VERSION)
-	git push && git push --tags
-	@echo "Released v$(VERSION)"
+# Auto-increment and release
+release-patch:
+	@VERSION=$$(./scripts/bump-version.sh patch) && \
+	git add -A && \
+	git commit -m "Release v$$VERSION" && \
+	git tag v$$VERSION && \
+	git push && git push --tags && \
+	echo "Released v$$VERSION"
+
+release-minor:
+	@VERSION=$$(./scripts/bump-version.sh minor) && \
+	git add -A && \
+	git commit -m "Release v$$VERSION" && \
+	git tag v$$VERSION && \
+	git push && git push --tags && \
+	echo "Released v$$VERSION"
+
+release-major:
+	@VERSION=$$(./scripts/bump-version.sh major) && \
+	git add -A && \
+	git commit -m "Release v$$VERSION" && \
+	git tag v$$VERSION && \
+	git push && git push --tags && \
+	echo "Released v$$VERSION"
 
 # =============================================================================
 # Utilities
