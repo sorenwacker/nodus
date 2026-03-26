@@ -333,7 +333,7 @@ watch(() => props.storylineId, loadStoryline)
                   </svg>
                 </div>
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="comment-text" v-html="renderedContent.get(node.id) || node.markdown_content || ''"></div>
+                <div class="comment-text" v-html="renderedContent.get(node.id) || ''"></div>
               </aside>
 
               <!-- Regular nodes render as sections -->

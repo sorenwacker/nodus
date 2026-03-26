@@ -103,6 +103,31 @@ pub async fn create_node_from_file(
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     let path = std::path::Path::new(&file_path);
 
+    // Validate file path - must be a .md file and not contain path traversal
+    if !file_path.ends_with(".md") {
+        return Err("Only .md files can be imported".to_string());
+    }
+    if file_path.contains("..") {
+        return Err("Invalid file path".to_string());
+    }
+
+    // Verify file exists and is within a valid workspace vault
+    if let Some(ref ws_id) = workspace_id {
+        if let Ok(Some(workspace)) = database::workspaces::get_by_id(pool, ws_id).await {
+            if let Some(vault_path) = &workspace.vault_path {
+                let canonical_vault = std::path::Path::new(vault_path)
+                    .canonicalize()
+                    .map_err(|e| format!("Invalid vault path: {}", e))?;
+                let canonical_file = path
+                    .canonicalize()
+                    .map_err(|e| format!("Invalid file path: {}", e))?;
+                if !canonical_file.starts_with(&canonical_vault) {
+                    return Err("File must be within workspace vault".to_string());
+                }
+            }
+        }
+    }
+
     // Check if node already exists for this file
     if let Ok(Some(_)) = database::nodes::get_by_file_path(pool, &file_path).await {
         return Err("Node already exists for this file".to_string());
@@ -339,11 +364,26 @@ pub async fn create_file_for_node(node_id: String) -> Result<String, String> {
 
     let vault_path = workspace.vault_path.ok_or("Workspace has no vault path")?;
 
-    // Create file path
+    // Create file path - sanitize title to prevent path traversal
     let safe_title = node
         .title
-        .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+        .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
+        .replace("..", "_"); // Prevent directory traversal
     let file_path = std::path::Path::new(&vault_path).join(format!("{}.md", safe_title));
+
+    // Verify the resolved path is within the vault (defense in depth)
+    let canonical_vault = std::path::Path::new(&vault_path)
+        .canonicalize()
+        .map_err(|e| format!("Invalid vault path: {}", e))?;
+    let canonical_file = file_path
+        .parent()
+        .ok_or("Invalid file path")?
+        .canonicalize()
+        .unwrap_or_else(|_| canonical_vault.clone());
+    if !canonical_file.starts_with(&canonical_vault) {
+        return Err("Path traversal detected".to_string());
+    }
+
     let file_path_str = file_path.to_string_lossy().to_string();
 
     // Write content to file
