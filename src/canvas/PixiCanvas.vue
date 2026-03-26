@@ -372,6 +372,9 @@ const nodeEditor = useNodeEditor({
 const {
   editingNodeId, editContent, editingTitleId, editTitle,
   startEditing, startEditingTitle, saveTitleEditing, cancelTitleEditing,
+  // In-node search
+  showNodeSearch, nodeSearchQuery, nodeSearchMatches, nodeSearchIndex,
+  openNodeSearch, closeNodeSearch, updateNodeSearch, findNextMatch, findPrevMatch,
 } = nodeEditor
 
 // Edge manipulation composable - handles edge creation, selection, modification
@@ -1334,12 +1337,18 @@ function saveEditing(e?: FocusEvent) {
 }
 
 function onEditorKeydown(e: KeyboardEvent) {
-  // Let Cmd+F fall through to browser/global search
+  // Cmd/Ctrl+F opens in-node search
   if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {
-    return // Don't prevent default - allow browser find
+    e.preventDefault()
+    openNodeSearch()
+    return
   }
   if (e.key === 'Escape') {
-    saveEditing()
+    if (showNodeSearch.value) {
+      closeNodeSearch()
+    } else {
+      saveEditing()
+    }
     return
   }
   // Cmd/Ctrl+Enter to save and exit
@@ -1678,6 +1687,13 @@ const { exportGraphAsYaml } = graphExport
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(window as any).exportGraphAsYaml = exportGraphAsYaml
 
+// Helper to start editing a node and immediately open search
+function startEditingAndSearch(nodeId: string) {
+  startEditing(nodeId)
+  // Wait for DOM to update, then open search
+  setTimeout(() => openNodeSearch(), 50)
+}
+
 // Keyboard shortcuts composable - handles global canvas shortcuts
 useCanvasKeyboardShortcuts({
   pendingFramePlacement: frames.pendingFramePlacement,
@@ -1692,6 +1708,7 @@ useCanvasKeyboardShortcuts({
   copySelectedNodes,
   pasteNodes,
   resetAllNodeSizes,
+  startEditingAndSearch,
   layoutNodes: () => store.layoutNodes(undefined, { frameId: store.selectedFrameId ?? undefined }),
   fitToContent,
   toggleNeighborhoodMode,
@@ -1845,6 +1862,10 @@ useCanvasKeyboardShortcuts({
         :edit-title="editTitle"
         :edit-content="editContent"
         :scale="scale"
+        :show-node-search="showNodeSearch && editingNodeId === node.id"
+        :node-search-query="nodeSearchQuery"
+        :node-search-match-count="nodeSearchMatches.length"
+        :node-search-index="nodeSearchIndex"
         @pointerdown="onNodePointerDown($event, node.id)"
         @pointerenter="onNodePointerEnter($event, node.id)"
         @pointermove="onNodePointerMove($event)"
@@ -1860,6 +1881,10 @@ useCanvasKeyboardShortcuts({
         @content-click="handleContentClick"
         @delete="deleteSelectedNodes"
         @resize-start="(e, dir) => onResizePointerDown(e, node.id, dir)"
+        @update:node-search-query="updateNodeSearch"
+        @find-next="findNextMatch"
+        @find-prev="findPrevMatch"
+        @close-search="closeNodeSearch"
       />
 
     </div>

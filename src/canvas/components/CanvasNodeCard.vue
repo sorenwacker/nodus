@@ -36,6 +36,11 @@ const props = defineProps<{
   editTitle: string
   editContent: string
   scale: number
+  // In-node search
+  showNodeSearch: boolean
+  nodeSearchQuery: string
+  nodeSearchMatchCount: number
+  nodeSearchIndex: number
 }>()
 
 const emit = defineEmits<{
@@ -54,6 +59,11 @@ const emit = defineEmits<{
   (e: 'content-click', event: MouseEvent): void
   (e: 'delete'): void
   (e: 'resize-start', event: PointerEvent, direction: string): void
+  // In-node search
+  (e: 'update:node-search-query', value: string): void
+  (e: 'find-next'): void
+  (e: 'find-prev'): void
+  (e: 'close-search'): void
 }>()
 
 const { t } = useI18n()
@@ -113,6 +123,25 @@ const showDeleteButton = computed(() =>
         @pointerup.stop
       />
       <span v-else>{{ node.title || t('canvas.node.untitled') }}</span>
+    </div>
+
+    <!-- In-node search bar (when editing and search is active) -->
+    <div v-if="showNodeSearch && isEditing && !isCollapsed" class="node-search-bar" @pointerdown.stop>
+      <input
+        class="node-search-input"
+        :value="nodeSearchQuery"
+        placeholder="Find..."
+        @input="emit('update:node-search-query', ($event.target as HTMLInputElement).value)"
+        @keydown.enter.exact.prevent="emit('find-next')"
+        @keydown.enter.shift.prevent="emit('find-prev')"
+        @keydown.escape.prevent="emit('close-search')"
+      />
+      <span class="node-search-count" :class="{ 'no-match': nodeSearchMatchCount === 0 && nodeSearchQuery }">
+        {{ nodeSearchMatchCount > 0 ? `${nodeSearchIndex + 1}/${nodeSearchMatchCount}` : (nodeSearchQuery ? '0/0' : '') }}
+      </span>
+      <button class="node-search-btn" title="Previous (Shift+Enter)" @click="emit('find-prev')">&#x25B2;</button>
+      <button class="node-search-btn" title="Next (Enter)" @click="emit('find-next')">&#x25BC;</button>
+      <button class="node-search-btn node-search-close" title="Close (Esc)" @click="emit('close-search')">&times;</button>
     </div>
 
     <!-- Editing mode (disabled when collapsed) -->

@@ -136,13 +136,14 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   }
 
   function saveEditing(e?: FocusEvent) {
-    // Don't close if focus moved to LLM inputs, buttons, or color bar
+    // Don't close if focus moved to LLM inputs, buttons, color bar, or search bar
     if (e?.relatedTarget) {
       const related = e.relatedTarget as HTMLElement
       if (
         related.closest('.node-llm-bar-floating') ||
         related.closest('.node-color-bar') ||
-        related.closest('.graph-llm-bar')
+        related.closest('.graph-llm-bar') ||
+        related.closest('.node-search-bar')
       ) {
         return
       }

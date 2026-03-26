@@ -24,6 +24,9 @@ export interface UseCanvasKeyboardShortcutsContext {
   pasteNodes: () => void
   resetAllNodeSizes: () => void
 
+  // Node editing
+  startEditingAndSearch?: (nodeId: string) => void
+
   // Layout
   layoutNodes: () => void
   fitToContent: () => void
@@ -62,6 +65,7 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     copySelectedNodes,
     pasteNodes,
     resetAllNodeSizes,
+    startEditingAndSearch,
     layoutNodes,
     fitToContent,
     toggleNeighborhoodMode,
@@ -93,6 +97,15 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     const isInInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
     if (isInInput) {
       return
+    }
+
+    // Cmd/Ctrl+F with a single node selected: start editing and open search
+    if ((e.key === 'f' || e.key === 'F') && (e.metaKey || e.ctrlKey)) {
+      if (selectedNodeIds.value.length === 1 && startEditingAndSearch) {
+        e.preventDefault()
+        startEditingAndSearch(selectedNodeIds.value[0])
+        return
+      }
     }
 
     // ? key toggles help modal
