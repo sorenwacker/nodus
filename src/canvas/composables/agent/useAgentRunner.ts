@@ -90,6 +90,7 @@ export interface AgentContext {
   // LLM settings
   model: Ref<string>
   contextLength: Ref<number>
+  getProviderId?: () => string
 
   // Agent state (shared with useLLM)
   isRunning: Ref<boolean>
@@ -352,6 +353,8 @@ export function useAgentRunner(ctx: AgentContext) {
       ctx.log.value.push('---')
     }
     ctx.log.value.push(`> User: ${userRequest}`)
+    const providerId = ctx.getProviderId?.() || 'unknown'
+    ctx.log.value.push(`> Provider: ${providerId} (${ctx.model.value})`)
     ctx.log.value.push(`> Mode: ${mode.value}`)
 
     // Enhance prompt if it's a graph creation request

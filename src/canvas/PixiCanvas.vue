@@ -760,6 +760,7 @@ const {
   savePromptToHistory,
   navigateHistory,
   agentTools,
+  getActiveProviderId,
 } = llm
 
 const graphPrompt = ref('')
@@ -938,6 +939,7 @@ const agentContext: AgentContext = {
   workspaceId: () => store.currentWorkspaceId || 'default',
   model: ollamaModel,
   contextLength: ollamaContextLength,
+  getProviderId: getActiveProviderId,
   isRunning: agentRunning,
   log: agentLog,
   tasks: agentTasks,
