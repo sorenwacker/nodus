@@ -72,13 +72,10 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     // Also skip filtering if visibleNodeIds is empty (viewport not ready yet)
     if (edges.length > EDGE_VIEWPORT_FILTER_THRESHOLD && visIds.size > 0) {
       // Filter to edges that should be rendered:
-      // 1. Edges connected to hovered/selected nodes (always show, even if other endpoint is off-screen)
-      // 2. Edges where BOTH endpoints are visible
+      // Show edge if AT LEAST ONE endpoint is visible (so you can see connections going off-screen)
+      // Hide edge only if BOTH endpoints are off-screen
       edges = edges.filter(e => {
-        const connectedToActive = hovered === e.source_node_id || hovered === e.target_node_id ||
-          selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
-        if (connectedToActive) return true
-        return visIds.has(e.source_node_id) && visIds.has(e.target_node_id)
+        return visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
       })
     }
 
