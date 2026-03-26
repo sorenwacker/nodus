@@ -36,11 +36,6 @@ const props = defineProps<{
   editTitle: string
   editContent: string
   scale: number
-  // In-node search props
-  showNodeSearch?: boolean
-  nodeSearchQuery?: string
-  nodeSearchIndex?: number
-  nodeSearchMatchCount?: number
 }>()
 
 const emit = defineEmits<{
@@ -59,11 +54,6 @@ const emit = defineEmits<{
   (e: 'content-click', event: MouseEvent): void
   (e: 'delete'): void
   (e: 'resize-start', event: PointerEvent, direction: string): void
-  // In-node search events
-  (e: 'search-input', value: string): void
-  (e: 'search-next'): void
-  (e: 'search-prev'): void
-  (e: 'search-close'): void
 }>()
 
 const { t } = useI18n()
@@ -123,41 +113,6 @@ const showDeleteButton = computed(() =>
         @pointerup.stop
       />
       <span v-else>{{ node.title || t('canvas.node.untitled') }}</span>
-    </div>
-
-    <!-- In-node search bar -->
-    <div v-if="isEditing && showNodeSearch && !isCollapsed" class="node-search-bar">
-      <input
-        :value="nodeSearchQuery"
-        class="node-search-input"
-        :placeholder="t('canvas.node.searchPlaceholder', 'Find...')"
-        @input="emit('search-input', ($event.target as HTMLInputElement).value)"
-        @keydown.enter.prevent="emit('search-next')"
-        @keydown.escape.prevent="emit('search-close')"
-        @pointerdown.stop
-      />
-      <span v-if="nodeSearchMatchCount !== undefined && nodeSearchMatchCount > 0" class="node-search-count">
-        {{ (nodeSearchIndex ?? 0) + 1 }}/{{ nodeSearchMatchCount }}
-      </span>
-      <span v-else-if="nodeSearchQuery && nodeSearchMatchCount === 0" class="node-search-count no-match">
-        0/0
-      </span>
-      <button class="node-search-btn" :title="t('canvas.node.searchPrev', 'Previous')" @click="emit('search-prev')" @pointerdown.stop>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="18 15 12 9 6 15"></polyline>
-        </svg>
-      </button>
-      <button class="node-search-btn" :title="t('canvas.node.searchNext', 'Next')" @click="emit('search-next')" @pointerdown.stop>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
-      </button>
-      <button class="node-search-btn node-search-close" :title="t('common.close', 'Close')" @click="emit('search-close')" @pointerdown.stop>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
     </div>
 
     <!-- Editing mode (disabled when collapsed) -->
