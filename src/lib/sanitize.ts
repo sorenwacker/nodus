@@ -5,14 +5,51 @@
 import DOMPurify from 'dompurify'
 
 // Configure DOMPurify for SVG content (allows SVG elements)
-// Mermaid uses foreignObject for text rendering in flowcharts
+// Mermaid uses foreignObject with HTML divs for text rendering
+// Must be permissive to support all Mermaid diagram types
 const svgConfig: DOMPurify.Config = {
-  USE_PROFILES: { svg: true, svgFilters: true, html: true },
-  ADD_TAGS: ['use', 'foreignObject'],
-  ADD_ATTR: [
-    'xmlns', 'xmlns:xlink', 'xlink:href', 'viewBox', 'preserveAspectRatio',
-    'requiredExtensions', 'dominant-baseline', 'text-anchor',
+  ADD_TAGS: [
+    // Core SVG elements
+    'svg', 'g', 'defs', 'symbol', 'use', 'switch',
+    'path', 'line', 'polyline', 'polygon', 'rect', 'circle', 'ellipse',
+    'text', 'tspan', 'textPath',
+    'marker', 'clipPath', 'mask', 'pattern',
+    'linearGradient', 'radialGradient', 'stop',
+    'filter', 'feGaussianBlur', 'feOffset', 'feBlend', 'feColorMatrix',
+    'feMerge', 'feMergeNode', 'feFlood', 'feComposite',
+    // Mermaid-specific
+    'foreignObject',
+    // HTML inside foreignObject
+    'div', 'span', 'p', 'br', 'b', 'i', 'em', 'strong',
   ],
+  ADD_ATTR: [
+    // SVG namespace
+    'xmlns', 'xmlns:xlink', 'xlink:href', 'href',
+    // Positioning
+    'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',
+    'width', 'height', 'viewBox', 'preserveAspectRatio',
+    // Path/shape
+    'd', 'points', 'transform', 'pathLength',
+    // Styling
+    'fill', 'stroke', 'stroke-width', 'stroke-dasharray',
+    'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
+    'opacity', 'fill-opacity', 'stroke-opacity', 'fill-rule',
+    // Text
+    'dominant-baseline', 'text-anchor', 'alignment-baseline',
+    'font-size', 'font-family', 'font-weight', 'font-style',
+    'letter-spacing', 'dy', 'dx',
+    // Marker/clip/filter
+    'marker-start', 'marker-mid', 'marker-end',
+    'clip-path', 'mask', 'filter',
+    'markerWidth', 'markerHeight', 'refX', 'refY', 'orient',
+    'gradientUnits', 'gradientTransform', 'offset', 'stop-color', 'stop-opacity',
+    // References
+    'id', 'class', 'style',
+    // foreignObject
+    'requiredExtensions',
+  ],
+  // Allow style attribute with CSS
+  ALLOW_UNKNOWN_PROTOCOLS: false,
 }
 
 // Configure DOMPurify for HTML content (markdown rendered)
