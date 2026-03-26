@@ -329,7 +329,13 @@ DO NOT call done() without first calling update_content(). Your response will be
     }
 
     isRunning.value = true
-    log.value = [`> ${prompt}`]
+    const providerId = llmStorage.getProvider()
+    const providerConfig = llmStorage.getProviderConfig(providerId)
+    const modelName = providerConfig.model || 'unknown'
+    log.value = [
+      `> User: ${prompt}`,
+      `> Provider: ${providerId} (${modelName})`,
+    ]
     currentContent.value = ctx.nodeContent
     let contentWasUpdated = false // Track if update_content was called
 

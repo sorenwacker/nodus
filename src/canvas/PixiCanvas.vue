@@ -1035,11 +1035,10 @@ async function sendNodePrompt() {
         },
       }
 
-      // Node agent logs go to global log
-      nodeAgent.log.value.forEach(msg => agentLog.value.push(msg))
+      // Clear any leftover logs and run agent
       nodeAgent.log.value = []
       await nodeAgent.run(prompt, ctx)
-      // Merge any new logs to global
+      // Merge node agent logs to global log
       nodeAgent.log.value.forEach(msg => agentLog.value.push(msg))
       setTimeout(renderMermaidDiagrams, 100)
 
