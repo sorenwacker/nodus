@@ -2,7 +2,7 @@
  * Node editor composable
  * Manages inline editing of node content and titles with autosave
  */
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import type { Node } from '../../../types'
 
 export interface NodeEditorStore {
@@ -187,11 +187,16 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     nodeSearchQuery.value = ''
     nodeSearchMatches.value = []
     nodeSearchIndex.value = 0
-    // Focus the search input after Vue updates
-    setTimeout(() => {
-      const input = document.querySelector('.node-search-input') as HTMLInputElement
-      if (input) input.focus()
-    }, 10)
+    // Focus the search input after Vue renders
+    nextTick(() => {
+      // Additional delay to ensure DOM is fully ready
+      requestAnimationFrame(() => {
+        const input = document.querySelector('.node-search-input') as HTMLInputElement
+        if (input) {
+          input.focus()
+        }
+      })
+    })
   }
 
   function closeNodeSearch() {
