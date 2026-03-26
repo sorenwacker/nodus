@@ -34,6 +34,10 @@ const OWL_NAMED_INDIVIDUAL: &str = "http://www.w3.org/2002/07/owl#NamedIndividua
 const OWL_RESTRICTION: &str = "http://www.w3.org/2002/07/owl#Restriction";
 const OWL_ON_PROPERTY: &str = "http://www.w3.org/2002/07/owl#onProperty";
 const OWL_SOME_VALUES_FROM: &str = "http://www.w3.org/2002/07/owl#someValuesFrom";
+const OWL_UNION_OF: &str = "http://www.w3.org/2002/07/owl#unionOf";
+const RDF_FIRST: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#first";
+const RDF_REST: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#rest";
+const RDF_NIL: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil";
 const DC_DESCRIPTION: &str = "http://purl.org/dc/elements/1.1/description";
 const DC_TERMS_DESCRIPTION: &str = "http://purl.org/dc/terms/description";
 const SKOS_PREF_LABEL: &str = "http://www.w3.org/2004/02/skos/core#prefLabel";
@@ -122,6 +126,14 @@ struct TripleCollector {
     restriction_values: RefCell<HashMap<String, String>>,
     /// Class to blank node restriction mappings (class IRI -> restriction blank node IDs)
     class_restrictions: RefCell<HashMap<String, Vec<String>>>,
+    /// Property to blank node domain mappings (for union domains)
+    property_blank_domains: RefCell<HashMap<String, String>>,
+    /// Blank node owl:unionOf mappings (blank node -> list node)
+    union_of_lists: RefCell<HashMap<String, String>>,
+    /// RDF list first elements (list node -> IRI)
+    rdf_list_first: RefCell<HashMap<String, String>>,
+    /// RDF list rest pointers (list node -> next list node or rdf:nil)
+    rdf_list_rest: RefCell<HashMap<String, String>>,
 }
 
 /// Intermediate structure for collecting property definition info
@@ -144,6 +156,10 @@ impl TripleCollector {
             restriction_properties: RefCell::new(HashMap::new()),
             restriction_values: RefCell::new(HashMap::new()),
             class_restrictions: RefCell::new(HashMap::new()),
+            property_blank_domains: RefCell::new(HashMap::new()),
+            union_of_lists: RefCell::new(HashMap::new()),
+            rdf_list_first: RefCell::new(HashMap::new()),
+            rdf_list_rest: RefCell::new(HashMap::new()),
         }
     }
 
@@ -172,6 +188,18 @@ impl TripleCollector {
                     // Track owl:someValuesFrom for restrictions
                     if predicate_iri == OWL_SOME_VALUES_FROM {
                         self.restriction_values
+                            .borrow_mut()
+                            .insert(subject_iri.clone(), obj_iri.clone());
+                    }
+                    // Track rdf:first for list parsing
+                    if predicate_iri == RDF_FIRST {
+                        self.rdf_list_first
+                            .borrow_mut()
+                            .insert(subject_iri.clone(), obj_iri.clone());
+                    }
+                    // Track rdf:rest for list parsing (named node case like rdf:nil)
+                    if predicate_iri == RDF_REST {
+                        self.rdf_list_rest
                             .borrow_mut()
                             .insert(subject_iri.clone(), obj_iri);
                     }
@@ -278,14 +306,36 @@ impl TripleCollector {
                 }
             }
             Term::BlankNode(bn) => {
+                let bn_id = format!("_:{}", bn.id);
+
                 // Handle blank node objects (e.g., rdfs:subClassOf pointing to owl:Restriction)
                 if predicate_iri == RDFS_SUBCLASS_OF && !is_blank_subject {
-                    let bn_id = format!("_:{}", bn.id);
                     self.class_restrictions
                         .borrow_mut()
                         .entry(subject_iri.clone())
                         .or_default()
-                        .push(bn_id);
+                        .push(bn_id.clone());
+                }
+
+                // Track rdfs:domain pointing to blank node (union class)
+                if predicate_iri == RDFS_DOMAIN && !is_blank_subject {
+                    self.property_blank_domains
+                        .borrow_mut()
+                        .insert(subject_iri.clone(), bn_id.clone());
+                }
+
+                // Track owl:unionOf from blank node to list
+                if predicate_iri == OWL_UNION_OF && is_blank_subject {
+                    self.union_of_lists
+                        .borrow_mut()
+                        .insert(subject_iri.clone(), bn_id.clone());
+                }
+
+                // Track rdf:rest pointing to another blank node (list continuation)
+                if predicate_iri == RDF_REST && is_blank_subject {
+                    self.rdf_list_rest
+                        .borrow_mut()
+                        .insert(subject_iri.clone(), bn_id);
                 }
             }
             _ => {}
@@ -295,11 +345,46 @@ impl TripleCollector {
     fn into_ontology_data(self) -> OntologyData {
         let subjects = self.subjects.into_inner();
         let mut classes = self.classes.into_inner();
-        let prop_defs = self.property_definitions.into_inner();
+        let mut prop_defs = self.property_definitions.into_inner();
         let restriction_properties = self.restriction_properties.into_inner();
         let restriction_values = self.restriction_values.into_inner();
         let class_restrictions = self.class_restrictions.into_inner();
         let mut object_properties = self.object_properties.into_inner();
+        let property_blank_domains = self.property_blank_domains.into_inner();
+        let union_of_lists = self.union_of_lists.into_inner();
+        let rdf_list_first = self.rdf_list_first.into_inner();
+        let rdf_list_rest = self.rdf_list_rest.into_inner();
+
+        // Resolve union domains for properties
+        for (prop_iri, blank_domain_id) in &property_blank_domains {
+            // Check if this blank node has an owl:unionOf
+            if let Some(list_id) = union_of_lists.get(blank_domain_id) {
+                // Traverse the RDF list to get all union members
+                let mut current = list_id.clone();
+                let mut iterations = 0;
+                while iterations < 100 {
+                    // Safety limit
+                    iterations += 1;
+                    // Get the first element of the current list node
+                    if let Some(class_iri) = rdf_list_first.get(&current) {
+                        if let Some(prop) = prop_defs.get_mut(prop_iri) {
+                            if !prop.domains.contains(class_iri) {
+                                prop.domains.push(class_iri.clone());
+                            }
+                        }
+                    }
+                    // Move to rest of list
+                    if let Some(rest_id) = rdf_list_rest.get(&current) {
+                        if rest_id == RDF_NIL {
+                            break;
+                        }
+                        current = rest_id.clone();
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
 
         // Connect class restrictions to their properties and create object property edges
         for (class_iri, restriction_ids) in &class_restrictions {
