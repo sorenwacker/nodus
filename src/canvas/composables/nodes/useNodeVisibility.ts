@@ -31,12 +31,12 @@ export interface UseNodeVisibilityOptions {
 /** Threshold for LOD (Level of Detail) mode - render nodes as circles when many visible */
 const LOD_THRESHOLD = 500
 
-/** Thresholds for graph size classification */
-const LARGE_GRAPH_NODES = 200
-const LARGE_GRAPH_EDGES = 500
-const HUGE_GRAPH_NODES = 350
-const MASSIVE_GRAPH_NODES = 300
-const MASSIVE_GRAPH_EDGES = 800
+/** Thresholds for graph size classification - increased for modern hardware */
+const LARGE_GRAPH_NODES = 500
+const LARGE_GRAPH_EDGES = 1500
+const HUGE_GRAPH_NODES = 1000
+const MASSIVE_GRAPH_NODES = 800
+const MASSIVE_GRAPH_EDGES = 2000
 
 export function useNodeVisibility(options: UseNodeVisibilityOptions) {
   const { nodes, edges, viewState, getViewportSize } = options

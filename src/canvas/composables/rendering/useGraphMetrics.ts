@@ -41,16 +41,17 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
 
   // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
   // In neighborhood mode, always use full routing since we have few nodes
+  // Thresholds increased for modern hardware - most devices handle 500+ nodes fine
   const isLargeGraph = computed(() =>
-    !neighborhoodMode.value && (displayNodes.value.length > 200 || filteredEdges.value.length > 500)
+    !neighborhoodMode.value && (displayNodes.value.length > 500 || filteredEdges.value.length > 1500)
   )
 
   const isHugeGraph = computed(() =>
-    !neighborhoodMode.value && displayNodes.value.length > 350
+    !neighborhoodMode.value && displayNodes.value.length > 1000
   )
 
   const isMassiveGraph = computed(() =>
-    !neighborhoodMode.value && (displayNodes.value.length > 300 || filteredEdges.value.length > 800)
+    !neighborhoodMode.value && (displayNodes.value.length > 800 || filteredEdges.value.length > 2000)
   )
 
   // Semantic zoom collapse - show title only when zoomed out
