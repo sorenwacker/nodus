@@ -660,12 +660,26 @@ export function useLayout(options: UseLayoutOptions) {
           target: e.target_node_id,
         }))
 
-      const positions = applyHierarchicalLayout(layoutNodes, layoutEdges, {
-        direction: 'TB',
-        nodeSpacingX: 150,
-        nodeSpacingY: 360,
-        centerX,
-        centerY,
+      // For very large graphs, warn and use simpler ranker
+      const ranker = virtualNodes.length > 2000 ? 'longest-path' : 'network-simplex'
+      if (virtualNodes.length > 1000) {
+        console.log(`Hierarchical layout for ${virtualNodes.length} nodes - using ${ranker} ranker`)
+      }
+
+      // Use requestIdleCallback or setTimeout to avoid blocking UI
+      const positions = await new Promise<Map<string, { x: number; y: number }>>((resolve) => {
+        // Give the UI a chance to update before heavy computation
+        setTimeout(() => {
+          const result = applyHierarchicalLayout(layoutNodes, layoutEdges, {
+            direction: 'TB',
+            nodeSpacingX: 150,
+            nodeSpacingY: 360,
+            centerX,
+            centerY,
+            ranker,
+          })
+          resolve(result)
+        }, 10)
       })
 
       // Convert to targets map, expanding frames
@@ -700,7 +714,13 @@ export function useLayout(options: UseLayoutOptions) {
         ? constrainNodesToFrame(nodeTargets, nodeMap, targetFrame)
         : pushNodesOutOfFrames(nodeTargets, nodeMap)
 
-      animateToPositions(finalTargets, 600)
+      // For large graphs, use batch updates instead of animation (much faster)
+      if (virtualNodes.length > 500) {
+        console.log(`Batch updating ${finalTargets.size} node positions (skipping animation)`)
+        await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
+      } else {
+        animateToPositions(finalTargets, 600)
+      }
       return
     }
 
