@@ -11,7 +11,6 @@ import type { Frame } from '../types'
 // Maximum canvas coordinate bounds
 const MAX_CANVAS_COORD = 100_000
 const MIN_FRAME_SIZE = 50
-const MAX_FRAME_SIZE = 10_000
 
 /**
  * Validate and clamp a coordinate value
@@ -22,11 +21,11 @@ function clampCoord(value: number): number {
 }
 
 /**
- * Validate and clamp a size value
+ * Validate and clamp a size value (no max limit)
  */
-function clampSize(value: number, min = MIN_FRAME_SIZE, max = MAX_FRAME_SIZE): number {
+function clampSize(value: number, min = MIN_FRAME_SIZE): number {
   if (!Number.isFinite(value)) return min
-  return Math.max(min, Math.min(max, value))
+  return Math.max(min, value)
 }
 
 export const useFramesStore = defineStore('frames', () => {
