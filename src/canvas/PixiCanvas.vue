@@ -1218,8 +1218,10 @@ const nodeCollision = useNodeCollision({
 const { pushOverlappingNodesAway, pushOverlappingNodesAwayExcept } = nodeCollision
 
 // When node is selected, push non-neighbors away from neighbors
+// Skip in dot mode (semantic zoom collapsed) - nodes are small dots, no need to push
 watch(() => store.selectedNodeIds, (selectedIds) => {
   if (selectedIds.length === 0) return
+  if (isSemanticZoomCollapsed.value) return // Skip in dot mode
 
   // Get all neighbor IDs for selected nodes
   const protectedIds = new Set<string>(selectedIds)
