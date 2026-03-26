@@ -92,16 +92,23 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       return
     }
 
-    // Cmd+F opens node search (works even in inputs)
+    // Skip shortcuts if user is typing in an input (allow native browser behavior)
+    const target = e.target as HTMLElement
+    const isInInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
+    // Cmd+F opens node search (but allow native find when editing text)
     if ((e.key === 'f' || e.key === 'F') && (e.metaKey || e.ctrlKey)) {
+      if (isInInput) {
+        // Allow native browser find in text inputs
+        return
+      }
       e.preventDefault()
       showSearch()
       return
     }
 
     // Skip other shortcuts if user is typing in an input
-    const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (isInInput) {
       return
     }
 
