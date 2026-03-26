@@ -351,7 +351,7 @@ export function useAgentRunner(ctx: AgentContext) {
     if (ctx.log.value.length > 0) {
       ctx.log.value.push('---')
     }
-    ctx.log.value.push(`User: ${userRequest}`)
+    ctx.log.value.push(`> User: ${userRequest}`)
     ctx.log.value.push(`> Mode: ${mode.value}`)
 
     // Enhance prompt if it's a graph creation request
