@@ -1309,14 +1309,25 @@ function handleContentClick(e: MouseEvent) {
 
 // Custom saveEditing with mermaid render and auto-fit
 function saveEditing(e?: FocusEvent) {
-  // Don't close if focus moved to LLM inputs, buttons, or color bar
+  // If this is a blur event (e defined) and search is active, don't close
+  // (focus is moving within the node, e.g., to search bar)
+  // Direct calls without event (e.g., from canvas click or Cmd+Enter) should still close
+  if (e && showNodeSearch.value) {
+    return
+  }
+  // Don't close if focus moved to LLM inputs, buttons, color bar, or search bar
   if (e?.relatedTarget) {
     const related = e.relatedTarget as HTMLElement
     if (related.closest('.node-llm-bar-floating') ||
         related.closest('.collapsed-color-bar') ||
-        related.closest('.graph-llm-bar')) {
+        related.closest('.graph-llm-bar') ||
+        related.closest('.node-search-bar')) {
       return
     }
+  }
+  // Close search if it was open
+  if (showNodeSearch.value) {
+    closeNodeSearch()
   }
 
   const nodeId = editingNodeId.value
