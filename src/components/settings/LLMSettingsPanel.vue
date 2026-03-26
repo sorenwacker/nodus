@@ -37,11 +37,6 @@ const currentConfig = computed(() => providerConfigs.value[selectedProvider.valu
 // Current provider object
 const currentProvider = computed(() => providerRegistry.getProvider(selectedProvider.value))
 
-// Check if current provider is a paid API service
-const isPaidProvider = computed(() => {
-  const paidProviders = ['openai', 'anthropic']
-  return paidProviders.includes(selectedProvider.value)
-})
 
 // Check if current provider needs API key
 const requiresApiKey = computed(() => currentProvider.value?.requiresApiKey ?? false)
@@ -324,8 +319,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Cost Warning for paid providers -->
-    <div v-if="isPaidProvider" class="cost-warning">
+    <!-- Cost Warning -->
+    <div class="cost-warning">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
         <line x1="12" y1="9" x2="12" y2="13" />
@@ -333,7 +328,7 @@ onMounted(() => {
       </svg>
       <div class="cost-warning-text">
         <strong>{{ t('llm.costWarning.title') }}</strong>
-        <span>{{ t('llm.costWarning.message', { provider: selectedProvider === 'openai' ? 'OpenAI' : 'Anthropic' }) }}</span>
+        <span>{{ t('llm.costWarning.message') }}</span>
       </div>
     </div>
 

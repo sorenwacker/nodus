@@ -157,7 +157,7 @@
     },
     "costWarning": {
       "title": "API costs may apply",
-      "message": "Using {provider} incurs costs based on token usage. Monitor your usage at the provider's dashboard."
+      "message": "LLM providers may charge based on token usage. Monitor your usage at the provider's dashboard."
     }
   },
   "workspace": {
