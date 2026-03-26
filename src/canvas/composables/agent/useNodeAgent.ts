@@ -1,6 +1,12 @@
 /**
  * Node Agent composable
  * Agent runner focused on a single node with web search and editing tools
+ *
+ * Uses registry tools filtered by categories:
+ * - 'utility' for web_search (shared with graph agent)
+ * - 'research' for fetch_url
+ * - 'node-edit' for update_content, append_content, update_title, node_done
+ * - 'agent' for wikipedia_search (from agentTools)
  */
 import { ref, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
@@ -9,6 +15,11 @@ import { llmQueue } from '../../../llm/queue'
 import { notifications$ } from '../../../composables/useNotifications'
 import { llmStorage } from '../../../lib/storage'
 import { convertLatexDocument } from '../../../lib/latex-to-typst'
+import { toolRegistry } from '../../../llm/registry'
+import { registerCoreTools } from '../../../llm/tools'
+
+// Ensure tools are registered
+registerCoreTools()
 
 /**
  * Escape special characters that could be used for prompt injection
@@ -19,7 +30,8 @@ function escapeForPrompt(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/\[INST\]/gi, '[_INST_]')
     .replace(/\[\/INST\]/gi, '[_/INST_]')
-    .replace(/```/g, "'''")}
+    .replace(/```/g, "'''")
+}
 
 /**
  * Validate URL scheme to prevent SSRF attacks
@@ -82,108 +94,6 @@ export interface NodeAgentContext {
   updateContent: (content: string) => Promise<void>
   updateTitle: (title: string) => Promise<void>
 }
-
-// Node-level tools (subset focused on editing + research)
-const nodeTools = [
-  {
-    type: 'function' as const,
-    function: {
-      name: 'web_search',
-      description: 'Search the web for any information - news, facts, organizations, people, current events, etc.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Search query' },
-        },
-        required: ['query'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'fetch_url',
-      description: 'Fetch and read the content of a web page. Use this after web_search to read full articles.',
-      parameters: {
-        type: 'object',
-        properties: {
-          url: { type: 'string', description: 'The URL to fetch' },
-        },
-        required: ['url'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'wikipedia_search',
-      description: 'Search Wikipedia for encyclopedic information and definitions',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Search query' },
-        },
-        required: ['query'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'update_content',
-      description: 'Update the note content with new text',
-      parameters: {
-        type: 'object',
-        properties: {
-          content: { type: 'string', description: 'New content for the note (markdown)' },
-        },
-        required: ['content'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'append_content',
-      description: 'Append text to the end of the note',
-      parameters: {
-        type: 'object',
-        properties: {
-          text: { type: 'string', description: 'Text to append' },
-        },
-        required: ['text'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'update_title',
-      description: 'Change the note title',
-      parameters: {
-        type: 'object',
-        properties: {
-          title: { type: 'string', description: 'New title' },
-        },
-        required: ['title'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'done',
-      description: 'Signal that the task is complete',
-      parameters: {
-        type: 'object',
-        properties: {
-          summary: { type: 'string', description: 'Brief summary of what was done' },
-        },
-        required: ['summary'],
-      },
-    },
-  },
-]
 
 async function executeWebSearch(query: string): Promise<string> {
   try {
@@ -279,6 +189,30 @@ async function executeWikipediaSearch(query: string): Promise<string> {
   throw new Error(`Wikipedia search failed for "${query}". Try a different query.`)
 }
 
+/**
+ * Get node agent tools from registry
+ * Uses tools from: utility (web_search), research (fetch_url), node-edit, agent (wikipedia_search)
+ */
+function getNodeAgentTools() {
+  // Get tools by categories - utility has web_search, research has fetch_url,
+  // node-edit has update_content/append_content/update_title/node_done,
+  // agent has wikipedia_search
+  const tools = toolRegistry.getToolsByCategories(['utility', 'research', 'node-edit', 'agent'])
+
+  // Filter to only the tools we need for node editing
+  const allowedTools = new Set([
+    'web_search',
+    'fetch_url',
+    'wikipedia_search',
+    'update_content',
+    'append_content',
+    'update_title',
+    'node_done',
+  ])
+
+  return tools.filter(t => allowedTools.has(t.function.name))
+}
+
 export function useNodeAgent() {
   const isRunning = ref(false)
   const log: Ref<string[]> = ref([])
@@ -307,20 +241,20 @@ TOOLS:
 - update_content(content): Replace note content - THIS SAVES YOUR WORK
 - append_content(text): Add text to end of note
 - update_title(title): Change note title
-- done(summary): Signal completion
+- node_done(summary): Signal completion
 
 CRITICAL RULES:
 1. You can answer from your own knowledge OR use search tools - searching is OPTIONAL
 2. You MUST call update_content(content) to save your answer to the note
-3. The done() tool does NOT save anything - it only signals you're finished
-4. Always call update_content() BEFORE done()
+3. The node_done() tool does NOT save anything - it only signals you're finished
+4. Always call update_content() BEFORE node_done()
 
 Example workflow:
 - User asks "What is pi?"
 - You write: update_content("# Pi\\n\\nPi is the ratio of a circle's circumference...")
-- Then: done("Added explanation of pi")
+- Then: node_done("Added explanation of pi")
 
-DO NOT call done() without first calling update_content(). Your response will be lost.`
+DO NOT call node_done() without first calling update_content(). Your response will be lost.`
   }
 
   async function run(prompt: string, ctx: NodeAgentContext): Promise<string> {
@@ -344,6 +278,8 @@ DO NOT call done() without first calling update_content(). Your response will be
       { role: 'user', content: prompt },
     ]
 
+    // Get tools from registry
+    const nodeTools = getNodeAgentTools()
     const maxIterations = 20
 
     for (let i = 0; i < maxIterations; i++) {
@@ -368,6 +304,8 @@ DO NOT call done() without first calling update_content(). Your response will be
             log.value.push(`> ${name}`)
             let result = ''
 
+            // Handle tool execution based on name
+            // Tools return markers, but we execute the actual logic here
             switch (name) {
               case 'web_search':
                 log.value.push(`  Searching: ${args.query}`)
@@ -448,16 +386,16 @@ DO NOT call done() without first calling update_content(). Your response will be
                 log.value.push(`  Title: ${args.title}`)
                 break
 
-              case 'done':
+              case 'node_done':
                 // Check if content was actually updated
                 if (!contentWasUpdated) {
                   log.value.push(`  WARNING: No content saved yet!`)
-                  result = `REJECTED: You cannot call done() yet because you have not saved any content to the note.
+                  result = `REJECTED: You cannot call node_done() yet because you have not saved any content to the note.
 
 YOUR NEXT STEP: Call update_content with your answer. Example:
-update_content("# Pi\\n\\nPi (π) is a mathematical constant equal to approximately 3.14159...")
+update_content("# Pi\\n\\nPi (\\u03c0) is a mathematical constant equal to approximately 3.14159...")
 
-After update_content succeeds, then you may call done().`
+After update_content succeeds, then you may call node_done().`
                   break
                 }
                 log.value.push(`> Done: ${args.summary}`)
@@ -466,7 +404,7 @@ After update_content succeeds, then you may call done().`
 
               default:
                 log.value.push(`  Unknown tool: ${name}`)
-                result = `Error: Unknown tool "${name}". Available tools: web_search, wikipedia_search, update_content, append_content, update_title, done`
+                result = `Error: Unknown tool "${name}". Available tools: web_search, fetch_url, wikipedia_search, update_content, append_content, update_title, node_done`
             }
 
             messages.push({ role: 'tool', content: result, tool_call_id: toolCallId })
@@ -479,7 +417,7 @@ After update_content succeeds, then you may call done().`
             return msg.content
           }
           // Prompt to use tools
-          messages.push({ role: 'user', content: 'Use tools. Call done() when finished.' })
+          messages.push({ role: 'user', content: 'Use tools. Call node_done() when finished.' })
         }
       } catch (e: unknown) {
         const errorMsg = e instanceof Error ? e.message : String(e)

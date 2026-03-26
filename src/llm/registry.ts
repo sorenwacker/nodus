@@ -146,6 +146,29 @@ class ToolRegistry {
   }
 
   /**
+   * Get tool definitions filtered by multiple categories
+   */
+  getToolsByCategories(categories: string[]): Array<{ type: 'function'; function: ToolDefinition }> {
+    const allNames = new Set<string>()
+    for (const category of categories) {
+      const names = this.categories.get(category)
+      if (names) {
+        for (const name of names) {
+          allNames.add(name)
+        }
+      }
+    }
+
+    return Array.from(allNames)
+      .map(name => this.tools.get(name))
+      .filter((t): t is RegisteredTool => t !== undefined)
+      .map(t => ({
+        type: 'function' as const,
+        function: t.definition,
+      }))
+  }
+
+  /**
    * Execute a tool by name
    */
   async execute(
