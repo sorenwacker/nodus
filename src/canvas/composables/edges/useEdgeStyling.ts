@@ -4,7 +4,7 @@
  * Handles edge colors, styles, and theme-aware highlighting
  */
 
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { canvasStorage } from '../../../lib/storage'
 
 export type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'
@@ -155,6 +155,22 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   // Update edge style when workspace changes
   watch(workspaceId, (newId) => {
     globalEdgeStyle.value = canvasStorage.getEdgeStyle(newId || undefined)
+  })
+
+  // Listen for edge style changes from settings panel
+  function handleEdgeStyleChange(e: Event) {
+    const style = (e as CustomEvent).detail as EdgeStyleType
+    if (style) {
+      globalEdgeStyle.value = style
+    }
+  }
+
+  onMounted(() => {
+    window.addEventListener('nodus-edge-style-change', handleEdgeStyleChange)
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener('nodus-edge-style-change', handleEdgeStyleChange)
   })
 
   // Reactive edge color palette - neon for dark themes, professional for light
