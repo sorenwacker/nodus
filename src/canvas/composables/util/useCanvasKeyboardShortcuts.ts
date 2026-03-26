@@ -40,9 +40,6 @@ export interface UseCanvasKeyboardShortcutsContext {
   refreshFromFiles: () => void
   exportGraphAsYaml: () => void
 
-  // Search
-  showSearch: () => void
-
   // Help
   showHelp: () => void
 }
@@ -73,7 +70,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     decreaseFontScale,
     refreshFromFiles,
     exportGraphAsYaml,
-    showSearch,
     showHelp,
   } = ctx
 
@@ -95,19 +91,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     // Skip shortcuts if user is typing in an input (allow native browser behavior)
     const target = e.target as HTMLElement
     const isInInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
-
-    // Cmd+F opens node search (but allow native find when editing text)
-    if ((e.key === 'f' || e.key === 'F') && (e.metaKey || e.ctrlKey)) {
-      if (isInInput) {
-        // Allow native browser find in text inputs
-        return
-      }
-      e.preventDefault()
-      showSearch()
-      return
-    }
-
-    // Skip other shortcuts if user is typing in an input
     if (isInInput) {
       return
     }

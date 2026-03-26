@@ -16,10 +16,6 @@ CREATE TABLE IF NOT EXISTS workspaces (
     updated_at INTEGER NOT NULL
 );
 
--- Default workspace
-INSERT OR IGNORE INTO workspaces (id, name, color, created_at, updated_at)
-VALUES ('default', 'Default', '#3b82f6', strftime('%s', 'now'), strftime('%s', 'now'));
-
 -- 2. Frames: Spatial grouping on canvas (must be before nodes)
 CREATE TABLE IF NOT EXISTS frames (
     id TEXT PRIMARY KEY,
