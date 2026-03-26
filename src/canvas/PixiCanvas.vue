@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 import type { Node, Edge } from '../types'
@@ -925,6 +926,10 @@ function clearConversation() {
   conversationHistory.value = []
 }
 
+async function copyAgentLog() {
+  await writeText(agentLog.value.join('\n'))
+}
+
 // Agent runner composable - handles the main agent loop
 const agentContext: AgentContext = {
   filteredNodes: () => {
@@ -1753,6 +1758,34 @@ useCanvasKeyboardShortcuts({
       @prompt-keydown="onPromptKeydown"
       @clear-log="agentLog.length = 0"
     />
+
+    <!-- Standalone agent log panel (when LLM bar is hidden) -->
+    <div v-if="!llmEnabled && showAgentLogPanel && agentLog.length > 0" class="standalone-agent-log">
+      <div class="log-header">
+        <span>Agent Log ({{ agentLog.length }})</span>
+        <div class="log-buttons">
+          <button class="log-btn" title="Copy log" @click="copyAgentLog">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+          <button class="log-btn" title="Clear log" @click="agentLog.length = 0">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+          <button class="log-btn" title="Close" @click="showAgentLogPanel = false">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="log-content">
+        <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
+      </div>
+    </div>
 
     <div
       ref="canvasRef"
