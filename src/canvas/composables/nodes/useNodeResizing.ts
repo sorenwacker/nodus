@@ -24,6 +24,8 @@ export interface UseNodeResizingContext {
   pushOverlappingNodesAway: (sourceId: string) => void
   setLastDragEndTime: (time: number) => void
   pushSizeUndo?: (sizes: Map<string, { width: number; height: number; x: number; y: number }>) => void
+  isSemanticZoomCollapsed?: Ref<boolean>
+  isLODMode?: Ref<boolean>
 }
 
 export interface UseNodeResizingReturn {
@@ -51,6 +53,8 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     pushOverlappingNodesAway,
     setLastDragEndTime,
     pushSizeUndo,
+    isSemanticZoomCollapsed,
+    isLODMode,
   } = ctx
 
   // State
@@ -204,9 +208,10 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
       }
 
       // In neighborhood mode, re-layout to adapt to new sizes
+      // Skip push-away in dot mode (semantic zoom collapsed or LOD mode)
       if (neighborhoodMode.value && focusNodeId.value) {
         setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
-      } else {
+      } else if (!isSemanticZoomCollapsed?.value && !isLODMode?.value) {
         pushOverlappingNodesAway(nodeId)
       }
     }
