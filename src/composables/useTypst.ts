@@ -4,6 +4,7 @@
  */
 import { ref, shallowRef } from 'vue'
 import { invoke, isTauri } from '@/lib/tauri'
+import { sanitizeSvg, escapeText } from '@/lib/sanitize'
 
 // SVG cache: hash -> rendered SVG
 const mathCache = new Map<string, string>()
@@ -40,8 +41,8 @@ async function renderMathToSvg(math: string, displayMode: boolean): Promise<stri
   if (cached) return cached
 
   if (!isTauri()) {
-    // Fallback for browser mode - show the raw math
-    return `<span class="math-fallback">${math}</span>`
+    // Fallback for browser mode - show the raw math (escaped)
+    return `<span class="math-fallback">${escapeText(math)}</span>`
   }
 
   try {
@@ -50,14 +51,17 @@ async function renderMathToSvg(math: string, displayMode: boolean): Promise<stri
       displayMode,
     })
 
+    // Sanitize SVG before caching
+    const sanitized = sanitizeSvg(svg)
+
     // Cache the result
     if (mathCache.size >= MAX_CACHE_SIZE) {
       const firstKey = mathCache.keys().next().value
       if (firstKey) mathCache.delete(firstKey)
     }
-    mathCache.set(cacheKey, svg)
+    mathCache.set(cacheKey, sanitized)
 
-    return svg
+    return sanitized
   } catch (e) {
     console.error('[Math] Render error:', e)
     throw e
@@ -137,8 +141,9 @@ async function renderMathInContent(content: string): Promise<{
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e)
       mathBlocks.push({ original, svg: '', error })
+      // Escape both error and original to prevent XSS
       html = html.slice(0, match.index) +
-        `<span class="math-error" title="${error}">${original}</span>` +
+        `<span class="math-error" title="${escapeText(error)}">${escapeText(original)}</span>` +
         html.slice((match.index || 0) + original.length)
     }
   }

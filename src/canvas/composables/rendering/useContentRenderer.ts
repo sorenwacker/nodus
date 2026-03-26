@@ -7,6 +7,7 @@ import { ref, watch, nextTick } from 'vue'
 import { marked } from 'marked'
 import { invoke, isTauri } from '../../../lib/tauri'
 import { renderMath as renderMathWasm, initTypst as initTypstWasm, isTypstReady } from '../../../lib/typst'
+import { sanitizeSvg, sanitizeHtml, escapeText } from '../../../lib/sanitize'
 import type { Node } from '../../../types'
 
 export interface UseContentRendererOptions {
@@ -89,8 +90,9 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         }
 
         if (svg) {
-          mathCache.set(cacheKey, svg)
-          el.innerHTML = svg
+          const sanitized = sanitizeSvg(svg)
+          mathCache.set(cacheKey, sanitized)
+          el.innerHTML = sanitized
           el.classList.remove('typst-pending')
         } else {
           // No renderer available - show raw math
@@ -199,6 +201,9 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       const missingClass = targetExists ? '' : ' missing'
       return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
     })
+
+    // Sanitize HTML to prevent XSS
+    html = sanitizeHtml(html)
 
     // Cache the result (limit cache size)
     if (markdownCache.size > 100) {
@@ -334,14 +339,16 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         console.log('[Mermaid] Calling mermaid.render with id:', id)
         const { svg } = await mermaidApi.render(id, code)
         console.log('[Mermaid] Render successful, SVG length:', svg?.length)
-        mermaidCache.set(code, svg)
-        el.innerHTML = svg
+        const sanitized = sanitizeSvg(svg)
+        mermaidCache.set(code, sanitized)
+        el.innerHTML = sanitized
         didRenderNew = true
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         console.error('[Mermaid] Render error:', e)
         const msg = e.message || String(e)
-        const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${msg.substring(0, 100)}</div>`
+        // Escape error message to prevent XSS
+        const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${escapeText(msg.substring(0, 100))}</div>`
         mermaidCache.set(code, errorHtml)
         el.innerHTML = errorHtml
         didRenderNew = true

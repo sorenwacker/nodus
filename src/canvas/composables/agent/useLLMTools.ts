@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type { Node } from '../../../types'
 import type { AgentTask, AgentPlan } from '../../../llm/types'
 import { quickResearch } from '../../../llm/research'
+import { evalMathExpr } from '../../../llm/utils'
 
 /**
  * LLM Queue interface (subset of llmQueue)
@@ -142,24 +143,12 @@ export function useLLMTools(ctx: LLMToolsContext) {
         if (nodes.length === 0) return `No nodes match filter "${filter}"`
         log(`> Iterating ${nodes.length} nodes`)
 
-        const evalExpr = (expr: string, n: number): string => {
-          try {
-            const safe = expr.replace(/\bn\b/g, String(n)).replace(/\^/g, '**')
-            if (!/^[\d\s+\-*/().]+$/.test(safe)) return expr
-            return String(
-              Math.round(Function(`"use strict"; return (${safe})`)() * 1000) / 1000
-            )
-          } catch {
-            return expr
-          }
-        }
-
         const results: string[] = []
         for (const node of nodes) {
           const num = parseInt(node.title.match(/\d+/)?.[0] || '0')
           const query = ((args.template as string) || '')
             .replace(/\{title\}/g, node.title)
-            .replace(/\{([^}]+)\}/g, (_: string, expr: string) => evalExpr(expr, num))
+            .replace(/\{([^}]+)\}/g, (_: string, expr: string) => evalMathExpr(expr, num))
 
           if (args.action === 'set') {
             pushContentUndo(node.id, node.markdown_content, node.title)

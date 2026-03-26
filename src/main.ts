@@ -11,5 +11,9 @@ try {
   app.mount('#app')
 } catch (e) {
   console.error('Nodus: Failed to mount app', e)
-  document.body.innerHTML = `<pre style="color:red;padding:20px">Error: ${e}</pre>`
+  const errorEl = document.createElement('pre')
+  errorEl.style.cssText = 'color:red;padding:20px'
+  errorEl.textContent = `Error: ${e instanceof Error ? e.message : String(e)}`
+  document.body.innerHTML = ''
+  document.body.appendChild(errorEl)
 }

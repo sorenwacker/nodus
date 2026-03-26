@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import { invoke } from '@tauri-apps/api/core'
 import { useNodesStore } from '../stores/nodes'
+import { sanitizeHtml, sanitizeSvg } from '../lib/sanitize'
 import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
 import type { Node, Storyline } from '../types'
@@ -158,14 +159,15 @@ async function parseMarkdownAsync(content: string): Promise<string> {
 
   // Render math to SVG and restore
   for (const [id, { math, isDisplay }] of mathPlaceholders) {
-    const svg = await renderMathToSvg(math, isDisplay)
+    const svg = sanitizeSvg(await renderMathToSvg(math, isDisplay))
     const wrapper = isDisplay
       ? `<div class="typst-display typst-math">${svg}</div>`
       : `<span class="typst-inline typst-math">${svg}</span>`
     html = html.replace(new RegExp(id, 'g'), wrapper)
   }
 
-  return html
+  // Sanitize final HTML output
+  return sanitizeHtml(html)
 }
 
 // Cached rendered content per node

@@ -40,19 +40,88 @@ export function parseToolArgs(args: unknown): Record<string, unknown> {
 }
 
 /**
- * Simple math expression evaluator
+ * Safe math expression evaluator using recursive descent parsing
  * Supports n, +, -, *, /, ^, parentheses
+ * No use of eval() or Function() - fully parsed
  */
 export function evalMathExpr(expr: string, n: number): string {
   try {
-    // Replace n with the number, ^ with **
-    const safe = expr.replace(/\bn\b/g, String(n)).replace(/\^/g, '**')
+    // Replace n with the number
+    const normalized = expr.replace(/\bn\b/g, String(n))
     // Only allow safe math characters
-    if (!/^[\d\s+\-*/().]+$/.test(safe)) return expr
-    return String(Math.round(Function(`"use strict"; return (${safe})`)() * 1000) / 1000)
+    if (!/^[\d\s+\-*/().^]+$/.test(normalized)) return expr
+    const result = parseMathExpression(normalized)
+    return String(Math.round(result * 1000) / 1000)
   } catch {
     return expr
   }
+}
+
+/**
+ * Recursive descent parser for safe math evaluation
+ */
+function parseMathExpression(expr: string): number {
+  let pos = 0
+  const str = expr.replace(/\s/g, '')
+
+  function parseNumber(): number {
+    let numStr = ''
+    while (pos < str.length && /[\d.]/.test(str[pos])) {
+      numStr += str[pos++]
+    }
+    if (!numStr) throw new Error('Expected number')
+    return parseFloat(numStr)
+  }
+
+  function parseFactor(): number {
+    if (str[pos] === '(') {
+      pos++ // skip '('
+      const result = parseAddSub()
+      if (str[pos] !== ')') throw new Error('Expected )')
+      pos++ // skip ')'
+      return result
+    }
+    // Handle negative numbers
+    if (str[pos] === '-') {
+      pos++
+      return -parseFactor()
+    }
+    return parseNumber()
+  }
+
+  function parsePower(): number {
+    let left = parseFactor()
+    while (pos < str.length && str[pos] === '^') {
+      pos++
+      const right = parseFactor()
+      left = Math.pow(left, right)
+    }
+    return left
+  }
+
+  function parseMulDiv(): number {
+    let left = parsePower()
+    while (pos < str.length && (str[pos] === '*' || str[pos] === '/')) {
+      const op = str[pos++]
+      const right = parsePower()
+      left = op === '*' ? left * right : left / right
+    }
+    return left
+  }
+
+  function parseAddSub(): number {
+    let left = parseMulDiv()
+    while (pos < str.length && (str[pos] === '+' || str[pos] === '-')) {
+      const op = str[pos++]
+      const right = parseMulDiv()
+      left = op === '+' ? left + right : left - right
+    }
+    return left
+  }
+
+  const result = parseAddSub()
+  if (pos !== str.length) throw new Error('Unexpected character')
+  return result
 }
 
 /**
