@@ -154,6 +154,10 @@
     "agentPrompt": {
       "label": "Agent Prompt (graph builder)",
       "reset": "Reset"
+    },
+    "costWarning": {
+      "title": "API costs may apply",
+      "message": "Using {provider} incurs costs based on token usage. Monitor your usage at the provider's dashboard."
     }
   },
   "workspace": {
