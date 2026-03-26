@@ -5,10 +5,14 @@
 import DOMPurify from 'dompurify'
 
 // Configure DOMPurify for SVG content (allows SVG elements)
+// Mermaid uses foreignObject for text rendering in flowcharts
 const svgConfig: DOMPurify.Config = {
-  USE_PROFILES: { svg: true, svgFilters: true },
-  ADD_TAGS: ['use'],
-  ADD_ATTR: ['xmlns', 'xmlns:xlink', 'xlink:href', 'viewBox', 'preserveAspectRatio'],
+  USE_PROFILES: { svg: true, svgFilters: true, html: true },
+  ADD_TAGS: ['use', 'foreignObject'],
+  ADD_ATTR: [
+    'xmlns', 'xmlns:xlink', 'xlink:href', 'viewBox', 'preserveAspectRatio',
+    'requiredExtensions', 'dominant-baseline', 'text-anchor',
+  ],
 }
 
 // Configure DOMPurify for HTML content (markdown rendered)
