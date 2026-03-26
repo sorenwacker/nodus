@@ -229,13 +229,13 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     }
     nodeSearchMatches.value = matches
     nodeSearchIndex.value = matches.length > 0 ? 0 : -1
-    // Select first match
+    // Select first match but keep focus in search input
     if (matches.length > 0) {
-      selectMatch(0)
+      selectMatch(0, true)
     }
   }
 
-  function selectMatch(index: number) {
+  function selectMatch(index: number, refocusSearch = false) {
     const matches = nodeSearchMatches.value
     if (matches.length === 0 || index < 0 || index >= matches.length) return
     const pos = matches[index]
@@ -248,6 +248,13 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
       const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20
       const linesBefore = editContent.value.substring(0, pos).split('\n').length - 1
       textarea.scrollTop = linesBefore * lineHeight - textarea.clientHeight / 2
+    }
+    // Refocus search input if requested (during typing)
+    if (refocusSearch) {
+      requestAnimationFrame(() => {
+        const input = document.querySelector('.node-search-input') as HTMLInputElement
+        if (input) input.focus()
+      })
     }
   }
 
