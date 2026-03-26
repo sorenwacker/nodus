@@ -573,9 +573,9 @@ fn format_individual_content(individual: &OntologyIndividual) -> String {
 
     // Metadata footer
     if let Some(class_iri) = &individual.class_iri {
-        content.push_str(&format!("**Type:** {}\n", local_name(class_iri)));
+        content.push_str(&format!("**Type:** `{}`\n", curie_from_iri(class_iri)));
     }
-    content.push_str(&format!("**URI:** {}\n", individual.iri));
+    content.push_str(&format!("**ID:** `{}`\n", curie_from_iri(&individual.iri)));
 
     content
 }
@@ -647,7 +647,7 @@ fn format_class_content(class: &OntologyClass, properties: &[OntologyProperty]) 
         content.push('\n');
     }
 
-    content.push_str(&format!("**URI:** {}\n", class.iri));
+    content.push_str(&format!("**ID:** `{}`\n", curie_from_iri(&class.iri)));
 
     content
 }

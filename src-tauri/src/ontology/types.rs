@@ -140,6 +140,69 @@ pub fn local_name(iri: &str) -> String {
     iri.to_string()
 }
 
+/// Extract a short ID (CURIE) from IRI
+/// Examples:
+/// - `http://purl.org/ppeo/PPEO.owl#investigation` → `PPEO:investigation`
+/// - `http://purl.obolibrary.org/obo/OBI_0000001` → `OBI:0000001`
+/// - `http://www.w3.org/2002/07/owl#Class` → `owl:Class`
+pub fn curie_from_iri(iri: &str) -> String {
+    // Well-known prefixes
+    let known_prefixes: &[(&str, &str)] = &[
+        ("http://www.w3.org/2002/07/owl#", "owl"),
+        ("http://www.w3.org/2000/01/rdf-schema#", "rdfs"),
+        ("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf"),
+        ("http://www.w3.org/2001/XMLSchema#", "xsd"),
+        ("http://purl.org/dc/elements/1.1/", "dc"),
+        ("http://purl.org/dc/terms/", "dcterms"),
+        ("http://xmlns.com/foaf/0.1/", "foaf"),
+        ("http://www.w3.org/2004/02/skos/core#", "skos"),
+        ("http://schema.org/", "schema"),
+        ("https://schema.org/", "schema"),
+    ];
+
+    // Check well-known prefixes first
+    for (namespace, prefix) in known_prefixes {
+        if let Some(local) = iri.strip_prefix(namespace) {
+            return format!("{}:{}", prefix, local);
+        }
+    }
+
+    // OBO Foundry pattern: http://purl.obolibrary.org/obo/PREFIX_ID
+    if iri.starts_with("http://purl.obolibrary.org/obo/") {
+        let local = &iri[31..]; // After "http://purl.obolibrary.org/obo/"
+        if let Some(pos) = local.find('_') {
+            let prefix = &local[..pos];
+            let id = &local[pos + 1..];
+            return format!("{}:{}", prefix, id);
+        }
+    }
+
+    // Generic pattern: extract prefix from path before .owl# or just before #
+    if let Some(hash_pos) = iri.rfind('#') {
+        let namespace = &iri[..hash_pos];
+        let local = &iri[hash_pos + 1..];
+
+        // Try to extract prefix from namespace
+        // Pattern: .../PREFIX.owl or .../PREFIX#
+        if let Some(slash_pos) = namespace.rfind('/') {
+            let filename = &namespace[slash_pos + 1..];
+            // Remove .owl suffix if present
+            let prefix = filename
+                .strip_suffix(".owl")
+                .or_else(|| filename.strip_suffix(".rdf"))
+                .or_else(|| filename.strip_suffix(".ttl"))
+                .unwrap_or(filename);
+
+            if !prefix.is_empty() {
+                return format!("{}:{}", prefix, local);
+            }
+        }
+    }
+
+    // Fallback: just use local name
+    local_name(iri)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,5 +236,41 @@ mod tests {
             Some(OntologyFormat::JsonLd)
         );
         assert_eq!(OntologyFormat::from_extension("txt"), None);
+    }
+
+    #[test]
+    fn test_curie_ppeo() {
+        assert_eq!(
+            curie_from_iri("http://purl.org/ppeo/PPEO.owl#investigation"),
+            "PPEO:investigation"
+        );
+        assert_eq!(
+            curie_from_iri("http://purl.org/ppeo/PPEO.owl#event"),
+            "PPEO:event"
+        );
+    }
+
+    #[test]
+    fn test_curie_owl() {
+        assert_eq!(
+            curie_from_iri("http://www.w3.org/2002/07/owl#Class"),
+            "owl:Class"
+        );
+        assert_eq!(
+            curie_from_iri("http://www.w3.org/2000/01/rdf-schema#label"),
+            "rdfs:label"
+        );
+    }
+
+    #[test]
+    fn test_curie_obo() {
+        assert_eq!(
+            curie_from_iri("http://purl.obolibrary.org/obo/OBI_0000001"),
+            "OBI:0000001"
+        );
+        assert_eq!(
+            curie_from_iri("http://purl.obolibrary.org/obo/GO_0008150"),
+            "GO:0008150"
+        );
     }
 }
