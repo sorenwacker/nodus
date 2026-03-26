@@ -46,6 +46,7 @@ fn main() {
             commands::create_node,
             commands::update_node,
             commands::delete_node,
+            commands::delete_nodes,
             commands::restore_node,
             commands::update_node_position,
             commands::update_node_content,

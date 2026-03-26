@@ -630,6 +630,19 @@ export const useNodesStore = defineStore('nodes', () => {
     edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
   }
 
+  async function deleteNodes(ids: string[]) {
+    if (ids.length === 0) return
+    try {
+      await invoke('delete_nodes', { ids })
+    } catch (e) {
+      console.error('Failed to delete nodes:', e)
+    }
+    const idSet = new Set(ids)
+    nodes.value = nodes.value.filter(n => !idSet.has(n.id))
+    // Remove edges connected to deleted nodes
+    edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
+  }
+
   // Edge functions - forwarded to edges store
   const createEdge = (data: CreateEdgeInput) => edgesStore.createEdge(data)
   const deleteEdge = (id: string) => edgesStore.deleteEdge(id)
@@ -1088,6 +1101,7 @@ export const useNodesStore = defineStore('nodes', () => {
     refreshNodeFromFile,
     createNode,
     deleteNode,
+    deleteNodes,
     restoreNode,
     createEdge,
     deleteEdge,

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
+import type { Node, Edge } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
 import { optimizeNodeEntrypoints } from './routing'
@@ -1569,21 +1570,28 @@ function selectAllNodes() {
 }
 
 async function deleteSelectedNodes() {
-  const count = store.selectedNodeIds.length
-  if (count === 0) return
-  // Delete without confirm to avoid Tauri permission issues
-  for (const id of [...store.selectedNodeIds]) {
+  const ids = [...store.selectedNodeIds]
+  if (ids.length === 0) return
+
+  // Collect all nodes and edges for undo before deletion
+  const undoData: Array<{ node: Node; edges: Edge[] }> = []
+  for (const id of ids) {
     const node = store.getNode(id)
     if (node) {
-      // Capture connected edges before deletion
       const connectedEdges = store.filteredEdges.filter(
         e => e.source_node_id === id || e.target_node_id === id
       )
-      // Save for undo
-      pushDeletionUndo(node, connectedEdges)
+      undoData.push({ node, edges: connectedEdges })
     }
-    await store.deleteNode(id)
   }
+
+  // Push all to undo stack
+  for (const { node, edges } of undoData) {
+    pushDeletionUndo(node, edges)
+  }
+
+  // Batch delete all nodes at once
+  await store.deleteNodes(ids)
 }
 
 // Get node background - wrapper for utility function with current theme

@@ -454,6 +454,45 @@ pub async fn delete_node(id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Batch delete multiple nodes efficiently
+#[tauri::command]
+pub async fn delete_nodes(ids: Vec<String>) -> Result<(), String> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Get all nodes with file_paths in one query
+    let nodes = database::nodes::get_many_by_ids(pool, &ids)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Move files to trash (collect errors but don't fail)
+    for node in &nodes {
+        if let Some(file_path) = &node.file_path {
+            let path = std::path::Path::new(file_path);
+            if path.exists() {
+                if let Some(parent) = path.parent() {
+                    let trash_dir = parent.join(".nodus-trash");
+                    if !trash_dir.exists() {
+                        let _ = std::fs::create_dir_all(&trash_dir);
+                    }
+                    if let Some(filename) = path.file_name() {
+                        let trash_path = trash_dir.join(filename);
+                        let _ = std::fs::rename(path, &trash_path);
+                    }
+                }
+            }
+        }
+    }
+
+    // Batch soft delete all nodes
+    database::nodes::soft_delete_many(pool, &ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn restore_node(node: Node) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;

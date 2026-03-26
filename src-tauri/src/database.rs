@@ -235,6 +235,47 @@ pub mod nodes {
         Ok(())
     }
 
+    /// Batch soft delete multiple nodes in a single transaction
+    pub async fn soft_delete_many(pool: &DbPool, ids: &[String]) -> Result<(), DatabaseError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let now = chrono::Utc::now().timestamp();
+        // Build placeholders for IN clause
+        let placeholders: Vec<&str> = ids.iter().map(|_| "?").collect();
+        let query = format!(
+            "UPDATE nodes SET deleted_at = ? WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query(&query).bind(now);
+        for id in ids {
+            q = q.bind(id);
+        }
+        q.execute(pool).await?;
+        Ok(())
+    }
+
+    /// Get multiple nodes by IDs (for batch operations)
+    pub async fn get_many_by_ids(
+        pool: &DbPool,
+        ids: &[String],
+    ) -> Result<Vec<Node>, DatabaseError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders: Vec<&str> = ids.iter().map(|_| "?").collect();
+        let query = format!(
+            "SELECT * FROM nodes WHERE id IN ({}) AND deleted_at IS NULL",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query_as::<_, Node>(&query);
+        for id in ids {
+            q = q.bind(id);
+        }
+        let nodes = q.fetch_all(pool).await?;
+        Ok(nodes)
+    }
+
     pub async fn restore(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
         sqlx::query("UPDATE nodes SET deleted_at = NULL WHERE id = ?")
             .bind(id)
