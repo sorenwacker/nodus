@@ -68,6 +68,8 @@ pub struct OntologyClass {
     pub label: Option<String>,
     /// Description
     pub description: Option<String>,
+    /// Property IRIs restricted on this class (from owl:Restriction)
+    pub restricted_properties: Vec<String>,
 }
 
 /// A subclass relationship

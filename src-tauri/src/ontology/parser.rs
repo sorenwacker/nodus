@@ -30,6 +30,9 @@ const OWL_CLASS: &str = "http://www.w3.org/2002/07/owl#Class";
 const OWL_OBJECT_PROPERTY: &str = "http://www.w3.org/2002/07/owl#ObjectProperty";
 const OWL_DATATYPE_PROPERTY: &str = "http://www.w3.org/2002/07/owl#DatatypeProperty";
 const OWL_NAMED_INDIVIDUAL: &str = "http://www.w3.org/2002/07/owl#NamedIndividual";
+#[allow(dead_code)] // Used for documentation, matching done via blank nodes
+const OWL_RESTRICTION: &str = "http://www.w3.org/2002/07/owl#Restriction";
+const OWL_ON_PROPERTY: &str = "http://www.w3.org/2002/07/owl#onProperty";
 const DC_DESCRIPTION: &str = "http://purl.org/dc/elements/1.1/description";
 const DC_TERMS_DESCRIPTION: &str = "http://purl.org/dc/terms/description";
 const SKOS_PREF_LABEL: &str = "http://www.w3.org/2004/02/skos/core#prefLabel";
@@ -112,6 +115,10 @@ struct TripleCollector {
     subclass_relations: RefCell<Vec<SubclassRelation>>,
     /// OWL ObjectProperty definitions with domain/range
     property_definitions: RefCell<HashMap<String, PropertyDefinition>>,
+    /// Blank nodes representing owl:Restriction - maps blank node ID to property IRI
+    restriction_properties: RefCell<HashMap<String, String>>,
+    /// Class to blank node restriction mappings (class IRI -> restriction blank node IDs)
+    class_restrictions: RefCell<HashMap<String, Vec<String>>>,
 }
 
 /// Intermediate structure for collecting property definition info
@@ -131,21 +138,35 @@ impl TripleCollector {
             classes: RefCell::new(HashMap::new()),
             subclass_relations: RefCell::new(Vec::new()),
             property_definitions: RefCell::new(HashMap::new()),
+            restriction_properties: RefCell::new(HashMap::new()),
+            class_restrictions: RefCell::new(HashMap::new()),
         }
     }
 
     fn process_triple(&self, triple: Triple) {
-        let subject_iri = match triple.subject {
-            Subject::NamedNode(NamedNode { iri }) => iri.to_string(),
-            Subject::BlankNode(_) => return, // Skip blank nodes
+        let predicate_iri = triple.predicate.iri.to_string();
+
+        // Handle blank node subjects (for owl:Restriction)
+        let (subject_iri, is_blank_subject) = match &triple.subject {
+            Subject::NamedNode(NamedNode { iri }) => (iri.to_string(), false),
+            Subject::BlankNode(bn) => (format!("_:{}", bn.id), true),
             _ => return,
         };
 
-        let predicate_iri = triple.predicate.iri.to_string();
-
-        match triple.object {
+        match &triple.object {
             Term::NamedNode(NamedNode { iri: obj_iri }) => {
                 let obj_iri = obj_iri.to_string();
+
+                // Handle blank node as subject
+                if is_blank_subject {
+                    // Track owl:onProperty for restrictions
+                    if predicate_iri == OWL_ON_PROPERTY {
+                        self.restriction_properties
+                            .borrow_mut()
+                            .insert(subject_iri.clone(), obj_iri);
+                    }
+                    return;
+                }
 
                 if predicate_iri == RDF_TYPE {
                     // Track type
@@ -162,6 +183,7 @@ impl TripleCollector {
                                 iri: subject_iri.clone(),
                                 label: None,
                                 description: None,
+                                restricted_properties: Vec::new(),
                             });
                     }
 
@@ -245,14 +267,40 @@ impl TripleCollector {
                     }
                 }
             }
+            Term::BlankNode(bn) => {
+                // Handle blank node objects (e.g., rdfs:subClassOf pointing to owl:Restriction)
+                if predicate_iri == RDFS_SUBCLASS_OF && !is_blank_subject {
+                    let bn_id = format!("_:{}", bn.id);
+                    self.class_restrictions
+                        .borrow_mut()
+                        .entry(subject_iri.clone())
+                        .or_default()
+                        .push(bn_id);
+                }
+            }
             _ => {}
         }
     }
 
     fn into_ontology_data(self) -> OntologyData {
         let subjects = self.subjects.into_inner();
-        let classes = self.classes.into_inner();
+        let mut classes = self.classes.into_inner();
         let prop_defs = self.property_definitions.into_inner();
+        let restriction_properties = self.restriction_properties.into_inner();
+        let class_restrictions = self.class_restrictions.into_inner();
+
+        // Connect class restrictions to their properties
+        for (class_iri, restriction_ids) in &class_restrictions {
+            if let Some(class) = classes.get_mut(class_iri) {
+                for restriction_id in restriction_ids {
+                    if let Some(prop_iri) = restriction_properties.get(restriction_id) {
+                        if !class.restricted_properties.contains(prop_iri) {
+                            class.restricted_properties.push(prop_iri.clone());
+                        }
+                    }
+                }
+            }
+        }
 
         // Convert subjects to individuals (excluding pure class definitions)
         let individuals: Vec<OntologyIndividual> = subjects
@@ -362,6 +410,7 @@ fn parse_json_ld(path: &Path) -> Result<OntologyData, String> {
                 iri: id.clone(),
                 label: get_json_label(obj),
                 description: get_json_description(obj),
+                restricted_properties: Vec::new(), // JSON-LD doesn't parse restrictions yet
             });
             continue;
         }

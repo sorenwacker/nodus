@@ -594,17 +594,40 @@ fn format_class_content(class: &OntologyClass, properties: &[OntologyProperty]) 
         content.push_str("\n\n");
     }
 
-    // Find properties that have this class in their domain
-    let class_properties: Vec<&OntologyProperty> = properties
+    // Find properties that have this class in their domain (via rdfs:domain)
+    let domain_properties: Vec<&OntologyProperty> = properties
         .iter()
         .filter(|p| p.domains.contains(&class.iri))
         .collect();
 
-    if !class_properties.is_empty() {
+    // Find properties from owl:Restriction on the class
+    let restricted_props: Vec<&OntologyProperty> = class
+        .restricted_properties
+        .iter()
+        .filter_map(|prop_iri| properties.iter().find(|p| &p.iri == prop_iri))
+        .collect();
+
+    // Combine both sources, avoiding duplicates
+    let mut all_properties: Vec<&OntologyProperty> = domain_properties;
+    for prop in restricted_props {
+        if !all_properties.iter().any(|p| p.iri == prop.iri) {
+            all_properties.push(prop);
+        }
+    }
+
+    // Also add restricted properties that aren't in the property_definitions list
+    let mut extra_props: Vec<String> = Vec::new();
+    for prop_iri in &class.restricted_properties {
+        if !all_properties.iter().any(|p| &p.iri == prop_iri) {
+            extra_props.push(prop_iri.clone());
+        }
+    }
+
+    if !all_properties.is_empty() || !extra_props.is_empty() {
         content.push_str("## Properties\n\n");
         content.push_str("| Property | Range |\n");
         content.push_str("|----------|-------|\n");
-        for prop in &class_properties {
+        for prop in &all_properties {
             let prop_name = prop.label.clone().unwrap_or_else(|| local_name(&prop.iri));
             let range_str = if prop.ranges.is_empty() {
                 "-".to_string()
@@ -616,6 +639,10 @@ fn format_class_content(class: &OntologyClass, properties: &[OntologyProperty]) 
                     .join(", ")
             };
             content.push_str(&format!("| {} | {} |\n", prop_name, range_str));
+        }
+        // Add extra restricted properties without full definitions
+        for prop_iri in &extra_props {
+            content.push_str(&format!("| {} | - |\n", local_name(prop_iri)));
         }
         content.push('\n');
     }

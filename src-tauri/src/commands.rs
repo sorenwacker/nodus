@@ -2066,6 +2066,12 @@ pub async fn import_ontology(
         ontology_data.property_definitions.len(),
         total_entities
     );
+    // Debug: print property definitions with their domains
+    for prop in &ontology_data.property_definitions {
+        if !prop.domains.is_empty() {
+            println!("  Property: {} -> domains: {:?}", prop.iri, prop.domains);
+        }
+    }
     use std::io::Write;
     let _ = std::io::stdout().flush();
     println!("DEBUG: About to check layout...");
