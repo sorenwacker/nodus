@@ -205,9 +205,10 @@ export function useImport(deps: ImportDeps) {
       )
 
       // Reload nodes and edges to include the newly created ones
+      const workspaceId = deps.getCurrentWorkspaceId()
       const [fetchedNodes, fetchedEdges] = await Promise.all([
         invoke<Node[]>('get_nodes'),
-        invoke<Edge[]>('get_edges'),
+        invoke<Edge[]>('get_edges', { workspaceId: workspaceId ?? null }),
       ])
       deps.setNodes(fetchedNodes)
       deps.setEdges(fetchedEdges)
