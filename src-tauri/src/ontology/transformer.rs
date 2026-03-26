@@ -162,7 +162,7 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
                 .clone()
                 .unwrap_or_else(|| local_name(&class.iri));
 
-            let markdown_content = format_class_content(class);
+            let markdown_content = format_class_content(class, &data.property_definitions);
 
             // Position after individuals
             let total_idx = class_start_idx + idx;
@@ -581,7 +581,7 @@ fn format_individual_content(individual: &OntologyIndividual) -> String {
 }
 
 /// Format markdown content for a class
-fn format_class_content(class: &OntologyClass) -> String {
+fn format_class_content(class: &OntologyClass, properties: &[OntologyProperty]) -> String {
     let mut content = String::new();
 
     content.push_str(&format!(
@@ -592,6 +592,32 @@ fn format_class_content(class: &OntologyClass) -> String {
     if let Some(desc) = &class.description {
         content.push_str(desc);
         content.push_str("\n\n");
+    }
+
+    // Find properties that have this class in their domain
+    let class_properties: Vec<&OntologyProperty> = properties
+        .iter()
+        .filter(|p| p.domains.contains(&class.iri))
+        .collect();
+
+    if !class_properties.is_empty() {
+        content.push_str("## Properties\n\n");
+        content.push_str("| Property | Range |\n");
+        content.push_str("|----------|-------|\n");
+        for prop in &class_properties {
+            let prop_name = prop.label.clone().unwrap_or_else(|| local_name(&prop.iri));
+            let range_str = if prop.ranges.is_empty() {
+                "-".to_string()
+            } else {
+                prop.ranges
+                    .iter()
+                    .map(|r| local_name(r))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            content.push_str(&format!("| {} | {} |\n", prop_name, range_str));
+        }
+        content.push('\n');
     }
 
     content.push_str(&format!("**URI:** {}\n", class.iri));

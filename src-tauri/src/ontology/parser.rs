@@ -28,7 +28,6 @@ const SCHEMA_RANGE_INCLUDES_HTTPS: &str = "https://schema.org/rangeIncludes";
 const RDFS_CLASS: &str = "http://www.w3.org/2000/01/rdf-schema#Class";
 const OWL_CLASS: &str = "http://www.w3.org/2002/07/owl#Class";
 const OWL_OBJECT_PROPERTY: &str = "http://www.w3.org/2002/07/owl#ObjectProperty";
-#[allow(dead_code)]
 const OWL_DATATYPE_PROPERTY: &str = "http://www.w3.org/2002/07/owl#DatatypeProperty";
 const OWL_NAMED_INDIVIDUAL: &str = "http://www.w3.org/2002/07/owl#NamedIndividual";
 const DC_DESCRIPTION: &str = "http://purl.org/dc/elements/1.1/description";
@@ -166,8 +165,8 @@ impl TripleCollector {
                             });
                     }
 
-                    // If it's an ObjectProperty definition, track it
-                    if obj_iri == OWL_OBJECT_PROPERTY {
+                    // If it's an ObjectProperty or DatatypeProperty definition, track it
+                    if obj_iri == OWL_OBJECT_PROPERTY || obj_iri == OWL_DATATYPE_PROPERTY {
                         let mut props = self.property_definitions.borrow_mut();
                         props.entry(subject_iri.clone()).or_default();
                     }
