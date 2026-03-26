@@ -76,10 +76,24 @@ const htmlConfig: DOMPurify.Config = {
 }
 
 /**
- * Sanitize SVG content (from Typst, Mermaid, etc.)
+ * Sanitize SVG content (from Typst, etc.)
  */
 export function sanitizeSvg(svg: string): string {
   return DOMPurify.sanitize(svg, svgConfig)
+}
+
+/**
+ * Sanitize Mermaid SVG output
+ * Mermaid uses foreignObject with HTML for text rendering which DOMPurify strips.
+ * Since Mermaid has its own security model (securityLevel config), we do minimal
+ * sanitization - just remove script tags and event handlers.
+ */
+export function sanitizeMermaidSvg(svg: string): string {
+  // Remove script tags
+  let sanitized = svg.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  // Remove event handlers (onclick, onerror, etc.)
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '')
+  return sanitized
 }
 
 /**

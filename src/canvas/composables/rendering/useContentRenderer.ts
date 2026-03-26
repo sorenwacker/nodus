@@ -7,7 +7,7 @@ import { ref, watch, nextTick } from 'vue'
 import { marked } from 'marked'
 import { invoke, isTauri } from '../../../lib/tauri'
 import { renderMath as renderMathWasm, initTypst as initTypstWasm, isTypstReady } from '../../../lib/typst'
-import { sanitizeSvg, sanitizeHtml, escapeText } from '../../../lib/sanitize'
+import { sanitizeSvg, sanitizeHtml, escapeText, sanitizeMermaidSvg } from '../../../lib/sanitize'
 import type { Node } from '../../../types'
 
 export interface UseContentRendererOptions {
@@ -339,7 +339,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         console.log('[Mermaid] Calling mermaid.render with id:', id)
         const { svg } = await mermaidApi.render(id, code)
         console.log('[Mermaid] Render successful, SVG length:', svg?.length)
-        const sanitized = sanitizeSvg(svg)
+        // Use Mermaid-specific sanitization that preserves foreignObject content
+        const sanitized = sanitizeMermaidSvg(svg)
         mermaidCache.set(code, sanitized)
         el.innerHTML = sanitized
         didRenderNew = true
