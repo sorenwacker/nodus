@@ -275,12 +275,14 @@ const {
 
 // Viewport culling composable - filters nodes visible in viewport
 // selectedNodeIds ensures selected nodes are always rendered (for fitting, etc.)
+// isZooming defers culling during zoom for smoother performance
 const viewportCulling = useViewportCulling({
   scale,
   offsetX,
   offsetY,
   displayNodes,
   selectedNodeIds: computed(() => store.selectedNodeIds),
+  isZooming,
 })
 const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
