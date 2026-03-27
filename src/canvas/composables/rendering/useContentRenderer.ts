@@ -6,7 +6,11 @@
 import { ref, watch, nextTick } from 'vue'
 import { marked } from 'marked'
 import { invoke, isTauri } from '../../../lib/tauri'
-import { renderMath as renderMathWasm, initTypst as initTypstWasm, isTypstReady } from '../../../lib/typst'
+import {
+  renderMath as renderMathWasm,
+  initTypst as initTypstWasm,
+  isTypstReady,
+} from '../../../lib/typst'
 import { sanitizeSvg, sanitizeHtml, escapeText, sanitizeMermaidSvg } from '../../../lib/sanitize'
 import type { Node } from '../../../types'
 
@@ -131,11 +135,14 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     })
 
     // Extract inline math ($...$)
-    processedContent = processedContent.replace(/(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g, (_match, math) => {
-      const id = `MATH_INLINE_${mathPlaceholders.size}`
-      mathPlaceholders.set(id, math.trim())
-      return id
-    })
+    processedContent = processedContent.replace(
+      /(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g,
+      (_match, math) => {
+        const id = `MATH_INLINE_${mathPlaceholders.size}`
+        mathPlaceholders.set(id, math.trim())
+        return id
+      }
+    )
 
     // Render markdown (without math blocks)
     let html = marked.parse(processedContent) as string
@@ -196,7 +203,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       const targetTrimmed = target.trim()
       // Check if target node exists for styling
       const targetExists = getFilteredNodes().some(
-        (n) => n.title.toLowerCase() === targetTrimmed.toLowerCase()
+        n => n.title.toLowerCase() === targetTrimmed.toLowerCase()
       )
       const missingClass = targetExists ? '' : ' missing'
       return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
@@ -205,8 +212,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     // Sanitize HTML to prevent XSS
     html = sanitizeHtml(html)
 
-    // Cache the result (limit cache size)
-    if (markdownCache.size > 100) {
+    // Cache the result (limit cache size - increased for large graphs)
+    if (markdownCache.size > 2000) {
       const firstKey = markdownCache.keys().next().value
       if (firstKey) markdownCache.delete(firstKey)
     }
@@ -344,7 +351,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         mermaidCache.set(code, sanitized)
         el.innerHTML = sanitized
         didRenderNew = true
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         console.error('[Mermaid] Render error:', e)
         const msg = e.message || String(e)
@@ -410,7 +417,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         }
         return mermaidBlocks.join('|||')
       },
-      (newMermaidCode) => {
+      newMermaidCode => {
         if (newMermaidCode && newMermaidCode !== lastMermaidCode) {
           lastMermaidCode = newMermaidCode
           setTimeout(renderMermaidDiagrams, 100)

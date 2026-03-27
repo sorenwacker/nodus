@@ -303,6 +303,18 @@ const {
   getLODRadius,
 } = graphMetrics
 
+// Pre-computed LOD node lists to avoid double filtering in template
+const lodCircleNodes = computed(() => {
+  if (!isLODMode.value) return []
+  const selectedSet = new Set(store.selectedNodeIds)
+  return visibleNodes.value.filter(n => !selectedSet.has(n.id) && n.id !== editingNodeId.value)
+})
+const lodCardNodes = computed(() => {
+  if (!isLODMode.value) return visibleNodes.value
+  const selectedSet = new Set(store.selectedNodeIds)
+  return visibleNodes.value.filter(n => selectedSet.has(n.id) || n.id === editingNodeId.value)
+})
+
 // Preview panel state (functions defined after nodeNavigation)
 const showPreviewPanel = ref(false)
 const previewNode = computed(() => {
@@ -2082,9 +2094,7 @@ useCanvasKeyboardShortcuts({
         <!-- LOD Mode: Render non-selected nodes as circles -->
         <template v-if="isLODMode">
           <div
-            v-for="node in visibleNodes.filter(
-              n => !store.selectedNodeIds.includes(n.id) && n.id !== editingNodeId
-            )"
+            v-for="node in lodCircleNodes"
             :key="node.id"
             :data-node-id="node.id"
             class="node-circle"
@@ -2112,11 +2122,7 @@ useCanvasKeyboardShortcuts({
 
         <!-- Node cards - shown for all nodes in normal mode, or selected/editing nodes in LOD mode -->
         <CanvasNodeCard
-          v-for="node in isLODMode
-            ? visibleNodes.filter(
-                n => store.selectedNodeIds.includes(n.id) || n.id === editingNodeId
-              )
-            : visibleNodes"
+          v-for="node in lodCardNodes"
           :key="node.id"
           :node="node"
           :style="getNodeStyle(node)"
