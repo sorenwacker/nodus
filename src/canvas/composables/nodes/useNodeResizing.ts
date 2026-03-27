@@ -23,16 +23,26 @@ export interface UseNodeResizingContext {
   layoutNeighborhood: (focusId: string) => void
   pushOverlappingNodesAway: (sourceId: string) => void
   setLastDragEndTime: (time: number) => void
-  pushSizeUndo?: (sizes: Map<string, { width: number; height: number; x: number; y: number }>) => void
+  pushSizeUndo?: (
+    sizes: Map<string, { width: number; height: number; x: number; y: number }>
+  ) => void
   isSemanticZoomCollapsed?: Ref<boolean>
   isLODMode?: Ref<boolean>
+  getVisualNode?: (id: string) => { canvas_x: number; canvas_y: number } | undefined
 }
 
 export interface UseNodeResizingReturn {
   // State
   resizingNode: Ref<string | null>
   resizeDirection: Ref<string>
-  resizeStart: Ref<{ x: number; y: number; width: number; height: number; nodeX: number; nodeY: number }>
+  resizeStart: Ref<{
+    x: number
+    y: number
+    width: number
+    height: number
+    nodeX: number
+    nodeY: number
+  }>
   resizePreview: Ref<{ width: number; height: number; x: number; y: number }>
 
   // Functions
@@ -55,6 +65,7 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     pushSizeUndo,
     isSemanticZoomCollapsed,
     isLODMode,
+    getVisualNode,
   } = ctx
 
   // State
@@ -62,7 +73,9 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
   const resizeDirection = ref<string>('se')
   const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0, nodeX: 0, nodeY: 0 })
   const resizePreview = ref({ width: 0, height: 0, x: 0, y: 0 })
-  const multiResizeInitial = ref<Map<string, { width: number; height: number; x: number; y: number }>>(new Map())
+  const multiResizeInitial = ref<
+    Map<string, { width: number; height: number; x: number; y: number }>
+  >(new Map())
 
   function onResizePointerDown(e: PointerEvent, nodeId: string, direction: string = 'se') {
     e.stopPropagation()
@@ -70,6 +83,9 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
 
     const node = store.getNode(nodeId)
     if (!node) return
+
+    // In neighborhood mode, use visual positions; otherwise use store positions
+    const visualNode = getVisualNode?.(nodeId) ?? node
 
     // Capture old sizes for undo before resize starts
     if (pushSizeUndo) {
@@ -106,14 +122,14 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
       y: e.clientY,
       width: node.width || NODE_DEFAULTS.WIDTH,
       height: node.height || NODE_DEFAULTS.HEIGHT,
-      nodeX: node.canvas_x,
-      nodeY: node.canvas_y,
+      nodeX: visualNode.canvas_x,
+      nodeY: visualNode.canvas_y,
     }
     resizePreview.value = {
       width: node.width || NODE_DEFAULTS.WIDTH,
       height: node.height || NODE_DEFAULTS.HEIGHT,
-      x: node.canvas_x,
-      y: node.canvas_y,
+      x: visualNode.canvas_x,
+      y: visualNode.canvas_y,
     }
 
     // Store initial sizes of all selected nodes for multi-resize
@@ -121,12 +137,13 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     if (store.selectedNodeIds.includes(nodeId) && store.selectedNodeIds.length > 1) {
       for (const id of store.selectedNodeIds) {
         const n = store.getNode(id)
-        if (n) {
+        const vn = getVisualNode?.(id) ?? n
+        if (n && vn) {
           multiResizeInitial.value.set(id, {
             width: n.width || NODE_DEFAULTS.WIDTH,
             height: n.height || NODE_DEFAULTS.HEIGHT,
-            x: n.canvas_x,
-            y: n.canvas_y,
+            x: vn.canvas_x,
+            y: vn.canvas_y,
           })
         }
       }
@@ -195,9 +212,14 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
       const nodeId = resizingNode.value
       const { width, height, x, y } = resizePreview.value
 
-      // Update primary node size and position
+      // Update primary node size
       store.updateNodeSize(nodeId, width, height)
-      store.updateNodePosition(nodeId, x, y)
+
+      // Only update position if NOT in neighborhood mode
+      // (neighborhood mode uses computed positions that shouldn't be persisted)
+      if (!neighborhoodMode.value) {
+        store.updateNodePosition(nodeId, x, y)
+      }
 
       // Update all other selected nodes to the SAME size
       if (multiResizeInitial.value.size > 0) {

@@ -56,7 +56,11 @@ import {
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
-import { findConnectedNodes, getImmediateNeighbors, buildChainContext } from './utils/graphTraversal'
+import {
+  findConnectedNodes,
+  getImmediateNeighbors,
+  buildChainContext,
+} from './utils/graphTraversal'
 import ImportOptionsModal from '../components/ImportOptionsModal.vue'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
@@ -80,7 +84,14 @@ import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 
 // Undo handlers
-const { pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo } = useUndoHandlers()
+const {
+  pushUndo,
+  pushContentUndo,
+  pushDeletionUndo,
+  pushCreationUndo,
+  pushColorUndo,
+  pushSizeUndo,
+} = useUndoHandlers()
 
 // Content renderer is configured via composable
 
@@ -114,7 +125,17 @@ const canvasRef = ref<HTMLElement | null>(null)
 const viewState = useViewState({
   getCanvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
 })
-const { scale, offsetX, offsetY, isZooming, hasSavedView: savedView, scheduleSaveViewState, centerGrid, screenToCanvas, startZooming } = viewState
+const {
+  scale,
+  offsetX,
+  offsetY,
+  isZooming,
+  hasSavedView: savedView,
+  scheduleSaveViewState,
+  centerGrid,
+  screenToCanvas,
+  startZooming,
+} = viewState
 
 onMounted(() => {
   // Setup content renderer watchers for markdown/math/mermaid
@@ -125,7 +146,7 @@ onMounted(() => {
   const observer = new MutationObserver(updateTheme)
   observer.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ['data-theme']
+    attributeFilter: ['data-theme'],
   })
 
   // Track viewport size for node culling
@@ -190,34 +211,41 @@ onMounted(() => {
 
 // Center view when nodes are first loaded, or center grid when empty
 // Always fit to content on initial load to ensure nodes are visible
-watch(() => store.filteredNodes.length, (newLen, _oldLen) => {
-  if (newLen > 0 && !hasInitiallyCentered) {
-    hasInitiallyCentered = true
-    // Always fit to content on initial load - saved view may be for different workspace
-    setTimeout(fitToContent, 50)
-    // Render mermaid diagrams after initial load (use arrow fn to defer lookup)
-    setTimeout(() => renderMermaidDiagrams?.(), 500)
-  } else if (newLen === 0 && !savedView) {
-    // Empty workspace - center the grid
-    hasInitiallyCentered = false
-    setTimeout(centerGrid, 50)
-  }
-}, { immediate: true })
+watch(
+  () => store.filteredNodes.length,
+  (newLen, _oldLen) => {
+    if (newLen > 0 && !hasInitiallyCentered) {
+      hasInitiallyCentered = true
+      // Always fit to content on initial load - saved view may be for different workspace
+      setTimeout(fitToContent, 50)
+      // Render mermaid diagrams after initial load (use arrow fn to defer lookup)
+      setTimeout(() => renderMermaidDiagrams?.(), 500)
+    } else if (newLen === 0 && !savedView) {
+      // Empty workspace - center the grid
+      hasInitiallyCentered = false
+      setTimeout(centerGrid, 50)
+    }
+  },
+  { immediate: true }
+)
 
 // Re-center when workspace changes - auto-fit so nodes are visible
-watch(() => store.currentWorkspaceId, () => {
-  // Exit neighborhood mode when workspace changes
-  neighborhood.exit()
-  // Auto-fit to content when switching workspaces (so nodes are visible)
-  hasInitiallyCentered = false
-  // Use nextTick + timeout to ensure Vue reactivity has updated filteredNodes
-  setTimeout(() => {
-    if (store.filteredNodes.length > 0) {
-      fitToContent()
-      hasInitiallyCentered = true
-    }
-  }, 200)
-})
+watch(
+  () => store.currentWorkspaceId,
+  () => {
+    // Exit neighborhood mode when workspace changes
+    neighborhood.exit()
+    // Auto-fit to content when switching workspaces (so nodes are visible)
+    hasInitiallyCentered = false
+    // Use nextTick + timeout to ensure Vue reactivity has updated filteredNodes
+    setTimeout(() => {
+      if (store.filteredNodes.length > 0) {
+        fitToContent()
+        hasInitiallyCentered = true
+      }
+    }, 200)
+  }
+)
 
 // Neighborhood mode composable
 const neighborhood = useNeighborhoodMode({
@@ -236,7 +264,14 @@ const neighborhood = useNeighborhoodMode({
 })
 
 // Destructure for convenience
-const { neighborhoodMode, focusNodeId, displayNodes, neighborhoodDepth, neighborhoodPositions, setDepth } = neighborhood
+const {
+  neighborhoodMode,
+  focusNodeId,
+  displayNodes,
+  neighborhoodDepth,
+  neighborhoodPositions,
+  setDepth,
+} = neighborhood
 
 // Viewport culling composable - filters nodes visible in viewport
 // selectedNodeIds ensures selected nodes are always rendered (for fitting, etc.)
@@ -292,7 +327,7 @@ const nodeNavigation = useNodeNavigation({
   getFilteredNodes: () => store.filteredNodes,
   getNode: store.getNode,
   getVisualNode,
-  selectNode: (id) => store.selectNode(id),
+  selectNode: id => store.selectNode(id),
   canvasRef,
   scale,
   offsetX,
@@ -302,11 +337,15 @@ const nodeNavigation = useNodeNavigation({
 const { navigateToNode, zoomToNode } = nodeNavigation
 
 // Preview panel functions (need zoomToNode from above)
-watch([() => store.selectedNodeIds, isSemanticZoomCollapsed], ([ids, collapsed]) => {
-  if (collapsed && ids.length === 1) {
-    showPreviewPanel.value = true
-  }
-}, { immediate: true })
+watch(
+  [() => store.selectedNodeIds, isSemanticZoomCollapsed],
+  ([ids, collapsed]) => {
+    if (collapsed && ids.length === 1) {
+      showPreviewPanel.value = true
+    }
+  },
+  { immediate: true }
+)
 
 function closePreviewPanel() {
   showPreviewPanel.value = false
@@ -325,7 +364,9 @@ function zoomToPreviewNode() {
 const lasso = useLasso({
   store: {
     getFilteredNodes: () => [...store.filteredNodes],
-    setSelectedNodeIds: (ids: string[]) => { store.selectedNodeIds = ids },
+    setSelectedNodeIds: (ids: string[]) => {
+      store.selectedNodeIds = ids
+    },
   },
   screenToCanvas,
   neighborhoodMode,
@@ -333,9 +374,15 @@ const lasso = useLasso({
   getDisplayNodes: () => [...displayNodes.value],
 })
 const { isLassoSelecting, lassoPoints } = lasso
-function startLasso(e: PointerEvent) { lasso.start(e) }
-function updateLasso(e: PointerEvent) { lasso.update(e) }
-function endLasso() { lasso.end() }
+function startLasso(e: PointerEvent) {
+  lasso.start(e)
+}
+function updateLasso(e: PointerEvent) {
+  lasso.update(e)
+}
+function endLasso() {
+  lasso.end()
+}
 
 // Node clipboard composable
 const clipboard = useNodeClipboard({
@@ -345,7 +392,9 @@ const clipboard = useNodeClipboard({
     getFilteredEdges: () => store.filteredEdges,
     createNode: store.createNode,
     createEdge: store.createEdge,
-    setSelectedNodeIds: (ids: string[]) => { store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...ids) },
+    setSelectedNodeIds: (ids: string[]) => {
+      store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...ids)
+    },
   },
   screenToCanvas,
   getViewportSize: () => ({ width: viewportWidth.value, height: viewportHeight.value }),
@@ -358,7 +407,13 @@ const contentRenderer = useContentRenderer({
   getFilteredNodes: () => store.filteredNodes,
   isDarkMode: () => isDarkMode.value,
 })
-const { nodeRenderedContent, renderMarkdown, renderTypstMath, renderMermaidDiagrams, setupWatchers: setupContentWatchers } = contentRenderer
+const {
+  nodeRenderedContent,
+  renderMarkdown,
+  renderTypstMath,
+  renderMermaidDiagrams,
+  setupWatchers: setupContentWatchers,
+} = contentRenderer
 
 // Node editor composable - handles inline editing with autosave
 const nodeEditor = useNodeEditor({
@@ -371,11 +426,24 @@ const nodeEditor = useNodeEditor({
 })
 // Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit
 const {
-  editingNodeId, editContent, editingTitleId, editTitle,
-  startEditing, startEditingTitle, saveTitleEditing, cancelTitleEditing,
+  editingNodeId,
+  editContent,
+  editingTitleId,
+  editTitle,
+  startEditing,
+  startEditingTitle,
+  saveTitleEditing,
+  cancelTitleEditing,
   // In-node search
-  showNodeSearch, nodeSearchQuery, nodeSearchMatches, nodeSearchIndex,
-  openNodeSearch, closeNodeSearch, updateNodeSearch, findNextMatch, findPrevMatch,
+  showNodeSearch,
+  nodeSearchQuery,
+  nodeSearchMatches,
+  nodeSearchIndex,
+  openNodeSearch,
+  closeNodeSearch,
+  updateNodeSearch,
+  findNextMatch,
+  findPrevMatch,
 } = nodeEditor
 
 // Edge manipulation composable - handles edge creation, selection, modification
@@ -393,9 +461,19 @@ const edgeManipulation = useEdgeManipulation({
   screenToCanvas,
 })
 const {
-  isCreatingEdge, edgeStartNode, edgePreviewEnd, selectedEdge,
-  onEdgePreviewMove, onEdgeCreate, onEdgeClick, deleteSelectedEdge, changeEdgeLabel,
-  reverseEdge, isEdgeBidirectional, makeUnidirectional, makeBidirectional,
+  isCreatingEdge,
+  edgeStartNode,
+  edgePreviewEnd,
+  selectedEdge,
+  onEdgePreviewMove,
+  onEdgeCreate,
+  onEdgeClick,
+  deleteSelectedEdge,
+  changeEdgeLabel,
+  reverseEdge,
+  isEdgeBidirectional,
+  makeUnidirectional,
+  makeBidirectional,
   insertNodeOnEdge,
 } = edgeManipulation
 
@@ -410,7 +488,14 @@ const canvasZoom = useCanvasZoom({
   scheduleSaveViewState,
   magnifierThreshold: 0.4, // MAGNIFIER_THRESHOLD
 })
-const { showMagnifier, magnifierPos, onWheel, onCanvasPointerMove, onCanvasPointerEnter, onCanvasPointerLeave } = canvasZoom
+const {
+  showMagnifier,
+  magnifierPos,
+  onWheel,
+  onCanvasPointerMove,
+  onCanvasPointerEnter,
+  onCanvasPointerLeave,
+} = canvasZoom
 
 // Canvas display composable - handles magnifier, thumbnails, font scale
 const canvasDisplay = useCanvasDisplay({
@@ -445,7 +530,7 @@ const magnifierVisibleNodes = computed(() => {
   if (!shouldShowMagnifier.value) return []
 
   // Calculate the canvas area visible in the magnifier
-  const viewRadius = (MAGNIFIER_SIZE / 2) / MAGNIFIER_ZOOM / scale.value
+  const viewRadius = MAGNIFIER_SIZE / 2 / MAGNIFIER_ZOOM / scale.value
   const centerX = (magnifierPos.value.x - offsetX.value) / scale.value
   const centerY = (magnifierPos.value.y - offsetY.value) / scale.value
 
@@ -457,7 +542,7 @@ const magnifierVisibleNodes = computed(() => {
     const closestY = Math.max(node.canvas_y, Math.min(centerY, nodeBottom))
     const dx = centerX - closestX
     const dy = centerY - closestY
-    return (dx * dx + dy * dy) < (viewRadius * viewRadius * 4) // 2x radius for margin
+    return dx * dx + dy * dy < viewRadius * viewRadius * 4 // 2x radius for margin
   })
 })
 
@@ -473,14 +558,16 @@ const frameBorderWidth = computed(() => {
 
 // Minimap - using composable
 const minimap = useMinimap({
-  nodes: computed(() => store.filteredNodes.map(n => ({
-    id: n.id,
-    canvas_x: n.canvas_x,
-    canvas_y: n.canvas_y,
-    width: n.width || NODE_DEFAULTS.WIDTH,
-    height: n.height || NODE_DEFAULTS.HEIGHT,
-    color_theme: n.color_theme,
-  }))),
+  nodes: computed(() =>
+    store.filteredNodes.map(n => ({
+      id: n.id,
+      canvas_x: n.canvas_x,
+      canvas_y: n.canvas_y,
+      width: n.width || NODE_DEFAULTS.WIDTH,
+      height: n.height || NODE_DEFAULTS.HEIGHT,
+      color_theme: n.color_theme,
+    }))
+  ),
   selectedNodeIds: computed(() => store.selectedNodeIds),
   scale,
   offsetX,
@@ -515,7 +602,8 @@ const canvasPan = useCanvasPan({
 const { isPanning, startPan } = canvasPan
 
 // Get reactive refs from store for the hover composable
-const { selectedNodeIds: storeSelectedNodeIds, filteredEdges: storeFilteredEdges } = storeToRefs(store)
+const { selectedNodeIds: storeSelectedNodeIds, filteredEdges: storeFilteredEdges } =
+  storeToRefs(store)
 
 // Node hover composable - handles hover state, tooltips, and active node tracking
 const nodeHover = useNodeHover({
@@ -571,7 +659,7 @@ watch(
 const contextMenu = useContextMenu({
   getSelectedNodeIds: () => store.selectedNodeIds,
   addNodeToStoryline: (storylineId, nodeId) => store.addNodeToStoryline(storylineId, nodeId),
-  createStoryline: (title) => store.createStoryline(title),
+  createStoryline: title => store.createStoryline(title),
   moveNodesToWorkspace: (nodeIds, workspaceId) => store.moveNodesToWorkspace(nodeIds, workspaceId),
 })
 // Expose refs for template compatibility
@@ -585,9 +673,11 @@ const contextMenuWorkspaceSubmenu = contextMenu.workspaceSubmenu
 const linkPicker = useLinkPicker({
   contextMenuNodeId,
   closeContextMenu: () => contextMenu.close(),
-  createEdge: (sourceId, targetId) => store.createEdge({ source_node_id: sourceId, target_node_id: targetId, link_type: 'related' }),
+  createEdge: (sourceId, targetId) =>
+    store.createEdge({ source_node_id: sourceId, target_node_id: targetId, link_type: 'related' }),
 })
-const { showLinkPicker, linkPickerSourceNodeId, openLinkPicker, closeLinkPicker, linkToNode } = linkPicker
+const { showLinkPicker, linkPickerSourceNodeId, openLinkPicker, closeLinkPicker, linkToNode } =
+  linkPicker
 
 // Node agent mode - always agent (tools enabled)
 const nodeAgentMode = ref<'simple' | 'agent'>('agent')
@@ -611,10 +701,18 @@ function snapToGrid(value: number): number {
 // Frame operations composable
 const frames = useFrames({
   store: {
-    get frames() { return store.frames },
-    get filteredNodes() { return store.filteredNodes },
-    get selectedNodeIds() { return store.selectedNodeIds },
-    get selectedFrameId() { return store.selectedFrameId },
+    get frames() {
+      return store.frames
+    },
+    get filteredNodes() {
+      return store.filteredNodes
+    },
+    get selectedNodeIds() {
+      return store.selectedNodeIds
+    },
+    get selectedFrameId() {
+      return store.selectedFrameId
+    },
     selectFrame: store.selectFrame,
     selectNode: store.selectNode,
     createFrame: store.createFrame,
@@ -638,14 +736,30 @@ function onFramePointerDown(e: PointerEvent, frameId: string) {
   console.log('[PixiCanvas] onFramePointerDown received:', frameId)
   frames.onPointerDown(e, frameId)
 }
-function startFrameResize(e: PointerEvent, frameId: string, direction = 'se') { frames.startResize(e, frameId, direction) }
-function startEditingFrameTitle(frameId: string) { frames.startEditingTitle(frameId) }
-function saveFrameTitleEditing() { frames.saveTitle() }
-function cancelFrameTitleEditing() { frames.cancelTitleEditing() }
-function createFrameAtCenter() { frames.createAtCenter() }
-function createFrameAtPosition(x: number, y: number) { frames.createAtPosition(x, y) }
-function cancelFramePlacement() { frames.cancelPlacement() }
-function deleteSelectedFrame() { frames.deleteSelected() }
+function startFrameResize(e: PointerEvent, frameId: string, direction = 'se') {
+  frames.startResize(e, frameId, direction)
+}
+function startEditingFrameTitle(frameId: string) {
+  frames.startEditingTitle(frameId)
+}
+function saveFrameTitleEditing() {
+  frames.saveTitle()
+}
+function cancelFrameTitleEditing() {
+  frames.cancelTitleEditing()
+}
+function createFrameAtCenter() {
+  frames.createAtCenter()
+}
+function createFrameAtPosition(x: number, y: number) {
+  frames.createAtPosition(x, y)
+}
+function cancelFramePlacement() {
+  frames.cancelPlacement()
+}
+function deleteSelectedFrame() {
+  frames.deleteSelected()
+}
 
 // Layout composable
 const layout = useLayout({
@@ -669,10 +783,14 @@ const layout = useLayout({
 })
 const isLayouting = ref(false)
 
-async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid') {
+async function autoLayoutNodes(
+  type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid'
+) {
   isLayouting.value = true
   const frameId = store.selectedFrameId
-  console.log(`[LAYOUT] autoLayoutNodes called, type=${type}, store.selectedFrameId=${store.selectedFrameId}, frameId=${frameId}`)
+  console.log(
+    `[LAYOUT] autoLayoutNodes called, type=${type}, store.selectedFrameId=${store.selectedFrameId}, frameId=${frameId}`
+  )
   try {
     // If force layout and a frame is selected, use the frame-aware layoutNodes
     if (type === 'force' && frameId) {
@@ -685,7 +803,9 @@ async function autoLayoutNodes(type: 'grid' | 'horizontal' | 'vertical' | 'force
     isLayouting.value = false
   }
 }
-function fitToContent() { layout.fitToContent() }
+function fitToContent() {
+  layout.fitToContent()
+}
 
 // Auto-fit is per-node (stored on node.auto_fit)
 
@@ -719,9 +839,8 @@ async function fitAllNodesToContent() {
   // Wait longer for Mermaid SVGs to render (they're async)
   setTimeout(() => {
     // Fit selected nodes if any, otherwise all visible nodes
-    const nodesToFit = store.selectedNodeIds.length > 0
-      ? store.selectedNodeIds
-      : store.filteredNodes.map(n => n.id)
+    const nodesToFit =
+      store.selectedNodeIds.length > 0 ? store.selectedNodeIds : store.filteredNodes.map(n => n.id)
     for (const nodeId of nodesToFit) {
       fitNodeToContent(nodeId)
     }
@@ -1002,7 +1121,7 @@ async function sendNodePrompt() {
 
   const isEditing = editingNodeId.value === nodeId
   // Get current content from editing buffer or store
-  const currentContent = isEditing ? editContent.value : (node.markdown_content || '')
+  const currentContent = isEditing ? editContent.value : node.markdown_content || ''
 
   // Save undo state before AI modifies content (use current content, not stored)
   pushContentUndo(nodeId, currentContent, node.title)
@@ -1080,7 +1199,9 @@ ${currentContent || '(empty)'}`
 
     // Track context size
     lastContextSize.value = nodeSystemPrompt.length + prompt.length
-    console.log(`LLM request: ${(lastContextSize.value / 1000).toFixed(1)}k chars, ${chainNodes.length} connected nodes`)
+    console.log(
+      `LLM request: ${(lastContextSize.value / 1000).toFixed(1)}k chars, ${chainNodes.length} connected nodes`
+    )
 
     const response = await callOllama(prompt, nodeSystemPrompt)
 
@@ -1112,7 +1233,10 @@ const COLLAPSED_NODE_HEIGHT = 48
 
 // Get node height - use stored height or estimate from content
 // When semantic zoom is active, returns collapsed height instead
-function getNodeHeight(node: { height?: number; markdown_content: string | null }, respectCollapse = true): number {
+function getNodeHeight(
+  node: { height?: number; markdown_content: string | null },
+  respectCollapse = true
+): number {
   // When semantic zoom collapse is active, all nodes render at fixed height
   if (respectCollapse && isSemanticZoomCollapsed.value) {
     return COLLAPSED_NODE_HEIGHT
@@ -1155,7 +1279,13 @@ function onCanvasPointerDown(e: PointerEvent) {
   if (e.button === 0) {
     const target = e.target as HTMLElement
     // Don't pan if clicking on a node, edge, panel, frame, or node AI toolbar
-    if (target.closest('.node-card') || target.closest('.edge-line') || target.closest('.edge-panel') || target.closest('.canvas-frame') || target.closest('.node-llm-bar-floating')) {
+    if (
+      target.closest('.node-card') ||
+      target.closest('.edge-line') ||
+      target.closest('.edge-panel') ||
+      target.closest('.canvas-frame') ||
+      target.closest('.node-llm-bar-floating')
+    ) {
       return
     }
     e.preventDefault()
@@ -1168,10 +1298,14 @@ function onCanvasPointerDown(e: PointerEvent) {
     if (e.shiftKey) {
       startLasso(e)
       document.addEventListener('pointermove', updateLasso)
-      document.addEventListener('pointerup', () => {
-        endLasso()
-        document.removeEventListener('pointermove', updateLasso)
-      }, { once: true })
+      document.addEventListener(
+        'pointerup',
+        () => {
+          endLasso()
+          document.removeEventListener('pointermove', updateLasso)
+        },
+        { once: true }
+      )
       return
     }
 
@@ -1208,28 +1342,32 @@ const { pushOverlappingNodesAway, pushOverlappingNodesAwayExcept } = nodeCollisi
 
 // When node is selected, push non-neighbors away from neighbors
 // Skip in dot mode (semantic zoom collapsed or LOD mode) - nodes are small dots, no need to push
-watch(() => store.selectedNodeIds, (selectedIds) => {
-  if (selectedIds.length === 0) return
-  if (isSemanticZoomCollapsed.value || isLODMode.value) return // Skip in dot mode
+watch(
+  () => store.selectedNodeIds,
+  selectedIds => {
+    if (selectedIds.length === 0) return
+    if (isSemanticZoomCollapsed.value || isLODMode.value) return // Skip in dot mode
 
-  // Get all neighbor IDs for selected nodes
-  const protectedIds = new Set<string>(selectedIds)
-  for (const edge of store.filteredEdges) {
-    if (selectedIds.includes(edge.source_node_id)) {
-      protectedIds.add(edge.target_node_id)
+    // Get all neighbor IDs for selected nodes
+    const protectedIds = new Set<string>(selectedIds)
+    for (const edge of store.filteredEdges) {
+      if (selectedIds.includes(edge.source_node_id)) {
+        protectedIds.add(edge.target_node_id)
+      }
+      if (selectedIds.includes(edge.target_node_id)) {
+        protectedIds.add(edge.source_node_id)
+      }
     }
-    if (selectedIds.includes(edge.target_node_id)) {
-      protectedIds.add(edge.source_node_id)
-    }
-  }
 
-  // For each neighbor, push away overlapping non-neighbors
-  for (const neighborId of protectedIds) {
-    if (!selectedIds.includes(neighborId)) {
-      pushOverlappingNodesAwayExcept(neighborId, protectedIds)
+    // For each neighbor, push away overlapping non-neighbors
+    for (const neighborId of protectedIds) {
+      if (!selectedIds.includes(neighborId)) {
+        pushOverlappingNodesAwayExcept(neighborId, protectedIds)
+      }
     }
-  }
-}, { deep: true })
+  },
+  { deep: true }
+)
 
 // Node resizing composable
 const nodeResizing = useNodeResizing({
@@ -1237,7 +1375,9 @@ const nodeResizing = useNodeResizing({
     getNode: store.getNode,
     updateNodeSize: store.updateNodeSize,
     updateNodePosition: store.updateNodePosition,
-    get selectedNodeIds() { return store.selectedNodeIds },
+    get selectedNodeIds() {
+      return store.selectedNodeIds
+    },
   },
   scale,
   gridLockEnabled,
@@ -1246,10 +1386,13 @@ const nodeResizing = useNodeResizing({
   focusNodeId,
   layoutNeighborhood,
   pushOverlappingNodesAway,
-  setLastDragEndTime: (time: number) => { lastDragEndTime = time },
+  setLastDragEndTime: (time: number) => {
+    lastDragEndTime = time
+  },
   pushSizeUndo,
   isSemanticZoomCollapsed,
   isLODMode,
+  getVisualNode,
 })
 const { resizingNode, resizePreview, onResizePointerDown } = nodeResizing
 
@@ -1259,14 +1402,26 @@ const nodeDragging = useNodeDragging({
     getNode: store.getNode,
     updateNodePosition: store.updateNodePosition,
     selectNode: store.selectNode,
-    get selectedNodeIds() { return store.selectedNodeIds },
-    get filteredNodes() { return store.filteredNodes },
-    get filteredEdges() { return store.filteredEdges },
-    get frames() { return store.frames },
+    get selectedNodeIds() {
+      return store.selectedNodeIds
+    },
+    get filteredNodes() {
+      return store.filteredNodes
+    },
+    get filteredEdges() {
+      return store.filteredEdges
+    },
+    get frames() {
+      return store.frames
+    },
     assignNodesToFrame: store.assignNodesToFrame,
     refreshNodeFromFile: store.refreshNodeFromFile,
-    get nodeLayoutVersion() { return store.nodeLayoutVersion },
-    set nodeLayoutVersion(v: number) { store.nodeLayoutVersion = v },
+    get nodeLayoutVersion() {
+      return store.nodeLayoutVersion
+    },
+    set nodeLayoutVersion(v: number) {
+      store.nodeLayoutVersion = v
+    },
   },
   scale,
   offset: computed(() => ({ x: offsetX.value, y: offsetY.value })),
@@ -1289,7 +1444,9 @@ const nodeDragging = useNodeDragging({
   optimizeNodeEntrypoints,
   onEdgePreviewMove,
   onEdgeCreate,
-  setLastDragEndTime: (time: number) => { lastDragEndTime = time },
+  setLastDragEndTime: (time: number) => {
+    lastDragEndTime = time
+  },
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
@@ -1324,10 +1481,12 @@ function saveEditing(e?: FocusEvent) {
   // Don't close if focus moved to LLM inputs, buttons, color bar, or search bar
   if (e?.relatedTarget) {
     const related = e.relatedTarget as HTMLElement
-    if (related.closest('.node-llm-bar-floating') ||
-        related.closest('.collapsed-color-bar') ||
-        related.closest('.graph-llm-bar') ||
-        related.closest('.node-search-bar')) {
+    if (
+      related.closest('.node-llm-bar-floating') ||
+      related.closest('.collapsed-color-bar') ||
+      related.closest('.graph-llm-bar') ||
+      related.closest('.node-search-bar')
+    ) {
       return
     }
   }
@@ -1381,10 +1540,12 @@ async function onCanvasDoubleClick(e: MouseEvent) {
   const target = e.target as HTMLElement
 
   // Don't create if clicking on interactive elements
-  if (target.closest('.node-card') ||
-      target.closest('.edge-panel') ||
-      target.closest('.zoom-controls') ||
-      target.closest('.status-bar')) {
+  if (
+    target.closest('.node-card') ||
+    target.closest('.edge-panel') ||
+    target.closest('.zoom-controls') ||
+    target.closest('.status-bar')
+  ) {
     return
   }
 
@@ -1540,7 +1701,7 @@ async function fitNodeNow(nodeId: string): Promise<void> {
   if (node) {
     nodeRenderedContent.value = {
       ...nodeRenderedContent.value,
-      [nodeId]: renderMarkdown(node.markdown_content)
+      [nodeId]: renderMarkdown(node.markdown_content),
     }
   }
 
@@ -1553,7 +1714,7 @@ async function fitNodeNow(nodeId: string): Promise<void> {
   const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`)
   if (!cardEl) return
 
-  return new Promise<void>((resolve) => {
+  return new Promise<void>(resolve => {
     let attempts = 0
     const waitForContent = () => {
       const contentEl = cardEl.querySelector('.node-content')
@@ -1615,12 +1776,19 @@ function getNodeBackground(colorTheme: string | null): string | undefined {
 }
 
 // Get computed style for a node card (simplifies template binding)
-function getNodeStyle(node: { id: string; canvas_x: number; canvas_y: number; width?: number; height?: number; color_theme?: string | null }) {
+function getNodeStyle(node: {
+  id: string
+  canvas_x: number
+  canvas_y: number
+  width?: number
+  height?: number
+  color_theme?: string | null
+}) {
   const isResizing = resizingNode.value === node.id
   const x = isResizing ? resizePreview.value.x : node.canvas_x
   const y = isResizing ? resizePreview.value.y : node.canvas_y
-  const width = isResizing ? resizePreview.value.width : (node.width || NODE_DEFAULTS.WIDTH)
-  const height = isResizing ? resizePreview.value.height : (node.height || NODE_DEFAULTS.HEIGHT)
+  const width = isResizing ? resizePreview.value.width : node.width || NODE_DEFAULTS.WIDTH
+  const height = isResizing ? resizePreview.value.height : node.height || NODE_DEFAULTS.HEIGHT
 
   const style: Record<string, string> = {
     transform: `translate3d(${x}px, ${y}px, 0)`,
@@ -1734,7 +1902,9 @@ useCanvasKeyboardShortcuts({
   decreaseFontScale,
   refreshFromFiles,
   exportGraphAsYaml,
-  showHelp: () => { showHelpModal.value = true },
+  showHelp: () => {
+    showHelpModal.value = true
+  },
 })
 </script>
 
@@ -1759,23 +1929,47 @@ useCanvasKeyboardShortcuts({
     />
 
     <!-- Standalone agent log panel (when LLM bar is hidden) -->
-    <div v-if="!llmEnabled && showAgentLogPanel && agentLog.length > 0" class="standalone-agent-log">
+    <div
+      v-if="!llmEnabled && showAgentLogPanel && agentLog.length > 0"
+      class="standalone-agent-log"
+    >
       <div class="log-header">
         <span>Agent Log ({{ agentLog.length }})</span>
         <div class="log-buttons">
           <button class="log-btn" title="Copy log" @click="copyAgentLog">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
           <button class="log-btn" title="Clear log" @click="agentLog.length = 0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
           <button class="log-btn" title="Close" @click="showAgentLogPanel = false">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -1812,13 +2006,23 @@ useCanvasKeyboardShortcuts({
           class="color-dot"
           :class="{
             active: store.selectedFrameId
-              ? store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color === color.display
-              : store.selectedNodeIds.every(id => store.filteredNodes.find(n => n.id === id)?.color_theme === color.value)
+              ? store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color ===
+                color.display
+              : store.selectedNodeIds.every(
+                  id => store.filteredNodes.find(n => n.id === id)?.color_theme === color.value
+                ),
           }"
           :style="{ background: color.display || 'var(--bg-surface)' }"
-          @click.stop="store.selectedFrameId ? updateSelectedFrameColor(color.display) : updateSelectedNodesColor(color.value)"
+          @click.stop="
+            store.selectedFrameId
+              ? updateSelectedFrameColor(color.display)
+              : updateSelectedNodesColor(color.value)
+          "
         ></button>
-        <span v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId" class="color-bar-sep"></span>
+        <span
+          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
+          class="color-bar-sep"
+        ></span>
         <button
           v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
           class="autofit-toggle"
@@ -1826,336 +2030,368 @@ useCanvasKeyboardShortcuts({
           :disabled="isSemanticZoomCollapsed"
           :title="isSemanticZoomCollapsed ? 'Zoom in to fit nodes' : t('canvas.node.fitContent')"
           @click.stop="fitSelectedNodes"
-        >Fit</button>
+        >
+          Fit
+        </button>
       </div>
 
-    <div class="canvas-content" :style="{ transform }">
-      <!-- Frames (rendered first, below edges) -->
-      <CanvasFrames
-        :frames="store.filteredFrames"
-        :selected-frame-id="store.selectedFrameId"
-        :editing-frame-id="editingFrameId"
-        :edit-frame-title="editFrameTitle"
-        :frame-border-width="frameBorderWidth"
-        :scale="scale"
-        @update:edit-frame-title="editFrameTitle = $event"
-        @pointerdown="onFramePointerDown"
-        @dblclick="startEditingFrameTitle"
-        @save-title="saveFrameTitleEditing"
-        @cancel-title="cancelFrameTitleEditing"
-        @delete="deleteSelectedFrame"
-        @start-resize="startFrameResize"
-      />
+      <div class="canvas-content" :style="{ transform }">
+        <!-- Frames (rendered first, below edges) -->
+        <CanvasFrames
+          :frames="store.filteredFrames"
+          :selected-frame-id="store.selectedFrameId"
+          :editing-frame-id="editingFrameId"
+          :edit-frame-title="editFrameTitle"
+          :frame-border-width="frameBorderWidth"
+          :scale="scale"
+          @update:edit-frame-title="editFrameTitle = $event"
+          @pointerdown="onFramePointerDown"
+          @dblclick="startEditingFrameTitle"
+          @save-title="saveFrameTitleEditing"
+          @cancel-title="cancelFrameTitleEditing"
+          @delete="deleteSelectedFrame"
+          @start-resize="startFrameResize"
+        />
 
-      <!-- SVG for edges (above frames) -->
-      <CanvasEdgesSVG
-        :edges="visibleEdgeLines"
-        :marker-colors="allMarkerColors"
-        :is-large-graph="isLargeGraph"
-        :edge-stroke-width="edgeStrokeWidth"
-        :lasso-points="lassoPoints"
-        :is-lasso-selecting="isLassoSelecting"
-        :current-theme="currentTheme"
-        :highlight-color="highlightColor"
-        :is-creating-edge="isCreatingEdge"
-        :edge-preview-start="edgeStartNode ? { x: (store.getNode(edgeStartNode)?.canvas_x || 0) + 100, y: (store.getNode(edgeStartNode)?.canvas_y || 0) + 40 } : null"
-        :edge-preview-end="edgePreviewEnd"
-        :get-arrow-marker-id="getArrowMarkerId"
-        @edge-click="onEdgeClick"
-      />
+        <!-- SVG for edges (above frames) -->
+        <CanvasEdgesSVG
+          :edges="visibleEdgeLines"
+          :marker-colors="allMarkerColors"
+          :is-large-graph="isLargeGraph"
+          :edge-stroke-width="edgeStrokeWidth"
+          :lasso-points="lassoPoints"
+          :is-lasso-selecting="isLassoSelecting"
+          :current-theme="currentTheme"
+          :highlight-color="highlightColor"
+          :is-creating-edge="isCreatingEdge"
+          :edge-preview-start="
+            edgeStartNode
+              ? {
+                  x: (store.getNode(edgeStartNode)?.canvas_x || 0) + 100,
+                  y: (store.getNode(edgeStartNode)?.canvas_y || 0) + 40,
+                }
+              : null
+          "
+          :edge-preview-end="edgePreviewEnd"
+          :get-arrow-marker-id="getArrowMarkerId"
+          @edge-click="onEdgeClick"
+        />
 
-      <!-- LOD Mode: Render non-selected nodes as circles -->
-      <template v-if="isLODMode">
-        <div
-          v-for="node in visibleNodes.filter(n => !store.selectedNodeIds.includes(n.id) && n.id !== editingNodeId)"
+        <!-- LOD Mode: Render non-selected nodes as circles -->
+        <template v-if="isLODMode">
+          <div
+            v-for="node in visibleNodes.filter(
+              n => !store.selectedNodeIds.includes(n.id) && n.id !== editingNodeId
+            )"
+            :key="node.id"
+            :data-node-id="node.id"
+            class="node-circle"
+            :class="{ dragging: draggingNode === node.id }"
+            :style="{
+              transform: `translate3d(${node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2 - getLODRadius(node.id)}px, ${node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2 - getLODRadius(node.id)}px, 0)`,
+              width: getLODRadius(node.id) * 2 + 'px',
+              height: getLODRadius(node.id) * 2 + 'px',
+              background: node.color_theme || 'var(--primary-color)',
+            }"
+            :title="
+              node.title +
+              ' (' +
+              (nodeDegree[node.id] || 0) +
+              ' ' +
+              t('canvas.node.connections') +
+              ')'
+            "
+            @pointerdown="onNodePointerDown($event, node.id)"
+            @pointerenter="onNodePointerEnter($event, node.id)"
+            @pointerleave="onNodePointerLeave"
+            @dblclick.stop="startEditing(node.id)"
+          ></div>
+        </template>
+
+        <!-- Node cards - shown for all nodes in normal mode, or selected/editing nodes in LOD mode -->
+        <CanvasNodeCard
+          v-for="node in isLODMode
+            ? visibleNodes.filter(
+                n => store.selectedNodeIds.includes(n.id) || n.id === editingNodeId
+              )
+            : visibleNodes"
           :key="node.id"
-          :data-node-id="node.id"
-          class="node-circle"
-          :class="{ dragging: draggingNode === node.id }"
-          :style="{
-            transform: `translate3d(${node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2 - getLODRadius(node.id)}px, ${node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2 - getLODRadius(node.id)}px, 0)`,
-            width: getLODRadius(node.id) * 2 + 'px',
-            height: getLODRadius(node.id) * 2 + 'px',
-            background: node.color_theme || 'var(--primary-color)',
-          }"
-          :title="node.title + ' (' + (nodeDegree[node.id] || 0) + ' ' + t('canvas.node.connections') + ')'"
+          :node="node"
+          :style="getNodeStyle(node)"
+          :is-selected="store.selectedNodeIds.includes(node.id)"
+          :is-dragging="draggingNode === node.id"
+          :is-resizing="resizingNode === node.id"
+          :is-editing="editingNodeId === node.id"
+          :is-collapsed="isSemanticZoomCollapsed"
+          :is-neighborhood-mode="neighborhoodMode"
+          :is-neighborhood-focus="neighborhoodMode && node.id === focusNodeId"
+          :is-neighbor-highlighted="!!neighborHighlightedMap[node.id]"
+          :show-thumbnail="showImageThumbnail"
+          :thumbnail-src="nodeFirstImage[node.id]"
+          :rendered-content="nodeRenderedContent[node.id] || ''"
+          :editing-title-id="editingTitleId"
+          :edit-title="editTitle"
+          :edit-content="editContent"
+          :scale="scale"
+          :show-node-search="showNodeSearch && editingNodeId === node.id"
+          :node-search-query="nodeSearchQuery"
+          :node-search-match-count="nodeSearchMatches.length"
+          :node-search-index="nodeSearchIndex"
           @pointerdown="onNodePointerDown($event, node.id)"
           @pointerenter="onNodePointerEnter($event, node.id)"
+          @pointermove="onNodePointerMove($event)"
           @pointerleave="onNodePointerLeave"
-          @dblclick.stop="startEditing(node.id)"
-        ></div>
-      </template>
+          @dblclick="startEditing(node.id)"
+          @start-editing-title="startEditingTitle(node.id)"
+          @save-title="saveTitleEditing"
+          @cancel-title="cancelTitleEditing"
+          @update:edit-title="editTitle = $event"
+          @update:edit-content="editContent = $event"
+          @save-editing="saveEditing($event)"
+          @editor-keydown="onEditorKeydown"
+          @content-click="handleContentClick"
+          @delete="deleteSelectedNodes"
+          @resize-start="(e, dir) => onResizePointerDown(e, node.id, dir)"
+          @update:node-search-query="updateNodeSearch"
+          @find-next="findNextMatch"
+          @find-prev="findPrevMatch"
+          @close-search="closeNodeSearch"
+        />
+      </div>
 
-      <!-- Node cards - shown for all nodes in normal mode, or selected/editing nodes in LOD mode -->
-      <CanvasNodeCard
-        v-for="node in isLODMode ? visibleNodes.filter(n => store.selectedNodeIds.includes(n.id) || n.id === editingNodeId) : visibleNodes"
-        :key="node.id"
-        :node="node"
-        :style="getNodeStyle(node)"
-        :is-selected="store.selectedNodeIds.includes(node.id)"
-        :is-dragging="draggingNode === node.id"
-        :is-resizing="resizingNode === node.id"
-        :is-editing="editingNodeId === node.id"
-        :is-collapsed="isSemanticZoomCollapsed"
-        :is-neighborhood-mode="neighborhoodMode"
-        :is-neighborhood-focus="neighborhoodMode && node.id === focusNodeId"
-        :is-neighbor-highlighted="!!neighborHighlightedMap[node.id]"
-        :show-thumbnail="showImageThumbnail"
-        :thumbnail-src="nodeFirstImage[node.id]"
-        :rendered-content="nodeRenderedContent[node.id] || ''"
-        :editing-title-id="editingTitleId"
-        :edit-title="editTitle"
-        :edit-content="editContent"
-        :scale="scale"
-        :show-node-search="showNodeSearch && editingNodeId === node.id"
-        :node-search-query="nodeSearchQuery"
-        :node-search-match-count="nodeSearchMatches.length"
-        :node-search-index="nodeSearchIndex"
-        @pointerdown="onNodePointerDown($event, node.id)"
-        @pointerenter="onNodePointerEnter($event, node.id)"
-        @pointermove="onNodePointerMove($event)"
-        @pointerleave="onNodePointerLeave"
-        @dblclick="startEditing(node.id)"
-        @start-editing-title="startEditingTitle(node.id)"
-        @save-title="saveTitleEditing"
-        @cancel-title="cancelTitleEditing"
-        @update:edit-title="editTitle = $event"
-        @update:edit-content="editContent = $event"
-        @save-editing="saveEditing($event)"
-        @editor-keydown="onEditorKeydown"
-        @content-click="handleContentClick"
-        @delete="deleteSelectedNodes"
-        @resize-start="(e, dir) => onResizePointerDown(e, node.id, dir)"
-        @update:node-search-query="updateNodeSearch"
-        @find-next="findNextMatch"
-        @find-prev="findPrevMatch"
-        @close-search="closeNodeSearch"
+      <!-- Floating Node LLM bar (positioned in screen coordinates, outside canvas transform) -->
+      <!-- Hidden when zoomed out (semantic zoom collapsed) since node content isn't editable -->
+      <NodeLLMBar
+        v-if="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
+        :visible="
+          llmEnabled &&
+          !isSemanticZoomCollapsed &&
+          (store.selectedNodeIds.length === 1 || !!editingNodeId)
+        "
+        :node-prompt="nodePrompt"
+        :is-loading="isNodeLLMLoading"
+        :node-x="
+          getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x * scale + offsetX
+        "
+        :node-y="
+          getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y * scale + offsetY
+        "
+        :node-width="
+          (getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width ||
+            NODE_DEFAULTS.WIDTH) * scale
+        "
+        :scale="1"
+        @update:node-prompt="nodePrompt = $event"
+        @send="sendNodePrompt"
+        @stop="stopNodeLLM"
+        @keydown="onNodePromptKeydown"
       />
 
-    </div>
+      <!-- Edge edit panel -->
+      <CanvasEdgePanel
+        :selected-edge="selectedEdge"
+        :edges="store.filteredEdges"
+        :edge-color-palette="edgeColorPalette"
+        :edge-styles="edgeStyles"
+        :get-edge-color="getEdgeColor"
+        :get-edge-style="getEdgeStyle"
+        :is-edge-bidirectional="isEdgeBidirectional"
+        @close="selectedEdge = null"
+        @change-label="changeEdgeLabel"
+        @change-color="changeEdgeColor"
+        @set-style="setEdgeStyle"
+        @reverse="reverseEdge"
+        @make-unidirectional="makeUnidirectional"
+        @make-bidirectional="makeBidirectional"
+        @insert-node="insertNodeOnEdge"
+        @delete="deleteSelectedEdge"
+      />
 
-    <!-- Floating Node LLM bar (positioned in screen coordinates, outside canvas transform) -->
-    <!-- Hidden when zoomed out (semantic zoom collapsed) since node content isn't editable -->
-    <NodeLLMBar
-      v-if="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
-      :visible="llmEnabled && !isSemanticZoomCollapsed && (store.selectedNodeIds.length === 1 || !!editingNodeId)"
-      :node-prompt="nodePrompt"
-      :is-loading="isNodeLLMLoading"
-      :node-x="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x * scale + offsetX"
-      :node-y="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y * scale + offsetY"
-      :node-width="(getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width || NODE_DEFAULTS.WIDTH) * scale"
-      :scale="1"
-      @update:node-prompt="nodePrompt = $event"
-      @send="sendNodePrompt"
-      @stop="stopNodeLLM"
-      @keydown="onNodePromptKeydown"
-    />
+      <!-- Node Preview Panel (shown when zoomed out and node selected) -->
+      <CanvasPreviewPanel
+        :visible="showPreviewPanel && !!previewNode"
+        :title="previewNode?.title || ''"
+        :content="previewNode ? nodeRenderedContent[previewNode.id] || '' : ''"
+        @close="closePreviewPanel"
+        @zoom-to-node="zoomToPreviewNode"
+      />
 
-    <!-- Edge edit panel -->
-    <CanvasEdgePanel
-      :selected-edge="selectedEdge"
-      :edges="store.filteredEdges"
-      :edge-color-palette="edgeColorPalette"
-      :edge-styles="edgeStyles"
-      :get-edge-color="getEdgeColor"
-      :get-edge-style="getEdgeStyle"
-      :is-edge-bidirectional="isEdgeBidirectional"
-      @close="selectedEdge = null"
-      @change-label="changeEdgeLabel"
-      @change-color="changeEdgeColor"
-      @set-style="setEdgeStyle"
-      @reverse="reverseEdge"
-      @make-unidirectional="makeUnidirectional"
-      @make-bidirectional="makeBidirectional"
-      @insert-node="insertNodeOnEdge"
-      @delete="deleteSelectedEdge"
-    />
+      <!-- Controls -->
+      <CanvasControls
+        :scale="scale"
+        :grid-lock-enabled="gridLockEnabled"
+        :is-large-graph="isLargeGraph"
+        :global-edge-style="globalEdgeStyle"
+        :magnifier-enabled="magnifierEnabled"
+        :neighborhood-mode="neighborhoodMode"
+        :neighborhood-depth="neighborhoodDepth"
+        :pending-frame-placement="frames.pendingFramePlacement.value"
+        :highlight-all-edges="highlightAllEdges"
+        @zoom-in="scale = Math.min(scale * 1.25, 3)"
+        @zoom-out="scale = Math.max(scale * 0.8, 0.01)"
+        @fit-to-content="fitToContent"
+        @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
+        @layout="autoLayoutNodes"
+        @fit-nodes-to-content="fitAllNodesToContent"
+        @cycle-edge-style="cycleEdgeStyle"
+        @toggle-magnifier="toggleMagnifier"
+        @toggle-neighborhood-mode="toggleNeighborhoodMode()"
+        @set-neighborhood-depth="setDepth"
+        @create-frame="createFrameAtCenter"
+        @show-help="showHelpModal = true"
+        @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
+      />
 
-    <!-- Node Preview Panel (shown when zoomed out and node selected) -->
-    <CanvasPreviewPanel
-      :visible="showPreviewPanel && !!previewNode"
-      :title="previewNode?.title || ''"
-      :content="previewNode ? (nodeRenderedContent[previewNode.id] || '') : ''"
-      @close="closePreviewPanel"
-      @zoom-to-node="zoomToPreviewNode"
-    />
+      <!-- Help Modal -->
+      <KeyboardShortcutsModal :show="showHelpModal" @close="showHelpModal = false" />
 
-    <!-- Controls -->
-    <CanvasControls
-      :scale="scale"
-      :grid-lock-enabled="gridLockEnabled"
-      :is-large-graph="isLargeGraph"
-      :global-edge-style="globalEdgeStyle"
-      :magnifier-enabled="magnifierEnabled"
-      :neighborhood-mode="neighborhoodMode"
-      :neighborhood-depth="neighborhoodDepth"
-      :pending-frame-placement="frames.pendingFramePlacement.value"
-      :highlight-all-edges="highlightAllEdges"
-      @zoom-in="scale = Math.min(scale * 1.25, 3)"
-      @zoom-out="scale = Math.max(scale * 0.8, 0.01)"
-      @fit-to-content="fitToContent"
-      @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
-      @layout="autoLayoutNodes"
-      @fit-nodes-to-content="fitAllNodesToContent"
-      @cycle-edge-style="cycleEdgeStyle"
-      @toggle-magnifier="toggleMagnifier"
-      @toggle-neighborhood-mode="toggleNeighborhoodMode()"
-      @set-neighborhood-depth="setDepth"
-      @create-frame="createFrameAtCenter"
-      @show-help="showHelpModal = true"
-      @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
-    />
+      <!-- Status Bar -->
+      <CanvasStatusBar
+        :visible-node-count="visibleNodes.length"
+        :total-node-count="store.filteredNodes.length"
+        :visible-edge-count="edgeLines.length"
+        :total-edge-count="store.filteredEdges.length"
+        :is-layouting="isLayouting"
+        :is-large-graph="isLargeGraph"
+        :is-pdf-processing="pdfDrop.isProcessing.value"
+        :pdf-status="pdfDrop.processingStatus.value"
+        :agent-log="agentLog"
+        :show-agent-log="showAgentLogPanel"
+        @stop-pdf="pdfDrop.stop()"
+        @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
+      />
 
-    <!-- Help Modal -->
-    <KeyboardShortcutsModal :show="showHelpModal" @close="showHelpModal = false" />
+      <!-- SVG filter for fisheye warp effect -->
+      <svg width="0" height="0" style="position: absolute">
+        <defs>
+          <filter id="fisheye-warp" x="-50%" y="-50%" width="200%" height="200%">
+            <!-- Slight barrel distortion effect -->
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur" />
+            <feDisplacementMap
+              in="blur"
+              in2="SourceGraphic"
+              scale="0"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+        </defs>
+      </svg>
 
-    <!-- Status Bar -->
-    <CanvasStatusBar
-      :visible-node-count="visibleNodes.length"
-      :total-node-count="store.filteredNodes.length"
-      :visible-edge-count="edgeLines.length"
-      :total-edge-count="store.filteredEdges.length"
-      :is-layouting="isLayouting"
-      :is-large-graph="isLargeGraph"
-      :is-pdf-processing="pdfDrop.isProcessing.value"
-      :pdf-status="pdfDrop.processingStatus.value"
-      :agent-log="agentLog"
-      :show-agent-log="showAgentLogPanel"
-      @stop-pdf="pdfDrop.stop()"
-      @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
-    />
+      <!-- Magnifying lens (when zoomed out far) -->
+      <CanvasMagnifier
+        :visible="shouldShowMagnifier"
+        :position="magnifierPos"
+        :nodes="magnifierVisibleNodes"
+        :magnifier-size="MAGNIFIER_SIZE"
+        :magnifier-zoom="MAGNIFIER_ZOOM"
+        :offset-x="offsetX"
+        :offset-y="offsetY"
+        :scale="scale"
+        :node-defaults="NODE_DEFAULTS"
+        :get-node-background="getNodeBackground"
+      />
 
-    <!-- SVG filter for fisheye warp effect -->
-    <svg width="0" height="0" style="position: absolute;">
-      <defs>
-        <filter id="fisheye-warp" x="-50%" y="-50%" width="200%" height="200%">
-          <!-- Slight barrel distortion effect -->
-          <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur" />
-          <feDisplacementMap
-            in="blur"
-            in2="SourceGraphic"
-            scale="0"
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
-        </filter>
-      </defs>
-    </svg>
+      <!-- Hover tooltip (when zoomed out) -->
+      <CanvasHoverTooltip
+        :visible="showHoverTooltip"
+        :position="hoverMousePos"
+        :node="hoveredNode"
+        :content="tooltipContent"
+        :rendered-content="hoveredNode ? nodeRenderedContent[hoveredNode.id] || '' : ''"
+      />
 
-    <!-- Magnifying lens (when zoomed out far) -->
-    <CanvasMagnifier
-      :visible="shouldShowMagnifier"
-      :position="magnifierPos"
-      :nodes="magnifierVisibleNodes"
-      :magnifier-size="MAGNIFIER_SIZE"
-      :magnifier-zoom="MAGNIFIER_ZOOM"
-      :offset-x="offsetX"
-      :offset-y="offsetY"
-      :scale="scale"
-      :node-defaults="NODE_DEFAULTS"
-      :get-node-background="getNodeBackground"
-    />
+      <!-- Minimap -->
+      <CanvasMinimap
+        v-if="minimap.viewport.value"
+        :visible="store.filteredNodes.length > 0"
+        :nodes="store.filteredNodes"
+        :minimap-size="minimap.MINIMAP_SIZE"
+        :get-node-position="minimap.getNodePosition"
+        :is-selected="minimap.isSelected"
+        :viewport-x="minimap.viewport.value.x || 0"
+        :viewport-y="minimap.viewport.value.y || 0"
+        :viewport-width="minimap.viewport.value.width || 50"
+        :viewport-height="minimap.viewport.value.height || 40"
+        @click="onMinimapClick"
+      />
 
-    <!-- Hover tooltip (when zoomed out) -->
-    <CanvasHoverTooltip
-      :visible="showHoverTooltip"
-      :position="hoverMousePos"
-      :node="hoveredNode"
-      :content="tooltipContent"
-      :rendered-content="hoveredNode ? (nodeRenderedContent[hoveredNode.id] || '') : ''"
-    />
+      <!-- Context Menu -->
+      <CanvasContextMenu
+        :visible="contextMenuVisible"
+        :position="contextMenuPosition"
+        :node-id="contextMenuNodeId"
+        :node-count="contextMenuNodeCount"
+        :storyline-submenu="contextMenuStorylineSubmenu"
+        :workspace-submenu="contextMenuWorkspaceSubmenu"
+        :storylines="store.filteredStorylines"
+        :workspaces="store.workspaces"
+        :current-workspace-id="store.currentWorkspaceId"
+        @close="closeContextMenu"
+        @fit-to-content="fitNodeNow"
+        @zoom-to-node="zoomToNode"
+        @open-link-picker="openLinkPicker"
+        @delete-nodes="deleteSelectedNodes"
+        @add-to-storyline="addNodeToStoryline"
+        @create-storyline="createStorylineFromNode"
+        @move-to-workspace="moveNodesToWorkspace"
+        @update:storyline-submenu="contextMenuStorylineSubmenu = $event"
+        @update:workspace-submenu="contextMenuWorkspaceSubmenu = $event"
+      />
 
-    <!-- Minimap -->
-    <CanvasMinimap
-      v-if="minimap.viewport.value"
-      :visible="store.filteredNodes.length > 0"
-      :nodes="store.filteredNodes"
-      :minimap-size="minimap.MINIMAP_SIZE"
-      :get-node-position="minimap.getNodePosition"
-      :is-selected="minimap.isSelected"
-      :viewport-x="minimap.viewport.value.x || 0"
-      :viewport-y="minimap.viewport.value.y || 0"
-      :viewport-width="minimap.viewport.value.width || 50"
-      :viewport-height="minimap.viewport.value.height || 40"
-      @click="onMinimapClick"
-    />
+      <!-- Link to picker modal -->
+      <Teleport to="body">
+        <div v-if="showLinkPicker" class="link-picker-overlay" @click="closeLinkPicker">
+          <div class="link-picker-modal" @click.stop>
+            <NodePicker
+              :exclude-node-ids="linkPickerSourceNodeId ? [linkPickerSourceNodeId] : []"
+              :show-search="true"
+              :allow-create="false"
+              :max-items="20"
+              @select="linkToNode"
+              @close="closeLinkPicker"
+            />
+          </div>
+        </div>
+      </Teleport>
 
-    <!-- Context Menu -->
-    <CanvasContextMenu
-      :visible="contextMenuVisible"
-      :position="contextMenuPosition"
-      :node-id="contextMenuNodeId"
-      :node-count="contextMenuNodeCount"
-      :storyline-submenu="contextMenuStorylineSubmenu"
-      :workspace-submenu="contextMenuWorkspaceSubmenu"
-      :storylines="store.filteredStorylines"
-      :workspaces="store.workspaces"
-      :current-workspace-id="store.currentWorkspaceId"
-      @close="closeContextMenu"
-      @fit-to-content="fitNodeNow"
-      @zoom-to-node="zoomToNode"
-      @open-link-picker="openLinkPicker"
-      @delete-nodes="deleteSelectedNodes"
-      @add-to-storyline="addNodeToStoryline"
-      @create-storyline="createStorylineFromNode"
-      @move-to-workspace="moveNodesToWorkspace"
-      @update:storyline-submenu="contextMenuStorylineSubmenu = $event"
-      @update:workspace-submenu="contextMenuWorkspaceSubmenu = $event"
-    />
-
-    <!-- Link to picker modal -->
-    <Teleport to="body">
-      <div v-if="showLinkPicker" class="link-picker-overlay" @click="closeLinkPicker">
-        <div class="link-picker-modal" @click.stop>
-          <NodePicker
-            :exclude-node-ids="linkPickerSourceNodeId ? [linkPickerSourceNodeId] : []"
-            :show-search="true"
-            :allow-create="false"
-            :max-items="20"
-            @select="linkToNode"
-            @close="closeLinkPicker"
-          />
+      <!-- Empty state overlay -->
+      <div v-if="store.filteredNodes.length === 0" class="empty-state-overlay">
+        <div class="empty-state-box">
+          <h3>No nodes yet</h3>
+          <p>Double-click anywhere to create a node</p>
         </div>
       </div>
-    </Teleport>
 
-    <!-- Empty state overlay -->
-    <div v-if="store.filteredNodes.length === 0" class="empty-state-overlay">
-      <div class="empty-state-box">
-        <h3>No nodes yet</h3>
-        <p>Double-click anywhere to create a node</p>
-      </div>
-    </div>
+      <!-- Import options modal for Zotero/BibTeX files -->
+      <ImportOptionsModal
+        v-if="pdfDrop.showImportOptions.value && pdfDrop.pendingBibImport.value"
+        :filename="pdfDrop.pendingBibImport.value.filename"
+        :entry-count="pdfDrop.pendingBibImport.value.entries.length"
+        :collection-name="pdfDrop.pendingBibImport.value.collectionName"
+        :has-attachments="pdfDrop.pendingBibImport.value.hasAttachments"
+        @import="pdfDrop.confirmBibImport($event)"
+        @cancel="pdfDrop.cancelBibImport()"
+      />
 
-    <!-- Import options modal for Zotero/BibTeX files -->
-    <ImportOptionsModal
-      v-if="pdfDrop.showImportOptions.value && pdfDrop.pendingBibImport.value"
-      :filename="pdfDrop.pendingBibImport.value.filename"
-      :entry-count="pdfDrop.pendingBibImport.value.entries.length"
-      :collection-name="pdfDrop.pendingBibImport.value.collectionName"
-      :has-attachments="pdfDrop.pendingBibImport.value.hasAttachments"
-      @import="pdfDrop.confirmBibImport($event)"
-      @cancel="pdfDrop.cancelBibImport()"
-    />
+      <!-- Plan approval modal for agent planning -->
+      <PlanApprovalModal
+        :plan="planCurrentPlan"
+        :visible="planShowApprovalModal"
+        @approve="handlePlanApprove"
+        @reject="handlePlanReject"
+        @modify="handlePlanModify"
+        @add-step="handlePlanAddStep"
+        @remove-step="handlePlanRemoveStep"
+        @close="closePlanModal"
+      />
 
-    <!-- Plan approval modal for agent planning -->
-    <PlanApprovalModal
-      :plan="planCurrentPlan"
-      :visible="planShowApprovalModal"
-      @approve="handlePlanApprove"
-      @reject="handlePlanReject"
-      @modify="handlePlanModify"
-      @add-step="handlePlanAddStep"
-      @remove-step="handlePlanRemoveStep"
-      @close="closePlanModal"
-    />
-
-    <!-- Agent task panel for progress display -->
-    <Teleport to="body">
-      <div v-if="agentTasksStore.totalTasks > 0" class="agent-task-panel-container">
-        <AgentTaskPanel />
-      </div>
-    </Teleport>
+      <!-- Agent task panel for progress display -->
+      <Teleport to="body">
+        <div v-if="agentTasksStore.totalTasks > 0" class="agent-task-panel-container">
+          <AgentTaskPanel />
+        </div>
+      </Teleport>
     </div>
   </div>
 </template>
