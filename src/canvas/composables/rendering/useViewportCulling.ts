@@ -63,7 +63,6 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   if (isZooming) {
     watch(isZooming, zooming => {
       if (!zooming) {
-        console.log('[Culling] Zoom ended, invalidating cache')
         cacheValidUntilZoomEnds = false
       }
     })
@@ -89,7 +88,6 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     // Check zoom state FIRST, before reading any other reactive state
     // This minimizes dependency tracking during zoom
     if (isZooming?.value && cacheValidUntilZoomEnds && cachedVisibleNodes.length > 0) {
-      console.log('[Culling] Using cached nodes during zoom:', cachedVisibleNodes.length)
       return cachedVisibleNodes
     }
 

@@ -76,6 +76,7 @@ import CanvasFrames from './components/CanvasFrames.vue'
 import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
 import CanvasNodeCard from './components/CanvasNodeCard.vue'
 import CanvasPreviewPanel from './components/CanvasPreviewPanel.vue'
+import CanvasLODLayer from './components/CanvasLODLayer.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -301,7 +302,6 @@ const {
   isMassiveGraph,
   isSemanticZoomCollapsed,
   isLODMode,
-  nodeDegree,
   getLODRadius,
 } = graphMetrics
 
@@ -2052,6 +2052,22 @@ useCanvasKeyboardShortcuts({
         </button>
       </div>
 
+      <!-- GPU-accelerated LOD layer (rendered outside canvas-content for independent transform) -->
+      <CanvasLODLayer
+        v-if="isLODMode"
+        :nodes="lodCircleNodes"
+        :scale="scale"
+        :offset-x="offsetX"
+        :offset-y="offsetY"
+        :selected-node-ids="store.selectedNodeIds"
+        :dragging-node-id="draggingNode"
+        :get-l-o-d-radius="getLODRadius"
+        @node-pointerdown="onNodePointerDown"
+        @node-pointerenter="onNodePointerEnter"
+        @node-pointerleave="onNodePointerLeave"
+        @node-dblclick="startEditing"
+      />
+
       <div class="canvas-content" :style="{ transform }">
         <!-- Frames (rendered first, below edges) -->
         <CanvasFrames
@@ -2094,34 +2110,7 @@ useCanvasKeyboardShortcuts({
           @edge-click="onEdgeClick"
         />
 
-        <!-- LOD Mode: Render non-selected nodes as circles -->
-        <template v-if="isLODMode">
-          <div
-            v-for="node in lodCircleNodes"
-            :key="node.id"
-            :data-node-id="node.id"
-            class="node-circle"
-            :class="{ dragging: draggingNode === node.id }"
-            :style="{
-              transform: `translate3d(${node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2 - getLODRadius(node.id)}px, ${node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2 - getLODRadius(node.id)}px, 0)`,
-              width: getLODRadius(node.id) * 2 + 'px',
-              height: getLODRadius(node.id) * 2 + 'px',
-              background: node.color_theme || 'var(--primary-color)',
-            }"
-            :title="
-              node.title +
-              ' (' +
-              (nodeDegree[node.id] || 0) +
-              ' ' +
-              t('canvas.node.connections') +
-              ')'
-            "
-            @pointerdown="onNodePointerDown($event, node.id)"
-            @pointerenter="onNodePointerEnter($event, node.id)"
-            @pointerleave="onNodePointerLeave"
-            @dblclick.stop="startEditing(node.id)"
-          ></div>
-        </template>
+        <!-- LOD Mode circles are now rendered via GPU in CanvasLODLayer above -->
 
         <!-- Node cards - shown for all nodes in normal mode, or selected/editing nodes in LOD mode -->
         <CanvasNodeCard
