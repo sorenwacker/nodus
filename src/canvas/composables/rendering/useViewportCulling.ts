@@ -2,11 +2,16 @@
  * Viewport culling composable
  *
  * Handles viewport-based node visibility filtering for performance optimization
+ * Uses spatial grid indexing for O(k) queries instead of O(n) linear scan
  */
 
-import { ref, computed, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
+import { SpatialGrid } from '../../utils/SpatialGrid'
 import type { Node } from '../../../types'
+
+// Threshold for using spatial index (below this, linear scan is faster)
+const SPATIAL_INDEX_THRESHOLD = 200
 
 export interface UseViewportCullingContext {
   scale: Ref<number>
@@ -30,6 +35,22 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   const viewportWidth = ref(window.innerWidth)
   const viewportHeight = ref(window.innerHeight)
 
+  // Spatial index for large graphs
+  const spatialGrid = new SpatialGrid({ cellSize: 500 })
+  const spatialIndexVersion = ref(0)
+
+  // Rebuild spatial index when nodes change
+  watch(
+    () => displayNodes.value,
+    nodes => {
+      if (nodes.length >= SPATIAL_INDEX_THRESHOLD) {
+        spatialGrid.build(nodes)
+        spatialIndexVersion.value++
+      }
+    },
+    { immediate: true }
+  )
+
   // Handle window resize
   function onResize() {
     viewportWidth.value = window.innerWidth
@@ -47,6 +68,7 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   // Only render nodes visible in viewport (with margin for smooth scrolling)
   // Always include selected nodes so they can be measured/fitted even if off-screen
   const visibleNodes = computed(() => {
+    const nodes = displayNodes.value
     const s = scale.value
     const ox = offsetX.value
     const oy = offsetY.value
@@ -64,19 +86,62 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     // Selected nodes should always be rendered (for fitting, etc.)
     const selectedSet = new Set(selectedNodeIds.value)
 
-    // Use displayNodes which respects neighborhood mode
-    return displayNodes.value.filter(node => {
-      // Always include selected nodes
-      if (selectedSet.has(node.id)) return true
+    // For small graphs, use simple linear filter (faster than grid overhead)
+    if (nodes.length < SPATIAL_INDEX_THRESHOLD) {
+      return nodes.filter(node => {
+        if (selectedSet.has(node.id)) return true
+        const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
+        const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
+        return (
+          nodeRight >= viewLeft &&
+          node.canvas_x <= viewRight &&
+          nodeBottom >= viewTop &&
+          node.canvas_y <= viewBottom
+        )
+      })
+    }
 
+    // For large graphs, use spatial index for O(k) query
+    // Track version to ensure reactivity
+    void spatialIndexVersion.value
+
+    // Get candidate nodes from spatial grid
+    const candidateIds = spatialGrid.queryViewport(viewLeft, viewTop, viewRight, viewBottom)
+
+    // Add selected nodes (always visible)
+    for (const id of selectedSet) {
+      candidateIds.add(id)
+    }
+
+    // Build node map for efficient lookup
+    const nodeMap = new Map(nodes.map(n => [n.id, n]))
+
+    // Filter candidates with precise AABB check (grid may have false positives at cell boundaries)
+    const result: Node[] = []
+    for (const id of candidateIds) {
+      const node = nodeMap.get(id)
+      if (!node) continue
+
+      // Selected nodes always included
+      if (selectedSet.has(id)) {
+        result.push(node)
+        continue
+      }
+
+      // Precise AABB check
       const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
       const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
-      // Check if node intersects viewport
-      return nodeRight >= viewLeft &&
-             node.canvas_x <= viewRight &&
-             nodeBottom >= viewTop &&
-             node.canvas_y <= viewBottom
-    })
+      if (
+        nodeRight >= viewLeft &&
+        node.canvas_x <= viewRight &&
+        nodeBottom >= viewTop &&
+        node.canvas_y <= viewBottom
+      ) {
+        result.push(node)
+      }
+    }
+
+    return result
   })
 
   // Set of visible node IDs for quick lookup
