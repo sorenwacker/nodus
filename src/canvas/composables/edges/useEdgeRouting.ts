@@ -64,8 +64,10 @@ export interface UseEdgeRoutingContext {
     node: { height?: number; markdown_content: string | null },
     respectCollapse?: boolean
   ) => number
-  /** When true, skip complex routing and use simple lines (for drag performance) */
+  /** When true, skip complex routing and use cached edges (for drag performance) */
   isDragging?: Ref<boolean>
+  /** When true, skip complex routing and use cached edges (for zoom performance) */
+  isZooming?: Ref<boolean>
 }
 
 export interface UseEdgeRoutingReturn {
@@ -84,7 +86,11 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     edgeStyleMap,
     getNodeHeight,
     isDragging,
+    isZooming,
   } = ctx
+
+  // Combined flag for deferring expensive routing
+  const isDeferringRouting = () => isDragging?.value || isZooming?.value
 
   // Cache for routed edges - only recalculate when not dragging
   const cachedRoutedEdges = ref<Map<
@@ -276,8 +282,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     // Create a key to detect when routing needs recalculation
     const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}`
 
-    if (!isDragging?.value && routingKey !== lastRoutingKey.value) {
-      // Not dragging and cache is stale - recalculate routing
+    if (!isDeferringRouting() && routingKey !== lastRoutingKey.value) {
+      // Not dragging/zooming and cache is stale - recalculate routing
       const spatialIndex = new SpatialIndex()
       spatialIndex.build(nodeMap)
       setRoutingSpatialIndex(spatialIndex)
@@ -395,8 +401,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
         if (isHugeGraph.value) {
           path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
-        } else if (isDragging?.value) {
-          // During drag, use simple paths that match the edge style
+        } else if (isDeferringRouting()) {
+          // During drag/zoom, use simple paths that match the edge style
           if (edgeStyle === 'straight') {
             path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
           } else if (edgeStyle === 'orthogonal') {
@@ -481,7 +487,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
               labelY = (pts[0].y + pts[pts.length - 1].y) / 2
             }
           }
-        } else if (isDragging?.value || !routed) {
+        } else if (isDeferringRouting() || !routed) {
           // Calculate label position based on edge style to match visual path
           if (edgeStyle === 'straight' || isHugeGraph.value) {
             labelX = (startPort.x + endEdge.x) / 2

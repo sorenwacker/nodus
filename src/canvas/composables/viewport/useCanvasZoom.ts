@@ -50,6 +50,36 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
   // Magnifier mouse tracking (throttled for performance)
   let magnifierRafId: number | null = null
 
+  // Zoom throttling for large graphs - accumulate deltas and apply via RAF
+  let pendingZoom: { deltaY: number; mouseX: number; mouseY: number } | null = null
+  let zoomRafId: number | null = null
+
+  function applyPendingZoom() {
+    zoomRafId = null
+    if (!pendingZoom) return
+
+    const { deltaY, mouseX, mouseY } = pendingZoom
+    pendingZoom = null
+
+    startZooming()
+
+    const zoomIntensity = 0.003
+    const delta = Math.exp(-deltaY * zoomIntensity)
+    const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
+    const scaleChange = newScale / scale.value
+    offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
+    offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
+    scale.value = newScale
+
+    // Update magnifier visibility when zoom crosses threshold
+    if (isMouseOnCanvas.value) {
+      showMagnifier.value = newScale < magnifierThreshold
+    }
+
+    // Save view state (debounced)
+    scheduleSaveViewState()
+  }
+
   function onWheel(e: WheelEvent) {
     // Check if inside a scrollable element
     const target = e.target as HTMLElement
@@ -94,26 +124,23 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
       isZooming.value = false
       offsetX.value -= e.deltaX
       offsetY.value -= e.deltaY
+      scheduleSaveViewState()
     } else {
-      // Smooth zoom - use deltaY magnitude for proportional zooming
-      startZooming()
+      // Throttle zoom via RAF - accumulate delta and apply once per frame
+      // This prevents multiple recomputations per wheel event burst
+      if (pendingZoom) {
+        // Accumulate delta for smoother zooming
+        pendingZoom.deltaY += e.deltaY
+        pendingZoom.mouseX = mouseX
+        pendingZoom.mouseY = mouseY
+      } else {
+        pendingZoom = { deltaY: e.deltaY, mouseX, mouseY }
+      }
 
-      const zoomIntensity = 0.003
-      const delta = Math.exp(-e.deltaY * zoomIntensity)
-      const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
-      const scaleChange = newScale / scale.value
-      offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
-      offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
-      scale.value = newScale
-
-      // Update magnifier visibility when zoom crosses threshold
-      if (isMouseOnCanvas.value) {
-        showMagnifier.value = newScale < magnifierThreshold
+      if (!zoomRafId) {
+        zoomRafId = requestAnimationFrame(applyPendingZoom)
       }
     }
-
-    // Save view state (debounced)
-    scheduleSaveViewState()
   }
 
   function onCanvasPointerMove(e: PointerEvent) {
@@ -126,7 +153,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
       if (rect) {
         magnifierPos.value = {
           x: e.clientX - rect.left,
-          y: e.clientY - rect.top
+          y: e.clientY - rect.top,
         }
       }
       // Update magnifier visibility based on current zoom level
