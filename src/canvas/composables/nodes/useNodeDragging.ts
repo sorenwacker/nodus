@@ -29,6 +29,7 @@ export interface UseNodeDraggingContext {
   neighborhoodMode: Ref<boolean>
   focusNodeId: Ref<string | null>
   isLODMode: Ref<boolean>
+  isSemanticZoomCollapsed: Ref<boolean>
   editingNodeId: Ref<string | null>
   selectedEdge: Ref<string | null>
   isCreatingEdge: Ref<boolean>
@@ -39,7 +40,14 @@ export interface UseNodeDraggingContext {
   pushUndo: () => void
   screenToCanvas: (clientX: number, clientY: number) => { x: number; y: number }
   zoomToNode: (nodeId: string) => void
-  optimizeNodeEntrypoints: (nodeId: string, edges: Array<{ id: string; source_node_id: string; target_node_id: string }>, nodeMap: Map<string, { id: string; canvas_x: number; canvas_y: number; width: number; height: number }>) => void
+  optimizeNodeEntrypoints: (
+    nodeId: string,
+    edges: Array<{ id: string; source_node_id: string; target_node_id: string }>,
+    nodeMap: Map<
+      string,
+      { id: string; canvas_x: number; canvas_y: number; width: number; height: number }
+    >
+  ) => void
   onEdgePreviewMove: (e: PointerEvent) => void
   onEdgeCreate: (e: PointerEvent) => void
   setLastDragEndTime: (time: number) => void
@@ -64,6 +72,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     neighborhoodMode,
     focusNodeId,
     isLODMode,
+    isSemanticZoomCollapsed,
     editingNodeId,
     selectedEdge,
     isCreatingEdge,
@@ -140,7 +149,10 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
     // Optimize entry points for this node (wrapped in try-catch to not break click handling)
     try {
-      const optNodeMap = new Map<string, { id: string; canvas_x: number; canvas_y: number; width: number; height: number }>()
+      const optNodeMap = new Map<
+        string,
+        { id: string; canvas_x: number; canvas_y: number; width: number; height: number }
+      >()
       for (const n of store.filteredNodes) {
         optNodeMap.set(n.id, {
           id: n.id,
@@ -229,17 +241,24 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     }
 
     const draggedNodeId = draggingNode.value
-    const draggedNodeIds = multiDragInitial.value.size > 0
-      ? [...multiDragInitial.value.keys()]
-      : (draggedNodeId ? [draggedNodeId] : [])
+    const draggedNodeIds =
+      multiDragInitial.value.size > 0
+        ? [...multiDragInitial.value.keys()]
+        : draggedNodeId
+          ? [draggedNodeId]
+          : []
 
     // Check if drag ended over storyline panel
     const storylinePanel = document.querySelector('.storyline-panel')
     let droppedOnStoryline = false
     if (storylinePanel && draggedNodeIds.length > 0) {
       const rect = storylinePanel.getBoundingClientRect()
-      if (e.clientX >= rect.left && e.clientX <= rect.right &&
-          e.clientY >= rect.top && e.clientY <= rect.bottom) {
+      if (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
         droppedOnStoryline = true
         // Reset nodes to original positions (don't move them on canvas)
         if (multiDragInitial.value.size > 0) {
@@ -250,15 +269,17 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
           store.updateNodePosition(draggedNodeId, dragStart.value.nodeX, dragStart.value.nodeY)
         }
         // Emit event for storyline panel to handle
-        window.dispatchEvent(new CustomEvent('node-dropped-on-storyline', {
-          detail: { nodeIds: draggedNodeIds, x: e.clientX, y: e.clientY }
-        }))
+        window.dispatchEvent(
+          new CustomEvent('node-dropped-on-storyline', {
+            detail: { nodeIds: draggedNodeIds, x: e.clientX, y: e.clientY },
+          })
+        )
       }
     }
 
     // Push overlapping nodes away after drag (only if not dropped on storyline)
-    // Skip in LOD mode - circles are small, pushing based on full node size doesn't make sense
-    if (!droppedOnStoryline && !isLODMode.value) {
+    // Skip in dot mode (LOD or semantic zoom collapsed) - circles are small, pushing based on full node size doesn't make sense
+    if (!droppedOnStoryline && !isLODMode.value && !isSemanticZoomCollapsed.value) {
       if (multiDragInitial.value.size > 0) {
         for (const id of multiDragInitial.value.keys()) {
           pushOverlappingNodesAway(id)
@@ -278,8 +299,16 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         let assignedFrameId: string | null = null
 
         for (const frame of store.frames) {
-          const overlapX = Math.max(0, Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) - Math.max(node.canvas_x, frame.canvas_x))
-          const overlapY = Math.max(0, Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) - Math.max(node.canvas_y, frame.canvas_y))
+          const overlapX = Math.max(
+            0,
+            Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
+              Math.max(node.canvas_x, frame.canvas_x)
+          )
+          const overlapY = Math.max(
+            0,
+            Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
+              Math.max(node.canvas_y, frame.canvas_y)
+          )
           const overlapArea = overlapX * overlapY
 
           if (overlapArea > nodeArea * 0.5) {

@@ -1342,11 +1342,12 @@ const { pushOverlappingNodesAway, pushOverlappingNodesAwayExcept } = nodeCollisi
 
 // When node is selected, push non-neighbors away from neighbors
 // Skip in dot mode (semantic zoom collapsed or LOD mode) - nodes are small dots, no need to push
+// Skip in neighborhood mode - layout is controlled by the neighborhood system
 watch(
   () => store.selectedNodeIds,
   selectedIds => {
     if (selectedIds.length === 0) return
-    if (isSemanticZoomCollapsed.value || isLODMode.value) return // Skip in dot mode
+    if (isSemanticZoomCollapsed.value || isLODMode.value || neighborhoodMode.value) return // Skip in dot/neighborhood mode
 
     // Get all neighbor IDs for selected nodes
     const protectedIds = new Set<string>(selectedIds)
@@ -1431,6 +1432,7 @@ const nodeDragging = useNodeDragging({
   neighborhoodMode,
   focusNodeId,
   isLODMode,
+  isSemanticZoomCollapsed,
   editingNodeId,
   selectedEdge,
   isCreatingEdge,
