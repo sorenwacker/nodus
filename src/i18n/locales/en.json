@@ -425,7 +425,8 @@
         "valid": "Connected",
         "invalid": "Connection failed",
         "getKey": "Get your API key at",
-        "refresh": "Refresh"
+        "refresh": "Refresh",
+        "importAll": "Import All Items"
       },
       "citationGraph": {
         "title": "Citation Graph",

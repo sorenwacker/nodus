@@ -155,6 +155,72 @@ function formatCloudItemAsMarkdown(item: ZoteroApiItem): string {
   return lines.join('\n')
 }
 
+// Import all items from Zotero Cloud library
+async function importAllCloudItems() {
+  if (importingCollection.value) return
+
+  importingCollection.value = 'all'
+  cloudError.value = null
+  try {
+    const items = await zoteroApi.getItems()
+    if (items.length === 0) {
+      cloudError.value = 'No items in library'
+      return
+    }
+
+    const nodeIds: string[] = []
+    const startX = 100
+    const startY = 100
+    const nodeWidth = 300
+    const nodeHeight = 200
+    const cols = Math.ceil(Math.sqrt(items.length))
+    const padding = 40
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      cloudImportProgress.value = {
+        current: i + 1,
+        total: items.length,
+        item: item.title || 'Untitled',
+      }
+
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      const x = startX + col * (nodeWidth + padding)
+      const y = startY + row * (nodeHeight + padding)
+
+      const markdown = formatCloudItemAsMarkdown(item)
+
+      try {
+        const node = await store.createNode({
+          title: item.title || 'Untitled',
+          markdown_content: markdown,
+          node_type: 'citation',
+          canvas_x: x,
+          canvas_y: y,
+          width: nodeWidth,
+          height: nodeHeight,
+          workspace_id: store.currentWorkspaceId || undefined,
+        })
+        nodeIds.push(node.id)
+      } catch (e) {
+        console.error(`Failed to create node for ${item.title}:`, e)
+      }
+    }
+
+    cloudImportProgress.value = null
+
+    if (nodeIds.length > 0) {
+      await store.layoutNodes(nodeIds)
+    }
+  } catch (e) {
+    cloudError.value = String(e)
+  } finally {
+    importingCollection.value = null
+    cloudImportProgress.value = null
+  }
+}
+
 // Import collection from Zotero Cloud
 async function importCloudCollection(collectionKey: string) {
   if (importingCollection.value) return
@@ -438,6 +504,20 @@ async function buildGraph() {
       <!-- Cloud Collections -->
       <div v-if="cloudStatus === 'valid'" class="cloud-collections">
         <label>{{ t('settings.zotero.collections') }} ({{ cloudCollections.length }})</label>
+
+        <!-- Import All Items button -->
+        <button
+          class="import-all-btn"
+          :disabled="importingCollection === 'all'"
+          @click="importAllCloudItems"
+        >
+          <template v-if="importingCollection === 'all' && cloudImportProgress">
+            {{ cloudImportProgress.current }}/{{ cloudImportProgress.total }}
+          </template>
+          <template v-else>
+            {{ t('settings.zotero.cloud.importAll') }}
+          </template>
+        </button>
 
         <div v-if="cloudLoading" class="loading">
           {{ t('settings.zotero.loading') }}
@@ -953,5 +1033,25 @@ async function buildGraph() {
 .refresh-btn:hover {
   background: var(--primary-color, #3b82f6);
   color: white;
+}
+
+.import-all-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.import-all-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.import-all-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
 </style>
