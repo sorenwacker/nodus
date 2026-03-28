@@ -358,8 +358,11 @@ async function importVault() {
 }
 
 async function onOnboardingComplete() {
-  // Create starter nodes if canvas is empty (uses selected language)
-  if (store.filteredNodes.length === 0) {
+  // Create starter nodes only if Default workspace is empty
+  // Don't create starter content in custom workspaces
+  const isDefaultWorkspace = !store.currentWorkspaceId || store.currentWorkspaceId === 'default'
+  const defaultNodes = store.nodes.filter(n => !n.workspace_id)
+  if (isDefaultWorkspace && defaultNodes.length === 0) {
     await store.resetDefaultWorkspace()
   }
 }
