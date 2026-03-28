@@ -23,6 +23,7 @@
   width: 1px;
   height: 1px;
   transform-origin: 0 0;
+  z-index: 2;
   /* GPU acceleration */
   will-change: transform;
   transform: translateZ(0);
