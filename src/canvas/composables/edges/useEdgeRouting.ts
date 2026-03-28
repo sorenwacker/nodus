@@ -401,8 +401,11 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
         if (isHugeGraph.value) {
           path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
+        } else if (routed?.svgPath) {
+          // Prefer cached routed paths - this handles both normal rendering and zoom/drag with cache
+          path = routed.svgPath
         } else if (isDeferringRouting()) {
-          // During drag/zoom, use simple paths that match the edge style
+          // During drag/zoom without cache, use simple paths that match the edge style
           if (edgeStyle === 'straight') {
             path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
           } else if (edgeStyle === 'orthogonal') {
@@ -420,8 +423,6 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
             // diagonal/hyperbolic - use standoff points
             path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
           }
-        } else if (routed?.svgPath) {
-          path = routed.svgPath
         } else {
           path = `M${startPort.x},${startPort.y} L${startStandoff.x},${startStandoff.y} L${endStandoff.x},${endStandoff.y} L${endEdge.x},${endEdge.y}`
         }

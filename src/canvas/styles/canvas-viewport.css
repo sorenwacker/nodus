@@ -94,7 +94,7 @@
 
 /* Dim non-highlighted edges when a node is hovered/selected */
 .edges-layer:has(.edge-highlighted) .edge-line-visible:not(.edge-highlighted) {
-  opacity: 0.25;
+  opacity: 0.5;
 }
 
 /* LOD (Level of Detail) mode - circles for large graphs */
