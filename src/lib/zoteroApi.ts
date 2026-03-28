@@ -141,6 +141,20 @@ export class ZoteroWebApi {
   }
 
   /**
+   * Get items in a collection
+   */
+  async getCollectionItems(collectionKey: string): Promise<ZoteroApiItem[]> {
+    return this.request<ZoteroApiItem[]>('GET', `/collections/${collectionKey}/items?itemType=-attachment&format=json`)
+  }
+
+  /**
+   * Get all library items (top-level, no attachments)
+   */
+  async getItems(): Promise<ZoteroApiItem[]> {
+    return this.request<ZoteroApiItem[]>('GET', '/items/top?itemType=-attachment&format=json')
+  }
+
+  /**
    * Create a new item in Zotero
    */
   async createItem(item: ZoteroApiItem): Promise<string> {

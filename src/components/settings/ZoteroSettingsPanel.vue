@@ -9,6 +9,7 @@ import { useZotero } from '../../composables/useZotero'
 import { useCitationGraph } from '../../composables/useCitationGraph'
 import { useNodesStore } from '../../stores/nodes'
 import { zoteroStorage } from '../../lib/storage'
+import { zoteroApi, type ZoteroApiCollection, type ZoteroApiItem } from '../../lib/zoteroApi'
 
 const { t } = useI18n()
 const store = useNodesStore()
@@ -27,6 +28,12 @@ const citationGraph = useCitationGraph({
 const zoteroUserId = ref(zoteroStorage.getUserId())
 const zoteroApiKey = ref(zoteroStorage.getApiKey())
 const cloudStatus = ref<'idle' | 'testing' | 'valid' | 'invalid'>('idle')
+
+// Cloud collections
+const cloudCollections = ref<ZoteroApiCollection[]>([])
+const cloudLoading = ref(false)
+const cloudError = ref<string | null>(null)
+const cloudImportProgress = ref<{ current: number; total: number; item: string } | null>(null)
 
 // Citation graph options
 const createStubs = ref(true)
@@ -51,11 +58,12 @@ const isCloudConfigured = computed(() =>
   Boolean(zoteroUserId.value && zoteroApiKey.value)
 )
 
-// Test Zotero Cloud connection
+// Test Zotero Cloud connection and fetch collections
 async function testCloudConnection() {
   if (!isCloudConfigured.value) return
 
   cloudStatus.value = 'testing'
+  cloudError.value = null
   try {
     const response = await fetch(
       `https://api.zotero.org/users/${zoteroUserId.value}/collections?limit=1`,
@@ -65,9 +73,151 @@ async function testCloudConnection() {
         },
       }
     )
-    cloudStatus.value = response.ok ? 'valid' : 'invalid'
+    if (response.ok) {
+      cloudStatus.value = 'valid'
+      // Fetch all collections
+      await fetchCloudCollections()
+    } else {
+      cloudStatus.value = 'invalid'
+    }
   } catch {
     cloudStatus.value = 'invalid'
+  }
+}
+
+// Fetch collections from Zotero Cloud
+async function fetchCloudCollections() {
+  if (!isCloudConfigured.value) return
+
+  cloudLoading.value = true
+  cloudError.value = null
+  try {
+    const collections = await zoteroApi.getCollections()
+    cloudCollections.value = collections
+  } catch (e) {
+    cloudError.value = String(e)
+    cloudCollections.value = []
+  } finally {
+    cloudLoading.value = false
+  }
+}
+
+// Format cloud item as markdown with frontmatter
+function formatCloudItemAsMarkdown(item: ZoteroApiItem): string {
+  const lines: string[] = ['---']
+  if (item.DOI) lines.push(`doi: ${item.DOI}`)
+  if (item.key) lines.push(`zotero_key: ${item.key}`)
+  if (item.itemType) lines.push(`type: ${item.itemType}`)
+  if (item.date) lines.push(`date: ${item.date}`)
+  if (item.publicationTitle) lines.push(`journal: "${item.publicationTitle}"`)
+  lines.push('---')
+  lines.push('')
+
+  if (item.title) {
+    lines.push(`# ${item.title}`)
+    lines.push('')
+  }
+
+  if (item.creators && item.creators.length > 0) {
+    const authors = item.creators
+      .filter(c => c.creatorType === 'author')
+      .map(c => c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim())
+      .join(', ')
+    if (authors) {
+      lines.push(`**Authors:** ${authors}`)
+      lines.push('')
+    }
+  }
+
+  const pubInfo: string[] = []
+  if (item.publicationTitle) pubInfo.push(item.publicationTitle)
+  if (item.volume) pubInfo.push(`Vol. ${item.volume}`)
+  if (item.issue) pubInfo.push(`Issue ${item.issue}`)
+  if (item.pages) pubInfo.push(`pp. ${item.pages}`)
+  if (item.date) pubInfo.push(`(${item.date})`)
+  if (pubInfo.length > 0) {
+    lines.push(`*${pubInfo.join(', ')}*`)
+    lines.push('')
+  }
+
+  if (item.DOI) {
+    lines.push(`**DOI:** [${item.DOI}](https://doi.org/${item.DOI})`)
+    lines.push('')
+  }
+
+  if (item.abstractNote) {
+    lines.push('## Abstract')
+    lines.push('')
+    lines.push(item.abstractNote)
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
+// Import collection from Zotero Cloud
+async function importCloudCollection(collectionKey: string) {
+  if (importingCollection.value) return
+
+  importingCollection.value = collectionKey
+  cloudError.value = null
+  try {
+    const items = await zoteroApi.getCollectionItems(collectionKey)
+    if (items.length === 0) {
+      cloudError.value = 'No items in collection'
+      return
+    }
+
+    const nodeIds: string[] = []
+    const startX = 100
+    const startY = 100
+    const nodeWidth = 300
+    const nodeHeight = 200
+    const cols = Math.ceil(Math.sqrt(items.length))
+    const padding = 40
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      cloudImportProgress.value = {
+        current: i + 1,
+        total: items.length,
+        item: item.title || 'Untitled',
+      }
+
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      const x = startX + col * (nodeWidth + padding)
+      const y = startY + row * (nodeHeight + padding)
+
+      const markdown = formatCloudItemAsMarkdown(item)
+
+      try {
+        const node = await store.createNode({
+          title: item.title || 'Untitled',
+          markdown_content: markdown,
+          node_type: 'citation',
+          canvas_x: x,
+          canvas_y: y,
+          width: nodeWidth,
+          height: nodeHeight,
+          workspace_id: store.currentWorkspaceId || undefined,
+        })
+        nodeIds.push(node.id)
+      } catch (e) {
+        console.error(`Failed to create node for ${item.title}:`, e)
+      }
+    }
+
+    cloudImportProgress.value = null
+
+    if (nodeIds.length > 0) {
+      await store.layoutNodes(nodeIds)
+    }
+  } catch (e) {
+    cloudError.value = String(e)
+  } finally {
+    importingCollection.value = null
+    cloudImportProgress.value = null
   }
 }
 
@@ -284,6 +434,63 @@ async function buildGraph() {
           zotero.org/settings/keys
         </a>
       </span>
+
+      <!-- Cloud Collections -->
+      <div v-if="cloudStatus === 'valid'" class="cloud-collections">
+        <label>{{ t('settings.zotero.collections') }} ({{ cloudCollections.length }})</label>
+
+        <div v-if="cloudLoading" class="loading">
+          {{ t('settings.zotero.loading') }}
+        </div>
+
+        <div v-else-if="cloudCollections.length === 0" class="no-collections">
+          {{ t('settings.zotero.noCollections') }}
+          <button class="refresh-btn" @click="fetchCloudCollections">
+            {{ t('settings.zotero.cloud.refresh') }}
+          </button>
+        </div>
+
+        <div v-else class="collections-list">
+          <div
+            v-for="collection in cloudCollections"
+            :key="collection.key"
+            class="collection-item"
+          >
+            <div class="collection-info">
+              <span class="collection-name">{{ collection.data.name }}</span>
+            </div>
+            <button
+              class="import-btn"
+              :disabled="importingCollection === collection.key"
+              @click="importCloudCollection(collection.key)"
+            >
+              <template v-if="importingCollection === collection.key && cloudImportProgress">
+                {{ cloudImportProgress.current }}/{{ cloudImportProgress.total }}
+              </template>
+              <template v-else>
+                {{ t('settings.zotero.import') }}
+              </template>
+            </button>
+          </div>
+        </div>
+
+        <!-- Cloud Import Progress -->
+        <div v-if="cloudImportProgress" class="import-progress">
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              :style="{ width: `${(cloudImportProgress.current / cloudImportProgress.total) * 100}%` }"
+            />
+          </div>
+          <span class="progress-text">
+            {{ t('settings.zotero.importing') }} {{ cloudImportProgress.item }}
+          </span>
+        </div>
+
+        <div v-if="cloudError" class="error-message">
+          {{ cloudError }}
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -701,5 +908,50 @@ async function buildGraph() {
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .result-message {
   background: rgba(34, 197, 94, 0.15);
   color: #4ade80;
+}
+
+/* Cloud Collections */
+.cloud-collections {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-node, #e4e4e7);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .cloud-collections {
+  border-color: #3f3f46;
+}
+
+.cloud-collections > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main, #18181b);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .cloud-collections > label {
+  color: #f4f4f5;
+}
+
+.refresh-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--border-node, #e4e4e7);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-main, #18181b);
+  margin-left: 8px;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .refresh-btn {
+  background: #3f3f46;
+  color: #f4f4f5;
+}
+
+.refresh-btn:hover {
+  background: var(--primary-color, #3b82f6);
+  color: white;
 }
 </style>

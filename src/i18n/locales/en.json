@@ -424,7 +424,8 @@
         "testing": "Testing...",
         "valid": "Connected",
         "invalid": "Connection failed",
-        "getKey": "Get your API key at"
+        "getKey": "Get your API key at",
+        "refresh": "Refresh"
       },
       "citationGraph": {
         "title": "Citation Graph",
