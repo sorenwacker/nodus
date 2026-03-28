@@ -130,6 +130,15 @@ const frameColors = [
 const EDGE_SCREEN_WIDTH = 1.5 // Target screen pixels
 const HIGHLIGHTED_STROKE_MULTIPLIER = 1.4
 
+// Link type to color mapping for semantic edges
+const LINK_TYPE_COLORS: Record<string, string> = {
+  cites: '#3b82f6',       // Blue - citation relationship
+  related: '#94a3b8',     // Gray - general relationship
+  blocks: '#ef4444',      // Red - blocking relationship
+  supports: '#22c55e',    // Green - supporting relationship
+  contradicts: '#f97316', // Orange - contradicting relationship
+}
+
 export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn {
   const { store, selectedEdgeId, currentTheme, scale, workspaceId } = ctx
 
@@ -213,6 +222,10 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     const colors = new Set<string>()
     // Default gray color (fallback)
     colors.add('#94a3b8')
+    // Link type semantic colors
+    for (const color of Object.values(LINK_TYPE_COLORS)) {
+      colors.add(color)
+    }
     // Edge colors (both palettes)
     for (const c of cyberEdgeColors) {
       if (c.value) colors.add(c.value)
@@ -255,9 +268,18 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   }
 
   function getEdgeColor(edge: { link_type: string; color?: string | null }): string {
-    // Prefer explicit color field, then check link_type, then default to gray
+    // 1. Prefer explicit color field (user override)
     if (edge.color && edge.color.startsWith('#')) return edge.color
+
+    // 2. Check semantic link_type for predefined colors
+    if (edge.link_type && LINK_TYPE_COLORS[edge.link_type]) {
+      return LINK_TYPE_COLORS[edge.link_type]
+    }
+
+    // 3. Legacy: link_type used to store hex color directly
     if (edge.link_type && edge.link_type.startsWith('#')) return edge.link_type
+
+    // 4. Default gray
     return '#94a3b8'
   }
 

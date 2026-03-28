@@ -24,6 +24,8 @@ const KEYS = {
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
   showTagNodes: 'nodus_show_tag_nodes',
+  zoteroUserId: 'nodus_zotero_user_id',
+  zoteroApiKey: 'nodus_zotero_api_key',
 } as const
 
 /**
@@ -228,6 +230,31 @@ export const memoryStorage = {
   },
   clearMemories(workspaceId: string): void {
     localStorage.removeItem(`nodus_memories_${workspaceId}`)
+  },
+}
+
+/**
+ * Zotero Cloud API settings storage
+ */
+export const zoteroStorage = {
+  getUserId(): string {
+    return localStorage.getItem(KEYS.zoteroUserId) || ''
+  },
+  setUserId(value: string): void {
+    localStorage.setItem(KEYS.zoteroUserId, value)
+  },
+  getApiKey(): string {
+    return localStorage.getItem(KEYS.zoteroApiKey) || ''
+  },
+  setApiKey(value: string): void {
+    localStorage.setItem(KEYS.zoteroApiKey, value)
+  },
+  isConfigured(): boolean {
+    return Boolean(this.getUserId() && this.getApiKey())
+  },
+  clear(): void {
+    localStorage.removeItem(KEYS.zoteroUserId)
+    localStorage.removeItem(KEYS.zoteroApiKey)
   },
 }
 

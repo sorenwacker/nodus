@@ -409,7 +409,43 @@
       "collections": "Collections",
       "loading": "Loading collections...",
       "noCollections": "No collections found",
-      "collectionsHint": "Collections from your Zotero library"
+      "collectionsHint": "Collections from your Zotero library",
+      "items": "items",
+      "import": "Import",
+      "importing": "Importing",
+      "cloud": {
+        "title": "Zotero Cloud",
+        "hint": "Connect to Zotero Cloud to sync citations bidirectionally",
+        "userId": "User ID",
+        "userIdPlaceholder": "Your Zotero user ID (numeric)",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "Your Zotero API key",
+        "testConnection": "Test connection",
+        "testing": "Testing...",
+        "valid": "Connected",
+        "invalid": "Connection failed",
+        "getKey": "Get your API key at"
+      },
+      "citationGraph": {
+        "title": "Citation Graph",
+        "build": "Build Citation Graph",
+        "building": "Building...",
+        "hint": "Discover citation relationships using Semantic Scholar",
+        "scanning": "Scanning papers...",
+        "fetching": "Fetching citations...",
+        "creating": "Creating edges...",
+        "done": "Done",
+        "result": "Created {edges} edges and {stubs} stub nodes",
+        "noPapers": "No papers with DOI found",
+        "createStubs": "Create stub nodes for missing papers",
+        "stubsHint": "Stub nodes show citation links to papers not in your library"
+      },
+      "export": {
+        "toZotero": "Save to Zotero",
+        "exporting": "Saving...",
+        "success": "Saved to Zotero",
+        "error": "Failed to save to Zotero"
+      }
     },
     "language": "Language",
     "llmEnabled": "LLM Features",
