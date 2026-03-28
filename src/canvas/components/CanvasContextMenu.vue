@@ -155,7 +155,7 @@ function handleMoveToWorkspace(workspaceId: string | null) {
           class="context-menu-item"
           @click="handleMoveToWorkspace(null)"
         >
-          <span>Default Workspace</span>
+          <span>Default</span>
         </div>
         <div
           v-for="workspace in otherWorkspaces"

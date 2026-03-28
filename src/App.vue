@@ -133,7 +133,7 @@ async function openWorkspaceEditor() {
       sync_enabled: wsSettings?.sync_enabled ?? false,
     }
   } else {
-    editingWorkspace.value = { id: '', name: 'Default Workspace', description: '', vault_path: null, sync_enabled: false }
+    editingWorkspace.value = { id: '', name: 'Default', description: '', vault_path: null, sync_enabled: false }
   }
   showWorkspaceEditor.value = true
 }
@@ -400,7 +400,7 @@ async function openFolderDialog() {
             :value="store.currentWorkspaceId || ''"
             @change="store.switchWorkspace(($event.target as HTMLSelectElement).value || null)"
           >
-            <option value="">Default Workspace</option>
+            <option value="">Default</option>
             <option v-for="ws in store.workspaces" :key="ws.id" :value="ws.id">
               {{ ws.name }}
             </option>

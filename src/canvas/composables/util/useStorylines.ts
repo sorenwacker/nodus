@@ -94,7 +94,7 @@ export function useStorylines(ctx: UseStorylinesContext): UseStorylinesReturn {
       await store.moveNodesToWorkspace(nodeIds, workspaceId)
       const targetName = workspaceId
         ? store.workspaces.find(w => w.id === workspaceId)?.name || 'workspace'
-        : 'Default Workspace'
+        : 'Default'
       showToast?.(`Moved ${nodeIds.length} node(s) to ${targetName}`, 'success')
       closeContextMenu()
     } catch (e) {
