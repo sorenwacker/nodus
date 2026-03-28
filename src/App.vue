@@ -133,7 +133,7 @@ async function openWorkspaceEditor() {
       sync_enabled: wsSettings?.sync_enabled ?? false,
     }
   } else {
-    editingWorkspace.value = { id: '', name: 'Default', description: '', vault_path: null, sync_enabled: false }
+    editingWorkspace.value = { id: null, name: 'Default', description: '', vault_path: null, sync_enabled: false }
   }
   showWorkspaceEditor.value = true
 }
