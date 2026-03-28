@@ -144,14 +144,29 @@ export class ZoteroWebApi {
    * Get items in a collection
    */
   async getCollectionItems(collectionKey: string): Promise<ZoteroApiItem[]> {
-    return this.request<ZoteroApiItem[]>('GET', `/collections/${collectionKey}/items?itemType=-attachment&format=json`)
+    const response = await this.request<Array<{ key: string; data: ZoteroApiItem }>>(
+      'GET',
+      `/collections/${collectionKey}/items?itemType=-attachment&format=json`
+    )
+    // Zotero API v3 wraps item data in a 'data' property
+    return response
+      .filter(item => item.data && item.data.itemType !== 'attachment')
+      .map(item => ({ ...item.data, key: item.key || item.data.key }))
   }
 
   /**
    * Get all library items (top-level, no attachments)
    */
   async getItems(): Promise<ZoteroApiItem[]> {
-    return this.request<ZoteroApiItem[]>('GET', '/items/top?itemType=-attachment&format=json')
+    const response = await this.request<Array<{ key: string; data: ZoteroApiItem }>>(
+      'GET',
+      '/items/top?itemType=-attachment&format=json'
+    )
+    // Zotero API v3 wraps item data in a 'data' property
+    console.log('[ZoteroAPI] getItems response:', JSON.stringify(response.slice(0, 1), null, 2))
+    return response
+      .filter(item => item.data && item.data.itemType !== 'attachment')
+      .map(item => ({ ...item.data, key: item.key || item.data.key }))
   }
 
   /**
