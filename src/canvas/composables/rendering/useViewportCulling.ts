@@ -19,8 +19,6 @@ export interface UseViewportCullingContext {
   offsetY: Ref<number>
   displayNodes: ComputedRef<Node[]>
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
-  /** When true, defer culling recalculation for smoother zoom */
-  isZooming?: Ref<boolean>
 }
 
 export interface UseViewportCullingReturn {
@@ -31,15 +29,13 @@ export interface UseViewportCullingReturn {
 }
 
 export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportCullingReturn {
-  const { scale, offsetX, offsetY, displayNodes, selectedNodeIds, isZooming } = ctx
+  const { scale, offsetX, offsetY, displayNodes, selectedNodeIds } = ctx
 
   // Viewport size for culling (updated on resize)
   const viewportWidth = ref(window.innerWidth)
   const viewportHeight = ref(window.innerHeight)
 
-  // Cached nodes for zoom deferral - prevents DOM thrashing during zoom
-  let cachedVisibleNodes: Node[] = []
-  let cacheValidUntilZoomEnds = false
+  // Note: Zoom deferral caching removed - PixiJS GPU rendering handles zoom performance
 
   // Spatial index for large graphs
   const spatialGrid = new SpatialGrid({ cellSize: 500 })
@@ -49,8 +45,6 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   watch(
     () => displayNodes.value,
     nodes => {
-      // Invalidate cache when nodes change
-      cacheValidUntilZoomEnds = false
       if (nodes.length >= SPATIAL_INDEX_THRESHOLD) {
         spatialGrid.build(nodes)
         spatialIndexVersion.value++
@@ -58,15 +52,6 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     },
     { immediate: true }
   )
-
-  // Invalidate cache when zoom ends to trigger recalculation
-  if (isZooming) {
-    watch(isZooming, zooming => {
-      if (!zooming) {
-        cacheValidUntilZoomEnds = false
-      }
-    })
-  }
 
   // Handle window resize
   function onResize() {
@@ -85,12 +70,6 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   // Only render nodes visible in viewport (with margin for smooth scrolling)
   // Always include selected nodes so they can be measured/fitted even if off-screen
   const visibleNodes = computed(() => {
-    // Check zoom state FIRST, before reading any other reactive state
-    // This minimizes dependency tracking during zoom
-    if (isZooming?.value && cacheValidUntilZoomEnds && cachedVisibleNodes.length > 0) {
-      return cachedVisibleNodes
-    }
-
     const nodes = displayNodes.value
     const s = scale.value
     const ox = offsetX.value
@@ -123,9 +102,6 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
           node.canvas_y <= viewBottom
         )
       })
-      // Cache for small graphs too
-      cachedVisibleNodes = result
-      cacheValidUntilZoomEnds = true
       return result
     }
 
@@ -168,10 +144,6 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
         result.push(node)
       }
     }
-
-    // Cache the result for zoom deferral
-    cachedVisibleNodes = result
-    cacheValidUntilZoomEnds = true
 
     return result
   })
