@@ -35,6 +35,8 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   const viewportWidth = ref(window.innerWidth)
   const viewportHeight = ref(window.innerHeight)
 
+  // Note: Zoom deferral caching removed - PixiJS GPU rendering handles zoom performance
+
   // Spatial index for large graphs
   const spatialGrid = new SpatialGrid({ cellSize: 500 })
   const spatialIndexVersion = ref(0)
@@ -72,10 +74,11 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     const s = scale.value
     const ox = offsetX.value
     const oy = offsetY.value
-    // Scale margin inversely with zoom to maintain consistent screen-space buffer
-    // At zoom 1.0: 500px margin. At zoom 0.2: 2500px margin in canvas coords
+    // Scale margin inversely with zoom, but cap it to avoid rendering everything when zoomed out
+    // At zoom 1.0: 500px margin. At zoom 0.2: 1000px margin (capped)
     const baseMargin = 500
-    const margin = baseMargin / Math.max(s, 0.1)
+    const maxMargin = 1000 // Cap margin to prevent including all nodes when zoomed out
+    const margin = Math.min(baseMargin / Math.max(s, 0.1), maxMargin)
 
     // Viewport bounds in canvas coordinates
     const viewLeft = -ox / s - margin
@@ -88,7 +91,7 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
 
     // For small graphs, use simple linear filter (faster than grid overhead)
     if (nodes.length < SPATIAL_INDEX_THRESHOLD) {
-      return nodes.filter(node => {
+      const result = nodes.filter(node => {
         if (selectedSet.has(node.id)) return true
         const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
         const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
@@ -99,6 +102,7 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
           node.canvas_y <= viewBottom
         )
       })
+      return result
     }
 
     // For large graphs, use spatial index for O(k) query
