@@ -1,8 +1,10 @@
 /**
  * Node clipboard composable
  * Handles copy/paste of nodes with their edges
+ * Also handles DOI paste - fetches metadata from Semantic Scholar
  */
 import { writeText as writeClipboard, readText as readClipboard } from '@tauri-apps/plugin-clipboard-manager'
+import { semanticScholar } from '../../../lib/semanticScholar'
 
 export interface ClipboardNodeData {
   type: 'nodus-nodes'
@@ -29,6 +31,86 @@ export interface ClipboardNodeData {
  */
 function isValidCoordinate(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1_000_000
+}
+
+/**
+ * Extract DOI from text (supports various formats)
+ */
+function extractDOI(text: string): string | null {
+  const trimmed = text.trim()
+
+  // Direct DOI (10.xxxx/...)
+  const directMatch = trimmed.match(/^(10\.\d{4,}\/[^\s]+)$/i)
+  if (directMatch) return directMatch[1]
+
+  // DOI URL (https://doi.org/10.xxxx/...)
+  const urlMatch = trimmed.match(/doi\.org\/(10\.\d{4,}\/[^\s]+)/i)
+  if (urlMatch) return urlMatch[1]
+
+  // DOI: prefix (DOI: 10.xxxx/...)
+  const prefixMatch = trimmed.match(/^doi:\s*(10\.\d{4,}\/[^\s]+)/i)
+  if (prefixMatch) return prefixMatch[1]
+
+  return null
+}
+
+/**
+ * Format Semantic Scholar paper as markdown with frontmatter
+ */
+function formatPaperAsMarkdown(paper: {
+  title: string
+  authors?: Array<{ name: string }>
+  year?: number
+  abstract?: string
+  venue?: string
+  externalIds?: { DOI?: string }
+  paperId: string
+}): string {
+  const lines: string[] = ['---']
+
+  if (paper.externalIds?.DOI) {
+    lines.push(`doi: ${paper.externalIds.DOI}`)
+  }
+  lines.push(`semantic_scholar_id: ${paper.paperId}`)
+  if (paper.year) lines.push(`date: ${paper.year}`)
+  if (paper.venue) lines.push(`journal: "${paper.venue}"`)
+  lines.push('---')
+  lines.push('')
+
+  lines.push(`# ${paper.title}`)
+  lines.push('')
+
+  if (paper.authors && paper.authors.length > 0) {
+    const authorNames = paper.authors.slice(0, 10).map(a => a.name).join(', ')
+    if (paper.authors.length > 10) {
+      lines.push(`**Authors:** ${authorNames}, et al.`)
+    } else {
+      lines.push(`**Authors:** ${authorNames}`)
+    }
+    lines.push('')
+  }
+
+  if (paper.venue && paper.year) {
+    lines.push(`*${paper.venue} (${paper.year})*`)
+    lines.push('')
+  } else if (paper.year) {
+    lines.push(`*${paper.year}*`)
+    lines.push('')
+  }
+
+  if (paper.externalIds?.DOI) {
+    lines.push(`**DOI:** [${paper.externalIds.DOI}](https://doi.org/${paper.externalIds.DOI})`)
+    lines.push('')
+  }
+
+  if (paper.abstract) {
+    lines.push('## Abstract')
+    lines.push('')
+    lines.push(paper.abstract)
+    lines.push('')
+  }
+
+  return lines.join('\n')
 }
 
 /**
@@ -152,16 +234,32 @@ export function useNodeClipboard(options: UseNodeClipboardOptions) {
   async function pasteNodes(): Promise<string[]> {
     try {
       const text = await readClipboard()
+
+      // Check if the clipboard contains a DOI
+      const doi = extractDOI(text)
+      if (doi) {
+        return await pasteFromDOI(doi)
+      }
+
+      // Try to parse as JSON (Nodus clipboard format)
       let parsedData: unknown
 
       try {
         parsedData = JSON.parse(text)
       } catch {
+        // Not JSON - create a plain text node
+        if (text.trim()) {
+          return await pasteAsTextNode(text)
+        }
         return []
       }
 
       // Validate clipboard data schema
       if (!validateClipboardData(parsedData)) {
+        // Not Nodus format - create a plain text node
+        if (text.trim()) {
+          return await pasteAsTextNode(text)
+        }
         return []
       }
 
@@ -223,6 +321,78 @@ export function useNodeClipboard(options: UseNodeClipboardOptions) {
       console.debug('Paste failed:', e)
       return []
     }
+  }
+
+  /**
+   * Paste a DOI - fetch metadata from Semantic Scholar and create a citation node
+   */
+  async function pasteFromDOI(doi: string): Promise<string[]> {
+    showToast?.(`Fetching paper: ${doi}...`, 'info')
+
+    try {
+      const paper = await semanticScholar.getPaperByDOI(doi)
+
+      if (!paper) {
+        showToast?.(`Paper not found: ${doi}`, 'error')
+        return []
+      }
+
+      const viewportSize = getViewportSize()
+      const viewportCenter = screenToCanvas(
+        viewportSize.width / 2,
+        viewportSize.height / 2
+      )
+
+      const markdown = formatPaperAsMarkdown(paper)
+
+      const newNode = await store.createNode({
+        title: paper.title,
+        markdown_content: markdown,
+        canvas_x: viewportCenter.x,
+        canvas_y: viewportCenter.y,
+        width: 350,
+        height: 250,
+      })
+
+      store.setSelectedNodeIds([newNode.id])
+      showToast?.(`Created: ${paper.title}`, 'success')
+
+      return [newNode.id]
+    } catch (e) {
+      console.error('Failed to fetch paper:', e)
+      showToast?.(`Failed to fetch: ${doi}`, 'error')
+      return []
+    }
+  }
+
+  /**
+   * Paste plain text as a new node
+   */
+  async function pasteAsTextNode(text: string): Promise<string[]> {
+    const viewportSize = getViewportSize()
+    const viewportCenter = screenToCanvas(
+      viewportSize.width / 2,
+      viewportSize.height / 2
+    )
+
+    // Extract first line as title, rest as content
+    const lines = text.split('\n')
+    const title = lines[0].replace(/^#*\s*/, '').slice(0, 100) || 'Pasted note'
+    const content = text
+
+    const newNode = await store.createNode({
+      title,
+      markdown_content: content,
+      canvas_x: viewportCenter.x,
+      canvas_y: viewportCenter.y,
+      width: 300,
+      height: 200,
+    })
+
+    store.setSelectedNodeIds([newNode.id])
+    showToast?.('Pasted as note', 'success')
+
+    return [newNode.id]
   }
 
   return {
