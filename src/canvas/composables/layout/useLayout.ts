@@ -7,6 +7,18 @@ import { NODE_DEFAULTS } from '../../constants'
 import { applyForceLayout, applyHierarchicalLayout, layoutRegistry } from '../../layout'
 import { fastGridLayout, batchUpdatePositions } from '../../layout/fastGrid'
 import type { LayoutNode as StrategyLayoutNode, LayoutEdge as StrategyLayoutEdge } from '../../layout/types'
+import {
+  pushNodesOutOfFrames,
+  constrainNodesToFrame,
+  isNodeInFrame,
+  type FrameRect,
+  type NodeSize,
+} from './useFrameCollision'
+import {
+  createLayoutAnimator,
+  animateToPositions as animatePositions,
+} from './useLayoutAnimation'
+import { tetrisGridLayout } from './useTetrisLayout'
 
 interface Node {
   id: string
@@ -59,311 +71,37 @@ export interface UseLayoutOptions {
 export function useLayout(options: UseLayoutOptions) {
   const { store, viewState, pushUndo } = options
 
-  let layoutAnimationId: number | null = null
+  // Animation state
+  const animationState = createLayoutAnimator()
 
   function stopAnimation() {
-    if (layoutAnimationId) {
-      cancelAnimationFrame(layoutAnimationId)
-      layoutAnimationId = null
-    }
-  }
-
-  /**
-   * Push nodes out of frame boundaries after layout calculation.
-   * Ensures nodes don't end up inside frames.
-   */
-  function pushNodesOutOfFrames(
-    positions: Map<string, { x: number; y: number }>,
-    nodeMap: Map<string, { width?: number; height?: number }>
-  ): Map<string, { x: number; y: number }> {
-    const frames = store.getFilteredFrames()
-    if (frames.length === 0) return positions
-
-    const result = new Map<string, { x: number; y: number }>()
-
-    for (const [nodeId, pos] of positions) {
-      const nodeInfo = nodeMap.get(nodeId)
-      const nodeWidth = nodeInfo?.width || NODE_DEFAULTS.WIDTH
-      const nodeHeight = nodeInfo?.height || NODE_DEFAULTS.HEIGHT
-      let newX = pos.x
-      let newY = pos.y
-
-      // Check collision with each frame and push out
-      for (const frame of frames) {
-        const nodeRight = newX + nodeWidth
-        const nodeBottom = newY + nodeHeight
-        const frameRight = frame.canvas_x + frame.width
-        const frameBottom = frame.canvas_y + frame.height
-
-        // Check if node overlaps frame
-        const overlapX = newX < frameRight && nodeRight > frame.canvas_x
-        const overlapY = newY < frameBottom && nodeBottom > frame.canvas_y
-
-        if (overlapX && overlapY) {
-          // Calculate push distances for each direction
-          const pushLeft = nodeRight - frame.canvas_x
-          const pushRight = frameRight - newX
-          const pushUp = nodeBottom - frame.canvas_y
-          const pushDown = frameBottom - newY
-
-          // Find minimum push distance and apply
-          const minPush = Math.min(pushLeft, pushRight, pushUp, pushDown)
-          if (minPush === pushLeft) {
-            newX = frame.canvas_x - nodeWidth - 20
-          } else if (minPush === pushRight) {
-            newX = frameRight + 20
-          } else if (minPush === pushUp) {
-            newY = frame.canvas_y - nodeHeight - 20
-          } else {
-            newY = frameBottom + 20
-          }
-        }
-      }
-
-      result.set(nodeId, { x: newX, y: newY })
-    }
-
-    return result
-  }
-
-  /**
-   * Constrain nodes to stay within a frame's boundaries.
-   * Used for frame-scoped layout to prevent nodes from leaving the frame.
-   */
-  function constrainNodesToFrame(
-    positions: Map<string, { x: number; y: number }>,
-    nodeMap: Map<string, { width?: number; height?: number }>,
-    frame: Frame
-  ): Map<string, { x: number; y: number }> {
-    const result = new Map<string, { x: number; y: number }>()
-    const padding = 20 // Padding from frame edges
-
-    for (const [nodeId, pos] of positions) {
-      const nodeInfo = nodeMap.get(nodeId)
-      const nodeWidth = nodeInfo?.width || NODE_DEFAULTS.WIDTH
-      const nodeHeight = nodeInfo?.height || NODE_DEFAULTS.HEIGHT
-
-      // Constrain X position
-      const minX = frame.canvas_x + padding
-      const maxX = frame.canvas_x + frame.width - nodeWidth - padding
-      const newX = Math.max(minX, Math.min(maxX, pos.x))
-
-      // Constrain Y position
-      const minY = frame.canvas_y + padding
-      const maxY = frame.canvas_y + frame.height - nodeHeight - padding
-      const newY = Math.max(minY, Math.min(maxY, pos.y))
-
-      result.set(nodeId, { x: newX, y: newY })
-    }
-
-    return result
+    animationState.stop()
   }
 
   function animateToPositions(targets: Map<string, { x: number; y: number }>, duration = 400) {
-    stopAnimation()
-
-    const startTime = performance.now()
-    const startPositions = new Map<string, { x: number; y: number }>()
-
-    for (const [id] of targets) {
-      const node = store.getNodes().find(n => n.id === id)
-      if (node) {
-        startPositions.set(id, { x: node.canvas_x, y: node.canvas_y })
-      }
-    }
-
-    function easeOutCubic(t: number): number {
-      return 1 - Math.pow(1 - t, 3)
-    }
-
-    function animate() {
-      const elapsed = performance.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = easeOutCubic(progress)
-
-      for (const [id, target] of targets) {
-        const start = startPositions.get(id)
-        if (start) {
-          const x = start.x + (target.x - start.x) * eased
-          const y = start.y + (target.y - start.y) * eased
-          store.updateNodePosition(id, x, y)
-        }
-      }
-
-      if (progress < 1) {
-        layoutAnimationId = requestAnimationFrame(animate)
-      } else {
-        layoutAnimationId = null
-      }
-    }
-
-    layoutAnimationId = requestAnimationFrame(animate)
+    animatePositions(
+      targets,
+      (id: string) => {
+        const node = store.getNodes().find(n => n.id === id)
+        return node ? { x: node.canvas_x, y: node.canvas_y } : null
+      },
+      store.updateNodePosition,
+      animationState,
+      duration
+    )
   }
 
-  /**
-   * Tetris-style bin packing for grid layout with edge-aware placement
-   * Places connected nodes closer together to minimize total edge length
-   */
-  function tetrisGridLayout(
-    nodes: Node[],
-    edges: Edge[],
-    startX: number,
-    startY: number,
-    gap: number
+  // Helper to get frames for collision detection
+  function getFramesForCollision(): FrameRect[] {
+    return store.getFilteredFrames()
+  }
+
+  // Wrapper for pushNodesOutOfFrames that gets frames from store
+  function pushOutOfFrames(
+    positions: Map<string, { x: number; y: number }>,
+    nodeMap: Map<string, NodeSize>
   ): Map<string, { x: number; y: number }> {
-    const targets = new Map<string, { x: number; y: number }>()
-
-    if (nodes.length === 0) return targets
-
-    // Build adjacency map for edge-aware placement
-    const nodeIds = new Set(nodes.map(n => n.id))
-    const adjacency = new Map<string, Set<string>>()
-    for (const node of nodes) {
-      adjacency.set(node.id, new Set())
-    }
-    for (const edge of edges) {
-      if (nodeIds.has(edge.source_node_id) && nodeIds.has(edge.target_node_id)) {
-        adjacency.get(edge.source_node_id)?.add(edge.target_node_id)
-        adjacency.get(edge.target_node_id)?.add(edge.source_node_id)
-      }
-    }
-
-    // Calculate total area to estimate ideal dimensions
-    let totalArea = 0
-    let maxNodeWidth = 0
-    let maxNodeHeight = 0
-    for (const node of nodes) {
-      const w = node.width || NODE_DEFAULTS.WIDTH
-      const h = node.height || NODE_DEFAULTS.HEIGHT
-      totalArea += (w + gap) * (h + gap)
-      maxNodeWidth = Math.max(maxNodeWidth, w)
-      maxNodeHeight = Math.max(maxNodeHeight, h)
-    }
-
-    // Target a roughly square layout
-    const idealSide = Math.sqrt(totalArea) * 1.2
-    const maxWidth = Math.max(idealSide, maxNodeWidth + gap)
-
-    // Sort nodes: prioritize by connectivity (most connected first), then by area
-    const sorted = [...nodes].sort((a, b) => {
-      const connA = adjacency.get(a.id)?.size || 0
-      const connB = adjacency.get(b.id)?.size || 0
-      if (connA !== connB) return connB - connA // Most connected first
-      const areaA = (a.width || NODE_DEFAULTS.WIDTH) * (a.height || NODE_DEFAULTS.HEIGHT)
-      const areaB = (b.width || NODE_DEFAULTS.WIDTH) * (b.height || NODE_DEFAULTS.HEIGHT)
-      return areaB - areaA // Then largest first
-    })
-
-    // Track placed rectangles with node IDs
-    const placed: { id: string; x: number; y: number; w: number; h: number }[] = []
-
-    function overlaps(x: number, y: number, w: number, h: number): boolean {
-      for (const rect of placed) {
-        if (x < rect.x + rect.w + gap &&
-            x + w + gap > rect.x &&
-            y < rect.y + rect.h + gap &&
-            y + h + gap > rect.y) {
-          return true
-        }
-      }
-      return false
-    }
-
-    // Calculate distance to center of connected placed nodes
-    function distanceToConnected(nodeId: string, x: number, y: number, w: number, h: number): number {
-      const connected = adjacency.get(nodeId)
-      if (!connected || connected.size === 0) return 0
-
-      let totalDist = 0
-      let count = 0
-      const cx = x + w / 2
-      const cy = y + h / 2
-
-      for (const rect of placed) {
-        if (connected.has(rect.id)) {
-          const rcx = rect.x + rect.w / 2
-          const rcy = rect.y + rect.h / 2
-          totalDist += Math.sqrt((cx - rcx) ** 2 + (cy - rcy) ** 2)
-          count++
-        }
-      }
-
-      return count > 0 ? totalDist / count : 0
-    }
-
-    function findBestPosition(nodeId: string, w: number, h: number): { x: number; y: number } {
-      const candidates: { x: number; y: number; packScore: number; edgeScore: number }[] = []
-
-      candidates.push({ x: startX, y: startY, packScore: 0, edgeScore: 0 })
-
-      for (const rect of placed) {
-        const rightX = rect.x + rect.w + gap
-        if (rightX + w <= startX + maxWidth) {
-          candidates.push({ x: rightX, y: rect.y, packScore: rect.y * 10000 + rightX, edgeScore: 0 })
-        }
-
-        candidates.push({ x: rect.x, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rect.x, edgeScore: 0 })
-        candidates.push({ x: startX, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000, edgeScore: 0 })
-
-        if (rightX + w <= startX + maxWidth) {
-          candidates.push({ x: rightX, y: startY, packScore: startY * 10000 + rightX, edgeScore: 0 })
-        }
-
-        for (const other of placed) {
-          if (other === rect) continue
-          if (other.y > rect.y + rect.h + gap) {
-            const gapTop = rect.y + rect.h + gap
-            const gapHeight = other.y - gapTop - gap
-            if (gapHeight >= h) {
-              candidates.push({ x: rect.x, y: gapTop, packScore: gapTop * 10000 + rect.x, edgeScore: 0 })
-            }
-          }
-        }
-      }
-
-      // Calculate edge distance scores for valid candidates
-      const validCandidates: typeof candidates = []
-      for (const cand of candidates) {
-        if (cand.x >= startX && cand.y >= startY &&
-            cand.x + w <= startX + maxWidth &&
-            !overlaps(cand.x, cand.y, w, h)) {
-          cand.edgeScore = distanceToConnected(nodeId, cand.x, cand.y, w, h)
-          validCandidates.push(cand)
-        }
-      }
-
-      if (validCandidates.length === 0) {
-        let maxBottom = startY
-        for (const rect of placed) {
-          maxBottom = Math.max(maxBottom, rect.y + rect.h + gap)
-        }
-        return { x: startX, y: maxBottom }
-      }
-
-      // Sort by edge distance first (to minimize edge length), then by packing score
-      // Weight edge proximity heavily for connected nodes
-      validCandidates.sort((a, b) => {
-        // If both have edge connections, prioritize closer to connected nodes
-        if (a.edgeScore > 0 || b.edgeScore > 0) {
-          const edgeDiff = a.edgeScore - b.edgeScore
-          if (Math.abs(edgeDiff) > 50) return edgeDiff // Significant edge distance difference
-        }
-        // Otherwise use packing score
-        return a.packScore - b.packScore
-      })
-
-      return { x: validCandidates[0].x, y: validCandidates[0].y }
-    }
-
-    for (const node of sorted) {
-      const w = node.width || NODE_DEFAULTS.WIDTH
-      const h = node.height || NODE_DEFAULTS.HEIGHT
-      const pos = findBestPosition(node.id, w, h)
-      targets.set(node.id, pos)
-      placed.push({ id: node.id, x: pos.x, y: pos.y, w, h })
-    }
-
-    return targets
+    return pushNodesOutOfFrames(positions, nodeMap, getFramesForCollision())
   }
 
   /**
@@ -506,22 +244,12 @@ export function useLayout(options: UseLayoutOptions) {
       }
       console.log('[LAYOUT] Found frame:', targetFrame.title, 'at', targetFrame.canvas_x, targetFrame.canvas_y, 'size', targetFrame.width, 'x', targetFrame.height)
 
-      // Helper to check if a node is inside the target frame (50%+ overlap)
+      // Helper to check if a node is inside the target frame (explicit frame_id or 50%+ overlap)
       const isNodeInTargetFrame = (node: Node): boolean => {
         if (node.frame_id === frameId) return true
-
         const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
         const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-        const nodeArea = nodeWidth * nodeHeight
-
-        const overlapX = Math.max(0,
-          Math.min(node.canvas_x + nodeWidth, targetFrame!.canvas_x + targetFrame!.width) -
-          Math.max(node.canvas_x, targetFrame!.canvas_x))
-        const overlapY = Math.max(0,
-          Math.min(node.canvas_y + nodeHeight, targetFrame!.canvas_y + targetFrame!.height) -
-          Math.max(node.canvas_y, targetFrame!.canvas_y))
-
-        return overlapX * overlapY > nodeArea * 0.5
+        return isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, targetFrame!)
       }
 
       nodes = allNodes.filter(n => isNodeInTargetFrame(n))
@@ -579,7 +307,7 @@ export function useLayout(options: UseLayoutOptions) {
       const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
       const finalPositions = targetFrame
         ? constrainNodesToFrame(positions, nodeMap, targetFrame)
-        : pushNodesOutOfFrames(positions, nodeMap)
+        : pushOutOfFrames(positions, nodeMap)
 
       // Batch update positions to avoid blocking UI
       await batchUpdatePositions(finalPositions, store.updateNodePosition, 200)
@@ -593,19 +321,10 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     // Helper to check if a node is spatially inside a frame (50%+ overlap)
-    const isNodeInFrame = (node: Node, frame: Frame): boolean => {
+    const checkNodeInFrame = (node: Node, frame: Frame): boolean => {
       const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
       const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-      const nodeArea = nodeWidth * nodeHeight
-
-      const overlapX = Math.max(0,
-        Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
-        Math.max(node.canvas_x, frame.canvas_x))
-      const overlapY = Math.max(0,
-        Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
-        Math.max(node.canvas_y, frame.canvas_y))
-
-      return overlapX * overlapY > nodeArea * 0.5
+      return isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, frame)
     }
 
     // Create frame map first for spatial checks
@@ -637,7 +356,7 @@ export function useLayout(options: UseLayoutOptions) {
         // Check spatial overlap with any frame
         let inFrame = false
         for (const frame of allFrames) {
-          if (isNodeInFrame(node, frame)) {
+          if (checkNodeInFrame(node, frame)) {
             if (!frameNodes.has(frame.id)) {
               frameNodes.set(frame.id, [])
             }
@@ -748,7 +467,7 @@ export function useLayout(options: UseLayoutOptions) {
       const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
       const finalTargets = targetFrame
         ? constrainNodesToFrame(nodeTargets, nodeMap, targetFrame)
-        : pushNodesOutOfFrames(nodeTargets, nodeMap)
+        : pushOutOfFrames(nodeTargets, nodeMap)
 
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
@@ -832,7 +551,7 @@ export function useLayout(options: UseLayoutOptions) {
       const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
       const finalTargets = targetFrame
         ? constrainNodesToFrame(nodeTargets, nodeMap, targetFrame)
-        : pushNodesOutOfFrames(nodeTargets, nodeMap)
+        : pushOutOfFrames(nodeTargets, nodeMap)
 
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
@@ -898,7 +617,7 @@ export function useLayout(options: UseLayoutOptions) {
       console.log('Grid layout targets:', targets.size)
     } else if (layout === 'horizontal') {
       const sorted = [...virtualNodes].sort((a, b) => (b.height || NODE_DEFAULTS.HEIGHT) - (a.height || NODE_DEFAULTS.HEIGHT))
-      const totalWidth = sorted.reduce((sum, n) => sum + (n.width || NODE_DEFAULTS.WIDTH) + gap, -gap)
+      const totalWidth = sorted.reduce((sum, n) => sum + (n.width || NODE_DEFAULTS.WIDTH) + gridGap, -gridGap)
       let x = centerX - totalWidth / 2
       const maxHeight = Math.max(...sorted.map(n => n.height || NODE_DEFAULTS.HEIGHT))
 
@@ -906,7 +625,7 @@ export function useLayout(options: UseLayoutOptions) {
       for (const node of sorted) {
         const h = node.height || NODE_DEFAULTS.HEIGHT
         virtualTargets.set(node.id, { x, y: centerY - maxHeight / 2 + (maxHeight - h) / 2 })
-        x += (node.width || NODE_DEFAULTS.WIDTH) + gap
+        x += (node.width || NODE_DEFAULTS.WIDTH) + gridGap
       }
 
       const realTargets = expandToRealTargets(virtualTargets)
@@ -926,7 +645,7 @@ export function useLayout(options: UseLayoutOptions) {
       }
     } else if (layout === 'vertical') {
       const sorted = [...virtualNodes].sort((a, b) => (b.width || NODE_DEFAULTS.WIDTH) - (a.width || NODE_DEFAULTS.WIDTH))
-      const totalHeight = sorted.reduce((sum, n) => sum + (n.height || NODE_DEFAULTS.HEIGHT) + gap, -gap)
+      const totalHeight = sorted.reduce((sum, n) => sum + (n.height || NODE_DEFAULTS.HEIGHT) + gridGap, -gridGap)
       let y = centerY - totalHeight / 2
       const maxWidth = Math.max(...sorted.map(n => n.width || NODE_DEFAULTS.WIDTH))
 
@@ -934,7 +653,7 @@ export function useLayout(options: UseLayoutOptions) {
       for (const node of sorted) {
         const w = node.width || NODE_DEFAULTS.WIDTH
         virtualTargets.set(node.id, { x: centerX - maxWidth / 2 + (maxWidth - w) / 2, y })
-        y += (node.height || NODE_DEFAULTS.HEIGHT) + gap
+        y += (node.height || NODE_DEFAULTS.HEIGHT) + gridGap
       }
 
       const realTargets = expandToRealTargets(virtualTargets)
@@ -958,7 +677,7 @@ export function useLayout(options: UseLayoutOptions) {
     const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
     const finalTargets = targetFrame
       ? constrainNodesToFrame(targets, nodeMap, targetFrame)
-      : pushNodesOutOfFrames(targets, nodeMap)
+      : pushOutOfFrames(targets, nodeMap)
 
     console.log('Calling animateToPositions with', finalTargets.size, 'targets')
     animateToPositions(finalTargets, 500)
@@ -1094,7 +813,7 @@ export function useLayout(options: UseLayoutOptions) {
     const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
 
     // Post-process: push nodes out of frames
-    const positions = pushNodesOutOfFrames(calculatedPositions, nodeMap)
+    const positions = pushOutOfFrames(calculatedPositions, nodeMap)
 
     // Apply positions
     const animate = options?.animate !== false
