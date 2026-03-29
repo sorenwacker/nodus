@@ -143,6 +143,9 @@ onMounted(() => {
   // Setup content renderer watchers for markdown/math/mermaid
   setupContentWatchers()
 
+  // Initialize font scale CSS variable
+  document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
+
   updateTheme()
   // Watch for theme changes
   const observer = new MutationObserver(updateTheme)
@@ -502,10 +505,6 @@ const {
 } = canvasDisplay
 
 // Initialize font scale on mount
-onMounted(() => {
-  document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
-})
-
 // Help modal
 const showHelpModal = ref(false)
 
@@ -841,7 +840,6 @@ const graphPrompt = ref('')
 const nodePrompt = ref('')
 const isGraphLLMLoading = ref(false)
 const isNodeLLMLoading = ref(false)
-const lastContextSize = ref(0) // Track context size of last request
 const showAgentLogPanel = ref(false) // User-controlled visibility of agent log
 const llmEnabled = ref(llmStorage.getLLMEnabled())
 let nodeLLMAbortController: AbortController | null = null
@@ -1144,9 +1142,6 @@ CURRENT NOTE TO EDIT:
 Title: ${node.title || 'Untitled'}
 Content:
 ${currentContent || '(empty)'}`
-
-    // Track context size
-    lastContextSize.value = nodeSystemPrompt.length + prompt.length
 
     const response = await callOllama(prompt, nodeSystemPrompt)
 
@@ -2137,23 +2132,6 @@ useCanvasKeyboardShortcuts({
         @stop-pdf="pdfDrop.stop()"
         @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
       />
-
-      <!-- SVG filter for fisheye warp effect -->
-      <svg width="0" height="0" style="position: absolute">
-        <defs>
-          <filter id="fisheye-warp" x="-50%" y="-50%" width="200%" height="200%">
-            <!-- Slight barrel distortion effect -->
-            <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur" />
-            <feDisplacementMap
-              in="blur"
-              in2="SourceGraphic"
-              scale="0"
-              xChannelSelector="R"
-              yChannelSelector="G"
-            />
-          </filter>
-        </defs>
-      </svg>
 
       <!-- Magnifying lens (when zoomed out far) -->
       <CanvasMagnifier
