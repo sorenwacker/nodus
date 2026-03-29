@@ -15,6 +15,7 @@ import {
   useCanvasPan,
   useCanvasZoom,
   useCanvasDisplay,
+  usePreviewPanel,
 } from './composables/viewport'
 import {
   useNodeClipboard,
@@ -318,14 +319,6 @@ const lodCardNodes = computed(() => {
   return visibleNodes.value.filter(n => selectedSet.has(n.id) || n.id === editingNodeId.value)
 })
 
-// Preview panel state (functions defined after nodeNavigation)
-const showPreviewPanel = ref(false)
-const previewNode = computed(() => {
-  if (!isSemanticZoomCollapsed.value) return null
-  if (store.selectedNodeIds.length !== 1) return null
-  return store.getNode(store.selectedNodeIds[0]) || null
-})
-
 // Expose functions with original names for compatibility
 function toggleNeighborhoodMode(nodeId?: string) {
   neighborhood.toggle(nodeId)
@@ -351,29 +344,14 @@ const nodeNavigation = useNodeNavigation({
 })
 const { navigateToNode, zoomToNode } = nodeNavigation
 
-// Preview panel functions (need zoomToNode from above)
-watch(
-  [() => store.selectedNodeIds, isSemanticZoomCollapsed],
-  ([ids, collapsed]) => {
-    if (collapsed && ids.length === 1) {
-      showPreviewPanel.value = true
-    }
-  },
-  { immediate: true }
-)
-
-function closePreviewPanel() {
-  showPreviewPanel.value = false
-}
-
-function zoomToPreviewNode() {
-  const nodeId = store.selectedNodeIds[0]
-  if (!nodeId) return
-  showPreviewPanel.value = false
-  nextTick(() => {
-    zoomToNode(nodeId, 1)
-  })
-}
+// Preview panel composable - auto-shows when single node selected while zoomed out
+const previewPanel = usePreviewPanel({
+  selectedNodeIds: computed(() => store.selectedNodeIds),
+  isSemanticZoomCollapsed,
+  getNode: store.getNode,
+  zoomToNode,
+})
+const { showPreviewPanel, previewNode, closePreviewPanel, zoomToPreviewNode } = previewPanel
 
 // Lasso selection composable
 const lasso = useLasso({
@@ -388,16 +366,7 @@ const lasso = useLasso({
   neighborhoodPositions,
   getDisplayNodes: () => [...displayNodes.value],
 })
-const { isLassoSelecting, lassoPoints } = lasso
-function startLasso(e: PointerEvent) {
-  lasso.start(e)
-}
-function updateLasso(e: PointerEvent) {
-  lasso.update(e)
-}
-function endLasso() {
-  lasso.end()
-}
+const { isLassoSelecting, lassoPoints, start: startLasso, update: updateLasso, end: endLasso } = lasso
 
 // Node clipboard composable
 const clipboard = useNodeClipboard({
@@ -636,40 +605,11 @@ const {
   tooltipContent,
   hoveredNodeEdgeStats,
   highlightedEdgeIds,
+  highlightedNodeIds,
   onNodePointerEnter,
   onNodePointerMove,
   onNodePointerLeave,
 } = nodeHover
-
-// Watch selection changes and compute neighbors
-const neighborHighlightedMap = ref<Record<string, boolean>>({})
-
-watch(
-  [storeSelectedNodeIds, () => storeFilteredEdges.value.length],
-  ([selectedIds]) => {
-    const edges = storeFilteredEdges.value
-    const map: Record<string, boolean> = {}
-
-    if (selectedIds.length === 0) {
-      neighborHighlightedMap.value = map
-      return
-    }
-
-    const activeIds = new Set<string>(selectedIds)
-
-    for (const edge of edges) {
-      if (activeIds.has(edge.source_node_id)) {
-        map[edge.target_node_id] = true
-      }
-      if (activeIds.has(edge.target_node_id)) {
-        map[edge.source_node_id] = true
-      }
-    }
-
-    neighborHighlightedMap.value = map
-  },
-  { immediate: true }
-)
 
 // Context menu composable
 const contextMenu = useContextMenu({
@@ -770,34 +710,19 @@ const frames = useFrames({
   screenToCanvas,
   snapToGrid,
 })
-const { editingFrameId, editFrameTitle } = frames
-function onFramePointerDown(e: PointerEvent, frameId: string) {
-  frames.onPointerDown(e, frameId)
-}
-function startFrameResize(e: PointerEvent, frameId: string, direction = 'se') {
-  frames.startResize(e, frameId, direction)
-}
-function startEditingFrameTitle(frameId: string) {
-  frames.startEditingTitle(frameId)
-}
-function saveFrameTitleEditing() {
-  frames.saveTitle()
-}
-function cancelFrameTitleEditing() {
-  frames.cancelTitleEditing()
-}
-function createFrameAtCenter() {
-  frames.createAtCenter()
-}
-function createFrameAtPosition(x: number, y: number) {
-  frames.createAtPosition(x, y)
-}
-function cancelFramePlacement() {
-  frames.cancelPlacement()
-}
-function deleteSelectedFrame() {
-  frames.deleteSelected()
-}
+const {
+  editingFrameId,
+  editFrameTitle,
+  onPointerDown: onFramePointerDown,
+  startResize: startFrameResize,
+  startEditingTitle: startEditingFrameTitle,
+  saveTitle: saveFrameTitleEditing,
+  cancelTitleEditing: cancelFrameTitleEditing,
+  createAtCenter: createFrameAtCenter,
+  createAtPosition: createFrameAtPosition,
+  cancelPlacement: cancelFramePlacement,
+  deleteSelected: deleteSelectedFrame,
+} = frames
 
 // Layout composable
 const layout = useLayout({
@@ -2075,7 +2000,7 @@ useCanvasKeyboardShortcuts({
           :is-collapsed="isSemanticZoomCollapsed"
           :is-neighborhood-mode="neighborhoodMode"
           :is-neighborhood-focus="neighborhoodMode && node.id === focusNodeId"
-          :is-neighbor-highlighted="!!neighborHighlightedMap[node.id]"
+          :is-neighbor-highlighted="highlightedNodeIds.has(node.id)"
           :show-thumbnail="showImageThumbnail"
           :thumbnail-src="nodeFirstImage[node.id]"
           :rendered-content="nodeRenderedContent[node.id] || ''"

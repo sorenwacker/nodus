@@ -20,3 +20,8 @@ export {
   type UseViewStateOptions,
   type UseViewStateReturn,
 } from './useViewState'
+export {
+  usePreviewPanel,
+  type UsePreviewPanelContext,
+  type UsePreviewPanelReturn,
+} from './usePreviewPanel'
