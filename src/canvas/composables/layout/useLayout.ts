@@ -366,8 +366,128 @@ export function useLayout(options: UseLayoutOptions) {
     return targets
   }
 
-  async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid', frameId?: string) {
+  /**
+   * Radial/concentric layout - places selected node at center with neighbors in rings
+   */
+  async function radialLayout(): Promise<void> {
+    const selectedIds = store.getSelectedNodeIds()
+    if (selectedIds.length !== 1) {
+      console.log('[LAYOUT] Radial layout requires exactly one selected node')
+      return
+    }
+
+    const centerId = selectedIds[0]
+    const allNodes = store.getFilteredNodes()
+    const allEdges = store.getFilteredEdges()
+
+    // Build adjacency map
+    const adjacency = new Map<string, Set<string>>()
+    for (const node of allNodes) {
+      adjacency.set(node.id, new Set())
+    }
+    for (const edge of allEdges) {
+      adjacency.get(edge.source_node_id)?.add(edge.target_node_id)
+      adjacency.get(edge.target_node_id)?.add(edge.source_node_id)
+    }
+
+    // BFS to find all connected nodes and their depths
+    const depths = new Map<string, number>()
+    const queue: string[] = [centerId]
+    depths.set(centerId, 0)
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift()!
+      const currentDepth = depths.get(nodeId)!
+      const neighbors = adjacency.get(nodeId) || new Set()
+
+      for (const neighborId of neighbors) {
+        if (!depths.has(neighborId)) {
+          depths.set(neighborId, currentDepth + 1)
+          queue.push(neighborId)
+        }
+      }
+    }
+
+    // Group nodes by depth level
+    const levels = new Map<number, string[]>()
+    let maxDepth = 0
+    for (const [nodeId, depth] of depths) {
+      if (!levels.has(depth)) {
+        levels.set(depth, [])
+      }
+      levels.get(depth)!.push(nodeId)
+      maxDepth = Math.max(maxDepth, depth)
+    }
+
+    // Get center node position
+    const centerNode = allNodes.find(n => n.id === centerId)
+    if (!centerNode) return
+
+    const centerX = centerNode.canvas_x + (centerNode.width || NODE_DEFAULTS.WIDTH) / 2
+    const centerY = centerNode.canvas_y + (centerNode.height || NODE_DEFAULTS.HEIGHT) / 2
+
+    pushUndo()
+    stopAnimation()
+
+    // Calculate positions for each level
+    const targets = new Map<string, { x: number; y: number }>()
+    const baseRadius = 400 // Distance between rings
+    const minNodeSpacing = 200 // Minimum spacing between nodes on a ring
+
+    for (let depth = 0; depth <= maxDepth; depth++) {
+      const nodesAtDepth = levels.get(depth) || []
+
+      if (depth === 0) {
+        // Center node stays in place
+        targets.set(centerId, { x: centerNode.canvas_x, y: centerNode.canvas_y })
+        continue
+      }
+
+      const radius = depth * baseRadius
+      const circumference = 2 * Math.PI * radius
+      const nodeCount = nodesAtDepth.length
+
+      // Ensure nodes don't overlap - expand radius if needed
+      const requiredCircumference = nodeCount * minNodeSpacing
+      const adjustedRadius = requiredCircumference > circumference
+        ? requiredCircumference / (2 * Math.PI)
+        : radius
+
+      const angleStep = (2 * Math.PI) / nodeCount
+      const startAngle = -Math.PI / 2 // Start from top
+
+      for (let i = 0; i < nodeCount; i++) {
+        const nodeId = nodesAtDepth[i]
+        const node = allNodes.find(n => n.id === nodeId)
+        if (!node) continue
+
+        const angle = startAngle + i * angleStep
+        const x = centerX + Math.cos(angle) * adjustedRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
+        const y = centerY + Math.sin(angle) * adjustedRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
+
+        targets.set(nodeId, { x: Math.round(x), y: Math.round(y) })
+      }
+    }
+
+    // Animate to positions
+    if (targets.size > 200) {
+      await batchUpdatePositions(targets, store.updateNodePosition, 100)
+    } else {
+      animateToPositions(targets, 600)
+    }
+
+    console.log(`[LAYOUT] Radial layout complete: ${targets.size} nodes in ${maxDepth + 1} levels`)
+  }
+
+  async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid', frameId?: string) {
     console.log('[LAYOUT] autoLayout called with:', layout, 'frameId:', frameId)
+
+    // Radial layout is handled separately (requires exactly one selected node)
+    if (layout === 'radial') {
+      await radialLayout()
+      return
+    }
+
     const selectedIds = store.getSelectedNodeIds()
     const allNodes = store.getFilteredNodes()
     const allFrames = store.getFilteredFrames()
@@ -991,6 +1111,7 @@ export function useLayout(options: UseLayoutOptions) {
     stopAnimation,
     animateToPositions,
     autoLayout,
+    radialLayout,
     fitToContent,
     // Strategy pattern methods
     getAvailableLayouts,

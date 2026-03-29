@@ -67,10 +67,10 @@ export async function applyForceLayout(
   const {
     centerX = 0,
     centerY = 0,
-    chargeStrength = -300,
-    linkDistance = 150,
+    chargeStrength = -3000,
+    linkDistance = 250,
     iterations = 300,
-    gravityStrength = 0.6,
+    gravityStrength = 0.4,
     onTick,
   } = options
 
@@ -135,7 +135,6 @@ export async function applyForceLayout(
   const disconnectedRatio = simNodes.length > 0 ? disconnectedIds.size / simNodes.length : 0
   // Keep gravity reasonable even for disconnected graphs - 0.3 minimum
   const effectiveGravity = disconnectedRatio > 0.5 ? Math.max(gravityStrength * 0.5, 0.3) : gravityStrength
-  console.log('[FORCE] nodes:', simNodes.length, 'edges:', edges.length, 'disconnected:', disconnectedIds.size, `(${Math.round(disconnectedRatio * 100)}%)`, 'gravity:', effectiveGravity.toFixed(2))
 
   // Create simulation - keep nodes close together
   const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(simNodes)
@@ -151,7 +150,7 @@ export async function applyForceLayout(
         return chargeStrength
       })
       .distanceMin(10)
-      .distanceMax(500)
+      .distanceMax(800)
       .theta(simNodes.length > 200 ? 0.9 : 0.7))
     // Gravity to keep nodes clustered - stronger for disconnected nodes
     .force('gravityX', forceX<SimNode>(centerX).strength(d =>
@@ -161,11 +160,11 @@ export async function applyForceLayout(
     .force('collide', forceCollide<SimNode>()
       .radius(d => {
         // Use actual node diagonal / 2 as collision radius
-        // Tighter gap (15px) for denser packing
+        // Larger gap (30px) for more spacing between nodes
         const diagonal = Math.sqrt(d.width ** 2 + d.height ** 2)
-        return diagonal / 2 + 15
+        return diagonal / 2 + 30
       })
-      .strength(0.8)  // Slightly softer collision
+      .strength(0.9)
       .iterations(3))
 
   // Run simulation

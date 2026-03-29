@@ -69,6 +69,7 @@
       "gridLayout": "Disposición en cuadrícula - Ordenar nodos en cuadrícula",
       "forceLayout": "Disposición por fuerza - Ordenar por conexiones",
       "hierarchicalLayout": "Disposición jerárquica - Ordenar como árbol (para DAGs/ontologías)",
+      "radialLayout": "Disposición radial - Ordenar vecinos en círculos concéntricos alrededor del nodo seleccionado",
       "fitNodesToContent": "Ajustar nodos al contenido - Redimensionar todos los nodos",
       "edgeStyle": "Estilo de aristas",
       "magnifier": "Lupa - Mostrar vista ampliada al alejar",

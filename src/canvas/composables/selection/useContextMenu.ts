@@ -18,20 +18,15 @@ export function useContextMenu(deps: ContextMenuDeps) {
   const nodeId = ref<string | null>(null)
   const storylineSubmenu = ref(false)
   const workspaceSubmenu = ref(false)
+  // Snapshot of affected node IDs captured when menu opens
+  const affectedNodeIdsSnapshot = ref<string[]>([])
 
   /**
    * Get the nodes that will be affected by context menu actions.
-   * If multiple nodes are selected and the context menu node is among them,
-   * all selected nodes are affected. Otherwise, only the context menu node.
+   * Uses the snapshot captured when menu opened to avoid issues with
+   * selection being cleared before action is triggered.
    */
-  const affectedNodeIds = computed(() => {
-    if (!nodeId.value) return []
-    const selectedIds = deps.getSelectedNodeIds()
-    if (selectedIds.length > 1 && selectedIds.includes(nodeId.value)) {
-      return selectedIds
-    }
-    return [nodeId.value]
-  })
+  const affectedNodeIds = computed(() => affectedNodeIdsSnapshot.value)
 
   /**
    * Count of nodes affected by context menu actions
@@ -47,6 +42,14 @@ export function useContextMenu(deps: ContextMenuDeps) {
     visible.value = true
     storylineSubmenu.value = false
     workspaceSubmenu.value = false
+
+    // Capture affected node IDs at open time
+    const selectedIds = deps.getSelectedNodeIds()
+    if (selectedIds.length > 1 && selectedIds.includes(targetNodeId)) {
+      affectedNodeIdsSnapshot.value = [...selectedIds]
+    } else {
+      affectedNodeIdsSnapshot.value = [targetNodeId]
+    }
   }
 
   /**
@@ -57,6 +60,7 @@ export function useContextMenu(deps: ContextMenuDeps) {
     storylineSubmenu.value = false
     workspaceSubmenu.value = false
     nodeId.value = null
+    affectedNodeIdsSnapshot.value = []
   }
 
   /**

@@ -13,12 +13,21 @@ import type { Node } from '../../../types'
 // Threshold for using spatial index (below this, linear scan is faster)
 const SPATIAL_INDEX_THRESHOLD = 200
 
+// Viewport margin for smooth scrolling (includes nodes slightly off-screen)
+const BASE_VIEWPORT_MARGIN = 500
+const MAX_VIEWPORT_MARGIN = 1000 // Cap margin to prevent including all nodes when zoomed out
+
+// Grid cell size for spatial indexing
+const SPATIAL_GRID_CELL_SIZE = 500
+
 export interface UseViewportCullingContext {
   scale: Ref<number>
   offsetX: Ref<number>
   offsetY: Ref<number>
   displayNodes: ComputedRef<Node[]>
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
+  /** Increments when node positions change (e.g., after layout) */
+  nodeLayoutVersion?: Ref<number> | ComputedRef<number>
 }
 
 export interface UseViewportCullingReturn {
@@ -29,7 +38,7 @@ export interface UseViewportCullingReturn {
 }
 
 export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportCullingReturn {
-  const { scale, offsetX, offsetY, displayNodes, selectedNodeIds } = ctx
+  const { scale, offsetX, offsetY, displayNodes, selectedNodeIds, nodeLayoutVersion } = ctx
 
   // Viewport size for culling (updated on resize)
   const viewportWidth = ref(window.innerWidth)
@@ -38,13 +47,13 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   // Note: Zoom deferral caching removed - PixiJS GPU rendering handles zoom performance
 
   // Spatial index for large graphs
-  const spatialGrid = new SpatialGrid({ cellSize: 500 })
+  const spatialGrid = new SpatialGrid({ cellSize: SPATIAL_GRID_CELL_SIZE })
   const spatialIndexVersion = ref(0)
 
-  // Rebuild spatial index when nodes change
+  // Rebuild spatial index when nodes change or positions update (after layout)
   watch(
-    () => displayNodes.value,
-    nodes => {
+    [() => displayNodes.value, () => nodeLayoutVersion?.value],
+    ([nodes]) => {
       if (nodes.length >= SPATIAL_INDEX_THRESHOLD) {
         spatialGrid.build(nodes)
         spatialIndexVersion.value++
@@ -76,9 +85,7 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     const oy = offsetY.value
     // Scale margin inversely with zoom, but cap it to avoid rendering everything when zoomed out
     // At zoom 1.0: 500px margin. At zoom 0.2: 1000px margin (capped)
-    const baseMargin = 500
-    const maxMargin = 1000 // Cap margin to prevent including all nodes when zoomed out
-    const margin = Math.min(baseMargin / Math.max(s, 0.1), maxMargin)
+    const margin = Math.min(BASE_VIEWPORT_MARGIN / Math.max(s, 0.1), MAX_VIEWPORT_MARGIN)
 
     // Viewport bounds in canvas coordinates
     const viewLeft = -ox / s - margin

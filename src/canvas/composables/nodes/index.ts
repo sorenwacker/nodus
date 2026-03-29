@@ -47,3 +47,7 @@ export {
   type NodeLike,
   type NodeNavigationDeps,
 } from './useNodeNavigation'
+export {
+  useNodeSelectionActions,
+  type UseNodeSelectionActionsContext,
+} from './useNodeSelectionActions'

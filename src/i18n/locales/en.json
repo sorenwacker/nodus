@@ -26,6 +26,11 @@
       "untitled": "Untitled",
       "connections": "connections"
     },
+    "hover": {
+      "incoming": "Incoming edges (cited by)",
+      "outgoing": "Outgoing edges (cites)",
+      "bidirectional": "Bidirectional connections"
+    },
     "edge": {
       "labelPlaceholder": "e.g. depends on",
       "flip": "Flip",
@@ -70,11 +75,13 @@
       "gridLayout": "Grid Layout - Arrange nodes in a grid",
       "forceLayout": "Force Layout - Arrange by connections",
       "hierarchicalLayout": "Hierarchical Layout - Arrange as tree (for DAGs/ontologies)",
+      "radialLayout": "Radial Layout - Arrange neighbors in concentric circles around selected node",
       "fitNodesToContent": "Fit Nodes to Content - Resize all nodes to show full content",
       "edgeStyle": "Edge Style",
       "highlightEdges": "Highlight All Edges - Make all edges more visible",
       "magnifier": "Magnifier - Show magnified view when zoomed out",
       "neighborhoodView": "Neighborhood View - Show only selected node and neighbors (N)",
+      "bubbleMode": "Bubble Mode - Show nodes as circles",
       "neighborhoodDepth": "Neighborhood depth (hops)",
       "hop": "hop",
       "hops": "hops",

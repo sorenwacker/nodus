@@ -4,12 +4,20 @@ import type { Node } from '../../types'
 
 const { t } = useI18n()
 
+interface EdgeStats {
+  incoming: number
+  outgoing: number
+  bidirectional: number
+  total: number
+}
+
 defineProps<{
   visible: boolean
   position: { x: number; y: number }
   node: Node | null
   content: string
   renderedContent?: string
+  edgeStats?: EdgeStats | null
 }>()
 </script>
 
@@ -23,6 +31,29 @@ defineProps<{
     }"
   >
     <div class="hover-tooltip-title">{{ node.title || t('canvas.node.untitled') }}</div>
+
+    <!-- Edge stats -->
+    <div v-if="edgeStats && edgeStats.total > 0" class="hover-tooltip-stats">
+      <span class="stat" :title="t('canvas.hover.incoming')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+        {{ edgeStats.incoming }}
+      </span>
+      <span class="stat" :title="t('canvas.hover.outgoing')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+        {{ edgeStats.outgoing }}
+      </span>
+      <span v-if="edgeStats.bidirectional > 0" class="stat" :title="t('canvas.hover.bidirectional')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M7 10l5-5 5 5M7 14l5 5 5-5"/>
+        </svg>
+        {{ edgeStats.bidirectional }}
+      </span>
+    </div>
+
     <!-- eslint-disable-next-line vue/no-v-html -->
     <div v-if="renderedContent" class="hover-tooltip-content" v-html="renderedContent"></div>
     <div v-else-if="content" class="hover-tooltip-content">
@@ -62,6 +93,26 @@ defineProps<{
   color: var(--text-main);
   margin-bottom: 6px;
   line-height: 1.3;
+}
+
+.hover-tooltip-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.hover-tooltip-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hover-tooltip-stats svg {
+  opacity: 0.7;
 }
 
 .hover-tooltip-content {

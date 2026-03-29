@@ -69,6 +69,7 @@
       "gridLayout": "Layout a griglia - Disponi nodi in griglia",
       "forceLayout": "Layout a forza - Disponi per connessioni",
       "hierarchicalLayout": "Layout gerarchico - Disponi come albero (per DAG/ontologie)",
+      "radialLayout": "Layout radiale - Disponi i vicini in cerchi concentrici attorno al nodo selezionato",
       "fitNodesToContent": "Adatta nodi al contenuto - Ridimensiona tutti i nodi",
       "edgeStyle": "Stile archi",
       "magnifier": "Lente - Mostra vista ingrandita quando rimpicciolito",

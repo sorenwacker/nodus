@@ -163,7 +163,6 @@ export class ZoteroWebApi {
       '/items/top?itemType=-attachment&format=json'
     )
     // Zotero API v3 wraps item data in a 'data' property
-    console.log('[ZoteroAPI] getItems response:', JSON.stringify(response.slice(0, 1), null, 2))
     return response
       .filter(item => item.data && item.data.itemType !== 'attachment')
       .map(item => ({ ...item.data, key: item.key || item.data.key }))

@@ -4,7 +4,7 @@
  * Computes graph size thresholds, LOD mode, and node degree for visualization optimization
  */
 
-import { computed, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, type Ref, type ComputedRef } from 'vue'
 import type { Node, Edge } from '../../../types'
 
 export interface UseGraphMetricsContext {
@@ -16,14 +16,19 @@ export interface UseGraphMetricsContext {
   scale: Ref<number>
 }
 
+// Persistent LOD mode override (user can manually toggle bubble mode)
+const forceLODMode = ref(false)
+
 export interface UseGraphMetricsReturn {
   isLargeGraph: ComputedRef<boolean>
   isHugeGraph: ComputedRef<boolean>
   isMassiveGraph: ComputedRef<boolean>
   isSemanticZoomCollapsed: ComputedRef<boolean>
   isLODMode: ComputedRef<boolean>
+  isBubbleModeForced: ComputedRef<boolean>
   nodeDegree: ComputedRef<Record<string, number>>
   getLODRadius: (nodeId: string) => number
+  toggleBubbleMode: () => void
 }
 
 // LOD (Level of Detail) mode threshold
@@ -66,7 +71,13 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   })
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
-  const isLODMode = computed(() => visibleNodes.value.length > LOD_THRESHOLD)
+  // Also activates when user manually toggles bubble mode
+  const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > LOD_THRESHOLD)
+
+  // Toggle bubble mode manually
+  function toggleBubbleMode() {
+    forceLODMode.value = !forceLODMode.value
+  }
 
   // Node degree (edge count) for LOD circle sizing
   const nodeDegree = computed(() => {
@@ -94,7 +105,9 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     isMassiveGraph,
     isSemanticZoomCollapsed,
     isLODMode,
+    isBubbleModeForced: computed(() => forceLODMode.value),
     nodeDegree,
     getLODRadius,
+    toggleBubbleMode,
   }
 }

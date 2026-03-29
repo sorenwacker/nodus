@@ -69,6 +69,7 @@
       "gridLayout": "Disposition en grille - Arranger les nœuds en grille",
       "forceLayout": "Disposition par force - Arranger par connexions",
       "hierarchicalLayout": "Disposition hiérarchique - Arranger en arbre (pour DAGs/ontologies)",
+      "radialLayout": "Disposition radiale - Disposer les voisins en cercles concentriques autour du nœud sélectionné",
       "fitNodesToContent": "Ajuster les nœuds au contenu - Redimensionner tous les nœuds",
       "edgeStyle": "Style des arêtes",
       "magnifier": "Loupe - Afficher une vue agrandie en zoom arrière",

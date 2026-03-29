@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
-import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 import type { Node, Edge } from '../types'
@@ -53,6 +51,7 @@ import {
   useStorylines,
   useUndoHandlers,
   useGraphExport,
+  useCitationFetch,
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
@@ -77,6 +76,8 @@ import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
 import CanvasNodeCard from './components/CanvasNodeCard.vue'
 import CanvasPreviewPanel from './components/CanvasPreviewPanel.vue'
 import CanvasLODCanvas from './components/CanvasLODCanvas.vue'
+import CanvasAgentLogPanel from './components/CanvasAgentLogPanel.vue'
+import CanvasColorBar from './components/CanvasColorBar.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -96,7 +97,6 @@ const {
 
 // Content renderer is configured via composable
 
-const { t } = useI18n()
 const store = useNodesStore()
 const themesStore = useThemesStore()
 const agentTasksStore = useAgentTasksStore()
@@ -282,6 +282,7 @@ const viewportCulling = useViewportCulling({
   offsetY,
   displayNodes,
   selectedNodeIds: computed(() => store.selectedNodeIds),
+  nodeLayoutVersion: computed(() => store.nodeLayoutVersion),
 })
 const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
@@ -300,7 +301,9 @@ const {
   isMassiveGraph,
   isSemanticZoomCollapsed,
   isLODMode,
+  isBubbleModeForced,
   getLODRadius,
+  toggleBubbleMode,
 } = graphMetrics
 
 // Pre-computed LOD node lists to avoid double filtering in template
@@ -631,6 +634,7 @@ const {
   showHoverTooltip,
   hoveredNode,
   tooltipContent,
+  hoveredNodeEdgeStats,
   highlightedEdgeIds,
   onNodePointerEnter,
   onNodePointerMove,
@@ -680,6 +684,29 @@ const contextMenuPosition = contextMenu.position
 const contextMenuNodeId = contextMenu.nodeId
 const contextMenuStorylineSubmenu = contextMenu.storylineSubmenu
 const contextMenuWorkspaceSubmenu = contextMenu.workspaceSubmenu
+
+// Citation fetch composable (for Semantic Scholar integration)
+const citationFetch = useCitationFetch({
+  store: {
+    getFilteredNodes: () => store.filteredNodes,
+    getFilteredEdges: () => store.filteredEdges,
+    getCurrentWorkspaceId: () => store.currentWorkspaceId,
+    getNode: store.getNode,
+    createNode: store.createNode,
+    createEdge: store.createEdge,
+  },
+  getAffectedNodeIds: () => contextMenu.affectedNodeIds.value,
+  contextMenuNodeId,
+  showToast,
+})
+const {
+  isFetchingCitations,
+  fetchProgress,
+  queueSize,
+  contextMenuNodeHasDOI,
+  contextMenuDOICount,
+  handleFetchCitations,
+} = citationFetch
 
 // Link picker composable
 const linkPicker = useLinkPicker({
@@ -745,7 +772,6 @@ const frames = useFrames({
 })
 const { editingFrameId, editFrameTitle } = frames
 function onFramePointerDown(e: PointerEvent, frameId: string) {
-  console.log('[PixiCanvas] onFramePointerDown received:', frameId)
   frames.onPointerDown(e, frameId)
 }
 function startFrameResize(e: PointerEvent, frameId: string, direction = 'se') {
@@ -800,9 +826,6 @@ async function autoLayoutNodes(
 ) {
   isLayouting.value = true
   const frameId = store.selectedFrameId
-  console.log(
-    `[LAYOUT] autoLayoutNodes called, type=${type}, store.selectedFrameId=${store.selectedFrameId}, frameId=${frameId}`
-  )
   try {
     // If force layout and a frame is selected, use the frame-aware layoutNodes
     if (type === 'force' && frameId) {
@@ -810,7 +833,6 @@ async function autoLayoutNodes(
     } else {
       await layout.autoLayout(type, frameId ?? undefined)
     }
-    console.log(`[LAYOUT] ${type} layout complete`)
   } finally {
     isLayouting.value = false
   }
@@ -871,12 +893,7 @@ async function resetAllNodeSizes() {
 
 // Refresh all nodes from their source files
 async function refreshFromFiles() {
-  try {
-    const updated = await store.refreshWorkspace()
-    console.log(`Refreshed ${updated} nodes from files`)
-  } catch (e) {
-    console.error('Failed to refresh workspace:', e)
-  }
+  await store.refreshWorkspace()
 }
 
 // LLM interface - using composable
@@ -1025,6 +1042,8 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     snapToGrid,
     ollamaModel: ollamaModel.value,
     ollamaContextLength: ollamaContextLength.value,
+    // Enable undo for AI content changes
+    pushContentUndo,
   }
 
   // Try extracted executor (handles simple tools)
@@ -1042,8 +1061,6 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     return result
   }
 
-  console.log(`[Tool] ${name} falling through to LLM tools`)
-
   // Try LLM-dependent tools
   const llmResult = await llmTools.executeLLMTool(name, args)
   if (llmResult !== null) {
@@ -1055,10 +1072,6 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
 
 function clearConversation() {
   conversationHistory.value = []
-}
-
-async function copyAgentLog() {
-  await writeText(agentLog.value.join('\n'))
 }
 
 // Agent runner composable - handles the main agent loop
@@ -1186,7 +1199,6 @@ async function sendNodePrompt() {
     // Simple mode: direct LLM call
     // Traverse full chain of connected nodes (BFS)
     const chainNodes = findConnectedNodes(nodeId, store.filteredEdges, store.getNode)
-    console.log(`BFS complete: found ${chainNodes.length} connected nodes`)
 
     // Build context with content from chain (respecting limit)
     const contextLimit = llmStorage.getChainContextLimit()
@@ -1211,9 +1223,6 @@ ${currentContent || '(empty)'}`
 
     // Track context size
     lastContextSize.value = nodeSystemPrompt.length + prompt.length
-    console.log(
-      `LLM request: ${(lastContextSize.value / 1000).toFixed(1)}k chars, ${chainNodes.length} connected nodes`
-    )
 
     const response = await callOllama(prompt, nodeSystemPrompt)
 
@@ -1268,9 +1277,9 @@ function getNodeHeight(
 }
 
 // Transform for the canvas content
+// Use 2D transform to avoid z-axis issues when zooming in
 const transform = computed(() => {
-  // Use translate3d for GPU acceleration
-  return `translate3d(${offsetX.value}px, ${offsetY.value}px, 0) scale(${scale.value})`
+  return `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`
 })
 
 // Pan with pointer drag on empty canvas space (supports mouse, touch, pen)
@@ -1621,6 +1630,7 @@ const { edgeLines } = useEdgeRouting({
   focusNodeId,
   isMassiveGraph,
   isHugeGraph,
+  isLODMode,
   globalEdgeStyle,
   edgeStyleMap,
   getNodeHeight,
@@ -1806,7 +1816,7 @@ function getNodeStyle(node: {
   const height = isResizing ? resizePreview.value.height : node.height || NODE_DEFAULTS.HEIGHT
 
   const style: Record<string, string> = {
-    transform: `translate3d(${x}px, ${y}px, 0)`,
+    transform: `translate(${x}px, ${y}px)`,
     width: width + 'px',
     height: height + 'px',
     borderWidth: nodeBorderWidth.value + 'px',
@@ -1851,6 +1861,18 @@ function onContextMenu(e: MouseEvent) {
 }
 
 function closeContextMenu() {
+  contextMenu.close()
+}
+
+// LOD canvas context menu handlers
+function onLODNodeContextMenu(e: MouseEvent, nodeId: string) {
+  contextMenu.open(e, nodeId)
+  if (!store.selectedNodeIds.includes(nodeId)) {
+    store.selectNode(nodeId)
+  }
+}
+
+function onLODCanvasContextMenu(_e: MouseEvent) {
   contextMenu.close()
 }
 
@@ -1944,56 +1966,12 @@ useCanvasKeyboardShortcuts({
     />
 
     <!-- Standalone agent log panel (when LLM bar is hidden) -->
-    <div
+    <CanvasAgentLogPanel
       v-if="!llmEnabled && showAgentLogPanel && agentLog.length > 0"
-      class="standalone-agent-log"
-    >
-      <div class="log-header">
-        <span>Agent Log ({{ agentLog.length }})</span>
-        <div class="log-buttons">
-          <button class="log-btn" title="Copy log" @click="copyAgentLog">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-          </button>
-          <button class="log-btn" title="Clear log" @click="agentLog.length = 0">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-          <button class="log-btn" title="Close" @click="showAgentLogPanel = false">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="log-content">
-        <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
-      </div>
-    </div>
+      :log="agentLog"
+      @clear="agentLog.length = 0"
+      @close="showAgentLogPanel = false"
+    />
 
     <div
       ref="canvasRef"
@@ -2009,46 +1987,18 @@ useCanvasKeyboardShortcuts({
       @contextmenu="onContextMenu"
     >
       <!-- Floating color bar (shown when nodes or frame is selected) -->
-      <div
+      <CanvasColorBar
         v-if="store.selectedNodeIds.length > 0 || store.selectedFrameId"
-        class="collapsed-color-bar"
-        @pointerdown.stop
-        @click.stop
-      >
-        <button
-          v-for="color in nodeColors"
-          :key="color.value || 'default'"
-          class="color-dot"
-          :class="{
-            active: store.selectedFrameId
-              ? store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color ===
-                color.display
-              : store.selectedNodeIds.every(
-                  id => store.filteredNodes.find(n => n.id === id)?.color_theme === color.value
-                ),
-          }"
-          :style="{ background: color.display || 'var(--bg-surface)' }"
-          @click.stop="
-            store.selectedFrameId
-              ? updateSelectedFrameColor(color.display)
-              : updateSelectedNodesColor(color.value)
-          "
-        ></button>
-        <span
-          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
-          class="color-bar-sep"
-        ></span>
-        <button
-          v-if="store.selectedNodeIds.length > 0 && !store.selectedFrameId"
-          class="autofit-toggle"
-          :class="{ disabled: isSemanticZoomCollapsed }"
-          :disabled="isSemanticZoomCollapsed"
-          :title="isSemanticZoomCollapsed ? 'Zoom in to fit nodes' : t('canvas.node.fitContent')"
-          @click.stop="fitSelectedNodes"
-        >
-          Fit
-        </button>
-      </div>
+        :colors="nodeColors"
+        :selected-node-ids="store.selectedNodeIds"
+        :selected-frame-id="store.selectedFrameId"
+        :is-collapsed="isSemanticZoomCollapsed"
+        :get-node-color="(id: string) => store.filteredNodes.find(n => n.id === id)?.color_theme"
+        :get-frame-color="() => store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color"
+        @update-node-color="updateSelectedNodesColor"
+        @update-frame-color="updateSelectedFrameColor"
+        @fit-nodes="fitSelectedNodes"
+      />
 
       <!-- Canvas 2D LOD layer for GPU-accelerated circle rendering -->
       <CanvasLODCanvas
@@ -2059,11 +2009,14 @@ useCanvasKeyboardShortcuts({
         :offset-y="offsetY"
         :selected-node-ids="store.selectedNodeIds"
         :dragging-node-id="draggingNode"
+        :hovered-node-id="hoveredNodeId"
         :get-l-o-d-radius="getLODRadius"
         @node-pointerdown="onNodePointerDown"
         @node-pointerenter="onNodePointerEnter"
         @node-pointerleave="onNodePointerLeave"
         @node-dblclick="startEditing"
+        @node-contextmenu="onLODNodeContextMenu"
+        @canvas-contextmenu="onLODCanvasContextMenu"
       />
 
       <div class="canvas-content" :style="{ transform }">
@@ -2225,6 +2178,7 @@ useCanvasKeyboardShortcuts({
         :neighborhood-depth="neighborhoodDepth"
         :pending-frame-placement="frames.pendingFramePlacement.value"
         :highlight-all-edges="highlightAllEdges"
+        :bubble-mode-active="isBubbleModeForced"
         @zoom-in="scale = Math.min(scale * 1.25, 3)"
         @zoom-out="scale = Math.max(scale * 0.8, 0.01)"
         @fit-to-content="fitToContent"
@@ -2238,6 +2192,7 @@ useCanvasKeyboardShortcuts({
         @create-frame="createFrameAtCenter"
         @show-help="showHelpModal = true"
         @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
+        @toggle-bubble-mode="toggleBubbleMode"
       />
 
       <!-- Help Modal -->
@@ -2297,6 +2252,7 @@ useCanvasKeyboardShortcuts({
         :node="hoveredNode"
         :content="tooltipContent"
         :rendered-content="hoveredNode ? nodeRenderedContent[hoveredNode.id] || '' : ''"
+        :edge-stats="hoveredNodeEdgeStats"
       />
 
       <!-- Minimap -->
@@ -2325,6 +2281,8 @@ useCanvasKeyboardShortcuts({
         :storylines="store.filteredStorylines"
         :workspaces="store.workspaces"
         :current-workspace-id="store.currentWorkspaceId"
+        :has-d-o-i="contextMenuNodeHasDOI"
+        :doi-count="contextMenuDOICount"
         @close="closeContextMenu"
         @fit-to-content="fitNodeNow"
         @zoom-to-node="zoomToNode"
@@ -2333,9 +2291,38 @@ useCanvasKeyboardShortcuts({
         @add-to-storyline="addNodeToStoryline"
         @create-storyline="createStorylineFromNode"
         @move-to-workspace="moveNodesToWorkspace"
+        @fetch-citations="handleFetchCitations()"
         @update:storyline-submenu="contextMenuStorylineSubmenu = $event"
         @update:workspace-submenu="contextMenuWorkspaceSubmenu = $event"
       />
+
+      <!-- Citation fetch progress indicator -->
+      <div v-if="isFetchingCitations" class="citation-fetch-progress">
+        <div class="citation-fetch-content">
+          <div class="citation-fetch-header">
+            <span class="citation-fetch-title">Fetching Citations</span>
+            <span v-if="queueSize > 0" class="citation-fetch-queue">({{ queueSize }} queued)</span>
+            <button class="citation-fetch-cancel" @click="citationFetch.cancelFetch()">
+              Cancel
+            </button>
+          </div>
+          <div v-if="fetchProgress" class="citation-fetch-info">
+            <div v-if="fetchProgress.paperCount && fetchProgress.paperCount > 1" class="citation-fetch-papers">
+              Paper {{ fetchProgress.paperIndex }} / {{ fetchProgress.paperCount }}
+            </div>
+            <div class="citation-fetch-count">
+              Citation {{ fetchProgress.current }} / {{ fetchProgress.total }}
+            </div>
+            <div class="citation-fetch-paper">{{ fetchProgress.paperTitle }}</div>
+            <div class="citation-fetch-bar">
+              <div
+                class="citation-fetch-bar-fill"
+                :style="{ width: `${(fetchProgress.current / Math.max(fetchProgress.total, 1)) * 100}%` }"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Link to picker modal -->
       <Teleport to="body">

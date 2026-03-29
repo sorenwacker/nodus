@@ -25,3 +25,7 @@ export {
   type EdgeLine,
   type GraphExportDeps,
 } from './useGraphExport'
+export {
+  useCitationFetch,
+  type UseCitationFetchOptions,
+} from './useCitationFetch'

@@ -22,6 +22,8 @@ export function registerUpdateTools(): void {
     async (args, ctx) => {
       const node = ctx.store.filteredNodes.find(n => n.title === args.title)
       if (!node) return `Error: Node "${args.title}" not found`
+      // Push to undo stack before modifying
+      ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)
       await ctx.store.updateNodeContent(node.id, cleanContent(args.new_content))
       return `Updated node "${args.title}"`
     },
@@ -77,6 +79,10 @@ export function registerUpdateTools(): void {
           continue
         }
 
+        if (upd.set_title || upd.set_content !== undefined) {
+          // Push to undo stack before modifying content or title
+          ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)
+        }
         if (upd.set_title) {
           await ctx.store.updateNodeTitle(node.id, upd.set_title)
           results.push(`${upd.title} → ${upd.set_title}`)

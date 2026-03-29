@@ -37,6 +37,8 @@ export interface ToolContext {
   snapToGrid: (value: number) => number
   ollamaModel: string
   ollamaContextLength: number
+  // Undo support for content changes
+  pushContentUndo?: (nodeId: string, oldContent: string | null, oldTitle: string) => void
 }
 
 // Store interface - enables swapping implementations

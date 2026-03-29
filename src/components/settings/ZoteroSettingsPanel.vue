@@ -10,6 +10,7 @@ import { useCitationGraph } from '../../composables/useCitationGraph'
 import { useNodesStore } from '../../stores/nodes'
 import { zoteroStorage } from '../../lib/storage'
 import { zoteroApi, type ZoteroApiCollection, type ZoteroApiItem } from '../../lib/zoteroApi'
+import { formatCitationAsMarkdown } from '../../lib/citationFormat'
 
 const { t } = useI18n()
 const store = useNodesStore()
@@ -104,55 +105,82 @@ async function fetchCloudCollections() {
 
 // Format cloud item as markdown with frontmatter
 function formatCloudItemAsMarkdown(item: ZoteroApiItem): string {
-  const lines: string[] = ['---']
-  if (item.DOI) lines.push(`doi: ${item.DOI}`)
-  if (item.key) lines.push(`zotero_key: ${item.key}`)
-  if (item.itemType) lines.push(`type: ${item.itemType}`)
-  if (item.date) lines.push(`date: ${item.date}`)
-  if (item.publicationTitle) lines.push(`journal: "${item.publicationTitle}"`)
-  lines.push('---')
-  lines.push('')
+  return formatCitationAsMarkdown({
+    title: item.title,
+    doi: item.DOI,
+    zoteroKey: item.key,
+    itemType: item.itemType,
+    date: item.date,
+    journal: item.publicationTitle,
+    volume: item.volume,
+    issue: item.issue,
+    pages: item.pages,
+    authors: item.creators
+      ?.filter(c => c.creatorType === 'author')
+      .map(c => ({
+        name: c.name,
+        firstName: c.firstName,
+        lastName: c.lastName,
+      })),
+    abstract: item.abstractNote,
+  })
+}
 
-  if (item.title) {
-    lines.push(`# ${item.title}`)
-    lines.push('')
+// Shared helper to import Zotero items as nodes
+async function importZoteroItems(
+  items: ZoteroApiItem[],
+  emptyMessage: string
+): Promise<void> {
+  if (items.length === 0) {
+    cloudError.value = emptyMessage
+    return
   }
 
-  if (item.creators && item.creators.length > 0) {
-    const authors = item.creators
-      .filter(c => c.creatorType === 'author')
-      .map(c => c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim())
-      .join(', ')
-    if (authors) {
-      lines.push(`**Authors:** ${authors}`)
-      lines.push('')
+  const nodeIds: string[] = []
+  const startX = 100
+  const startY = 100
+  const nodeWidth = 300
+  const nodeHeight = 200
+  const cols = Math.ceil(Math.sqrt(items.length))
+  const padding = 40
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    cloudImportProgress.value = {
+      current: i + 1,
+      total: items.length,
+      item: item.title || 'Untitled',
+    }
+
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const x = startX + col * (nodeWidth + padding)
+    const y = startY + row * (nodeHeight + padding)
+
+    const markdown = formatCloudItemAsMarkdown(item)
+
+    try {
+      const node = await store.createNode({
+        title: item.title || 'Untitled',
+        markdown_content: markdown,
+        node_type: 'citation',
+        canvas_x: x,
+        canvas_y: y,
+        width: nodeWidth,
+        height: nodeHeight,
+        workspace_id: store.currentWorkspaceId || undefined,
+      })
+      nodeIds.push(node.id)
+    } catch {
+      // Node creation failed - continue with remaining items
     }
   }
 
-  const pubInfo: string[] = []
-  if (item.publicationTitle) pubInfo.push(item.publicationTitle)
-  if (item.volume) pubInfo.push(`Vol. ${item.volume}`)
-  if (item.issue) pubInfo.push(`Issue ${item.issue}`)
-  if (item.pages) pubInfo.push(`pp. ${item.pages}`)
-  if (item.date) pubInfo.push(`(${item.date})`)
-  if (pubInfo.length > 0) {
-    lines.push(`*${pubInfo.join(', ')}*`)
-    lines.push('')
-  }
+  cloudImportProgress.value = null
 
-  if (item.DOI) {
-    lines.push(`**DOI:** [${item.DOI}](https://doi.org/${item.DOI})`)
-    lines.push('')
+  if (nodeIds.length > 0) {
+    await store.layoutNodes(nodeIds)
   }
-
-  if (item.abstractNote) {
-    lines.push('## Abstract')
-    lines.push('')
-    lines.push(item.abstractNote)
-    lines.push('')
-  }
-
-  return lines.join('\n')
 }
 
 // Import all items from Zotero Cloud library
@@ -163,56 +191,7 @@ async function importAllCloudItems() {
   cloudError.value = null
   try {
     const items = await zoteroApi.getItems()
-    if (items.length === 0) {
-      cloudError.value = 'No items in library'
-      return
-    }
-
-    const nodeIds: string[] = []
-    const startX = 100
-    const startY = 100
-    const nodeWidth = 300
-    const nodeHeight = 200
-    const cols = Math.ceil(Math.sqrt(items.length))
-    const padding = 40
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      cloudImportProgress.value = {
-        current: i + 1,
-        total: items.length,
-        item: item.title || 'Untitled',
-      }
-
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      const x = startX + col * (nodeWidth + padding)
-      const y = startY + row * (nodeHeight + padding)
-
-      const markdown = formatCloudItemAsMarkdown(item)
-
-      try {
-        const node = await store.createNode({
-          title: item.title || 'Untitled',
-          markdown_content: markdown,
-          node_type: 'citation',
-          canvas_x: x,
-          canvas_y: y,
-          width: nodeWidth,
-          height: nodeHeight,
-          workspace_id: store.currentWorkspaceId || undefined,
-        })
-        nodeIds.push(node.id)
-      } catch (e) {
-        console.error(`Failed to create node for ${item.title}:`, e)
-      }
-    }
-
-    cloudImportProgress.value = null
-
-    if (nodeIds.length > 0) {
-      await store.layoutNodes(nodeIds)
-    }
+    await importZoteroItems(items, 'No items in library')
   } catch (e) {
     cloudError.value = String(e)
   } finally {
@@ -229,56 +208,7 @@ async function importCloudCollection(collectionKey: string) {
   cloudError.value = null
   try {
     const items = await zoteroApi.getCollectionItems(collectionKey)
-    if (items.length === 0) {
-      cloudError.value = 'No items in collection'
-      return
-    }
-
-    const nodeIds: string[] = []
-    const startX = 100
-    const startY = 100
-    const nodeWidth = 300
-    const nodeHeight = 200
-    const cols = Math.ceil(Math.sqrt(items.length))
-    const padding = 40
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      cloudImportProgress.value = {
-        current: i + 1,
-        total: items.length,
-        item: item.title || 'Untitled',
-      }
-
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      const x = startX + col * (nodeWidth + padding)
-      const y = startY + row * (nodeHeight + padding)
-
-      const markdown = formatCloudItemAsMarkdown(item)
-
-      try {
-        const node = await store.createNode({
-          title: item.title || 'Untitled',
-          markdown_content: markdown,
-          node_type: 'citation',
-          canvas_x: x,
-          canvas_y: y,
-          width: nodeWidth,
-          height: nodeHeight,
-          workspace_id: store.currentWorkspaceId || undefined,
-        })
-        nodeIds.push(node.id)
-      } catch (e) {
-        console.error(`Failed to create node for ${item.title}:`, e)
-      }
-    }
-
-    cloudImportProgress.value = null
-
-    if (nodeIds.length > 0) {
-      await store.layoutNodes(nodeIds)
-    }
+    await importZoteroItems(items, 'No items in collection')
   } catch (e) {
     cloudError.value = String(e)
   } finally {

@@ -14,6 +14,7 @@ const props = defineProps<{
   offsetY: number
   selectedNodeIds: string[]
   draggingNodeId: string | null
+  hoveredNodeId: string | null
   getLODRadius: (nodeId: string) => number
 }>()
 
@@ -22,6 +23,8 @@ const emit = defineEmits<{
   (e: 'node-pointerenter', event: PointerEvent, nodeId: string): void
   (e: 'node-pointerleave'): void
   (e: 'node-dblclick', nodeId: string): void
+  (e: 'node-contextmenu', event: MouseEvent, nodeId: string): void
+  (e: 'canvas-contextmenu', event: MouseEvent): void
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -67,12 +70,13 @@ function render() {
     const cy = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2
     const isSelected = selectedSet.value.has(node.id)
     const isDragging = props.draggingNodeId === node.id
+    const isHovered = props.hoveredNodeId === node.id
 
-    // Selection ring
-    if (isSelected) {
+    // Selection or hover ring
+    if (isSelected || isHovered) {
       ctx.beginPath()
       ctx.arc(cx, cy, r + 4, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.4)'
+      ctx.fillStyle = isSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.2)'
       ctx.fill()
     }
 
@@ -83,8 +87,8 @@ function render() {
     ctx.fill()
 
     // Border
-    ctx.strokeStyle = isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.3)'
-    ctx.lineWidth = isSelected ? 3 / props.scale : 2 / props.scale
+    ctx.strokeStyle = isSelected ? '#3b82f6' : isHovered ? '#60a5fa' : 'rgba(255, 255, 255, 0.3)'
+    ctx.lineWidth = (isSelected || isHovered) ? 3 / props.scale : 2 / props.scale
     ctx.stroke()
   }
 
@@ -119,7 +123,7 @@ function hitTest(e: PointerEvent): string | null {
   return null
 }
 
-let hoveredNodeId: string | null = null
+let localHoveredId: string | null = null
 
 function onPointerDown(e: PointerEvent) {
   const nodeId = hitTest(e)
@@ -130,11 +134,11 @@ function onPointerDown(e: PointerEvent) {
 
 function onPointerMove(e: PointerEvent) {
   const nodeId = hitTest(e)
-  if (nodeId !== hoveredNodeId) {
-    if (hoveredNodeId) {
+  if (nodeId !== localHoveredId) {
+    if (localHoveredId) {
       emit('node-pointerleave')
     }
-    hoveredNodeId = nodeId
+    localHoveredId = nodeId
     if (nodeId) {
       emit('node-pointerenter', e, nodeId)
     }
@@ -142,9 +146,9 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerLeave() {
-  if (hoveredNodeId) {
+  if (localHoveredId) {
     emit('node-pointerleave')
-    hoveredNodeId = null
+    localHoveredId = null
   }
 }
 
@@ -152,6 +156,16 @@ function onDblClick(e: MouseEvent) {
   const nodeId = hitTest(e as PointerEvent)
   if (nodeId) {
     emit('node-dblclick', nodeId)
+  }
+}
+
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  const nodeId = hitTest(e as PointerEvent)
+  if (nodeId) {
+    emit('node-contextmenu', e, nodeId)
+  } else {
+    emit('canvas-contextmenu', e)
   }
 }
 
@@ -164,6 +178,7 @@ watch(
     () => props.offsetY,
     () => props.selectedNodeIds,
     () => props.draggingNodeId,
+    () => props.hoveredNodeId,
   ],
   () => {
     if (animationId) cancelAnimationFrame(animationId)
@@ -194,6 +209,7 @@ onUnmounted(() => {
     @pointermove="onPointerMove"
     @pointerleave="onPointerLeave"
     @dblclick="onDblClick"
+    @contextmenu="onContextMenu"
   />
 </template>
 
@@ -205,6 +221,6 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   pointer-events: auto;
-  z-index: 0;
+  z-index: 10;
 }
 </style>

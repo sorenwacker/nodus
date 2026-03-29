@@ -69,6 +69,7 @@
       "gridLayout": "Rasterlayout - Knoten im Raster anordnen",
       "forceLayout": "Kraftbasiertes Layout - Nach Verbindungen anordnen",
       "hierarchicalLayout": "Hierarchisches Layout - Als Baum anordnen (für DAGs/Ontologien)",
+      "radialLayout": "Radiales Layout - Nachbarn in konzentrischen Kreisen um ausgewählten Knoten anordnen",
       "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
       "edgeStyle": "Kantenform",
       "magnifier": "Lupe - Vergrößerte Ansicht bei Verkleinerung anzeigen",

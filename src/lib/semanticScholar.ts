@@ -41,8 +41,9 @@ interface CacheEntry<T> {
 // Cache duration: 24 hours
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000
 
-// Rate limiting: minimum 3 seconds between requests
-const MIN_REQUEST_INTERVAL_MS = 3000
+// Rate limiting: minimum 10 seconds between requests (conservative for API limits)
+// Semantic Scholar free tier: 100 requests/5 min = 1 per 3s, but burst limits apply
+const MIN_REQUEST_INTERVAL_MS = 10000
 
 /**
  * Semantic Scholar API provider
@@ -126,7 +127,10 @@ export class SemanticScholarProvider {
         throw new Error(`Semantic Scholar API error: ${response.status}`)
       }
 
-      const data = await response.json() as { data: Array<{ citedPaper: SemanticScholarReference }> }
+      const data = await response.json() as { data: Array<{ citedPaper: SemanticScholarReference }> | null }
+      if (!data.data || !Array.isArray(data.data)) {
+        return []
+      }
       const references = data.data
         .map(r => r.citedPaper)
         .filter(r => r && r.paperId)
@@ -141,39 +145,67 @@ export class SemanticScholarProvider {
 
   /**
    * Get citations (papers that cite this paper)
+   * Fetches all citations using pagination
    */
-  async getCitations(paperId: string, limit = 100): Promise<SemanticScholarReference[]> {
+  async getCitations(paperId: string): Promise<SemanticScholarReference[]> {
     const cacheKey = `${this.cachePrefix}cites_${paperId}`
     const cached = this.getFromCache<SemanticScholarReference[]>(cacheKey)
     if (cached) return cached
 
-    try {
-      const response = await this.rateLimitedFetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paperId}/citations?fields=paperId,title,authors,year,externalIds&limit=${limit}`
-      )
+    const allCitations: SemanticScholarReference[] = []
+    const pageSize = 500 // Max allowed by API
+    let offset = 0
+    let hasMore = true
 
-      if (!response.ok) {
-        if (response.status === 404) return []
-        throw new Error(`Semantic Scholar API error: ${response.status}`)
+    try {
+      while (hasMore) {
+        const response = await this.rateLimitedFetch(
+          `https://api.semanticscholar.org/graph/v1/paper/${paperId}/citations?fields=paperId,title,authors,year,externalIds&limit=${pageSize}&offset=${offset}`
+        )
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            hasMore = false
+            continue
+          }
+          throw new Error(`Semantic Scholar API error: ${response.status}`)
+        }
+
+        const data = await response.json() as { data: Array<{ citingPaper: SemanticScholarReference }> | null }
+        if (!data.data || !Array.isArray(data.data)) {
+          hasMore = false
+          continue
+        }
+        const citations = data.data
+          .map(c => c.citingPaper)
+          .filter(c => c && c.paperId)
+
+        allCitations.push(...citations)
+
+        // If we got fewer than pageSize, we've reached the end
+        if (data.data.length < pageSize) {
+          hasMore = false
+        } else {
+          offset += pageSize
+        }
       }
 
-      const data = await response.json() as { data: Array<{ citingPaper: SemanticScholarReference }> }
-      const citations = data.data
-        .map(c => c.citingPaper)
-        .filter(c => c && c.paperId)
-
-      this.setCache(cacheKey, citations)
-      return citations
+      this.setCache(cacheKey, allCitations)
+      return allCitations
     } catch (error) {
       console.error(`Failed to fetch citations for ${paperId}:`, error)
-      return []
+      return allCitations // Return what we got so far
     }
   }
 
   /**
    * Rate-limited fetch that queues requests to respect API limits
+   * Includes retry with exponential backoff for 429 errors
    */
-  private rateLimitedFetch(url: string): Promise<Response> {
+  private rateLimitedFetch(url: string, retryCount = 0): Promise<Response> {
+    const maxRetries = 3
+    const baseBackoff = 30000 // 30 seconds base backoff for 429
+
     return new Promise((resolve, reject) => {
       const executeRequest = async () => {
         const now = Date.now()
@@ -192,8 +224,38 @@ export class SemanticScholarProvider {
               'Accept': 'application/json',
             },
           })
+
+          // Handle 429 rate limit with retry
+          if (response.status === 429 && retryCount < maxRetries) {
+            const backoff = baseBackoff * Math.pow(2, retryCount)
+            console.warn(`[SemanticScholar] Rate limited (429), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`)
+            this.processQueue()
+            await this.sleep(backoff)
+            // Retry the request
+            const retryResponse = await this.rateLimitedFetch(url, retryCount + 1)
+            resolve(retryResponse)
+            return
+          }
+
           resolve(response)
         } catch (error) {
+          // Network errors - typically CORS issues from 429 responses
+          // When rate limited, the API returns 429 without CORS headers
+          if (retryCount < maxRetries) {
+            const backoff = baseBackoff * Math.pow(2, retryCount)
+            console.warn(`[SemanticScholar] Rate limit hit (CORS blocked), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`)
+            this.processQueue()
+            await this.sleep(backoff)
+            try {
+              const retryResponse = await this.rateLimitedFetch(url, retryCount + 1)
+              resolve(retryResponse)
+              return
+            } catch (retryError) {
+              reject(retryError)
+              return
+            }
+          }
+          console.error(`[SemanticScholar] Request failed after ${maxRetries} retries:`, error)
           reject(error)
         }
 
@@ -255,18 +317,69 @@ export class SemanticScholarProvider {
 
   /**
    * Set item in localStorage cache
+   * Implements cache eviction when quota is exceeded
    */
   private setCache<T>(key: string, data: T): void {
-    try {
-      const entry: CacheEntry<T> = {
-        data,
-        timestamp: Date.now(),
-      }
-      localStorage.setItem(key, JSON.stringify(entry))
-    } catch (error) {
-      // localStorage might be full or unavailable
-      console.warn('Failed to cache Semantic Scholar data:', error)
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: Date.now(),
     }
+    const json = JSON.stringify(entry)
+
+    // Try to set directly first
+    try {
+      localStorage.setItem(key, json)
+      return
+    } catch {
+      // Quota exceeded - try to free up space
+    }
+
+    // Evict oldest cache entries and retry
+    try {
+      this.evictOldestCacheEntries(5)
+      localStorage.setItem(key, json)
+    } catch {
+      // Still failing - clear all cache and retry
+      try {
+        this.clearCache()
+        localStorage.setItem(key, json)
+      } catch (error) {
+        // localStorage unavailable or entry too large
+        console.warn('Cache unavailable:', error)
+      }
+    }
+  }
+
+  /**
+   * Evict oldest cache entries to free up space
+   */
+  private evictOldestCacheEntries(count: number): void {
+    const entries: Array<{ key: string; timestamp: number }> = []
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(this.cachePrefix)) {
+        try {
+          const item = localStorage.getItem(key)
+          if (item) {
+            const entry = JSON.parse(item) as CacheEntry<unknown>
+            entries.push({ key, timestamp: entry.timestamp })
+          }
+        } catch {
+          // Invalid entry - mark for removal with old timestamp
+          entries.push({ key, timestamp: 0 })
+        }
+      }
+    }
+
+    // Sort by timestamp (oldest first) and remove
+    entries.sort((a, b) => a.timestamp - b.timestamp)
+    const toRemove = entries.slice(0, count)
+    for (const entry of toRemove) {
+      localStorage.removeItem(entry.key)
+    }
+
+    console.log(`[SemanticScholar] Evicted ${toRemove.length} old cache entries`)
   }
 
   /**

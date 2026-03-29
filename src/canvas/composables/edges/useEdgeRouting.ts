@@ -58,6 +58,7 @@ export interface UseEdgeRoutingContext {
   focusNodeId: Ref<string | null>
   isMassiveGraph: ComputedRef<boolean>
   isHugeGraph: ComputedRef<boolean>
+  isLODMode: ComputedRef<boolean>
   globalEdgeStyle: Ref<string>
   edgeStyleMap: Ref<Record<string, string>>
   getNodeHeight: (
@@ -82,6 +83,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     focusNodeId,
     isMassiveGraph,
     isHugeGraph,
+    isLODMode,
     globalEdgeStyle,
     edgeStyleMap,
     getNodeHeight,
@@ -138,8 +140,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       edges = edges.filter(e => e.source_node_id === focusId || e.target_node_id === focusId)
     }
 
-    // MASSIVE GRAPH OPTIMIZATION: Simple center-to-center lines
-    if (isMassiveGraph.value) {
+    // LOD/BUBBLE MODE or MASSIVE GRAPH: Simple center-to-center lines
+    if (isLODMode.value || isMassiveGraph.value) {
       const nodeMap = new Map(displayNodes.value.map(n => [n.id, n]))
 
       return edges

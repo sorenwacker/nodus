@@ -24,10 +24,8 @@
   height: 1px;
   transform-origin: 0 0;
   z-index: 2;
-  /* GPU acceleration */
+  /* GPU acceleration without 3D context */
   will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
   contain: layout style;
   /* Children handle their own pointer-events */
