@@ -529,6 +529,45 @@ export function getStarterTitles(locale: string): { gettingStarted: string; impo
   return titles[supported] || titles.en
 }
 
+/**
+ * Get starter node configurations (positions and sizes)
+ */
+export interface StarterNodeConfig {
+  key: keyof StarterTemplates
+  canvas_x: number
+  canvas_y: number
+  width: number
+  height: number
+}
+
+export function getStarterNodeConfigs(): StarterNodeConfig[] {
+  return [
+    { key: 'gettingStarted', canvas_x: 100, canvas_y: 100, width: 500, height: 600 },
+    { key: 'importingFiles', canvas_x: 700, canvas_y: 100, width: 520, height: 720 },
+    { key: 'mathReference', canvas_x: 100, canvas_y: 780, width: 560, height: 620 },
+    { key: 'mermaidDemo', canvas_x: 700, canvas_y: 900, width: 520, height: 800 },
+  ]
+}
+
+/**
+ * Get starter edge configurations (connections between starter nodes)
+ */
+export interface StarterEdgeConfig {
+  sourceKey: keyof StarterTemplates
+  targetKey: keyof StarterTemplates
+  linkType: string
+  label: string
+}
+
+export function getStarterEdgeConfigs(): StarterEdgeConfig[] {
+  return [
+    { sourceKey: 'gettingStarted', targetKey: 'importingFiles', linkType: 'related', label: 'see also' },
+    { sourceKey: 'gettingStarted', targetKey: 'mathReference', linkType: 'cites', label: 'references' },
+    { sourceKey: 'importingFiles', targetKey: 'gettingStarted', linkType: 'supports', label: 'extends' },
+    { sourceKey: 'gettingStarted', targetKey: 'mermaidDemo', linkType: 'related', label: 'diagrams' },
+  ]
+}
+
 // Legacy exports for backwards compatibility
 export const TYPST_MATH_REFERENCE = templates.en.mathReference
 export const GETTING_STARTED = templates.en.gettingStarted

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { invoke, getWorkspace } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
-import { getStarterTemplates, getStarterTitles } from '../lib/templates'
+import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs } from '../lib/templates'
 import { canvasStorage } from '../lib/storage'
 import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
@@ -27,6 +27,8 @@ import type {
   StorylineNode,
 } from '../types'
 import { clampCoord, clampNodeSize } from '../lib/geometry'
+import { pushOverlappingNodes as pushNodesApart } from '../lib/nodeCollision'
+import { createMockNodes } from '../lib/mockData'
 
 // Re-export types for consumers
 export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
@@ -178,51 +180,7 @@ export const useNodesStore = defineStore('nodes', () => {
       error.value = String(e)
       storeLogger.error('Failed to load nodes:', e)
       notifications$.error('Failed to load data', 'Using offline mode with sample data')
-      // Fallback to mock data for development
-      nodes.value = [
-        {
-          id: '1',
-          title: 'Welcome to Nodus',
-          file_path: null,
-          markdown_content: '# Welcome\n\nThis is your first node.',
-          node_type: 'note',
-          canvas_x: 100,
-          canvas_y: 100,
-          width: 200,
-          height: 120,
-          z_index: 0,
-          frame_id: null,
-          color_theme: null,
-          is_collapsed: false,
-          tags: null,
-          workspace_id: null,
-          checksum: null,
-          created_at: Date.now(),
-          updated_at: Date.now(),
-          deleted_at: null,
-        },
-        {
-          id: '2',
-          title: 'Getting Started',
-          file_path: null,
-          markdown_content: '## Getting Started\n\nDrag nodes to arrange them.',
-          node_type: 'note',
-          canvas_x: 400,
-          canvas_y: 150,
-          width: 200,
-          height: 120,
-          z_index: 0,
-          frame_id: null,
-          color_theme: null,
-          is_collapsed: false,
-          tags: null,
-          workspace_id: null,
-          checksum: null,
-          created_at: Date.now(),
-          updated_at: Date.now(),
-          deleted_at: null,
-        },
-      ]
+      nodes.value = createMockNodes()
     } finally {
       loading.value = false
     }
@@ -290,81 +248,38 @@ export const useNodesStore = defineStore('nodes', () => {
   /**
    * Push nodes that overlap with the given node away (ripples through graph)
    */
-  function pushOverlappingNodes(sourceNode: Node, processed = new Set<string>()) {
-    const PADDING = 15 // Minimum gap between nodes
-    const MAX_ITERATIONS = 50 // Prevent infinite loops
+  function pushOverlappingNodes(sourceNode: Node) {
+    const collisionNode = {
+      id: sourceNode.id,
+      canvas_x: sourceNode.canvas_x,
+      canvas_y: sourceNode.canvas_y,
+      width: sourceNode.width || 200,
+      height: sourceNode.height || 120,
+      workspace_id: sourceNode.workspace_id,
+    }
 
-    if (processed.size > MAX_ITERATIONS) return
-    processed.add(sourceNode.id)
+    const collisionNodes = nodes.value.map(n => ({
+      id: n.id,
+      canvas_x: n.canvas_x,
+      canvas_y: n.canvas_y,
+      width: n.width || 200,
+      height: n.height || 120,
+      workspace_id: n.workspace_id,
+    }))
 
-    const sw = sourceNode.width || 200
-    const sh = sourceNode.height || 120
-    const sx = sourceNode.canvas_x
-    const sy = sourceNode.canvas_y
-    const scx = sx + sw / 2
-    const scy = sy + sh / 2
-
-    const pushedNodes: Node[] = []
-
-    for (const node of nodes.value) {
-      if (node.id === sourceNode.id) continue
-      if (node.workspace_id !== sourceNode.workspace_id) continue
-      if (processed.has(node.id)) continue
-
-      const nw = node.width || 200
-      const nh = node.height || 120
-      const nx = node.canvas_x
-      const ny = node.canvas_y
-
-      // Check for overlap (with padding)
-      const overlapX = sx < nx + nw + PADDING && sx + sw + PADDING > nx
-      const overlapY = sy < ny + nh + PADDING && sy + sh + PADDING > ny
-
-      if (overlapX && overlapY) {
-        // Calculate push direction (away from source node center)
-        const ncx = nx + nw / 2
-        const ncy = ny + nh / 2
-        const dx = ncx - scx
-        const dy = ncy - scy
-
-        // Calculate how much to push
-        let pushX = 0, pushY = 0
-        if (Math.abs(dx) > Math.abs(dy)) {
-          // Push horizontally
-          if (dx > 0) {
-            pushX = (sx + sw + PADDING) - nx
-          } else {
-            pushX = (sx - PADDING) - (nx + nw)
-          }
-        } else {
-          // Push vertically
-          if (dy > 0) {
-            pushY = (sy + sh + PADDING) - ny
-          } else {
-            pushY = (sy - PADDING) - (ny + nh)
-          }
+    pushNodesApart(collisionNode, {
+      nodes: collisionNodes,
+      updatePosition: (id, x, y) => {
+        const node = nodes.value.find(n => n.id === id)
+        if (node) {
+          node.canvas_x = x
+          node.canvas_y = y
+          node.updated_at = Date.now()
+          invoke('update_node_position', { id, x, y })
+            .catch(e => console.error('Failed to update pushed node position:', e))
         }
-
-        // Apply push
-        node.canvas_x += pushX
-        node.canvas_y += pushY
-        node.updated_at = Date.now()
-
-        // Persist position
-        invoke('update_node_position', {
-          id: node.id,
-          x: node.canvas_x,
-          y: node.canvas_y
-        }).catch(e => console.error('Failed to update pushed node position:', e))
-
-        pushedNodes.push(node)
-      }
-    }
-
-    // Recursively push nodes that the pushed nodes now overlap with
-    for (const pushedNode of pushedNodes) {
-      pushOverlappingNodes(pushedNode, processed)
-    }
+      },
+    })
   }
 
   function selectNode(id: string | null, addToSelection = false) {
@@ -547,8 +462,8 @@ export const useNodesStore = defineStore('nodes', () => {
   async function createNode(data: CreateNodeInput): Promise<Node> {
     // Determine workspace_id for the new node
     // "default" maps to null (the default workspace uses null in the database)
-    let validWorkspaceId = data.workspace_id
-    if (validWorkspaceId === undefined) {
+    let validWorkspaceId: string | null = data.workspace_id ?? null
+    if (data.workspace_id === undefined) {
       // Use current workspace, but convert "default" to null
       if (currentWorkspaceId.value === 'default') {
         validWorkspaceId = null
@@ -557,7 +472,7 @@ export const useNodesStore = defineStore('nodes', () => {
       } else {
         validWorkspaceId = null
       }
-    } else if (validWorkspaceId === 'default') {
+    } else if (data.workspace_id === 'default') {
       validWorkspaceId = null
     }
 
@@ -737,76 +652,40 @@ export const useNodesStore = defineStore('nodes', () => {
     nodes.value = nodes.value.filter(n => n.workspace_id !== null)
     selectedNodeIds.value = []
 
-    // Get localized templates based on current language
+    // Get localized content and node configurations
     const locale = localStorage.getItem('nodus-locale') || 'en'
     const templates = getStarterTemplates(locale)
     const titles = getStarterTitles(locale)
+    const nodeConfigs = getStarterNodeConfigs()
+    const edgeConfigs = getStarterEdgeConfigs()
 
-    // Create the welcome/starter nodes with generous sizes
-    const gettingStarted = await createNode({
-      title: titles.gettingStarted,
-      markdown_content: templates.gettingStarted,
-      canvas_x: 100,
-      canvas_y: 100,
-      width: 500,
-      height: 600,
-    })
+    // Create starter nodes from configurations
+    const createdNodes = new Map<string, Node>()
+    for (const config of nodeConfigs) {
+      const node = await createNode({
+        title: titles[config.key],
+        markdown_content: templates[config.key],
+        canvas_x: config.canvas_x,
+        canvas_y: config.canvas_y,
+        width: config.width,
+        height: config.height,
+      })
+      createdNodes.set(config.key, node)
+    }
 
-    const importingFiles = await createNode({
-      title: titles.importingFiles,
-      markdown_content: templates.importingFiles,
-      canvas_x: 700,
-      canvas_y: 100,
-      width: 520,
-      height: 720,
-    })
-
-    const mathReference = await createNode({
-      title: titles.mathReference,
-      markdown_content: templates.mathReference,
-      canvas_x: 100,
-      canvas_y: 780,
-      width: 560,
-      height: 620,
-    })
-
-    const mermaidDemo = await createNode({
-      title: titles.mermaidDemo,
-      markdown_content: templates.mermaidDemo,
-      canvas_x: 700,
-      canvas_y: 900,
-      width: 520,
-      height: 800,
-    })
-
-    // Create demo edges with different styles and labels
-    await createEdge({
-      source_node_id: gettingStarted.id,
-      target_node_id: importingFiles.id,
-      link_type: 'related',
-      label: 'see also',
-    })
-
-    await createEdge({
-      source_node_id: gettingStarted.id,
-      target_node_id: mathReference.id,
-      link_type: 'cites',
-      label: 'references',
-    })
-
-    await createEdge({
-      source_node_id: importingFiles.id,
-      target_node_id: gettingStarted.id,
-      link_type: 'supports',
-      label: 'extends',
-    })
-
-    await createEdge({
-      source_node_id: gettingStarted.id,
-      target_node_id: mermaidDemo.id,
-      link_type: 'related',
-      label: 'diagrams',
-    })
+    // Create demo edges from configurations
+    for (const config of edgeConfigs) {
+      const source = createdNodes.get(config.sourceKey)
+      const target = createdNodes.get(config.targetKey)
+      if (source && target) {
+        await createEdge({
+          source_node_id: source.id,
+          target_node_id: target.id,
+          link_type: config.linkType,
+          label: config.label,
+        })
+      }
+    }
 
     // Set hyperbolic edge style for starter content
     canvasStorage.setEdgeStyle('hyperbolic')
