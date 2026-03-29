@@ -1048,7 +1048,6 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
 
   // Try extracted executor (handles simple tools)
   const result = await executeTool(name, args, toolCtx)
-  console.log(`[Tool] ${name} -> executeTool returned:`, result.slice(0, 100))
 
   // Try marker handlers for async processing
   const markerResult = await markerHandlers.handleMarker(result)
