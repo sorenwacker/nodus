@@ -67,18 +67,7 @@ function extractBalancedJson(str: string): string | null {
   return null // Unbalanced
 }
 
-/**
- * Escape special characters that could be used for prompt injection
- * Replaces XML-like tags and control characters
- */
-function escapeForPrompt(text: string): string {
-  return text
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\[INST\]/gi, '[_INST_]')
-    .replace(/\[\/INST\]/gi, '[_/INST_]')
-    .replace(/```/g, "'''")
-}
+import { escapeForPrompt } from '../../../lib/promptSecurity'
 
 export interface AgentContext {
   // Node store access

@@ -7,26 +7,7 @@ import { ref, computed } from 'vue'
 import { invoke } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import type { Frame } from '../types'
-
-// Maximum canvas coordinate bounds
-const MAX_CANVAS_COORD = 100_000
-const MIN_FRAME_SIZE = 50
-
-/**
- * Validate and clamp a coordinate value
- */
-function clampCoord(value: number): number {
-  if (!Number.isFinite(value)) return 0
-  return Math.max(-MAX_CANVAS_COORD, Math.min(MAX_CANVAS_COORD, value))
-}
-
-/**
- * Validate and clamp a size value (no max limit)
- */
-function clampSize(value: number, min = MIN_FRAME_SIZE): number {
-  if (!Number.isFinite(value)) return min
-  return Math.max(min, value)
-}
+import { clampCoord, clampFrameSize } from '../lib/geometry'
 
 export const useFramesStore = defineStore('frames', () => {
   const frames = ref<Frame[]>([])
@@ -132,8 +113,8 @@ export const useFramesStore = defineStore('frames', () => {
   function updateFrameSize(id: string, width: number, height: number): void {
     const frame = frames.value.find((f) => f.id === id)
     if (frame) {
-      const clampedWidth = clampSize(width)
-      const clampedHeight = clampSize(height)
+      const clampedWidth = clampFrameSize(width)
+      const clampedHeight = clampFrameSize(height)
       frame.width = clampedWidth
       frame.height = clampedHeight
       invoke('update_frame_size', { id, width: clampedWidth, height: clampedHeight }).catch((e) =>

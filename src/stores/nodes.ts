@@ -26,27 +26,7 @@ import type {
   Storyline,
   StorylineNode,
 } from '../types'
-
-// Maximum canvas coordinate bounds
-const MAX_CANVAS_COORD = 100_000
-const MIN_NODE_SIZE = 50
-const MAX_NODE_SIZE = 5_000
-
-/**
- * Validate and clamp a coordinate value
- */
-function clampCoord(value: number): number {
-  if (!Number.isFinite(value)) return 0
-  return Math.max(-MAX_CANVAS_COORD, Math.min(MAX_CANVAS_COORD, value))
-}
-
-/**
- * Validate and clamp a node size value
- */
-function clampNodeSize(value: number): number {
-  if (!Number.isFinite(value)) return 200 // Default node width
-  return Math.max(MIN_NODE_SIZE, Math.min(MAX_NODE_SIZE, value))
-}
+import { clampCoord, clampNodeSize } from '../lib/geometry'
 
 // Re-export types for consumers
 export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
