@@ -9,6 +9,10 @@ import { semanticScholar } from '../lib/semanticScholar'
 import type { SemanticScholarReference } from '../lib/semanticScholar'
 import type { Node, CreateNodeInput, CreateEdgeInput } from '../types'
 import { formatStubCitation } from '../lib/citationFormat'
+import { extractDOI, extractZoteroKey } from '../lib/extraction'
+
+// Re-export for backwards compatibility
+export { extractDOI, extractZoteroKey }
 
 export interface CitationGraphProgress {
   phase: 'scanning' | 'fetching' | 'creating' | 'done'
@@ -30,58 +34,6 @@ export interface UseCitationGraphContext {
   createNode: (data: CreateNodeInput) => Promise<{ id: string }>
   createEdge: (data: CreateEdgeInput) => Promise<{ id: string }>
   getCurrentWorkspaceId: () => string | null
-}
-
-/**
- * Extract DOI from node content (frontmatter or body)
- */
-export function extractDOI(content: string | null): string | null {
-  if (!content) return null
-
-  // Check YAML frontmatter first
-  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
-  if (frontmatterMatch) {
-    const doiMatch = frontmatterMatch[1].match(/^doi:\s*(.+)$/m)
-    if (doiMatch) {
-      return doiMatch[1].trim()
-    }
-  }
-
-  // Check for DOI in body text (various formats)
-  const patterns = [
-    /doi\.org\/([^\s\])"']+)/i,
-    /DOI:\s*([^\s\])"']+)/i,
-    /10\.\d{4,}\/[^\s\])"']+/,
-  ]
-
-  for (const pattern of patterns) {
-    const match = content.match(pattern)
-    if (match) {
-      // Clean up the DOI
-      let doi = match[1] || match[0]
-      doi = doi.replace(/[.,;:)\]]+$/, '') // Remove trailing punctuation
-      return doi
-    }
-  }
-
-  return null
-}
-
-/**
- * Extract Zotero key from node content
- */
-export function extractZoteroKey(content: string | null): string | null {
-  if (!content) return null
-
-  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
-  if (frontmatterMatch) {
-    const keyMatch = frontmatterMatch[1].match(/^zotero_key:\s*(.+)$/m)
-    if (keyMatch) {
-      return keyMatch[1].trim()
-    }
-  }
-
-  return null
 }
 
 /**

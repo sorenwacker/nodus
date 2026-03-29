@@ -5,6 +5,8 @@
  */
 import { writeText as writeClipboard, readText as readClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { semanticScholar } from '../../../lib/semanticScholar'
+import { extractDOI } from '../../../lib/extraction'
+import { isValidCoordinate } from '../../../lib/geometry'
 
 export interface ClipboardNodeData {
   type: 'nodus-nodes'
@@ -24,34 +26,6 @@ export interface ClipboardNodeData {
     link_type: string
     color?: string | null
   }>
-}
-
-/**
- * Validate that a value is a finite number within reasonable bounds
- */
-function isValidCoordinate(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1_000_000
-}
-
-/**
- * Extract DOI from text (supports various formats)
- */
-function extractDOI(text: string): string | null {
-  const trimmed = text.trim()
-
-  // Direct DOI (10.xxxx/...)
-  const directMatch = trimmed.match(/^(10\.\d{4,}\/[^\s]+)$/i)
-  if (directMatch) return directMatch[1]
-
-  // DOI URL (https://doi.org/10.xxxx/...)
-  const urlMatch = trimmed.match(/doi\.org\/(10\.\d{4,}\/[^\s]+)/i)
-  if (urlMatch) return urlMatch[1]
-
-  // DOI: prefix (DOI: 10.xxxx/...)
-  const prefixMatch = trimmed.match(/^doi:\s*(10\.\d{4,}\/[^\s]+)/i)
-  if (prefixMatch) return prefixMatch[1]
-
-  return null
 }
 
 /**

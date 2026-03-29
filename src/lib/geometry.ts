@@ -34,10 +34,10 @@ export function clampFrameSize(value: number, min = MIN_FRAME_SIZE): number {
 }
 
 /**
- * Check if a coordinate is valid (finite number)
+ * Check if a coordinate is valid (finite number within reasonable bounds)
  */
 export function isValidCoordinate(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1_000_000
 }
 
 /**
