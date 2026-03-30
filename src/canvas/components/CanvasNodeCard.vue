@@ -112,6 +112,7 @@ const showDeleteButton = computed(() =>
     <div
       v-else-if="node.title || isEditing || isEditingTitle"
       class="node-header"
+      tabindex="-1"
       @dblclick.stop="emit('start-editing-title')"
       @click.stop="isEditing && !isEditingTitle && emit('start-editing-title')"
     >

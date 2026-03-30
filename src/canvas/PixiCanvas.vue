@@ -1430,14 +1430,15 @@ function saveEditing(e?: FocusEvent) {
   if (e && showNodeSearch.value) {
     return
   }
-  // Don't close if focus moved to LLM inputs, buttons, color bar, or search bar
+  // Don't close if focus moved to LLM inputs, buttons, color bar, search bar, or title header
   if (e?.relatedTarget) {
     const related = e.relatedTarget as HTMLElement
     if (
       related.closest('.node-llm-bar-floating') ||
       related.closest('.collapsed-color-bar') ||
       related.closest('.graph-llm-bar') ||
-      related.closest('.node-search-bar')
+      related.closest('.node-search-bar') ||
+      related.closest('.node-header')
     ) {
       return
     }
