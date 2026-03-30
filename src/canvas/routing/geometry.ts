@@ -77,7 +77,7 @@ export function getStandoff(point: Point, side: Side, distance: number): Point {
  * Adds a perpendicular offset based on edge direction to avoid 0-degree entries
  */
 export function getAngledStandoff(
-  port: Point,
+  _port: Point,
   standoff: Point,
   side: Side,
   incomingDirection: Point,

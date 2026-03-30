@@ -91,6 +91,8 @@ describe('Typst Export', () => {
           label: null,
           link_type: 'cites',
           weight: 1,
+          color: null,
+          storyline_id: null,
           created_at: Date.now(),
         },
       ]

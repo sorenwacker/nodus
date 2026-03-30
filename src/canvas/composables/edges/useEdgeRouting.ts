@@ -431,8 +431,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
         const strokeWidth = routed?.strokeWidth || 1.5
 
-        let labelX: number
-        let labelY: number
+        let labelX: number = (x1 + x2) / 2
+        let labelY: number = (y1 + y2) / 2
 
         // Helper: compute cubic Bezier point at t=0.5
         const bezierMidpoint = (

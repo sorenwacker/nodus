@@ -87,6 +87,8 @@ describe('PDF Export', () => {
           label: null,
           link_type: 'related',
           weight: 1,
+          color: null,
+          storyline_id: null,
           created_at: Date.now(),
         },
       ]
@@ -138,8 +140,11 @@ describe('PDF Export', () => {
       mockAnchor = { href: '', download: '', click: vi.fn() }
 
       // Mock document.createElement to return our mock anchor
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockAnchor as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockAnchor as any)
 
       // Mock URL methods

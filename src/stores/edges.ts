@@ -98,6 +98,8 @@ export const useEdgesStore = defineStore('edges', () => {
         label: data.label || null,
         link_type: data.link_type || 'related',
         weight: 1,
+        color: null,
+        storyline_id: null,
         created_at: Date.now(),
       }
       edges.value = [...edges.value, edge]

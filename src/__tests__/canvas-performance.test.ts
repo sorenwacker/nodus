@@ -164,6 +164,8 @@ describe('Canvas Performance', () => {
           label: null,
           link_type: 'related',
           weight: 1,
+          color: null,
+          storyline_id: null,
           created_at: Date.now(),
         })
       }
@@ -190,6 +192,8 @@ describe('Canvas Performance', () => {
           label: null,
           link_type: 'related',
           weight: 1,
+          color: null,
+          storyline_id: null,
           created_at: Date.now(),
         })
       }
@@ -221,18 +225,29 @@ describe('Canvas Performance', () => {
           label: null,
           link_type: 'related',
           weight: 1,
+          color: null,
+          storyline_id: null,
           created_at: Date.now(),
         })
       }
 
-      // Delete 100 nodes
+      // Delete 100 nodes using in-place mutation (store properties are readonly)
       const startDelete = performance.now()
       for (let i = 0; i < 100; i++) {
         const nodeId = `node-${i}`
-        store.nodes = store.nodes.filter((n) => n.id !== nodeId)
-        store.edges = store.edges.filter(
-          (e) => e.source_node_id !== nodeId && e.target_node_id !== nodeId
-        )
+        // Filter nodes using splice (reverse iteration for safe removal)
+        for (let j = store.nodes.length - 1; j >= 0; j--) {
+          if (store.nodes[j].id === nodeId) {
+            store.nodes.splice(j, 1)
+            break
+          }
+        }
+        // Filter edges using splice (reverse iteration for safe removal)
+        for (let j = store.edges.length - 1; j >= 0; j--) {
+          if (store.edges[j].source_node_id === nodeId || store.edges[j].target_node_id === nodeId) {
+            store.edges.splice(j, 1)
+          }
+        }
       }
       const deleteTime = performance.now() - startDelete
 
@@ -404,6 +419,8 @@ describe('Canvas Performance', () => {
           label: null,
           link_type: 'related',
           weight: 1,
+          color: null,
+          storyline_id: null,
           created_at: Date.now(),
         })
       }

@@ -438,7 +438,7 @@ function routeThreeSegment(
   const nodeList = nodes instanceof Map ? Array.from(nodes.values()) : nodes
   const checkMidClear = (): boolean => {
     for (const node of nodeList) {
-      if (excludeIds.has(node.id)) continue
+      if (node.id && excludeIds.has(node.id)) continue
       const left = node.canvas_x - OBSTACLE_MARGIN
       const right = node.canvas_x + (node.width || 200) + OBSTACLE_MARGIN
       const top = node.canvas_y - OBSTACLE_MARGIN
@@ -466,7 +466,7 @@ function routeThreeSegment(
     const regionMaxY = Math.max(startStandoff.y, endStandoff.y) + 50
 
     const obstaclesInRegion = nodeList.filter(node => {
-      if (excludeIds.has(node.id)) return false
+      if (node.id && excludeIds.has(node.id)) return false
       const nodeRight = node.canvas_x + (node.width || 200)
       const nodeBottom = node.canvas_y + (node.height || 120)
       return nodeRight >= regionMinX && node.canvas_x <= regionMaxX &&
