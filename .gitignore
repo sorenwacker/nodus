@@ -54,4 +54,5 @@ temp/
 *.tmp
 
 # Claude
-.claude/settings.json
+.claude/
+CLAUDE.md
