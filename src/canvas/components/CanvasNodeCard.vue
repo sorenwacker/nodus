@@ -108,8 +108,12 @@ const showDeleteButton = computed(() =>
       <img :src="thumbnailSrc" :alt="node.title" />
     </div>
 
-    <!-- Node title header (hidden when showing thumbnail) -->
-    <div v-else class="node-header" @dblclick.stop="emit('start-editing-title')">
+    <!-- Node title header (hidden when showing thumbnail, or when no title in rendered mode) -->
+    <div
+      v-else-if="node.title || isEditing || isEditingTitle"
+      class="node-header"
+      @dblclick.stop="emit('start-editing-title')"
+    >
       <input
         v-if="isEditingTitle"
         :value="editTitle"
