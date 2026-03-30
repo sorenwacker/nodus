@@ -284,7 +284,7 @@ export function routeAllEdges(
     let routeResult: { path: Point[]; svgPath: string }
 
     if (style === 'direct') {
-      // True straight line: center-to-center, no ports, no obstacle avoidance
+      // True straight line: center-to-edge, no ports, no obstacle avoidance
       const sw = source.width || 200
       const sh = source.height || 120
       const tw = target.width || 200
@@ -293,8 +293,41 @@ export function routeAllEdges(
       const srcCenter = { x: source.canvas_x + sw / 2, y: source.canvas_y + sh / 2 }
       const tgtCenter = { x: target.canvas_x + tw / 2, y: target.canvas_y + th / 2 }
 
-      const path = [srcCenter, tgtCenter]
-      const svgPath = `M ${srcCenter.x} ${srcCenter.y} L ${tgtCenter.x} ${tgtCenter.y}`
+      // Calculate intersection with target node boundary for arrow visibility
+      const dx = tgtCenter.x - srcCenter.x
+      const dy = tgtCenter.y - srcCenter.y
+
+      // Find where line intersects target node edge
+      let tgtEdge = tgtCenter
+      if (dx !== 0 || dy !== 0) {
+        // Calculate intersection with rectangle edges
+        const halfW = tw / 2 + 2 // Small margin for arrow
+        const halfH = th / 2 + 2
+        const ratioX = halfW / Math.abs(dx || 1)
+        const ratioY = halfH / Math.abs(dy || 1)
+        const ratio = Math.min(ratioX, ratioY)
+        tgtEdge = {
+          x: tgtCenter.x - dx * ratio,
+          y: tgtCenter.y - dy * ratio,
+        }
+      }
+
+      // Same for source node
+      let srcEdge = srcCenter
+      if (dx !== 0 || dy !== 0) {
+        const halfW = sw / 2 + 2
+        const halfH = sh / 2 + 2
+        const ratioX = halfW / Math.abs(dx || 1)
+        const ratioY = halfH / Math.abs(dy || 1)
+        const ratio = Math.min(ratioX, ratioY)
+        srcEdge = {
+          x: srcCenter.x + dx * ratio,
+          y: srcCenter.y + dy * ratio,
+        }
+      }
+
+      const path = [srcEdge, tgtEdge]
+      const svgPath = `M ${srcEdge.x} ${srcEdge.y} L ${tgtEdge.x} ${tgtEdge.y}`
       routeResult = { path, svgPath }
     } else if (style === 'straight') {
       // Direct line from port to port with obstacle avoidance
