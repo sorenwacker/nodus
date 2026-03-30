@@ -31,6 +31,7 @@ export interface UseNodeDraggingContext {
   isLODMode: Ref<boolean>
   isSemanticZoomCollapsed: Ref<boolean>
   editingNodeId: Ref<string | null>
+  editingTitleId: Ref<string | null>
   selectedEdge: Ref<string | null>
   isCreatingEdge: Ref<boolean>
   edgeStartNode: Ref<string | null>
@@ -74,6 +75,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     isLODMode,
     isSemanticZoomCollapsed,
     editingNodeId,
+    editingTitleId,
     selectedEdge,
     isCreatingEdge,
     edgeStartNode,
@@ -104,8 +106,8 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       e.preventDefault()
     }
 
-    // Don't start drag if editing this node
-    if (editingNodeId.value === nodeId) {
+    // Don't start drag if editing this node (content or title)
+    if (editingNodeId.value === nodeId || editingTitleId.value === nodeId) {
       return
     }
 

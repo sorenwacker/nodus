@@ -1382,6 +1382,7 @@ const nodeDragging = useNodeDragging({
   isLODMode,
   isSemanticZoomCollapsed,
   editingNodeId,
+  editingTitleId,
   selectedEdge,
   isCreatingEdge,
   edgeStartNode,
