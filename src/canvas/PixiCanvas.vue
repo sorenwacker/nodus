@@ -401,6 +401,14 @@ const {
   setupWatchers: setupContentWatchers,
 } = contentRenderer
 
+// Preview content computed - renders on-demand if not cached
+const previewContent = computed(() => {
+  const node = previewNode.value
+  if (!node) return ''
+  // Return cached content or render on-demand
+  return nodeRenderedContent.value[node.id] || renderMarkdown(node.markdown_content)
+})
+
 // Node editor composable - handles inline editing with autosave
 const nodeEditor = useNodeEditor({
   store: {
@@ -2082,7 +2090,7 @@ useCanvasKeyboardShortcuts({
       <CanvasPreviewPanel
         :visible="showPreviewPanel && !!previewNode"
         :title="previewNode?.title || ''"
-        :content="previewNode ? nodeRenderedContent[previewNode.id] || '' : ''"
+        :content="previewContent"
         @close="closePreviewPanel"
         @zoom-to-node="zoomToPreviewNode"
       />
