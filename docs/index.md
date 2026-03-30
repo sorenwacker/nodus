@@ -50,3 +50,4 @@ See [Getting Started](getting-started.md) for detailed instructions.
 
 !!! warning "Use at your own risk"
     This software is provided "as-is" without warranty of any kind. The author is not liable for any data loss, corruption, API costs (including LLM provider charges), or other damages arising from the use of this software.
+
