@@ -106,6 +106,11 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         .execute(pool)
         .await;
 
+    // Add directed column to edges
+    let _ = sqlx::query(include_str!("../migrations/010_edge_directed.sql"))
+        .execute(pool)
+        .await;
+
     Ok(())
 }
 
