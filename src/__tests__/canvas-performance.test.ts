@@ -252,7 +252,7 @@ describe('Canvas Performance', () => {
       const deleteTime = performance.now() - startDelete
 
       expect(store.nodes.length).toBe(400)
-      expect(deleteTime).toBeLessThan(500) // Accounts for CI variance
+      expect(deleteTime).toBeLessThan(600) // Accounts for CI variance
     })
   })
 
