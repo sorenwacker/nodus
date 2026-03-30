@@ -2,7 +2,6 @@
 
 [![Release](https://img.shields.io/github/v/release/sorenwacker/nodus?style=flat-square)](https://github.com/sorenwacker/nodus/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/sorenwacker/nodus/ci.yml?branch=main&style=flat-square)](https://github.com/sorenwacker/nodus/actions)
-[![License](https://img.shields.io/github/license/sorenwacker/nodus?style=flat-square)](LICENSE)
 
 Local-first knowledge graph with EU sovereignty. A canvas-based visual thinking tool where research nodes, Typst math, and Obsidian vaults live on a single workspace.
 
@@ -65,4 +64,4 @@ npm run tauri:dev
 
 ## License
 
-[MIT](LICENSE)
+All rights reserved. License to be determined.
