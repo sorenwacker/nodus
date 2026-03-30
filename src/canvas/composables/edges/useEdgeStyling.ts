@@ -132,13 +132,21 @@ const frameColors = [
 const EDGE_SCREEN_WIDTH = 1.5 // Target screen pixels
 const HIGHLIGHTED_STROKE_MULTIPLIER = 1.4
 
-// Link type to color mapping for semantic edges
-const LINK_TYPE_COLORS: Record<string, string> = {
+// Link type to color mapping for semantic edges (dark/light variants)
+const LINK_TYPE_COLORS_DARK: Record<string, string> = {
   cites: '#3b82f6',       // Blue - citation relationship
   related: '#94a3b8',     // Gray - general relationship
   blocks: '#ef4444',      // Red - blocking relationship
   supports: '#22c55e',    // Green - supporting relationship
   contradicts: '#f97316', // Orange - contradicting relationship
+}
+
+const LINK_TYPE_COLORS_LIGHT: Record<string, string> = {
+  cites: '#1d4ed8',       // Darker blue for light mode
+  related: '#64748b',     // Darker gray for light mode
+  blocks: '#b91c1c',      // Darker red for light mode
+  supports: '#15803d',    // Darker green for light mode
+  contradicts: '#c2410c', // Darker orange for light mode
 }
 
 // Map neon/bright colors (dark themes) to visible equivalents (light themes)
@@ -242,10 +250,14 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   // All colors that need arrow markers (edge colors + node colors + highlight + cyber neons)
   const allMarkerColors = computed(() => {
     const colors = new Set<string>()
-    // Default gray color (fallback)
+    // Default gray colors (fallback)
     colors.add('#94a3b8')
-    // Link type semantic colors
-    for (const color of Object.values(LINK_TYPE_COLORS)) {
+    colors.add('#64748b')
+    // Link type semantic colors (both dark and light variants)
+    for (const color of Object.values(LINK_TYPE_COLORS_DARK)) {
+      colors.add(color)
+    }
+    for (const color of Object.values(LINK_TYPE_COLORS_LIGHT)) {
       colors.add(color)
     }
     // Edge colors (both palettes)
@@ -305,9 +317,10 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
       return remapForTheme(edge.color)
     }
 
-    // 2. Check semantic link_type for predefined colors
-    if (edge.link_type && LINK_TYPE_COLORS[edge.link_type]) {
-      return LINK_TYPE_COLORS[edge.link_type]
+    // 2. Check semantic link_type for predefined colors (theme-aware)
+    const linkTypeColors = isLightMode ? LINK_TYPE_COLORS_LIGHT : LINK_TYPE_COLORS_DARK
+    if (edge.link_type && linkTypeColors[edge.link_type]) {
+      return linkTypeColors[edge.link_type]
     }
 
     // 3. Legacy: link_type used to store hex color directly
@@ -315,8 +328,8 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
       return remapForTheme(edge.link_type)
     }
 
-    // 4. Default gray
-    return '#94a3b8'
+    // 4. Default: use theme-appropriate default color
+    return defaultEdgeColor.value
   }
 
   /**

@@ -21,6 +21,8 @@ const KEYS = {
   canvasGridSnap: 'nodus_canvas_grid_snap',
   canvasGridSize: 'nodus_canvas_grid_size',
   canvasEdgeStyle: 'nodus_canvas_edge_style',
+  canvasHighlightAllEdges: 'nodus_canvas_highlight_all_edges',
+  canvasDefaultLayout: 'nodus_canvas_default_layout',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
   showTagNodes: 'nodus_show_tag_nodes',
@@ -183,15 +185,31 @@ export const canvasStorage = {
   setGridSize(value: number, workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasGridSize, workspaceId), String(value))
   },
-  getEdgeStyle(workspaceId?: string): 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' {
+  getEdgeStyle(workspaceId?: string): 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' | 'direct' {
     const value = localStorage.getItem(this._key(KEYS.canvasEdgeStyle, workspaceId))
-    if (value === 'diagonal' || value === 'curved' || value === 'hyperbolic' || value === 'straight') {
+    if (value === 'diagonal' || value === 'curved' || value === 'hyperbolic' || value === 'straight' || value === 'direct') {
       return value
     }
     return 'orthogonal'
   },
-  setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight', workspaceId?: string): void {
+  setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' | 'direct', workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasEdgeStyle, workspaceId), value)
+  },
+  getHighlightAllEdges(workspaceId?: string): boolean {
+    return localStorage.getItem(this._key(KEYS.canvasHighlightAllEdges, workspaceId)) === 'true'
+  },
+  setHighlightAllEdges(value: boolean, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasHighlightAllEdges, workspaceId), String(value))
+  },
+  getDefaultLayout(workspaceId?: string): 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' {
+    const value = localStorage.getItem(this._key(KEYS.canvasDefaultLayout, workspaceId))
+    if (value === 'horizontal' || value === 'vertical' || value === 'force' || value === 'hierarchical' || value === 'radial') {
+      return value
+    }
+    return 'grid'
+  },
+  setDefaultLayout(value: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial', workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasDefaultLayout, workspaceId), value)
   },
 }
 
