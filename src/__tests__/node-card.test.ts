@@ -16,10 +16,14 @@ describe('CanvasNodeCard', () => {
      * 4. Shown when editing content (isEditing=true) - allows access to title edit
      * 5. Shown when editing title (isEditingTitle=true)
      *
+     * Title editing interactions:
+     * - Double-click on header: Start title editing (works in any mode)
+     * - Single-click on header while editing content: Start title editing
+     *
      * To edit a title on an untitled node:
      * 1. Double-click node content to start editing
      * 2. Header appears with "Untitled" placeholder
-     * 3. Double-click header to edit title
+     * 3. Single-click or double-click header to edit title
      */
 
     it('should hide header when no title and not editing', () => {
