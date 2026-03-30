@@ -55,18 +55,30 @@ async function executeWebSearch(query: string): Promise<string> {
   }
 }
 
-async function executeFetchUrl(url: string): Promise<string> {
+async function executeFetchUrl(url: string, currentContextChars = 0): Promise<string> {
   try {
     let content = await invoke<string>('fetch_url', { url })
-    // Apply context limit from settings, with hard cap for model safety
+
+    // Smart truncation based on context budget
+    // Default to 16k token model if not specified, leave room for response
     const userLimit = llmStorage.getChainContextLimit()
-    const maxChars = Math.min(userLimit, 30000) // Hard cap at 30k chars (~7.5k tokens)
+    const modelContextTokens = 16000 // Assume conservative 16k model
+    const reserveForResponse = 2000 // Reserve tokens for model response
+
+    // Calculate remaining budget
+    const usedTokens = Math.ceil(currentContextChars / 4)
+    const availableTokens = modelContextTokens - usedTokens - reserveForResponse
+    const maxChars = Math.min(
+      userLimit,
+      Math.max(availableTokens * 4, 4000) // At least 4k chars, or remaining budget
+    )
+
     if (content.length > maxChars) {
       // Keep start and end for better context
-      const keepStart = Math.floor(maxChars * 0.8)
-      const keepEnd = Math.floor(maxChars * 0.15)
+      const keepStart = Math.floor(maxChars * 0.85)
+      const keepEnd = Math.floor(maxChars * 0.1)
       content = content.slice(0, keepStart) +
-        '\n\n[... content truncated ...]\n\n' +
+        `\n\n[... truncated ${content.length - maxChars} chars to fit context ...]\n\n` +
         content.slice(-keepEnd)
     }
     return content
@@ -295,7 +307,9 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                   break
                 }
                 try {
-                  result = await executeFetchUrl(urlToFetch)
+                  // Calculate current context size for smart truncation
+                  const currentContextChars = messages.reduce((sum, m) => sum + (m.content?.length || 0), 0)
+                  result = await executeFetchUrl(urlToFetch, currentContextChars)
                   log.value.push(`  Got content (${result.length} chars)`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Fetch failed'
