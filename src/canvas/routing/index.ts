@@ -293,36 +293,45 @@ export function routeAllEdges(
       const srcCenter = { x: source.canvas_x + sw / 2, y: source.canvas_y + sh / 2 }
       const tgtCenter = { x: target.canvas_x + tw / 2, y: target.canvas_y + th / 2 }
 
-      // Calculate intersection with target node boundary for arrow visibility
+      // Calculate intersection with node boundaries for arrow visibility
       const dx = tgtCenter.x - srcCenter.x
       const dy = tgtCenter.y - srcCenter.y
+      const len = Math.sqrt(dx * dx + dy * dy)
 
-      // Find where line intersects target node edge
+      // Normalize direction
+      const nx = len > 0 ? dx / len : 0
+      const ny = len > 0 ? dy / len : 0
+
+      // Find intersection with target node edge (+ margin for arrow)
+      const tgtMargin = 12 // Margin for arrow visibility
       let tgtEdge = tgtCenter
-      if (dx !== 0 || dy !== 0) {
-        // Calculate intersection with rectangle edges
-        const halfW = tw / 2 + 2 // Small margin for arrow
-        const halfH = th / 2 + 2
-        const ratioX = halfW / Math.abs(dx || 1)
-        const ratioY = halfH / Math.abs(dy || 1)
-        const ratio = Math.min(ratioX, ratioY)
+      if (len > 0) {
+        // Use parametric line intersection with rectangle
+        const tgtHalfW = tw / 2 + tgtMargin
+        const tgtHalfH = th / 2 + tgtMargin
+        // Time to hit vertical edge
+        const tx = nx !== 0 ? tgtHalfW / Math.abs(nx) : Infinity
+        // Time to hit horizontal edge
+        const ty = ny !== 0 ? tgtHalfH / Math.abs(ny) : Infinity
+        const t = Math.min(tx, ty)
         tgtEdge = {
-          x: tgtCenter.x - dx * ratio,
-          y: tgtCenter.y - dy * ratio,
+          x: tgtCenter.x - nx * t,
+          y: tgtCenter.y - ny * t,
         }
       }
 
-      // Same for source node
+      // Find intersection with source node edge
+      const srcMargin = 4
       let srcEdge = srcCenter
-      if (dx !== 0 || dy !== 0) {
-        const halfW = sw / 2 + 2
-        const halfH = sh / 2 + 2
-        const ratioX = halfW / Math.abs(dx || 1)
-        const ratioY = halfH / Math.abs(dy || 1)
-        const ratio = Math.min(ratioX, ratioY)
+      if (len > 0) {
+        const srcHalfW = sw / 2 + srcMargin
+        const srcHalfH = sh / 2 + srcMargin
+        const tx = nx !== 0 ? srcHalfW / Math.abs(nx) : Infinity
+        const ty = ny !== 0 ? srcHalfH / Math.abs(ny) : Infinity
+        const t = Math.min(tx, ty)
         srcEdge = {
-          x: srcCenter.x + dx * ratio,
-          y: srcCenter.y + dy * ratio,
+          x: srcCenter.x + nx * t,
+          y: srcCenter.y + ny * t,
         }
       }
 
