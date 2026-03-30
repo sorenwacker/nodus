@@ -76,6 +76,7 @@ const lightEdgeColors: EdgeColorOption[] = [
   { value: '#0c4a6e' }, // blue
   { value: '#0e7490' }, // cyan
   { value: '#047857' }, // green
+  { value: '#b45309' }, // amber/golden (visible yellow alternative)
   { value: '#6d28d9' }, // purple
   { value: '#be185d' }, // pink
 ]
