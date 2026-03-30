@@ -1534,7 +1534,6 @@ const {
   globalEdgeStyle,
   edgeStrokeWidth,
   edgeColorPalette,
-  defaultEdgeColor,
   highlightColor,
   selectedColor,
   nodeColors,
@@ -1577,7 +1576,7 @@ const { visibleEdgeLines } = useEdgeVisibility({
   edgeStrokeWidth,
   highlightColor,
   selectedColor,
-  defaultEdgeColor,
+  getEdgeColor,
   getEdgeHighlightColor,
   getNode: store.getNode,
 })

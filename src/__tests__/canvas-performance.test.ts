@@ -166,6 +166,7 @@ describe('Canvas Performance', () => {
           weight: 1,
           color: null,
           storyline_id: null,
+          directed: true,
           created_at: Date.now(),
         })
       }
@@ -194,6 +195,7 @@ describe('Canvas Performance', () => {
           weight: 1,
           color: null,
           storyline_id: null,
+          directed: true,
           created_at: Date.now(),
         })
       }
@@ -227,6 +229,7 @@ describe('Canvas Performance', () => {
           weight: 1,
           color: null,
           storyline_id: null,
+          directed: true,
           created_at: Date.now(),
         })
       }
@@ -421,6 +424,7 @@ describe('Canvas Performance', () => {
           weight: 1,
           color: null,
           storyline_id: null,
+          directed: true,
           created_at: Date.now(),
         })
       }

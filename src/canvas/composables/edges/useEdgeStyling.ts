@@ -58,27 +58,28 @@ export interface UseEdgeStylingReturn {
   changeEdgeColor: (color: string) => void
 }
 
-// Color palettes - neon colors for dark themes
+// Color palettes - neon colors for dark themes (8 colors)
 const cyberEdgeColors: EdgeColorOption[] = [
   { value: '#00ffcc' }, // neon cyan (default)
-  { value: '#ff00ff' }, // neon magenta
   { value: '#00ccff' }, // neon blue
+  { value: '#00ff66' }, // neon green
   { value: '#ffff00' }, // neon yellow
   { value: '#ff3366' }, // neon red
   { value: '#9933ff' }, // neon purple
-  { value: '#00ff66' }, // neon green
+  { value: '#ff00ff' }, // neon magenta
+  { value: '#94a3b8' }, // gray
 ]
 
-// Light mode edge colors - high contrast, professional tones
+// Light mode edge colors - high contrast, professional tones (8 colors, matching order)
 const lightEdgeColors: EdgeColorOption[] = [
-  { value: '#475569' }, // slate gray (default)
-  { value: '#334155' }, // darker slate
+  { value: '#0e7490' }, // cyan (default)
   { value: '#0c4a6e' }, // blue
-  { value: '#0e7490' }, // cyan
   { value: '#047857' }, // green
-  { value: '#b45309' }, // amber/golden (visible yellow alternative)
+  { value: '#b45309' }, // amber (yellow equivalent)
+  { value: '#b91c1c' }, // red
   { value: '#6d28d9' }, // purple
-  { value: '#be185d' }, // pink
+  { value: '#be185d' }, // pink (magenta equivalent)
+  { value: '#475569' }, // gray
 ]
 
 // Node colors for the color picker (transparent tints layered over solid bg)
@@ -138,6 +139,18 @@ const LINK_TYPE_COLORS: Record<string, string> = {
   blocks: '#ef4444',      // Red - blocking relationship
   supports: '#22c55e',    // Green - supporting relationship
   contradicts: '#f97316', // Orange - contradicting relationship
+}
+
+// Map neon colors (dark themes) to visible equivalents (light themes)
+const NEON_TO_LIGHT_COLORS: Record<string, string> = {
+  '#00ffcc': '#0e7490', // neon cyan -> dark cyan
+  '#ff00ff': '#be185d', // neon magenta -> pink
+  '#00ccff': '#0c4a6e', // neon blue -> dark blue
+  '#ffff00': '#b45309', // neon yellow -> amber
+  '#ff3366': '#b91c1c', // neon red -> dark red
+  '#9933ff': '#6d28d9', // neon purple -> dark purple
+  '#00ff66': '#047857', // neon green -> dark green
+  '#ffaa00': '#b45309', // neon orange -> amber
 }
 
 export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn {
@@ -270,8 +283,20 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   }
 
   function getEdgeColor(edge: { link_type: string; color?: string | null }): string {
+    const isLightMode = currentTheme.value !== 'dark' && currentTheme.value !== 'pitch-black' && currentTheme.value !== 'cyber'
+
+    // Helper to remap neon colors in light mode
+    const remapForTheme = (color: string): string => {
+      if (isLightMode && NEON_TO_LIGHT_COLORS[color.toLowerCase()]) {
+        return NEON_TO_LIGHT_COLORS[color.toLowerCase()]
+      }
+      return color
+    }
+
     // 1. Prefer explicit color field (user override)
-    if (edge.color && edge.color.startsWith('#')) return edge.color
+    if (edge.color && edge.color.startsWith('#')) {
+      return remapForTheme(edge.color)
+    }
 
     // 2. Check semantic link_type for predefined colors
     if (edge.link_type && LINK_TYPE_COLORS[edge.link_type]) {
@@ -279,7 +304,9 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     }
 
     // 3. Legacy: link_type used to store hex color directly
-    if (edge.link_type && edge.link_type.startsWith('#')) return edge.link_type
+    if (edge.link_type && edge.link_type.startsWith('#')) {
+      return remapForTheme(edge.link_type)
+    }
 
     // 4. Default gray
     return '#94a3b8'

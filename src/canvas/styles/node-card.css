@@ -117,6 +117,11 @@
   pointer-events: none;
 }
 
+/* Light mode: darker borders for unselected nodes */
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-card {
+  border-color: #64748b;
+}
+
 .node-card:hover {
   border-color: var(--text-muted);
 }

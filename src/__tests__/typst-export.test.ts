@@ -93,6 +93,7 @@ describe('Typst Export', () => {
           weight: 1,
           color: null,
           storyline_id: null,
+          directed: true,
           created_at: Date.now(),
         },
       ]

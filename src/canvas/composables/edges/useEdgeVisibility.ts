@@ -29,7 +29,7 @@ export interface UseEdgeVisibilityContext {
   edgeStrokeWidth: ComputedRef<number>
   highlightColor: ComputedRef<string>
   selectedColor: ComputedRef<string>
-  defaultEdgeColor: ComputedRef<string>
+  getEdgeColor: (edge: { link_type: string; color?: string | null }) => string
   getEdgeHighlightColor: (colorTheme: string | null) => string
   getNode: (id: string) => { color_theme?: string | null } | undefined
 }
@@ -57,7 +57,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     edgeStrokeWidth,
     highlightColor,
     selectedColor,
-    defaultEdgeColor,
+    getEdgeColor,
     getEdgeHighlightColor,
     getNode,
   } = ctx
@@ -131,9 +131,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       // When all edges are highlighted, show full opacity
       const opacity = isHighlighted ? 1.0 : (isNeighborEdge ? 0.2 : 0.3)
 
-      // Use explicit color field first, then link_type as fallback, then default
-      const color = (e.color && e.color.startsWith('#')) ? e.color
-        : (e.link_type?.startsWith('#') ? e.link_type : defaultEdgeColor.value)
+      // Use getEdgeColor for theme-aware color remapping
+      const color = getEdgeColor({ link_type: e.link_type || '', color: e.color })
       // Simple stroke width: base for normal, slightly thicker for selected/highlighted
       const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * 1.3 : baseStrokeWidth
 
