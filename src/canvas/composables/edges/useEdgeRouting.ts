@@ -205,25 +205,30 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     // Filter edges to only those with valid source and target nodes
     edges = edges.filter(e => nodeMap.has(e.source_node_id) && nodeMap.has(e.target_node_id))
 
-    // Deduplicate edges by source-target pair
-    const seenPairs = new Set<string>()
+    // Deduplicate edges by source-target pair (using sorted key to catch A->B and B->A as same pair)
+    const seenSortedPairs = new Set<string>()
     edges = edges.filter(e => {
       if (e.storyline_id) return true
       const ids = [e.source_node_id, e.target_node_id].sort()
       const key = `${ids[0]}:${ids[1]}`
-      if (seenPairs.has(key)) return false
-      seenPairs.add(key)
+      if (seenSortedPairs.has(key)) return false
+      seenSortedPairs.add(key)
       return true
     })
 
-    // Pre-compute bidirectional edge set for O(1) lookup (instead of O(m) per edge)
+    // Pre-compute bidirectional edge set for O(1) lookup
+    // Track directional pairs (source:target) to detect when both A->B and B->A exist
+    const seenDirectionalPairs = new Set<string>()
     const bidirectionalEdges = new Set<string>()
     for (const e of edges) {
+      const forwardKey = `${e.source_node_id}:${e.target_node_id}`
       const reverseKey = `${e.target_node_id}:${e.source_node_id}`
-      if (seenPairs.has(reverseKey) || bidirectionalEdges.has(reverseKey)) {
-        bidirectionalEdges.add(`${e.source_node_id}:${e.target_node_id}`)
+      // Check if we've already seen the reverse direction
+      if (seenDirectionalPairs.has(reverseKey)) {
+        bidirectionalEdges.add(forwardKey)
         bidirectionalEdges.add(reverseKey)
       }
+      seenDirectionalPairs.add(forwardKey)
     }
 
     const style = globalEdgeStyle.value
@@ -282,7 +287,9 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     > | null = null
 
     // Create a key to detect when routing needs recalculation
-    const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}`
+    // Include edge IDs and directions so reversing an edge triggers recalculation
+    const edgeKey = edges.map(e => `${e.id}:${e.source_node_id}>${e.target_node_id}`).join(',')
+    const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}-${edgeKey}`
 
     // Always recalculate routing for live updates during drag
     if (routingKey !== lastRoutingKey.value || isDeferringRouting()) {
@@ -378,14 +385,15 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
           `${edge.source_node_id}:${edge.target_node_id}`
         )
 
-        const arrowOffset = isBidirectional ? 0 : 6
+        const arrowOffset = isBidirectional ? 0 : 5
 
+        // Adjust endpoint AWAY from node so arrow is visible
         const endEdge = { ...endPort }
         if (arrowOffset > 0) {
-          if (targetSide === 'left') endEdge.x += arrowOffset
-          else if (targetSide === 'right') endEdge.x -= arrowOffset
-          else if (targetSide === 'top') endEdge.y += arrowOffset
-          else if (targetSide === 'bottom') endEdge.y -= arrowOffset
+          if (targetSide === 'left') endEdge.x -= arrowOffset      // Move left (away from node)
+          else if (targetSide === 'right') endEdge.x += arrowOffset // Move right (away from node)
+          else if (targetSide === 'top') endEdge.y -= arrowOffset   // Move up (away from node)
+          else if (targetSide === 'bottom') endEdge.y += arrowOffset // Move down (away from node)
         }
 
         const x1 = startPort.x

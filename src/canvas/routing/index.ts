@@ -43,7 +43,7 @@ export {
 } from './crossingReduction'
 
 // Internal imports
-import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle } from './types'
+import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
 import { getPortPoint, getStandoff } from './geometry'
 import { analyzeEdges, assignPorts, calculatePortOffset, cachePortIndex } from './portAssignment'
 import { GridTracker } from './gridTracker'
@@ -185,6 +185,55 @@ function pathToSvgString(path: Point[]): string {
     svg += ` L ${path[i].x} ${path[i].y}`
   }
   return svg
+}
+
+/**
+ * Arrow visibility offset - adjusts path endpoint so arrow is visible above node
+ */
+export const ARROW_OFFSET = 5
+
+/**
+ * Adjust path endpoint to ensure arrow is visible (not hidden behind node)
+ * Moves the final point AWAY from the target node based on entry side
+ */
+export function adjustPathEndpointForArrow(
+  path: Point[],
+  svgPath: string,
+  targetSide: Side
+): { path: Point[]; svgPath: string } {
+  // Skip adjustment if offset is 0 or path is too short
+  if (ARROW_OFFSET === 0 || path.length < 2) return { path, svgPath }
+
+  const lastPoint = path[path.length - 1]
+  const adjustedPoint = { ...lastPoint }
+
+  // Move endpoint AWAY from the node (opposite direction of entry)
+  switch (targetSide) {
+    case 'left':
+      adjustedPoint.x -= ARROW_OFFSET
+      break
+    case 'right':
+      adjustedPoint.x += ARROW_OFFSET
+      break
+    case 'top':
+      adjustedPoint.y -= ARROW_OFFSET
+      break
+    case 'bottom':
+      adjustedPoint.y += ARROW_OFFSET
+      break
+  }
+
+  // Create new path with adjusted endpoint
+  const newPath = [...path.slice(0, -1), adjustedPoint]
+
+  // Replace last coordinate pair in SVG path using regex
+  // Matches patterns like "100,200" or "100 200" at the end, preserves comma separator
+  const newSvgPath = svgPath.replace(
+    /(-?[\d.]+)[,\s]+(-?[\d.]+)\s*$/,
+    `${adjustedPoint.x},${adjustedPoint.y}`
+  )
+
+  return { path: newPath, svgPath: newSvgPath }
 }
 
 /**
@@ -497,7 +546,7 @@ export function routeAllEdges(
         nodes,
         excludeIds,
         gridTracker,
-      })
+              })
     } else {
       // orthogonal (default)
       const channelOffset = -(srcOffset + tgtOffset) * 3
@@ -513,13 +562,16 @@ export function routeAllEdges(
         excludeIds,
         gridTracker,
         channelOffset,
-      })
+              })
     }
+
+    // Adjust endpoint for arrow visibility (all edge styles)
+    const adjusted = adjustPathEndpointForArrow(routeResult.path, routeResult.svgPath, targetSide)
 
     result.set(edge.id, {
       id: edge.id,
-      path: routeResult.path,
-      svgPath: routeResult.svgPath,
+      path: adjusted.path,
+      svgPath: adjusted.svgPath,
       debugInfo: { srcOffset, tgtOffset, srcSide: sourceSide, tgtSide: targetSide },
     })
   }

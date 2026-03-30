@@ -661,6 +661,26 @@ pub async fn deduplicate_edges() -> Result<u64, String> {
     Ok(removed)
 }
 
+/// Clean up orphan edges (edges pointing to non-existent nodes)
+#[tauri::command]
+pub async fn cleanup_orphan_edges() -> Result<u64, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let removed = database::edges::cleanup_orphans(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    println!("Removed {} orphan edges", removed);
+    Ok(removed)
+}
+
+/// Get all edges (for debugging)
+#[tauri::command]
+pub async fn debug_get_all_edges() -> Result<Vec<database::edges::Edge>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::edges::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Update node content. Returns the new checksum if file was written.
 #[tauri::command]
 pub async fn update_node_content(id: String, content: String) -> Result<Option<String>, String> {

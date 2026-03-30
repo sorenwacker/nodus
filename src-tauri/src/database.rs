@@ -588,6 +588,28 @@ pub mod edges {
         .await?;
         Ok(result.rows_affected())
     }
+
+    /// Remove orphan edges (edges pointing to non-existent nodes)
+    pub async fn cleanup_orphans(pool: &DbPool) -> Result<u64, DatabaseError> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM edges
+            WHERE source_node_id NOT IN (SELECT id FROM nodes)
+               OR target_node_id NOT IN (SELECT id FROM nodes)
+            "#,
+        )
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Get all edges (for debugging)
+    pub async fn get_all(pool: &DbPool) -> Result<Vec<Edge>, DatabaseError> {
+        let edges = sqlx::query_as::<_, Edge>("SELECT * FROM edges")
+            .fetch_all(pool)
+            .await?;
+        Ok(edges)
+    }
 }
 
 // Workspace CRUD operations

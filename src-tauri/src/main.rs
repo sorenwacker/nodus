@@ -74,6 +74,8 @@ fn main() {
             commands::sync_all_wikilinks,
             commands::create_file_for_node,
             commands::deduplicate_edges,
+            commands::cleanup_orphan_edges,
+            commands::debug_get_all_edges,
             commands::read_file_content,
             commands::http_request,
             commands::extract_pdf_text,

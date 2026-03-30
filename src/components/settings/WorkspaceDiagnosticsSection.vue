@@ -6,9 +6,11 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../../stores/nodes'
+import { useEdgesStore } from '../../stores/edges'
 
 const { t } = useI18n()
 const nodesStore = useNodesStore()
+const edgesStore = useEdgesStore()
 
 const emit = defineEmits<{
   close: []
@@ -98,6 +100,31 @@ async function switchToWorkspace(id: string) {
   }
   emit('close')
 }
+
+// Edge cleanup
+const cleaningEdges = ref(false)
+const cleanupResult = ref<string | null>(null)
+
+async function cleanupEdges() {
+  cleaningEdges.value = true
+  cleanupResult.value = null
+  try {
+    // First cleanup orphan edges (edges pointing to deleted nodes)
+    const orphansRemoved = await edgesStore.cleanupOrphanEdgesDb()
+
+    // Then deduplicate edges
+    const dupsRemoved = await edgesStore.deduplicateEdges()
+
+    cleanupResult.value = `Removed ${orphansRemoved} orphan edges, ${dupsRemoved} duplicates`
+
+    // Reload edges for current workspace
+    await edgesStore.initialize(nodesStore.currentWorkspaceId)
+  } catch (e) {
+    cleanupResult.value = `Error: ${e}`
+  } finally {
+    cleaningEdges.value = false
+  }
+}
 </script>
 
 <template>
@@ -142,6 +169,21 @@ async function switchToWorkspace(id: string) {
     </div>
     <span class="hint">
       {{ t('settings.workspaceStatsHint') }}
+    </span>
+  </div>
+
+  <div class="setting-group">
+    <label>Edge Database Cleanup</label>
+    <button
+      class="scan-btn"
+      :disabled="cleaningEdges"
+      @click="cleanupEdges"
+    >
+      {{ cleaningEdges ? 'Cleaning...' : 'Clean Up Edges' }}
+    </button>
+    <span v-if="cleanupResult" class="hint">{{ cleanupResult }}</span>
+    <span class="hint">
+      Removes orphan edges (pointing to deleted nodes) and duplicates.
     </span>
   </div>
 </template>

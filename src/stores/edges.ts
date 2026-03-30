@@ -232,6 +232,32 @@ export const useEdgesStore = defineStore('edges', () => {
   }
 
   /**
+   * Clean up orphan edges in the database (edges pointing to non-existent nodes)
+   */
+  async function cleanupOrphanEdgesDb(): Promise<number> {
+    try {
+      const removed = await invoke<number>('cleanup_orphan_edges')
+      storeLogger.info(`Cleaned up ${removed} orphan edges from database`)
+      return removed
+    } catch (e) {
+      storeLogger.error('Failed to cleanup orphan edges:', e)
+      return 0
+    }
+  }
+
+  /**
+   * Debug: get all edges in database (across all workspaces)
+   */
+  async function debugGetAllEdges(): Promise<Edge[]> {
+    try {
+      return await invoke<Edge[]>('debug_get_all_edges')
+    } catch (e) {
+      storeLogger.error('Failed to get all edges:', e)
+      return []
+    }
+  }
+
+  /**
    * Get edge by ID
    */
   function getEdge(id: string): Edge | undefined {
@@ -275,6 +301,8 @@ export const useEdgesStore = defineStore('edges', () => {
     updateEdgeStoryline,
     cleanupOrphanEdges,
     deduplicateEdges,
+    cleanupOrphanEdgesDb,
+    debugGetAllEdges,
     getEdge,
     findEdgeBetween,
     edgeExists,
