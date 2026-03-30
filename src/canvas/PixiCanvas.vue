@@ -58,7 +58,6 @@ import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
 import {
   findConnectedNodes,
-  getNeighborsWithDepth,
   buildChainContext,
 } from './utils/graphTraversal'
 import ImportOptionsModal from '../components/ImportOptionsModal.vue'
@@ -1081,11 +1080,9 @@ async function sendNodePrompt() {
   try {
     // Use agent mode if enabled
     if (nodeAgentMode.value === 'agent') {
-      // Get connected nodes for agent context (2-hop neighbors, sorted by depth)
-      const neighborsWithDepth = getNeighborsWithDepth(nodeId, store.filteredEdges, store.getNode, 2)
-      const connectedNodes = neighborsWithDepth
-        .sort((a, b) => a.depth - b.depth)
-        .map(({ title, content }) => ({ title, content }))
+      // Get ALL connected nodes via BFS traversal
+      const allConnected = findConnectedNodes(nodeId, store.filteredEdges, store.getNode)
+      const connectedNodes = allConnected.map(({ title, content }) => ({ title, content }))
 
       const ctx: NodeAgentContext = {
         nodeId,
