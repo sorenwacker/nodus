@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "description": "Local-first knowledge graph with EU sovereignty",
   "type": "module",
   "scripts": {
