@@ -91,6 +91,45 @@ export function getImmediateNeighbors(
 }
 
 /**
+ * Get neighbors up to N hops away with depth info
+ */
+export function getNeighborsWithDepth(
+  nodeId: string,
+  edges: Edge[],
+  getNode: (id: string) => { title?: string; markdown_content?: string | null } | undefined,
+  maxDepth = 2
+): Array<{ title: string; content: string; depth: number }> {
+  const visited = new Set<string>([nodeId])
+  const result: Array<{ title: string; content: string; depth: number }> = []
+  let currentLevel = [nodeId]
+
+  for (let depth = 1; depth <= maxDepth && currentLevel.length > 0; depth++) {
+    const nextLevel: string[] = []
+
+    for (const currentId of currentLevel) {
+      for (const neighborId of getNeighborIds(currentId, edges)) {
+        if (!visited.has(neighborId)) {
+          visited.add(neighborId)
+          nextLevel.push(neighborId)
+          const node = getNode(neighborId)
+          if (node) {
+            result.push({
+              title: node.title || 'Untitled',
+              content: node.markdown_content || '',
+              depth,
+            })
+          }
+        }
+      }
+    }
+
+    currentLevel = nextLevel
+  }
+
+  return result
+}
+
+/**
  * Build context string from connected nodes with a character limit
  */
 export function buildChainContext(

@@ -167,8 +167,8 @@ export function useNodeAgent() {
     let connectedContext = ''
     if (ctx.connectedNodes.length > 0) {
       connectedContext = '\n\n<connected_notes>\n' +
-        ctx.connectedNodes.slice(0, 5).map(n =>
-          `<note title="${escapeForPrompt(n.title)}">${escapeForPrompt(n.content.slice(0, 200))}...</note>`
+        ctx.connectedNodes.slice(0, 10).map(n =>
+          `<note title="${escapeForPrompt(n.title)}">${escapeForPrompt(n.content.slice(0, 500))}${n.content.length > 500 ? '...' : ''}</note>`
         ).join('\n') +
         '\n</connected_notes>'
     }
