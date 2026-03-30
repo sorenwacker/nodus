@@ -81,8 +81,9 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
 
     editingNodeId.value = nodeId
     editContent.value = node.markdown_content || ''
-    // Focus the textarea after Vue updates the DOM
+    // Focus the textarea after Vue updates the DOM (but not if editing title)
     setTimeout(() => {
+      if (editingTitleId.value) return // Don't steal focus from title editor
       const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
       if (textarea) {
         textarea.focus()
