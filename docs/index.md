@@ -7,6 +7,7 @@ Local-first knowledge graph with EU sovereignty.
 - [Getting Started](getting-started.md) - Installation and first steps
 - [Features](features.md) - Complete feature overview
 - [Typst Math Reference](typst-math-reference.md) - Math syntax guide
+- [Development](development.md) - Contributing and building from source
 
 ## Links
 
