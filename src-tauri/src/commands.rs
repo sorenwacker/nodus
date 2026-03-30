@@ -329,6 +329,7 @@ async fn sync_wikilinks_for_node(
                     color: None,
                     storyline_id: None,
                     created_at: now,
+                    directed: true,
                 };
                 if database::edges::create(pool, &edge).await.is_ok() {
                     created_count += 1;
@@ -550,6 +551,7 @@ pub struct CreateEdgeInput {
     pub link_type: Option<String>,
     pub color: Option<String>,
     pub storyline_id: Option<String>,
+    pub directed: Option<bool>,
 }
 
 #[tauri::command]
@@ -566,6 +568,7 @@ pub async fn create_edge(input: CreateEdgeInput) -> Result<Edge, String> {
         color: input.color,
         storyline_id: input.storyline_id,
         created_at: chrono::Utc::now().timestamp(),
+        directed: input.directed.unwrap_or(true),
     };
 
     database::edges::create(pool, &edge)
@@ -573,6 +576,14 @@ pub async fn create_edge(input: CreateEdgeInput) -> Result<Edge, String> {
         .map_err(|e| e.to_string())?;
 
     Ok(edge)
+}
+
+#[tauri::command]
+pub async fn update_edge_directed(id: String, directed: bool) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::edges::update_directed(pool, &id, directed)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1194,6 +1205,7 @@ pub async fn import_vault(
                         color: None,
                         storyline_id: None,
                         created_at: now,
+                        directed: true,
                     };
                     if database::edges::create(pool, &edge).await.is_ok() {
                         edge_count += 1;

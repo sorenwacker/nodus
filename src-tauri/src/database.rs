@@ -458,6 +458,7 @@ pub mod edges {
         pub color: Option<String>,
         pub storyline_id: Option<String>,
         pub created_at: i64,
+        pub directed: bool,
     }
 
     /// Get edges filtered by workspace (both source and target nodes must be in workspace)
@@ -507,8 +508,8 @@ pub mod edges {
     pub async fn create(pool: &DbPool, edge: &Edge) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO edges (id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO edges (id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at, directed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
         )
         .bind(&edge.id)
@@ -520,8 +521,22 @@ pub mod edges {
         .bind(&edge.color)
         .bind(&edge.storyline_id)
         .bind(edge.created_at)
+        .bind(edge.directed)
         .execute(pool)
         .await?;
+        Ok(())
+    }
+
+    pub async fn update_directed(
+        pool: &DbPool,
+        id: &str,
+        directed: bool,
+    ) -> Result<(), DatabaseError> {
+        sqlx::query("UPDATE edges SET directed = ? WHERE id = ?")
+            .bind(directed)
+            .bind(id)
+            .execute(pool)
+            .await?;
         Ok(())
     }
 

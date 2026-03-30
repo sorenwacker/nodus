@@ -522,6 +522,7 @@ export const useNodesStore = defineStore('nodes', () => {
   const restoreEdge = (edge: Edge) => edgesStore.restoreEdge(edge)
   const updateEdgeLinkType = (id: string, linkType: string) => edgesStore.updateEdgeLinkType(id, linkType)
   const updateEdgeColor = (id: string, color: string | null) => edgesStore.updateEdgeColor(id, color)
+  const updateEdgeDirected = (id: string, directed: boolean) => edgesStore.updateEdgeDirected(id, directed)
 
   // Initialize composables that depend on functions defined above
   importComposable = useImport({
@@ -945,6 +946,7 @@ export const useNodesStore = defineStore('nodes', () => {
     restoreEdge,
     updateEdgeLinkType,
     updateEdgeColor,
+    updateEdgeDirected,
     updateStorylineEdgeColors,
     createFrame,
     updateFramePosition,

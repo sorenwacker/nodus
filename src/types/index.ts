@@ -38,6 +38,7 @@ export interface Edge {
   color: string | null
   storyline_id: string | null
   created_at: number
+  directed: boolean
 }
 
 export interface Frame {

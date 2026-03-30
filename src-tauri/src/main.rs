@@ -58,6 +58,7 @@ fn main() {
             commands::delete_edge,
             commands::update_edge_color,
             commands::update_edge_storyline,
+            commands::update_edge_directed,
             commands::restore_edge,
             commands::watch_vault,
             commands::stop_watching,

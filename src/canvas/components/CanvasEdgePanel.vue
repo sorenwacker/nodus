@@ -12,7 +12,7 @@ const props = defineProps<{
   edgeStyles: Array<{ value: string; label: string }>
   getEdgeColor: (edge: { link_type: string | null }) => string
   getEdgeStyle: (edgeId: string) => string
-  isEdgeBidirectional: (edgeId: string) => boolean
+  isEdgeDirected: (edgeId: string) => boolean
 }>()
 
 defineEmits<{
@@ -21,8 +21,8 @@ defineEmits<{
   (e: 'change-color', value: string): void
   (e: 'set-style', value: string): void
   (e: 'reverse'): void
-  (e: 'make-unidirectional'): void
-  (e: 'make-bidirectional'): void
+  (e: 'make-non-directional'): void
+  (e: 'make-directional'): void
   (e: 'insert-node'): void
   (e: 'delete'): void
 }>()
@@ -44,9 +44,9 @@ const currentStyle = computed(() => {
   return props.getEdgeStyle(props.selectedEdge)
 })
 
-const isBidirectional = computed(() => {
-  if (!props.selectedEdge) return false
-  return props.isEdgeBidirectional(props.selectedEdge)
+const isDirected = computed(() => {
+  if (!props.selectedEdge) return true
+  return props.isEdgeDirected(props.selectedEdge)
 })
 </script>
 
@@ -90,15 +90,15 @@ const isBidirectional = computed(() => {
       <div class="direction-btns">
         <button :data-tooltip="t('canvas.edge.reverseDirection')" @click.stop="$emit('reverse')">{{ t('canvas.edge.flip') }}</button>
         <button
-          v-if="isBidirectional"
-          :data-tooltip="t('canvas.edge.makeDirectional')"
-          @click.stop="$emit('make-unidirectional')"
-        >{{ t('canvas.edge.directional') }}</button>
+          v-if="isDirected"
+          :data-tooltip="t('canvas.edge.makeNonDirectional')"
+          @click.stop="$emit('make-non-directional')"
+        >{{ t('canvas.edge.nonDirectional') }}</button>
         <button
           v-else
-          :data-tooltip="t('canvas.edge.makeNonDirectional')"
-          @click.stop="$emit('make-bidirectional')"
-        >{{ t('canvas.edge.nonDirectional') }}</button>
+          :data-tooltip="t('canvas.edge.makeDirectional')"
+          @click.stop="$emit('make-directional')"
+        >{{ t('canvas.edge.directional') }}</button>
       </div>
       <button class="insert-node-btn" :data-tooltip="t('canvas.edge.insertNodeTooltip')" @click="$emit('insert-node')">{{ t('canvas.edge.insertNode') }}</button>
       <button class="delete-edge-btn" :data-tooltip="t('canvas.edge.deleteEdgeTooltip')" @click="$emit('delete')">{{ t('canvas.edge.deleteEdge') }}</button>

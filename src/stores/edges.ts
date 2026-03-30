@@ -101,10 +101,23 @@ export const useEdgesStore = defineStore('edges', () => {
         color: null,
         storyline_id: null,
         created_at: Date.now(),
+        directed: true,
       }
       edges.value = [...edges.value, edge]
       return edge
     }
+  }
+
+  /**
+   * Update edge directed state (directional vs non-directional)
+   */
+  async function updateEdgeDirected(id: string, directed: boolean): Promise<void> {
+    try {
+      await invoke('update_edge_directed', { id, directed })
+    } catch (e) {
+      storeLogger.error('Failed to update edge directed:', e)
+    }
+    edges.value = edges.value.map((e) => (e.id === id ? { ...e, directed } : e))
   }
 
   /**
@@ -299,6 +312,7 @@ export const useEdgesStore = defineStore('edges', () => {
     updateEdgeColor,
     updateEdgeLabel,
     updateEdgeStoryline,
+    updateEdgeDirected,
     cleanupOrphanEdges,
     deduplicateEdges,
     cleanupOrphanEdgesDb,

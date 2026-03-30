@@ -13,6 +13,7 @@ export interface EdgeManipulationStore {
   createNode: (data: { title: string; node_type: string; markdown_content: string; canvas_x: number; canvas_y: number }) => Promise<Node>
   createEdge: (data: CreateEdgeInput) => Promise<Edge>
   deleteEdge: (id: string) => Promise<void>
+  updateEdgeDirected: (id: string, directed: boolean) => Promise<void>
   selectNode: (id: string | null) => void
 }
 
@@ -119,50 +120,19 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     }
   }
 
-  function isEdgeBidirectional(edgeId: string): boolean {
-    const edges = store.getEdges()
-    const edge = edges.find((e) => e.id === edgeId)
-    if (!edge) return false
-    return edges.some(
-      (e) => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
-    )
+  function isEdgeDirected(edgeId: string): boolean {
+    const edge = store.getEdges().find((e) => e.id === edgeId)
+    return edge?.directed ?? true
   }
 
-  async function makeUnidirectional() {
+  async function makeNonDirectional() {
     if (!selectedEdge.value) return
-    const edges = store.getEdges()
-    const edge = edges.find((e) => e.id === selectedEdge.value)
-    if (!edge) return
-
-    // Find and delete the reverse edge
-    const reverseEdge = edges.find(
-      (e) => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
-    )
-
-    if (reverseEdge) {
-      await store.deleteEdge(reverseEdge.id)
-    }
+    await store.updateEdgeDirected(selectedEdge.value, false)
   }
 
-  async function makeBidirectional() {
+  async function makeDirectional() {
     if (!selectedEdge.value) return
-    const edges = store.getEdges()
-    const edge = edges.find((e) => e.id === selectedEdge.value)
-    if (!edge) return
-
-    // Check if reverse edge already exists
-    const reverseExists = edges.some(
-      (e) => e.source_node_id === edge.target_node_id && e.target_node_id === edge.source_node_id
-    )
-
-    if (!reverseExists) {
-      await store.createEdge({
-        source_node_id: edge.target_node_id,
-        target_node_id: edge.source_node_id,
-        link_type: edge.link_type,
-        label: edge.label || undefined,
-      })
-    }
+    await store.updateEdgeDirected(selectedEdge.value, true)
   }
 
   async function insertNodeOnEdge() {
@@ -226,9 +196,9 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     deleteSelectedEdge,
     changeEdgeLabel,
     reverseEdge,
-    isEdgeBidirectional,
-    makeUnidirectional,
-    makeBidirectional,
+    isEdgeDirected,
+    makeNonDirectional,
+    makeDirectional,
     insertNodeOnEdge,
     clearSelection,
   }

@@ -385,7 +385,9 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
           `${edge.source_node_id}:${edge.target_node_id}`
         )
 
-        const arrowOffset = isBidirectional ? 0 : 5
+        // Show arrow only if edge is directed (has arrow) and not bidirectional
+        const showArrow = edge.directed !== false && !isBidirectional
+        const arrowOffset = showArrow ? 5 : 0
 
         // Adjust endpoint AWAY from node so arrow is visible
         const endEdge = { ...endPort }
@@ -558,7 +560,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
           link_type: edge.link_type,
           color: edge.color,
           label: edge.label,
-          isBidirectional,
+          isBidirectional: !showArrow, // Hide arrow if non-directional or bidirectional
           isShortEdge,
           debugInfo: routed?.debugInfo,
         }

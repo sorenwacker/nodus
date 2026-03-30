@@ -266,13 +266,13 @@ export function routeDiagonal(params: DiagonalRouteParams): DiagonalRouteResult 
   const absDy = Math.abs(dy)
   const isHorizDominant = absDx >= absDy
 
-  // Adjust end port for arrow head
+  // Adjust end port for arrow head - move endpoint AWAY from node so arrow is visible
   const endEdge = { ...endPort }
   if (arrowOffset > 0) {
-    if (targetSide === 'left') endEdge.x += arrowOffset
-    else if (targetSide === 'right') endEdge.x -= arrowOffset
-    else if (targetSide === 'top') endEdge.y += arrowOffset
-    else if (targetSide === 'bottom') endEdge.y -= arrowOffset
+    if (targetSide === 'left') endEdge.x -= arrowOffset      // Move left (away from node)
+    else if (targetSide === 'right') endEdge.x += arrowOffset // Move right (away from node)
+    else if (targetSide === 'top') endEdge.y -= arrowOffset   // Move up (away from node)
+    else if (targetSide === 'bottom') endEdge.y += arrowOffset // Move down (away from node)
   }
 
   // Detect 180-degree turn situations (crossed standoffs)

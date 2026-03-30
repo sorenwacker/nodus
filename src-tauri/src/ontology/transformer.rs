@@ -236,6 +236,7 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
             color: None,
             storyline_id: None,
             created_at: now,
+            directed: true,
         };
         edges.push(edge);
     }
@@ -277,6 +278,7 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
                 color: Some("#9333ea".to_string()), // Purple for class hierarchy
                 storyline_id: None,
                 created_at: now,
+                directed: true,
             };
             edges.push(edge);
         }
@@ -319,6 +321,7 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
                         color: Some("#3b82f6".to_string()), // Blue for properties
                         storyline_id: None,
                         created_at: now,
+                        directed: true,
                     };
                     edges.push(edge);
                 }
@@ -360,6 +363,7 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
                     color: Some("#6b7280".to_string()), // Gray for type edges
                     storyline_id: None,
                     created_at: now,
+                    directed: true,
                 };
                 edges.push(edge);
             }

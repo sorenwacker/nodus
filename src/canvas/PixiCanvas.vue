@@ -450,6 +450,7 @@ const edgeManipulation = useEdgeManipulation({
     createNode: store.createNode,
     createEdge: store.createEdge,
     deleteEdge: store.deleteEdge,
+    updateEdgeDirected: store.updateEdgeDirected,
     selectNode: store.selectNode,
   },
   screenToCanvas,
@@ -465,9 +466,9 @@ const {
   deleteSelectedEdge,
   changeEdgeLabel,
   reverseEdge,
-  isEdgeBidirectional,
-  makeUnidirectional,
-  makeBidirectional,
+  isEdgeDirected,
+  makeNonDirectional,
+  makeDirectional,
   insertNodeOnEdge,
 } = edgeManipulation
 
@@ -2075,14 +2076,14 @@ useCanvasKeyboardShortcuts({
         :edge-styles="edgeStyles"
         :get-edge-color="getEdgeColor"
         :get-edge-style="getEdgeStyle"
-        :is-edge-bidirectional="isEdgeBidirectional"
+        :is-edge-directed="isEdgeDirected"
         @close="selectedEdge = null"
         @change-label="changeEdgeLabel"
         @change-color="changeEdgeColor"
         @set-style="setEdgeStyle"
         @reverse="reverseEdge"
-        @make-unidirectional="makeUnidirectional"
-        @make-bidirectional="makeBidirectional"
+        @make-non-directional="makeNonDirectional"
+        @make-directional="makeDirectional"
         @insert-node="insertNodeOnEdge"
         @delete="deleteSelectedEdge"
       />

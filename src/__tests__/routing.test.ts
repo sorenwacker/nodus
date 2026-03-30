@@ -11,6 +11,8 @@ import {
   getPortPoint,
   calculatePortOffset,
   PORT_SPACING,
+  ARROW_OFFSET,
+  adjustPathEndpointForArrow,
   type NodeRect,
   type EdgeDef
 } from '../canvas/routing'
@@ -252,6 +254,185 @@ describe('routing module', () => {
       // Single edge - nothing to optimize
       expect(result.improved).toBe(false)
       expect(result.swapsPerformed).toBe(0)
+    })
+  })
+
+  describe('adjustPathEndpointForArrow', () => {
+    it('adjusts endpoint away from node when entering from left', () => {
+      const path = [{ x: 100, y: 200 }, { x: 300, y: 200 }]
+      const svgPath = 'M100,200 L300,200'
+      const result = adjustPathEndpointForArrow(path, svgPath, 'left')
+
+      // When entering from left, endpoint should move left (decrease x)
+      expect(result.path[result.path.length - 1].x).toBe(300 - ARROW_OFFSET)
+      expect(result.path[result.path.length - 1].y).toBe(200)
+      expect(result.svgPath).toContain(`${300 - ARROW_OFFSET},200`)
+    })
+
+    it('adjusts endpoint away from node when entering from right', () => {
+      const path = [{ x: 300, y: 200 }, { x: 100, y: 200 }]
+      const svgPath = 'M300,200 L100,200'
+      const result = adjustPathEndpointForArrow(path, svgPath, 'right')
+
+      // When entering from right, endpoint should move right (increase x)
+      expect(result.path[result.path.length - 1].x).toBe(100 + ARROW_OFFSET)
+      expect(result.path[result.path.length - 1].y).toBe(200)
+      expect(result.svgPath).toContain(`${100 + ARROW_OFFSET},200`)
+    })
+
+    it('adjusts endpoint away from node when entering from top', () => {
+      const path = [{ x: 200, y: 100 }, { x: 200, y: 300 }]
+      const svgPath = 'M200,100 L200,300'
+      const result = adjustPathEndpointForArrow(path, svgPath, 'top')
+
+      // When entering from top, endpoint should move up (decrease y)
+      expect(result.path[result.path.length - 1].x).toBe(200)
+      expect(result.path[result.path.length - 1].y).toBe(300 - ARROW_OFFSET)
+      expect(result.svgPath).toContain(`200,${300 - ARROW_OFFSET}`)
+    })
+
+    it('adjusts endpoint away from node when entering from bottom', () => {
+      const path = [{ x: 200, y: 300 }, { x: 200, y: 100 }]
+      const svgPath = 'M200,300 L200,100'
+      const result = adjustPathEndpointForArrow(path, svgPath, 'bottom')
+
+      // When entering from bottom, endpoint should move down (increase y)
+      expect(result.path[result.path.length - 1].x).toBe(200)
+      expect(result.path[result.path.length - 1].y).toBe(100 + ARROW_OFFSET)
+      expect(result.svgPath).toContain(`200,${100 + ARROW_OFFSET}`)
+    })
+
+    it('preserves original path when path has fewer than 2 points', () => {
+      const path = [{ x: 100, y: 200 }]
+      const svgPath = 'M100,200'
+      const result = adjustPathEndpointForArrow(path, svgPath, 'left')
+
+      expect(result.path).toEqual(path)
+      expect(result.svgPath).toBe(svgPath)
+    })
+
+    it('works with complex orthogonal paths', () => {
+      const path = [
+        { x: 100, y: 200 },
+        { x: 200, y: 200 },
+        { x: 200, y: 300 },
+        { x: 300, y: 300 }
+      ]
+      const svgPath = 'M100,200 L200,200 L200,300 L300,300'
+      const result = adjustPathEndpointForArrow(path, svgPath, 'left')
+
+      // Only the last point should be adjusted
+      expect(result.path[0]).toEqual({ x: 100, y: 200 })
+      expect(result.path[1]).toEqual({ x: 200, y: 200 })
+      expect(result.path[2]).toEqual({ x: 200, y: 300 })
+      expect(result.path[3].x).toBe(300 - ARROW_OFFSET)
+      expect(result.path[3].y).toBe(300)
+    })
+
+    it('applies consistent offset regardless of direction (A->B vs B->A)', () => {
+      // Test edge A to B (entering B from left)
+      const pathAB = [{ x: 100, y: 200 }, { x: 300, y: 200 }]
+      const svgPathAB = 'M100,200 L300,200'
+      const resultAB = adjustPathEndpointForArrow(pathAB, svgPathAB, 'left')
+
+      // Test edge B to A (entering A from right)
+      const pathBA = [{ x: 300, y: 200 }, { x: 100, y: 200 }]
+      const svgPathBA = 'M300,200 L100,200'
+      const resultBA = adjustPathEndpointForArrow(pathBA, svgPathBA, 'right')
+
+      // Both should have ARROW_OFFSET applied
+      const endpointAB = resultAB.path[resultAB.path.length - 1]
+      const endpointBA = resultBA.path[resultBA.path.length - 1]
+
+      // A->B: endpoint at 300 should move to 295 (left)
+      expect(endpointAB.x).toBe(300 - ARROW_OFFSET)
+      // B->A: endpoint at 100 should move to 105 (right)
+      expect(endpointBA.x).toBe(100 + ARROW_OFFSET)
+    })
+  })
+
+  describe('routeAllEdges arrow visibility', () => {
+    beforeEach(() => {
+      clearPortCache()
+    })
+
+    it('applies arrow offset when routing edge A->B', () => {
+      const nodes: NodeRect[] = [
+        { id: 'a', canvas_x: 0, canvas_y: 0, width: 200, height: 120 },
+        { id: 'b', canvas_x: 400, canvas_y: 0, width: 200, height: 120 },
+      ]
+
+      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
+
+      const edges: EdgeDef[] = [
+        { id: 'e1', source_node_id: 'a', target_node_id: 'b' },
+      ]
+
+      const result = routeAllEdges(edges, nodes, nodeMap)
+      const routed = result.get('e1')!
+
+      // The endpoint should be offset from the target node's left edge (x=400)
+      const lastPoint = routed.path[routed.path.length - 1]
+      // Target node left edge is at x=400, arrow offset moves it left by ARROW_OFFSET
+      expect(lastPoint.x).toBe(400 - ARROW_OFFSET)
+    })
+
+    it('applies arrow offset when routing edge B->A (reverse direction)', () => {
+      const nodes: NodeRect[] = [
+        { id: 'a', canvas_x: 0, canvas_y: 0, width: 200, height: 120 },
+        { id: 'b', canvas_x: 400, canvas_y: 0, width: 200, height: 120 },
+      ]
+
+      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
+
+      const edges: EdgeDef[] = [
+        { id: 'e1', source_node_id: 'b', target_node_id: 'a' },
+      ]
+
+      const result = routeAllEdges(edges, nodes, nodeMap)
+      const routed = result.get('e1')!
+
+      // The endpoint should be offset from the target node's right edge (x=200)
+      const lastPoint = routed.path[routed.path.length - 1]
+      // Target node right edge is at x=200, arrow offset moves it right by ARROW_OFFSET
+      expect(lastPoint.x).toBe(200 + ARROW_OFFSET)
+    })
+
+    it('arrow offset is symmetric for A->B and B->A', () => {
+      const nodes: NodeRect[] = [
+        { id: 'a', canvas_x: 0, canvas_y: 0, width: 200, height: 120 },
+        { id: 'b', canvas_x: 400, canvas_y: 0, width: 200, height: 120 },
+      ]
+
+      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
+
+      // Route A->B
+      const edgesAB: EdgeDef[] = [
+        { id: 'e1', source_node_id: 'a', target_node_id: 'b' },
+      ]
+      const resultAB = routeAllEdges(edgesAB, nodes, nodeMap)
+      const routedAB = resultAB.get('e1')!
+
+      clearPortCache()
+
+      // Route B->A
+      const edgesBA: EdgeDef[] = [
+        { id: 'e2', source_node_id: 'b', target_node_id: 'a' },
+      ]
+      const resultBA = routeAllEdges(edgesBA, nodes, nodeMap)
+      const routedBA = resultBA.get('e2')!
+
+      // Both should have arrow offset applied (not 0)
+      const endpointAB = routedAB.path[routedAB.path.length - 1]
+      const endpointBA = routedBA.path[routedBA.path.length - 1]
+
+      // A->B: target is B, entering from left, offset should move x left
+      // B's left edge is at 400, so endpoint should be at 400 - ARROW_OFFSET
+      expect(endpointAB.x).toBe(400 - ARROW_OFFSET)
+
+      // B->A: target is A, entering from right, offset should move x right
+      // A's right edge is at 200, so endpoint should be at 200 + ARROW_OFFSET
+      expect(endpointBA.x).toBe(200 + ARROW_OFFSET)
     })
   })
 })
