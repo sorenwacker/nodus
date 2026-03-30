@@ -50,7 +50,7 @@ const shortcuts = computed(() => [
 ])
 
 const filteredShortcuts = computed(() => {
-  if (!searchQuery.value.trim()) return shortcuts
+  if (!searchQuery.value.trim()) return shortcuts.value
   const q = searchQuery.value.toLowerCase()
   return shortcuts.value.filter(s =>
     s.key.toLowerCase().includes(q) ||
@@ -60,7 +60,7 @@ const filteredShortcuts = computed(() => {
 })
 
 const groupedShortcuts = computed(() => {
-  const groups: Record<string, typeof shortcuts> = {}
+  const groups: Record<string, Array<{ category: string; key: string; desc: string }>> = {}
   for (const s of filteredShortcuts.value) {
     if (!groups[s.category]) groups[s.category] = []
     groups[s.category].push(s)

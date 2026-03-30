@@ -8,7 +8,7 @@ import type { Node, Edge } from '../types'
 import { openExternal } from '../lib/tauri'
 import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
-import { llmStorage, memoryStorage, canvasStorage } from '../lib/storage'
+import { llmStorage, memoryStorage } from '../lib/storage'
 import {
   useMinimap,
   useViewState,
@@ -676,11 +676,8 @@ let lastDragEndTime = 0
 const gridLockEnabled = ref(false)
 const gridSize = 20 // Snap to 20px grid
 
-// Highlight all edges toggle (persisted per workspace)
-const highlightAllEdges = ref(canvasStorage.getHighlightAllEdges(store.currentWorkspaceId ?? undefined))
-watch(highlightAllEdges, (val) => {
-  canvasStorage.setHighlightAllEdges(val, store.currentWorkspaceId ?? undefined)
-})
+// Highlight all edges toggle
+const highlightAllEdges = ref(false)
 
 function snapToGrid(value: number): number {
   if (!gridLockEnabled.value) return value
