@@ -39,10 +39,11 @@ export interface UseEdgeVisibilityReturn {
 }
 
 // Threshold for "edges on hover only" mode (based on visible edges, not total)
-const EDGE_HOVER_ONLY_THRESHOLD = 500
+// In bubble/LOD mode, we can handle more edges since rendering is simpler
+const EDGE_HOVER_ONLY_THRESHOLD = 1500
 
 // Threshold for filtering edges by viewport visibility
-const EDGE_VIEWPORT_FILTER_THRESHOLD = 200
+const EDGE_VIEWPORT_FILTER_THRESHOLD = 500
 
 export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibilityReturn {
   const {

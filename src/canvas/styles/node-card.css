@@ -127,7 +127,7 @@
   /* Override paint containment so color bar below is visible */
   contain: layout style;
   overflow: visible;
-  z-index: 20;
+  z-index: 200;
   /* Highlight background for multi-select visibility */
   background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-surface));
 }

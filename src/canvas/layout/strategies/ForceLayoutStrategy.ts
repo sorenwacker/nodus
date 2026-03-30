@@ -42,7 +42,7 @@ export const ForceLayoutStrategy: LayoutStrategy = {
     const positions = await applyForceLayout(nodes, edges, {
       centerX: options.centerX,
       centerY: options.centerY,
-      chargeStrength: options.chargeStrength ?? -300,
+      chargeStrength: options.chargeStrength ?? -8000,
       linkDistance: options.linkDistance ?? 150,
       iterations: options.iterations ?? defaultIterations,
       gravityStrength: options.gravityStrength ?? 0.6,

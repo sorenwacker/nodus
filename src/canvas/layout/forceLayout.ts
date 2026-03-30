@@ -67,10 +67,10 @@ export async function applyForceLayout(
   const {
     centerX = 0,
     centerY = 0,
-    chargeStrength = -3000,
-    linkDistance = 250,
+    chargeStrength = -8000,
+    linkDistance = 350,
     iterations = 300,
-    gravityStrength = 0.4,
+    gravityStrength = 0.15,
     onTick,
   } = options
 
@@ -144,13 +144,13 @@ export async function applyForceLayout(
       .strength(1.0))
     .force('charge', forceManyBody<SimNode>()
       .strength(d => {
-        // Disconnected nodes: no repulsion (only collision prevents overlap)
-        // This keeps them in the cluster instead of being pushed out
-        if (disconnectedIds.has(d.id)) return 0
+        // Disconnected nodes: weaker repulsion to keep them in cluster
+        // but still push apart to avoid overlap
+        if (disconnectedIds.has(d.id)) return chargeStrength * 0.3
         return chargeStrength
       })
       .distanceMin(10)
-      .distanceMax(800)
+      .distanceMax(2000)
       .theta(simNodes.length > 200 ? 0.9 : 0.7))
     // Gravity to keep nodes clustered - stronger for disconnected nodes
     .force('gravityX', forceX<SimNode>(centerX).strength(d =>
@@ -160,12 +160,12 @@ export async function applyForceLayout(
     .force('collide', forceCollide<SimNode>()
       .radius(d => {
         // Use actual node diagonal / 2 as collision radius
-        // Larger gap (30px) for more spacing between nodes
+        // Large gap (80px) for generous spacing between nodes
         const diagonal = Math.sqrt(d.width ** 2 + d.height ** 2)
-        return diagonal / 2 + 30
+        return diagonal / 2 + 80
       })
-      .strength(0.9)
-      .iterations(3))
+      .strength(1.0)
+      .iterations(5))
 
   // Run simulation
   if (onTick) {

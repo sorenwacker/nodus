@@ -22,8 +22,8 @@
   --shadow-lg: rgba(0, 0, 0, 0.18);
   /* Selection and neighbor highlight */
   --selection-glow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
-  --neighbor-highlight: rgba(59, 130, 246, 0.6);
-  --neighbor-glow: rgba(59, 130, 246, 0.4);
+  --neighbor-highlight: rgba(59, 130, 246, 0.9);
+  --neighbor-glow: rgba(59, 130, 246, 0.6);
   /* Refined radius and spacing */
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -55,8 +55,8 @@
   --shadow-md: rgba(0, 0, 0, 0.3);
   --shadow-lg: rgba(0, 0, 0, 0.4);
   --selection-glow: 0 0 0 3px rgba(96, 165, 250, 0.4), 0 0 20px rgba(96, 165, 250, 0.2);
-  --neighbor-highlight: rgba(96, 165, 250, 0.7);
-  --neighbor-glow: rgba(96, 165, 250, 0.5);
+  --neighbor-highlight: rgba(96, 165, 250, 0.95);
+  --neighbor-glow: rgba(96, 165, 250, 0.7);
 }
 
 /* Pitch Black - OLED optimized */
@@ -77,8 +77,8 @@
   --shadow-sm: rgba(255, 255, 255, 0.03);
   --shadow-md: rgba(255, 255, 255, 0.05);
   --selection-glow: 0 0 0 3px rgba(96, 165, 250, 0.5), 0 0 25px rgba(96, 165, 250, 0.3);
-  --neighbor-highlight: rgba(96, 165, 250, 0.7);
-  --neighbor-glow: rgba(96, 165, 250, 0.5);
+  --neighbor-highlight: rgba(96, 165, 250, 0.95);
+  --neighbor-glow: rgba(96, 165, 250, 0.7);
 }
 
 /* Cyber - Hologram/Laser/Steampunk fusion */
@@ -126,9 +126,12 @@
 
 /* Neighbor highlighting - uses theme variables */
 .node-card.neighbor-highlighted:not(.selected) {
-  z-index: 15;
+  z-index: 100;
   border-color: var(--neighbor-highlight);
-  box-shadow: 0 0 8px var(--neighbor-glow), 0 0 16px var(--neighbor-glow);
+  border-width: 2px;
+  box-shadow: 0 0 12px var(--neighbor-glow), 0 0 24px var(--neighbor-glow), 0 0 36px var(--neighbor-glow);
+  transform: scale(1.02);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
 [data-theme='cyber'] .edge-line-visible,

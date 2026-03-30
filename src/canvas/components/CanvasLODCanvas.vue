@@ -13,6 +13,7 @@ const props = defineProps<{
   offsetX: number
   offsetY: number
   selectedNodeIds: string[]
+  highlightedNodeIds: Set<string>
   draggingNodeId: string | null
   hoveredNodeId: string | null
   getLODRadius: (nodeId: string) => number
@@ -63,34 +64,74 @@ function render() {
   ctx.translate(props.offsetX, props.offsetY)
   ctx.scale(props.scale, props.scale)
 
-  // Draw circles
+  // Separate nodes into layers for proper z-ordering
+  const regularNodes: Node[] = []
+  const highlightedNodes: Node[] = []
+  const selectedNodes: Node[] = []
+
   for (const node of props.nodes) {
+    const isSelected = selectedSet.value.has(node.id)
+    const isHighlighted = props.highlightedNodeIds.has(node.id)
+    const isHovered = props.hoveredNodeId === node.id
+
+    if (isSelected || isHovered) {
+      selectedNodes.push(node)
+    } else if (isHighlighted) {
+      highlightedNodes.push(node)
+    } else {
+      regularNodes.push(node)
+    }
+  }
+
+  // Draw in layers: regular -> highlighted -> selected (on top)
+  const drawNode = (node: Node) => {
     const r = props.getLODRadius(node.id)
     const cx = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2
     const cy = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2
     const isSelected = selectedSet.value.has(node.id)
     const isDragging = props.draggingNodeId === node.id
     const isHovered = props.hoveredNodeId === node.id
+    const isHighlighted = props.highlightedNodeIds.has(node.id)
+
+    // Highlight ring for neighbors
+    if (isHighlighted && !isSelected) {
+      ctx!.beginPath()
+      ctx!.arc(cx, cy, r + 8, 0, Math.PI * 2)
+      ctx!.fillStyle = 'rgba(59, 130, 246, 0.3)'
+      ctx!.fill()
+      ctx!.beginPath()
+      ctx!.arc(cx, cy, r + 5, 0, Math.PI * 2)
+      ctx!.fillStyle = 'rgba(59, 130, 246, 0.5)'
+      ctx!.fill()
+    }
 
     // Selection or hover ring
     if (isSelected || isHovered) {
-      ctx.beginPath()
-      ctx.arc(cx, cy, r + 4, 0, Math.PI * 2)
-      ctx.fillStyle = isSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.2)'
-      ctx.fill()
+      ctx!.beginPath()
+      ctx!.arc(cx, cy, r + 6, 0, Math.PI * 2)
+      ctx!.fillStyle = isSelected ? 'rgba(59, 130, 246, 0.5)' : 'rgba(59, 130, 246, 0.3)'
+      ctx!.fill()
     }
 
-    // Main circle
-    ctx.beginPath()
-    ctx.arc(cx, cy, isDragging ? r * 1.1 : r, 0, Math.PI * 2)
-    ctx.fillStyle = node.color_theme || '#3b82f6'
-    ctx.fill()
+    // Main circle - slightly larger for highlighted/selected
+    const radiusMultiplier = isDragging ? 1.15 : (isSelected || isHighlighted) ? 1.08 : 1
+    ctx!.beginPath()
+    ctx!.arc(cx, cy, r * radiusMultiplier, 0, Math.PI * 2)
+    ctx!.fillStyle = node.color_theme || '#3b82f6'
+    ctx!.fill()
 
     // Border
-    ctx.strokeStyle = isSelected ? '#3b82f6' : isHovered ? '#60a5fa' : 'rgba(255, 255, 255, 0.3)'
-    ctx.lineWidth = (isSelected || isHovered) ? 3 / props.scale : 2 / props.scale
-    ctx.stroke()
+    const borderColor = isSelected ? '#3b82f6' : isHovered ? '#60a5fa' : isHighlighted ? '#60a5fa' : 'rgba(255, 255, 255, 0.3)'
+    const borderWidth = (isSelected || isHovered || isHighlighted) ? 3 / props.scale : 2 / props.scale
+    ctx!.strokeStyle = borderColor
+    ctx!.lineWidth = borderWidth
+    ctx!.stroke()
   }
+
+  // Draw layers in order
+  for (const node of regularNodes) drawNode(node)
+  for (const node of highlightedNodes) drawNode(node)
+  for (const node of selectedNodes) drawNode(node)
 
   ctx.restore()
 }

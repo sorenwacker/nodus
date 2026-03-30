@@ -1927,6 +1927,7 @@ useCanvasKeyboardShortcuts({
         :offset-x="offsetX"
         :offset-y="offsetY"
         :selected-node-ids="store.selectedNodeIds"
+        :highlighted-node-ids="highlightedNodeIds"
         :dragging-node-id="draggingNode"
         :hovered-node-id="hoveredNodeId"
         :get-l-o-d-radius="getLODRadius"
@@ -2121,7 +2122,7 @@ useCanvasKeyboardShortcuts({
       <CanvasStatusBar
         :visible-node-count="visibleNodes.length"
         :total-node-count="store.filteredNodes.length"
-        :visible-edge-count="edgeLines.length"
+        :visible-edge-count="visibleEdgeLines.length"
         :total-edge-count="store.filteredEdges.length"
         :is-layouting="isLayouting"
         :is-large-graph="isLargeGraph"
