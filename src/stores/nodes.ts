@@ -307,48 +307,26 @@ export const useNodesStore = defineStore('nodes', () => {
   // Check if node's file has changed and refresh content if needed
   async function refreshNodeFromFile(id: string): Promise<boolean> {
     const node = nodes.value.find(n => n.id === id)
-    if (!node) {
-      console.log('[refresh] Node not found:', id)
-      return false
-    }
-    if (!node.file_path) {
-      console.log('[refresh] No file_path for node:', node.title)
-      return false
-    }
+    if (!node || !node.file_path) return false
 
     try {
-      console.log('[refresh] Reading:', node.file_path)
       const content = await invoke<string>('read_file_content', { path: node.file_path })
-      console.log('[refresh] File read, length:', content.length, 'stored:', node.markdown_content?.length)
       if (content !== node.markdown_content) {
-        console.log('[refresh] Content changed, updating node')
         node.markdown_content = content
         node.updated_at = Date.now()
-        // Update in backend too
         const newChecksum = await invoke<string | null>('update_node_content', { id, content })
-        if (newChecksum) {
-          node.checksum = newChecksum
-        }
+        if (newChecksum) node.checksum = newChecksum
         return true
-      } else {
-        console.log('[refresh] Content unchanged')
       }
     } catch (e) {
       const errorMsg = String(e)
-      // If file doesn't exist, clear the file_path
       if (errorMsg.includes('No such file') || errorMsg.includes('not found')) {
-        console.warn('[refresh] File not found, clearing file_path:', node.file_path)
         node.file_path = null
         node.checksum = null
         node.updated_at = Date.now()
-        // Persist the change
-        try {
-          await invoke('update_node_file_path', { id, filePath: '' })
-        } catch {
-          // Ignore - just log
-        }
+        try { await invoke('update_node_file_path', { id, filePath: '' }) } catch { /* ignore */ }
       } else {
-        console.error('[refresh] Failed to read file:', e)
+        storeLogger.error('Failed to read file:', e)
       }
     }
     return false
