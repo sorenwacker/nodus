@@ -108,12 +108,8 @@ const showDeleteButton = computed(() =>
       <img :src="thumbnailSrc" :alt="node.title" />
     </div>
 
-    <!-- Node title header (hidden when showing thumbnail or when no title and not editing) -->
-    <div
-      v-else-if="isEditingTitle || node.title"
-      class="node-header"
-      @dblclick.stop="emit('start-editing-title')"
-    >
+    <!-- Node title header (hidden when showing thumbnail) -->
+    <div v-else class="node-header" @dblclick.stop="emit('start-editing-title')">
       <input
         v-if="isEditingTitle"
         :value="editTitle"
@@ -126,7 +122,7 @@ const showDeleteButton = computed(() =>
         @pointerdown.stop
         @pointerup.stop
       />
-      <span v-else>{{ node.title }}</span>
+      <span v-else>{{ node.title || t('canvas.node.untitled') }}</span>
     </div>
 
     <!-- In-node search bar (when editing and search is active) -->
