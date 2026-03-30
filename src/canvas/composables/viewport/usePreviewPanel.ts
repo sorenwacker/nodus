@@ -25,10 +25,13 @@ export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelRet
   const showPreviewPanel = ref(false)
 
   // Auto-show preview when single node selected while zoomed out
+  // Auto-hide when no nodes selected
   watch(
     [selectedNodeIds, isSemanticZoomCollapsed],
     ([ids, collapsed]) => {
-      if (collapsed && ids.length === 1) {
+      if (ids.length === 0) {
+        showPreviewPanel.value = false
+      } else if (collapsed && ids.length === 1) {
         showPreviewPanel.value = true
       }
     },
