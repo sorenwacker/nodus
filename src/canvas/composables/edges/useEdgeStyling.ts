@@ -58,28 +58,28 @@ export interface UseEdgeStylingReturn {
   changeEdgeColor: (color: string) => void
 }
 
-// Color palettes - neon colors for dark themes (8 colors)
+// Color palettes - neon colors for dark themes (8 distinct colors)
 const cyberEdgeColors: EdgeColorOption[] = [
-  { value: '#00ffcc' }, // neon cyan (default)
-  { value: '#00ccff' }, // neon blue
-  { value: '#00ff66' }, // neon green
-  { value: '#ffff00' }, // neon yellow
-  { value: '#ff3366' }, // neon red
-  { value: '#9933ff' }, // neon purple
-  { value: '#ff00ff' }, // neon magenta
+  { value: '#00ffcc' }, // cyan (default)
+  { value: '#3b82f6' }, // blue (more distinct from cyan)
+  { value: '#22c55e' }, // green (emerald, distinct from cyan)
+  { value: '#eab308' }, // yellow (golden)
+  { value: '#ef4444' }, // red
+  { value: '#a855f7' }, // purple (violet)
+  { value: '#ec4899' }, // pink/magenta
   { value: '#94a3b8' }, // gray
 ]
 
 // Light mode edge colors - high contrast, professional tones (8 colors, matching order)
 const lightEdgeColors: EdgeColorOption[] = [
-  { value: '#0e7490' }, // cyan (default)
-  { value: '#0c4a6e' }, // blue
-  { value: '#047857' }, // green
-  { value: '#b45309' }, // amber (yellow equivalent)
-  { value: '#b91c1c' }, // red
-  { value: '#6d28d9' }, // purple
-  { value: '#be185d' }, // pink (magenta equivalent)
-  { value: '#475569' }, // gray
+  { value: '#0891b2' }, // cyan (darker, visible)
+  { value: '#1d4ed8' }, // blue (royal blue)
+  { value: '#15803d' }, // green (forest)
+  { value: '#a16207' }, // amber/gold (darker yellow)
+  { value: '#b91c1c' }, // red (crimson)
+  { value: '#7c3aed' }, // purple (violet)
+  { value: '#be185d' }, // pink/magenta
+  { value: '#475569' }, // gray (slate)
 ]
 
 // Node colors for the color picker (transparent tints layered over solid bg)
@@ -141,16 +141,23 @@ const LINK_TYPE_COLORS: Record<string, string> = {
   contradicts: '#f97316', // Orange - contradicting relationship
 }
 
-// Map neon colors (dark themes) to visible equivalents (light themes)
+// Map neon/bright colors (dark themes) to visible equivalents (light themes)
 const NEON_TO_LIGHT_COLORS: Record<string, string> = {
-  '#00ffcc': '#0e7490', // neon cyan -> dark cyan
-  '#ff00ff': '#be185d', // neon magenta -> pink
-  '#00ccff': '#0c4a6e', // neon blue -> dark blue
-  '#ffff00': '#b45309', // neon yellow -> amber
-  '#ff3366': '#b91c1c', // neon red -> dark red
-  '#9933ff': '#6d28d9', // neon purple -> dark purple
-  '#00ff66': '#047857', // neon green -> dark green
-  '#ffaa00': '#b45309', // neon orange -> amber
+  '#00ffcc': '#0891b2', // cyan -> darker cyan
+  '#3b82f6': '#1d4ed8', // blue -> royal blue
+  '#22c55e': '#15803d', // green -> forest green
+  '#eab308': '#a16207', // yellow -> amber
+  '#ef4444': '#b91c1c', // red -> crimson
+  '#a855f7': '#7c3aed', // purple -> violet
+  '#ec4899': '#be185d', // pink -> dark pink
+  // Legacy mappings for old neon colors
+  '#ff00ff': '#be185d', // magenta -> pink
+  '#00ccff': '#1d4ed8', // old blue -> royal blue
+  '#ffff00': '#a16207', // bright yellow -> amber
+  '#ff3366': '#b91c1c', // old red -> crimson
+  '#9933ff': '#7c3aed', // old purple -> violet
+  '#00ff66': '#15803d', // old green -> forest green
+  '#ffaa00': '#a16207', // orange -> amber
 }
 
 export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn {
