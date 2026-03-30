@@ -284,11 +284,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     // Create a key to detect when routing needs recalculation
     const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}`
 
-    // 'direct' style is cheap - always recalculate for live updates during drag
-    const alwaysRecalculate = effectiveStyle === 'direct'
-
-    if (alwaysRecalculate || (!isDeferringRouting() && routingKey !== lastRoutingKey.value)) {
-      // Recalculate routing (always for 'direct', or when not dragging and cache stale)
+    // Always recalculate routing for live updates during drag
+    if (routingKey !== lastRoutingKey.value || isDeferringRouting()) {
       const spatialIndex = new SpatialIndex()
       spatialIndex.build(nodeMap)
       setRoutingSpatialIndex(spatialIndex)
@@ -296,13 +293,13 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       try {
         routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
         cachedRoutedEdges.value = routedEdges
-        lastRoutingKey.value = routingKey
+        if (!isDeferringRouting()) {
+          lastRoutingKey.value = routingKey
+        }
       } finally {
         setRoutingSpatialIndex(null)
       }
     } else {
-      // During drag OR cache is valid - use cached routing
-      // This keeps edges stable during drag instead of falling back to simple lines
       routedEdges = cachedRoutedEdges.value
     }
 
