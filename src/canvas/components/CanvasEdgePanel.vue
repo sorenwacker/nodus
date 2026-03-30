@@ -9,9 +9,7 @@ const props = defineProps<{
   selectedEdge: string | null
   edges: Edge[]
   edgeColorPalette: Array<{ value: string; label: string }>
-  edgeStyles: Array<{ value: string; label: string }>
   getEdgeColor: (edge: { link_type: string | null }) => string
-  getEdgeStyle: (edgeId: string) => string
   isEdgeDirected: (edgeId: string) => boolean
 }>()
 
@@ -19,7 +17,6 @@ defineEmits<{
   (e: 'close'): void
   (e: 'change-label', value: string): void
   (e: 'change-color', value: string): void
-  (e: 'set-style', value: string): void
   (e: 'reverse'): void
   (e: 'make-non-directional'): void
   (e: 'make-directional'): void
@@ -37,11 +34,6 @@ const currentLabel = computed(() => selectedEdgeData.value?.label || '')
 const currentColor = computed(() => {
   if (!selectedEdgeData.value) return ''
   return props.getEdgeColor({ link_type: selectedEdgeData.value.link_type })
-})
-
-const currentStyle = computed(() => {
-  if (!props.selectedEdge) return ''
-  return props.getEdgeStyle(props.selectedEdge)
 })
 
 const isDirected = computed(() => {
@@ -75,16 +67,6 @@ const isDirected = computed(() => {
           :style="{ background: color.value }"
           @click.stop="$emit('change-color', color.value)"
         ></button>
-      </div>
-      <label>{{ t('canvas.edge.style') }}</label>
-      <div class="edge-style-picker">
-        <button
-          v-for="style in edgeStyles"
-          :key="style.value"
-          class="edge-style-btn"
-          :class="{ active: currentStyle === style.value }"
-          @click.stop="$emit('set-style', style.value)"
-        >{{ style.label }}</button>
       </div>
       <label>{{ t('canvas.edge.direction') }}</label>
       <div class="direction-btns">

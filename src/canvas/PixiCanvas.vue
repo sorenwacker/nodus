@@ -1530,7 +1530,6 @@ const edgeStyling = useEdgeStyling({
   workspaceId: computed(() => store.currentWorkspaceId),
 })
 const {
-  edgeStyles,
   edgeStyleMap,
   globalEdgeStyle,
   edgeStrokeWidth,
@@ -1541,8 +1540,6 @@ const {
   nodeColors,
   allMarkerColors,
   cycleEdgeStyle,
-  getEdgeStyle,
-  setEdgeStyle,
   getEdgeColor,
   getEdgeHighlightColor,
   getArrowMarkerId,
@@ -2074,14 +2071,11 @@ useCanvasKeyboardShortcuts({
         :selected-edge="selectedEdge"
         :edges="store.filteredEdges"
         :edge-color-palette="edgeColorPalette"
-        :edge-styles="edgeStyles"
         :get-edge-color="getEdgeColor"
-        :get-edge-style="getEdgeStyle"
         :is-edge-directed="isEdgeDirected"
         @close="selectedEdge = null"
         @change-label="changeEdgeLabel"
         @change-color="changeEdgeColor"
-        @set-style="setEdgeStyle"
         @reverse="reverseEdge"
         @make-non-directional="makeNonDirectional"
         @make-directional="makeDirectional"
