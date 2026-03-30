@@ -410,7 +410,8 @@
       "diagonal": "Diagonal",
       "curved": "Curvo",
       "hyperbolic": "Hiperbólico",
-      "straight": "Recto"
+      "straight": "Gerade",
+      "direct": "Direkt"
     },
     "showTagNodes": "Mostrar etiquetas como nodos",
     "showTagNodesHint": "Mostrar #hashtags como nodos de etiqueta conectados en el lienzo",

@@ -410,7 +410,8 @@
       "diagonal": "Diagonal",
       "curved": "Gebogen",
       "hyperbolic": "Hyperbolisch",
-      "straight": "Gerade"
+      "straight": "Gerade",
+      "direct": "Direkt"
     },
     "showTagNodes": "Tags als Knoten anzeigen",
     "showTagNodesHint": "#Hashtags als verbundene Tag-Knoten auf der Leinwand anzeigen",

@@ -284,8 +284,11 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     // Create a key to detect when routing needs recalculation
     const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}`
 
-    if (!isDeferringRouting() && routingKey !== lastRoutingKey.value) {
-      // Not dragging/zooming and cache is stale - recalculate routing
+    // 'direct' style is cheap - always recalculate for live updates during drag
+    const alwaysRecalculate = effectiveStyle === 'direct'
+
+    if (alwaysRecalculate || (!isDeferringRouting() && routingKey !== lastRoutingKey.value)) {
+      // Recalculate routing (always for 'direct', or when not dragging and cache stale)
       const spatialIndex = new SpatialIndex()
       spatialIndex.build(nodeMap)
       setRoutingSpatialIndex(spatialIndex)

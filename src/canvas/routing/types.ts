@@ -45,7 +45,7 @@ export interface PortAssignment {
   total: number
 }
 
-export type EdgeStyle = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'sinusoidal' | 'straight'
+export type EdgeStyle = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'sinusoidal' | 'straight' | 'direct'
 
 export interface EdgeRouteParams {
   startPort: Point

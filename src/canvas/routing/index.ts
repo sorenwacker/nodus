@@ -283,7 +283,20 @@ export function routeAllEdges(
 
     let routeResult: { path: Point[]; svgPath: string }
 
-    if (style === 'straight') {
+    if (style === 'direct') {
+      // True straight line: center-to-center, no ports, no obstacle avoidance
+      const sw = source.width || 200
+      const sh = source.height || 120
+      const tw = target.width || 200
+      const th = target.height || 120
+
+      const srcCenter = { x: source.canvas_x + sw / 2, y: source.canvas_y + sh / 2 }
+      const tgtCenter = { x: target.canvas_x + tw / 2, y: target.canvas_y + th / 2 }
+
+      const path = [srcCenter, tgtCenter]
+      const svgPath = `M ${srcCenter.x} ${srcCenter.y} L ${tgtCenter.x} ${tgtCenter.y}`
+      routeResult = { path, svgPath }
+    } else if (style === 'straight') {
       // Direct line from port to port with obstacle avoidance
       const obstacles = findObstaclesOnLine(sourcePort, targetPort, nodes, excludeIds)
 

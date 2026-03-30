@@ -14,7 +14,7 @@ defineProps<{
   /** Whether graph is large (disables some features) */
   isLargeGraph: boolean
   /** Current global edge style */
-  globalEdgeStyle: 'straight' | 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic'
+  globalEdgeStyle: 'straight' | 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'direct'
   /** Whether magnifier is enabled */
   magnifierEnabled: boolean
   /** Whether neighborhood mode is active */
@@ -186,8 +186,21 @@ const emit = defineEmits<{
       >
         <path d="M4 20 C8 20 8 4 12 12 C16 20 16 4 20 4" />
       </svg>
+      <svg
+        v-else-if="globalEdgeStyle === 'direct'"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <!-- Simple straight line for 'direct' -->
+        <line x1="4" y1="20" x2="20" y2="4" />
+      </svg>
       <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 20 L20 4" />
+        <!-- 'straight' with slight kink to show obstacle avoidance -->
+        <path d="M4 20 L12 11 L20 4" />
       </svg>
     </button>
     <button

@@ -410,7 +410,8 @@
       "diagonal": "Diagonale",
       "curved": "Curvo",
       "hyperbolic": "Iperbolico",
-      "straight": "Dritto"
+      "straight": "Gerade",
+      "direct": "Direkt"
     },
     "showTagNodes": "Mostra tag come nodi",
     "showTagNodesHint": "Mostra #hashtag come nodi tag connessi sulla tela",

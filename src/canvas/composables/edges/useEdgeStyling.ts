@@ -7,7 +7,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { canvasStorage } from '../../../lib/storage'
 
-export type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'
+export type EdgeStyleType = 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' | 'direct'
 
 export interface EdgeStyleOption {
   value: EdgeStyleType
@@ -154,7 +154,8 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     { value: 'diagonal', label: '\u2220' },   // ∠
     { value: 'curved', label: '\u223F' },     // ∿
     { value: 'hyperbolic', label: '\u223C' }, // ∼
-    { value: 'straight', label: '/' },
+    { value: 'straight', label: '\u2215' },   // ∕ (with obstacle avoidance)
+    { value: 'direct', label: '\u2014' },     // — (true center-to-center)
   ]
 
   // Store edge styles (edgeId -> style)
@@ -251,7 +252,7 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
   })
 
   function cycleEdgeStyle() {
-    const styles: EdgeStyleType[] = ['orthogonal', 'diagonal', 'curved', 'hyperbolic', 'straight']
+    const styles: EdgeStyleType[] = ['orthogonal', 'diagonal', 'curved', 'hyperbolic', 'straight', 'direct']
     const idx = styles.indexOf(globalEdgeStyle.value)
     globalEdgeStyle.value = styles[(idx + 1) % styles.length]
     canvasStorage.setEdgeStyle(globalEdgeStyle.value, workspaceId.value || undefined)

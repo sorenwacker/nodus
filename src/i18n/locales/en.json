@@ -468,7 +468,8 @@
       "diagonal": "Diagonal",
       "curved": "Curved",
       "hyperbolic": "Hyperbolic",
-      "straight": "Straight"
+      "straight": "Straight",
+      "direct": "Direct"
     },
     "showTagNodes": "Show Tags as Nodes",
     "showTagNodesHint": "Display #hashtags as connected tag nodes on canvas",

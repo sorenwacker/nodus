@@ -410,7 +410,8 @@
       "diagonal": "Diagonal",
       "curved": "Courbe",
       "hyperbolic": "Hyperbolique",
-      "straight": "Droit"
+      "straight": "Gerade",
+      "direct": "Direkt"
     },
     "showTagNodes": "Afficher les tags comme nœuds",
     "showTagNodesHint": "Afficher les #hashtags comme nœuds de tag connectés sur le canevas",
