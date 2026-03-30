@@ -166,11 +166,30 @@ export function useNodeAgent() {
   function buildSystemPrompt(ctx: NodeAgentContext): string {
     let connectedContext = ''
     if (ctx.connectedNodes.length > 0) {
-      connectedContext = '\n\n<connected_notes>\n' +
-        ctx.connectedNodes.slice(0, 10).map(n =>
-          `<note title="${escapeForPrompt(n.title)}">${escapeForPrompt(n.content.slice(0, 500))}${n.content.length > 500 ? '...' : ''}</note>`
-        ).join('\n') +
-        '\n</connected_notes>'
+      // Use context limit setting, include as many nodes as fit
+      const maxChars = llmStorage.getChainContextLimit()
+      const notes: string[] = []
+      let totalChars = 0
+
+      for (const n of ctx.connectedNodes) {
+        const noteText = `<note title="${escapeForPrompt(n.title)}">${escapeForPrompt(n.content)}</note>`
+        if (totalChars + noteText.length > maxChars) {
+          // Try truncated version
+          const remaining = maxChars - totalChars - 100
+          if (remaining > 200) {
+            notes.push(`<note title="${escapeForPrompt(n.title)}">${escapeForPrompt(n.content.slice(0, remaining))}...</note>`)
+          }
+          break
+        }
+        notes.push(noteText)
+        totalChars += noteText.length
+      }
+
+      if (notes.length > 0) {
+        connectedContext = `\n\n<connected_notes count="${notes.length}" total="${ctx.connectedNodes.length}">\n` +
+          notes.join('\n') +
+          '\n</connected_notes>'
+      }
     }
 
     return `You are a note editor agent working on <current_note_title>${escapeForPrompt(ctx.nodeTitle)}</current_note_title>.
