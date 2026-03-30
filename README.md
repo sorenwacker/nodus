@@ -62,6 +62,12 @@ npm run tauri:dev
 | Database | LibSQL (SQLite) |
 | Math | Typst WASM |
 
+## Disclaimer
+
+This software is provided "as-is" without warranty of any kind. The author is not liable for any data loss, corruption, API costs (including LLM provider charges), or other damages arising from the use of this software. Use at your own risk.
+
 ## License
 
-All rights reserved. License to be determined.
+Copyright (c) 2024 Soren Wacker. All rights reserved.
+
+You may download, install, and use this software for personal and commercial purposes. Redistribution of the source code is not permitted without explicit permission.
