@@ -25,9 +25,11 @@ Local-first knowledge graph with EU sovereignty. A canvas-based visual thinking 
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md)
-- [Features](docs/features.md)
-- [Typst Math Reference](docs/typst-math-reference.md)
+**[Read the docs](https://sorenwacker.github.io/nodus/)**
+
+- [Getting Started](https://sorenwacker.github.io/nodus/getting-started)
+- [Features](https://sorenwacker.github.io/nodus/features)
+- [Typst Math Reference](https://sorenwacker.github.io/nodus/typst-math-reference)
 
 ## Development
 
