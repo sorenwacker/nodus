@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://sorenwacker.github.io/nodus/</loc>
+         <lastmod>2026-03-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sorenwacker.github.io/nodus/PRODUCT_DESIGN/</loc>
+         <lastmod>2026-03-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sorenwacker.github.io/nodus/development/</loc>
+         <lastmod>2026-03-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sorenwacker.github.io/nodus/features/</loc>
+         <lastmod>2026-03-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sorenwacker.github.io/nodus/getting-started/</loc>
+         <lastmod>2026-03-30</lastmod>
+    </url>
+    <url>
+         <loc>https://sorenwacker.github.io/nodus/typst-math-reference/</loc>
+         <lastmod>2026-03-30</lastmod>
+    </url>
+</urlset>
