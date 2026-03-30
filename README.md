@@ -1,24 +1,34 @@
 # Nodus
 
+[![Release](https://img.shields.io/github/v/release/sorenwacker/nodus?style=flat-square)](https://github.com/sorenwacker/nodus/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/sorenwacker/nodus/ci.yml?branch=main&style=flat-square)](https://github.com/sorenwacker/nodus/actions)
+[![License](https://img.shields.io/github/license/sorenwacker/nodus?style=flat-square)](LICENSE)
+
 Local-first knowledge graph with EU sovereignty. A canvas-based visual thinking tool where research nodes, Typst math, and Obsidian vaults live on a single workspace.
+
+## Download
+
+| Platform | Download |
+|----------|----------|
+| macOS | [Universal DMG](https://github.com/sorenwacker/nodus/releases/latest) |
+| Windows | [Installer (exe)](https://github.com/sorenwacker/nodus/releases/latest) |
+| Linux | [AppImage](https://github.com/sorenwacker/nodus/releases/latest) / [deb](https://github.com/sorenwacker/nodus/releases/latest) |
 
 ## Features
 
-- **Single Canvas**: The document and whiteboard are the same thing
-- **Native Typst**: Sub-second math rendering (no LaTeX compile times)
-- **Obsidian Bridge**: Seamless vault compatibility with bi-directional sync
-- **Local-First**: Your data stays on your device
-- **Graph Visualization**: Force-directed layouts, edge routing, and semantic zooming
-- **Citation Management**: Zotero integration and BibTeX import
-- **LLM Integration**: Connect local or cloud LLMs for research assistance
+- **Single Canvas** - The document and whiteboard are the same thing
+- **Native Typst** - Sub-second math rendering (no LaTeX compile times)
+- **Obsidian Bridge** - Seamless vault compatibility with bi-directional sync
+- **Local-First** - Your data stays on your device
+- **Graph Visualization** - Force-directed layouts, edge routing, semantic zooming
+- **Citation Management** - Zotero integration and BibTeX import
+- **LLM Integration** - Connect local or cloud LLMs for research assistance
 
-## Installation
+## Documentation
 
-Download the latest release for your platform:
-
-- **macOS**: `.dmg` (Universal - Intel + Apple Silicon)
-- **Windows**: `.msi` or `.exe` installer
-- **Linux**: `.AppImage` or `.deb`
+- [Getting Started](docs/getting-started.md)
+- [Features](docs/features.md)
+- [Typst Math Reference](docs/typst-math-reference.md)
 
 ## Development
 
@@ -26,42 +36,22 @@ Download the latest release for your platform:
 
 - Node.js 20+
 - Rust (latest stable)
-- [Tauri CLI](https://tauri.app/start/prerequisites/)
+- [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
-### Setup
+### Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run tauri:dev
-
-# Run tests
-npm test
-
-# Build for production
-npm run tauri:build
 ```
 
-### Project Structure
+### Commands
 
-```
-nodus/
-├── src/                    # Vue frontend
-│   ├── canvas/             # Canvas rendering (PixiJS + DOM)
-│   ├── components/         # Vue components
-│   ├── composables/        # Vue composables
-│   ├── stores/             # Pinia state management
-│   ├── llm/                # LLM integration
-│   └── lib/                # Utility libraries
-├── src-tauri/              # Rust backend
-│   └── src/
-│       ├── database.rs     # SQLite operations
-│       ├── watcher.rs      # File system watcher
-│       └── commands.rs     # Tauri commands
-└── docs/                   # Documentation
-```
+| Command | Description |
+|---------|-------------|
+| `npm run tauri:dev` | Start development server |
+| `npm test` | Run tests |
+| `npm run tauri:build` | Build for production |
 
 ## Tech Stack
 
@@ -70,9 +60,8 @@ nodus/
 | Desktop | Tauri v2 |
 | Frontend | Vue 3 + TypeScript |
 | Canvas | PixiJS + DOM hybrid |
-| Database | LibSQL (SQLite fork) |
+| Database | LibSQL (SQLite) |
 | Math | Typst WASM |
-| Sync | Yjs CRDTs |
 
 ## License
 
