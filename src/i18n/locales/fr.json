@@ -383,8 +383,25 @@
       "general": "Général",
       "themes": "Thèmes",
       "canvas": "Canevas",
+      "display": "Affichage",
       "llm": "IA",
       "zotero": "Zotero"
+    },
+    "display": {
+      "fontScale": "Taille de police",
+      "fontScaleHint": "Ajuster la taille du texte sur le canevas (Cmd+/Cmd- fonctionne aussi)",
+      "thresholds": "Seuils de performance",
+      "lodThreshold": "Seuil du mode LOD",
+      "lodThresholdHint": "Afficher les noeuds comme des points quand plus de ce nombre sont visibles",
+      "semanticZoomThreshold": "Seuil de zoom sémantique",
+      "semanticZoomThresholdHint": "Réduire les noeuds au titre seul en dessous de ce niveau de zoom",
+      "edgeHoverThreshold": "Seuil de survol des arêtes",
+      "edgeHoverThresholdHint": "Afficher les arêtes uniquement au survol quand plus de ce nombre d'arêtes",
+      "magnifier": "Loupe",
+      "magnifierEnabled": "Activer la loupe en zoom arrière",
+      "magnifierZoomThreshold": "Zoom d'activation de la loupe",
+      "magnifierZoomThresholdHint": "Afficher la loupe quand le zoom est en dessous de ce niveau",
+      "resetDefaults": "Réinitialiser par défaut"
     },
     "zotero": {
       "library": "Bibliothèque Zotero",

@@ -11,6 +11,11 @@ const KEYS = {
   currentWorkspace: 'nodus-current-workspace',
   magnifier: 'nodus-magnifier',
   fontScale: 'nodus-font-scale',
+  // Display thresholds
+  lodThreshold: 'nodus-lod-threshold',
+  semanticZoomThreshold: 'nodus-semantic-zoom-threshold',
+  edgeHoverThreshold: 'nodus-edge-hover-threshold',
+  magnifierZoomThreshold: 'nodus-magnifier-zoom-threshold',
   promptHistory: 'nodus-prompt-history',
   llmPrompt: 'nodus_llm_prompt',
   llmAgentPrompt: 'nodus_llm_agent_prompt',
@@ -89,6 +94,47 @@ export const uiStorage = {
   },
   setFontScale(value: number): void {
     localStorage.setItem(KEYS.fontScale, String(value))
+  },
+}
+
+/**
+ * Display and performance thresholds storage
+ */
+export const displayStorage = {
+  // LOD (Level of Detail) mode threshold - show nodes as dots when this many visible
+  getLodThreshold(): number {
+    const val = localStorage.getItem(KEYS.lodThreshold)
+    return val ? parseInt(val, 10) : 500
+  },
+  setLodThreshold(value: number): void {
+    localStorage.setItem(KEYS.lodThreshold, String(value))
+  },
+
+  // Semantic zoom threshold - collapse nodes to title-only below this zoom level (0-1)
+  getSemanticZoomThreshold(): number {
+    const val = localStorage.getItem(KEYS.semanticZoomThreshold)
+    return val ? parseFloat(val) : 0.5
+  },
+  setSemanticZoomThreshold(value: number): void {
+    localStorage.setItem(KEYS.semanticZoomThreshold, String(value))
+  },
+
+  // Edge hover-only threshold - only show edges on hover when this many edges
+  getEdgeHoverThreshold(): number {
+    const val = localStorage.getItem(KEYS.edgeHoverThreshold)
+    return val ? parseInt(val, 10) : 1500
+  },
+  setEdgeHoverThreshold(value: number): void {
+    localStorage.setItem(KEYS.edgeHoverThreshold, String(value))
+  },
+
+  // Magnifier activation zoom threshold (0-1)
+  getMagnifierZoomThreshold(): number {
+    const val = localStorage.getItem(KEYS.magnifierZoomThreshold)
+    return val ? parseFloat(val) : 0.4
+  },
+  setMagnifierZoomThreshold(value: number): void {
+    localStorage.setItem(KEYS.magnifierZoomThreshold, String(value))
   },
 }
 

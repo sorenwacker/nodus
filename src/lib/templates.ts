@@ -814,33 +814,106 @@ export interface StarterEdgeConfig {
   sourceKey: keyof StarterTemplates
   targetKey: keyof StarterTemplates
   linkType: string  // related (gray), cites (blue), blocks (red), supports (green), contradicts (orange)
-  label: string
+  labelKey: string  // Key for localized label lookup
   directed: boolean  // true = arrow, false = no arrow
+}
+
+/**
+ * Edge label translations
+ */
+export type EdgeLabelKey = 'seeAlso' | 'diagrams' | 'references' | 'backedBy' | 'challenges' | 'disputes' | 'example'
+
+interface EdgeLabels {
+  seeAlso: string
+  diagrams: string
+  references: string
+  backedBy: string
+  challenges: string
+  disputes: string
+  example: string
+}
+
+const edgeLabels: Record<SupportedLocale, EdgeLabels> = {
+  en: {
+    seeAlso: 'see also',
+    diagrams: 'diagrams',
+    references: 'references',
+    backedBy: 'backed by',
+    challenges: 'challenges',
+    disputes: 'disputes',
+    example: 'example',
+  },
+  de: {
+    seeAlso: 'siehe auch',
+    diagrams: 'Diagramme',
+    references: 'Referenzen',
+    backedBy: 'gestützt durch',
+    challenges: 'widerspricht',
+    disputes: 'bestreitet',
+    example: 'Beispiel',
+  },
+  fr: {
+    seeAlso: 'voir aussi',
+    diagrams: 'diagrammes',
+    references: 'références',
+    backedBy: 'soutenu par',
+    challenges: 'contredit',
+    disputes: 'conteste',
+    example: 'exemple',
+  },
+  es: {
+    seeAlso: 'ver también',
+    diagrams: 'diagramas',
+    references: 'referencias',
+    backedBy: 'respaldado por',
+    challenges: 'contradice',
+    disputes: 'disputa',
+    example: 'ejemplo',
+  },
+  it: {
+    seeAlso: 'vedi anche',
+    diagrams: 'diagrammi',
+    references: 'riferimenti',
+    backedBy: 'supportato da',
+    challenges: 'contraddice',
+    disputes: 'contesta',
+    example: 'esempio',
+  },
+}
+
+/**
+ * Get localized edge label
+ */
+export function getEdgeLabel(labelKey: string, locale: string): string {
+  if (!labelKey) return ''
+  const supported = locale as SupportedLocale
+  const labels = edgeLabels[supported] || edgeLabels.en
+  return labels[labelKey as EdgeLabelKey] || ''
 }
 
 export function getStarterEdgeConfigs(): StarterEdgeConfig[] {
   return [
     // Tutorial connections (undirected - bidirectional relationships)
-    { sourceKey: 'gettingStarted', targetKey: 'importingFiles', linkType: 'related', label: 'see also', directed: false },
-    { sourceKey: 'gettingStarted', targetKey: 'mathReference', linkType: 'related', label: '', directed: false },
-    { sourceKey: 'gettingStarted', targetKey: 'mermaidDemo', linkType: 'related', label: 'diagrams', directed: false },
+    { sourceKey: 'gettingStarted', targetKey: 'importingFiles', linkType: 'related', labelKey: 'seeAlso', directed: false },
+    { sourceKey: 'gettingStarted', targetKey: 'mathReference', linkType: 'related', labelKey: '', directed: false },
+    { sourceKey: 'gettingStarted', targetKey: 'mermaidDemo', linkType: 'related', labelKey: 'diagrams', directed: false },
 
     // Directed edges showing information flow
-    { sourceKey: 'importingFiles', targetKey: 'mathReference', linkType: 'cites', label: 'references', directed: true },  // blue arrow
-    { sourceKey: 'mathReference', targetKey: 'mermaidDemo', linkType: 'cites', label: '', directed: true },  // blue arrow
+    { sourceKey: 'importingFiles', targetKey: 'mathReference', linkType: 'cites', labelKey: 'references', directed: true },  // blue arrow
+    { sourceKey: 'mathReference', targetKey: 'mermaidDemo', linkType: 'cites', labelKey: '', directed: true },  // blue arrow
 
     // Research example edges - demonstrating all link types
-    { sourceKey: 'researchIdea', targetKey: 'evidence', linkType: 'supports', label: 'backed by', directed: true },  // green arrow
-    { sourceKey: 'evidence', targetKey: 'researchIdea', linkType: 'supports', label: '', directed: true },  // green arrow back
+    { sourceKey: 'researchIdea', targetKey: 'evidence', linkType: 'supports', labelKey: 'backedBy', directed: true },  // green arrow
+    { sourceKey: 'evidence', targetKey: 'researchIdea', linkType: 'supports', labelKey: '', directed: true },  // green arrow back
 
-    { sourceKey: 'counterpoint', targetKey: 'researchIdea', linkType: 'contradicts', label: 'challenges', directed: true },  // orange arrow
-    { sourceKey: 'counterpoint', targetKey: 'evidence', linkType: 'blocks', label: 'disputes', directed: true },  // red arrow
+    { sourceKey: 'counterpoint', targetKey: 'researchIdea', linkType: 'contradicts', labelKey: 'challenges', directed: true },  // orange arrow
+    { sourceKey: 'counterpoint', targetKey: 'evidence', linkType: 'blocks', labelKey: 'disputes', directed: true },  // red arrow
 
     // Undirected association
-    { sourceKey: 'quickNote', targetKey: 'researchIdea', linkType: 'related', label: '', directed: false },  // gray, no arrow
+    { sourceKey: 'quickNote', targetKey: 'researchIdea', linkType: 'related', labelKey: '', directed: false },  // gray, no arrow
 
     // Cross-reference between tutorial and examples
-    { sourceKey: 'gettingStarted', targetKey: 'researchIdea', linkType: 'cites', label: 'example', directed: true },  // blue arrow
+    { sourceKey: 'gettingStarted', targetKey: 'researchIdea', linkType: 'cites', labelKey: 'example', directed: true },  // blue arrow
   ]
 }
 

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { invoke, getWorkspace } from '../lib/tauri'
 import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
-import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs } from '../lib/templates'
+import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs, getEdgeLabel } from '../lib/templates'
 import { canvasStorage } from '../lib/storage'
 import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
@@ -662,7 +662,7 @@ export const useNodesStore = defineStore('nodes', () => {
           source_node_id: source.id,
           target_node_id: target.id,
           link_type: config.linkType,
-          label: config.label,
+          label: getEdgeLabel(config.labelKey, locale),
           directed: config.directed,
         })
       }

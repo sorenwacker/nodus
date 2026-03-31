@@ -403,8 +403,25 @@
       "general": "General",
       "themes": "Themes",
       "canvas": "Canvas",
+      "display": "Display",
       "llm": "LLM",
       "zotero": "Zotero"
+    },
+    "display": {
+      "fontScale": "Font Scale",
+      "fontScaleHint": "Adjust text size across the canvas (Cmd+/Cmd- also works)",
+      "thresholds": "Performance Thresholds",
+      "lodThreshold": "LOD Mode Threshold",
+      "lodThresholdHint": "Show nodes as dots when more than this many are visible",
+      "semanticZoomThreshold": "Semantic Zoom Threshold",
+      "semanticZoomThresholdHint": "Collapse nodes to title-only below this zoom level",
+      "edgeHoverThreshold": "Edge Hover Threshold",
+      "edgeHoverThresholdHint": "Only show edges on hover when more than this many edges",
+      "magnifier": "Magnifier",
+      "magnifierEnabled": "Enable magnifier when zoomed out",
+      "magnifierZoomThreshold": "Magnifier Activation Zoom",
+      "magnifierZoomThresholdHint": "Show magnifier when zoom is below this level",
+      "resetDefaults": "Reset to Defaults"
     },
     "zotero": {
       "library": "Zotero Library",

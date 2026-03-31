@@ -383,8 +383,25 @@
       "general": "Generale",
       "themes": "Temi",
       "canvas": "Tela",
+      "display": "Visualizzazione",
       "llm": "IA",
       "zotero": "Zotero"
+    },
+    "display": {
+      "fontScale": "Dimensione carattere",
+      "fontScaleHint": "Regola la dimensione del testo sulla tela (Cmd+/Cmd- funziona anche)",
+      "thresholds": "Soglie di prestazione",
+      "lodThreshold": "Soglia modalità LOD",
+      "lodThresholdHint": "Mostra nodi come punti quando più di questo numero sono visibili",
+      "semanticZoomThreshold": "Soglia zoom semantico",
+      "semanticZoomThresholdHint": "Riduci nodi solo al titolo sotto questo livello di zoom",
+      "edgeHoverThreshold": "Soglia bordi al passaggio",
+      "edgeHoverThresholdHint": "Mostra bordi solo al passaggio quando più di questo numero di bordi",
+      "magnifier": "Lente",
+      "magnifierEnabled": "Attiva lente quando zoom ridotto",
+      "magnifierZoomThreshold": "Zoom attivazione lente",
+      "magnifierZoomThresholdHint": "Mostra lente quando lo zoom è sotto questo livello",
+      "resetDefaults": "Ripristina predefiniti"
     },
     "zotero": {
       "library": "Libreria Zotero",

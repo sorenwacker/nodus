@@ -12,6 +12,7 @@ import { setLocale, getLocale, loadLocale } from '../i18n'
 import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
 import CanvasSettingsPanel from './settings/CanvasSettingsPanel.vue'
 import ThemeSettingsPanel from './settings/ThemeSettingsPanel.vue'
+import DisplaySettingsPanel from './settings/DisplaySettingsPanel.vue'
 import WorkspaceDiagnosticsSection from './settings/WorkspaceDiagnosticsSection.vue'
 import ZoteroSettingsPanel from './settings/ZoteroSettingsPanel.vue'
 
@@ -23,7 +24,7 @@ const emit = defineEmits<{
 }>()
 
 // Active tab
-const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general' | 'zotero'>('general')
+const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general' | 'zotero' | 'display'>('general')
 
 // App version
 const appVersion = ref('')
@@ -90,6 +91,12 @@ function handleClose() {
           {{ t('settings.tabs.canvas') }}
         </button>
         <button
+          :class="{ active: activeTab === 'display' }"
+          @click="activeTab = 'display'"
+        >
+          {{ t('settings.tabs.display') }}
+        </button>
+        <button
           v-if="llmEnabled"
           :class="{ active: activeTab === 'llm' }"
           @click="activeTab = 'llm'"
@@ -110,6 +117,9 @@ function handleClose() {
 
         <!-- Canvas Settings -->
         <CanvasSettingsPanel v-if="activeTab === 'canvas'" />
+
+        <!-- Display Settings -->
+        <DisplaySettingsPanel v-if="activeTab === 'display'" />
 
         <!-- General Settings -->
         <div v-if="activeTab === 'general'" class="settings-section">

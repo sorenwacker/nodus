@@ -383,8 +383,25 @@
       "general": "Allgemein",
       "themes": "Designs",
       "canvas": "Leinwand",
+      "display": "Anzeige",
       "llm": "KI",
       "zotero": "Zotero"
+    },
+    "display": {
+      "fontScale": "Schriftgröße",
+      "fontScaleHint": "Textgröße auf der Leinwand anpassen (Cmd+/Cmd- funktioniert auch)",
+      "thresholds": "Leistungs-Schwellenwerte",
+      "lodThreshold": "LOD-Modus-Schwellenwert",
+      "lodThresholdHint": "Knoten als Punkte anzeigen, wenn mehr als diese Anzahl sichtbar ist",
+      "semanticZoomThreshold": "Semantischer Zoom-Schwellenwert",
+      "semanticZoomThresholdHint": "Knoten auf Titel reduzieren unter diesem Zoom-Level",
+      "edgeHoverThreshold": "Kanten-Hover-Schwellenwert",
+      "edgeHoverThresholdHint": "Kanten nur beim Hover anzeigen bei mehr als dieser Anzahl Kanten",
+      "magnifier": "Lupe",
+      "magnifierEnabled": "Lupe aktivieren wenn herausgezoomt",
+      "magnifierZoomThreshold": "Lupen-Aktivierungs-Zoom",
+      "magnifierZoomThresholdHint": "Lupe anzeigen wenn Zoom unter diesem Level",
+      "resetDefaults": "Standardwerte wiederherstellen"
     },
     "zotero": {
       "library": "Zotero-Bibliothek",

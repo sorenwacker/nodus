@@ -383,8 +383,25 @@
       "general": "General",
       "themes": "Temas",
       "canvas": "Lienzo",
+      "display": "Visualización",
       "llm": "IA",
       "zotero": "Zotero"
+    },
+    "display": {
+      "fontScale": "Tamaño de fuente",
+      "fontScaleHint": "Ajustar el tamaño del texto en el lienzo (Cmd+/Cmd- también funciona)",
+      "thresholds": "Umbrales de rendimiento",
+      "lodThreshold": "Umbral del modo LOD",
+      "lodThresholdHint": "Mostrar nodos como puntos cuando hay más de este número visibles",
+      "semanticZoomThreshold": "Umbral de zoom semántico",
+      "semanticZoomThresholdHint": "Reducir nodos solo al título por debajo de este nivel de zoom",
+      "edgeHoverThreshold": "Umbral de aristas al pasar",
+      "edgeHoverThresholdHint": "Mostrar aristas solo al pasar cuando hay más de este número de aristas",
+      "magnifier": "Lupa",
+      "magnifierEnabled": "Activar lupa cuando está alejado",
+      "magnifierZoomThreshold": "Zoom de activación de la lupa",
+      "magnifierZoomThresholdHint": "Mostrar lupa cuando el zoom está por debajo de este nivel",
+      "resetDefaults": "Restablecer valores predeterminados"
     },
     "zotero": {
       "library": "Biblioteca Zotero",
