@@ -481,7 +481,6 @@ const canvasZoom = useCanvasZoom({
   isZooming,
   startZooming,
   scheduleSaveViewState,
-  magnifierThreshold: 0.4, // MAGNIFIER_THRESHOLD
 })
 const {
   showMagnifier,

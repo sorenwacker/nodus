@@ -20,7 +20,7 @@ export interface UseCanvasDisplayReturn {
   magnifierEnabled: Ref<boolean>
   shouldShowMagnifier: ComputedRef<boolean>
   toggleMagnifier: () => void
-  MAGNIFIER_THRESHOLD: number
+  getMagnifierThreshold: () => number
   MAGNIFIER_SIZE: number
   MAGNIFIER_ZOOM: number
 
@@ -98,7 +98,7 @@ export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplay
     magnifierEnabled,
     shouldShowMagnifier,
     toggleMagnifier,
-    MAGNIFIER_THRESHOLD,
+    getMagnifierThreshold: () => displayStorage.getMagnifierZoomThreshold(),
     MAGNIFIER_SIZE,
     MAGNIFIER_ZOOM,
 
