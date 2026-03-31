@@ -10,6 +10,10 @@ interface StarterTemplates {
   importingFiles: string
   mathReference: string
   mermaidDemo: string
+  researchIdea: string
+  quickNote: string
+  counterpoint: string
+  evidence: string
 }
 
 const templates: Record<SupportedLocale, StarterTemplates> = {
@@ -119,6 +123,43 @@ classDiagram
 \`\`\`
 
 See [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) for full syntax.`,
+
+    researchIdea: `# Research Hypothesis
+
+This node demonstrates a **colored node** with a research idea.
+
+## Hypothesis
+
+Knowledge graphs with visual interfaces improve information retention compared to linear note-taking.
+
+## Next Steps
+
+- Review existing literature
+- Design experiment methodology`,
+
+    quickNote: `A quick capture without a formal title.
+
+Just jot down thoughts here.`,
+
+    counterpoint: `## Alternative Perspective
+
+Not all users benefit from visual approaches. Some prefer:
+
+- Linear text documents
+- Hierarchical outlines
+- Simple lists
+
+This demonstrates **contradicts** edge type (orange).`,
+
+    evidence: `## Supporting Data
+
+Studies show spatial memory aids recall:
+
+- Method of loci (memory palace)
+- Mind mapping effectiveness
+- Visual learner preferences
+
+This node shows the **supports** edge type (green).`,
   },
 
   de: {
@@ -215,6 +256,43 @@ sequenceDiagram
 \`\`\`
 
 Siehe [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) fur vollstandige Syntax.`,
+
+    researchIdea: `# Forschungshypothese
+
+Dieser Knoten zeigt einen **farbigen Knoten** mit einer Forschungsidee.
+
+## Hypothese
+
+Wissensgraphen mit visuellen Interfaces verbessern die Informationsspeicherung im Vergleich zu linearem Notieren.
+
+## Nachste Schritte
+
+- Bestehende Literatur prufen
+- Experimentmethodik entwerfen`,
+
+    quickNote: `Eine schnelle Notiz ohne formellen Titel.
+
+Hier einfach Gedanken notieren.`,
+
+    counterpoint: `## Alternative Perspektive
+
+Nicht alle Benutzer profitieren von visuellen Ansatzen. Manche bevorzugen:
+
+- Lineare Textdokumente
+- Hierarchische Gliederungen
+- Einfache Listen
+
+Dies zeigt den **contradicts** Kantentyp (orange).`,
+
+    evidence: `## Unterstutzende Daten
+
+Studien zeigen, dass raumliches Gedachtnis die Erinnerung unterstutzt:
+
+- Loci-Methode (Gedachtnispalast)
+- Effektivitat von Mind-Mapping
+- Praferenzen visueller Lerner
+
+Dieser Knoten zeigt den **supports** Kantentyp (grun).`,
   },
 
   fr: {
@@ -311,6 +389,43 @@ sequenceDiagram
 \`\`\`
 
 Voir [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) pour la syntaxe complete.`,
+
+    researchIdea: `# Hypothese de Recherche
+
+Ce noeud demontre un **noeud colore** avec une idee de recherche.
+
+## Hypothese
+
+Les graphes de connaissances avec interfaces visuelles ameliorent la retention d'information comparee a la prise de notes lineaire.
+
+## Prochaines Etapes
+
+- Examiner la litterature existante
+- Concevoir la methodologie experimentale`,
+
+    quickNote: `Une capture rapide sans titre formel.
+
+Notez simplement vos pensees ici.`,
+
+    counterpoint: `## Perspective Alternative
+
+Tous les utilisateurs ne beneficient pas des approches visuelles. Certains preferent:
+
+- Documents textuels lineaires
+- Plans hierarchiques
+- Listes simples
+
+Ceci demontre le type de connexion **contradicts** (orange).`,
+
+    evidence: `## Donnees de Support
+
+Les etudes montrent que la memoire spatiale aide la memorisation:
+
+- Methode des loci (palais de la memoire)
+- Efficacite du mind mapping
+- Preferences des apprenants visuels
+
+Ce noeud montre le type de connexion **supports** (vert).`,
   },
 
   es: {
@@ -407,6 +522,43 @@ sequenceDiagram
 \`\`\`
 
 Ver [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) para sintaxis completa.`,
+
+    researchIdea: `# Hipotesis de Investigacion
+
+Este nodo demuestra un **nodo coloreado** con una idea de investigacion.
+
+## Hipotesis
+
+Los grafos de conocimiento con interfaces visuales mejoran la retencion de informacion comparada con la toma de notas lineal.
+
+## Proximos Pasos
+
+- Revisar literatura existente
+- Disenar metodologia experimental`,
+
+    quickNote: `Una captura rapida sin titulo formal.
+
+Simplemente anota pensamientos aqui.`,
+
+    counterpoint: `## Perspectiva Alternativa
+
+No todos los usuarios se benefician de enfoques visuales. Algunos prefieren:
+
+- Documentos de texto lineales
+- Esquemas jerarquicos
+- Listas simples
+
+Esto demuestra el tipo de conexion **contradicts** (naranja).`,
+
+    evidence: `## Datos de Apoyo
+
+Estudios muestran que la memoria espacial ayuda al recuerdo:
+
+- Metodo de loci (palacio de la memoria)
+- Efectividad del mapeo mental
+- Preferencias de aprendices visuales
+
+Este nodo muestra el tipo de conexion **supports** (verde).`,
   },
 
   it: {
@@ -503,6 +655,43 @@ sequenceDiagram
 \`\`\`
 
 Vedi [mermaid.js.org](https://mermaid.js.org/syntax/flowchart.html) per la sintassi completa.`,
+
+    researchIdea: `# Ipotesi di Ricerca
+
+Questo nodo dimostra un **nodo colorato** con un'idea di ricerca.
+
+## Ipotesi
+
+I grafi di conoscenza con interfacce visive migliorano la ritenzione delle informazioni rispetto alla presa di appunti lineare.
+
+## Prossimi Passi
+
+- Esaminare la letteratura esistente
+- Progettare la metodologia sperimentale`,
+
+    quickNote: `Una cattura rapida senza titolo formale.
+
+Annota semplicemente i pensieri qui.`,
+
+    counterpoint: `## Prospettiva Alternativa
+
+Non tutti gli utenti beneficiano degli approcci visivi. Alcuni preferiscono:
+
+- Documenti di testo lineari
+- Schemi gerarchici
+- Liste semplici
+
+Questo dimostra il tipo di connessione **contradicts** (arancione).`,
+
+    evidence: `## Dati di Supporto
+
+Gli studi mostrano che la memoria spaziale aiuta il richiamo:
+
+- Metodo dei loci (palazzo della memoria)
+- Efficacia del mind mapping
+- Preferenze degli apprendisti visivi
+
+Questo nodo mostra il tipo di connessione **supports** (verde).`,
   },
 }
 
@@ -515,22 +704,83 @@ export function getStarterTemplates(locale: string): StarterTemplates {
 }
 
 /**
+ * Starter node title keys - some nodes intentionally have empty titles
+ */
+export type StarterTitleKey = keyof StarterTemplates
+
+export interface StarterTitles {
+  gettingStarted: string
+  importingFiles: string
+  mathReference: string
+  mermaidDemo: string
+  researchIdea: string
+  quickNote: string  // Empty title - demonstrates untitled node
+  counterpoint: string
+  evidence: string
+}
+
+/**
  * Get localized node titles
  */
-export function getStarterTitles(locale: string): { gettingStarted: string; importingFiles: string; mathReference: string; mermaidDemo: string } {
-  const titles: Record<SupportedLocale, { gettingStarted: string; importingFiles: string; mathReference: string; mermaidDemo: string }> = {
-    en: { gettingStarted: 'Getting Started', importingFiles: 'Importing Files', mathReference: 'Typst Math Reference', mermaidDemo: 'Mermaid Diagrams' },
-    de: { gettingStarted: 'Erste Schritte mit Nodus', importingFiles: 'Dateien importieren', mathReference: 'Typst Mathe-Referenz', mermaidDemo: 'Mermaid-Diagramme' },
-    fr: { gettingStarted: 'Premiers pas avec Nodus', importingFiles: 'Importer des fichiers', mathReference: 'Reference Typst Math', mermaidDemo: 'Diagrammes Mermaid' },
-    es: { gettingStarted: 'Primeros pasos con Nodus', importingFiles: 'Importar archivos', mathReference: 'Referencia Typst Math', mermaidDemo: 'Diagramas Mermaid' },
-    it: { gettingStarted: 'Primi passi con Nodus', importingFiles: 'Importare file', mathReference: 'Riferimento Typst Math', mermaidDemo: 'Diagrammi Mermaid' },
+export function getStarterTitles(locale: string): StarterTitles {
+  const titles: Record<SupportedLocale, StarterTitles> = {
+    en: {
+      gettingStarted: 'Getting Started',
+      importingFiles: 'Importing Files',
+      mathReference: 'Typst Math Reference',
+      mermaidDemo: 'Mermaid Diagrams',
+      researchIdea: 'Research Hypothesis',
+      quickNote: '',  // Untitled node
+      counterpoint: 'Alternative View',
+      evidence: 'Supporting Evidence',
+    },
+    de: {
+      gettingStarted: 'Erste Schritte mit Nodus',
+      importingFiles: 'Dateien importieren',
+      mathReference: 'Typst Mathe-Referenz',
+      mermaidDemo: 'Mermaid-Diagramme',
+      researchIdea: 'Forschungshypothese',
+      quickNote: '',
+      counterpoint: 'Alternative Sicht',
+      evidence: 'Unterstutzende Belege',
+    },
+    fr: {
+      gettingStarted: 'Premiers pas avec Nodus',
+      importingFiles: 'Importer des fichiers',
+      mathReference: 'Reference Typst Math',
+      mermaidDemo: 'Diagrammes Mermaid',
+      researchIdea: 'Hypothese de Recherche',
+      quickNote: '',
+      counterpoint: 'Vue Alternative',
+      evidence: 'Preuves de Support',
+    },
+    es: {
+      gettingStarted: 'Primeros pasos con Nodus',
+      importingFiles: 'Importar archivos',
+      mathReference: 'Referencia Typst Math',
+      mermaidDemo: 'Diagramas Mermaid',
+      researchIdea: 'Hipotesis de Investigacion',
+      quickNote: '',
+      counterpoint: 'Vista Alternativa',
+      evidence: 'Evidencia de Apoyo',
+    },
+    it: {
+      gettingStarted: 'Primi passi con Nodus',
+      importingFiles: 'Importare file',
+      mathReference: 'Riferimento Typst Math',
+      mermaidDemo: 'Diagrammi Mermaid',
+      researchIdea: 'Ipotesi di Ricerca',
+      quickNote: '',
+      counterpoint: 'Vista Alternativa',
+      evidence: 'Prove di Supporto',
+    },
   }
   const supported = locale as SupportedLocale
   return titles[supported] || titles.en
 }
 
 /**
- * Get starter node configurations (positions and sizes)
+ * Get starter node configurations (positions, sizes, and optional colors)
  */
 export interface StarterNodeConfig {
   key: keyof StarterTemplates
@@ -538,33 +788,59 @@ export interface StarterNodeConfig {
   canvas_y: number
   width: number
   height: number
+  color_theme?: string | null  // Node background color
 }
 
 export function getStarterNodeConfigs(): StarterNodeConfig[] {
   return [
+    // Main tutorial nodes (no color)
     { key: 'gettingStarted', canvas_x: 100, canvas_y: 100, width: 500, height: 600 },
     { key: 'importingFiles', canvas_x: 700, canvas_y: 100, width: 520, height: 720 },
     { key: 'mathReference', canvas_x: 100, canvas_y: 780, width: 560, height: 620 },
     { key: 'mermaidDemo', canvas_x: 700, canvas_y: 900, width: 520, height: 800 },
+    // Colored example nodes
+    { key: 'researchIdea', canvas_x: 1340, canvas_y: 100, width: 400, height: 320, color_theme: 'rgba(59, 130, 246, 0.18)' },  // blue
+    { key: 'quickNote', canvas_x: 1340, canvas_y: 480, width: 300, height: 150, color_theme: 'rgba(234, 179, 8, 0.18)' },  // yellow (no title)
+    { key: 'counterpoint', canvas_x: 1340, canvas_y: 700, width: 380, height: 280, color_theme: 'rgba(249, 115, 22, 0.18)' },  // orange
+    { key: 'evidence', canvas_x: 1340, canvas_y: 1040, width: 380, height: 280, color_theme: 'rgba(34, 197, 94, 0.18)' },  // green
   ]
 }
 
 /**
  * Get starter edge configurations (connections between starter nodes)
+ * Demonstrates all edge types and directed/undirected options
  */
 export interface StarterEdgeConfig {
   sourceKey: keyof StarterTemplates
   targetKey: keyof StarterTemplates
-  linkType: string
+  linkType: string  // related (gray), cites (blue), blocks (red), supports (green), contradicts (orange)
   label: string
+  directed: boolean  // true = arrow, false = no arrow
 }
 
 export function getStarterEdgeConfigs(): StarterEdgeConfig[] {
   return [
-    { sourceKey: 'gettingStarted', targetKey: 'importingFiles', linkType: 'related', label: 'see also' },
-    { sourceKey: 'gettingStarted', targetKey: 'mathReference', linkType: 'cites', label: 'references' },
-    { sourceKey: 'importingFiles', targetKey: 'gettingStarted', linkType: 'supports', label: 'extends' },
-    { sourceKey: 'gettingStarted', targetKey: 'mermaidDemo', linkType: 'related', label: 'diagrams' },
+    // Tutorial connections (undirected - bidirectional relationships)
+    { sourceKey: 'gettingStarted', targetKey: 'importingFiles', linkType: 'related', label: 'see also', directed: false },
+    { sourceKey: 'gettingStarted', targetKey: 'mathReference', linkType: 'related', label: '', directed: false },
+    { sourceKey: 'gettingStarted', targetKey: 'mermaidDemo', linkType: 'related', label: 'diagrams', directed: false },
+
+    // Directed edges showing information flow
+    { sourceKey: 'importingFiles', targetKey: 'mathReference', linkType: 'cites', label: 'references', directed: true },  // blue arrow
+    { sourceKey: 'mathReference', targetKey: 'mermaidDemo', linkType: 'cites', label: '', directed: true },  // blue arrow
+
+    // Research example edges - demonstrating all link types
+    { sourceKey: 'researchIdea', targetKey: 'evidence', linkType: 'supports', label: 'backed by', directed: true },  // green arrow
+    { sourceKey: 'evidence', targetKey: 'researchIdea', linkType: 'supports', label: '', directed: true },  // green arrow back
+
+    { sourceKey: 'counterpoint', targetKey: 'researchIdea', linkType: 'contradicts', label: 'challenges', directed: true },  // orange arrow
+    { sourceKey: 'counterpoint', targetKey: 'evidence', linkType: 'blocks', label: 'disputes', directed: true },  // red arrow
+
+    // Undirected association
+    { sourceKey: 'quickNote', targetKey: 'researchIdea', linkType: 'related', label: '', directed: false },  // gray, no arrow
+
+    // Cross-reference between tutorial and examples
+    { sourceKey: 'gettingStarted', targetKey: 'researchIdea', linkType: 'cites', label: 'example', directed: true },  // blue arrow
   ]
 }
 
@@ -573,3 +849,7 @@ export const TYPST_MATH_REFERENCE = templates.en.mathReference
 export const GETTING_STARTED = templates.en.gettingStarted
 export const IMPORTING_FILES = templates.en.importingFiles
 export const MERMAID_DEMO = templates.en.mermaidDemo
+export const RESEARCH_IDEA = templates.en.researchIdea
+export const QUICK_NOTE = templates.en.quickNote
+export const COUNTERPOINT = templates.en.counterpoint
+export const EVIDENCE = templates.en.evidence

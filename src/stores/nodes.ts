@@ -648,6 +648,7 @@ export const useNodesStore = defineStore('nodes', () => {
         canvas_y: config.canvas_y,
         width: config.width,
         height: config.height,
+        color_theme: config.color_theme,
       })
       createdNodes.set(config.key, node)
     }
@@ -662,6 +663,7 @@ export const useNodesStore = defineStore('nodes', () => {
           target_node_id: target.id,
           link_type: config.linkType,
           label: config.label,
+          directed: config.directed,
         })
       }
     }

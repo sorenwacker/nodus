@@ -96,6 +96,7 @@ export interface CreateEdgeInput {
   link_type?: string
   color?: string
   storyline_id?: string
+  directed?: boolean
 }
 
 // Event types
