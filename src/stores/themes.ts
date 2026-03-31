@@ -13,6 +13,7 @@ import type {
   UpdateThemeInput,
 } from '../types/theme'
 import { injectTheme } from '../lib/themeInjector'
+import { uiStorage } from '../lib/storage'
 
 const STORAGE_KEY = 'nodus-theme'
 
@@ -85,6 +86,9 @@ export const useThemesStore = defineStore('themes', () => {
       injectTheme(parsed)
       document.documentElement.setAttribute('data-theme', parsed.name)
     }
+    // Apply font scale from storage
+    const fontScale = uiStorage.getFontScale()
+    document.documentElement.style.setProperty('--font-scale', String(fontScale))
   }
 
   function setTheme(name: string) {

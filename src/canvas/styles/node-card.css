@@ -57,7 +57,7 @@
 .node-card.collapsed .node-header {
   border-bottom: none;
   border-radius: 5px;
-  font-size: 36px;
+  font-size: calc(36px * var(--font-scale, 1));
   font-weight: 700;
   padding: 20px 24px;
   color: var(--text-main);
@@ -94,7 +94,7 @@
   width: 100%;
   border: none;
   background: transparent;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-main);
   outline: none;
@@ -351,7 +351,7 @@
   background: transparent;
   color: var(--text-main);
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   line-height: 1.5;
   resize: none;
   outline: none;
