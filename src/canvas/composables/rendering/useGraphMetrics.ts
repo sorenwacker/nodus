@@ -5,7 +5,9 @@
  */
 
 import { computed, ref, type Ref, type ComputedRef } from 'vue'
+import { storeToRefs } from 'pinia'
 import type { Node, Edge } from '../../../types'
+import { useDisplayStore } from '../../../stores/display'
 
 export interface UseGraphMetricsContext {
   displayNodes: ComputedRef<Node[]>
@@ -31,8 +33,6 @@ export interface UseGraphMetricsReturn {
   toggleBubbleMode: () => void
 }
 
-import { displayStorage } from '../../../lib/storage'
-
 export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsReturn {
   const {
     displayNodes,
@@ -42,6 +42,10 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     neighborhoodMode,
     scale,
   } = ctx
+
+  // Get reactive refs from display store
+  const displayStore = useDisplayStore()
+  const { lodThreshold, semanticZoomThreshold } = storeToRefs(displayStore)
 
   // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
   // In neighborhood mode, always use full routing since we have few nodes
@@ -62,7 +66,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   // Triggers at configured threshold for any graph, or +20% for massive graphs
   const isSemanticZoomCollapsed = computed(() => {
     const s = scale.value
-    const threshold = displayStorage.getSemanticZoomThreshold()
+    const threshold = semanticZoomThreshold.value
     // Always collapse below threshold
     if (s < threshold) return true
     // Collapse massive graphs below threshold + 20%
@@ -72,7 +76,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   // Also activates when user manually toggles bubble mode
-  const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > displayStorage.getLodThreshold())
+  const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > lodThreshold.value)
 
   // Toggle bubble mode manually
   function toggleBubbleMode() {

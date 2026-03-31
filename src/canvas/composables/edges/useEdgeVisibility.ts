@@ -5,7 +5,9 @@
  */
 
 import { computed, ref, type Ref, type ComputedRef } from 'vue'
+import { storeToRefs } from 'pinia'
 import type { EdgeLine } from './useEdgeRouting'
+import { useDisplayStore } from '../../../stores/display'
 
 export interface VisibleEdgeLine extends EdgeLine {
   isHighlighted: boolean
@@ -38,8 +40,6 @@ export interface UseEdgeVisibilityReturn {
   visibleEdgeLines: ComputedRef<VisibleEdgeLine[]>
 }
 
-import { displayStorage } from '../../../lib/storage'
-
 // Threshold for filtering edges by viewport visibility
 const EDGE_VIEWPORT_FILTER_THRESHOLD = 500
 
@@ -59,6 +59,10 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     getEdgeHighlightColor,
     getNode,
   } = ctx
+
+  // Get reactive refs from display store
+  const displayStore = useDisplayStore()
+  const { edgeHoverThreshold } = storeToRefs(displayStore)
 
   const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
     let edges = edgeLines.value
@@ -94,7 +98,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
     // For very large visible edge counts, only show edges on hover/select
     // Also include neighbor's edges (2nd hop) for context
-    if (edges.length > displayStorage.getEdgeHoverThreshold()) {
+    if (edges.length > edgeHoverThreshold.value) {
       if (hovered || selectedNodes.length > 0) {
         edges = edges.filter(e => {
           // Direct edges to hovered/selected nodes

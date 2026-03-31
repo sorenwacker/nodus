@@ -5,7 +5,8 @@
  */
 
 import { ref, type Ref } from 'vue'
-import { displayStorage } from '../../../lib/storage'
+import { storeToRefs } from 'pinia'
+import { useDisplayStore } from '../../../stores/display'
 
 export interface UseCanvasZoomContext {
   canvasRef: Ref<HTMLElement | null>
@@ -41,8 +42,9 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     scheduleSaveViewState,
   } = ctx
 
-  // Get magnifier threshold from storage (dynamic)
-  const getMagnifierThreshold = () => displayStorage.getMagnifierZoomThreshold()
+  // Get reactive refs from display store
+  const displayStore = useDisplayStore()
+  const { magnifierZoomThreshold } = storeToRefs(displayStore)
 
   // State
   const showMagnifier = ref(false)
@@ -75,7 +77,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
     // Update magnifier visibility when zoom crosses threshold
     if (isMouseOnCanvas.value) {
-      showMagnifier.value = newScale < getMagnifierThreshold()
+      showMagnifier.value = newScale < magnifierZoomThreshold.value
     }
 
     // Save view state (debounced)
@@ -159,7 +161,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
         }
       }
       // Update magnifier visibility based on current zoom level
-      if (scale.value < getMagnifierThreshold() && isMouseOnCanvas.value) {
+      if (scale.value < magnifierZoomThreshold.value && isMouseOnCanvas.value) {
         showMagnifier.value = true
       } else {
         showMagnifier.value = false
@@ -169,7 +171,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
   function onCanvasPointerEnter() {
     isMouseOnCanvas.value = true
-    if (scale.value < getMagnifierThreshold()) {
+    if (scale.value < magnifierZoomThreshold.value) {
       showMagnifier.value = true
     }
   }

@@ -3,7 +3,9 @@
  * Handles viewport culling, LOD mode, and graph size analysis
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { storeToRefs } from 'pinia'
 import { NODE_DEFAULTS } from '../../constants'
+import { useDisplayStore } from '../../../stores/display'
 
 export interface VisibilityNode {
   id: string
@@ -28,8 +30,6 @@ export interface UseNodeVisibilityOptions {
   getViewportSize: () => { width: number; height: number } | null
 }
 
-import { displayStorage } from '../../../lib/storage'
-
 /** Thresholds for graph size classification - increased for modern hardware */
 const LARGE_GRAPH_NODES = 500
 const LARGE_GRAPH_EDGES = 1500
@@ -39,6 +39,10 @@ const MASSIVE_GRAPH_EDGES = 2000
 
 export function useNodeVisibility(options: UseNodeVisibilityOptions) {
   const { nodes, edges, viewState, getViewportSize } = options
+
+  // Get reactive refs from display store
+  const displayStore = useDisplayStore()
+  const { lodThreshold, semanticZoomThreshold } = storeToRefs(displayStore)
 
   // Track viewport size for culling
   const viewportWidth = ref(window.innerWidth)
@@ -101,7 +105,7 @@ export function useNodeVisibility(options: UseNodeVisibilityOptions) {
   // Triggers at configured threshold (default 50%) for any graph, or +10% for massive graphs
   const isSemanticZoomCollapsed = computed(() => {
     const scale = viewState.scale.value
-    const threshold = displayStorage.getSemanticZoomThreshold()
+    const threshold = semanticZoomThreshold.value
     // Always collapse below threshold
     if (scale < threshold) return true
     // Collapse massive graphs below threshold + 10%
@@ -110,7 +114,7 @@ export function useNodeVisibility(options: UseNodeVisibilityOptions) {
   })
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
-  const isLODMode = computed(() => visibleNodes.value.length > displayStorage.getLodThreshold())
+  const isLODMode = computed(() => visibleNodes.value.length > lodThreshold.value)
 
   // Node degree (edge count) for LOD circle sizing
   const nodeDegree = computed(() => {

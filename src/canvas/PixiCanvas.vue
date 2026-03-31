@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from '
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
+import { useDisplayStore } from '../stores/display'
 import type { Node, Edge } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
@@ -100,6 +101,7 @@ const {
 const store = useNodesStore()
 const themesStore = useThemesStore()
 const agentTasksStore = useAgentTasksStore()
+const displayStore = useDisplayStore()
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
 
 // Plan state for interactive approval flow
@@ -139,6 +141,9 @@ const {
 } = viewState
 
 onMounted(() => {
+  // Setup display settings listener for reactive updates
+  displayStore.setupListener()
+
   // Setup content renderer watchers for markdown/math/mermaid
   setupContentWatchers()
 

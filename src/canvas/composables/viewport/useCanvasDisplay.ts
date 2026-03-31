@@ -5,8 +5,10 @@
  */
 
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { storeToRefs } from 'pinia'
 import { uiStorage } from '../../../lib/storage'
 import type { Node } from '../../../types'
+import { useDisplayStore } from '../../../stores/display'
 
 export interface UseCanvasDisplayContext {
   scale: Ref<number>
@@ -34,8 +36,6 @@ export interface UseCanvasDisplayReturn {
   decreaseFontScale: () => void
 }
 
-import { displayStorage } from '../../../lib/storage'
-
 const MAGNIFIER_SIZE = 200
 const MAGNIFIER_ZOOM = 2.5
 const MIN_FONT_SCALE = 0.7
@@ -44,12 +44,16 @@ const MAX_FONT_SCALE = 1.5
 export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplayReturn {
   const { scale, filteredNodes, isLargeGraph, showMagnifier } = ctx
 
-  // Magnifier state
-  const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
+  // Get reactive refs from display store
+  const displayStore = useDisplayStore()
+  const { magnifierZoomThreshold, magnifierEnabled: storedMagnifierEnabled } = storeToRefs(displayStore)
+
+  // Magnifier state - use store value
+  const magnifierEnabled = ref(storedMagnifierEnabled.value)
 
   const shouldShowMagnifier = computed(() =>
     magnifierEnabled.value &&
-    scale.value < displayStorage.getMagnifierZoomThreshold() &&
+    scale.value < magnifierZoomThreshold.value &&
     showMagnifier.value &&
     !isLargeGraph.value
   )
@@ -98,7 +102,7 @@ export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplay
     magnifierEnabled,
     shouldShowMagnifier,
     toggleMagnifier,
-    getMagnifierThreshold: () => displayStorage.getMagnifierZoomThreshold(),
+    getMagnifierThreshold: () => magnifierZoomThreshold.value,
     MAGNIFIER_SIZE,
     MAGNIFIER_ZOOM,
 
