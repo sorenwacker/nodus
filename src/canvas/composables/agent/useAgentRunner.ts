@@ -69,6 +69,15 @@ function extractBalancedJson(str: string): string | null {
 
 import { escapeForPrompt } from '../../../lib/promptSecurity'
 
+/** Truncate text to max length, adding ellipsis if truncated */
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength - 3) + '...'
+}
+
+/** Max characters for node titles in system prompt */
+const MAX_TITLE_LENGTH = 100
+
 export interface AgentContext {
   // Node store access
   filteredNodes: () => Array<{ id: string; title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>
@@ -112,19 +121,19 @@ function buildSystemPrompt(
 ): SystemPromptMessage {
   let nodeList = 'No nodes yet. Canvas is empty.'
 
-  // Build node ID to title map for edge display
+  // Build node ID to title map for edge display (truncated for prompt safety)
   const nodeIdToTitle = new Map<string, string>()
   for (const n of nodes) {
-    nodeIdToTitle.set(n.id, n.title)
+    nodeIdToTitle.set(n.id, truncateText(n.title, MAX_TITLE_LENGTH))
   }
 
   if (nodes.length > 0 && nodes.length <= 30) {
-    // Escape node titles to prevent prompt injection
+    // Escape and truncate node titles to prevent prompt injection and token overflow
     nodeList = nodes.map((n, i) =>
-      `${i+1}. <node_title>${escapeForPrompt(n.title)}</node_title> @(${Math.round(n.canvas_x)},${Math.round(n.canvas_y)})`
+      `${i+1}. <node_title>${escapeForPrompt(truncateText(n.title, MAX_TITLE_LENGTH))}</node_title> @(${Math.round(n.canvas_x)},${Math.round(n.canvas_y)})`
     ).join('\n')
   } else if (nodes.length > 30) {
-    nodeList = nodes.slice(0, 20).map(n => `<node_title>${escapeForPrompt(n.title)}</node_title>`).join(', ') + `... (${nodes.length} total)`
+    nodeList = nodes.slice(0, 20).map(n => `<node_title>${escapeForPrompt(truncateText(n.title, MAX_TITLE_LENGTH))}</node_title>`).join(', ') + `... (${nodes.length} total)`
   }
 
   // Build edge list showing connections
@@ -152,7 +161,7 @@ function buildSystemPrompt(
   }
   const disconnectedNodes = nodes.filter(n => !connectedNodeIds.has(n.id))
   const disconnectedList = disconnectedNodes.length > 0
-    ? `\nDISCONNECTED NODES (${disconnectedNodes.length}): ${disconnectedNodes.map(n => `"${escapeForPrompt(n.title)}"`).join(', ')}`
+    ? `\nDISCONNECTED NODES (${disconnectedNodes.length}): ${disconnectedNodes.map(n => `"${escapeForPrompt(truncateText(n.title, MAX_TITLE_LENGTH))}"`).join(', ')}`
     : ''
 
   const customRules = llmStorage.getAgentPrompt(DEFAULT_AGENT_PROMPT)
@@ -633,15 +642,32 @@ export function useAgentRunner(ctx: AgentContext) {
         }
       } catch (e: unknown) {
         const error = e as { name?: string; message?: string }
-        if (error.name === 'AbortError' || error.message === 'Cancelled') {
+        const errorMsg = error.message || String(e)
+
+        if (error.name === 'AbortError' || errorMsg === 'Cancelled') {
           ctx.log.value.push('> Agent stopped')
           ctx.isRunning.value = false
           return { status: 'stopped', message: 'Agent stopped by user' }
         }
+
+        // Detect token/context limit errors
+        const isTokenLimitError = errorMsg.includes('maximum model length') ||
+          errorMsg.includes('context length') ||
+          errorMsg.includes('too long') ||
+          errorMsg.includes('token limit') ||
+          errorMsg.includes('decoder prompt')
+
+        if (isTokenLimitError) {
+          ctx.log.value.push(`> ERROR: Context too large - ${errorMsg}`)
+          ctx.log.value.push('> Tip: Select fewer nodes or reduce node content')
+          ctx.isRunning.value = false
+          return { status: 'error', message: 'Context exceeds model limit. Select fewer nodes or reduce content.' }
+        }
+
         console.error('Agent error:', e)
-        ctx.log.value.push(`> Error: ${String(e)}`)
+        ctx.log.value.push(`> ERROR: ${errorMsg}`)
         ctx.isRunning.value = false
-        return { status: 'error', message: String(e) }
+        return { status: 'error', message: errorMsg }
       }
     }
 

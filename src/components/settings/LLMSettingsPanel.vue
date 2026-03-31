@@ -468,7 +468,7 @@ onMounted(() => {
         />
         <div class="preset-buttons">
           <button
-            v-for="preset in [4096, 8192, 32768, 65536, 131072]"
+            v-for="preset in [4096, 8192, 16384, 32768, 65536, 131072]"
             :key="preset"
             :class="{ active: contextWindow === preset }"
             @click="contextWindow = preset"

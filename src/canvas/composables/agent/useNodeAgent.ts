@@ -176,10 +176,21 @@ export function useNodeAgent() {
   const currentContent = ref('')
 
   function buildSystemPrompt(ctx: NodeAgentContext): string {
+    // Truncate main content to fit within context limits
+    // Reserve ~4000 chars for system prompt overhead, tools, and response
+    const maxContentChars = llmStorage.getChainContextLimit() - 4000
+    let nodeContent = ctx.nodeContent || '(empty)'
+    let contentTruncated = false
+
+    if (nodeContent.length > maxContentChars && maxContentChars > 500) {
+      nodeContent = nodeContent.slice(0, maxContentChars) + '\n\n[... content truncated due to size ...]'
+      contentTruncated = true
+    }
+
     let connectedContext = ''
-    if (ctx.connectedNodes.length > 0) {
-      // Use context limit setting, include as many nodes as fit
-      const maxChars = llmStorage.getChainContextLimit()
+    if (ctx.connectedNodes.length > 0 && !contentTruncated) {
+      // Only include connected nodes if main content wasn't truncated
+      const maxChars = Math.max(0, maxContentChars - nodeContent.length)
       const notes: string[] = []
       let totalChars = 0
 
@@ -207,7 +218,7 @@ export function useNodeAgent() {
     return `You are a note editor agent working on <current_note_title>${escapeForPrompt(ctx.nodeTitle)}</current_note_title>.
 
 CURRENT CONTENT:
-${ctx.nodeContent || '(empty)'}
+${nodeContent}
 ${connectedContext}
 
 TOOLS:
@@ -246,6 +257,13 @@ DO NOT call node_done() without first calling update_content(). Your response wi
       `> User: ${prompt}`,
       `> Provider: ${providerId} (${modelName})`,
     ]
+
+    // Warn if content will be truncated
+    const maxContentChars = llmStorage.getChainContextLimit() - 4000
+    if (ctx.nodeContent && ctx.nodeContent.length > maxContentChars) {
+      log.value.push(`> Warning: Content truncated (${ctx.nodeContent.length} chars > ${maxContentChars} limit)`)
+    }
+
     currentContent.value = ctx.nodeContent
     let contentWasUpdated = false // Track if update_content was called
 
@@ -415,8 +433,10 @@ After update_content succeeds, then you may call node_done().`
           notifications$.error('API authentication failed', 'Check your API key in Settings.')
         } else if (errorMsg.includes('429')) {
           notifications$.error('Rate limit exceeded', 'Too many requests. Wait a moment and try again.')
+        } else if (errorMsg.includes('maximum model length') || errorMsg.includes('context length') || errorMsg.includes('too long') || errorMsg.includes('token limit')) {
+          notifications$.error('Context too large', 'The prompt exceeds the model\'s context limit. Try selecting fewer nodes or reduce node content.')
         } else if (errorMsg.includes('500') || errorMsg.includes('502') || errorMsg.includes('503')) {
-          notifications$.error('LLM service error', 'The LLM service is temporarily unavailable.')
+          notifications$.error('LLM service error', errorMsg.slice(0, 200))
         } else {
           notifications$.error('Agent error', errorMsg)
         }
