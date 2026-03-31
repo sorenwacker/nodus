@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Settings Modal
- * Unified settings interface for LLM, Canvas, and general preferences
+ * Unified settings interface with consolidated tabs
  */
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,12 +9,11 @@ import { getVersion } from '@tauri-apps/api/app'
 import { llmStorage } from '../lib/storage'
 import { useThemesStore } from '../stores/themes'
 import { setLocale, getLocale, loadLocale } from '../i18n'
-import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
+import AppearanceSettingsPanel from './settings/AppearanceSettingsPanel.vue'
 import CanvasSettingsPanel from './settings/CanvasSettingsPanel.vue'
-import ThemeSettingsPanel from './settings/ThemeSettingsPanel.vue'
-import DisplaySettingsPanel from './settings/DisplaySettingsPanel.vue'
-import WorkspaceDiagnosticsSection from './settings/WorkspaceDiagnosticsSection.vue'
+import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
 import ZoteroSettingsPanel from './settings/ZoteroSettingsPanel.vue'
+import WorkspaceDiagnosticsSection from './settings/WorkspaceDiagnosticsSection.vue'
 
 const { t } = useI18n()
 const themesStore = useThemesStore()
@@ -23,8 +22,8 @@ const emit = defineEmits<{
   close: []
 }>()
 
-// Active tab
-const activeTab = ref<'llm' | 'canvas' | 'themes' | 'general' | 'zotero' | 'display'>('general')
+// Active tab - reduced from 6 to 4 main tabs
+const activeTab = ref<'general' | 'appearance' | 'canvas' | 'ai' | 'integrations'>('general')
 
 // App version
 const appVersion = ref('')
@@ -34,6 +33,9 @@ const llmEnabled = ref(llmStorage.getLLMEnabled())
 
 // Language Settings
 const selectedLanguage = ref(getLocale())
+
+// Show advanced settings (diagnostics)
+const showAdvanced = ref(false)
 
 watch(selectedLanguage, async (locale) => {
   await loadLocale(locale)
@@ -49,9 +51,6 @@ onMounted(async () => {
 watch(llmEnabled, (value) => {
   llmStorage.setLLMEnabled(value)
   window.dispatchEvent(new CustomEvent('nodus-llm-enabled-change', { detail: value }))
-  if (!value && activeTab.value === 'llm') {
-    activeTab.value = 'general'
-  }
 })
 
 function handleClose() {
@@ -64,7 +63,7 @@ function handleClose() {
     <div class="settings-modal">
       <header class="settings-header">
         <h2>{{ t('settings.title') }}</h2>
-        <button class="close-btn" :data-tooltip="t('common.close')" @click="handleClose">
+        <button class="close-btn" :title="t('common.close')" @click="handleClose">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -79,10 +78,10 @@ function handleClose() {
           {{ t('settings.tabs.general') }}
         </button>
         <button
-          :class="{ active: activeTab === 'themes' }"
-          @click="activeTab = 'themes'"
+          :class="{ active: activeTab === 'appearance' }"
+          @click="activeTab = 'appearance'"
         >
-          {{ t('settings.tabs.themes') }}
+          {{ t('settings.tabs.appearance') }}
         </button>
         <button
           :class="{ active: activeTab === 'canvas' }"
@@ -91,36 +90,14 @@ function handleClose() {
           {{ t('settings.tabs.canvas') }}
         </button>
         <button
-          :class="{ active: activeTab === 'display' }"
-          @click="activeTab = 'display'"
+          :class="{ active: activeTab === 'integrations' }"
+          @click="activeTab = 'integrations'"
         >
-          {{ t('settings.tabs.display') }}
-        </button>
-        <button
-          v-if="llmEnabled"
-          :class="{ active: activeTab === 'llm' }"
-          @click="activeTab = 'llm'"
-        >
-          {{ t('settings.tabs.llm') }}
-        </button>
-        <button
-          :class="{ active: activeTab === 'zotero' }"
-          @click="activeTab = 'zotero'"
-        >
-          {{ t('settings.tabs.zotero') }}
+          {{ t('settings.tabs.integrations') }}
         </button>
       </nav>
 
       <div class="settings-content">
-        <!-- LLM Settings -->
-        <LLMSettingsPanel v-if="activeTab === 'llm'" />
-
-        <!-- Canvas Settings -->
-        <CanvasSettingsPanel v-if="activeTab === 'canvas'" />
-
-        <!-- Display Settings -->
-        <DisplaySettingsPanel v-if="activeTab === 'display'" />
-
         <!-- General Settings -->
         <div v-if="activeTab === 'general'" class="settings-section">
           <div class="setting-group">
@@ -134,16 +111,7 @@ function handleClose() {
             </select>
           </div>
 
-          <div class="setting-group">
-            <label class="checkbox-label">
-              <input v-model="llmEnabled" type="checkbox" />
-              {{ t('settings.llmEnabled') }}
-            </label>
-            <span class="hint">{{ t('settings.llmEnabledHint') }}</span>
-          </div>
-
-          <!-- Workspace Diagnostics -->
-          <WorkspaceDiagnosticsSection @close="handleClose" />
+          <hr class="divider" />
 
           <div class="setting-group">
             <label>{{ t('settings.about') }}</label>
@@ -152,13 +120,62 @@ function handleClose() {
               <p class="version">{{ t('settings.version') }} {{ appVersion }}</p>
             </div>
           </div>
+
+          <hr class="divider" />
+
+          <!-- Advanced Section (collapsible) -->
+          <button class="advanced-toggle" @click="showAdvanced = !showAdvanced">
+            <svg
+              class="chevron"
+              :class="{ rotated: showAdvanced }"
+              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            >
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+            {{ t('settings.advanced') }}
+          </button>
+
+          <div v-if="showAdvanced" class="advanced-section">
+            <WorkspaceDiagnosticsSection @close="handleClose" />
+          </div>
         </div>
 
-        <!-- Themes Settings -->
-        <ThemeSettingsPanel v-if="activeTab === 'themes'" />
+        <!-- Appearance Settings (Themes + Display) -->
+        <AppearanceSettingsPanel v-if="activeTab === 'appearance'" />
 
-        <!-- Zotero Settings -->
-        <ZoteroSettingsPanel v-if="activeTab === 'zotero'" />
+        <!-- Canvas Settings -->
+        <CanvasSettingsPanel v-if="activeTab === 'canvas'" />
+
+        <!-- Integrations (AI + Zotero) -->
+        <div v-if="activeTab === 'integrations'" class="settings-section">
+          <!-- AI Section -->
+          <div class="integration-section">
+            <div class="integration-header">
+              <label class="checkbox-label">
+                <input v-model="llmEnabled" type="checkbox" />
+                <span class="integration-title">{{ t('settings.tabs.llm') }}</span>
+              </label>
+              <span class="hint">{{ t('settings.llmEnabledHint') }}</span>
+            </div>
+
+            <div v-if="llmEnabled" class="integration-content">
+              <LLMSettingsPanel />
+            </div>
+          </div>
+
+          <hr class="section-divider" />
+
+          <!-- Zotero Section -->
+          <div class="integration-section">
+            <div class="integration-header">
+              <span class="integration-title">{{ t('settings.tabs.zotero') }}</span>
+              <span class="hint">{{ t('settings.zotero.description') }}</span>
+            </div>
+            <div class="integration-content">
+              <ZoteroSettingsPanel />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -178,9 +195,9 @@ function handleClose() {
 .settings-modal {
   background: var(--bg-node, #ffffff);
   border-radius: 12px;
-  width: 500px;
+  width: 520px;
   max-width: 90vw;
-  max-height: 80vh;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
@@ -199,6 +216,7 @@ function handleClose() {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-node, #e4e4e7);
   background: inherit;
+  flex-shrink: 0;
 }
 
 .settings-header h2 {
@@ -237,6 +255,7 @@ function handleClose() {
   padding: 12px 20px;
   border-bottom: 1px solid var(--border-node, #e4e4e7);
   background: inherit;
+  flex-shrink: 0;
 }
 
 .settings-tabs button {
@@ -275,7 +294,7 @@ function handleClose() {
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .setting-group {
@@ -322,19 +341,14 @@ function handleClose() {
   color: var(--text-muted, #71717a);
 }
 
-.checkbox-label {
-  display: flex !important;
-  align-items: center;
-  justify-content: flex-start !important;
-  gap: 8px;
-  cursor: pointer;
-  font-weight: normal !important;
+.divider {
+  border: none;
+  border-top: 1px solid var(--border-node, #e4e4e7);
+  margin: 4px 0;
 }
 
-.checkbox-label input {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .divider {
+  border-color: #3f3f46;
 }
 
 .about-info {
@@ -360,5 +374,96 @@ function handleClose() {
 .about-info .version {
   color: var(--text-muted, #71717a);
   margin-top: 4px;
+}
+
+/* Advanced toggle */
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 6px;
+  color: var(--text-muted, #71717a);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.advanced-toggle:hover {
+  background: var(--bg-canvas, #f4f4f5);
+  color: var(--text-main, #18181b);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .advanced-toggle {
+  border-color: #3f3f46;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .advanced-toggle:hover {
+  background: #3f3f46;
+  color: #f4f4f5;
+}
+
+.chevron {
+  transition: transform 0.2s;
+}
+
+.chevron.rotated {
+  transform: rotate(90deg);
+}
+
+.advanced-section {
+  padding-top: 12px;
+}
+
+/* Integrations */
+.integration-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.integration-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.integration-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main, #18181b);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .integration-title {
+  color: #f4f4f5;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.integration-content {
+  padding-left: 4px;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border-node, #e4e4e7);
+  margin: 16px 0;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .section-divider {
+  border-color: #3f3f46;
 }
 </style>

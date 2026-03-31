@@ -401,12 +401,15 @@
     "title": "Settings",
     "tabs": {
       "general": "General",
+      "appearance": "Appearance",
       "themes": "Themes",
       "canvas": "Canvas",
       "display": "Display",
-      "llm": "LLM",
-      "zotero": "Zotero"
+      "llm": "AI",
+      "zotero": "Zotero",
+      "integrations": "Integrations"
     },
+    "advanced": "Advanced",
     "display": {
       "fontScale": "Font Scale",
       "fontScaleHint": "Adjust text size across the canvas (Cmd+/Cmd- also works)",
@@ -424,6 +427,7 @@
       "resetDefaults": "Reset to Defaults"
     },
     "zotero": {
+      "description": "Import citations from Zotero and build citation graphs",
       "library": "Zotero Library",
       "detect": "Detect Zotero",
       "detecting": "Detecting...",
