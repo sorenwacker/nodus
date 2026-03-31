@@ -28,8 +28,7 @@ export interface UseNodeVisibilityOptions {
   getViewportSize: () => { width: number; height: number } | null
 }
 
-/** Threshold for LOD (Level of Detail) mode - render nodes as circles when many visible */
-const LOD_THRESHOLD = 500
+import { displayStorage } from '../../../lib/storage'
 
 /** Thresholds for graph size classification - increased for modern hardware */
 const LARGE_GRAPH_NODES = 500
@@ -99,18 +98,19 @@ export function useNodeVisibility(options: UseNodeVisibilityOptions) {
   )
 
   // Semantic zoom collapse - show title only when zoomed out
-  // Triggers at 50% zoom for any graph, or 60% for massive graphs
+  // Triggers at configured threshold (default 50%) for any graph, or +10% for massive graphs
   const isSemanticZoomCollapsed = computed(() => {
     const scale = viewState.scale.value
-    // Always collapse below 50% zoom
-    if (scale < 0.5) return true
-    // Collapse massive graphs below 60% zoom
-    if (isMassiveGraph.value && scale < 0.6) return true
+    const threshold = displayStorage.getSemanticZoomThreshold()
+    // Always collapse below threshold
+    if (scale < threshold) return true
+    // Collapse massive graphs below threshold + 10%
+    if (isMassiveGraph.value && scale < threshold + 0.1) return true
     return false
   })
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
-  const isLODMode = computed(() => visibleNodes.value.length > LOD_THRESHOLD)
+  const isLODMode = computed(() => visibleNodes.value.length > displayStorage.getLodThreshold())
 
   // Node degree (edge count) for LOD circle sizing
   const nodeDegree = computed(() => {

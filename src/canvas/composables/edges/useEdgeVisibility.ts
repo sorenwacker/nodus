@@ -38,9 +38,7 @@ export interface UseEdgeVisibilityReturn {
   visibleEdgeLines: ComputedRef<VisibleEdgeLine[]>
 }
 
-// Threshold for "edges on hover only" mode (based on visible edges, not total)
-// In bubble/LOD mode, we can handle more edges since rendering is simpler
-const EDGE_HOVER_ONLY_THRESHOLD = 1500
+import { displayStorage } from '../../../lib/storage'
 
 // Threshold for filtering edges by viewport visibility
 const EDGE_VIEWPORT_FILTER_THRESHOLD = 500
@@ -94,9 +92,9 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       }
     }
 
-    // For very large visible edge counts (500+), only show edges on hover/select
+    // For very large visible edge counts, only show edges on hover/select
     // Also include neighbor's edges (2nd hop) for context
-    if (edges.length > EDGE_HOVER_ONLY_THRESHOLD) {
+    if (edges.length > displayStorage.getEdgeHoverThreshold()) {
       if (hovered || selectedNodes.length > 0) {
         edges = edges.filter(e => {
           // Direct edges to hovered/selected nodes

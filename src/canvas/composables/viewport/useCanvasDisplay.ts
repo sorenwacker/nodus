@@ -34,7 +34,8 @@ export interface UseCanvasDisplayReturn {
   decreaseFontScale: () => void
 }
 
-const MAGNIFIER_THRESHOLD = 0.4
+import { displayStorage } from '../../../lib/storage'
+
 const MAGNIFIER_SIZE = 200
 const MAGNIFIER_ZOOM = 2.5
 const MIN_FONT_SCALE = 0.7
@@ -48,7 +49,7 @@ export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplay
 
   const shouldShowMagnifier = computed(() =>
     magnifierEnabled.value &&
-    scale.value < MAGNIFIER_THRESHOLD &&
+    scale.value < displayStorage.getMagnifierZoomThreshold() &&
     showMagnifier.value &&
     !isLargeGraph.value
   )

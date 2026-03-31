@@ -31,8 +31,7 @@ export interface UseGraphMetricsReturn {
   toggleBubbleMode: () => void
 }
 
-// LOD (Level of Detail) mode threshold
-const LOD_THRESHOLD = 500
+import { displayStorage } from '../../../lib/storage'
 
 export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsReturn {
   const {
@@ -60,19 +59,20 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   )
 
   // Semantic zoom collapse - show title only when zoomed out
-  // Triggers at 30% zoom for any graph, or 50% for massive graphs
+  // Triggers at configured threshold for any graph, or +20% for massive graphs
   const isSemanticZoomCollapsed = computed(() => {
     const s = scale.value
-    // Always collapse below 30% zoom
-    if (s < 0.3) return true
-    // Collapse massive graphs below 50% zoom
-    if (isMassiveGraph.value && s < 0.5) return true
+    const threshold = displayStorage.getSemanticZoomThreshold()
+    // Always collapse below threshold
+    if (s < threshold) return true
+    // Collapse massive graphs below threshold + 20%
+    if (isMassiveGraph.value && s < threshold + 0.2) return true
     return false
   })
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   // Also activates when user manually toggles bubble mode
-  const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > LOD_THRESHOLD)
+  const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > displayStorage.getLodThreshold())
 
   // Toggle bubble mode manually
   function toggleBubbleMode() {
