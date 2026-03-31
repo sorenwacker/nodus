@@ -20,29 +20,42 @@ defineProps<{
 function stripMarkdown(text: string): string {
   if (!text) return ''
   return text
+    // Remove code blocks first (before other processing)
+    .replace(/```[\s\S]*?```/g, '')
     // Remove headers
     .replace(/^#{1,6}\s+/gm, '')
-    // Remove bold/italic
+    // Remove bold/italic (handle nested cases)
+    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/___([^_]+)___/g, '$1')
     .replace(/__([^_]+)__/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
-    // Remove links but keep text
+    // Remove wikilinks [[text]] or [[text|alias]]
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    // Remove markdown links but keep text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     // Remove images
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
-    // Remove code blocks
-    .replace(/```[\s\S]*?```/g, '')
+    // Remove inline code
     .replace(/`([^`]+)`/g, '$1')
     // Remove blockquotes
-    .replace(/^>\s+/gm, '')
+    .replace(/^>\s*/gm, '')
     // Remove horizontal rules
     .replace(/^[-*_]{3,}$/gm, '')
     // Remove list markers
-    .replace(/^[\s]*[-*+]\s+/gm, '')
+    .replace(/^[\s]*[-*+]\s+/gm, '- ')
     .replace(/^[\s]*\d+\.\s+/gm, '')
+    // Remove HTML tags
+    .replace(/<[^>]+>/g, '')
+    // Remove math delimiters
+    .replace(/\$\$[\s\S]*?\$\$/g, '[math]')
+    .replace(/\$([^$]+)\$/g, '$1')
     // Collapse multiple newlines
     .replace(/\n{3,}/g, '\n\n')
+    // Collapse multiple spaces
+    .replace(/  +/g, ' ')
     .trim()
 }
 </script>
