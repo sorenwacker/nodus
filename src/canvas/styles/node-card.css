@@ -261,7 +261,7 @@
   background: var(--bg-surface-alt);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   min-width: 24px;
 }
@@ -282,7 +282,7 @@
   padding: 4px 8px;
   border: 1px solid var(--border-default);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   background: var(--bg-surface);
   color: var(--text-main);
   min-width: 0;
@@ -304,7 +304,7 @@
   background: var(--primary-color);
   color: white;
   cursor: pointer;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   font-weight: 500;
   white-space: nowrap;
 }
@@ -325,7 +325,7 @@
   background: var(--danger-color);
   color: white;
   cursor: pointer;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   font-weight: 500;
   white-space: nowrap;
 }
@@ -418,7 +418,7 @@
   background: var(--bg-surface);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale, 1));
   font-weight: 500;
 }
 
@@ -450,7 +450,7 @@
   color: var(--danger-color);
   cursor: pointer;
   padding: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   line-height: 1;
   display: flex;
@@ -501,7 +501,7 @@
   border-radius: 4px;
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   outline: none;
 }
 
@@ -514,7 +514,7 @@
 }
 
 .node-search-count {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--text-secondary);
   white-space: nowrap;
   padding: 0 4px;

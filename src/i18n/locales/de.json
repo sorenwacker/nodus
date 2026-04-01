@@ -381,12 +381,15 @@
     "title": "Einstellungen",
     "tabs": {
       "general": "Allgemein",
+      "appearance": "Erscheinungsbild",
       "themes": "Designs",
       "canvas": "Leinwand",
       "display": "Anzeige",
       "llm": "KI",
-      "zotero": "Zotero"
+      "zotero": "Zotero",
+      "integrations": "Integrationen"
     },
+    "advanced": "Erweitert",
     "display": {
       "fontScale": "Schriftgröße",
       "fontScaleHint": "Textgröße auf der Leinwand anpassen (Cmd+/Cmd- funktioniert auch)",
@@ -404,6 +407,7 @@
       "resetDefaults": "Standardwerte wiederherstellen"
     },
     "zotero": {
+      "description": "Zitate aus Zotero importieren und Zitationsgraphen erstellen",
       "library": "Zotero-Bibliothek",
       "detect": "Zotero erkennen",
       "detecting": "Erkennung...",

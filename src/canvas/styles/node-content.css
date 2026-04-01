@@ -21,7 +21,7 @@
 
 .node-content-minimal .minimal-hint {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   margin: 0;
   opacity: 0.7;
 }
@@ -388,14 +388,14 @@
 }
 
 .empty-state-box h3 {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 8px;
 }
 
 .empty-state-box p {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   margin: 0;
 }
 

@@ -28,7 +28,7 @@
   padding: 8px;
   background: var(--bg-surface-alt);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   max-height: 150px;
   overflow-y: auto;
 }
@@ -41,7 +41,7 @@
   border: 1px solid var(--border-default);
   border-radius: 6px;
   font-family: monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   max-height: 120px;
   overflow-y: auto;
   color: var(--text-secondary);
@@ -128,7 +128,7 @@
   background: var(--bg-surface-alt);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
 }
 
@@ -156,7 +156,7 @@
   padding: 8px 12px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   background: var(--bg-surface);
   color: var(--text-main);
 }
@@ -174,7 +174,7 @@
   padding: 8px 10px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
@@ -187,7 +187,7 @@
   background: var(--primary-color);
   color: white;
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
 }
 
@@ -207,7 +207,7 @@
   background: #dc2626;
   color: white;
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
 }
 
@@ -222,7 +222,7 @@
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   min-width: 32px;
 }
@@ -247,20 +247,20 @@
 }
 
 .context-info {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--text-muted);
   padding: 4px 0;
 }
 
 .settings-grid label {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-secondary);
 }
 
 .settings-label {
   display: block;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: 8px;
@@ -270,7 +270,7 @@
   padding: 8px 12px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   background: var(--bg-surface-alt);
   color: var(--text-main);
 }
@@ -284,7 +284,7 @@
   padding: 8px 12px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   background: var(--bg-surface-alt);
   color: var(--text-main);
   cursor: pointer;
@@ -330,7 +330,7 @@
 }
 
 .slider-value {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-main);
   min-width: 32px;
@@ -342,7 +342,7 @@
   padding: 12px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   line-height: 1.5;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   background: var(--bg-surface-alt);
@@ -380,7 +380,7 @@
   padding: 8px 12px;
   background: var(--bg-surface-alt);
   border-bottom: 1px solid var(--border-default);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -414,7 +414,7 @@
   overflow-y: auto;
   padding: 8px 12px;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   line-height: 1.5;
   color: var(--text-main);
   user-select: text;

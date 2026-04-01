@@ -381,12 +381,15 @@
     "title": "Paramètres",
     "tabs": {
       "general": "Général",
+      "appearance": "Apparence",
       "themes": "Thèmes",
       "canvas": "Canevas",
       "display": "Affichage",
       "llm": "IA",
-      "zotero": "Zotero"
+      "zotero": "Zotero",
+      "integrations": "Intégrations"
     },
+    "advanced": "Avancé",
     "display": {
       "fontScale": "Taille de police",
       "fontScaleHint": "Ajuster la taille du texte sur le canevas (Cmd+/Cmd- fonctionne aussi)",
@@ -404,6 +407,7 @@
       "resetDefaults": "Réinitialiser par défaut"
     },
     "zotero": {
+      "description": "Importer des citations depuis Zotero et construire des graphes de citations",
       "library": "Bibliothèque Zotero",
       "detect": "Détecter Zotero",
       "detecting": "Détection...",

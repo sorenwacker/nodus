@@ -381,12 +381,15 @@
     "title": "Impostazioni",
     "tabs": {
       "general": "Generale",
+      "appearance": "Aspetto",
       "themes": "Temi",
       "canvas": "Tela",
       "display": "Visualizzazione",
       "llm": "IA",
-      "zotero": "Zotero"
+      "zotero": "Zotero",
+      "integrations": "Integrazioni"
     },
+    "advanced": "Avanzate",
     "display": {
       "fontScale": "Dimensione carattere",
       "fontScaleHint": "Regola la dimensione del testo sulla tela (Cmd+/Cmd- funziona anche)",
@@ -404,6 +407,7 @@
       "resetDefaults": "Ripristina predefiniti"
     },
     "zotero": {
+      "description": "Importa citazioni da Zotero e costruisci grafi di citazioni",
       "library": "Libreria Zotero",
       "detect": "Rileva Zotero",
       "detecting": "Rilevamento...",

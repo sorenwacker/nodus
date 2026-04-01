@@ -191,6 +191,7 @@ onMounted(() => {
     window.removeEventListener('zoom-to-node', handleZoomToNode)
     window.removeEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
     pdfDrop.cleanup()
+    displayStore.cleanupListener()
   })
 
   // Only center if no saved view state
