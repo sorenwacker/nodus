@@ -79,7 +79,8 @@ const htmlConfig: DOMPurify.Config = {
  * Sanitize SVG content (from Typst, etc.)
  */
 export function sanitizeSvg(svg: string): string {
-  return DOMPurify.sanitize(svg, svgConfig)
+  // Type cast needed due to DOMPurify types version mismatch
+  return DOMPurify.sanitize(svg, svgConfig as Parameters<typeof DOMPurify.sanitize>[1])
 }
 
 /**
@@ -100,7 +101,8 @@ export function sanitizeMermaidSvg(svg: string): string {
  * Sanitize HTML content (from markdown rendering)
  */
 export function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, htmlConfig)
+  // Type cast needed due to DOMPurify types version mismatch
+  return DOMPurify.sanitize(html, htmlConfig as Parameters<typeof DOMPurify.sanitize>[1])
 }
 
 /**

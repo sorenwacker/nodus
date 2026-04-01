@@ -100,13 +100,17 @@ function markdownToTypst(content: string): string {
   result = result.replace(/^#\s+(.+)$/gm, '= $1')
 
   // Bold: **text** -> *text* (use placeholder to avoid italic conversion)
+  // eslint-disable-next-line no-control-regex
   result = result.replace(/\*\*([^*]+)\*\*/g, '\x00BOLD\x00$1\x00/BOLD\x00')
 
   // Italic: *text* -> _text_ (single asterisks only)
+  // eslint-disable-next-line no-control-regex
   result = result.replace(/\*([^*\x00]+)\*/g, '_$1_')
 
   // Restore bold markers
+  // eslint-disable-next-line no-control-regex
   result = result.replace(/\x00BOLD\x00/g, '*')
+  // eslint-disable-next-line no-control-regex
   result = result.replace(/\x00\/BOLD\x00/g, '*')
 
   // Code blocks

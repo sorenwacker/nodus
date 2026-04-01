@@ -109,9 +109,10 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
       }
 
       // Build cross-reference edges between all papers on canvas (if not cancelled)
+      // Use cacheOnly to avoid additional API calls - only use already-cached data
       if (totalPapers > 0 && !citationGraph.isCancelled.value) {
         showToast?.('Building cross-references...', 'info')
-        const crossRefResult = await citationGraph.buildCitationGraph({ createStubs: false })
+        const crossRefResult = await citationGraph.buildCitationGraph({ createStubs: false, cacheOnly: true })
         totalEdges += crossRefResult.edgesCreated
       }
 

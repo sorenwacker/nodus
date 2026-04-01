@@ -296,7 +296,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       console.log('[Mermaid] Loading mermaid library...')
       try {
         const mod = await import('mermaid')
-        let api = mod.default || mod
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let api: any = mod.default || mod
         if (api.default) api = api.default
 
         mermaidApi = api

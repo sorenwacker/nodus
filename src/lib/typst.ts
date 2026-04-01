@@ -70,7 +70,8 @@ export async function renderMath(
     const typstCode = displayMode ? `$ ${math} $` : `$${math}$`
 
     // Render to SVG
-    const result = await renderer.runWithSession(async (session) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await renderer.runWithSession(async (session: any) => {
       const svg = await session.svg({
         mainContent: typstCode,
       })

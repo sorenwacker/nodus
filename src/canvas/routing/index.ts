@@ -190,7 +190,7 @@ function pathToSvgString(path: Point[]): string {
 /**
  * Arrow visibility offset - adjusts path endpoint so arrow is visible above node
  */
-export const ARROW_OFFSET = 5
+export const ARROW_OFFSET: number = 5
 
 /**
  * Adjust path endpoint to ensure arrow is visible (not hidden behind node)

@@ -7,6 +7,7 @@ import type { Node, Edge } from '../types'
 import { exportToTypst, type ExportOptions as TypstExportOptions } from './typst-export'
 
 // Typst instance (lazy loaded)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let $typst: any = null
 let initPromise: Promise<void> | null = null
 

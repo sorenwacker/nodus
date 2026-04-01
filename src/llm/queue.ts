@@ -6,6 +6,7 @@
 import { ref, computed } from 'vue'
 import { providerRegistry } from './providers'
 import type { ChatMessage } from './types'
+import type { LLMTool } from './providers/types'
 
 type RequestType = 'generate' | 'chat'
 
@@ -27,7 +28,7 @@ interface GenerateRequest extends BaseRequest {
 interface ChatRequest extends BaseRequest {
   type: 'chat'
   messages: ChatMessage[]
-  tools?: unknown[]
+  tools?: LLMTool[]
 }
 
 type QueuedRequest = GenerateRequest | ChatRequest
@@ -70,7 +71,7 @@ class LLMQueue {
   /**
    * Chat with tools (queued)
    */
-  async chat(messages: ChatMessage[], tools?: unknown[]): Promise<{ message: ChatMessage }> {
+  async chat(messages: ChatMessage[], tools?: LLMTool[]): Promise<{ message: ChatMessage }> {
     return new Promise((resolve, reject) => {
       const request: ChatRequest = {
         id: crypto.randomUUID(),
@@ -218,7 +219,7 @@ export function useLLMQueue() {
   return {
     generate: (prompt: string, system?: string, priority?: number) =>
       llmQueue.generate(prompt, system, priority),
-    chat: (messages: ChatMessage[], tools?: unknown[]) =>
+    chat: (messages: ChatMessage[], tools?: LLMTool[]) =>
       llmQueue.chat(messages, tools),
     cancel: () => llmQueue.cancel(),
     cancelCurrent: () => llmQueue.cancelCurrent(),

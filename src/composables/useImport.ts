@@ -95,6 +95,7 @@ export function useImport(deps: ImportDeps) {
         error,
         notify: (t, m) => notifications$.error(t, m),
       })(e)
+      return []
     } finally {
       loading.value = false
     }
@@ -161,6 +162,7 @@ export function useImport(deps: ImportDeps) {
         error,
         notify: (t, m) => notifications$.error(t, m),
       })(e)
+      return []
     } finally {
       loading.value = false
     }
@@ -225,6 +227,7 @@ export function useImport(deps: ImportDeps) {
         error,
         notify: (t, m) => notifications$.error(t, m),
       })(e)
+      return { nodesCreated: 0, edgesCreated: 0, classNodesCreated: 0, nodeIds: [] }
     } finally {
       loading.value = false
     }

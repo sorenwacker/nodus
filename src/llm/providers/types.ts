@@ -8,6 +8,7 @@ export interface LLMMessage {
   content: string
   tool_calls?: Array<{
     id?: string
+    type?: 'function'
     function: {
       name: string
       arguments: string
@@ -27,6 +28,7 @@ export interface LLMTool {
 export interface GenerateOptions {
   prompt: string
   system?: string
+  maxTokens?: number
 }
 
 export interface ChatOptions {

@@ -6,6 +6,7 @@
 import { ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
 import { providerRegistry } from './providers'
+import type { ProviderConfig } from './providers/types'
 import { agentTools } from './tools'
 import { llmStorage } from '../lib/storage'
 import { DEFAULT_SYSTEM_PROMPT } from './prompts'
@@ -69,8 +70,8 @@ export function useLLM() {
 
     // Load provider config
     const config = llmStorage.getProviderConfig(providerId)
-    if (Object.keys(config).length > 0) {
-      providerRegistry.configureProvider(providerId, config)
+    if (Object.keys(config).length > 0 && 'id' in config) {
+      providerRegistry.configureProvider(providerId, config as ProviderConfig)
     }
   }
 

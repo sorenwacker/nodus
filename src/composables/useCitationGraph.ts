@@ -265,13 +265,16 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
   /**
    * Build citation graph for all citation nodes
    * Creates edges between existing nodes and optionally creates stub nodes
+   * @param cacheOnly - If true, skip API calls for papers without cached data (use after individual fetches)
    */
   async function buildCitationGraph(options?: {
     createStubs?: boolean
     maxStubsPerPaper?: number
+    cacheOnly?: boolean
   }): Promise<CitationGraphResult> {
     const createStubs = options?.createStubs ?? true
     const maxStubsPerPaper = options?.maxStubsPerPaper ?? 10
+    const cacheOnly = options?.cacheOnly ?? false
 
     isBuilding.value = true
     const errors: string[] = []
@@ -320,20 +323,41 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
       try {
         // Get paper from Semantic Scholar (by DOI or Semantic Scholar ID)
+        // In cacheOnly mode, skip papers without cached data
         let paper = null
-        if (doi) {
-          paper = await semanticScholar.getPaperByDOI(doi)
-        } else if (ssId) {
-          paper = await semanticScholar.getPaperById(ssId)
-        }
-        if (!paper) {
-          errors.push(`Paper not found: ${node.title}`)
-          continue
+        if (cacheOnly) {
+          if (doi) {
+            paper = semanticScholar.getCachedPaperByDOI(doi)
+          } else if (ssId) {
+            paper = semanticScholar.getCachedPaperById(ssId)
+          }
+          if (!paper) {
+            // Skip papers without cached data in cacheOnly mode
+            continue
+          }
+        } else {
+          if (doi) {
+            paper = await semanticScholar.getPaperByDOI(doi)
+          } else if (ssId) {
+            paper = await semanticScholar.getPaperById(ssId)
+          }
+          if (!paper) {
+            errors.push(`Paper not found: ${node.title}`)
+            continue
+          }
         }
 
-        // Get references and citations (sequential to respect rate limits)
-        const references = await semanticScholar.getReferences(paper.paperId)
-        const citations = await semanticScholar.getCitations(paper.paperId)
+        // Get references and citations
+        // In cacheOnly mode, use cached data only (no API calls)
+        let references: SemanticScholarReference[]
+        let citations: SemanticScholarReference[]
+        if (cacheOnly) {
+          references = semanticScholar.getCachedReferences(paper.paperId) || []
+          citations = semanticScholar.getCachedCitations(paper.paperId) || []
+        } else {
+          references = await semanticScholar.getReferences(paper.paperId)
+          citations = await semanticScholar.getCitations(paper.paperId)
+        }
 
         progress.value = {
           phase: 'creating',

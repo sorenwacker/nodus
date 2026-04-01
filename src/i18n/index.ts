@@ -9,15 +9,21 @@ import fr from './locales/fr.json'
 import es from './locales/es.json'
 import it from './locales/it.json'
 
+export type SupportedLocale = 'en' | 'de' | 'fr' | 'es' | 'it'
+const supportedLocales: SupportedLocale[] = ['en', 'de', 'fr', 'es', 'it']
+
+function isValidLocale(locale: string): locale is SupportedLocale {
+  return supportedLocales.includes(locale as SupportedLocale)
+}
+
 // Detect browser language or use stored preference
-function getDefaultLocale(): string {
+function getDefaultLocale(): SupportedLocale {
   const stored = localStorage.getItem('nodus-locale')
-  if (stored) return stored
+  if (stored && isValidLocale(stored)) return stored
 
   const browserLang = navigator.language.split('-')[0]
   // Return browser language if we have translations, otherwise default to English
-  const supportedLocales = ['en', 'de', 'fr', 'es', 'it']
-  return supportedLocales.includes(browserLang) ? browserLang : 'en'
+  return isValidLocale(browserLang) ? browserLang : 'en'
 }
 
 export const i18n = createI18n({
@@ -33,18 +39,18 @@ export const i18n = createI18n({
   },
 })
 
-export function setLocale(locale: string) {
+export function setLocale(locale: SupportedLocale) {
   i18n.global.locale.value = locale
   localStorage.setItem('nodus-locale', locale)
   document.documentElement.setAttribute('lang', locale)
 }
 
-export function getLocale(): string {
-  return i18n.global.locale.value
+export function getLocale(): SupportedLocale {
+  return i18n.global.locale.value as SupportedLocale
 }
 
 // Lazy load additional locales
-export async function loadLocale(locale: string): Promise<void> {
+export async function loadLocale(locale: SupportedLocale): Promise<void> {
   if (i18n.global.availableLocales.includes(locale)) {
     return // Already loaded
   }

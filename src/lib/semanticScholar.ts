@@ -383,6 +383,38 @@ export class SemanticScholarProvider {
   }
 
   /**
+   * Get cached paper by DOI (no API call)
+   */
+  getCachedPaperByDOI(doi: string): SemanticScholarPaper | null {
+    const cacheKey = `${this.cachePrefix}doi_${doi}`
+    return this.getFromCache<SemanticScholarPaper>(cacheKey)
+  }
+
+  /**
+   * Get cached paper by ID (no API call)
+   */
+  getCachedPaperById(paperId: string): SemanticScholarPaper | null {
+    const cacheKey = `${this.cachePrefix}paper_${paperId}`
+    return this.getFromCache<SemanticScholarPaper>(cacheKey)
+  }
+
+  /**
+   * Get cached references (no API call)
+   */
+  getCachedReferences(paperId: string): SemanticScholarReference[] | null {
+    const cacheKey = `${this.cachePrefix}refs_${paperId}`
+    return this.getFromCache<SemanticScholarReference[]>(cacheKey)
+  }
+
+  /**
+   * Get cached citations (no API call)
+   */
+  getCachedCitations(paperId: string): SemanticScholarReference[] | null {
+    const cacheKey = `${this.cachePrefix}cites_${paperId}`
+    return this.getFromCache<SemanticScholarReference[]>(cacheKey)
+  }
+
+  /**
    * Clear all cached data
    */
   clearCache(): void {

@@ -127,10 +127,10 @@ function cleanBibValue(value: string): string {
   return cleaned
     // Convert LaTeX commands to unicode
     .replace(/\\&/g, '&')
-    .replace(/\\'([aeiou])/gi, (_, c) => ({ a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú', A: 'Á', E: 'É', I: 'Í', O: 'Ó', U: 'Ú' }[c] || c))
-    .replace(/\\"([aeiou])/gi, (_, c) => ({ a: 'ä', e: 'ë', i: 'ï', o: 'ö', u: 'ü', A: 'Ä', E: 'Ë', I: 'Ï', O: 'Ö', U: 'Ü' }[c] || c))
-    .replace(/\\`([aeiou])/gi, (_, c) => ({ a: 'à', e: 'è', i: 'ì', o: 'ò', u: 'ù', A: 'À', E: 'È', I: 'Ì', O: 'Ò', U: 'Ù' }[c] || c))
-    .replace(/\\~([an])/gi, (_, c) => ({ a: 'ã', n: 'ñ', A: 'Ã', N: 'Ñ' }[c] || c))
+    .replace(/\\'([aeiou])/gi, (_, c: string) => ({ a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú', A: 'Á', E: 'É', I: 'Í', O: 'Ó', U: 'Ú' } as Record<string, string>)[c] || c)
+    .replace(/\\"([aeiou])/gi, (_, c: string) => ({ a: 'ä', e: 'ë', i: 'ï', o: 'ö', u: 'ü', A: 'Ä', E: 'Ë', I: 'Ï', O: 'Ö', U: 'Ü' } as Record<string, string>)[c] || c)
+    .replace(/\\`([aeiou])/gi, (_, c: string) => ({ a: 'à', e: 'è', i: 'ì', o: 'ò', u: 'ù', A: 'À', E: 'È', I: 'Ì', O: 'Ò', U: 'Ù' } as Record<string, string>)[c] || c)
+    .replace(/\\~([an])/gi, (_, c: string) => ({ a: 'ã', n: 'ñ', A: 'Ã', N: 'Ñ' } as Record<string, string>)[c] || c)
     .replace(/\\c\{c\}/gi, 'ç')
     .replace(/\\ss\b/g, 'ß')
     .replace(/---/g, '—')
