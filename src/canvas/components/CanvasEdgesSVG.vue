@@ -1,13 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { VisibleEdgeLine } from '../composables/edges'
 
-export interface MarkerColor {
-  value: string
-}
-
-defineProps<{
+const props = defineProps<{
   edges: VisibleEdgeLine[]
-  markerColors: MarkerColor[]
   isLargeGraph: boolean
   edgeStrokeWidth: number
   lassoPoints: Array<{ x: number; y: number }>
@@ -17,21 +13,39 @@ defineProps<{
   isCreatingEdge: boolean
   edgePreviewStart: { x: number; y: number } | null
   edgePreviewEnd: { x: number; y: number }
-  getArrowMarkerId: (color: string) => string
 }>()
 
 defineEmits<{
   (e: 'edge-click', event: MouseEvent, edgeId: string): void
 }>()
+
+// Derive marker colors dynamically from visible edges
+// This automatically creates markers for any edge color in use
+const markerColors = computed(() => {
+  const colors = new Set<string>()
+  // Also add highlight color for edge preview
+  colors.add(props.highlightColor)
+  for (const edge of props.edges) {
+    if (edge.color) colors.add(edge.color)
+    if (edge.edgeHighlightColor) colors.add(edge.edgeHighlightColor)
+  }
+  return Array.from(colors)
+})
+
+// Simple marker ID generation - just remove # from color
+function getArrowMarkerId(color: string): string {
+  return `arrow-${color.replace('#', '')}`
+}
 </script>
 
 <template>
   <svg class="edges-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;">
     <defs>
+      <!-- Dynamically create markers for all edge colors in use -->
       <marker
         v-for="color in markerColors"
-        :id="getArrowMarkerId(color.value)"
-        :key="color.value"
+        :id="getArrowMarkerId(color)"
+        :key="color"
         viewBox="0 0 10 10"
         markerWidth="20"
         markerHeight="20"
@@ -40,7 +54,7 @@ defineEmits<{
         refY="5"
         orient="auto"
       >
-        <path d="M0,0 L10,5 L0,10 z" :fill="color.value" />
+        <path d="M0,0 L10,5 L0,10 z" :fill="color" />
       </marker>
     </defs>
 

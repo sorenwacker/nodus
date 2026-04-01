@@ -838,3 +838,30 @@
   border-radius: 2px;
   transition: width 0.3s ease;
 }
+
+.citation-fetch-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--bg-warning, #fef3c7);
+  border-radius: 8px;
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text-warning, #92400e);
+}
+
+.citation-fetch-wait-icon {
+  font-size: calc(16px * var(--font-scale, 1));
+}
+
+.citation-fetch-wait-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.citation-fetch-papers {
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--text-muted, #71717a);
+  margin-bottom: 4px;
+}

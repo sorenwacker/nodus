@@ -302,7 +302,17 @@
   "citations": {
     "importTitle": "Importa citazioni",
     "selectAll": "Seleziona tutto ({count})",
-    "importCount": "Importa {count} citazione | Importa {count} citazioni"
+    "importCount": "Importa {count} citazione | Importa {count} citazioni",
+    "fetch": {
+      "title": "Recupero citazioni",
+      "queued": "({count} in coda)",
+      "paper": "Paper {current} / {total}",
+      "citation": "Citazione {current} / {total}",
+      "cancel": "Annulla",
+      "rateLimited": "Limite raggiunto, nuovo tentativo tra",
+      "nextRequest": "Prossima richiesta tra",
+      "seconds": "{count}s"
+    }
   },
   "common": {
     "close": "Chiudi",

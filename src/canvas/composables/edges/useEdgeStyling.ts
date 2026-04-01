@@ -139,6 +139,11 @@ const LINK_TYPE_COLORS_DARK: Record<string, string> = {
   blocks: '#ef4444',      // Red - blocking relationship
   supports: '#22c55e',    // Green - supporting relationship
   contradicts: '#f97316', // Orange - contradicting relationship
+  // Ontology link types
+  subClassOf: '#9333ea',  // Purple - class hierarchy (matches Rust transformer)
+  'rdf:type': '#06b6d4',  // Cyan - instance-of relationship
+  domain: '#8b5cf6',      // Violet - property domain
+  range: '#d946ef',       // Fuchsia - property range
 }
 
 const LINK_TYPE_COLORS_LIGHT: Record<string, string> = {
@@ -147,6 +152,11 @@ const LINK_TYPE_COLORS_LIGHT: Record<string, string> = {
   blocks: '#b91c1c',      // Darker red for light mode
   supports: '#15803d',    // Darker green for light mode
   contradicts: '#c2410c', // Darker orange for light mode
+  // Ontology link types
+  subClassOf: '#7c3aed',  // Darker purple for light mode
+  'rdf:type': '#0891b2',  // Darker cyan for light mode
+  domain: '#6d28d9',      // Darker violet for light mode
+  range: '#a21caf',       // Darker fuchsia for light mode
 }
 
 // Map neon/bright colors (dark themes) to visible equivalents (light themes)
@@ -158,6 +168,11 @@ const NEON_TO_LIGHT_COLORS: Record<string, string> = {
   '#ef4444': '#b91c1c', // red -> crimson
   '#a855f7': '#7c3aed', // purple -> violet
   '#ec4899': '#be185d', // pink -> dark pink
+  // Ontology colors (from Rust transformer)
+  '#9333ea': '#7c3aed', // ontology purple -> violet
+  '#06b6d4': '#0891b2', // ontology cyan -> darker cyan
+  '#8b5cf6': '#6d28d9', // ontology violet -> darker violet
+  '#d946ef': '#a21caf', // ontology fuchsia -> darker fuchsia
   // Legacy mappings for old neon colors
   '#ff00ff': '#be185d', // magenta -> pink
   '#00ccff': '#1d4ed8', // old blue -> royal blue

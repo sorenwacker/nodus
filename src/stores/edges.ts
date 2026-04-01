@@ -203,17 +203,27 @@ export const useEdgesStore = defineStore('edges', () => {
   }
 
   /**
-   * Local edge deduplication (handles bidirectional duplicates)
+   * Local edge deduplication
+   * - For directed edges: keep exact duplicates only (same source, target, link_type)
+   * - For undirected edges: treat A->B and B->A as same
    */
   function deduplicateEdgesLocal(edgeList: Edge[]): Edge[] {
-    const seenPairs = new Set<string>()
+    const seenKeys = new Set<string>()
     const beforeCount = edgeList.length
     const result = edgeList.filter((e) => {
-      // Create canonical key (smaller ID first) to catch bidirectional duplicates
-      const ids = [e.source_node_id, e.target_node_id].sort()
-      const key = `${ids[0]}:${ids[1]}`
-      if (seenPairs.has(key)) return false
-      seenPairs.add(key)
+      // For directed edges, use exact source->target->type key
+      // For undirected edges, sort IDs to catch bidirectional duplicates
+      let key: string
+      if (e.directed !== false) {
+        // Directed: exact match including link_type
+        key = `${e.source_node_id}:${e.target_node_id}:${e.link_type}`
+      } else {
+        // Undirected: canonical form (sorted IDs + type)
+        const ids = [e.source_node_id, e.target_node_id].sort()
+        key = `${ids[0]}:${ids[1]}:${e.link_type}`
+      }
+      if (seenKeys.has(key)) return false
+      seenKeys.add(key)
       return true
     })
     const removed = beforeCount - result.length

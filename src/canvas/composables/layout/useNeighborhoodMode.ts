@@ -24,6 +24,8 @@ interface Store {
   getFilteredEdges: () => Edge[]
   getNode: (id: string) => Node | undefined
   getSelectedNodeIds: () => string[]
+  /** Version counter that increments when node list or positions change */
+  nodeLayoutVersion?: Ref<number> | { value: number }
 }
 
 interface ViewState {
@@ -79,6 +81,9 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
 
   // Nodes to display (filtered by neighborhood if active, with local positions)
   const displayNodes = computed(() => {
+    // Track nodeLayoutVersion for reactivity when nodes are added/removed
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    store.nodeLayoutVersion?.value
     const nodes = store.getFilteredNodes()
     if (neighborhoodNodeIds.value) {
       const positions = neighborhoodPositions.value

@@ -318,7 +318,17 @@
   "citations": {
     "importTitle": "Import Citations",
     "selectAll": "Select all ({count})",
-    "importCount": "Import {count} citation | Import {count} citations"
+    "importCount": "Import {count} citation | Import {count} citations",
+    "fetch": {
+      "title": "Fetching Citations",
+      "queued": "({count} queued)",
+      "paper": "Paper {current} / {total}",
+      "citation": "Citation {current} / {total}",
+      "cancel": "Cancel",
+      "rateLimited": "Rate limited, retrying in",
+      "nextRequest": "Next request in",
+      "seconds": "{count}s"
+    }
   },
   "common": {
     "close": "Close",

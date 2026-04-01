@@ -41,9 +41,22 @@ interface CacheEntry<T> {
 // Cache duration: 24 hours
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000
 
-// Rate limiting: minimum 10 seconds between requests (conservative for API limits)
-// Semantic Scholar free tier: 100 requests/5 min = 1 per 3s, but burst limits apply
-const MIN_REQUEST_INTERVAL_MS = 10000
+// Rate limiting for Semantic Scholar API:
+// 1 request every 3 seconds to avoid hitting rate limits
+const MIN_REQUEST_INTERVAL_MS = 3000
+
+// Backoff for 429 errors: start at 10s, doubles each retry (10s, 20s, 40s)
+const BASE_BACKOFF_MS = 10000
+
+/** Wait status for UI countdown display */
+export interface WaitStatus {
+  isWaiting: boolean
+  remainingSeconds: number
+  reason: 'rate-limit' | 'backoff' | null
+}
+
+/** Callback type for wait status updates */
+export type WaitStatusCallback = (status: WaitStatus) => void
 
 /**
  * Semantic Scholar API provider
@@ -54,6 +67,73 @@ export class SemanticScholarProvider {
   private requestQueue: Array<() => void> = []
   private isProcessingQueue = false
   private cachePrefix = 'nodus_ss_cache_'
+  private waitStatusCallback: WaitStatusCallback | null = null
+  private countdownInterval: ReturnType<typeof setInterval> | null = null
+
+  /**
+   * Set callback to receive wait status updates for UI display
+   */
+  setWaitStatusCallback(callback: WaitStatusCallback | null): void {
+    this.waitStatusCallback = callback
+  }
+
+  /**
+   * Start countdown timer and emit status updates
+   */
+  private startCountdown(totalMs: number, reason: 'rate-limit' | 'backoff'): void {
+    if (!this.waitStatusCallback) return
+
+    const startTime = Date.now()
+    const endTime = startTime + totalMs
+
+    // Clear any existing countdown
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval)
+    }
+
+    // Emit initial status
+    this.waitStatusCallback({
+      isWaiting: true,
+      remainingSeconds: Math.ceil(totalMs / 1000),
+      reason,
+    })
+
+    // Update every second
+    this.countdownInterval = setInterval(() => {
+      const remaining = Math.max(0, endTime - Date.now())
+      const remainingSeconds = Math.ceil(remaining / 1000)
+
+      if (this.waitStatusCallback) {
+        this.waitStatusCallback({
+          isWaiting: remainingSeconds > 0,
+          remainingSeconds,
+          reason: remainingSeconds > 0 ? reason : null,
+        })
+      }
+
+      if (remainingSeconds <= 0 && this.countdownInterval) {
+        clearInterval(this.countdownInterval)
+        this.countdownInterval = null
+      }
+    }, 1000)
+  }
+
+  /**
+   * Stop countdown and clear wait status
+   */
+  private stopCountdown(): void {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval)
+      this.countdownInterval = null
+    }
+    if (this.waitStatusCallback) {
+      this.waitStatusCallback({
+        isWaiting: false,
+        remainingSeconds: 0,
+        reason: null,
+      })
+    }
+  }
 
   /**
    * Get paper metadata by DOI
@@ -204,7 +284,6 @@ export class SemanticScholarProvider {
    */
   private rateLimitedFetch(url: string, retryCount = 0): Promise<Response> {
     const maxRetries = 3
-    const baseBackoff = 30000 // 30 seconds base backoff for 429
 
     return new Promise((resolve, reject) => {
       const executeRequest = async () => {
@@ -213,7 +292,9 @@ export class SemanticScholarProvider {
         const waitTime = Math.max(0, MIN_REQUEST_INTERVAL_MS - timeSinceLastRequest)
 
         if (waitTime > 0) {
+          this.startCountdown(waitTime, 'rate-limit')
           await this.sleep(waitTime)
+          this.stopCountdown()
         }
 
         this.lastRequestTime = Date.now()
@@ -227,10 +308,12 @@ export class SemanticScholarProvider {
 
           // Handle 429 rate limit with retry
           if (response.status === 429 && retryCount < maxRetries) {
-            const backoff = baseBackoff * Math.pow(2, retryCount)
+            const backoff = BASE_BACKOFF_MS * Math.pow(2, retryCount)
             console.warn(`[SemanticScholar] Rate limited (429), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`)
             this.processQueue()
+            this.startCountdown(backoff, 'backoff')
             await this.sleep(backoff)
+            this.stopCountdown()
             // Retry the request
             const retryResponse = await this.rateLimitedFetch(url, retryCount + 1)
             resolve(retryResponse)
@@ -242,10 +325,12 @@ export class SemanticScholarProvider {
           // Network errors - typically CORS issues from 429 responses
           // When rate limited, the API returns 429 without CORS headers
           if (retryCount < maxRetries) {
-            const backoff = baseBackoff * Math.pow(2, retryCount)
+            const backoff = BASE_BACKOFF_MS * Math.pow(2, retryCount)
             console.warn(`[SemanticScholar] Rate limit hit (CORS blocked), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`)
             this.processQueue()
+            this.startCountdown(backoff, 'backoff')
             await this.sleep(backoff)
+            this.stopCountdown()
             try {
               const retryResponse = await this.rateLimitedFetch(url, retryCount + 1)
               resolve(retryResponse)

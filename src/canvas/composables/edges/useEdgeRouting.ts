@@ -205,30 +205,41 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     // Filter edges to only those with valid source and target nodes
     edges = edges.filter(e => nodeMap.has(e.source_node_id) && nodeMap.has(e.target_node_id))
 
-    // Deduplicate edges by source-target pair (using sorted key to catch A->B and B->A as same pair)
-    const seenSortedPairs = new Set<string>()
+    // Deduplicate edges - respect directed flag
+    // For directed edges: keep exact duplicates only (same source, target, link_type)
+    // For undirected edges: treat A->B and B->A as same
+    const seenEdgeKeys = new Set<string>()
     edges = edges.filter(e => {
       if (e.storyline_id) return true
-      const ids = [e.source_node_id, e.target_node_id].sort()
-      const key = `${ids[0]}:${ids[1]}`
-      if (seenSortedPairs.has(key)) return false
-      seenSortedPairs.add(key)
+      let key: string
+      if (e.directed !== false) {
+        // Directed: exact source->target->type key
+        key = `${e.source_node_id}:${e.target_node_id}:${e.link_type}`
+      } else {
+        // Undirected: canonical form (sorted IDs + type)
+        const ids = [e.source_node_id, e.target_node_id].sort()
+        key = `${ids[0]}:${ids[1]}:${e.link_type}`
+      }
+      if (seenEdgeKeys.has(key)) return false
+      seenEdgeKeys.add(key)
       return true
     })
 
     // Pre-compute bidirectional edge set for O(1) lookup
-    // Track directional pairs (source:target) to detect when both A->B and B->A exist
-    const seenDirectionalPairs = new Set<string>()
+    // Only consider edges bidirectional if they have the SAME link_type
+    // Different link_types (e.g., "subClassOf" vs "relatedTo") should both show arrows
+    const seenDirectionalPairs = new Map<string, string>() // key -> link_type
     const bidirectionalEdges = new Set<string>()
     for (const e of edges) {
       const forwardKey = `${e.source_node_id}:${e.target_node_id}`
       const reverseKey = `${e.target_node_id}:${e.source_node_id}`
-      // Check if we've already seen the reverse direction
-      if (seenDirectionalPairs.has(reverseKey)) {
+      const linkType = e.link_type || ''
+      // Check if we've already seen the reverse direction WITH SAME link_type
+      if (seenDirectionalPairs.get(reverseKey) === linkType) {
         bidirectionalEdges.add(forwardKey)
         bidirectionalEdges.add(reverseKey)
       }
-      seenDirectionalPairs.add(forwardKey)
+      seenDirectionalPairs.set(forwardKey, linkType)
     }
 
     const style = globalEdgeStyle.value

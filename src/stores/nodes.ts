@@ -462,6 +462,7 @@ export const useNodesStore = defineStore('nodes', () => {
     try {
       const node = await invoke<Node>('create_node', { input: inputWithWorkspace })
       nodes.value.push(node)
+      nodeLayoutVersion.value++ // Trigger reactivity for displayNodes/visibleNodes
       return node
     } catch (e) {
       console.error('Failed to create node:', e)
@@ -488,6 +489,7 @@ export const useNodesStore = defineStore('nodes', () => {
         deleted_at: null,
       }
       nodes.value.push(node)
+      nodeLayoutVersion.value++ // Trigger reactivity for displayNodes/visibleNodes
       return node
     }
   }

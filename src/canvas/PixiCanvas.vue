@@ -264,6 +264,7 @@ const neighborhood = useNeighborhoodMode({
     getFilteredEdges: () => [...store.filteredEdges],
     getNode: store.getNode,
     getSelectedNodeIds: () => [...store.selectedNodeIds],
+    nodeLayoutVersion: computed(() => store.nodeLayoutVersion),
   },
   viewState: {
     scale,
@@ -655,6 +656,7 @@ const {
   isFetchingCitations,
   fetchProgress,
   queueSize,
+  waitStatus,
   contextMenuNodeHasDOI,
   contextMenuDOICount,
   handleFetchCitations,
@@ -1542,11 +1544,9 @@ const {
   highlightColor,
   selectedColor,
   nodeColors,
-  allMarkerColors,
   cycleEdgeStyle,
   getEdgeColor,
   getEdgeHighlightColor,
-  getArrowMarkerId,
   changeEdgeColor,
 } = edgeStyling
 
@@ -1972,7 +1972,6 @@ useCanvasKeyboardShortcuts({
         <!-- SVG for edges (above frames) -->
         <CanvasEdgesSVG
           :edges="visibleEdgeLines"
-          :marker-colors="allMarkerColors"
           :is-large-graph="isLargeGraph"
           :edge-stroke-width="edgeStrokeWidth"
           :lasso-points="lassoPoints"
@@ -1989,7 +1988,6 @@ useCanvasKeyboardShortcuts({
               : null
           "
           :edge-preview-end="edgePreviewEnd"
-          :get-arrow-marker-id="getArrowMarkerId"
           @edge-click="onEdgeClick"
         />
 
@@ -2232,6 +2230,14 @@ useCanvasKeyboardShortcuts({
                 :style="{ width: `${(fetchProgress.current / Math.max(fetchProgress.total, 1)) * 100}%` }"
               ></div>
             </div>
+          </div>
+          <!-- Wait countdown display -->
+          <div v-if="waitStatus?.isWaiting" class="citation-fetch-wait">
+            <span class="citation-fetch-wait-icon">&#8987;</span>
+            <span class="citation-fetch-wait-text">
+              {{ waitStatus.reason === 'backoff' ? 'Rate limited, retrying in' : 'Next request in' }}
+              {{ waitStatus.remainingSeconds }}s
+            </span>
           </div>
         </div>
       </div>

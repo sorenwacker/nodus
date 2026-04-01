@@ -44,6 +44,11 @@
       "deleteEdge": "Kante löschen",
       "deleteEdgeTooltip": "Diese Kante löschen"
     },
+    "hover": {
+      "incoming": "Eingehende Kanten (zitiert von)",
+      "outgoing": "Ausgehende Kanten (zitiert)",
+      "bidirectional": "Bidirektionale Verbindungen"
+    },
     "frame": {
       "delete": "Rahmen löschen",
       "addFrame": "Rahmen hinzufügen - Ausgewählte Knoten gruppieren",
@@ -59,7 +64,8 @@
       "showAgentLog": "Agenten-Protokoll anzeigen",
       "log": "Log",
       "hint": "Hoch/runter scrollen: Zoom | Seitwärts scrollen: Verschieben | Alt+Ziehen: Verknüpfen | Doppelklick: Neu",
-      "cancelPdf": "PDF-Verarbeitung abbrechen"
+      "cancelPdf": "PDF-Verarbeitung abbrechen",
+      "cancelImport": "Import abbrechen"
     },
     "controls": {
       "zoomIn": "Vergrößern",
@@ -72,8 +78,10 @@
       "radialLayout": "Radiales Layout - Nachbarn in konzentrischen Kreisen um ausgewählten Knoten anordnen",
       "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
       "edgeStyle": "Kantenform",
+      "highlightEdges": "Alle Kanten hervorheben - Alle Kanten sichtbarer machen",
       "magnifier": "Lupe - Vergrößerte Ansicht bei Verkleinerung anzeigen",
       "neighborhoodView": "Nachbarschaftsansicht - Nur ausgewählten Knoten und Nachbarn anzeigen (N)",
+      "bubbleMode": "Blasenmodus - Knoten als Kreise anzeigen",
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
       "hop": "Schritt",
       "hops": "Schritte",
@@ -302,7 +310,17 @@
   "citations": {
     "importTitle": "Zitate importieren",
     "selectAll": "Alle auswählen ({count})",
-    "importCount": "{count} Zitat importieren | {count} Zitate importieren"
+    "importCount": "{count} Zitat importieren | {count} Zitate importieren",
+    "fetch": {
+      "title": "Zitate abrufen",
+      "queued": "({count} in Warteschlange)",
+      "paper": "Paper {current} / {total}",
+      "citation": "Zitat {current} / {total}",
+      "cancel": "Abbrechen",
+      "rateLimited": "Ratenlimit erreicht, Wiederholung in",
+      "nextRequest": "Nächste Anfrage in",
+      "seconds": "{count}s"
+    }
   },
   "common": {
     "close": "Schließen",

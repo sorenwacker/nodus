@@ -5,8 +5,9 @@
  * Wraps the useCitationGraph composable with UI concerns.
  * Uses a queue to allow adding papers while fetching is in progress.
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, onUnmounted, type Ref } from 'vue'
 import { useCitationGraph, extractDOI } from '../../../composables/useCitationGraph'
+import { semanticScholar, type WaitStatus } from '../../../lib/semanticScholar'
 import type { Node, CreateNodeInput, CreateEdgeInput } from '../../../types'
 
 export interface UseCitationFetchOptions {
@@ -32,6 +33,23 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
   const isProcessingQueue = ref(false)
   const queueTotalPapers = ref(0)
   const queueProcessedPapers = ref(0)
+
+  // Wait status for countdown display
+  const waitStatus = ref<WaitStatus>({
+    isWaiting: false,
+    remainingSeconds: 0,
+    reason: null,
+  })
+
+  // Set up callback for wait status updates from Semantic Scholar API
+  semanticScholar.setWaitStatusCallback((status) => {
+    waitStatus.value = status
+  })
+
+  // Clean up callback on unmount
+  onUnmounted(() => {
+    semanticScholar.setWaitStatusCallback(null)
+  })
 
   // Initialize citation graph composable
   const citationGraph = useCitationGraph({
@@ -197,6 +215,7 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
     isFetchingCitations,
     fetchProgress: citationGraph.fetchProgress,
     queueSize,
+    waitStatus: computed(() => waitStatus.value),
 
     // Actions
     cancelFetch: citationGraph.cancelFetch,
