@@ -5,6 +5,55 @@
 
 // Core data types
 
+/**
+ * Node type classification
+ * - note: Regular content node
+ * - comment: Storyline annotation
+ * - character: Person/entity (novel writing)
+ * - location: Place (novel writing)
+ * - citation: Reference (academic writing)
+ * - term: Glossary/definition (both)
+ * - item: Object, figure, dataset
+ */
+export type NodeType = 'note' | 'comment' | 'character' | 'location' | 'citation' | 'term' | 'item'
+
+/** Entity node types (subset of NodeType used for cross-linking) */
+export type EntityNodeType = 'character' | 'location' | 'citation' | 'term' | 'item'
+
+/** All entity node type values */
+export const ENTITY_NODE_TYPES: EntityNodeType[] = ['character', 'location', 'citation', 'term', 'item']
+
+/**
+ * Edge link type classification
+ * - related: General relationship
+ * - cites: Academic citation
+ * - blocks: Blocking relationship
+ * - supports: Supporting evidence
+ * - contradicts: Contradicting evidence
+ * - wikilink: Wiki-style link from content
+ * - mentions: Content node mentions entity
+ * - appears_in: Character/location appears in scene
+ * - references: Academic reference to citation
+ * - defines: Node defines a term
+ */
+export type LinkType =
+  | 'related'
+  | 'cites'
+  | 'blocks'
+  | 'supports'
+  | 'contradicts'
+  | 'wikilink'
+  | 'mentions'
+  | 'appears_in'
+  | 'references'
+  | 'defines'
+
+/** Entity-specific link types */
+export type EntityLinkType = 'mentions' | 'appears_in' | 'references' | 'defines'
+
+/** All entity link type values */
+export const ENTITY_LINK_TYPES: EntityLinkType[] = ['mentions', 'appears_in', 'references', 'defines']
+
 export interface Node {
   id: string
   title: string
