@@ -6,7 +6,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
-import type { Edge, CreateEdgeInput } from '../types'
+import type { Edge, CreateEdgeInput, EntityLinkType } from '../types'
+import { ENTITY_LINK_TYPES } from '../types'
 
 export const useEdgesStore = defineStore('edges', () => {
   const edges = ref<Edge[]>([])
@@ -305,6 +306,36 @@ export const useEdgesStore = defineStore('edges', () => {
     return findEdgeBetween(sourceId, targetId) !== undefined
   }
 
+  /**
+   * Get all edges connecting a node to entity nodes
+   * @param nodeId - The node to find entity edges for
+   * @param direction - 'outgoing' (node -> entity), 'incoming' (entity -> node), or 'both'
+   */
+  function getEntityEdgesForNode(
+    nodeId: string,
+    direction: 'outgoing' | 'incoming' | 'both' = 'both'
+  ): Edge[] {
+    return edges.value.filter((e) => {
+      const isEntityLink = ENTITY_LINK_TYPES.includes(e.link_type as EntityLinkType)
+      if (!isEntityLink) return false
+
+      if (direction === 'outgoing') {
+        return e.source_node_id === nodeId
+      } else if (direction === 'incoming') {
+        return e.target_node_id === nodeId
+      } else {
+        return e.source_node_id === nodeId || e.target_node_id === nodeId
+      }
+    })
+  }
+
+  /**
+   * Get edges by link type
+   */
+  function getEdgesByLinkType(linkType: string): Edge[] {
+    return edges.value.filter((e) => e.link_type === linkType)
+  }
+
   return {
     // State
     edges,
@@ -330,6 +361,8 @@ export const useEdgesStore = defineStore('edges', () => {
     getEdge,
     findEdgeBetween,
     edgeExists,
+    getEntityEdgesForNode,
+    getEdgesByLinkType,
   }
 })
 
