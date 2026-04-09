@@ -24,14 +24,22 @@
   height: 1px;
   transform-origin: 0 0;
   z-index: 2;
-  /* GPU acceleration with 3D context for crisp text */
+  /* GPU acceleration for frames and edges */
   will-change: transform;
-  transform-style: preserve-3d;
-  -webkit-font-smoothing: subpixel-antialiased;
-  -moz-osx-font-smoothing: auto;
-  text-rendering: optimizeLegibility;
   contain: layout style;
   /* Children handle their own pointer-events */
+}
+
+/* Separate layer for node cards - renders at native resolution for crisp text */
+.nodes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  z-index: 3;
+  /* No transform - nodes positioned in screen coordinates */
+  pointer-events: none;
 }
 
 .canvas-viewport {

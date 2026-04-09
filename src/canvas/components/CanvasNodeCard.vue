@@ -85,9 +85,10 @@ const classes = computed(() => ({
   'neighbor-highlighted': props.isNeighborHighlighted,
 }))
 
+// Delete button scales with the node (no counter-scale needed)
+// Node renders at native resolution with zoom applied to dimensions
 const deleteButtonStyle = computed(() => ({
-  transform: `scale(${1 / props.scale})`,
-  transformOrigin: 'center center',
+  // No transform needed - button scales naturally with node
 }))
 
 const isEditingTitle = computed(() => props.editingTitleId === props.node.id)

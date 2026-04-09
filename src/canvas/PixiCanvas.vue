@@ -1757,11 +1757,18 @@ function getNodeStyle(node: {
   const width = isResizing ? resizePreview.value.width : node.width || NODE_DEFAULTS.WIDTH
   const height = isResizing ? resizePreview.value.height : node.height || NODE_DEFAULTS.HEIGHT
 
+  // Calculate screen position (node layer is outside canvas-content scale transform)
+  const screenX = x * scale.value + offsetX.value
+  const screenY = y * scale.value + offsetY.value
+  const screenWidth = width * scale.value
+  const screenHeight = height * scale.value
+
   const style: Record<string, string> = {
-    transform: `translate(${x}px, ${y}px)`,
-    width: width + 'px',
-    height: height + 'px',
-    borderWidth: nodeBorderWidth.value + 'px',
+    '--zoom-scale': String(scale.value),
+    transform: `translate(${screenX}px, ${screenY}px)`,
+    width: screenWidth + 'px',
+    height: screenHeight + 'px',
+    borderWidth: (nodeBorderWidth.value * scale.value) + 'px',
   }
 
   // Apply color theme background if set
@@ -2048,8 +2055,11 @@ useCanvasKeyboardShortcuts({
         />
 
         <!-- LOD Mode circles are rendered via Canvas 2D in CanvasLODCanvas above -->
+      </div>
 
-        <!-- Node cards - shown for all nodes in normal mode, or selected/editing nodes in LOD mode -->
+      <!-- Node cards layer - outside canvas-content for crisp text rendering -->
+      <!-- Nodes are positioned in screen coordinates directly -->
+      <div class="nodes-layer">
         <CanvasNodeCard
           v-for="node in lodCardNodes"
           :key="node.id"

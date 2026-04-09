@@ -3,18 +3,15 @@
   position: absolute;
   background: var(--bg-surface);
   border: 2px solid var(--border-default);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--zoom-scale, 1));
   cursor: grab;
   box-shadow: 0 2px 6px var(--shadow-sm), 0 1px 2px var(--shadow-md);
   user-select: none;
   display: flex;
   flex-direction: column;
-  min-height: 60px;
+  min-height: calc(60px * var(--zoom-scale, 1));
   z-index: 1;
-  /* GPU acceleration with crisp text */
-  will-change: transform;
-  contain: layout style paint;
-  transform: translateZ(0);
+  /* Crisp text - nodes rendered at native resolution */
   -webkit-font-smoothing: subpixel-antialiased;
   -moz-osx-font-smoothing: auto;
   text-rendering: optimizeLegibility;
@@ -58,12 +55,12 @@
 
 .node-card.collapsed .node-header {
   border-bottom: none;
-  border-radius: 5px;
-  font-size: calc(36px * var(--font-scale, 1));
+  border-radius: calc(5px * var(--zoom-scale, 1));
+  font-size: calc(36px * var(--font-scale, 1) * var(--zoom-scale, 1));
   font-weight: 700;
-  padding: 20px 24px;
+  padding: calc(20px * var(--zoom-scale, 1)) calc(24px * var(--zoom-scale, 1));
   color: var(--text-main);
-  letter-spacing: -0.5px;
+  letter-spacing: calc(-0.5px * var(--zoom-scale, 1));
   text-shadow: 0 1px 3px var(--shadow-sm);
   /* Center text */
   text-align: center;
@@ -79,13 +76,13 @@
 }
 
 .node-header {
-  padding: 8px 12px;
-  font-size: calc(12px * var(--font-scale, 1));
+  padding: calc(8px * var(--zoom-scale, 1)) calc(12px * var(--zoom-scale, 1));
+  font-size: calc(12px * var(--font-scale, 1) * var(--zoom-scale, 1));
   font-weight: 600;
   color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: calc(1px * var(--zoom-scale, 1)) solid var(--border-default);
   background: var(--bg-surface-alt);
-  border-radius: 7px 7px 0 0;
+  border-radius: calc(7px * var(--zoom-scale, 1)) calc(7px * var(--zoom-scale, 1)) 0 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -96,7 +93,7 @@
   width: 100%;
   border: none;
   background: transparent;
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: calc(12px * var(--font-scale, 1) * var(--zoom-scale, 1));
   font-weight: 600;
   color: var(--text-main);
   outline: none;
@@ -176,36 +173,36 @@
 /* Edge handles */
 .resize-edge-n,
 .resize-edge-s {
-  left: 8px;
-  right: 8px;
-  height: 6px;
+  left: calc(8px * var(--zoom-scale, 1));
+  right: calc(8px * var(--zoom-scale, 1));
+  height: calc(6px * var(--zoom-scale, 1));
   cursor: ns-resize;
 }
 
-.resize-edge-n { top: -3px; }
-.resize-edge-s { bottom: -3px; }
+.resize-edge-n { top: calc(-3px * var(--zoom-scale, 1)); }
+.resize-edge-s { bottom: calc(-3px * var(--zoom-scale, 1)); }
 
 .resize-edge-e,
 .resize-edge-w {
-  top: 8px;
-  bottom: 8px;
-  width: 6px;
+  top: calc(8px * var(--zoom-scale, 1));
+  bottom: calc(8px * var(--zoom-scale, 1));
+  width: calc(6px * var(--zoom-scale, 1));
   cursor: ew-resize;
 }
 
-.resize-edge-e { right: -3px; }
-.resize-edge-w { left: -3px; }
+.resize-edge-e { right: calc(-3px * var(--zoom-scale, 1)); }
+.resize-edge-w { left: calc(-3px * var(--zoom-scale, 1)); }
 
 /* Corner handles */
 .resize-corner {
-  width: 10px;
-  height: 10px;
+  width: calc(10px * var(--zoom-scale, 1));
+  height: calc(10px * var(--zoom-scale, 1));
 }
 
-.resize-corner-nw { top: -3px; left: -3px; cursor: nwse-resize; }
-.resize-corner-ne { top: -3px; right: -3px; cursor: nesw-resize; }
-.resize-corner-se { bottom: -3px; right: -3px; cursor: nwse-resize; }
-.resize-corner-sw { bottom: -3px; left: -3px; cursor: nesw-resize; }
+.resize-corner-nw { top: calc(-3px * var(--zoom-scale, 1)); left: calc(-3px * var(--zoom-scale, 1)); cursor: nwse-resize; }
+.resize-corner-ne { top: calc(-3px * var(--zoom-scale, 1)); right: calc(-3px * var(--zoom-scale, 1)); cursor: nesw-resize; }
+.resize-corner-se { bottom: calc(-3px * var(--zoom-scale, 1)); right: calc(-3px * var(--zoom-scale, 1)); cursor: nwse-resize; }
+.resize-corner-sw { bottom: calc(-3px * var(--zoom-scale, 1)); left: calc(-3px * var(--zoom-scale, 1)); cursor: nesw-resize; }
 
 /* Visual indicator for SE corner (most common) */
 .resize-corner-se::before,
@@ -213,21 +210,21 @@
   content: '';
   position: absolute;
   background: var(--text-muted);
-  border-radius: 1px;
+  border-radius: calc(1px * var(--zoom-scale, 1));
 }
 
 .resize-corner-se::before {
-  bottom: 3px;
-  right: 3px;
-  width: 6px;
-  height: 2px;
+  bottom: calc(3px * var(--zoom-scale, 1));
+  right: calc(3px * var(--zoom-scale, 1));
+  width: calc(6px * var(--zoom-scale, 1));
+  height: calc(2px * var(--zoom-scale, 1));
 }
 
 .resize-corner-se::after {
-  bottom: 3px;
-  right: 3px;
-  width: 2px;
-  height: 6px;
+  bottom: calc(3px * var(--zoom-scale, 1));
+  right: calc(3px * var(--zoom-scale, 1));
+  width: calc(2px * var(--zoom-scale, 1));
+  height: calc(6px * var(--zoom-scale, 1));
 }
 
 .node-card.editing {
@@ -353,13 +350,13 @@
   background: transparent;
   color: var(--text-main);
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: calc(13px * var(--font-scale, 1));
+  font-size: calc(13px * var(--font-scale, 1) * var(--zoom-scale, 1));
   line-height: 1.5;
   resize: none;
   outline: none;
   overflow-y: auto;
-  padding: 12px;
-  padding-bottom: 20px;
+  padding: calc(12px * var(--zoom-scale, 1));
+  padding-bottom: calc(20px * var(--zoom-scale, 1));
   user-select: text;
   -webkit-user-select: text;
 }
@@ -442,17 +439,17 @@
 
 .delete-node-btn {
   position: absolute;
-  top: -16px;
-  right: -16px;
-  width: 36px;
-  height: 36px;
+  top: calc(-16px * var(--zoom-scale, 1));
+  right: calc(-16px * var(--zoom-scale, 1));
+  width: calc(36px * var(--zoom-scale, 1));
+  height: calc(36px * var(--zoom-scale, 1));
   border-radius: 50%;
   border: none;
   background: transparent;
   color: var(--danger-color);
   cursor: pointer;
   padding: 0;
-  font-size: calc(13px * var(--font-scale, 1));
+  font-size: calc(13px * var(--font-scale, 1) * var(--zoom-scale, 1));
   font-weight: 500;
   line-height: 1;
   display: flex;
@@ -465,10 +462,10 @@
 .delete-node-btn::before {
   content: 'x';
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: calc(22px * var(--zoom-scale, 1));
+  height: calc(22px * var(--zoom-scale, 1));
   border-radius: 50%;
-  border: 1.5px solid var(--danger-border);
+  border: calc(1.5px * var(--zoom-scale, 1)) solid var(--danger-border);
   background: var(--danger-bg);
   color: var(--danger-color);
   display: flex;
