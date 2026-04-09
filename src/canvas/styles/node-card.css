@@ -19,9 +19,14 @@
   pointer-events: auto;
 }
 
-/* Neighborhood mode transitions */
+/* Neighborhood mode transitions - only animate opacity, not transform (conflicts with drag) */
 .node-card.neighborhood-mode {
-  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+  transition: opacity 0.3s ease-out;
+}
+
+/* Disable transitions during drag */
+.node-card.dragging {
+  transition: none !important;
 }
 
 .node-card.neighborhood-focus {
