@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import { invoke } from '@tauri-apps/api/core'
@@ -7,7 +7,8 @@ import { useNodesStore } from '../stores/nodes'
 import { sanitizeHtml, sanitizeSvg } from '../lib/sanitize'
 import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
-import type { Node, Storyline } from '../types'
+import type { Node, Storyline, EntityNodeType } from '../types'
+import { ENTITY_NODE_TYPES } from '../types'
 
 const { t } = useI18n()
 
@@ -36,6 +37,7 @@ const loading = ref(true)
 const activeNodeIndex = ref(0)
 const contentRef = ref<HTMLElement | null>(null)
 const showToc = ref(true)
+const showEntitySidebar = ref(false)
 
 async function loadStoryline() {
   loading.value = true
@@ -259,6 +261,75 @@ onUnmounted(() => {
 })
 
 watch(() => props.storylineId, loadStoryline)
+
+// Get entities for the current active node
+const currentNodeEntities = computed(() => {
+  const node = nodes.value[activeNodeIndex.value]
+  if (!node) return []
+  return store.getLinkedEntities(node.id)
+})
+
+// Group entities by type for display
+const entitiesByType = computed(() => {
+  const grouped: Record<EntityNodeType, Node[]> = {
+    character: [],
+    location: [],
+    citation: [],
+    term: [],
+    item: [],
+  }
+
+  for (const entity of currentNodeEntities.value) {
+    const type = entity.node_type as EntityNodeType
+    if (ENTITY_NODE_TYPES.includes(type)) {
+      grouped[type].push(entity)
+    }
+  }
+
+  return grouped
+})
+
+const hasEntities = computed(() => currentNodeEntities.value.length > 0)
+
+// Navigate to the previous/next node containing a specific entity
+function navigateToEntityNode(entityId: string, direction: 'prev' | 'next') {
+  const currentIndex = activeNodeIndex.value
+  const step = direction === 'next' ? 1 : -1
+  const startIndex = currentIndex + step
+
+  if (direction === 'next') {
+    for (let i = startIndex; i < nodes.value.length; i++) {
+      const nodeEntities = store.getLinkedEntities(nodes.value[i].id)
+      if (nodeEntities.some(e => e.id === entityId)) {
+        goToNode(i)
+        return
+      }
+    }
+  } else {
+    for (let i = startIndex; i >= 0; i--) {
+      const nodeEntities = store.getLinkedEntities(nodes.value[i].id)
+      if (nodeEntities.some(e => e.id === entityId)) {
+        goToNode(i)
+        return
+      }
+    }
+  }
+}
+
+function panToEntity(entityId: string) {
+  store.selectNode(entityId)
+  emit('close')
+  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entityId } }))
+}
+
+// Entity type labels
+const entityTypeLabels: Record<EntityNodeType, string> = {
+  character: 'Characters',
+  location: 'Locations',
+  citation: 'Citations',
+  term: 'Terms',
+  item: 'Items',
+}
 </script>
 
 <template>
@@ -274,6 +345,15 @@ watch(() => props.storylineId, loadStoryline)
         </div>
         <div class="header-right">
           <span class="page-indicator">{{ activeNodeIndex + 1 }} / {{ nodes.length }}</span>
+          <button
+            v-if="hasEntities"
+            class="entity-toggle"
+            :class="{ active: showEntitySidebar }"
+            title="Toggle entity sidebar"
+            @click="showEntitySidebar = !showEntitySidebar"
+          >
+            <Icon name="user" :size="18" />
+          </button>
           <button class="close-btn" :data-tooltip="t('storyline.closeEsc')" @click="$emit('close')">
             <Icon name="close" :size="20" />
           </button>
@@ -352,6 +432,58 @@ watch(() => props.storylineId, loadStoryline)
             </template>
           </template>
         </main>
+
+        <!-- Entity Sidebar -->
+        <aside v-if="showEntitySidebar && hasEntities" class="entity-sidebar">
+          <div class="entity-sidebar-header">
+            <h3 class="entity-sidebar-title">In this scene</h3>
+          </div>
+          <div class="entity-sidebar-content">
+            <template v-for="type in ENTITY_NODE_TYPES" :key="type">
+              <div v-if="entitiesByType[type].length > 0" class="entity-type-section">
+                <div class="entity-type-label">{{ entityTypeLabels[type] }}</div>
+                <div
+                  v-for="entity in entitiesByType[type]"
+                  :key="entity.id"
+                  class="entity-item"
+                >
+                  <span
+                    class="entity-indicator"
+                    :style="{ backgroundColor: entity.color_theme || '#6b7280' }"
+                  ></span>
+                  <span class="entity-name">{{ entity.title }}</span>
+                  <div class="entity-nav-btns">
+                    <button
+                      class="entity-nav-btn"
+                      title="Previous appearance"
+                      @click="navigateToEntityNode(entity.id, 'prev')"
+                    >
+                      <Icon name="back" :size="10" />
+                    </button>
+                    <button
+                      class="entity-nav-btn"
+                      title="Next appearance"
+                      @click="navigateToEntityNode(entity.id, 'next')"
+                    >
+                      <Icon name="forward" :size="10" />
+                    </button>
+                    <button
+                      class="entity-nav-btn"
+                      title="Go to entity on canvas"
+                      @click="panToEntity(entity.id)"
+                    >
+                      <Icon name="link" :size="10" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div v-if="!hasEntities" class="entity-empty">
+              No entities in this scene
+            </div>
+          </div>
+        </aside>
       </div>
 
       <!-- Navigation Footer -->
@@ -907,5 +1039,140 @@ watch(() => props.storylineId, loadStoryline)
   height: auto;
   border-radius: 8px;
   margin: 1em 0;
+}
+
+/* Entity toggle button */
+.entity-toggle {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entity-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-main);
+}
+
+.entity-toggle.active {
+  background: var(--primary-bg, rgba(59, 130, 246, 0.1));
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+/* Entity sidebar */
+.entity-sidebar {
+  width: 220px;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.entity-sidebar-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.entity-sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.entity-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.entity-type-section {
+  margin-bottom: 16px;
+}
+
+.entity-type-section:last-child {
+  margin-bottom: 0;
+}
+
+.entity-type-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.entity-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.entity-item:hover {
+  background: var(--bg-elevated);
+}
+
+.entity-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.entity-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entity-nav-btns {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.entity-item:hover .entity-nav-btns {
+  opacity: 1;
+}
+
+.entity-nav-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entity-nav-btn:hover {
+  background: var(--bg-surface);
+  color: var(--primary-color);
+}
+
+.entity-empty {
+  text-align: center;
+  padding: 20px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 </style>
