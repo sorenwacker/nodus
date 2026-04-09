@@ -5,6 +5,9 @@
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import EntityBadge from '../../components/EntityBadge.vue'
+import type { Node as EntityNode, EntityNodeType } from '../../types'
+import { ENTITY_NODE_TYPES } from '../../types'
 
 interface Node {
   id: string
@@ -41,6 +44,8 @@ const props = defineProps<{
   nodeSearchQuery: string
   nodeSearchMatchCount: number
   nodeSearchIndex: number
+  // Linked entities
+  linkedEntities?: EntityNode[]
 }>()
 
 const emit = defineEmits<{
@@ -64,6 +69,7 @@ const emit = defineEmits<{
   (e: 'find-next'): void
   (e: 'find-prev'): void
   (e: 'close-search'): void
+  (e: 'entity-click', entityId: string): void
 }>()
 
 const { t } = useI18n()
@@ -87,6 +93,28 @@ const deleteButtonStyle = computed(() => ({
 const isEditingTitle = computed(() => props.editingTitleId === props.node.id)
 const showDeleteButton = computed(() =>
   props.isSelected && !props.isEditing && !props.isCollapsed
+)
+
+// Entity badges - only show for non-entity nodes that have linked entities
+const isEntityNode = computed(() =>
+  ENTITY_NODE_TYPES.includes(props.node.node_type as EntityNodeType)
+)
+const showEntityBadges = computed(() =>
+  !isEntityNode.value &&
+  !props.isCollapsed &&
+  !props.isEditing &&
+  props.linkedEntities &&
+  props.linkedEntities.length > 0
+)
+const displayEntities = computed(() => {
+  // Show max 3 entities, with indication of more
+  return props.linkedEntities?.slice(0, 3) || []
+})
+const hasMoreEntities = computed(() =>
+  (props.linkedEntities?.length || 0) > 3
+)
+const moreEntitiesCount = computed(() =>
+  (props.linkedEntities?.length || 0) - 3
 )
 </script>
 
@@ -176,6 +204,20 @@ const showDeleteButton = computed(() =>
     ></div>
     <!-- eslint-enable vue/no-v-html -->
 
+    <!-- Entity badges footer -->
+    <div v-if="showEntityBadges" class="node-entity-footer">
+      <EntityBadge
+        v-for="entity in displayEntities"
+        :key="entity.id"
+        :entity="entity"
+        size="small"
+        @click="emit('entity-click', entity.id)"
+      />
+      <span v-if="hasMoreEntities" class="more-entities">
+        +{{ moreEntitiesCount }}
+      </span>
+    </div>
+
     <!-- Delete button (shown when selected but not editing, hidden when collapsed) -->
     <button
       v-if="showDeleteButton"
@@ -197,3 +239,28 @@ const showDeleteButton = computed(() =>
     <div class="resize-corner resize-corner-sw" @pointerdown.stop="emit('resize-start', $event, 'sw')"></div>
   </div>
 </template>
+
+<style scoped>
+.node-entity-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-surface-alt, rgba(0, 0, 0, 0.02));
+}
+
+.more-entities {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+:global([data-theme='dark']) .more-entities {
+  background: rgba(255, 255, 255, 0.08);
+}
+</style>

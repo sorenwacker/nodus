@@ -505,6 +505,17 @@ const {
   decreaseFontScale,
 } = canvasDisplay
 
+// Get linked entities for a node (memoized per node)
+function getLinkedEntities(nodeId: string): import('../types').Node[] {
+  return store.getLinkedEntities(nodeId)
+}
+
+// Handle entity badge click - zoom to entity
+function handleEntityClick(entityId: string) {
+  store.selectNode(entityId)
+  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entityId } }))
+}
+
 // Initialize font scale on mount
 // Help modal
 const showHelpModal = ref(false)
@@ -2051,6 +2062,7 @@ useCanvasKeyboardShortcuts({
           :node-search-query="nodeSearchQuery"
           :node-search-match-count="nodeSearchMatches.length"
           :node-search-index="nodeSearchIndex"
+          :linked-entities="getLinkedEntities(node.id)"
           @pointerdown="onNodePointerDown($event, node.id)"
           @pointerenter="onNodePointerEnter($event, node.id)"
           @pointermove="onNodePointerMove($event)"
@@ -2070,6 +2082,7 @@ useCanvasKeyboardShortcuts({
           @find-next="findNextMatch"
           @find-prev="findPrevMatch"
           @close-search="closeNodeSearch"
+          @entity-click="handleEntityClick"
         />
       </div>
 
