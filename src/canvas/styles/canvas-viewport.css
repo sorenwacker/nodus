@@ -24,9 +24,12 @@
   height: 1px;
   transform-origin: 0 0;
   z-index: 2;
-  /* GPU acceleration without 3D context */
+  /* GPU acceleration with 3D context for crisp text */
   will-change: transform;
-  -webkit-font-smoothing: antialiased;
+  transform-style: preserve-3d;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
   contain: layout style;
   /* Children handle their own pointer-events */
 }

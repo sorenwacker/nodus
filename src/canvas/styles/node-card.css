@@ -11,11 +11,13 @@
   flex-direction: column;
   min-height: 60px;
   z-index: 1;
-  /* GPU acceleration */
+  /* GPU acceleration with crisp text */
   will-change: transform;
   contain: layout style paint;
-  backface-visibility: hidden;
-  -webkit-font-smoothing: antialiased;
+  transform: translateZ(0);
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
   /* Re-enable pointer events (parent has none) */
   pointer-events: auto;
 }
