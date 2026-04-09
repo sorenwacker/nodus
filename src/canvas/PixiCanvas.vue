@@ -505,9 +505,21 @@ const {
   decreaseFontScale,
 } = canvasDisplay
 
-// Get linked entities for a node (memoized per node)
+// Memoized linked entities map - computed once and cached
+const linkedEntitiesMap = computed(() => {
+  const map = new Map<string, import('../types').Node[]>()
+  for (const node of store.filteredNodes) {
+    // Only compute for non-entity nodes to avoid unnecessary work
+    if (!['character', 'location', 'citation', 'term', 'item'].includes(node.node_type)) {
+      map.set(node.id, store.getLinkedEntities(node.id))
+    }
+  }
+  return map
+})
+
+// Get linked entities for a node (uses cached map)
 function getLinkedEntities(nodeId: string): import('../types').Node[] {
-  return store.getLinkedEntities(nodeId)
+  return linkedEntitiesMap.value.get(nodeId) || []
 }
 
 // Handle entity badge click - zoom to entity

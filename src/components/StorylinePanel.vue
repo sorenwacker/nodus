@@ -269,8 +269,15 @@ onUnmounted(() => {
 })
 
 // Get entities referenced in the selected storyline
-const storylineEntities = computed(() => {
-  if (!selectedStorylineId.value) return {}
+const storylineEntities = computed((): Record<EntityNodeType, { entity: Node; count: number }[]> => {
+  const emptyResult: Record<EntityNodeType, { entity: Node; count: number }[]> = {
+    character: [],
+    location: [],
+    citation: [],
+    term: [],
+    item: [],
+  }
+  if (!selectedStorylineId.value) return emptyResult
 
   // Get all nodes in the storyline
   const nodeIds = storylineNodes.value.get(selectedStorylineId.value) || []
