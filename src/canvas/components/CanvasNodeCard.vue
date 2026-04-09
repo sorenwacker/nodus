@@ -137,9 +137,9 @@ const moreEntitiesCount = computed(() =>
       <img :src="thumbnailSrc" :alt="node.title" />
     </div>
 
-    <!-- Node title header (hidden when showing thumbnail, or when no title in rendered mode) -->
+    <!-- Node title header (always show when collapsed, or when has title/editing) -->
     <div
-      v-else-if="node.title || isEditing || isEditingTitle"
+      v-else-if="node.title || isEditing || isEditingTitle || isCollapsed"
       class="node-header"
       tabindex="-1"
       @dblclick.stop="emit('start-editing-title')"
