@@ -125,13 +125,13 @@
 /* cyber .node-card.selected now uses --selection-glow variable */
 
 /* Neighbor highlighting - uses theme variables */
+/* Note: Cannot use transform here as it conflicts with position transform */
 .node-card.neighbor-highlighted:not(.selected) {
   z-index: 100;
   border-color: var(--neighbor-highlight);
   border-width: 2px;
   box-shadow: 0 0 12px var(--neighbor-glow), 0 0 24px var(--neighbor-glow), 0 0 36px var(--neighbor-glow);
-  transform: scale(1.02);
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  transition: box-shadow 0.15s ease-out;
 }
 
 [data-theme='cyber'] .edge-line-visible,
