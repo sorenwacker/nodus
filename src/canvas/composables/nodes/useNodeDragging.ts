@@ -134,8 +134,8 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     const node = store.getNode(nodeId)
     if (!node) return
 
-    // Check if file content has changed (on-demand sync)
-    store.refreshNodeFromFile(nodeId)
+    // Note: File sync is handled by the file watcher composable, not on click.
+    // Removed refreshNodeFromFile(nodeId) call to avoid file I/O blocking UI.
 
     // Capture undo state before dragging
     pushUndo()

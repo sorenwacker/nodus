@@ -4,6 +4,9 @@ import App from './App.vue'
 import { i18n } from './i18n'
 import './assets/main.css'
 
+// Performance monitor (available as window.perfMonitor in dev mode)
+import './lib/perfMonitor'
+
 try {
   const app = createApp(App)
   app.use(createPinia())

@@ -267,10 +267,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
   }
 
   async function renderMermaidDiagrams() {
-    console.log('[Mermaid] renderMermaidDiagrams called')
     // If already rendering, queue another render for when it's done
     if (mermaidRenderPending) {
-      console.log('[Mermaid] Already rendering, queuing')
       mermaidRenderQueued = true
       return
     }
@@ -280,7 +278,6 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     await nextTick()
 
     const elements = document.querySelectorAll('.mermaid')
-    console.log('[Mermaid] Found', elements.length, 'mermaid elements')
     if (elements.length === 0) {
       mermaidRenderPending = false
       // Check if another render was queued
@@ -293,7 +290,6 @@ export function useContentRenderer(options: UseContentRendererOptions) {
 
     // Lazy load mermaid only when needed
     if (!mermaidLoaded) {
-      console.log('[Mermaid] Loading mermaid library...')
       try {
         const mod = await import('mermaid')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -301,7 +297,6 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         if (api.default) api = api.default
 
         mermaidApi = api
-        console.log('[Mermaid] Mermaid API loaded, initialize:', typeof mermaidApi.initialize)
         if (typeof mermaidApi.initialize === 'function') {
           mermaidApi.initialize({
             startOnLoad: false,
@@ -310,7 +305,6 @@ export function useContentRenderer(options: UseContentRendererOptions) {
           })
         }
         mermaidLoaded = true
-        console.log('[Mermaid] Mermaid initialized successfully')
       } catch (e) {
         console.error('[Mermaid] Load error:', e)
         mermaidRenderPending = false
@@ -322,21 +316,16 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     for (const el of elements) {
       // Skip if already contains SVG (already rendered in DOM)
       if (el.querySelector('svg')) {
-        console.log('[Mermaid] Element already has SVG, skipping')
         continue
       }
 
       const code = el.textContent?.trim() || ''
       if (!code) {
-        console.log('[Mermaid] Element has no code, skipping')
         continue
       }
 
-      console.log('[Mermaid] Rendering code:', code.substring(0, 50) + '...')
-
       // Check cache first
       if (mermaidCache.has(code)) {
-        console.log('[Mermaid] Using cached result')
         el.innerHTML = mermaidCache.get(code)!
         didRenderNew = true
         continue
@@ -344,9 +333,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
 
       try {
         const id = `m${Date.now()}${Math.random().toString(36).substr(2, 5)}`
-        console.log('[Mermaid] Calling mermaid.render with id:', id)
         const { svg } = await mermaidApi.render(id, code)
-        console.log('[Mermaid] Render successful, SVG length:', svg?.length)
         // Use Mermaid-specific sanitization that preserves foreignObject content
         const sanitized = sanitizeMermaidSvg(svg)
         mermaidCache.set(code, sanitized)
@@ -354,7 +341,6 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         didRenderNew = true
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
-        console.error('[Mermaid] Render error:', e)
         const msg = e.message || String(e)
         // Escape error message to prevent XSS
         const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${escapeText(msg.substring(0, 100))}</div>`
@@ -393,6 +379,9 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     }
   }
 
+  // Track nodes that contain mermaid blocks (incremental tracking)
+  const nodesWithMermaid = new Set<string>()
+
   // Setup watchers
   function setupWatchers() {
     // Watch for node changes with shallow comparison
@@ -404,18 +393,38 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       { immediate: true }
     )
 
-    // Watch for mermaid content changes only
+    // Watch for mermaid content changes - optimized to only check nodes with mermaid
     watch(
       () => {
-        // Extract only mermaid code blocks from all nodes
+        const nodes = getFilteredNodes()
         const mermaidBlocks: string[] = []
-        for (const node of getFilteredNodes()) {
+
+        // First pass: check previously known mermaid nodes + scan for new ones
+        for (const node of nodes) {
           const content = node.markdown_content || ''
-          const matches = content.match(/```mermaid[\s\S]*?```/g)
-          if (matches) {
-            mermaidBlocks.push(...matches)
+          const hasMermaid = content.includes('```mermaid')
+
+          if (hasMermaid) {
+            nodesWithMermaid.add(node.id)
+            // Only extract blocks from nodes that have mermaid
+            const matches = content.match(/```mermaid[\s\S]*?```/g)
+            if (matches) {
+              mermaidBlocks.push(...matches)
+            }
+          } else if (nodesWithMermaid.has(node.id)) {
+            // Node no longer has mermaid - remove from tracking
+            nodesWithMermaid.delete(node.id)
           }
         }
+
+        // Clean up deleted nodes from tracking
+        const nodeIds = new Set(nodes.map(n => n.id))
+        for (const id of nodesWithMermaid) {
+          if (!nodeIds.has(id)) {
+            nodesWithMermaid.delete(id)
+          }
+        }
+
         return mermaidBlocks.join('|||')
       },
       newMermaidCode => {
