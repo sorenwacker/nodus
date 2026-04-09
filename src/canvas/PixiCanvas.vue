@@ -200,21 +200,8 @@ onMounted(() => {
   }
 
   // Render mermaid diagrams after mount (delayed to ensure DOM is ready)
+  // Note: Mermaid diagrams are also rendered on-demand via renderMarkdown() when content changes
   setTimeout(() => renderMermaidDiagrams?.(), 500)
-
-  // Periodically check for unrendered mermaid diagrams
-  // Less frequent for large graphs to save CPU
-  const mermaidCheckInterval = store.filteredNodes.length > 200 ? 5000 : 2000
-  const mermaidInterval = setInterval(() => {
-    const unrendered = document.querySelectorAll('.mermaid:not(:has(svg))')
-    if (unrendered.length > 0) {
-      renderMermaidDiagrams?.()
-    }
-  }, mermaidCheckInterval)
-
-  onUnmounted(() => {
-    clearInterval(mermaidInterval)
-  })
 })
 
 // centerGrid is provided by useViewState composable
@@ -637,6 +624,7 @@ const contextMenuPosition = contextMenu.position
 const contextMenuNodeId = contextMenu.nodeId
 const contextMenuStorylineSubmenu = contextMenu.storylineSubmenu
 const contextMenuWorkspaceSubmenu = contextMenu.workspaceSubmenu
+const contextMenuEntitySubmenu = contextMenu.entitySubmenu
 
 // Citation fetch composable (for Semantic Scholar integration)
 const citationFetch = useCitationFetch({
@@ -1823,6 +1811,51 @@ const storylines = useStorylines({
 })
 const { addNodeToStoryline, createStorylineFromNode, moveNodesToWorkspace } = storylines
 
+// Entity linking functions
+async function linkToEntity(entityId: string) {
+  const affectedIds = contextMenu.affectedNodeIds.value
+  for (const nodeId of affectedIds) {
+    try {
+      await store.linkToEntity(nodeId, entityId)
+    } catch (e) {
+      console.error('Failed to link to entity:', e)
+    }
+  }
+  const entity = store.getNode(entityId)
+  showToast?.(`Linked ${affectedIds.length} node(s) to ${entity?.title || 'entity'}`, 'success')
+  closeContextMenu()
+}
+
+async function handleCreateEntity(type: string) {
+  // Open entity create dialog - for now, create with default name and let user edit
+  const labels: Record<string, string> = {
+    character: 'New Character',
+    location: 'New Location',
+    citation: 'New Citation',
+    term: 'New Term',
+    item: 'New Item',
+  }
+  const title = labels[type] || 'New Entity'
+  try {
+    const entity = await store.createEntityNode(type as import('../types').EntityNodeType, title)
+
+    // Link affected nodes to the new entity
+    const affectedIds = contextMenu.affectedNodeIds.value
+    for (const nodeId of affectedIds) {
+      await store.linkToEntity(nodeId, entity.id)
+    }
+    showToast?.(`Created ${title} and linked ${affectedIds.length} node(s)`, 'success')
+    closeContextMenu()
+
+    // Select the new entity for editing
+    store.selectNode(entity.id)
+    window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entity.id } }))
+  } catch (e) {
+    showToast?.(`Failed to create entity: ${e}`, 'error')
+    closeContextMenu()
+  }
+}
+
 /// Computed: number of selected nodes for context menu display
 const contextMenuNodeCount = computed(() => contextMenu.nodeCount.value)
 
@@ -2188,8 +2221,10 @@ useCanvasKeyboardShortcuts({
         :node-count="contextMenuNodeCount"
         :storyline-submenu="contextMenuStorylineSubmenu"
         :workspace-submenu="contextMenuWorkspaceSubmenu"
+        :entity-submenu="contextMenuEntitySubmenu"
         :storylines="store.filteredStorylines"
         :workspaces="store.workspaces"
+        :entities="store.getEntities()"
         :current-workspace-id="store.currentWorkspaceId"
         :has-d-o-i="contextMenuNodeHasDOI"
         :doi-count="contextMenuDOICount"
@@ -2201,9 +2236,12 @@ useCanvasKeyboardShortcuts({
         @add-to-storyline="addNodeToStoryline"
         @create-storyline="createStorylineFromNode"
         @move-to-workspace="moveNodesToWorkspace"
+        @link-to-entity="linkToEntity"
+        @create-entity="handleCreateEntity"
         @fetch-citations="handleFetchCitations()"
         @update:storyline-submenu="contextMenuStorylineSubmenu = $event"
         @update:workspace-submenu="contextMenuWorkspaceSubmenu = $event"
+        @update:entity-submenu="contextMenuEntitySubmenu = $event"
       />
 
       <!-- Citation fetch progress indicator -->

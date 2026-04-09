@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Storyline, Workspace } from '../../types'
+import type { Storyline, Workspace, Node, EntityNodeType } from '../../types'
+import { ENTITY_NODE_TYPES } from '../../types'
 
 const props = defineProps<{
   visible: boolean
@@ -9,8 +10,10 @@ const props = defineProps<{
   nodeCount: number
   storylineSubmenu: boolean
   workspaceSubmenu: boolean
+  entitySubmenu: boolean
   storylines: Storyline[]
   workspaces: Workspace[]
+  entities: Node[]
   currentWorkspaceId: string | null
   hasDOI?: boolean
   doiCount?: number // Number of selected nodes with DOIs
@@ -27,11 +30,46 @@ const emit = defineEmits<{
   (e: 'move-to-workspace', workspaceId: string | null): void
   (e: 'update:storylineSubmenu', value: boolean): void
   (e: 'update:workspaceSubmenu', value: boolean): void
+  (e: 'update:entitySubmenu', value: boolean): void
+  (e: 'link-to-entity', entityId: string): void
+  (e: 'create-entity', type: EntityNodeType): void
   (e: 'fetch-citations'): void
 }>()
 
 const otherWorkspaces = computed(() => {
   return props.workspaces.filter(w => w.id !== props.currentWorkspaceId)
+})
+
+// Entity type config for submenu
+const entityTypeConfig: Record<EntityNodeType, { icon: string; label: string }> = {
+  character: { icon: 'user', label: 'Characters' },
+  location: { icon: 'map-pin', label: 'Locations' },
+  citation: { icon: 'quote', label: 'Citations' },
+  term: { icon: 'file-text', label: 'Terms' },
+  item: { icon: 'box', label: 'Items' },
+}
+
+// Group entities by type
+const entitiesByType = computed(() => {
+  const grouped: Record<EntityNodeType, Node[]> = {
+    character: [],
+    location: [],
+    citation: [],
+    term: [],
+    item: [],
+  }
+  for (const entity of props.entities) {
+    const type = entity.node_type as EntityNodeType
+    if (ENTITY_NODE_TYPES.includes(type)) {
+      grouped[type].push(entity)
+    }
+  }
+  return grouped
+})
+
+// Types that have entities
+const entityTypesWithContent = computed(() => {
+  return ENTITY_NODE_TYPES.filter(type => entitiesByType.value[type].length > 0)
 })
 
 function handleFitToContent() {
@@ -73,6 +111,16 @@ function handleFetchCitations() {
   emit('fetch-citations')
   emit('close')
 }
+
+function handleLinkToEntity(entityId: string) {
+  emit('link-to-entity', entityId)
+  emit('close')
+}
+
+function handleCreateEntity(type: EntityNodeType) {
+  emit('create-entity', type)
+  emit('close')
+}
 </script>
 
 <template>
@@ -103,6 +151,54 @@ function handleFetchCitations() {
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
       </svg>
       <span>Link to...</span>
+    </div>
+
+    <!-- Link to Entity submenu -->
+    <div
+      class="context-menu-item has-submenu"
+      @mouseenter="$emit('update:entitySubmenu', true)"
+      @mouseleave="$emit('update:entitySubmenu', false)"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <span>Link to Entity{{ nodeCount > 1 ? ` (${nodeCount})` : '' }}</span>
+      <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+
+      <!-- Entity submenu -->
+      <div v-if="entitySubmenu" class="context-submenu entity-submenu">
+        <template v-for="type in entityTypesWithContent" :key="type">
+          <div class="submenu-section-header">{{ entityTypeConfig[type].label }}</div>
+          <div
+            v-for="entity in entitiesByType[type]"
+            :key="entity.id"
+            class="context-menu-item"
+            @click="handleLinkToEntity(entity.id)"
+          >
+            <span class="entity-color-dot" :style="{ backgroundColor: entity.color_theme || '#6b7280' }"></span>
+            <span>{{ entity.title }}</span>
+          </div>
+        </template>
+        <div v-if="entityTypesWithContent.length > 0" class="context-menu-divider"></div>
+
+        <!-- Create new entity options -->
+        <div class="submenu-section-header">Create New</div>
+        <div
+          v-for="type in ENTITY_NODE_TYPES"
+          :key="type"
+          class="context-menu-item"
+          @click="handleCreateEntity(type)"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>New {{ entityTypeConfig[type].label.slice(0, -1) }}...</span>
+        </div>
+      </div>
     </div>
 
     <!-- Fetch Citations (for nodes with DOI) -->
@@ -206,3 +302,26 @@ function handleFetchCitations() {
     @contextmenu.prevent="$emit('close')"
   ></div>
 </template>
+
+<style scoped>
+.entity-submenu {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.submenu-section-header {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 6px 12px 4px;
+}
+
+.entity-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+</style>

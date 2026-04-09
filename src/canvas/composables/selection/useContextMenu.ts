@@ -18,6 +18,7 @@ export function useContextMenu(deps: ContextMenuDeps) {
   const nodeId = ref<string | null>(null)
   const storylineSubmenu = ref(false)
   const workspaceSubmenu = ref(false)
+  const entitySubmenu = ref(false)
   // Snapshot of affected node IDs captured when menu opens
   const affectedNodeIdsSnapshot = ref<string[]>([])
 
@@ -42,6 +43,7 @@ export function useContextMenu(deps: ContextMenuDeps) {
     visible.value = true
     storylineSubmenu.value = false
     workspaceSubmenu.value = false
+    entitySubmenu.value = false
 
     // Capture affected node IDs at open time
     const selectedIds = deps.getSelectedNodeIds()
@@ -59,6 +61,7 @@ export function useContextMenu(deps: ContextMenuDeps) {
     visible.value = false
     storylineSubmenu.value = false
     workspaceSubmenu.value = false
+    entitySubmenu.value = false
     nodeId.value = null
     affectedNodeIdsSnapshot.value = []
   }
@@ -103,6 +106,7 @@ export function useContextMenu(deps: ContextMenuDeps) {
     nodeId,
     storylineSubmenu,
     workspaceSubmenu,
+    entitySubmenu,
 
     // Computed
     affectedNodeIds,
