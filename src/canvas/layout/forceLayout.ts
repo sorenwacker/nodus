@@ -67,10 +67,10 @@ export async function applyForceLayout(
   const {
     centerX = 0,
     centerY = 0,
-    chargeStrength = -8000,
+    chargeStrength = -12000,
     linkDistance = 350,
     iterations = 300,
-    gravityStrength = 0.15,
+    gravityStrength = 0.03,
     onTick,
   } = options
 
@@ -108,14 +108,6 @@ export async function applyForceLayout(
       target: e.target,
     }))
 
-  // Find disconnected nodes (no edges)
-  const connectedIds = new Set<string>()
-  for (const e of edges) {
-    connectedIds.add(e.source)
-    connectedIds.add(e.target)
-  }
-  const disconnectedIds = new Set(simNodes.filter(n => !connectedIds.has(n.id)).map(n => n.id))
-
   // Pre-pass: move distant nodes closer to center before simulation
   // This ensures outliers can converge in limited iterations
   const maxInitialDistance = 2000
@@ -131,32 +123,20 @@ export async function applyForceLayout(
     }
   }
 
-  // If all or most nodes are disconnected, use moderate gravity (not too weak, not collapsing)
-  const disconnectedRatio = simNodes.length > 0 ? disconnectedIds.size / simNodes.length : 0
-  // Keep gravity reasonable even for disconnected graphs - 0.3 minimum
-  const effectiveGravity = disconnectedRatio > 0.5 ? Math.max(gravityStrength * 0.5, 0.3) : gravityStrength
-
-  // Create simulation - keep nodes close together
+  // Create simulation - disconnected graphs should separate naturally
   const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(simNodes)
     .force('link', forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks)
       .id(d => d.id)
       .distance(linkDistance)
       .strength(1.0))
     .force('charge', forceManyBody<SimNode>()
-      .strength(d => {
-        // Disconnected nodes: weaker repulsion to keep them in cluster
-        // but still push apart to avoid overlap
-        if (disconnectedIds.has(d.id)) return chargeStrength * 0.3
-        return chargeStrength
-      })
+      .strength(chargeStrength)
       .distanceMin(10)
-      .distanceMax(2000)
+      .distanceMax(3000)
       .theta(simNodes.length > 200 ? 0.9 : 0.7))
-    // Gravity to keep nodes clustered - stronger for disconnected nodes
-    .force('gravityX', forceX<SimNode>(centerX).strength(d =>
-      disconnectedIds.has(d.id) ? effectiveGravity * 1.5 : effectiveGravity))
-    .force('gravityY', forceY<SimNode>(centerY).strength(d =>
-      disconnectedIds.has(d.id) ? effectiveGravity * 1.5 : effectiveGravity))
+    // Weak gravity - just prevents infinite drift, allows disconnected graphs to separate
+    .force('gravityX', forceX<SimNode>(centerX).strength(gravityStrength))
+    .force('gravityY', forceY<SimNode>(centerY).strength(gravityStrength))
     .force('collide', forceCollide<SimNode>()
       .radius(d => {
         // Use actual node diagonal / 2 as collision radius
