@@ -792,6 +792,7 @@ watch(() => store.currentWorkspaceId, () => {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  padding-bottom: 320px; /* Space for dropdown to be visible when at bottom */
 }
 
 .empty-panel {

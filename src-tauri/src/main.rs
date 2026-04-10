@@ -30,9 +30,9 @@ fn main() {
             std::collections::HashMap::new(),
         )))
         .setup(|app| {
-            // Initialize database
+            // Initialize database - must complete before app starts
             let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
+            tauri::async_runtime::block_on(async move {
                 if let Err(e) = database::initialize(&app_handle).await {
                     eprintln!("Failed to initialize database: {}", e);
                 }

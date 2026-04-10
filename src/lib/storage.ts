@@ -33,6 +33,7 @@ const KEYS = {
   showTagNodes: 'nodus_show_tag_nodes',
   zoteroUserId: 'nodus_zotero_user_id',
   zoteroApiKey: 'nodus_zotero_api_key',
+  spellcheckEnabled: 'nodus_spellcheck_enabled',
 } as const
 
 /**
@@ -94,6 +95,12 @@ export const uiStorage = {
   },
   setFontScale(value: number): void {
     localStorage.setItem(KEYS.fontScale, String(value))
+  },
+  getSpellcheckEnabled(): boolean {
+    return localStorage.getItem(KEYS.spellcheckEnabled) === 'true'
+  },
+  setSpellcheckEnabled(value: boolean): void {
+    localStorage.setItem(KEYS.spellcheckEnabled, String(value))
   },
 }
 

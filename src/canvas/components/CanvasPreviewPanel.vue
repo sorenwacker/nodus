@@ -69,6 +69,9 @@ function cancelEditing() {
           v-if="isEditing"
           v-model="editTitle"
           class="preview-title-input"
+          spellcheck="false"
+          autocorrect="off"
+          autocapitalize="off"
           @keydown.enter="saveAndClose"
           @keydown.escape="cancelEditing"
         />

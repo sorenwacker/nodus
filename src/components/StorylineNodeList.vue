@@ -227,7 +227,6 @@ function onDragEnd() {
         <NodePicker
           v-if="showingInsertPicker === nodes.length"
           :exclude-node-ids="excludedNodeIds"
-          position="above"
           @select="handleSelect(nodes.length, $event)"
           @create="handleCreate(nodes.length, $event)"
           @create-comment="handleCreateComment(nodes.length, $event)"
