@@ -19,7 +19,24 @@ export function useLLM() {
   // Persist system prompt
   watch(systemPrompt, (v) => llmStorage.setSystemPrompt(v))
 
-  // Model and context length from provider config
+  /**
+   * Initialize provider from storage
+   */
+  function initProvider() {
+    const providerId = llmStorage.getProvider()
+    providerRegistry.setActiveProvider(providerId)
+
+    // Load provider config
+    const config = llmStorage.getProviderConfig(providerId)
+    if (Object.keys(config).length > 0) {
+      providerRegistry.configureProvider(providerId, config as ProviderConfig)
+    }
+  }
+
+  // Initialize provider FIRST so config is loaded before we read model
+  initProvider()
+
+  // Model and context length from provider config (after init)
   const getProviderConfig = () => {
     const provider = providerRegistry.getActiveProvider()
     return provider.getConfig()
@@ -60,23 +77,6 @@ export function useLLM() {
     }
     return null
   }
-
-  /**
-   * Initialize provider from storage
-   */
-  function initProvider() {
-    const providerId = llmStorage.getProvider()
-    providerRegistry.setActiveProvider(providerId)
-
-    // Load provider config
-    const config = llmStorage.getProviderConfig(providerId)
-    if (Object.keys(config).length > 0 && 'id' in config) {
-      providerRegistry.configureProvider(providerId, config as ProviderConfig)
-    }
-  }
-
-  // Initialize on first use
-  initProvider()
 
   /**
    * Simple generate (no tools) - goes through queue

@@ -2,7 +2,7 @@
  * Preview panel composable
  * Handles the node preview panel shown when zoomed out
  */
-import { ref, watch, nextTick, type Ref, type ComputedRef } from 'vue'
+import { ref, shallowRef, watch, nextTick, type Ref, type ComputedRef } from 'vue'
 import type { Node } from '../../../types'
 
 export interface UsePreviewPanelContext {
@@ -14,7 +14,7 @@ export interface UsePreviewPanelContext {
 
 export interface UsePreviewPanelReturn {
   showPreviewPanel: Ref<boolean>
-  previewNode: ComputedRef<Node | undefined>
+  previewNode: Ref<Node | undefined>
   closePreviewPanel: () => void
   zoomToPreviewNode: () => void
 }
@@ -38,12 +38,17 @@ export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelRet
     { immediate: true }
   )
 
-  const previewNode = {
-    get value() {
-      const nodeId = selectedNodeIds.value[0]
-      return nodeId ? getNode(nodeId) : undefined
+  // Use shallowRef to avoid tracking internal node properties
+  const previewNode = shallowRef<Node | undefined>(undefined)
+
+  // Update preview node only when selection changes
+  watch(
+    () => selectedNodeIds.value[0],
+    (nodeId) => {
+      previewNode.value = nodeId ? getNode(nodeId) : undefined
     },
-  } as ComputedRef<Node | undefined>
+    { immediate: true }
+  )
 
   function closePreviewPanel() {
     showPreviewPanel.value = false

@@ -7,52 +7,98 @@
 import { defineTool } from '../registry'
 
 export function registerQueryTools(): void {
-  defineTool<{ include_content?: boolean; max_content_length?: number }>(
+  defineTool<{ mode?: string; include_content?: boolean; max_content_length?: number }>(
     'read_graph',
-    'Read the current graph state including nodes, their content, and connections. Use this first to understand what exists.',
+    'Read the current graph state. Modes: "titles" (compact list), "summary" (stats only), "full" (default, with content).',
     {
       type: 'object',
       properties: {
-        include_content: { type: 'boolean', description: 'Include node content (default: true)' },
-        max_content_length: { type: 'number', description: 'Max chars per node content (default 200, max 5000)' },
+        mode: { type: 'string', description: '"titles" = compact title list, "summary" = stats only, "full" = with content (default)' },
+        include_content: { type: 'boolean', description: 'Include node content in full mode (default: true)' },
+        max_content_length: { type: 'number', description: 'Max chars per node content (default 300)' },
       },
       required: [],
     },
     async (args, ctx) => {
-      const includeContent = args.include_content !== false
-      const maxLen = Math.min(args.max_content_length || 200, 5000)
-      const nodes = ctx.store.filteredNodes
-      const edges = ctx.store.filteredEdges
+      const mode = args.mode || 'full'
+      const allNodes = ctx.store.filteredNodes
+      const allEdges = ctx.store.filteredEdges
 
-      if (nodes.length === 0) {
+      if (allNodes.length === 0) {
         return 'Graph is empty. No nodes exist yet.'
       }
 
-      // Build node descriptions
-      const nodeDescriptions = nodes.map(n => {
-        const content = includeContent && n.markdown_content
-          ? `\n   Content: ${n.markdown_content.slice(0, maxLen)}${n.markdown_content.length > maxLen ? '...' : ''}`
-          : ''
-        return `- "${n.title}" @(${Math.round(n.canvas_x)},${Math.round(n.canvas_y)})${content}`
-      }).join('\n')
+      // Summary mode - just stats
+      if (mode === 'summary') {
+        const withContent = allNodes.filter(n => n.markdown_content?.trim()).length
+        const orphans = allNodes.filter(n => {
+          const hasEdge = allEdges.some(e => e.source_node_id === n.id || e.target_node_id === n.id)
+          return !hasEdge
+        }).length
+        return `GRAPH SUMMARY: ${allNodes.length} nodes (${withContent} with content, ${orphans} orphans), ${allEdges.length} edges`
+      }
 
-      // Build edge descriptions
-      const edgeDescriptions = edges.length > 0
-        ? edges.map(e => {
-            const from = nodes.find(n => n.id === e.source_node_id)?.title || '?'
-            const to = nodes.find(n => n.id === e.target_node_id)?.title || '?'
-            const label = e.label ? ` [${e.label}]` : ''
-            return `  "${from}" -> "${to}"${label}`
-          }).join('\n')
-        : '  (no connections)'
+      // Titles mode - compact list
+      if (mode === 'titles') {
+        const titles = allNodes.map(n => n.title).join(', ')
+        return `GRAPH (${allNodes.length} nodes, ${allEdges.length} edges): ${titles}`
+      }
+
+      // Full mode - breadth-first with content
+      const includeContent = args.include_content !== false
+      const maxContentLen = args.max_content_length || 300
+
+      // Calculate available context budget
+      const contextLimit = ctx.ollamaContextLength || 8192
+      const reservedTokens = 4000
+      const availableChars = (contextLimit - reservedTokens) * 4
+
+      // Build nodes breadth-first until context is filled
+      const includedNodes: typeof allNodes = []
+      const nodeDescriptions: string[] = []
+      let usedChars = 200 // overhead
+
+      for (const node of allNodes) {
+        const content = includeContent && node.markdown_content
+          ? `\n   Content: ${node.markdown_content.slice(0, maxContentLen)}${node.markdown_content.length > maxContentLen ? '...' : ''}`
+          : ''
+        const desc = `- "${node.title}" @(${Math.round(node.canvas_x)},${Math.round(node.canvas_y)})${content}`
+
+        if (usedChars + desc.length > availableChars) break
+
+        includedNodes.push(node)
+        nodeDescriptions.push(desc)
+        usedChars += desc.length + 1
+      }
+
+      // Only include edges between returned nodes
+      const nodeIds = new Set(includedNodes.map(n => n.id))
+      const edges = allEdges.filter(e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id))
+
+      const edgeDescriptions: string[] = []
+      for (const e of edges) {
+        const from = includedNodes.find(n => n.id === e.source_node_id)?.title || '?'
+        const to = includedNodes.find(n => n.id === e.target_node_id)?.title || '?'
+        const label = e.label ? ` [${e.label}]` : ''
+        const desc = `  "${from}" -> "${to}"${label}`
+
+        if (usedChars + desc.length > availableChars) break
+        edgeDescriptions.push(desc)
+        usedChars += desc.length + 1
+      }
+
+      const truncated = includedNodes.length < allNodes.length
+      const truncationNote = truncated
+        ? `\n\nNOTE: Showing ${includedNodes.length} of ${allNodes.length} nodes (context: ${contextLimit} tokens). Use query_nodes to search.`
+        : ''
 
       return `CURRENT GRAPH STATE:
 
-NODES (${nodes.length}):
-${nodeDescriptions}
+NODES (${includedNodes.length}/${allNodes.length}):
+${nodeDescriptions.join('\n')}
 
-EDGES (${edges.length}):
-${edgeDescriptions}`
+EDGES (${edgeDescriptions.length}/${allEdges.length}):
+${edgeDescriptions.length > 0 ? edgeDescriptions.join('\n') : '  (none)'}${truncationNote}`
     },
     { category: 'query' }
   )

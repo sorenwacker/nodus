@@ -72,15 +72,17 @@ export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplay
         continue
       }
       // Match markdown image: ![alt](url) or HTML img: <img src="url">
-      const mdMatch = node.markdown_content.match(/!\[.*?\]\(([^)]+)\)/)
+      // Handle URLs with parentheses by matching to last ) before newline
+      const mdMatch = node.markdown_content.match(/!\[[^\]]*\]\((.+?)\)(?:\s|$)/)
       const htmlMatch = node.markdown_content.match(/<img[^>]+src=["']([^"']+)["']/)
       imageMap[node.id] = mdMatch?.[1] || htmlMatch?.[1] || null
     }
     return imageMap
   })
 
-  // Show image thumbnail when zoomed out (scale < 0.3) and node has an image
-  const showImageThumbnail = computed(() => scale.value < 0.3)
+  // Show image thumbnail when zoomed out enough that content is collapsed
+  // This should match the semantic zoom threshold (default 0.5)
+  const showImageThumbnail = computed(() => scale.value < 0.5)
 
   // Font scale state
   const fontScale = ref(uiStorage.getFontScale())

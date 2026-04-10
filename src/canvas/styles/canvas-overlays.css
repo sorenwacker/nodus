@@ -507,7 +507,7 @@
   position: absolute;
   top: 60px;
   right: 16px;
-  width: 320px;
+  width: 480px;
   max-height: calc(100% - 120px);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
@@ -517,6 +517,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.node-preview-panel.is-editing {
+  top: 20px;
+  bottom: 20px;
+  max-height: none;
 }
 
 .preview-header {

@@ -349,6 +349,16 @@ const previewPanel = usePreviewPanel({
 })
 const { showPreviewPanel, previewNode, closePreviewPanel, zoomToPreviewNode } = previewPanel
 
+// Preview panel save handlers
+async function savePreviewContent(nodeId: string, content: string) {
+  await store.updateNodeContent(nodeId, content)
+  setTimeout(renderMermaidDiagrams, 100)
+}
+
+async function savePreviewTitle(nodeId: string, title: string) {
+  await store.updateNodeTitle(nodeId, title)
+}
+
 // Lasso selection composable
 const lasso = useLasso({
   store: {
@@ -2158,8 +2168,12 @@ useCanvasKeyboardShortcuts({
         :visible="showPreviewPanel && !!previewNode"
         :title="previewNode?.title || ''"
         :content="previewContent"
+        :raw-content="previewNode?.markdown_content || ''"
+        :node-id="previewNode?.id || ''"
         @close="closePreviewPanel"
         @zoom-to-node="zoomToPreviewNode"
+        @save="savePreviewContent"
+        @save-title="savePreviewTitle"
       />
 
       <!-- Controls -->
