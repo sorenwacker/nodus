@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import NodePicker from '../../components/NodePicker.vue'
 import { useNodesStore } from '../../stores/nodes'
+import { useDisplayStore } from '../../stores/display'
 
 const store = useNodesStore()
+const displayStore = useDisplayStore()
+const { spellcheckEnabled } = storeToRefs(displayStore)
 
 const props = defineProps<{
   visible: boolean
@@ -151,9 +155,9 @@ function onEditorKeydown(e: KeyboardEvent) {
           v-if="isEditing"
           v-model="editTitle"
           class="preview-title-input"
-          spellcheck="false"
-          autocorrect="off"
-          autocapitalize="off"
+          :spellcheck="spellcheckEnabled"
+          :autocorrect="spellcheckEnabled ? 'on' : 'off'"
+          :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
           @keydown.enter="saveAndClose"
           @keydown.escape="cancelEditing"
         />
@@ -167,6 +171,9 @@ function onEditorKeydown(e: KeyboardEvent) {
           ref="editorRef"
           v-model="editContent"
           class="preview-editor"
+          :spellcheck="spellcheckEnabled"
+          :autocorrect="spellcheckEnabled ? 'on' : 'off'"
+          :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
           @input="onEditorInput"
           @keydown="onEditorKeydown"
         ></textarea>

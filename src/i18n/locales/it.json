@@ -403,6 +403,8 @@
     "display": {
       "fontScale": "Dimensione carattere",
       "fontScaleHint": "Regola la dimensione del testo sulla tela (Cmd+/Cmd- funziona anche)",
+      "spellcheck": "Abilita controllo ortografico e correzione automatica",
+      "spellcheckHint": "Abilita controllo ortografico e correzione automatica del browser negli editor di testo",
       "thresholds": "Soglie di prestazione",
       "lodThreshold": "Soglia modalità LOD",
       "lodThresholdHint": "Mostra nodi come punti quando più di questo numero sono visibili",

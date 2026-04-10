@@ -20,6 +20,9 @@ const selectedTheme = computed({
 // Font scale
 const fontScale = ref(uiStorage.getFontScale())
 
+// Spellcheck
+const spellcheckEnabled = ref(uiStorage.getSpellcheckEnabled())
+
 // Display thresholds
 const semanticZoomThreshold = ref(displayStorage.getSemanticZoomThreshold())
 const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
@@ -39,9 +42,15 @@ function saveDisplaySettings() {
   window.dispatchEvent(new CustomEvent('nodus-display-settings-change'))
 }
 
+function saveSpellcheckSetting() {
+  uiStorage.setSpellcheckEnabled(spellcheckEnabled.value)
+  window.dispatchEvent(new CustomEvent('nodus-display-settings-change'))
+}
+
 // Auto-save on changes
 watch(fontScale, saveFontScale)
 watch([semanticZoomThreshold, magnifierEnabled, magnifierZoomThreshold], saveDisplaySettings)
+watch(spellcheckEnabled, saveSpellcheckSetting)
 
 // Delete custom theme
 async function deleteCustomTheme(id: string) {
@@ -52,10 +61,12 @@ async function deleteCustomTheme(id: string) {
 
 function resetDisplayDefaults() {
   fontScale.value = 1.0
+  spellcheckEnabled.value = false
   semanticZoomThreshold.value = 0.5
   magnifierEnabled.value = true
   magnifierZoomThreshold.value = 0.4
   saveFontScale()
+  saveSpellcheckSetting()
   saveDisplaySettings()
 }
 </script>
@@ -107,6 +118,15 @@ function resetDisplayDefaults() {
         step="0.1"
       />
       <span class="hint">{{ t('settings.display.fontScaleHint') }}</span>
+    </div>
+
+    <!-- Spellcheck -->
+    <div class="setting-group">
+      <label class="checkbox-label">
+        <input v-model="spellcheckEnabled" type="checkbox" />
+        {{ t('settings.display.spellcheck') }}
+      </label>
+      <span class="hint">{{ t('settings.display.spellcheckHint') }}</span>
     </div>
 
     <hr class="divider" />

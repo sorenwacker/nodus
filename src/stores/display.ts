@@ -14,6 +14,7 @@ export const useDisplayStore = defineStore('display', () => {
   const magnifierZoomThreshold = ref(displayStorage.getMagnifierZoomThreshold())
   const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
   const fontScale = ref(uiStorage.getFontScale())
+  const spellcheckEnabled = ref(uiStorage.getSpellcheckEnabled())
 
   // Reload all values from storage
   function reload() {
@@ -23,6 +24,7 @@ export const useDisplayStore = defineStore('display', () => {
     magnifierZoomThreshold.value = displayStorage.getMagnifierZoomThreshold()
     magnifierEnabled.value = uiStorage.getMagnifierEnabled()
     fontScale.value = uiStorage.getFontScale()
+    spellcheckEnabled.value = uiStorage.getSpellcheckEnabled()
   }
 
   // Event handler for settings changes
@@ -47,6 +49,7 @@ export const useDisplayStore = defineStore('display', () => {
     magnifierZoomThreshold,
     magnifierEnabled,
     fontScale,
+    spellcheckEnabled,
     // Actions
     reload,
     setupListener,

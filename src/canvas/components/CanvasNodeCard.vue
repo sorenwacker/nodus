@@ -38,6 +38,7 @@ const props = defineProps<{
   editingTitleId: string | null
   editTitle: string
   editContent: string
+  spellcheckEnabled?: boolean
   scale: number
   // In-node search
   showNodeSearch: boolean
@@ -175,9 +176,9 @@ const displayTitle = computed(() => {
         v-if="isEditingTitle"
         :value="editTitle"
         class="title-editor"
-        spellcheck="false"
-        autocorrect="off"
-        autocapitalize="off"
+        :spellcheck="spellcheckEnabled"
+        :autocorrect="spellcheckEnabled ? 'on' : 'off'"
+        :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
         @input="emit('update:edit-title', ($event.target as HTMLInputElement).value)"
         @blur="emit('save-title')"
         @keydown.enter="emit('save-title')"
@@ -214,9 +215,9 @@ const displayTitle = computed(() => {
       :value="editContent"
       class="inline-editor"
       :placeholder="t('canvas.node.writePlaceholder')"
-      spellcheck="false"
-      autocorrect="off"
-      autocapitalize="off"
+      :spellcheck="spellcheckEnabled"
+      :autocorrect="spellcheckEnabled ? 'on' : 'off'"
+      :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
       @input="emit('update:edit-content', ($event.target as HTMLTextAreaElement).value)"
       @pointerdown.stop
       @pointerup.stop

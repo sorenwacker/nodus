@@ -423,6 +423,8 @@
     "display": {
       "fontScale": "Font Scale",
       "fontScaleHint": "Adjust text size across the canvas (Cmd+/Cmd- also works)",
+      "spellcheck": "Enable spellcheck and autocorrect",
+      "spellcheckHint": "Enable browser spellcheck and autocorrect in text editors",
       "thresholds": "Performance Thresholds",
       "lodThreshold": "LOD Mode Threshold",
       "lodThresholdHint": "Show nodes as dots when more than this many are visible",

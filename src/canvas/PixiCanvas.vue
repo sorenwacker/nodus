@@ -2095,6 +2095,7 @@ useCanvasKeyboardShortcuts({
           :node-search-match-count="nodeSearchMatches.length"
           :node-search-index="nodeSearchIndex"
           :linked-entities="getLinkedEntities(node.id)"
+          :spellcheck-enabled="displayStore.spellcheckEnabled"
           @pointerdown="onNodePointerDown($event, node.id)"
           @pointerenter="onNodePointerEnter($event, node.id)"
           @pointermove="onNodePointerMove($event)"

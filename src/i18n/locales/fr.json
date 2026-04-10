@@ -403,6 +403,8 @@
     "display": {
       "fontScale": "Taille de police",
       "fontScaleHint": "Ajuster la taille du texte sur le canevas (Cmd+/Cmd- fonctionne aussi)",
+      "spellcheck": "Activer la vérification orthographique et la correction automatique",
+      "spellcheckHint": "Activer la vérification orthographique et la correction automatique du navigateur dans les éditeurs de texte",
       "thresholds": "Seuils de performance",
       "lodThreshold": "Seuil du mode LOD",
       "lodThresholdHint": "Afficher les noeuds comme des points quand plus de ce nombre sont visibles",

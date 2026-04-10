@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
+import { useDisplayStore } from '../stores/display'
 
 const { t } = useI18n()
 const store = useNodesStore()
+const displayStore = useDisplayStore()
+const { spellcheckEnabled } = storeToRefs(displayStore)
 
 const selectedNode = computed(() => store.selectedNode)
 const editContent = ref('')
@@ -88,7 +92,9 @@ async function deleteNode() {
         v-model="editContent"
         class="markdown-editor"
         placeholder="Write markdown here..."
-        spellcheck="false"
+        :spellcheck="spellcheckEnabled"
+        :autocorrect="spellcheckEnabled ? 'on' : 'off'"
+        :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
         @input="updateContent"
       ></textarea>
     </div>

@@ -403,6 +403,8 @@
     "display": {
       "fontScale": "Tamaño de fuente",
       "fontScaleHint": "Ajustar el tamaño del texto en el lienzo (Cmd+/Cmd- también funciona)",
+      "spellcheck": "Habilitar corrector ortográfico y autocorrección",
+      "spellcheckHint": "Habilitar corrector ortográfico y autocorrección del navegador en editores de texto",
       "thresholds": "Umbrales de rendimiento",
       "lodThreshold": "Umbral del modo LOD",
       "lodThresholdHint": "Mostrar nodos como puntos cuando hay más de este número visibles",

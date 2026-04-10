@@ -411,6 +411,8 @@
     "display": {
       "fontScale": "Schriftgröße",
       "fontScaleHint": "Textgröße auf der Leinwand anpassen (Cmd+/Cmd- funktioniert auch)",
+      "spellcheck": "Rechtschreibprüfung und Autokorrektur aktivieren",
+      "spellcheckHint": "Browser-Rechtschreibprüfung und Autokorrektur in Texteditoren aktivieren",
       "thresholds": "Leistungs-Schwellenwerte",
       "lodThreshold": "LOD-Modus-Schwellenwert",
       "lodThresholdHint": "Knoten als Punkte anzeigen, wenn mehr als diese Anzahl sichtbar ist",
