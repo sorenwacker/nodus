@@ -15,10 +15,7 @@ export function useLinkPicker(deps: LinkPickerDeps) {
   const linkPickerSourceNodeId = ref<string | null>(null)
 
   function openLinkPicker() {
-    console.log('[LinkPicker] openLinkPicker called')
-    console.log('[LinkPicker] contextMenuNodeId.value:', deps.contextMenuNodeId.value)
     linkPickerSourceNodeId.value = deps.contextMenuNodeId.value
-    console.log('[LinkPicker] linkPickerSourceNodeId set to:', linkPickerSourceNodeId.value)
     showLinkPicker.value = true
     deps.closeContextMenu()
   }
@@ -29,16 +26,11 @@ export function useLinkPicker(deps: LinkPickerDeps) {
   }
 
   async function linkToNode(targetNodeId: string) {
-    console.log('[LinkPicker] linkToNode called with targetNodeId:', targetNodeId)
-    console.log('[LinkPicker] linkPickerSourceNodeId.value:', linkPickerSourceNodeId.value)
     if (!linkPickerSourceNodeId.value) {
-      console.warn('[LinkPicker] No source node ID, aborting')
       return
     }
     try {
-      console.log('[LinkPicker] Creating edge from', linkPickerSourceNodeId.value, 'to', targetNodeId)
       await deps.createEdge(linkPickerSourceNodeId.value, targetNodeId)
-      console.log('[LinkPicker] Edge created successfully')
     } catch (e) {
       console.error('[LinkPicker] Failed to create edge:', e)
     }

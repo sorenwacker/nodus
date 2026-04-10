@@ -110,7 +110,6 @@ export function useLayout(options: UseLayoutOptions) {
   async function radialLayout(): Promise<void> {
     const selectedIds = store.getSelectedNodeIds()
     if (selectedIds.length !== 1) {
-      console.log('[LAYOUT] Radial layout requires exactly one selected node')
       return
     }
 
@@ -213,12 +212,9 @@ export function useLayout(options: UseLayoutOptions) {
     } else {
       animateToPositions(targets, 600)
     }
-
-    console.log(`[LAYOUT] Radial layout complete: ${targets.size} nodes in ${maxDepth + 1} levels`)
   }
 
   async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid', frameId?: string) {
-    console.log('[LAYOUT] autoLayout called with:', layout, 'frameId:', frameId)
 
     // Radial layout is handled separately (requires exactly one selected node)
     if (layout === 'radial') {
@@ -229,20 +225,16 @@ export function useLayout(options: UseLayoutOptions) {
     const selectedIds = store.getSelectedNodeIds()
     const allNodes = store.getFilteredNodes()
     const allFrames = store.getFilteredFrames()
-    console.log('[LAYOUT] allNodes:', allNodes.length, 'allFrames:', allFrames.length)
 
     // If frameId is provided, only layout nodes inside that frame
     let nodes: Node[]
     let targetFrame: Frame | undefined
 
     if (frameId) {
-      console.log('[LAYOUT] Looking for frame:', frameId, 'in', allFrames.map(f => f.id))
       targetFrame = allFrames.find(f => f.id === frameId)
       if (!targetFrame) {
-        console.log('[LAYOUT] Frame not found:', frameId)
         return
       }
-      console.log('[LAYOUT] Found frame:', targetFrame.title, 'at', targetFrame.canvas_x, targetFrame.canvas_y, 'size', targetFrame.width, 'x', targetFrame.height)
 
       // Helper to check if a node is inside the target frame (explicit frame_id or 50%+ overlap)
       const isNodeInTargetFrame = (node: Node): boolean => {
@@ -253,15 +245,12 @@ export function useLayout(options: UseLayoutOptions) {
       }
 
       nodes = allNodes.filter(n => isNodeInTargetFrame(n))
-      console.log('[LAYOUT] Frame-scoped: found', nodes.length, 'nodes in frame', targetFrame.title)
-      console.log('[LAYOUT] Nodes in frame:', nodes.map(n => ({ id: n.id, x: n.canvas_x, y: n.canvas_y })))
     } else {
       nodes = selectedIds.length > 0
         ? allNodes.filter(n => selectedIds.includes(n.id))
         : allNodes
     }
 
-    console.log('autoLayout nodes:', nodes.length, 'selected:', selectedIds.length, 'frames:', allFrames.length)
     if (nodes.length === 0) return
 
     // Thresholds for layout performance
@@ -273,7 +262,6 @@ export function useLayout(options: UseLayoutOptions) {
 
     // Fast path for grid layout with large node sets
     if (layout === 'grid' && nodes.length > FAST_GRID_THRESHOLD) {
-      console.log(`Fast grid layout for ${nodes.length} nodes using optimized algorithm`)
 
       // Calculate center - use frame center if frame-scoped
       let centerX: number, centerY: number
@@ -311,7 +299,6 @@ export function useLayout(options: UseLayoutOptions) {
 
       // Batch update positions to avoid blocking UI
       await batchUpdatePositions(finalPositions, store.updateNodePosition, 200)
-      console.log(`Fast layout complete for ${nodes.length} nodes`)
       return
     }
 
@@ -337,7 +324,6 @@ export function useLayout(options: UseLayoutOptions) {
     if (frameId) {
       // Layout nodes inside the selected frame
       virtualNodes = [...nodes]
-      console.log('[Layout] Frame-scoped layout:', virtualNodes.length, 'nodes')
     } else {
       // Group nodes by frame (check both frame_id and spatial overlap)
       const frameNodes = new Map<string, Node[]>() // frame_id -> nodes in that frame
@@ -378,7 +364,6 @@ export function useLayout(options: UseLayoutOptions) {
     // (Previously we created virtual nodes for frames and moved them as units)
 
     if (virtualNodes.length === 0) {
-      console.log('[Layout] No nodes to layout')
       return
     }
 
@@ -388,7 +373,6 @@ export function useLayout(options: UseLayoutOptions) {
       // Use frame center for frame-scoped layout
       centerX = targetFrame.canvas_x + targetFrame.width / 2
       centerY = targetFrame.canvas_y + targetFrame.height / 2
-      console.log('[Layout] Using frame center:', centerX, centerY)
     } else {
       // Use nodes' center for global layout
       let sumX = 0, sumY = 0
@@ -471,7 +455,6 @@ export function useLayout(options: UseLayoutOptions) {
 
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
-        console.log(`Batch updating ${finalTargets.size} node positions (skipping animation)`)
         await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
       } else {
         animateToPositions(finalTargets, 800)
@@ -499,11 +482,8 @@ export function useLayout(options: UseLayoutOptions) {
           target: e.target_node_id,
         }))
 
-      // For very large graphs, warn and use simpler ranker
+      // For very large graphs, use simpler ranker
       const ranker = virtualNodes.length > 2000 ? 'longest-path' : 'network-simplex'
-      if (virtualNodes.length > 1000) {
-        console.log(`Hierarchical layout for ${virtualNodes.length} nodes - using ${ranker} ranker`)
-      }
 
       // Use requestIdleCallback or setTimeout to avoid blocking UI
       const positions = await new Promise<Map<string, { x: number; y: number }>>((resolve) => {
@@ -555,7 +535,6 @@ export function useLayout(options: UseLayoutOptions) {
 
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
-        console.log(`Batch updating ${finalTargets.size} node positions (skipping animation)`)
         await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
       } else {
         animateToPositions(finalTargets, 600)
@@ -613,8 +592,6 @@ export function useLayout(options: UseLayoutOptions) {
           }
         }
       }
-
-      console.log('Grid layout targets:', targets.size)
     } else if (layout === 'horizontal') {
       const sorted = [...virtualNodes].sort((a, b) => (b.height || NODE_DEFAULTS.HEIGHT) - (a.height || NODE_DEFAULTS.HEIGHT))
       const totalWidth = sorted.reduce((sum, n) => sum + (n.width || NODE_DEFAULTS.WIDTH) + gridGap, -gridGap)
@@ -679,7 +656,6 @@ export function useLayout(options: UseLayoutOptions) {
       ? constrainNodesToFrame(targets, nodeMap, targetFrame)
       : pushOutOfFrames(targets, nodeMap)
 
-    console.log('Calling animateToPositions with', finalTargets.size, 'targets')
     animateToPositions(finalTargets, 500)
   }
 

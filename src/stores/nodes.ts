@@ -833,12 +833,10 @@ export const useNodesStore = defineStore('nodes', () => {
       // Frame-scoped layout: only nodes inside the selected frame
       targetFrame = filteredFrames.value.find(f => f.id === frameId)
       if (!targetFrame) {
-        console.log('[Layout] Frame not found:', frameId)
         return
       }
 
       targetNodes = filteredNodes.value.filter(n => isNodeInSpecificFrame(n, targetFrame!))
-      console.log('[Layout] Frame-scoped layout:', targetFrame.title, 'Nodes:', targetNodes.length)
     } else {
       // Canvas layout: exclude nodes inside frames
       const allTargetNodes = nodeIds
@@ -846,10 +844,6 @@ export const useNodesStore = defineStore('nodes', () => {
         : filteredNodes.value
 
       targetNodes = allTargetNodes.filter(n => !isNodeInAnyFrame(n))
-      const excludedCount = allTargetNodes.length - targetNodes.length
-
-      console.log('[Layout] Frames:', filteredFrames.value.length)
-      console.log('[Layout] All nodes:', allTargetNodes.length, 'Excluded:', excludedCount, 'To layout:', targetNodes.length)
     }
 
     if (targetNodes.length === 0) return

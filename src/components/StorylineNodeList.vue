@@ -90,7 +90,6 @@ function handleNodeClick(index: number) {
 
 // Drag and drop
 function onDragStart(e: DragEvent, index: number) {
-  console.log('[StorylineNodeList] onDragStart', index)
   draggingNodeIndex.value = index
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
@@ -111,8 +110,6 @@ function onDrop(e: DragEvent, targetIndex: number) {
   e.preventDefault()
   dragOverIndex.value = null
 
-  console.log('[StorylineNodeList] onDrop called', { draggingNodeIndex: draggingNodeIndex.value, targetIndex })
-
   if (draggingNodeIndex.value === null) return
   if (draggingNodeIndex.value === targetIndex) {
     draggingNodeIndex.value = null
@@ -128,7 +125,6 @@ function onDrop(e: DragEvent, targetIndex: number) {
   nodesCopy.splice(adjustedTarget, 0, removed)
 
   const newOrder = nodesCopy.map(n => n.id)
-  console.log('[StorylineNodeList] Emitting reorder', newOrder)
   emit('reorder', newOrder)
   draggingNodeIndex.value = null
 }

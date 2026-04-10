@@ -294,24 +294,16 @@ onMounted(async () => {
   if (store.currentWorkspaceId) {
     try {
       const workspace = await import('./lib/tauri').then(m => m.getWorkspace(store.currentWorkspaceId!))
-      console.log('[App] Workspace settings:', {
-        id: store.currentWorkspaceId,
-        sync_enabled: workspace?.sync_enabled,
-        vault_path: workspace?.vault_path
-      })
       if (workspace?.sync_enabled && workspace?.vault_path) {
-        console.log('[App] Starting file watcher for workspace:', store.currentWorkspaceId)
         // First sync any missing files (added while Nodus was closed)
         try {
           const newNodes = await syncMissingFiles(store.currentWorkspaceId!, workspace.vault_path)
           if (newNodes.length > 0) {
-            console.log('[App] Synced', newNodes.length, 'missing files')
             await store.loadNodes()
           }
           // Sync wikilinks to create edges
           const edgesCreated = await syncAllWikilinks(store.currentWorkspaceId!)
           if (edgesCreated > 0) {
-            console.log('[App] Created', edgesCreated, 'wikilink edges')
             await store.loadEdges()
           }
         } catch (e) {
@@ -319,8 +311,6 @@ onMounted(async () => {
         }
         // Then start watching for future changes
         await store.watchVault(workspace.vault_path)
-      } else {
-        console.log('[App] File watcher NOT started - sync_enabled:', workspace?.sync_enabled, 'vault_path:', workspace?.vault_path)
       }
     } catch (e) {
       console.error('[App] Failed to start file watcher:', e)
