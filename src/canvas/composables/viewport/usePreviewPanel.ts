@@ -18,19 +18,27 @@ export interface UsePreviewPanelReturn {
   previewNode: Ref<Node | undefined>
   closePreviewPanel: () => void
   zoomToPreviewNode: () => void
+  suppressPreviewPanel: () => void
 }
 
 export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelReturn {
   const { selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible, getNode, zoomToNode } = ctx
 
   const showPreviewPanel = ref(false)
+  let suppressUntil = 0
+
+  // Suppress preview panel temporarily (e.g., during right-click)
+  function suppressPreviewPanel() {
+    suppressUntil = Date.now() + 300
+    showPreviewPanel.value = false
+  }
 
   // Auto-show preview when single node selected while zoomed out
   // Auto-hide when no nodes selected or context menu is open
   watch(
     [selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible],
     ([ids, collapsed, menuVisible]) => {
-      if (ids.length === 0 || menuVisible) {
+      if (ids.length === 0 || menuVisible || Date.now() < suppressUntil) {
         showPreviewPanel.value = false
       } else if (collapsed && ids.length === 1) {
         showPreviewPanel.value = true
@@ -69,5 +77,6 @@ export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelRet
     previewNode,
     closePreviewPanel,
     zoomToPreviewNode,
+    suppressPreviewPanel,
   }
 }

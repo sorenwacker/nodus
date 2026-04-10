@@ -362,7 +362,7 @@ const previewPanel = usePreviewPanel({
   getNode: store.getNode,
   zoomToNode,
 })
-const { showPreviewPanel, previewNode, closePreviewPanel, zoomToPreviewNode } = previewPanel
+const { showPreviewPanel, previewNode, closePreviewPanel, zoomToPreviewNode, suppressPreviewPanel } = previewPanel
 
 // Preview panel save handlers
 async function savePreviewContent(nodeId: string, content: string) {
@@ -1826,6 +1826,7 @@ function onContextMenu(e: MouseEvent) {
   if (nodeCard) {
     const nodeId = nodeCard.dataset.nodeId
     if (nodeId) {
+      suppressPreviewPanel()
       contextMenu.open(e, nodeId)
 
       // Select the node if not already selected
@@ -1846,6 +1847,7 @@ function closeContextMenu() {
 
 // LOD canvas context menu handlers
 function onLODNodeContextMenu(e: MouseEvent, nodeId: string) {
+  suppressPreviewPanel()
   contextMenu.open(e, nodeId)
   if (!store.selectedNodeIds.includes(nodeId)) {
     store.selectNode(nodeId)
