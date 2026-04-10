@@ -71,6 +71,8 @@ jobs:
           releaseName: 'Nodus ${{ github.ref_name }}'
           releaseBody: |
             See the [changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            Download links available at https://sorenwacker.github.io/nodus/downloads/
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
           args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
