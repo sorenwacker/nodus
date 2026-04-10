@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
+import NodePicker from '../../components/NodePicker.vue'
+import { useNodesStore } from '../../stores/nodes'
+
+const store = useNodesStore()
 
 const props = defineProps<{
   visible: boolean
@@ -19,6 +23,12 @@ const emit = defineEmits<{
 const isEditing = ref(false)
 const editContent = ref('')
 const editTitle = ref('')
+const editorRef = ref<HTMLTextAreaElement | null>(null)
+
+// Wikilink autocomplete state
+const showLinkPicker = ref(false)
+const linkPickerPosition = ref({ top: 0, left: 0 })
+const wikilinkStart = ref(-1)
 
 // Reset edit state when panel closes or node changes
 watch(() => props.visible, (visible) => {
@@ -49,6 +59,78 @@ function saveAndClose() {
 
 function cancelEditing() {
   isEditing.value = false
+  showLinkPicker.value = false
+}
+
+// Handle editor input for wikilink detection
+function onEditorInput(e: Event) {
+  const textarea = e.target as HTMLTextAreaElement
+  const cursorPos = textarea.selectionStart
+  const textBeforeCursor = editContent.value.slice(0, cursorPos)
+
+  // Check if we just typed `[[`
+  if (textBeforeCursor.endsWith('[[')) {
+    wikilinkStart.value = cursorPos - 2
+    showLinkPicker.value = true
+    // Position the picker near the cursor
+    nextTick(() => {
+      if (editorRef.value) {
+        const rect = editorRef.value.getBoundingClientRect()
+        // Approximate position based on cursor
+        linkPickerPosition.value = {
+          top: rect.top + 60,
+          left: rect.left + 20
+        }
+      }
+    })
+  } else if (showLinkPicker.value) {
+    // Check if we're still inside a wikilink
+    const textFromStart = editContent.value.slice(wikilinkStart.value, cursorPos)
+    if (textFromStart.includes(']]') || !textFromStart.startsWith('[[')) {
+      showLinkPicker.value = false
+    }
+  }
+}
+
+// Handle node selection from picker
+function onLinkSelect(nodeId: string, nodeTitle: string) {
+  if (wikilinkStart.value >= 0 && editorRef.value) {
+    const cursorPos = editorRef.value.selectionStart
+    const before = editContent.value.slice(0, wikilinkStart.value)
+    const after = editContent.value.slice(cursorPos)
+    editContent.value = before + '[[' + nodeTitle + ']]' + after
+    showLinkPicker.value = false
+
+    // Restore focus and cursor position
+    nextTick(() => {
+      if (editorRef.value) {
+        editorRef.value.focus()
+        const newPos = wikilinkStart.value + nodeTitle.length + 4 // [[ + title + ]]
+        editorRef.value.setSelectionRange(newPos, newPos)
+      }
+    })
+  }
+}
+
+function closeLinkPicker() {
+  showLinkPicker.value = false
+}
+
+function handleLinkPickerSelect(nodeId: string) {
+  const node = store.getNode(nodeId)
+  if (node) onLinkSelect(nodeId, node.title)
+}
+
+// Handle keyboard in editor
+function onEditorKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (showLinkPicker.value) {
+      e.stopPropagation()
+      showLinkPicker.value = false
+    } else {
+      cancelEditing()
+    }
+  }
 }
 </script>
 
@@ -80,12 +162,27 @@ function cancelEditing() {
       </div>
 
       <!-- Edit mode -->
-      <textarea
-        v-if="isEditing"
-        v-model="editContent"
-        class="preview-editor"
-        @keydown.escape="cancelEditing"
-      ></textarea>
+      <div v-if="isEditing" class="editor-wrapper">
+        <textarea
+          ref="editorRef"
+          v-model="editContent"
+          class="preview-editor"
+          @input="onEditorInput"
+          @keydown="onEditorKeydown"
+        ></textarea>
+
+        <!-- Wikilink picker -->
+        <NodePicker
+          v-if="showLinkPicker"
+          class="wikilink-picker"
+          :style="{ position: 'fixed', top: linkPickerPosition.top + 'px', left: linkPickerPosition.left + 'px' }"
+          :exclude-node-ids="[nodeId]"
+          :allow-create="false"
+          :show-search="true"
+          @select="handleLinkPickerSelect"
+          @close="closeLinkPicker"
+        />
+      </div>
 
       <!-- View mode -->
       <!-- eslint-disable-next-line vue/no-v-html -->
@@ -175,5 +272,17 @@ function cancelEditing() {
 
 .preview-header h3 {
   cursor: text;
+}
+
+.editor-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+
+.wikilink-picker {
+  z-index: 3000;
 }
 </style>
