@@ -26,17 +26,22 @@ export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelRet
 
   const showPreviewPanel = ref(false)
   const suppressed = ref(false)
-  let suppressTimeout: ReturnType<typeof setTimeout> | null = null
 
-  // Suppress preview panel temporarily (e.g., during right-click)
+  // Suppress preview panel (called before context menu opens)
   function suppressPreviewPanel() {
     suppressed.value = true
     showPreviewPanel.value = false
-    if (suppressTimeout) clearTimeout(suppressTimeout)
-    suppressTimeout = setTimeout(() => {
-      suppressed.value = false
-    }, 500)
   }
+
+  // Clear suppression when context menu closes
+  watch(contextMenuVisible, (visible) => {
+    if (!visible) {
+      // Delay clearing suppression to avoid race conditions
+      setTimeout(() => {
+        suppressed.value = false
+      }, 100)
+    }
+  })
 
   // Auto-show preview when single node selected while zoomed out
   // Auto-hide when no nodes selected, context menu is open, or suppressed
