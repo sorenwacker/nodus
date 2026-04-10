@@ -351,10 +351,14 @@ const nodeNavigation = useNodeNavigation({
 })
 const { navigateToNode, zoomToNode } = nodeNavigation
 
+// Context menu visible state - defined early for preview panel to reference
+const contextMenuVisibleRef = ref(false)
+
 // Preview panel composable - auto-shows when single node selected while zoomed out
 const previewPanel = usePreviewPanel({
   selectedNodeIds: computed(() => store.selectedNodeIds),
   isSemanticZoomCollapsed,
+  contextMenuVisible: contextMenuVisibleRef,
   getNode: store.getNode,
   zoomToNode,
 })
@@ -644,6 +648,11 @@ const contextMenu = useContextMenu({
 })
 // Expose refs for template compatibility
 const contextMenuVisible = contextMenu.visible
+
+// Sync context menu visibility with preview panel ref
+watch(contextMenuVisible, (visible) => {
+  contextMenuVisibleRef.value = visible
+}, { immediate: true })
 const contextMenuPosition = contextMenu.position
 const contextMenuNodeId = contextMenu.nodeId
 const contextMenuStorylineSubmenu = contextMenu.storylineSubmenu

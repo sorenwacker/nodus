@@ -8,6 +8,7 @@ import type { Node } from '../../../types'
 export interface UsePreviewPanelContext {
   selectedNodeIds: Ref<string[]>
   isSemanticZoomCollapsed: ComputedRef<boolean>
+  contextMenuVisible: Ref<boolean>
   getNode: (id: string) => Node | undefined
   zoomToNode: (nodeId: string, targetScale?: number) => void
 }
@@ -20,16 +21,16 @@ export interface UsePreviewPanelReturn {
 }
 
 export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelReturn {
-  const { selectedNodeIds, isSemanticZoomCollapsed, getNode, zoomToNode } = ctx
+  const { selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible, getNode, zoomToNode } = ctx
 
   const showPreviewPanel = ref(false)
 
   // Auto-show preview when single node selected while zoomed out
-  // Auto-hide when no nodes selected
+  // Auto-hide when no nodes selected or context menu is open
   watch(
-    [selectedNodeIds, isSemanticZoomCollapsed],
-    ([ids, collapsed]) => {
-      if (ids.length === 0) {
+    [selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible],
+    ([ids, collapsed, menuVisible]) => {
+      if (ids.length === 0 || menuVisible) {
         showPreviewPanel.value = false
       } else if (collapsed && ids.length === 1) {
         showPreviewPanel.value = true
