@@ -373,26 +373,43 @@ export const useNodesStore = defineStore('nodes', () => {
         }
       }
 
-      // Extract wikilinks and create edges
+      // Extract wikilinks and sync edges
       const links = extractWikilinks(content)
 
-      // Create edges for each wikilink
+      // Build set of target node IDs from current wikilinks
+      const currentTargetIds = new Set<string>()
       for (const linkTitle of links) {
         const targetNode = findNodeByTitle(linkTitle)
         if (targetNode && targetNode.id !== id) {
-          // Check if edge already exists
-          const exists = edges.value.some(e =>
-            e.source_node_id === id &&
-            e.target_node_id === targetNode.id &&
-            e.link_type === 'wikilink'
-          )
-          if (!exists) {
-            await createEdge({
-              source_node_id: id,
-              target_node_id: targetNode.id,
-              link_type: 'wikilink',
-            })
-          }
+          currentTargetIds.add(targetNode.id)
+        }
+      }
+
+      // Find existing wikilink edges from this node
+      const existingWikilinkEdges = edges.value.filter(e =>
+        e.source_node_id === id && e.link_type === 'wikilink'
+      )
+
+      // Delete edges that no longer have corresponding wikilinks
+      for (const edge of existingWikilinkEdges) {
+        if (!currentTargetIds.has(edge.target_node_id)) {
+          await edgesStore.deleteEdge(edge.id)
+        }
+      }
+
+      // Create edges for new wikilinks
+      for (const targetId of currentTargetIds) {
+        const exists = edges.value.some(e =>
+          e.source_node_id === id &&
+          e.target_node_id === targetId &&
+          e.link_type === 'wikilink'
+        )
+        if (!exists) {
+          await createEdge({
+            source_node_id: id,
+            target_node_id: targetId,
+            link_type: 'wikilink',
+          })
         }
       }
     }
@@ -522,7 +539,49 @@ export const useNodesStore = defineStore('nodes', () => {
 
   // Edge functions - forwarded to edges store
   const createEdge = (data: CreateEdgeInput) => edgesStore.createEdge(data)
-  const deleteEdge = (id: string) => edgesStore.deleteEdge(id)
+
+  /**
+   * Delete an edge. If it's a wikilink edge, convert the [[...]] to plain text in the source node.
+   */
+  async function deleteEdge(id: string): Promise<void> {
+    const edge = edgesStore.getEdge(id)
+
+    // If it's a wikilink edge, convert the wikilink to plain text in source node
+    if (edge && edge.link_type === 'wikilink') {
+      const sourceNode = nodes.value.find(n => n.id === edge.source_node_id)
+      const targetNode = nodes.value.find(n => n.id === edge.target_node_id)
+
+      if (sourceNode && targetNode && sourceNode.markdown_content) {
+        // Replace [[Target Title]] or [[Target Title|display]] with just the display text
+        const targetTitle = targetNode.title
+        const wikilinkRegex = new RegExp(
+          `\\[\\[${escapeRegex(targetTitle)}(?:\\|([^\\]]+))?\\]\\]`,
+          'gi'
+        )
+        const newContent = sourceNode.markdown_content.replace(wikilinkRegex, (_match, display) => {
+          return display || targetTitle
+        })
+
+        if (newContent !== sourceNode.markdown_content) {
+          // Update content without triggering edge sync (would cause infinite loop)
+          sourceNode.markdown_content = newContent
+          sourceNode.updated_at = Date.now()
+          try {
+            await invoke<string | null>('update_node_content', { id: sourceNode.id, content: newContent })
+          } catch (e) {
+            console.error('Failed to update content after wikilink removal:', e)
+          }
+        }
+      }
+    }
+
+    await edgesStore.deleteEdge(id)
+  }
+
+  /** Escape special regex characters in a string */
+  function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
   const restoreEdge = (edge: Edge) => edgesStore.restoreEdge(edge)
   const updateEdgeLinkType = (id: string, linkType: string) => edgesStore.updateEdgeLinkType(id, linkType)
   const updateEdgeColor = (id: string, color: string | null) => edgesStore.updateEdgeColor(id, color)
