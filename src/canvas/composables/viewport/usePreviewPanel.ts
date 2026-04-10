@@ -25,20 +25,25 @@ export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelRet
   const { selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible, getNode, zoomToNode } = ctx
 
   const showPreviewPanel = ref(false)
-  let suppressUntil = 0
+  const suppressed = ref(false)
+  let suppressTimeout: ReturnType<typeof setTimeout> | null = null
 
   // Suppress preview panel temporarily (e.g., during right-click)
   function suppressPreviewPanel() {
-    suppressUntil = Date.now() + 300
+    suppressed.value = true
     showPreviewPanel.value = false
+    if (suppressTimeout) clearTimeout(suppressTimeout)
+    suppressTimeout = setTimeout(() => {
+      suppressed.value = false
+    }, 500)
   }
 
   // Auto-show preview when single node selected while zoomed out
-  // Auto-hide when no nodes selected or context menu is open
+  // Auto-hide when no nodes selected, context menu is open, or suppressed
   watch(
-    [selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible],
-    ([ids, collapsed, menuVisible]) => {
-      if (ids.length === 0 || menuVisible || Date.now() < suppressUntil) {
+    [selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible, suppressed],
+    ([ids, collapsed, menuVisible, isSuppressed]) => {
+      if (ids.length === 0 || menuVisible || isSuppressed) {
         showPreviewPanel.value = false
       } else if (collapsed && ids.length === 1) {
         showPreviewPanel.value = true
