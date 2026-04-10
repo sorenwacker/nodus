@@ -98,3 +98,64 @@ describe('Zoom to Node', () => {
     expect(searchEventScale).toBe(DEFAULT_ZOOM_SCALE)
   })
 })
+
+describe('Preview Panel Suppression', () => {
+  it('should suppress panel using timestamp-based approach', () => {
+    // Simulate the suppression logic used in usePreviewPanel
+    let suppressedUntil = 0
+
+    function suppressPreviewPanel() {
+      suppressedUntil = Date.now() + 500
+    }
+
+    function isSuppressed() {
+      return Date.now() < suppressedUntil
+    }
+
+    // Initially not suppressed
+    expect(isSuppressed()).toBe(false)
+
+    // After calling suppress
+    suppressPreviewPanel()
+    expect(isSuppressed()).toBe(true)
+
+    // The suppression window is 500ms
+    expect(suppressedUntil - Date.now()).toBeLessThanOrEqual(500)
+    expect(suppressedUntil - Date.now()).toBeGreaterThan(0)
+  })
+
+  it('should not show panel when context menu is visible', () => {
+    // Simulate the panel visibility logic
+    function shouldShowPanel(
+      ids: string[],
+      collapsed: boolean,
+      menuVisible: boolean,
+      isSuppressed: boolean
+    ): boolean {
+      if (ids.length === 0 || menuVisible || isSuppressed) {
+        return false
+      } else if (collapsed && ids.length === 1) {
+        return true
+      }
+      return false
+    }
+
+    // Context menu visible - panel should not show
+    expect(shouldShowPanel(['node1'], true, true, false)).toBe(false)
+
+    // Context menu hidden, single node selected, collapsed - panel should show
+    expect(shouldShowPanel(['node1'], true, false, false)).toBe(true)
+
+    // Suppressed - panel should not show even with valid conditions
+    expect(shouldShowPanel(['node1'], true, false, true)).toBe(false)
+
+    // Multiple nodes selected - panel should not show
+    expect(shouldShowPanel(['node1', 'node2'], true, false, false)).toBe(false)
+
+    // No nodes selected - panel should not show
+    expect(shouldShowPanel([], true, false, false)).toBe(false)
+
+    // Not collapsed (zoomed in) - panel should not show
+    expect(shouldShowPanel(['node1'], false, false, false)).toBe(false)
+  })
+})
