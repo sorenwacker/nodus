@@ -520,6 +520,8 @@ export const useNodesStore = defineStore('nodes', () => {
       console.error('Failed to delete node:', e)
     }
     nodes.value = nodes.value.filter(n => n.id !== id)
+    // Clear selection if deleted node was selected
+    selectedNodeIds.value = selectedNodeIds.value.filter(nid => nid !== id)
     // Remove edges connected to deleted node
     edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
   }
@@ -533,6 +535,8 @@ export const useNodesStore = defineStore('nodes', () => {
     }
     const idSet = new Set(ids)
     nodes.value = nodes.value.filter(n => !idSet.has(n.id))
+    // Clear selection for deleted nodes
+    selectedNodeIds.value = selectedNodeIds.value.filter(nid => !idSet.has(nid))
     // Remove edges connected to deleted nodes
     edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
   }
