@@ -12,8 +12,8 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 }
 
-// Default to 'info' in production, 'debug' in development
-const currentLevel: LogLevel = import.meta.env.DEV ? 'debug' : 'info'
+// Default to 'warn' in production, 'info' in development
+const currentLevel: LogLevel = import.meta.env.DEV ? 'info' : 'warn'
 
 function shouldLog(level: LogLevel): boolean {
   return LOG_LEVELS[level] >= LOG_LEVELS[currentLevel]

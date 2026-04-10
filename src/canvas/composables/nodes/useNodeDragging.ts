@@ -113,7 +113,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
     // Cmd+click to zoom to node
     if (e.metaKey && !e.shiftKey && !e.altKey) {
-      zoomToNode(nodeId)
+      zoomToNode(nodeId, 1)
       return
     }
 

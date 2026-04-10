@@ -71,13 +71,9 @@ export function useFrames(options: UseFramesOptions) {
   const pendingFramePlacement = ref(false)
 
   function onPointerDown(e: PointerEvent, frameId: string) {
-    console.log('[Frame] onPointerDown:', frameId)
     e.preventDefault()
     store.selectFrame(frameId)
-    console.log('[Frame] selectedFrameId after selectFrame:', store.selectedFrameId)
     store.selectNode(null)
-    // Log all frames to verify CSS class should apply
-    console.log('[Frame] frames in store:', store.frames.map(f => ({ id: f.id, title: f.title })))
 
     const frame = store.frames.find(f => f.id === frameId)
     if (!frame) return

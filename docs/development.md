@@ -57,3 +57,34 @@ nodus/
 | Canvas | PixiJS + DOM hybrid |
 | Database | LibSQL (SQLite) |
 | Math | Typst WASM |
+
+## Logging
+
+The application uses a structured logging system with namespace prefixes.
+
+### Log Levels
+
+| Environment | Default Level | Shows |
+|-------------|---------------|-------|
+| Development | `info` | info, warn, error |
+| Production | `warn` | warn, error |
+
+### Namespaces
+
+| Logger | Prefix | Usage |
+|--------|--------|-------|
+| `appLogger` | `[Nodus]` | General application logs |
+| `storeLogger` | `[Store]` | Pinia store operations |
+| `canvasLogger` | `[Canvas]` | Canvas rendering |
+| `agentLogger` | `[Agent]` | LLM agent operations |
+
+### Usage
+
+```typescript
+import { storeLogger } from '../lib/logger'
+
+storeLogger.debug('Verbose debugging info')  // Only in development
+storeLogger.info('General information')       // Development only
+storeLogger.warn('Warning message')           // Always shown
+storeLogger.error('Error occurred', error)    // Always shown
+```

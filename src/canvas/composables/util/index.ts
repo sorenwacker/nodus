@@ -29,3 +29,4 @@ export {
   useCitationFetch,
   type UseCitationFetchOptions,
 } from './useCitationFetch'
+export { useCanvasSettings } from './useCanvasSettings'

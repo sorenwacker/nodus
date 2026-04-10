@@ -163,7 +163,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
 
     // Cmd+C / Ctrl+C copies selected nodes as JSON
     if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
-      console.log('[KEYDOWN] Cmd+C detected, selected nodes:', selectedNodeIds.value.length)
       if (selectedNodeIds.value.length > 0) {
         e.preventDefault()
         copySelectedNodes()

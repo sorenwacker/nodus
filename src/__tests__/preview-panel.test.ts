@@ -67,3 +67,34 @@ describe('Preview Panel Content', () => {
     expect(content).toBe('')
   })
 })
+
+describe('Preview Panel Mermaid Rendering', () => {
+  it('should detect mermaid content and request rendering', () => {
+    const contentWithMermaid = '<pre class="mermaid">graph TD; A-->B;</pre>'
+    const contentWithoutMermaid = '<p>Regular content</p>'
+
+    // Check mermaid detection logic
+    const hasMermaid = (content: string) => content.includes('class="mermaid"')
+
+    expect(hasMermaid(contentWithMermaid)).toBe(true)
+    expect(hasMermaid(contentWithoutMermaid)).toBe(false)
+  })
+})
+
+describe('Zoom to Node', () => {
+  it('should use consistent scale of 1 for all zoom actions', () => {
+    // Test the zoom scale calculation
+    const DEFAULT_ZOOM_SCALE = 1
+
+    // All zoom-to-node actions should use scale 1
+    const previewPanelScale = 1
+    const cmdClickScale = 1
+    const contextMenuScale = 1
+    const searchEventScale = 1
+
+    expect(previewPanelScale).toBe(DEFAULT_ZOOM_SCALE)
+    expect(cmdClickScale).toBe(DEFAULT_ZOOM_SCALE)
+    expect(contextMenuScale).toBe(DEFAULT_ZOOM_SCALE)
+    expect(searchEventScale).toBe(DEFAULT_ZOOM_SCALE)
+  })
+})

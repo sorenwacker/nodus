@@ -119,11 +119,8 @@ export const useThemesStore = defineStore('themes', () => {
   }
 
   async function createTheme(input: CreateThemeInput): Promise<DbTheme> {
-    console.log('[ThemesStore] Creating theme with input:', input.name)
     const newTheme = await invoke<DbTheme>('create_theme', { input })
-    console.log('[ThemesStore] Received from backend:', newTheme)
     themes.value.push(newTheme)
-    console.log('[ThemesStore] Themes after push:', themes.value.length, themes.value.map(t => t.name))
     return newTheme
   }
 

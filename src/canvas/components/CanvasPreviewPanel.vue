@@ -22,6 +22,7 @@ const emit = defineEmits<{
   zoomToNode: []
   save: [nodeId: string, content: string]
   saveTitle: [nodeId: string, title: string]
+  renderMermaid: []
 }>()
 
 const isEditing = ref(false)
@@ -44,6 +45,26 @@ watch(() => props.visible, (visible) => {
 watch(() => props.nodeId, () => {
   isEditing.value = false
 })
+
+// Request mermaid rendering when content with diagrams is displayed
+watch(
+  () => props.content,
+  (content) => {
+    if (content && content.includes('class="mermaid"') && props.visible && !isEditing.value) {
+      emit('renderMermaid')
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible && props.content?.includes('class="mermaid"') && !isEditing.value) {
+      emit('renderMermaid')
+    }
+  }
+)
 
 function startEditing() {
   editContent.value = props.rawContent

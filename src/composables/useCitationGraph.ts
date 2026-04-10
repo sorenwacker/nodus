@@ -153,12 +153,9 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     isFetchingCitations.value = true
     fetchProgress.value = { current: 0, total: 0, paperTitle: node.title, paperIndex: batchPaperIndex, paperCount: batchPaperCount }
 
-    console.log(`[CitationGraph] Fetching citations for: "${node.title}" (DOI: ${doi})`)
-
     // Get paper from Semantic Scholar
     const paper = await semanticScholar.getPaperByDOI(doi)
     if (!paper) {
-      console.log(`[CitationGraph] Paper not found in Semantic Scholar: ${doi}`)
       // Don't clear progress - let caller handle it for batch operations
       return { edgesCreated: 0, papersCreated: 0 }
     }
@@ -170,8 +167,6 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     // Get references and citations (sequential to respect rate limits)
     const references = await semanticScholar.getReferences(paper.paperId)
     const citations = await semanticScholar.getCitations(paper.paperId)
-
-    console.log(`[CitationGraph] Found ${references.length} references, ${citations.length} citations for "${node.title}"`)
 
     let edgesCreated = 0
     let papersCreated = 0
@@ -245,8 +240,6 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
       // Create edge: citing paper -> cited paper (the node we're fetching citations FOR)
       if (sourceNodeId && !edgeExists(sourceNodeId, nodeId, 'cites')) {
-        const citingTitle = cit.title || 'Unknown'
-        console.log(`[CitationGraph] Edge: "${citingTitle}" cites "${node.title}" (${sourceNodeId} -> ${nodeId})`)
         await ctx.createEdge({
           source_node_id: sourceNodeId,
           target_node_id: nodeId,

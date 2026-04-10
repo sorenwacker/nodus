@@ -35,8 +35,6 @@ export function registerNodeTools(): void {
         const offsetY = Math.floor(nodePositionCounter / 4) * 180
         nodePositionCounter++
 
-        console.log('[create_node] Creating:', args.title, 'at', pos.x + offsetX, pos.y + offsetY)
-
         const node = await ctx.store.createNode({
           title: args.title || '',
           node_type: 'note',
@@ -45,7 +43,6 @@ export function registerNodeTools(): void {
           canvas_y: ctx.snapToGrid(args.y ?? pos.y + offsetY),
         })
 
-        console.log('[create_node] Created node:', node.id)
         return `Created node "${args.title}" with id ${node.id}`
       } catch (e) {
         console.error('[create_node] Error:', e)

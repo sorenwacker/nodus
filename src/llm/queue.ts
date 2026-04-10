@@ -114,13 +114,6 @@ class LLMQueue {
 
     try {
       const provider = providerRegistry.getActiveProvider()
-      const config = provider.getConfig()
-
-      // Log which model and endpoint is being used
-      console.log(`[LLM] Provider: ${provider.id} (${provider.name})`)
-      console.log(`[LLM] Model: ${config.model || 'default'}`)
-      console.log(`[LLM] Endpoint: ${config.baseUrl || 'default'}`)
-      console.log(`[LLM] Request type: ${request.type}`)
 
       if (request.type === 'generate') {
         const result = await provider.generate({

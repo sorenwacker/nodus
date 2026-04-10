@@ -27,6 +27,7 @@ import {
   useLinkPicker,
   useNodeCollision,
   useNodeNavigation,
+  useEntityOperations,
 } from './composables/nodes'
 import {
   useEdgeManipulation,
@@ -41,6 +42,7 @@ import {
   useLLMTools,
   useMarkerHandlers,
   usePlanHandlers,
+  useCanvasLLMState,
   type AgentContext,
   type NodeAgentContext,
 } from './composables/agent'
@@ -54,6 +56,7 @@ import {
   useUndoHandlers,
   useGraphExport,
   useCitationFetch,
+  useCanvasSettings,
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
@@ -172,7 +175,7 @@ onMounted(() => {
   // Listen for zoom-to-node events from search
   const handleZoomToNode = (e: Event) => {
     const nodeId = (e as CustomEvent).detail?.nodeId
-    if (nodeId) zoomToNode(nodeId)
+    if (nodeId) zoomToNode(nodeId, 1)
   }
   window.addEventListener('zoom-to-node', handleZoomToNode)
 
@@ -303,6 +306,14 @@ const {
   toggleBubbleMode,
 } = graphMetrics
 
+// Render mermaid diagrams when zooming in from collapsed view
+watch(isSemanticZoomCollapsed, (collapsed, wasCollapsed) => {
+  if (wasCollapsed && !collapsed) {
+    // Transitioned from collapsed to expanded - render mermaid diagrams
+    setTimeout(renderMermaidDiagrams, 100)
+  }
+})
+
 // Pre-computed LOD node lists to avoid double filtering in template
 const lodCircleNodes = computed(() => {
   if (!isLODMode.value) return []
@@ -357,6 +368,11 @@ async function savePreviewContent(nodeId: string, content: string) {
 
 async function savePreviewTitle(nodeId: string, title: string) {
   await store.updateNodeTitle(nodeId, title)
+}
+
+// Zoom to node with consistent scale (used by context menu)
+function zoomToNodeDefault(nodeId: string) {
+  zoomToNode(nodeId, 1)
 }
 
 // Lasso selection composable
@@ -515,32 +531,7 @@ const {
   decreaseFontScale,
 } = canvasDisplay
 
-// Memoized linked entities map - computed once and cached
-const linkedEntitiesMap = computed(() => {
-  const map = new Map<string, import('../types').Node[]>()
-  for (const node of store.filteredNodes) {
-    // Only compute for non-entity nodes to avoid unnecessary work
-    if (!['character', 'location', 'citation', 'term', 'item'].includes(node.node_type)) {
-      map.set(node.id, store.getLinkedEntities(node.id))
-    }
-  }
-  return map
-})
-
-// Get linked entities for a node (uses cached map)
-function getLinkedEntities(nodeId: string): import('../types').Node[] {
-  return linkedEntitiesMap.value.get(nodeId) || []
-}
-
-// Handle entity badge click - zoom to entity
-function handleEntityClick(entityId: string) {
-  store.selectNode(entityId)
-  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entityId } }))
-}
-
 // Initialize font scale on mount
-// Help modal
-const showHelpModal = ref(false)
 
 // Only render nodes visible within magnifier viewport for performance
 const magnifierVisibleNodes = computed(() => {
@@ -693,24 +684,39 @@ const linkPicker = useLinkPicker({
 const { showLinkPicker, linkPickerSourceNodeId, openLinkPicker, closeLinkPicker, linkToNode } =
   linkPicker
 
-// Node agent mode - always agent (tools enabled)
-const nodeAgentMode = ref<'simple' | 'agent'>('agent')
+// Entity operations composable
+const entityOperations = useEntityOperations({
+  store: {
+    filteredNodes: store.filteredNodes,
+    selectedNodeIds: store.selectedNodeIds,
+    getLinkedEntities: store.getLinkedEntities,
+    selectNode: store.selectNode,
+    createEntityNode: store.createEntityNode,
+    linkToEntity: store.linkToEntity,
+    getNode: store.getNode,
+  },
+  contextMenu: {
+    affectedNodeIds: contextMenu.affectedNodeIds,
+    close: () => contextMenu.close(),
+  },
+  showToast,
+})
+const { getLinkedEntities, handleEntityClick, linkToEntity, handleCreateEntity } = entityOperations
+
+// Canvas settings composable
+const canvasSettings = useCanvasSettings()
+const {
+  gridLockEnabled,
+  highlightAllEdges,
+  nodeAgentMode,
+  showHelpModal,
+  snapToGrid,
+} = canvasSettings
+
 const nodeAgent = useNodeAgent()
 
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
-
-// Gridlock (snap to grid)
-const gridLockEnabled = ref(false)
-const gridSize = 20 // Snap to 20px grid
-
-// Highlight all edges toggle
-const highlightAllEdges = ref(false)
-
-function snapToGrid(value: number): number {
-  if (!gridLockEnabled.value) return value
-  return Math.round(value / gridSize) * gridSize
-}
 
 // Frame operations composable
 const frames = useFrames({
@@ -872,22 +878,28 @@ const {
   getActiveProviderId,
 } = llm
 
-const graphPrompt = ref('')
-const nodePrompt = ref('')
-const isGraphLLMLoading = ref(false)
-const isNodeLLMLoading = ref(false)
-const showAgentLogPanel = ref(false) // User-controlled visibility of agent log
-const llmEnabled = ref(llmStorage.getLLMEnabled())
-let nodeLLMAbortController: AbortController | null = null
+// LLM state composable
+const llmState = useCanvasLLMState()
+const {
+  graphPrompt,
+  nodePrompt,
+  isGraphLLMLoading,
+  isNodeLLMLoading,
+  showAgentLogPanel,
+  llmEnabled,
+  setNodeLLMAbortController,
+  getNodeLLMAbortController,
+} = llmState
 
 function stopNodeLLM() {
   // Stop agent if in agent mode
   if (nodeAgentMode.value === 'agent') {
     nodeAgent.stop()
   }
-  if (nodeLLMAbortController) {
-    nodeLLMAbortController.abort()
-    nodeLLMAbortController = null
+  const controller = getNodeLLMAbortController()
+  if (controller) {
+    controller.abort()
+    setNodeLLMAbortController(null)
   }
   isNodeLLMLoading.value = false
 }
@@ -1851,51 +1863,6 @@ const storylines = useStorylines({
 })
 const { addNodeToStoryline, createStorylineFromNode, moveNodesToWorkspace } = storylines
 
-// Entity linking functions
-async function linkToEntity(entityId: string) {
-  const affectedIds = contextMenu.affectedNodeIds.value
-  for (const nodeId of affectedIds) {
-    try {
-      await store.linkToEntity(nodeId, entityId)
-    } catch (e) {
-      console.error('Failed to link to entity:', e)
-    }
-  }
-  const entity = store.getNode(entityId)
-  showToast?.(`Linked ${affectedIds.length} node(s) to ${entity?.title || 'entity'}`, 'success')
-  closeContextMenu()
-}
-
-async function handleCreateEntity(type: string) {
-  // Open entity create dialog - for now, create with default name and let user edit
-  const labels: Record<string, string> = {
-    character: 'New Character',
-    location: 'New Location',
-    citation: 'New Citation',
-    term: 'New Term',
-    item: 'New Item',
-  }
-  const title = labels[type] || 'New Entity'
-  try {
-    const entity = await store.createEntityNode(type as import('../types').EntityNodeType, title)
-
-    // Link affected nodes to the new entity
-    const affectedIds = contextMenu.affectedNodeIds.value
-    for (const nodeId of affectedIds) {
-      await store.linkToEntity(nodeId, entity.id)
-    }
-    showToast?.(`Created ${title} and linked ${affectedIds.length} node(s)`, 'success')
-    closeContextMenu()
-
-    // Select the new entity for editing
-    store.selectNode(entity.id)
-    window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entity.id } }))
-  } catch (e) {
-    showToast?.(`Failed to create entity: ${e}`, 'error')
-    closeContextMenu()
-  }
-}
-
 /// Computed: number of selected nodes for context menu display
 const contextMenuNodeCount = computed(() => contextMenu.nodeCount.value)
 
@@ -2175,6 +2142,7 @@ useCanvasKeyboardShortcuts({
         @zoom-to-node="zoomToPreviewNode"
         @save="savePreviewContent"
         @save-title="savePreviewTitle"
+        @render-mermaid="renderMermaidDiagrams"
       />
 
       <!-- Controls -->
@@ -2280,7 +2248,7 @@ useCanvasKeyboardShortcuts({
         :doi-count="contextMenuDOICount"
         @close="closeContextMenu"
         @fit-to-content="fitNodeNow"
-        @zoom-to-node="zoomToNode"
+        @zoom-to-node="zoomToNodeDefault"
         @open-link-picker="openLinkPicker"
         @delete-nodes="deleteSelectedNodes"
         @add-to-storyline="addNodeToStoryline"

@@ -33,7 +33,7 @@ export const useEdgesStore = defineStore('edges', () => {
     error.value = null
     try {
       const fetchedEdges = await invoke<Edge[]>('get_edges', { workspaceId: workspaceId ?? null })
-      storeLogger.info(`Loaded ${fetchedEdges.length} edges for workspace ${workspaceId}`)
+      storeLogger.debug(`Loaded ${fetchedEdges.length} edges for workspace ${workspaceId}`)
       // Deduplicate edges on load
       edges.value = deduplicateEdgesLocal(fetchedEdges)
     } catch (e) {

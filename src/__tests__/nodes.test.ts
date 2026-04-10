@@ -276,6 +276,86 @@ describe('Nodes Store', () => {
   })
 })
 
+describe('Wikilink Edge Behavior', () => {
+  it('should detect bidirectional wikilinks and make edge non-directional', () => {
+    // Simulate the edge detection logic
+    interface Edge {
+      id: string
+      source_node_id: string
+      target_node_id: string
+      link_type: string
+      is_directional?: boolean
+    }
+
+    const edges: Edge[] = [
+      { id: 'e1', source_node_id: 'B', target_node_id: 'A', link_type: 'wikilink', is_directional: true }
+    ]
+
+    // When A links to B, check if reverse edge exists
+    const sourceId = 'A'
+    const targetId = 'B'
+
+    const existsForward = edges.some(e =>
+      e.source_node_id === sourceId &&
+      e.target_node_id === targetId &&
+      e.link_type === 'wikilink'
+    )
+
+    const reverseEdge = edges.find(e =>
+      e.source_node_id === targetId &&
+      e.target_node_id === sourceId &&
+      e.link_type === 'wikilink'
+    )
+
+    expect(existsForward).toBe(false)
+    expect(reverseEdge).toBeDefined()
+    expect(reverseEdge?.id).toBe('e1')
+
+    // Should make reverse edge non-directional instead of creating duplicate
+    if (reverseEdge && reverseEdge.is_directional !== false) {
+      reverseEdge.is_directional = false
+    }
+
+    expect(reverseEdge?.is_directional).toBe(false)
+    expect(edges.length).toBe(1) // No duplicate edge created
+  })
+
+  it('should create new edge when no existing edge in either direction', () => {
+    const edges: Array<{ source_node_id: string; target_node_id: string; link_type: string }> = []
+
+    const sourceId = 'A'
+    const targetId = 'B'
+
+    const existsForward = edges.some(e =>
+      e.source_node_id === sourceId &&
+      e.target_node_id === targetId &&
+      e.link_type === 'wikilink'
+    )
+
+    const reverseEdge = edges.find(e =>
+      e.source_node_id === targetId &&
+      e.target_node_id === sourceId &&
+      e.link_type === 'wikilink'
+    )
+
+    expect(existsForward).toBe(false)
+    expect(reverseEdge).toBeUndefined()
+
+    // Should create new edge
+    if (!existsForward && !reverseEdge) {
+      edges.push({
+        source_node_id: sourceId,
+        target_node_id: targetId,
+        link_type: 'wikilink'
+      })
+    }
+
+    expect(edges.length).toBe(1)
+    expect(edges[0].source_node_id).toBe('A')
+    expect(edges[0].target_node_id).toBe('B')
+  })
+})
+
 describe('Clipboard Node Data', () => {
   it('should have correct structure for copy/paste', () => {
     interface ClipboardNodeData {

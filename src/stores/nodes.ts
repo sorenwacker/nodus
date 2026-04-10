@@ -144,7 +144,7 @@ export const useNodesStore = defineStore('nodes', () => {
       // Convert "default" to null for backend compatibility
       const currentWorkspace = workspaceStore.currentWorkspaceId
       const workspaceForBackend = currentWorkspace === 'default' ? null : currentWorkspace
-      storeLogger.info(`[Nodes] Current workspace after init: ${currentWorkspace} (backend: ${workspaceForBackend})`)
+      storeLogger.debug(`[Nodes] Current workspace after init: ${currentWorkspace} (backend: ${workspaceForBackend})`)
 
       await Promise.all([
         edgesStore.initialize(workspaceForBackend),
@@ -155,10 +155,10 @@ export const useNodesStore = defineStore('nodes', () => {
       const fetchedNodes = await invoke<Node[]>('get_nodes')
       nodes.value = fetchedNodes
 
-      storeLogger.info(`[Nodes] Loaded ${fetchedNodes.length} total nodes`)
+      storeLogger.debug(`[Nodes] Loaded ${fetchedNodes.length} total nodes`)
       const workspaceIds = [...new Set(fetchedNodes.map(n => n.workspace_id))]
-      storeLogger.info(`[Nodes] Workspace IDs in nodes: ${JSON.stringify(workspaceIds)}`)
-      storeLogger.info(`[Nodes] Filtered nodes count: ${filteredNodes.value.length}`)
+      storeLogger.debug(`[Nodes] Workspace IDs in nodes: ${JSON.stringify(workspaceIds)}`)
+      storeLogger.debug(`[Nodes] Filtered nodes count: ${filteredNodes.value.length}`)
 
       // Set up node existence callback for edge validation
       edgesStore.setNodeExistsCallback((id) => nodes.value.some(n => n.id === id))
@@ -397,14 +397,30 @@ export const useNodesStore = defineStore('nodes', () => {
         }
       }
 
-      // Create edges for new wikilinks
+      // Create edges for new wikilinks (or make existing reverse edges non-directional)
       for (const targetId of currentTargetIds) {
-        const exists = edges.value.some(e =>
+        // Check if edge already exists in this direction
+        const existsForward = edges.value.some(e =>
           e.source_node_id === id &&
           e.target_node_id === targetId &&
           e.link_type === 'wikilink'
         )
-        if (!exists) {
+        if (existsForward) continue
+
+        // Check if reverse edge exists (target→source)
+        const reverseEdge = edges.value.find(e =>
+          e.source_node_id === targetId &&
+          e.target_node_id === id &&
+          e.link_type === 'wikilink'
+        )
+
+        if (reverseEdge) {
+          // Reverse edge exists - make it non-directional instead of creating duplicate
+          if (reverseEdge.is_directional !== false) {
+            await edgesStore.updateEdge(reverseEdge.id, { is_directional: false })
+          }
+        } else {
+          // No edge in either direction - create new one
           await createEdge({
             source_node_id: id,
             target_node_id: targetId,

@@ -184,11 +184,6 @@ export function useImport(deps: ImportDeps) {
     loading.value = true
     try {
       storeLogger.info(`Importing ontology from: ${filePath}`)
-      console.log('[Ontology] Calling import_ontology with:', {
-        filePath,
-        workspaceId: options?.workspaceId ?? deps.getCurrentWorkspaceId(),
-        createClassNodes: options?.createClassNodes ?? true,
-      })
 
       const result = await invoke<OntologyImportResult>('import_ontology', {
         input: {
@@ -199,8 +194,6 @@ export function useImport(deps: ImportDeps) {
           layout: options?.layout ?? 'grid',
         },
       })
-
-      console.log('[Ontology] import_ontology returned:', result)
 
       storeLogger.info(
         `Imported ${result.nodesCreated} nodes, ${result.edgesCreated} edges, ${result.classNodesCreated} class nodes`

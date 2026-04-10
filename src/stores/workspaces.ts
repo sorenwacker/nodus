@@ -64,7 +64,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
   // Load workspaces from database (database is source of truth)
   async function loadWorkspacesFromDatabase() {
     const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
-    storeLogger.info(`[Workspace] DB workspaces: ${JSON.stringify(dbWorkspaces.map(w => ({ id: w.id, name: w.name })))}`)
+    storeLogger.debug(`[Workspace] DB workspaces: ${JSON.stringify(dbWorkspaces.map(w => ({ id: w.id, name: w.name })))}`)
 
     // Convert database workspaces to frontend format
     const loadedWorkspaces: Workspace[] = dbWorkspaces.map((w) => ({
@@ -84,14 +84,14 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     loading.value = true
     error.value = null
     try {
-      storeLogger.info('[Workspace] Starting initialization...')
-      storeLogger.info(`[Workspace] localStorage cache: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
-      storeLogger.info(`[Workspace] localStorage currentWorkspaceId: ${currentWorkspaceId.value}`)
+      storeLogger.debug('[Workspace] Starting initialization...')
+      storeLogger.debug(`[Workspace] localStorage cache: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
+      storeLogger.debug(`[Workspace] localStorage currentWorkspaceId: ${currentWorkspaceId.value}`)
 
       // Load workspaces from database (source of truth)
       await loadWorkspacesFromDatabase()
 
-      storeLogger.info(`[Workspace] After load, workspaces: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
+      storeLogger.debug(`[Workspace] After load, workspaces: ${JSON.stringify(workspaces.value.map(w => ({ id: w.id, name: w.name })))}`)
 
       // Validate currentWorkspaceId exists in workspaces list
       const storedId = currentWorkspaceId.value
@@ -105,7 +105,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
         )
       }
 
-      storeLogger.info(`[Workspace] Final currentWorkspaceId: ${currentWorkspaceId.value}`)
+      storeLogger.debug(`[Workspace] Final currentWorkspaceId: ${currentWorkspaceId.value}`)
     } catch (e) {
       error.value = String(e)
       storeLogger.error('Failed to load workspaces:', e)

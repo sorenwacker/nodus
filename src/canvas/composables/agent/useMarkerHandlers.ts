@@ -61,13 +61,9 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
 
     // Approval request marker
     if (result.startsWith('__REQUEST_APPROVAL__:')) {
-      console.log('[MarkerHandlers] Handling request_approval marker')
       if (planState.currentPlan.value) {
-        const success = planState.requestApproval()
-        console.log('[MarkerHandlers] requestApproval result:', success)
+        planState.requestApproval()
         log('> Requesting approval...')
-      } else {
-        console.log('[MarkerHandlers] No current plan!')
       }
       return result
     }

@@ -203,6 +203,7 @@ All data stored on your device:
 | Zoom in | `Cmd+=` | `Ctrl+=` |
 | Zoom out | `Cmd+-` | `Ctrl+-` |
 | Fit view | `Cmd+0` | `Ctrl+0` |
+| Zoom to node | `Cmd+Click` | `Ctrl+Click` |
 | Search | `Cmd+F` | `Ctrl+F` |
 | Settings | `Cmd+,` | `Ctrl+,` |
 

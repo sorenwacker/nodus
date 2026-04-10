@@ -13,6 +13,7 @@ import type {
   ProviderModel,
   LLMMessage,
 } from './types'
+import { extractToolCallsFromContent, parseOpenAIToolCalls } from './toolCallParser'
 
 export class OpenAICompatibleProvider implements ILLMProvider {
   readonly id = 'openai-compatible'
@@ -161,32 +162,13 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     }
 
     if (choice?.message?.tool_calls) {
-      message.tool_calls = choice.message.tool_calls
-        .filter((tc: { id: string; function?: { name?: string; arguments?: string } }) => {
-          // Filter out malformed tool calls
-          if (!tc.function?.name) {
-            console.warn('Skipping tool call without function name:', tc)
-            return false
-          }
-          return true
-        })
-        .map((tc: {
-          id: string
-          function: { name: string; arguments: string }
-        }) => ({
-          id: tc.id,
-          type: 'function' as const,
-          function: {
-            name: tc.function.name,
-            arguments: tc.function.arguments || '{}',
-          },
-        }))
+      message.tool_calls = parseOpenAIToolCalls(choice.message.tool_calls)
     }
 
     // Fallback: extract tool calls from content if model outputs raw format
     // Handles models that output <|channel|>commentary to=func_name ... {"args"}
     if (!message.tool_calls?.length && message.content) {
-      const extracted = this.extractToolCallsFromContent(message.content)
+      const extracted = extractToolCallsFromContent(message.content)
       if (extracted.length > 0) {
         message.tool_calls = extracted
         message.content = ''
@@ -194,65 +176,5 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     }
 
     return { message }
-  }
-
-  /**
-   * Extract tool calls from raw content when model outputs special tokens
-   * Handles formats like: <|channel|>commentary to=function_name <|constrain|>json<|message|>{"args"...}
-   */
-  private extractToolCallsFromContent(content: string): Array<{
-    id: string
-    type: 'function'
-    function: { name: string; arguments: string }
-  }> {
-    const toolCalls: Array<{
-      id: string
-      type: 'function'
-      function: { name: string; arguments: string }
-    }> = []
-
-    // Pattern for Qwen-style tool calls: to=function_name ... <|message|>{json}
-    const qwenPattern = /to=(\w+)[^{]*(\{[\s\S]*?\}(?=\s*(?:<\||$)))/g
-    let match
-    let idx = 0
-    while ((match = qwenPattern.exec(content)) !== null) {
-      const [, funcName, argsJson] = match
-      try {
-        JSON.parse(argsJson) // Validate JSON
-        toolCalls.push({
-          id: `call_${idx++}`,
-          type: 'function',
-          function: {
-            name: funcName,
-            arguments: argsJson,
-          },
-        })
-      } catch {
-        // Invalid JSON, skip
-      }
-    }
-
-    // Also try to find plain JSON tool calls like {"name": "func", "arguments": {...}}
-    if (toolCalls.length === 0) {
-      const jsonPattern = /\{[^{}]*"name"\s*:\s*"(\w+)"[^{}]*"arguments"\s*:\s*(\{[^{}]*\})[^{}]*\}/g
-      while ((match = jsonPattern.exec(content)) !== null) {
-        const [, funcName, argsJson] = match
-        try {
-          JSON.parse(argsJson)
-          toolCalls.push({
-            id: `call_${idx++}`,
-            type: 'function',
-            function: {
-              name: funcName,
-              arguments: argsJson,
-            },
-          })
-        } catch {
-          // Invalid JSON, skip
-        }
-      }
-    }
-
-    return toolCalls
   }
 }

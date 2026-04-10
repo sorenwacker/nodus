@@ -101,24 +101,19 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
       while (paperQueue.value.length > 0) {
         // Check for cancellation
         if (citationGraph.isCancelled.value) {
-          console.log('[CitationFetch] Cancelled by user')
           showToast?.('Citation fetch cancelled', 'info')
           paperQueue.value = []
           break
         }
 
         const nodeId = paperQueue.value[0]
-        const node = store.getNode(nodeId)
         queueProcessedPapers.value++
-
-        console.log(`[CitationFetch] Processing paper ${queueProcessedPapers.value}/${queueTotalPapers.value}: "${node?.title || 'Unknown'}" (${nodeId})`)
 
         const result = await citationGraph.fetchCitationsForNode(nodeId, {
           paperIndex: queueProcessedPapers.value,
           paperCount: queueTotalPapers.value,
         })
 
-        console.log(`[CitationFetch] Result for "${node?.title || nodeId}": ${result.papersCreated} papers, ${result.edgesCreated} edges`)
         totalPapers += result.papersCreated
         totalEdges += result.edgesCreated
 
@@ -166,8 +161,6 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
     const nodeIds: string[] = []
     const affectedIds = getAffectedNodeIds()
 
-    console.log('[CitationFetch] affectedIds:', affectedIds.length, affectedIds)
-
     for (const id of affectedIds) {
       const node = store.getNode(id)
       const doi = node ? extractDOI(node.markdown_content) : null
@@ -178,8 +171,6 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
         }
       }
     }
-
-    console.log('[CitationFetch] nodeIds with DOIs to add:', nodeIds.length)
 
     if (nodeIds.length === 0) {
       if (affectedIds.length > 0 && paperQueue.value.length > 0) {

@@ -1,25 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { marked } from 'marked'
-import { invoke } from '@tauri-apps/api/core'
 import { useNodesStore } from '../stores/nodes'
-import { sanitizeHtml, sanitizeSvg } from '../lib/sanitize'
-import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
+import StorylineReaderHeader from './StorylineReaderHeader.vue'
+import StorylineEntitySidebar from './StorylineEntitySidebar.vue'
+import StorylineReaderFooter from './StorylineReaderFooter.vue'
+import { useStorylineNavigation } from '../composables/useStorylineNavigation'
+import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdownRendering'
 import type { Node, Storyline, EntityNodeType } from '../types'
 import { ENTITY_NODE_TYPES } from '../types'
 
 const { t } = useI18n()
-
-// Configure marked
-marked.use({
-  breaks: true,
-  gfm: true,
-})
-
-// Math cache for rendered SVGs
-const mathSvgCache = new Map<string, string>()
 
 const props = defineProps<{
   storylineId: string
@@ -34,10 +26,21 @@ const store = useNodesStore()
 const storyline = ref<Storyline | null>(null)
 const nodes = ref<Node[]>([])
 const loading = ref(true)
-const activeNodeIndex = ref(0)
 const contentRef = ref<HTMLElement | null>(null)
 const showToc = ref(true)
 const showEntitySidebar = ref(false)
+
+// Navigation composable
+const navigation = useStorylineNavigation({
+  contentRef,
+  nodeCount: () => nodes.value.length,
+  onClose: () => emit('close'),
+})
+const { activeNodeIndex, goToNode, goToPrevious, goToNext, handleScroll, setupKeyboardListeners, cleanupKeyboardListeners } = navigation
+
+// Markdown rendering composable
+const markdownRendering = useStorylineMarkdownRendering()
+const { renderedContent, renderNodeContent, getRenderedContent } = markdownRendering
 
 async function loadStoryline() {
   loading.value = true
@@ -54,134 +57,6 @@ async function loadStoryline() {
   } finally {
     loading.value = false
   }
-}
-
-function goToNode(index: number) {
-  activeNodeIndex.value = index
-  // Scroll to the node section
-  nextTick(() => {
-    const section = document.getElementById(`node-${index}`)
-    if (section) {
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  })
-}
-
-function goToPrevious() {
-  if (activeNodeIndex.value > 0) {
-    goToNode(activeNodeIndex.value - 1)
-  }
-}
-
-function goToNext() {
-  if (activeNodeIndex.value < nodes.value.length - 1) {
-    goToNode(activeNodeIndex.value + 1)
-  }
-}
-
-function handleKeydown(e: KeyboardEvent) {
-  switch (e.key) {
-    case 'Escape':
-      emit('close')
-      break
-    case 'ArrowLeft':
-    case 'ArrowUp':
-      e.preventDefault()
-      goToPrevious()
-      break
-    case 'ArrowRight':
-    case 'ArrowDown':
-      e.preventDefault()
-      goToNext()
-      break
-  }
-}
-
-function handleScroll() {
-  if (!contentRef.value) return
-
-  // Find which section is most visible
-  const sections = contentRef.value.querySelectorAll('.node-section')
-  let closestIndex = 0
-  let closestDistance = Infinity
-
-  sections.forEach((section, index) => {
-    const rect = section.getBoundingClientRect()
-    const distance = Math.abs(rect.top - 100) // 100px offset for header
-    if (distance < closestDistance) {
-      closestDistance = distance
-      closestIndex = index
-    }
-  })
-
-  activeNodeIndex.value = closestIndex
-}
-
-// Render math to SVG using Tauri backend
-async function renderMathToSvg(math: string, displayMode: boolean): Promise<string> {
-  const cacheKey = `${displayMode ? 'd' : 'i'}:${math}`
-  if (mathSvgCache.has(cacheKey)) {
-    return mathSvgCache.get(cacheKey)!
-  }
-
-  try {
-    const svg = await invoke<string>('render_typst_math', { math, displayMode })
-    mathSvgCache.set(cacheKey, svg)
-    return svg
-  } catch (e) {
-    console.error('[Math] Render error:', e)
-    return `<span class="math-error">${math}</span>`
-  }
-}
-
-// Parse markdown and render math to SVG
-async function parseMarkdownAsync(content: string): Promise<string> {
-  if (!content) return ''
-
-  // Extract math blocks before markdown processing
-  const mathPlaceholders: Map<string, { math: string; isDisplay: boolean }> = new Map()
-  let processedContent = content
-
-  // Extract display math first ($$...$$)
-  processedContent = processedContent.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
-    const id = `MATH_DISPLAY_${mathPlaceholders.size}`
-    mathPlaceholders.set(id, { math: math.trim(), isDisplay: true })
-    return id
-  })
-
-  // Extract inline math ($...$)
-  processedContent = processedContent.replace(/(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g, (_, math) => {
-    const id = `MATH_INLINE_${mathPlaceholders.size}`
-    mathPlaceholders.set(id, { math: math.trim(), isDisplay: false })
-    return id
-  })
-
-  // Render markdown
-  let html = marked.parse(processedContent) as string
-
-  // Render math to SVG and restore
-  for (const [id, { math, isDisplay }] of mathPlaceholders) {
-    const svg = sanitizeSvg(await renderMathToSvg(math, isDisplay))
-    const wrapper = isDisplay
-      ? `<div class="typst-display typst-math">${svg}</div>`
-      : `<span class="typst-inline typst-math">${svg}</span>`
-    html = html.replace(new RegExp(id, 'g'), wrapper)
-  }
-
-  // Sanitize final HTML output
-  return sanitizeHtml(html)
-}
-
-// Cached rendered content per node
-const renderedContent = ref<Map<string, string>>(new Map())
-
-async function renderNodeContent(node: Node) {
-  if (!node.markdown_content) {
-    renderedContent.value.set(node.id, '')
-    return
-  }
-  const html = await parseMarkdownAsync(node.markdown_content)
-  renderedContent.value = new Map(renderedContent.value).set(node.id, html)
 }
 
 // Render all node content when nodes change
@@ -253,11 +128,11 @@ async function handleNodeReorder(nodeIds: string[]) {
 
 onMounted(() => {
   loadStoryline()
-  window.addEventListener('keydown', handleKeydown)
+  setupKeyboardListeners()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  cleanupKeyboardListeners()
 })
 
 watch(() => props.storylineId, loadStoryline)
@@ -294,8 +169,7 @@ const hasEntities = computed(() => currentNodeEntities.value.length > 0)
 // Navigate to the previous/next node containing a specific entity
 function navigateToEntityNode(entityId: string, direction: 'prev' | 'next') {
   const currentIndex = activeNodeIndex.value
-  const step = direction === 'next' ? 1 : -1
-  const startIndex = currentIndex + step
+  const startIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1
 
   if (direction === 'next') {
     for (let i = startIndex; i < nodes.value.length; i++) {
@@ -321,44 +195,22 @@ function panToEntity(entityId: string) {
   emit('close')
   window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entityId } }))
 }
-
-// Entity type labels
-const entityTypeLabels: Record<EntityNodeType, string> = {
-  character: 'Characters',
-  location: 'Locations',
-  citation: 'Citations',
-  term: 'Terms',
-  item: 'Items',
-}
 </script>
 
 <template>
   <div class="reader-overlay">
     <div class="reader-container">
       <!-- Header -->
-      <header class="reader-header">
-        <div class="header-left">
-          <button class="toc-toggle" :title="t('storyline.toggleContents')" @click="showToc = !showToc">
-            <Icon name="menu" :size="18" />
-          </button>
-          <h1 class="reader-title">{{ storyline?.title || t('storyline.loading') }}</h1>
-        </div>
-        <div class="header-right">
-          <span class="page-indicator">{{ activeNodeIndex + 1 }} / {{ nodes.length }}</span>
-          <button
-            v-if="hasEntities"
-            class="entity-toggle"
-            :class="{ active: showEntitySidebar }"
-            title="Toggle entity sidebar"
-            @click="showEntitySidebar = !showEntitySidebar"
-          >
-            <Icon name="user" :size="18" />
-          </button>
-          <button class="close-btn" :data-tooltip="t('storyline.closeEsc')" @click="$emit('close')">
-            <Icon name="close" :size="20" />
-          </button>
-        </div>
-      </header>
+      <StorylineReaderHeader
+        :title="storyline?.title || ''"
+        :active-index="activeNodeIndex"
+        :node-count="nodes.length"
+        :has-entities="hasEntities"
+        :show-entity-sidebar="showEntitySidebar"
+        @close="$emit('close')"
+        @toggle-toc="showToc = !showToc"
+        @toggle-entities="showEntitySidebar = !showEntitySidebar"
+      />
 
       <div class="reader-body">
         <!-- Table of Contents Sidebar -->
@@ -413,7 +265,7 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
                   </svg>
                 </div>
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="comment-text" v-html="renderedContent.get(node.id) || ''"></div>
+                <div class="comment-text" v-html="getRenderedContent(node.id) || ''"></div>
               </aside>
 
               <!-- Regular nodes render as sections -->
@@ -427,95 +279,31 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
                   <h2 class="section-title">{{ node.title }}</h2>
                 </header>
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="section-content" v-html="renderedContent.get(node.id) || ''"></div>
+                <div class="section-content" v-html="getRenderedContent(node.id) || ''"></div>
               </article>
             </template>
           </template>
         </main>
 
         <!-- Entity Sidebar -->
-        <aside v-if="showEntitySidebar && hasEntities" class="entity-sidebar">
-          <div class="entity-sidebar-header">
-            <h3 class="entity-sidebar-title">In this scene</h3>
-          </div>
-          <div class="entity-sidebar-content">
-            <template v-for="type in ENTITY_NODE_TYPES" :key="type">
-              <div v-if="entitiesByType[type].length > 0" class="entity-type-section">
-                <div class="entity-type-label">{{ entityTypeLabels[type] }}</div>
-                <div
-                  v-for="entity in entitiesByType[type]"
-                  :key="entity.id"
-                  class="entity-item"
-                >
-                  <span
-                    class="entity-indicator"
-                    :style="{ backgroundColor: entity.color_theme || '#6b7280' }"
-                  ></span>
-                  <span class="entity-name">{{ entity.title }}</span>
-                  <div class="entity-nav-btns">
-                    <button
-                      class="entity-nav-btn"
-                      title="Previous appearance"
-                      @click="navigateToEntityNode(entity.id, 'prev')"
-                    >
-                      <Icon name="back" :size="10" />
-                    </button>
-                    <button
-                      class="entity-nav-btn"
-                      title="Next appearance"
-                      @click="navigateToEntityNode(entity.id, 'next')"
-                    >
-                      <Icon name="forward" :size="10" />
-                    </button>
-                    <button
-                      class="entity-nav-btn"
-                      title="Go to entity on canvas"
-                      @click="panToEntity(entity.id)"
-                    >
-                      <Icon name="link" :size="10" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <div v-if="!hasEntities" class="entity-empty">
-              No entities in this scene
-            </div>
-          </div>
-        </aside>
+        <StorylineEntitySidebar
+          v-if="showEntitySidebar && hasEntities"
+          :entities-by-type="entitiesByType"
+          :has-entities="hasEntities"
+          @navigate="navigateToEntityNode"
+          @pan-to-entity="panToEntity"
+        />
       </div>
 
       <!-- Navigation Footer -->
-      <footer v-if="nodes.length > 0" class="reader-footer">
-        <button
-          class="nav-btn prev"
-          :disabled="activeNodeIndex === 0"
-          @click="goToPrevious"
-        >
-          <Icon name="back" :size="16" />
-          <span>Previous</span>
-        </button>
-
-        <div class="nav-dots">
-          <button
-            v-for="(_, index) in nodes"
-            :key="index"
-            class="nav-dot"
-            :class="{ active: activeNodeIndex === index }"
-            @click="goToNode(index)"
-          ></button>
-        </div>
-
-        <button
-          class="nav-btn next"
-          :disabled="activeNodeIndex === nodes.length - 1"
-          @click="goToNext"
-        >
-          <span>Next</span>
-          <Icon name="forward" :size="16" />
-        </button>
-      </footer>
+      <StorylineReaderFooter
+        v-if="nodes.length > 0"
+        :active-index="activeNodeIndex"
+        :total-nodes="nodes.length"
+        @previous="goToPrevious"
+        @next="goToNext"
+        @goto="goToNode"
+      />
     </div>
   </div>
 </template>
@@ -541,76 +329,6 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-
-.reader-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.toc-toggle {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.toc-toggle:hover {
-  background: var(--bg-elevated);
-  color: var(--text-main);
-}
-
-.reader-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.page-indicator {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.close-btn {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-main);
 }
 
 .reader-body {
@@ -642,58 +360,6 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
   flex: 1;
   overflow-y: auto;
   padding: 0 8px 16px;
-}
-
-.toc-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 12px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  margin-bottom: 2px;
-}
-
-.toc-item:hover {
-  background: var(--bg-elevated);
-}
-
-.toc-item.active {
-  background: var(--primary-color);
-  color: white;
-}
-
-.toc-number {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  background: var(--bg-surface-alt);
-  border-radius: 6px;
-  flex-shrink: 0;
-}
-
-.toc-item.active .toc-number {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.toc-text {
-  font-size: 13px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.toc-item.active .toc-text {
-  color: white;
 }
 
 .reader-content {
@@ -877,101 +543,6 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
   font-weight: 600;
 }
 
-.reader-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-default);
-  flex-shrink: 0;
-}
-
-.nav-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  min-width: 100px;
-}
-
-.nav-btn:hover:not(:disabled) {
-  background: var(--bg-elevated);
-  color: var(--text-main);
-}
-
-.nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.nav-btn.prev {
-  justify-content: flex-start;
-}
-
-.nav-btn.next {
-  justify-content: flex-end;
-}
-
-.nav-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.nav-dot {
-  width: 8px;
-  height: 8px;
-  border: none;
-  border-radius: 50%;
-  background: var(--border-default);
-  cursor: pointer;
-  padding: 0;
-}
-
-.nav-dot:hover {
-  background: var(--text-muted);
-}
-
-.nav-dot.active {
-  background: var(--primary-color);
-}
-
-/* Add node button */
-.add-node-wrapper {
-  display: flex;
-  justify-content: center;
-  position: relative;
-  margin: 16px 0;
-}
-
-.add-node-btn {
-  width: 32px;
-  height: 32px;
-  border: 2px dashed var(--border-default);
-  border-radius: 50%;
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.5;
-  transition: all 0.15s;
-}
-
-.add-node-btn:hover {
-  opacity: 1;
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-  background: var(--bg-elevated);
-}
-
 /* Math rendering styles */
 .section-content :deep(.typst-display) {
   display: block;
@@ -1039,140 +610,5 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
   height: auto;
   border-radius: 8px;
   margin: 1em 0;
-}
-
-/* Entity toggle button */
-.entity-toggle {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.entity-toggle:hover {
-  background: var(--bg-elevated);
-  color: var(--text-main);
-}
-
-.entity-toggle.active {
-  background: var(--primary-bg, rgba(59, 130, 246, 0.1));
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-/* Entity sidebar */
-.entity-sidebar {
-  width: 220px;
-  background: var(--bg-surface);
-  border-left: 1px solid var(--border-default);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.entity-sidebar-header {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border-default);
-}
-
-.entity-sidebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.entity-sidebar-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-}
-
-.entity-type-section {
-  margin-bottom: 16px;
-}
-
-.entity-type-section:last-child {
-  margin-bottom: 0;
-}
-
-.entity-type-label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-
-.entity-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  margin-bottom: 4px;
-}
-
-.entity-item:hover {
-  background: var(--bg-elevated);
-}
-
-.entity-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.entity-name {
-  flex: 1;
-  font-size: 13px;
-  color: var(--text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.entity-nav-btns {
-  display: flex;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-
-.entity-item:hover .entity-nav-btns {
-  opacity: 1;
-}
-
-.entity-nav-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.entity-nav-btn:hover {
-  background: var(--bg-surface);
-  color: var(--primary-color);
-}
-
-.entity-empty {
-  text-align: center;
-  padding: 20px;
-  font-size: 12px;
-  color: var(--text-muted);
 }
 </style>

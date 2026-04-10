@@ -113,7 +113,7 @@ export function usePlanState() {
   /**
    * User rejects the plan
    */
-  function rejectPlan(reason?: string): boolean {
+  function rejectPlan(_reason?: string): boolean {
     if (!currentPlan.value) return false
 
     // Mark all steps as rejected
@@ -126,11 +126,6 @@ export function usePlanState() {
 
     // Keep plan for reference but close modal
     showApprovalModal.value = false
-
-    // Log rejection reason if provided
-    if (reason) {
-      console.log('[PlanState] Plan rejected:', reason)
-    }
 
     return true
   }

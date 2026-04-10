@@ -28,3 +28,4 @@ export {
   type UsePlanHandlersContext,
   type UsePlanHandlersReturn,
 } from './usePlanHandlers'
+export { useCanvasLLMState } from './useCanvasLLMState'
