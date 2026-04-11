@@ -30,17 +30,15 @@ pub fn extract_annotations(path: &std::path::Path) -> Result<Vec<PdfAnnotation>,
 
     // Iterate through pages
     for (page_num, page_id) in doc.get_pages() {
-        if let Ok(page) = doc.get_object(page_id) {
-            if let Object::Dictionary(page_dict) = page {
-                // Get annotations array
-                if let Ok(annots_obj) = page_dict.get(b"Annots") {
-                    let annot_ids = resolve_array(&doc, annots_obj);
+        if let Ok(Object::Dictionary(page_dict)) = doc.get_object(page_id) {
+            // Get annotations array
+            if let Ok(annots_obj) = page_dict.get(b"Annots") {
+                let annot_ids = resolve_array(&doc, annots_obj);
 
-                    for annot_id in annot_ids {
-                        if let Ok(annot) = doc.get_object(annot_id) {
-                            if let Some(annotation) = parse_annotation(&doc, annot, page_num) {
-                                annotations.push(annotation);
-                            }
+                for annot_id in annot_ids {
+                    if let Ok(annot) = doc.get_object(annot_id) {
+                        if let Some(annotation) = parse_annotation(&doc, annot, page_num) {
+                            annotations.push(annotation);
                         }
                     }
                 }

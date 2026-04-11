@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteConnectOptions, Row, SqlitePool};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// A Zotero collection (folder)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,7 +99,7 @@ pub fn detect_zotero_path() -> Option<PathBuf> {
 }
 
 /// Open a read-only connection to the Zotero database
-async fn open_zotero_db(zotero_path: &PathBuf) -> Result<SqlitePool, String> {
+async fn open_zotero_db(zotero_path: &Path) -> Result<SqlitePool, String> {
     let db_path = zotero_path.join("zotero.sqlite");
 
     if !db_path.exists() {
@@ -118,7 +118,7 @@ async fn open_zotero_db(zotero_path: &PathBuf) -> Result<SqlitePool, String> {
 }
 
 /// Get all collections from the Zotero library
-pub async fn get_collections(zotero_path: &PathBuf) -> Result<Vec<ZoteroCollection>, String> {
+pub async fn get_collections(zotero_path: &Path) -> Result<Vec<ZoteroCollection>, String> {
     let pool = open_zotero_db(zotero_path).await?;
 
     let rows = sqlx::query(
@@ -154,7 +154,7 @@ pub async fn get_collections(zotero_path: &PathBuf) -> Result<Vec<ZoteroCollecti
 
 /// Get items in a specific collection
 pub async fn get_collection_items(
-    zotero_path: &PathBuf,
+    zotero_path: &Path,
     collection_key: &str,
 ) -> Result<Vec<ZoteroItem>, String> {
     let pool = open_zotero_db(zotero_path).await?;

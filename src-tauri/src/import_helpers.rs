@@ -29,7 +29,7 @@ pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<
     {
         let file_path = entry.path();
 
-        if file_path.extension().map_or(false, |ext| ext == "md") {
+        if file_path.extension().is_some_and(|ext| ext == "md") {
             let folder = get_relative_folder(file_path, vault_path).unwrap_or_default();
             println!(
                 "  Found: {:?} in folder: '{}'",

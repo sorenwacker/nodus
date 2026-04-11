@@ -20,7 +20,7 @@ pub fn calculate_frame_size(node_count: usize) -> (f64, f64) {
         return (FRAME_WIDTH, FRAME_HEIGHT);
     }
 
-    let rows = (node_count + FRAME_NODE_COLS - 1) / FRAME_NODE_COLS; // ceil division
+    let rows = node_count.div_ceil(FRAME_NODE_COLS);
     let cols = node_count.min(FRAME_NODE_COLS);
 
     let width = FRAME_NODE_X_OFFSET + (cols as f64) * FRAME_NODE_SPACING + FRAME_PADDING_RIGHT;

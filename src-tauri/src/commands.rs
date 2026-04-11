@@ -871,7 +871,7 @@ pub async fn sync_missing_files(
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
-        if !path.extension().map_or(false, |ext| ext == "md") {
+        if path.extension().is_none_or(|ext| ext != "md") {
             continue;
         }
 
@@ -1002,7 +1002,7 @@ pub async fn import_vault(
         }
 
         // Check if frame already exists
-        let frame_title = folder.split('/').last().unwrap_or(&folder);
+        let frame_title = folder.split('/').next_back().unwrap_or(&folder);
         if let Ok(Some(existing)) =
             database::frames::get_by_title_and_workspace(pool, frame_title, workspace_id.as_deref())
                 .await

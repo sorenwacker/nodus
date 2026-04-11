@@ -68,12 +68,8 @@ pub fn write_file_locked(path: &Path, content: &str) -> Result<String, WatcherEr
     // Lock is released on drop
     drop(lock);
     // Compute new checksum
-    crate::checksum::compute_file(path).map_err(|e| {
-        WatcherError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            e.to_string(),
-        ))
-    })
+    crate::checksum::compute_file(path)
+        .map_err(|e| WatcherError::Io(std::io::Error::other(e.to_string())))
 }
 
 impl Drop for FileLock {
@@ -112,7 +108,7 @@ impl VaultWatcher {
                             }
 
                             // Only process .md files
-                            if path.extension().map_or(false, |ext| ext == "md") {
+                            if path.extension().is_some_and(|ext| ext == "md") {
                                 let change = detect_change(&path, &checksums_clone);
                                 if let Some(change) = change {
                                     println!(
@@ -176,7 +172,7 @@ impl VaultWatcher {
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "md") {
+            if path.extension().is_some_and(|ext| ext == "md") {
                 if let Ok(hash) = checksum::compute_file(path) {
                     checksums.insert(path.to_path_buf(), hash);
                     count += 1;

@@ -417,7 +417,7 @@ fn apply_hierarchical_layout(nodes: &mut [Node], edges: &[Edge], start_x: f64, s
     // Find roots (nodes with no parents)
     let roots: Vec<String> = nodes
         .iter()
-        .filter(|n| parents.get(&n.id).map_or(true, |p| p.is_empty()))
+        .filter(|n| parents.get(&n.id).is_none_or(|p| p.is_empty()))
         .map(|n| n.id.clone())
         .collect();
 
@@ -865,7 +865,7 @@ mod tests {
         for entry in std::fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "ttl") {
+            if path.extension().is_some_and(|e| e == "ttl") {
                 if let Ok(data) = parse_ontology(&path) {
                     combined.individuals.extend(data.individuals);
                     combined.object_properties.extend(data.object_properties);

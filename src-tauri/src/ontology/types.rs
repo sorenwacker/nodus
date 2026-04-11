@@ -168,8 +168,7 @@ pub fn curie_from_iri(iri: &str) -> String {
     }
 
     // OBO Foundry pattern: http://purl.obolibrary.org/obo/PREFIX_ID
-    if iri.starts_with("http://purl.obolibrary.org/obo/") {
-        let local = &iri[31..]; // After "http://purl.obolibrary.org/obo/"
+    if let Some(local) = iri.strip_prefix("http://purl.obolibrary.org/obo/") {
         if let Some(pos) = local.find('_') {
             let prefix = &local[..pos];
             let id = &local[pos + 1..];
