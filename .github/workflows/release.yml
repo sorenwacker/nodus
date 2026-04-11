@@ -9,6 +9,24 @@ permissions:
   contents: write
 
 jobs:
+  # Validate R2 credentials before building (for full releases)
+  validate-r2:
+    name: Validate R2 Credentials
+    if: ${{ !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test R2 connection
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://78836246513c4e18ead5fd9349aea200.r2.cloudflarestorage.com
+        run: |
+          curl -s https://rclone.org/install.sh | sudo bash
+          rclone lsd r2:binaries --max-depth 1
+          echo "R2 credentials valid"
+
   # Run tests first - release only proceeds if tests pass
   test:
     name: Tests
@@ -59,7 +77,8 @@ jobs:
 
   release:
     name: Release (${{ matrix.platform }})
-    needs: test
+    needs: [test, validate-r2]
+    if: ${{ always() && needs.test.result == 'success' && (needs.validate-r2.result == 'success' || needs.validate-r2.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
