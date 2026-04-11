@@ -1,9 +1,29 @@
-Personal and Commercial Use License
+Nodus License
 
-Copyright (c) 2026 Soren Wacker
+Copyright (c) 2024-2026 Soren Wacker
 
-Permission is granted to use this software for personal and commercial
-purposes. Redistribution of this software, in whole or in part, is not
-permitted without explicit written permission from the copyright holder.
+Permission is hereby granted to any person obtaining a copy of this software
+and associated documentation files (the "Software"), to use the Software for
+personal and commercial purposes, subject to the following conditions:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+1. PERMITTED USES
+   - Personal use
+   - Commercial use within your organization
+
+2. RESTRICTIONS
+   - Redistribution of the Software, in whole or in part, in any form is
+     prohibited without prior written permission from the copyright holder.
+   - Sublicensing is not permitted.
+   - You may not sell, lease, or otherwise transfer the Software to third
+     parties.
+
+3. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+For redistribution rights or other inquiries, contact the copyright holder.
