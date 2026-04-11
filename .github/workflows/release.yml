@@ -190,4 +190,18 @@ jobs:
           done
           echo "</body></html>" >> assets/index.html
 
+          # Generate latest.yml for version tracking
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat > assets/latest.yml << EOF
+          version: $VERSION
+          date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          files:
+            - name: Nodus_${VERSION}_universal.dmg
+              platform: darwin
+            - name: Nodus_${VERSION}_x64-setup.exe
+              platform: win32
+            - name: Nodus_${VERSION}_amd64.deb
+              platform: linux
+          EOF
+
           rclone copy assets/ r2:binaries/nodus/
