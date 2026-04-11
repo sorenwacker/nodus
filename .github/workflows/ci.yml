@@ -61,7 +61,6 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy -- -D warnings
-        continue-on-error: true
 
   test-frontend:
     name: Frontend Tests
@@ -84,7 +83,6 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
   build:
     name: Build (${{ matrix.platform }})
