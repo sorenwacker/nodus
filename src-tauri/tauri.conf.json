@@ -39,7 +39,15 @@
       "icons/512x512.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "nodus.desktop"
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
   },
   "plugins": {}
 }
