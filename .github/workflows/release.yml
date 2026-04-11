@@ -149,4 +149,18 @@ jobs:
           RCLONE_CONFIG_R2_ENDPOINT: https://78836246513c4e18ead5fd9349aea200.r2.cloudflarestorage.com
         run: |
           curl -s https://rclone.org/install.sh | sudo bash
+
+          # Generate index.html
+          cat > assets/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html><head><title>Nodus Downloads</title>
+          <style>body{font-family:system-ui;max-width:800px;margin:2rem auto;padding:1rem}
+          a{display:block;padding:0.5rem 0}</style></head>
+          <body><h1>Nodus Downloads</h1>
+          EOF
+          for f in assets/*; do
+            [ -f "$f" ] && echo "<a href=\"$(basename "$f")\">$(basename "$f")</a>" >> assets/index.html
+          done
+          echo "</body></html>" >> assets/index.html
+
           rclone copy assets/ r2:binaries/nodus/
