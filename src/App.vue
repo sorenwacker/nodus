@@ -316,6 +316,21 @@ onMounted(async () => {
       console.error('[App] Failed to start file watcher:', e)
     }
   }
+
+  // Register menu event handlers for macOS menu bar
+  ;(window as unknown as Record<string, unknown>).__NODUS_OPEN_SETTINGS = () => {
+    showSettings.value = true
+  }
+  ;(window as unknown as Record<string, unknown>).__NODUS_ZOOM_IN = () => {
+    // Emit to canvas component
+    document.dispatchEvent(new CustomEvent('nodus:zoom-in'))
+  }
+  ;(window as unknown as Record<string, unknown>).__NODUS_ZOOM_OUT = () => {
+    document.dispatchEvent(new CustomEvent('nodus:zoom-out'))
+  }
+  ;(window as unknown as Record<string, unknown>).__NODUS_ZOOM_RESET = () => {
+    document.dispatchEvent(new CustomEvent('nodus:zoom-reset'))
+  }
 })
 
 async function importVault() {
