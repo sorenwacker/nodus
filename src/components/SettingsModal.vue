@@ -125,7 +125,7 @@ function handleClose() {
             <label>{{ t('settings.license') }}</label>
             <div class="legal-disclaimer">
               <p>{{ t('settings.licenseText') }}</p>
-              <p class="copyright">&copy; 2024-2026 Soren Wacker</p>
+              <p class="copyright">&copy; 2026 Soren Wacker</p>
             </div>
           </div>
 
