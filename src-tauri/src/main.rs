@@ -13,6 +13,7 @@ mod watcher;
 mod zotero;
 
 use std::sync::Mutex;
+#[cfg(target_os = "macos")]
 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
 use tauri::Manager;
 
