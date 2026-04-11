@@ -13,7 +13,7 @@ mod watcher;
 mod zotero;
 
 use std::sync::Mutex;
-use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder, PredefinedMenuItem};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
 use tauri::Manager;
 
 #[tauri::command]
@@ -46,11 +46,17 @@ fn main() {
                 let handle = app.handle();
 
                 let app_menu = SubmenuBuilder::new(handle, "Nodus")
-                    .item(&PredefinedMenuItem::about(handle, Some("About Nodus"), None)?)
+                    .item(&PredefinedMenuItem::about(
+                        handle,
+                        Some("About Nodus"),
+                        None,
+                    )?)
                     .separator()
-                    .item(&MenuItemBuilder::with_id("settings", "Settings...")
-                        .accelerator("CmdOrCtrl+,")
-                        .build(handle)?)
+                    .item(
+                        &MenuItemBuilder::with_id("settings", "Settings...")
+                            .accelerator("CmdOrCtrl+,")
+                            .build(handle)?,
+                    )
                     .separator()
                     .item(&PredefinedMenuItem::hide(handle, Some("Hide Nodus"))?)
                     .item(&PredefinedMenuItem::hide_others(handle, None)?)
@@ -70,24 +76,28 @@ fn main() {
                     .build()?;
 
                 let view_menu = SubmenuBuilder::new(handle, "View")
-                    .item(&MenuItemBuilder::with_id("zoom_in", "Zoom In")
-                        .accelerator("CmdOrCtrl+=")
-                        .build(handle)?)
-                    .item(&MenuItemBuilder::with_id("zoom_out", "Zoom Out")
-                        .accelerator("CmdOrCtrl+-")
-                        .build(handle)?)
-                    .item(&MenuItemBuilder::with_id("zoom_reset", "Actual Size")
-                        .accelerator("CmdOrCtrl+0")
-                        .build(handle)?)
+                    .item(
+                        &MenuItemBuilder::with_id("zoom_in", "Zoom In")
+                            .accelerator("CmdOrCtrl+=")
+                            .build(handle)?,
+                    )
+                    .item(
+                        &MenuItemBuilder::with_id("zoom_out", "Zoom Out")
+                            .accelerator("CmdOrCtrl+-")
+                            .build(handle)?,
+                    )
+                    .item(
+                        &MenuItemBuilder::with_id("zoom_reset", "Actual Size")
+                            .accelerator("CmdOrCtrl+0")
+                            .build(handle)?,
+                    )
                     .separator()
                     .item(&PredefinedMenuItem::fullscreen(handle, None)?)
                     .build()?;
 
                 let help_menu = SubmenuBuilder::new(handle, "Help")
-                    .item(&MenuItemBuilder::with_id("website", "Nodus Website")
-                        .build(handle)?)
-                    .item(&MenuItemBuilder::with_id("docs", "Documentation")
-                        .build(handle)?)
+                    .item(&MenuItemBuilder::with_id("website", "Nodus Website").build(handle)?)
+                    .item(&MenuItemBuilder::with_id("docs", "Documentation").build(handle)?)
                     .build()?;
 
                 let menu = MenuBuilder::new(handle)

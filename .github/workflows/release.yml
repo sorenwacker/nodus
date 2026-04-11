@@ -75,6 +75,14 @@ jobs:
         run: cargo test --verbose
         working-directory: src-tauri
 
+      - name: Check Rust formatting
+        run: cargo fmt --check
+        working-directory: src-tauri
+
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+        working-directory: src-tauri
+
   release:
     name: Release (${{ matrix.platform }})
     needs: [test, validate-r2]
