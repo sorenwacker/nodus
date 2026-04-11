@@ -121,6 +121,14 @@ function handleClose() {
             </div>
           </div>
 
+          <div class="setting-group">
+            <label>{{ t('settings.license') }}</label>
+            <div class="legal-disclaimer">
+              <p>{{ t('settings.licenseText') }}</p>
+              <p class="copyright">&copy; 2024-2026 Soren Wacker</p>
+            </div>
+          </div>
+
           <hr class="divider" />
 
           <!-- Advanced Section (collapsible) -->
@@ -374,6 +382,27 @@ function handleClose() {
 .about-info .version {
   color: var(--text-muted, #71717a);
   margin-top: 4px;
+}
+
+.legal-disclaimer {
+  padding: 12px;
+  background: var(--bg-canvas, #f4f4f5);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #71717a);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .legal-disclaimer {
+  background: #18181b;
+}
+
+.legal-disclaimer p {
+  margin: 0;
+}
+
+.legal-disclaimer .copyright {
+  margin-top: 8px;
+  font-size: 11px;
 }
 
 /* Advanced toggle */

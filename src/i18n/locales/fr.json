@@ -463,6 +463,8 @@
     "about": "À propos",
     "aboutDescription": "Graphe de connaissances local",
     "version": "Version",
+    "license": "Licence",
+    "licenseText": "Usage personnel et commercial autorisé. Redistribution interdite sans autorisation écrite.",
     "themeCount": "disponibles",
     "themeHint": "Utilisez l'agent IA pour créer des thèmes personnalisés",
     "deleteTheme": "Supprimer ce thème personnalisé ?"

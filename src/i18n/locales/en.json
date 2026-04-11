@@ -521,6 +521,8 @@
     "about": "About",
     "aboutDescription": "Local-first knowledge graph",
     "version": "Version",
+    "license": "License",
+    "licenseText": "Personal and commercial use permitted. Redistribution prohibited without written permission.",
     "themeCount": "available",
     "themeHint": "Use the AI agent to create custom themes",
     "deleteTheme": "Delete this custom theme?",

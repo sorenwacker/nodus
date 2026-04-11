@@ -471,6 +471,8 @@
     "about": "Info",
     "aboutDescription": "Lokaler Wissensgraph",
     "version": "Version",
+    "license": "Lizenz",
+    "licenseText": "Persönliche und kommerzielle Nutzung erlaubt. Weiterverbreitung ohne schriftliche Genehmigung untersagt.",
     "themeCount": "verfügbar",
     "themeHint": "Verwenden Sie den KI-Agenten, um benutzerdefinierte Designs zu erstellen",
     "deleteTheme": "Dieses benutzerdefinierte Design löschen?"
