@@ -662,7 +662,7 @@ mod tests {
         let file_path = dir.path().join("stress.md");
         fs::write(&file_path, "content").unwrap();
 
-        for i in 0..50 {
+        for _ in 0..50 {
             let lock = FileLock::exclusive(&file_path).unwrap();
             // Simulate brief edit
             std::thread::sleep(Duration::from_micros(100));
