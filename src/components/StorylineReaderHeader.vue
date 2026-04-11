@@ -22,23 +22,33 @@ defineEmits<{
 <template>
   <header class="reader-header">
     <div class="header-left">
-      <button class="toc-toggle" :title="t('storyline.toggleContents')" @click="$emit('toggle-toc')">
+      <button
+        class="toc-toggle"
+        :title="t('storyline.toggleContents')"
+        :aria-label="t('storyline.toggleContents')"
+        @click="$emit('toggle-toc')"
+      >
         <Icon name="menu" :size="18" />
       </button>
       <h1 class="reader-title">{{ title || t('storyline.loading') }}</h1>
     </div>
     <div class="header-right">
-      <span class="page-indicator">{{ activeIndex + 1 }} / {{ nodeCount }}</span>
+      <span class="page-indicator" aria-live="polite">{{ activeIndex + 1 }} / {{ nodeCount }}</span>
       <button
         v-if="hasEntities"
         class="entity-toggle"
         :class="{ active: showEntitySidebar }"
-        title="Toggle entity sidebar"
+        :aria-label="showEntitySidebar ? 'Hide entity sidebar' : 'Show entity sidebar'"
+        :aria-expanded="showEntitySidebar"
         @click="$emit('toggle-entities')"
       >
         <Icon name="user" :size="18" />
       </button>
-      <button class="close-btn" :data-tooltip="t('storyline.closeEsc')" @click="$emit('close')">
+      <button
+        class="close-btn"
+        :aria-label="t('storyline.closeEsc')"
+        @click="$emit('close')"
+      >
         <Icon name="close" :size="20" />
       </button>
     </div>

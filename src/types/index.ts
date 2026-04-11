@@ -199,3 +199,32 @@ export interface ImportOntologyInput {
   createClassNodes: boolean
   layout?: OntologyLayout
 }
+
+// Comment types for storyline annotations
+
+/**
+ * Comment type classification for storyline annotations
+ * - note: General annotation or observation
+ * - question: Question to address or research
+ * - todo: Task or action item
+ * - important: Critical point requiring attention
+ */
+export type CommentType = 'note' | 'question' | 'todo' | 'important'
+
+/**
+ * Metadata stored with comment nodes
+ */
+export interface CommentMeta {
+  type: CommentType
+  resolved: boolean
+}
+
+/**
+ * Style configuration for each comment type
+ */
+export const COMMENT_STYLES: Record<CommentType, { icon: string; color: string }> = {
+  note: { icon: 'comment', color: 'var(--text-muted)' },
+  question: { icon: 'help-circle', color: '#3b82f6' },
+  todo: { icon: 'check-square', color: '#f59e0b' },
+  important: { icon: 'alert-circle', color: '#ef4444' },
+}

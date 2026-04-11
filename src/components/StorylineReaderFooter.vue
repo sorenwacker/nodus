@@ -14,22 +14,26 @@ defineEmits<{
 </script>
 
 <template>
-  <footer class="reader-footer">
+  <footer class="reader-footer" role="navigation" aria-label="Page navigation">
     <button
       class="nav-btn prev"
       :disabled="activeIndex === 0"
+      aria-label="Go to previous section"
       @click="$emit('previous')"
     >
       <Icon name="back" :size="16" />
       <span>Previous</span>
     </button>
 
-    <div class="nav-dots">
+    <div class="nav-dots" role="tablist" aria-label="Section navigation">
       <button
         v-for="index in totalNodes"
         :key="index - 1"
         class="nav-dot"
+        role="tab"
         :class="{ active: activeIndex === index - 1 }"
+        :aria-selected="activeIndex === index - 1"
+        :aria-label="`Go to section ${index}`"
         @click="$emit('goto', index - 1)"
       ></button>
     </div>
@@ -37,6 +41,7 @@ defineEmits<{
     <button
       class="nav-btn next"
       :disabled="activeIndex === totalNodes - 1"
+      aria-label="Go to next section"
       @click="$emit('next')"
     >
       <span>Next</span>

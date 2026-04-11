@@ -330,6 +330,34 @@ export const zoteroStorage = {
 }
 
 /**
+ * Storyline reading position storage
+ * Remembers scroll position when returning to a storyline
+ */
+export const storylineReadingStorage = {
+  _key(storylineId: string): string {
+    return `nodus-storyline-position-${storylineId}`
+  },
+
+  getPosition(storylineId: string): { nodeIndex: number; scrollTop: number } | null {
+    const data = localStorage.getItem(this._key(storylineId))
+    if (!data) return null
+    try {
+      return JSON.parse(data) as { nodeIndex: number; scrollTop: number }
+    } catch {
+      return null
+    }
+  },
+
+  setPosition(storylineId: string, nodeIndex: number, scrollTop: number): void {
+    localStorage.setItem(this._key(storylineId), JSON.stringify({ nodeIndex, scrollTop }))
+  },
+
+  clearPosition(storylineId: string): void {
+    localStorage.removeItem(this._key(storylineId))
+  },
+}
+
+/**
  * Clear all Nodus data from localStorage
  */
 export function clearAllStorage(): void {

@@ -3,6 +3,8 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
+import type { CommentType } from '../types'
+import { COMMENT_STYLES } from '../types'
 
 const { t } = useI18n()
 
@@ -17,7 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select', nodeId: string): void
   (e: 'create', title: string): void
-  (e: 'create-comment', text: string): void
+  (e: 'create-comment', text: string, commentType: CommentType): void
   (e: 'close'): void
 }>()
 
@@ -25,8 +27,16 @@ const isCreating = ref(false)
 const isCreatingComment = ref(false)
 const newNodeTitle = ref('')
 const newCommentText = ref('')
+const selectedCommentType = ref<CommentType>('note')
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
+
+const commentTypes: { type: CommentType; label: string }[] = [
+  { type: 'note', label: 'Note' },
+  { type: 'question', label: 'Question' },
+  { type: 'todo', label: 'Todo' },
+  { type: 'important', label: 'Important' },
+]
 
 const store = useNodesStore()
 
@@ -84,18 +94,21 @@ function createNode() {
 function startCreatingComment() {
   isCreatingComment.value = true
   newCommentText.value = ''
+  selectedCommentType.value = 'note'
 }
 
 function cancelCreateComment() {
   isCreatingComment.value = false
   newCommentText.value = ''
+  selectedCommentType.value = 'note'
 }
 
 function createComment() {
   if (newCommentText.value.trim()) {
-    emit('create-comment', newCommentText.value.trim())
+    emit('create-comment', newCommentText.value.trim(), selectedCommentType.value)
     isCreatingComment.value = false
     newCommentText.value = ''
+    selectedCommentType.value = 'note'
   }
 }
 </script>
@@ -111,6 +124,19 @@ function createComment() {
 
     <!-- Create new comment form -->
     <div v-if="isCreatingComment" class="node-picker-create">
+      <div class="comment-type-selector">
+        <button
+          v-for="ct in commentTypes"
+          :key="ct.type"
+          class="comment-type-btn"
+          :class="{ active: selectedCommentType === ct.type }"
+          :style="{ '--type-color': COMMENT_STYLES[ct.type].color }"
+          :title="ct.label"
+          @click="selectedCommentType = ct.type"
+        >
+          <Icon :name="COMMENT_STYLES[ct.type].icon" :size="14" />
+        </button>
+      </div>
       <textarea
         v-model="newCommentText"
         :placeholder="t('nodePicker.commentPlaceholder')"
@@ -387,5 +413,37 @@ function createComment() {
 .action-btn.create:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.comment-type-selector {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.comment-type-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.comment-type-btn:hover {
+  border-color: var(--type-color);
+  color: var(--type-color);
+  background: var(--bg-elevated);
+}
+
+.comment-type-btn.active {
+  border-color: var(--type-color);
+  background: var(--type-color);
+  color: white;
 }
 </style>

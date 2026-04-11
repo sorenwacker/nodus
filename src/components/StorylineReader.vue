@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import StorylineNodeList from './StorylineNodeList.vue'
 import StorylineReaderHeader from './StorylineReaderHeader.vue'
 import StorylineEntitySidebar from './StorylineEntitySidebar.vue'
 import StorylineReaderFooter from './StorylineReaderFooter.vue'
+import Icon from './Icon.vue'
 import { useStorylineNavigation } from '../composables/useStorylineNavigation'
 import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdownRendering'
-import type { Node, Storyline, EntityNodeType } from '../types'
-import { ENTITY_NODE_TYPES } from '../types'
+import { useScrollPositionMemory } from '../composables/useScrollPositionMemory'
+import { useScrollObserver } from '../composables/useScrollObserver'
+import { parseCommentMeta, createCommentContent } from '../composables/useCommentMeta'
+import type { Node, Storyline, EntityNodeType, CommentType } from '../types'
+import { ENTITY_NODE_TYPES, COMMENT_STYLES } from '../types'
 
 const { t } = useI18n()
 
@@ -29,6 +33,7 @@ const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
 const showToc = ref(true)
 const showEntitySidebar = ref(false)
+const collapsedComments = ref<Set<string>>(new Set())
 
 // Navigation composable
 const navigation = useStorylineNavigation({
@@ -36,7 +41,58 @@ const navigation = useStorylineNavigation({
   nodeCount: () => nodes.value.length,
   onClose: () => emit('close'),
 })
-const { activeNodeIndex, goToNode, goToPrevious, goToNext, handleScroll, setupKeyboardListeners, cleanupKeyboardListeners } = navigation
+const { activeNodeIndex, goToNode, goToPrevious, goToNext, handleScroll: baseHandleScroll, setupKeyboardListeners, cleanupKeyboardListeners } = navigation
+
+// Scroll position memory
+const storylineIdRef = toRef(props, 'storylineId')
+const { schedulePositionSave, restorePosition } = useScrollPositionMemory(
+  storylineIdRef,
+  contentRef,
+  activeNodeIndex
+)
+
+// Scroll observer for active section tracking
+const { activeIndex: observedActiveIndex, initObserver, refreshObserver } = useScrollObserver({
+  root: contentRef,
+  selector: '[data-node-index]',
+  rootMargin: '-20% 0px -60% 0px',
+})
+
+// Sync observed active index with navigation
+watch(observedActiveIndex, (index) => {
+  if (index !== activeNodeIndex.value) {
+    activeNodeIndex.value = index
+  }
+})
+
+// Reading progress (0-100)
+const readingProgress = computed(() => {
+  if (nodes.value.length <= 1) return 100
+  return Math.round((activeNodeIndex.value / (nodes.value.length - 1)) * 100)
+})
+
+// Handle scroll with position saving
+function handleScroll(e: Event) {
+  baseHandleScroll(e)
+  schedulePositionSave()
+}
+
+// Comment helpers
+function getCommentMeta(node: Node) {
+  return parseCommentMeta(node.markdown_content)
+}
+
+function isCommentCollapsed(nodeId: string): boolean {
+  return collapsedComments.value.has(nodeId)
+}
+
+function toggleCommentCollapsed(nodeId: string) {
+  if (collapsedComments.value.has(nodeId)) {
+    collapsedComments.value.delete(nodeId)
+  } else {
+    collapsedComments.value.add(nodeId)
+  }
+}
 
 // Markdown rendering composable
 const markdownRendering = useStorylineMarkdownRendering()
@@ -90,13 +146,14 @@ async function handleNodeCreate(index: number, title: string) {
   }
 }
 
-async function handleCommentCreate(index: number, text: string) {
+async function handleCommentCreate(index: number, text: string, commentType: CommentType = 'note') {
   if (!storyline.value) return
   try {
+    const content = createCommentContent(text, commentType)
     const node = await store.createNode({
       title: 'Comment',
       node_type: 'comment',
-      markdown_content: text,
+      markdown_content: content,
     })
     await store.addNodeToStoryline(storyline.value.id, node.id, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
@@ -126,13 +183,28 @@ async function handleNodeReorder(nodeIds: string[]) {
   }
 }
 
-onMounted(() => {
-  loadStoryline()
+onMounted(async () => {
+  await loadStoryline()
   setupKeyboardListeners()
+
+  // Restore scroll position after content loads
+  nextTick(() => {
+    setTimeout(() => {
+      restorePosition()
+      initObserver()
+    }, 100)
+  })
 })
 
 onUnmounted(() => {
   cleanupKeyboardListeners()
+})
+
+// Refresh observer when nodes change
+watch(nodes, () => {
+  nextTick(() => {
+    refreshObserver()
+  })
 })
 
 watch(() => props.storylineId, loadStoryline)
@@ -199,6 +271,12 @@ function panToEntity(entityId: string) {
 
 <template>
   <div class="reader-overlay">
+    <!-- Skip link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
+    <!-- Reading progress bar -->
+    <div class="reading-progress" :style="{ width: `${readingProgress}%` }"></div>
+
     <div class="reader-container">
       <!-- Header -->
       <StorylineReaderHeader
@@ -214,11 +292,11 @@ function panToEntity(entityId: string) {
 
       <div class="reader-body">
         <!-- Table of Contents Sidebar -->
-        <aside v-if="showToc" class="toc-sidebar">
+        <aside v-if="showToc" class="toc-sidebar" role="navigation" aria-label="Table of Contents">
           <div class="toc-header">
             <h2 class="toc-title">{{ t('storyline.contents') }}</h2>
           </div>
-          <div class="toc-nav">
+          <nav class="toc-nav">
             <StorylineNodeList
               :nodes="nodes"
               :storyline-id="storylineId"
@@ -231,14 +309,17 @@ function panToEntity(entityId: string) {
               @create="handleNodeCreate"
               @create-comment="handleCommentCreate"
             />
-          </div>
+          </nav>
         </aside>
 
         <!-- Main Content -->
         <main
+          id="main-content"
           ref="contentRef"
           class="reader-content"
           :class="{ 'full-width': !showToc }"
+          role="main"
+          aria-label="Storyline content"
           @scroll="handleScroll"
         >
           <div v-if="loading" class="loading-state">
@@ -257,21 +338,40 @@ function panToEntity(entityId: string) {
               <aside
                 v-if="node.node_type === 'comment'"
                 :id="`node-${index}`"
+                :data-node-index="index"
                 class="comment-callout"
+                :class="[
+                  `comment-${getCommentMeta(node).meta.type}`,
+                  {
+                    'is-resolved': getCommentMeta(node).meta.resolved,
+                    'is-collapsed': isCommentCollapsed(node.id)
+                  }
+                ]"
+                :style="{ '--comment-color': COMMENT_STYLES[getCommentMeta(node).meta.type].color }"
               >
+                <button
+                  class="comment-collapse-toggle"
+                  :aria-expanded="!isCommentCollapsed(node.id)"
+                  :aria-label="isCommentCollapsed(node.id) ? 'Expand comment' : 'Collapse comment'"
+                  @click="toggleCommentCollapsed(node.id)"
+                >
+                  <Icon :name="isCommentCollapsed(node.id) ? 'chevron-right' : 'chevron-down'" :size="12" />
+                </button>
                 <div class="comment-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
+                  <Icon :name="COMMENT_STYLES[getCommentMeta(node).meta.type].icon" :size="16" />
                 </div>
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="comment-text" v-html="getRenderedContent(node.id) || ''"></div>
+                <div v-show="!isCommentCollapsed(node.id)" class="comment-text" v-html="getRenderedContent(node.id) || ''"></div>
+                <span v-if="isCommentCollapsed(node.id)" class="comment-preview">
+                  {{ getCommentMeta(node).text.slice(0, 50) }}{{ getCommentMeta(node).text.length > 50 ? '...' : '' }}
+                </span>
               </aside>
 
               <!-- Regular nodes render as sections -->
               <article
                 v-else
                 :id="`node-${index}`"
+                :data-node-index="index"
                 class="node-section"
               >
                 <header class="section-header">
@@ -286,13 +386,18 @@ function panToEntity(entityId: string) {
         </main>
 
         <!-- Entity Sidebar -->
-        <StorylineEntitySidebar
+        <aside
           v-if="showEntitySidebar && hasEntities"
-          :entities-by-type="entitiesByType"
-          :has-entities="hasEntities"
-          @navigate="navigateToEntityNode"
-          @pan-to-entity="panToEntity"
-        />
+          role="complementary"
+          aria-label="Entity sidebar"
+        >
+          <StorylineEntitySidebar
+            :entities-by-type="entitiesByType"
+            :has-entities="hasEntities"
+            @navigate="navigateToEntityNode"
+            @pan-to-entity="panToEntity"
+          />
+        </aside>
       </div>
 
       <!-- Navigation Footer -->
@@ -318,6 +423,39 @@ function panToEntity(entityId: string) {
   background: var(--bg-canvas);
   z-index: 500;
   animation: fadeIn 0.2s ease;
+}
+
+/* Skip link for accessibility */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 0 0 8px 8px;
+  text-decoration: none;
+  font-weight: 600;
+  z-index: 1000;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* Reading progress bar */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--primary-color);
+  z-index: 600;
+  transition: width 0.15s ease-out;
 }
 
 @keyframes fadeIn {
@@ -414,17 +552,61 @@ function panToEntity(entityId: string) {
   margin: 24px 0;
   padding: 16px 20px;
   background: var(--bg-surface-alt);
-  border-left: 3px solid var(--text-muted);
+  border-left: 3px solid var(--comment-color, var(--text-muted));
   border-radius: 0 8px 8px 0;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.comment-callout.is-resolved {
+  opacity: 0.6;
+}
+
+.comment-callout.is-resolved .comment-text {
+  text-decoration: line-through;
+}
+
+.comment-callout.is-collapsed {
+  padding: 12px 20px;
+}
+
+.comment-collapse-toggle {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.comment-collapse-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-main);
 }
 
 .comment-icon {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--comment-color, var(--text-muted));
   margin-top: 2px;
 }
 
+.comment-preview {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .comment-text {
+  flex: 1;
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary);
@@ -610,5 +792,20 @@ function panToEntity(entityId: string) {
   height: auto;
   border-radius: 8px;
   margin: 1em 0;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .reading-progress,
+  .comment-callout,
+  .node-section,
+  .skip-link {
+    transition: none;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 1; }
+    to { opacity: 1; }
+  }
 }
 </style>
