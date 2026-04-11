@@ -13,6 +13,8 @@ mod watcher;
 mod zotero;
 
 use std::sync::Mutex;
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder, PredefinedMenuItem};
+use tauri::Manager;
 
 #[tauri::command]
 fn render_typst_math(math: String, display_mode: bool) -> Result<String, String> {
@@ -38,7 +40,91 @@ fn main() {
                 }
             });
 
+            // Build macOS menu
+            #[cfg(target_os = "macos")]
+            {
+                let handle = app.handle();
+
+                let app_menu = SubmenuBuilder::new(handle, "Nodus")
+                    .item(&PredefinedMenuItem::about(handle, Some("About Nodus"), None)?)
+                    .separator()
+                    .item(&MenuItemBuilder::with_id("settings", "Settings...")
+                        .accelerator("CmdOrCtrl+,")
+                        .build(handle)?)
+                    .separator()
+                    .item(&PredefinedMenuItem::hide(handle, Some("Hide Nodus"))?)
+                    .item(&PredefinedMenuItem::hide_others(handle, None)?)
+                    .item(&PredefinedMenuItem::show_all(handle, None)?)
+                    .separator()
+                    .item(&PredefinedMenuItem::quit(handle, Some("Quit Nodus"))?)
+                    .build()?;
+
+                let edit_menu = SubmenuBuilder::new(handle, "Edit")
+                    .item(&PredefinedMenuItem::undo(handle, None)?)
+                    .item(&PredefinedMenuItem::redo(handle, None)?)
+                    .separator()
+                    .item(&PredefinedMenuItem::cut(handle, None)?)
+                    .item(&PredefinedMenuItem::copy(handle, None)?)
+                    .item(&PredefinedMenuItem::paste(handle, None)?)
+                    .item(&PredefinedMenuItem::select_all(handle, None)?)
+                    .build()?;
+
+                let view_menu = SubmenuBuilder::new(handle, "View")
+                    .item(&MenuItemBuilder::with_id("zoom_in", "Zoom In")
+                        .accelerator("CmdOrCtrl+=")
+                        .build(handle)?)
+                    .item(&MenuItemBuilder::with_id("zoom_out", "Zoom Out")
+                        .accelerator("CmdOrCtrl+-")
+                        .build(handle)?)
+                    .item(&MenuItemBuilder::with_id("zoom_reset", "Actual Size")
+                        .accelerator("CmdOrCtrl+0")
+                        .build(handle)?)
+                    .separator()
+                    .item(&PredefinedMenuItem::fullscreen(handle, None)?)
+                    .build()?;
+
+                let help_menu = SubmenuBuilder::new(handle, "Help")
+                    .item(&MenuItemBuilder::with_id("website", "Nodus Website")
+                        .build(handle)?)
+                    .item(&MenuItemBuilder::with_id("docs", "Documentation")
+                        .build(handle)?)
+                    .build()?;
+
+                let menu = MenuBuilder::new(handle)
+                    .item(&app_menu)
+                    .item(&edit_menu)
+                    .item(&view_menu)
+                    .item(&help_menu)
+                    .build()?;
+
+                app.set_menu(menu)?;
+            }
+
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            let window = app.get_webview_window("main").unwrap();
+            match event.id().as_ref() {
+                "settings" => {
+                    let _ = window.eval("window.__NODUS_OPEN_SETTINGS?.()");
+                }
+                "zoom_in" => {
+                    let _ = window.eval("window.__NODUS_ZOOM_IN?.()");
+                }
+                "zoom_out" => {
+                    let _ = window.eval("window.__NODUS_ZOOM_OUT?.()");
+                }
+                "zoom_reset" => {
+                    let _ = window.eval("window.__NODUS_ZOOM_RESET?.()");
+                }
+                "website" => {
+                    let _ = window.eval("window.open('https://nodus.app', '_blank')");
+                }
+                "docs" => {
+                    let _ = window.eval("window.open('https://nodus.app/docs', '_blank')");
+                }
+                _ => {}
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_nodes,
