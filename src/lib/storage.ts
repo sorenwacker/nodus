@@ -34,6 +34,7 @@ const KEYS = {
   zoteroUserId: 'nodus_zotero_user_id',
   zoteroApiKey: 'nodus_zotero_api_key',
   spellcheckEnabled: 'nodus_spellcheck_enabled',
+  hoverTooltipEnabled: 'nodus_hover_tooltip_enabled',
 } as const
 
 /**
@@ -101,6 +102,13 @@ export const uiStorage = {
   },
   setSpellcheckEnabled(value: boolean): void {
     localStorage.setItem(KEYS.spellcheckEnabled, String(value))
+  },
+  getHoverTooltipEnabled(): boolean {
+    // Default to true - tooltips enabled by default
+    return localStorage.getItem(KEYS.hoverTooltipEnabled) !== 'false'
+  },
+  setHoverTooltipEnabled(value: boolean): void {
+    localStorage.setItem(KEYS.hoverTooltipEnabled, String(value))
   },
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject, toRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
@@ -86,6 +86,7 @@ import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
+import FullscreenNodeModal from '../components/FullscreenNodeModal.vue'
 import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 
@@ -313,6 +314,28 @@ watch(isSemanticZoomCollapsed, (collapsed, wasCollapsed) => {
     setTimeout(renderMermaidDiagrams, 100)
   }
 })
+
+// Render mermaid diagrams when visible nodes change (e.g., panning/zooming brings nodes into view)
+let lastVisibleNodeIds = new Set<string>()
+watch(
+  () => visibleNodes.value.map(n => n.id).join(','),
+  () => {
+    const currentIds = new Set(visibleNodes.value.map(n => n.id))
+    // Check if any new nodes came into view
+    let hasNewNodes = false
+    for (const id of currentIds) {
+      if (!lastVisibleNodeIds.has(id)) {
+        hasNewNodes = true
+        break
+      }
+    }
+    lastVisibleNodeIds = currentIds
+    // If new nodes came into view and we're not collapsed, render mermaid
+    if (hasNewNodes && !isSemanticZoomCollapsed.value) {
+      setTimeout(renderMermaidDiagrams, 150)
+    }
+  }
+)
 
 // Pre-computed LOD node lists to avoid double filtering in template
 const lodCircleNodes = computed(() => {
@@ -624,6 +647,7 @@ const nodeHover = useNodeHover({
   selectedNodeIds: storeSelectedNodeIds,
   filteredEdges: storeFilteredEdges,
   getNode: store.getNode,
+  hoverTooltipEnabled: toRef(displayStore, 'hoverTooltipEnabled'),
 })
 const {
   hoveredNodeId,
@@ -1395,6 +1419,20 @@ const nodeResizing = useNodeResizing({
 })
 const { resizingNode, resizePreview, onResizePointerDown } = nodeResizing
 
+// Fullscreen node modal state
+const showFullscreenModal = ref(false)
+const fullscreenNodeId = ref<string | null>(null)
+
+function openFullscreenNode(nodeId: string) {
+  fullscreenNodeId.value = nodeId
+  showFullscreenModal.value = true
+}
+
+function closeFullscreenNode() {
+  showFullscreenModal.value = false
+  fullscreenNodeId.value = null
+}
+
 // Node dragging composable
 const nodeDragging = useNodeDragging({
   store: {
@@ -1448,6 +1486,7 @@ const nodeDragging = useNodeDragging({
   setLastDragEndTime: (time: number) => {
     lastDragEndTime = time
   },
+  onFullscreenOpen: openFullscreenNode,
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
@@ -1743,8 +1782,8 @@ function selectAllNodes() {
   store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...nodeIds)
 }
 
-async function deleteSelectedNodes() {
-  const ids = [...store.selectedNodeIds]
+async function deleteSelectedNodes(nodeIds?: string[]) {
+  const ids = nodeIds ?? [...store.selectedNodeIds]
   if (ids.length === 0) return
 
   // Collect all nodes and edges for undo before deletion
@@ -2187,6 +2226,15 @@ useCanvasKeyboardShortcuts({
       <!-- Help Modal -->
       <KeyboardShortcutsModal :show="showHelpModal" @close="showHelpModal = false" />
 
+      <!-- Fullscreen Node Modal -->
+      <FullscreenNodeModal
+        :node-id="fullscreenNodeId"
+        :visible="showFullscreenModal"
+        @close="closeFullscreenNode"
+        @zoom-to-node="(id) => { closeFullscreenNode(); zoomToNode(id, 1) }"
+        @render-mermaid="renderMermaidDiagrams"
+      />
+
       <!-- Status Bar -->
       <CanvasStatusBar
         :visible-node-count="visibleNodes.length"
@@ -2261,7 +2309,7 @@ useCanvasKeyboardShortcuts({
         @fit-to-content="fitNodeNow"
         @zoom-to-node="zoomToNodeDefault"
         @open-link-picker="openLinkPicker"
-        @delete-nodes="deleteSelectedNodes"
+        @delete-nodes="deleteSelectedNodes(contextMenu.affectedNodeIds.value)"
         @add-to-storyline="addNodeToStoryline"
         @create-storyline="createStorylineFromNode"
         @move-to-workspace="moveNodesToWorkspace"

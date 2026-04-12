@@ -31,6 +31,7 @@ const shortcuts = computed(() => [
 
   // Editing
   { category: t('shortcuts.categories.editing'), key: t('shortcuts.keys.doubleClick'), desc: t('shortcuts.descriptions.editCreate') },
+  { category: t('shortcuts.categories.editing'), key: t('shortcuts.keys.cmdClick'), desc: t('shortcuts.descriptions.fullscreenEdit') },
   { category: t('shortcuts.categories.editing'), key: t('shortcuts.keys.delete'), desc: t('shortcuts.descriptions.deleteSelected') },
   { category: t('shortcuts.categories.editing'), key: t('shortcuts.keys.undo'), desc: t('shortcuts.descriptions.undo') },
   { category: t('shortcuts.categories.editing'), key: t('shortcuts.keys.redo'), desc: t('shortcuts.descriptions.redo') },

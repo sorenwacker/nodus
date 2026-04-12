@@ -13,6 +13,7 @@ export interface UseNodeHoverContext {
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
   filteredEdges: Ref<Edge[]> | ComputedRef<Edge[]>
   getNode: (id: string) => Node | undefined
+  hoverTooltipEnabled?: Ref<boolean>
 }
 
 export interface EdgeStats {
@@ -38,13 +39,15 @@ export interface UseNodeHoverReturn {
 }
 
 export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
-  const { scale, isLODMode, selectedNodeIds, filteredEdges, getNode } = ctx
+  const { scale, isLODMode, selectedNodeIds, filteredEdges, getNode, hoverTooltipEnabled } = ctx
 
   const hoveredNodeId = ref<string | null>(null)
   const hoverMousePos = ref({ x: 0, y: 0 })
 
   // Tooltip for zoomed-out hover - shows node info when scale is low or in LOD mode
+  // Can be disabled via settings
   const showHoverTooltip = computed(() => {
+    if (hoverTooltipEnabled && !hoverTooltipEnabled.value) return false
     return !!hoveredNodeId.value && (scale.value < 0.5 || isLODMode.value)
   })
 

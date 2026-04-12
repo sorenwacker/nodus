@@ -6,7 +6,20 @@
 Pan and zoom freely across an infinite workspace. Semantic zooming adjusts detail level:
 
 - **Zoomed in**: Full content, edit handles, detailed view
-- **Zoomed out**: Titles only, bubble mode for performance
+- **Zoomed out**: Titles only, collapsed cards for performance
+
+### Bubble Mode
+Toggle bubble mode to display nodes as simple circles:
+
+- Shows relative node sizes at a glance
+- Improves performance with large graphs (1000+ nodes)
+- Useful for high-level structure visualization
+
+### Magnifier
+Enable the magnifier for detailed inspection while zoomed out:
+
+- Hover over areas to see magnified view
+- Useful when navigating large canvases
 
 ### Node Types
 
@@ -16,15 +29,34 @@ Pan and zoom freely across an infinite workspace. Semantic zooming adjusts detai
 | **Citation** | Academic references with DOI support |
 | **Tag** | Organizational nodes for categorization |
 | **File** | Linked external files |
+| **Character** | Entity node for people/characters |
+| **Location** | Entity node for places |
+| **Term** | Entity node for definitions/concepts |
+| **Item** | Entity node for objects/artifacts |
 
 ### Frames
 Group related nodes visually. Frames act as containers that can be moved together with all contained nodes.
 
 ### Selection & Multi-Select
 - Click to select single node
-- Cmd/Ctrl+Click to add to selection
+- Shift+Click to add to selection
 - Lasso selection for multiple nodes
 - Bulk operations on selection
+
+### Fullscreen Editor
+Open any node in a fullscreen split-view editor for focused writing:
+
+- **Trigger**: Cmd+Click (Mac) or Ctrl+Click (Windows/Linux) on any node
+- **Split view**: Markdown editor on left, live preview on right
+- **Auto-save**: Changes save automatically with 500ms debounce
+- **Keyboard shortcuts**:
+  - `Escape` - Save and close
+  - `Cmd/Ctrl+S` - Save immediately
+- **Features**:
+  - Title editing in header
+  - Wikilink autocomplete (type `[[` to trigger)
+  - Mermaid diagram preview
+  - "Zoom to Node" button to locate node on canvas
 
 ---
 
@@ -50,6 +82,12 @@ Multiple routing styles for visual clarity:
 
 ### Neighbor Highlighting
 When selecting a node, connected neighbors are highlighted for context.
+
+### Neighborhood View
+Focus on a specific node and its connections:
+- Toggle neighborhood mode to hide unrelated nodes
+- Adjust depth (1-5 hops) to control how far connections extend
+- Useful for exploring dense graphs
 
 ---
 
@@ -118,6 +156,13 @@ Connect to your local Zotero database:
 - DOI extraction and linking
 - Create citation nodes with metadata
 
+### Semantic Scholar Integration
+Fetch citations for papers with DOIs:
+
+- Right-click citation nodes and select "Fetch Citations"
+- Automatically creates nodes for referenced papers
+- Builds citation network on your canvas
+
 ### BibTeX Import
 Import `.bib` files directly to create citation nodes with:
 
@@ -158,7 +203,7 @@ Automatic arrangement of nodes:
 | Force-directed | General graphs, organic layout |
 | Grid | Structured content |
 | Hierarchical | Trees and DAGs |
-| Circular | Relationship diagrams |
+| Radial | Relationship diagrams (select center node first) |
 
 ---
 
@@ -203,7 +248,7 @@ All data stored on your device:
 | Zoom in | `Cmd+=` | `Ctrl+=` |
 | Zoom out | `Cmd+-` | `Ctrl+-` |
 | Fit view | `Cmd+0` | `Ctrl+0` |
-| Zoom to node | `Cmd+Click` | `Ctrl+Click` |
+| Fullscreen edit | `Cmd+Click` | `Ctrl+Click` |
 | Search | `Cmd+F` | `Ctrl+F` |
 | Settings | `Cmd+,` | `Ctrl+,` |
 
@@ -213,8 +258,11 @@ See Settings → Keyboard Shortcuts for full list.
 
 ## Themes
 
-- **Light mode** - Clean, bright interface
-- **Dark mode** - Easy on the eyes
-- **System** - Follows OS preference
+| Theme | Description |
+|-------|-------------|
+| **Light** | Clean, bright interface |
+| **Dark** | Easy on the eyes |
+| **Pitch Black** | OLED-optimized, true black background |
+| **Cyber** | Neon cyan/magenta aesthetic |
 
 Node colors can be customized individually.

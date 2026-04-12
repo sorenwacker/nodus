@@ -41,6 +41,7 @@ export interface UseNodeDraggingContext {
   pushUndo: () => void
   screenToCanvas: (clientX: number, clientY: number) => { x: number; y: number }
   zoomToNode: (nodeId: string) => void
+  onFullscreenOpen?: (nodeId: string) => void
   optimizeNodeEntrypoints: (
     nodeId: string,
     edges: Array<{ id: string; source_node_id: string; target_node_id: string }>,
@@ -111,9 +112,14 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       return
     }
 
-    // Cmd+click to zoom to node
-    if (e.metaKey && !e.shiftKey && !e.altKey) {
-      zoomToNode(nodeId, 1)
+    // Cmd+click (Mac) / Ctrl+click (Windows/Linux) to open fullscreen modal
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+      if (ctx.onFullscreenOpen) {
+        ctx.onFullscreenOpen(nodeId)
+      } else {
+        // Fallback to zoom if no fullscreen handler
+        zoomToNode(nodeId)
+      }
       return
     }
 

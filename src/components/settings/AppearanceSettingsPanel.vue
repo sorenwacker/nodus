@@ -23,6 +23,9 @@ const fontScale = ref(uiStorage.getFontScale())
 // Spellcheck
 const spellcheckEnabled = ref(uiStorage.getSpellcheckEnabled())
 
+// Hover tooltip
+const hoverTooltipEnabled = ref(uiStorage.getHoverTooltipEnabled())
+
 // Display thresholds
 const semanticZoomThreshold = ref(displayStorage.getSemanticZoomThreshold())
 const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
@@ -47,10 +50,16 @@ function saveSpellcheckSetting() {
   window.dispatchEvent(new CustomEvent('nodus-display-settings-change'))
 }
 
+function saveHoverTooltipSetting() {
+  uiStorage.setHoverTooltipEnabled(hoverTooltipEnabled.value)
+  window.dispatchEvent(new CustomEvent('nodus-display-settings-change'))
+}
+
 // Auto-save on changes
 watch(fontScale, saveFontScale)
 watch([semanticZoomThreshold, magnifierEnabled, magnifierZoomThreshold], saveDisplaySettings)
 watch(spellcheckEnabled, saveSpellcheckSetting)
+watch(hoverTooltipEnabled, saveHoverTooltipSetting)
 
 // Delete custom theme
 async function deleteCustomTheme(id: string) {
@@ -62,11 +71,13 @@ async function deleteCustomTheme(id: string) {
 function resetDisplayDefaults() {
   fontScale.value = 1.0
   spellcheckEnabled.value = false
+  hoverTooltipEnabled.value = true
   semanticZoomThreshold.value = 0.5
   magnifierEnabled.value = true
   magnifierZoomThreshold.value = 0.4
   saveFontScale()
   saveSpellcheckSetting()
+  saveHoverTooltipSetting()
   saveDisplaySettings()
 }
 </script>
@@ -127,6 +138,15 @@ function resetDisplayDefaults() {
         {{ t('settings.display.spellcheck') }}
       </label>
       <span class="hint">{{ t('settings.display.spellcheckHint') }}</span>
+    </div>
+
+    <!-- Hover Tooltip -->
+    <div class="setting-group">
+      <label class="checkbox-label">
+        <input v-model="hoverTooltipEnabled" type="checkbox" />
+        {{ t('settings.display.hoverTooltip') }}
+      </label>
+      <span class="hint">{{ t('settings.display.hoverTooltipHint') }}</span>
     </div>
 
     <hr class="divider" />
