@@ -208,9 +208,34 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
     document.addEventListener('pointermove', onNodeDrag)
     document.addEventListener('pointerup', stopNodeDrag)
+    document.addEventListener('pointercancel', cleanupDrag)
+    window.addEventListener('blur', cleanupDrag)
+  }
+
+  // Cleanup function for when drag is interrupted (blur, pointercancel, etc.)
+  function cleanupDrag() {
+    if (pendingDragNode.value) {
+      pendingDragNode.value = null
+    }
+    if (draggingNode.value) {
+      draggingNode.value = null
+    }
+    multiDragInitial.value.clear()
+    document.body.classList.remove('node-dragging')
+    document.removeEventListener('pointermove', onNodeDrag)
+    document.removeEventListener('pointerup', stopNodeDrag)
+    document.removeEventListener('pointercancel', cleanupDrag)
+    window.removeEventListener('blur', cleanupDrag)
   }
 
   function onNodeDrag(e: PointerEvent) {
+    // Safety check: if no buttons are pressed, stop dragging
+    // This handles cases where pointerup was missed (window blur, etc.)
+    if (e.buttons === 0) {
+      cleanupDrag()
+      return
+    }
+
     const pos = screenToCanvas(e.clientX, e.clientY)
     const dx = pos.x - dragStart.value.x
     const dy = pos.y - dragStart.value.y
@@ -338,6 +363,8 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     document.body.classList.remove('node-dragging')
     document.removeEventListener('pointermove', onNodeDrag)
     document.removeEventListener('pointerup', stopNodeDrag)
+    document.removeEventListener('pointercancel', cleanupDrag)
+    window.removeEventListener('blur', cleanupDrag)
   }
 
   return {

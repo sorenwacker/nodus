@@ -1,12 +1,10 @@
 /**
- * Canvas zoom and magnifier composable
+ * Canvas zoom composable
  *
- * Handles wheel zoom/pan, magnifier visibility, and mouse tracking
+ * Handles wheel zoom/pan and mouse tracking
  */
 
 import { ref, type Ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useDisplayStore } from '../../../stores/display'
 
 export interface UseCanvasZoomContext {
   canvasRef: Ref<HTMLElement | null>
@@ -20,9 +18,7 @@ export interface UseCanvasZoomContext {
 
 export interface UseCanvasZoomReturn {
   // State
-  showMagnifier: Ref<boolean>
   isMouseOnCanvas: Ref<boolean>
-  magnifierPos: Ref<{ x: number; y: number }>
 
   // Functions
   onWheel: (e: WheelEvent) => void
@@ -42,17 +38,8 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     scheduleSaveViewState,
   } = ctx
 
-  // Get reactive refs from display store
-  const displayStore = useDisplayStore()
-  const { magnifierZoomThreshold } = storeToRefs(displayStore)
-
   // State
-  const showMagnifier = ref(false)
   const isMouseOnCanvas = ref(false)
-  const magnifierPos = ref({ x: 0, y: 0 })
-
-  // Magnifier mouse tracking (throttled for performance)
-  let magnifierRafId: number | null = null
 
   // Zoom throttling for large graphs - accumulate deltas and apply via RAF
   let pendingZoom: { deltaY: number; mouseX: number; mouseY: number } | null = null
@@ -74,11 +61,6 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
     scale.value = newScale
-
-    // Update magnifier visibility when zoom crosses threshold
-    if (isMouseOnCanvas.value) {
-      showMagnifier.value = newScale < magnifierZoomThreshold.value
-    }
 
     // Save view state (debounced)
     scheduleSaveViewState()
@@ -147,44 +129,20 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     }
   }
 
-  function onCanvasPointerMove(e: PointerEvent) {
-    // Throttle magnifier updates using requestAnimationFrame
-    if (magnifierRafId) return
-
-    magnifierRafId = requestAnimationFrame(() => {
-      magnifierRafId = null
-      const rect = canvasRef.value?.getBoundingClientRect()
-      if (rect) {
-        magnifierPos.value = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        }
-      }
-      // Update magnifier visibility based on current zoom level
-      if (scale.value < magnifierZoomThreshold.value && isMouseOnCanvas.value) {
-        showMagnifier.value = true
-      } else {
-        showMagnifier.value = false
-      }
-    })
+  function onCanvasPointerMove(_e: PointerEvent) {
+    // Mouse tracking - kept for potential future use
   }
 
   function onCanvasPointerEnter() {
     isMouseOnCanvas.value = true
-    if (scale.value < magnifierZoomThreshold.value) {
-      showMagnifier.value = true
-    }
   }
 
   function onCanvasPointerLeave() {
     isMouseOnCanvas.value = false
-    showMagnifier.value = false
   }
 
   return {
-    showMagnifier,
     isMouseOnCanvas,
-    magnifierPos,
     onWheel,
     onCanvasPointerMove,
     onCanvasPointerEnter,

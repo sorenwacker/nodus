@@ -20,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   zoomToNode: []
+  openFullscreen: []
   save: [nodeId: string, content: string]
   saveTitle: [nodeId: string, title: string]
   renderMermaid: []
@@ -222,7 +223,7 @@ function onEditorKeydown(e: KeyboardEvent) {
           <button class="preview-btn-primary" @click="saveAndClose">Save</button>
         </template>
         <template v-else>
-          <button @click="startEditing">Edit</button>
+          <button @click="emit('openFullscreen')">Edit</button>
           <button @click="emit('zoomToNode')">Zoom to Node</button>
         </template>
       </div>

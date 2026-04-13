@@ -29,6 +29,7 @@ const props = defineProps<{
   isResizing: boolean
   isEditing: boolean
   isCollapsed: boolean
+  isTextHidden?: boolean
   isNeighborhoodMode: boolean
   isNeighborhoodFocus: boolean
   isNeighborHighlighted: boolean
@@ -81,6 +82,7 @@ const classes = computed(() => ({
   resizing: props.isResizing,
   editing: props.isEditing,
   collapsed: props.isCollapsed,
+  'text-hidden': props.isTextHidden,
   'neighborhood-mode': props.isNeighborhoodMode,
   'neighborhood-focus': props.isNeighborhoodFocus,
   'neighbor-highlighted': props.isNeighborHighlighted,

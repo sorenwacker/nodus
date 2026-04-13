@@ -25,6 +25,10 @@ const { spellcheckEnabled } = storeToRefs(displayStore)
 const editTitle = ref('')
 const editContent = ref('')
 const editorRef = ref<HTMLTextAreaElement | null>(null)
+const previewRef = ref<HTMLDivElement | null>(null)
+
+// Scroll sync state
+let isScrollingSynced = false // Prevents infinite scroll loop
 
 // Wikilink autocomplete state
 const showLinkPicker = ref(false)
@@ -218,6 +222,45 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+// Scroll sync between editor and preview
+function onEditorScroll() {
+  if (isScrollingSynced || !editorRef.value || !previewRef.value) return
+
+  const editor = editorRef.value
+  const preview = previewRef.value
+
+  // Calculate scroll percentage in editor
+  const scrollPercent = editor.scrollTop / (editor.scrollHeight - editor.clientHeight)
+
+  // Apply to preview
+  isScrollingSynced = true
+  preview.scrollTop = scrollPercent * (preview.scrollHeight - preview.clientHeight)
+
+  // Reset flag after a short delay to allow the scroll to complete
+  requestAnimationFrame(() => {
+    isScrollingSynced = false
+  })
+}
+
+function onPreviewScroll() {
+  if (isScrollingSynced || !editorRef.value || !previewRef.value) return
+
+  const editor = editorRef.value
+  const preview = previewRef.value
+
+  // Calculate scroll percentage in preview
+  const scrollPercent = preview.scrollTop / (preview.scrollHeight - preview.clientHeight)
+
+  // Apply to editor
+  isScrollingSynced = true
+  editor.scrollTop = scrollPercent * (editor.scrollHeight - editor.clientHeight)
+
+  // Reset flag after a short delay
+  requestAnimationFrame(() => {
+    isScrollingSynced = false
+  })
+}
+
 // Handle zoom to node action
 function handleZoomToNode() {
   if (props.nodeId) {
@@ -292,6 +335,7 @@ onUnmounted(() => {
                 :autocorrect="spellcheckEnabled ? 'on' : 'off'"
                 :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
                 @input="onContentInput"
+                @scroll="onEditorScroll"
               ></textarea>
 
               <!-- Wikilink picker -->
@@ -311,7 +355,12 @@ onUnmounted(() => {
             <div class="preview-pane">
               <div class="pane-header">Preview</div>
               <!-- eslint-disable-next-line vue/no-v-html -->
-              <div class="fullscreen-preview node-content" v-html="renderedContent"></div>
+              <div
+                ref="previewRef"
+                class="fullscreen-preview node-content"
+                @scroll="onPreviewScroll"
+                v-html="renderedContent"
+              ></div>
             </div>
           </div>
 

@@ -67,17 +67,32 @@
   color: var(--text-main);
   letter-spacing: calc(-0.5px * var(--zoom-scale, 1));
   text-shadow: 0 1px 3px var(--shadow-sm);
-  /* Center text */
+  /* Center text, single line with ellipsis when zoomed out */
   text-align: center;
   line-height: 1.15;
   width: 100%;
   background: transparent;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .node-card.collapsed .node-content,
 .node-card.collapsed .inline-editor,
 .node-card.collapsed .resize-handle {
   display: none;
+}
+
+/* Hide text completely when zoomed out below 15% (except selected nodes) */
+.node-card.text-hidden:not(.selected) .node-header {
+  visibility: hidden;
+}
+
+/* Selected nodes show wrapped text even when collapsed */
+.node-card.collapsed.selected .node-header {
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .node-header {
@@ -88,9 +103,9 @@
   border-bottom: calc(1px * var(--zoom-scale, 1)) solid var(--border-default);
   background: var(--bg-surface-alt);
   border-radius: calc(7px * var(--zoom-scale, 1)) calc(7px * var(--zoom-scale, 1)) 0 0;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  word-break: break-word;
   cursor: inherit;
 }
 

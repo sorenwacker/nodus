@@ -71,7 +71,6 @@ import CanvasControls from './components/CanvasControls.vue'
 import CanvasContextMenu from './components/CanvasContextMenu.vue'
 import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
 import CanvasLLMBar from './components/CanvasLLMBar.vue'
-import CanvasMagnifier from './components/CanvasMagnifier.vue'
 import CanvasHoverTooltip from './components/CanvasHoverTooltip.vue'
 import CanvasMinimap from './components/CanvasMinimap.vue'
 import NodeLLMBar from './components/NodeLLMBar.vue'
@@ -124,6 +123,9 @@ function updateTheme() {
 
 // Track if we've centered the view initially
 let hasInitiallyCentered = false
+
+// Z-order map for radial layout (angle-based stacking)
+const nodeZOrder = ref<Map<string, number>>(new Map())
 
 // Canvas element ref (needed early for view state and layout functions)
 const canvasRef = ref<HTMLElement | null>(null)
@@ -186,6 +188,15 @@ onMounted(() => {
   }
   window.addEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
 
+  // Listen for radial layout z-order updates (angle-based stacking)
+  const handleRadialZOrder = (e: Event) => {
+    const order = (e as CustomEvent<string[]>).detail
+    const zMap = new Map<string, number>()
+    order.forEach((id, idx) => zMap.set(id, idx))
+    nodeZOrder.value = zMap
+  }
+  window.addEventListener('nodus-radial-z-order', handleRadialZOrder)
+
   // Setup PDF drop listener
   pdfDrop.setup()
 
@@ -194,6 +205,7 @@ onMounted(() => {
     window.removeEventListener('resize', updateViewportSize)
     window.removeEventListener('zoom-to-node', handleZoomToNode)
     window.removeEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
+    window.removeEventListener('nodus-radial-z-order', handleRadialZOrder)
     pdfDrop.cleanup()
     displayStore.cleanupListener()
   })
@@ -295,12 +307,14 @@ const graphMetrics = useGraphMetrics({
   filteredEdges: computed(() => store.filteredEdges),
   neighborhoodMode,
   scale,
+  workspaceId: computed(() => store.currentWorkspaceId),
 })
 const {
   isLargeGraph,
   isHugeGraph,
   isMassiveGraph,
   isSemanticZoomCollapsed,
+  isTextHidden,
   isLODMode,
   isBubbleModeForced,
   getLODRadius,
@@ -519,7 +533,7 @@ const {
   insertNodeOnEdge,
 } = edgeManipulation
 
-// Canvas zoom composable - handles wheel zoom/pan and magnifier
+// Canvas zoom composable - handles wheel zoom/pan
 const canvasZoom = useCanvasZoom({
   canvasRef,
   scale,
@@ -530,56 +544,25 @@ const canvasZoom = useCanvasZoom({
   scheduleSaveViewState,
 })
 const {
-  showMagnifier,
-  magnifierPos,
   onWheel,
   onCanvasPointerMove,
   onCanvasPointerEnter,
   onCanvasPointerLeave,
 } = canvasZoom
 
-// Canvas display composable - handles magnifier, thumbnails, font scale
+// Canvas display composable - handles thumbnails, font scale
 const canvasDisplay = useCanvasDisplay({
   scale,
   filteredNodes: computed(() => store.filteredNodes),
   isLargeGraph,
-  showMagnifier,
 })
 const {
-  magnifierEnabled,
-  shouldShowMagnifier,
-  toggleMagnifier,
-  MAGNIFIER_SIZE,
-  MAGNIFIER_ZOOM,
   nodeFirstImage,
   showImageThumbnail,
   fontScale,
   increaseFontScale,
   decreaseFontScale,
 } = canvasDisplay
-
-// Initialize font scale on mount
-
-// Only render nodes visible within magnifier viewport for performance
-const magnifierVisibleNodes = computed(() => {
-  if (!shouldShowMagnifier.value) return []
-
-  // Calculate the canvas area visible in the magnifier
-  const viewRadius = MAGNIFIER_SIZE / 2 / MAGNIFIER_ZOOM / scale.value
-  const centerX = (magnifierPos.value.x - offsetX.value) / scale.value
-  const centerY = (magnifierPos.value.y - offsetY.value) / scale.value
-
-  return store.filteredNodes.filter(node => {
-    const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
-    const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
-    // Check if node intersects with magnifier circle (use bounding box approximation)
-    const closestX = Math.max(node.canvas_x, Math.min(centerX, nodeRight))
-    const closestY = Math.max(node.canvas_y, Math.min(centerY, nodeBottom))
-    const dx = centerX - closestX
-    const dy = centerY - closestY
-    return dx * dx + dy * dy < viewRadius * viewRadius * 4 // 2x radius for margin
-  })
-})
 
 // Node border width - scale inversely to maintain constant visual width (2px on screen)
 const nodeBorderWidth = computed(() => {
@@ -1841,6 +1824,12 @@ function getNodeStyle(node: {
     borderWidth: (nodeBorderWidth.value * scale.value) + 'px',
   }
 
+  // Apply z-index from radial layout angle order (if set)
+  const zIndex = nodeZOrder.value.get(node.id)
+  if (zIndex !== undefined) {
+    style.zIndex = String(zIndex)
+  }
+
   // Apply color theme background if set
   if (node.color_theme) {
     const bg = getNodeBackground(node.color_theme)
@@ -2097,6 +2086,7 @@ useCanvasKeyboardShortcuts({
           :is-resizing="resizingNode === node.id"
           :is-editing="editingNodeId === node.id"
           :is-collapsed="isSemanticZoomCollapsed"
+          :is-text-hidden="isTextHidden"
           :is-neighborhood-mode="neighborhoodMode"
           :is-neighborhood-focus="neighborhoodMode && node.id === focusNodeId"
           :is-neighbor-highlighted="highlightedNodeIds.has(node.id)"
@@ -2190,6 +2180,7 @@ useCanvasKeyboardShortcuts({
         :node-id="previewNode?.id || ''"
         @close="closePreviewPanel"
         @zoom-to-node="zoomToPreviewNode"
+        @open-fullscreen="previewNode && openFullscreenNode(previewNode.id)"
         @save="savePreviewContent"
         @save-title="savePreviewTitle"
         @render-mermaid="renderMermaidDiagrams"
@@ -2201,7 +2192,6 @@ useCanvasKeyboardShortcuts({
         :grid-lock-enabled="gridLockEnabled"
         :is-large-graph="isLargeGraph"
         :global-edge-style="globalEdgeStyle"
-        :magnifier-enabled="magnifierEnabled"
         :neighborhood-mode="neighborhoodMode"
         :neighborhood-depth="neighborhoodDepth"
         :pending-frame-placement="frames.pendingFramePlacement.value"
@@ -2214,7 +2204,6 @@ useCanvasKeyboardShortcuts({
         @layout="autoLayoutNodes"
         @fit-nodes-to-content="fitAllNodesToContent"
         @cycle-edge-style="cycleEdgeStyle"
-        @toggle-magnifier="toggleMagnifier"
         @toggle-neighborhood-mode="toggleNeighborhoodMode()"
         @set-neighborhood-depth="setDepth"
         @create-frame="createFrameAtCenter"
@@ -2249,20 +2238,6 @@ useCanvasKeyboardShortcuts({
         :show-agent-log="showAgentLogPanel"
         @stop-pdf="pdfDrop.stop()"
         @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
-      />
-
-      <!-- Magnifying lens (when zoomed out far) -->
-      <CanvasMagnifier
-        :visible="shouldShowMagnifier"
-        :position="magnifierPos"
-        :nodes="magnifierVisibleNodes"
-        :magnifier-size="MAGNIFIER_SIZE"
-        :magnifier-zoom="MAGNIFIER_ZOOM"
-        :offset-x="offsetX"
-        :offset-y="offsetY"
-        :scale="scale"
-        :node-defaults="NODE_DEFAULTS"
-        :get-node-background="getNodeBackground"
       />
 
       <!-- Hover tooltip (when zoomed out) -->

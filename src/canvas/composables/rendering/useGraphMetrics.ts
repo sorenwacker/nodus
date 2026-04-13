@@ -4,10 +4,11 @@
  * Computes graph size thresholds, LOD mode, and node degree for visualization optimization
  */
 
-import { computed, ref, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, watch, type Ref, type ComputedRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { Node, Edge } from '../../../types'
 import { useDisplayStore } from '../../../stores/display'
+import { canvasStorage } from '../../../lib/storage'
 
 export interface UseGraphMetricsContext {
   displayNodes: ComputedRef<Node[]>
@@ -16,10 +17,8 @@ export interface UseGraphMetricsContext {
   filteredEdges: ComputedRef<Edge[]> | Ref<Edge[]>
   neighborhoodMode: Ref<boolean>
   scale: Ref<number>
+  workspaceId: ComputedRef<string | null>
 }
-
-// Persistent LOD mode override (user can manually toggle bubble mode)
-const forceLODMode = ref(false)
 
 export interface UseGraphMetricsReturn {
   isLargeGraph: ComputedRef<boolean>
@@ -41,11 +40,20 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     filteredEdges,
     neighborhoodMode,
     scale,
+    workspaceId,
   } = ctx
 
   // Get reactive refs from display store
   const displayStore = useDisplayStore()
   const { lodThreshold, semanticZoomThreshold } = storeToRefs(displayStore)
+
+  // Persistent LOD mode override (user can manually toggle bubble mode) - per workspace
+  const forceLODMode = ref(canvasStorage.getBubbleMode(workspaceId.value || undefined))
+
+  // Update bubble mode when workspace changes
+  watch(workspaceId, (newId) => {
+    forceLODMode.value = canvasStorage.getBubbleMode(newId || undefined)
+  })
 
   // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
   // In neighborhood mode, always use full routing since we have few nodes
@@ -74,6 +82,9 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     return false
   })
 
+  // Hide text completely when zoomed out below 15% - text is unreadable at this scale
+  const isTextHidden = computed(() => scale.value < 0.15)
+
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   // Also activates when user manually toggles bubble mode
   const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > lodThreshold.value)
@@ -81,6 +92,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   // Toggle bubble mode manually
   function toggleBubbleMode() {
     forceLODMode.value = !forceLODMode.value
+    canvasStorage.setBubbleMode(forceLODMode.value, workspaceId.value || undefined)
   }
 
   // Node degree (edge count) for LOD circle sizing
@@ -108,6 +120,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     isHugeGraph,
     isMassiveGraph,
     isSemanticZoomCollapsed,
+    isTextHidden,
     isLODMode,
     isBubbleModeForced: computed(() => forceLODMode.value),
     nodeDegree,

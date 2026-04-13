@@ -28,8 +28,6 @@ const hoverTooltipEnabled = ref(uiStorage.getHoverTooltipEnabled())
 
 // Display thresholds
 const semanticZoomThreshold = ref(displayStorage.getSemanticZoomThreshold())
-const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
-const magnifierZoomThreshold = ref(displayStorage.getMagnifierZoomThreshold())
 
 // Save functions
 function saveFontScale() {
@@ -40,8 +38,6 @@ function saveFontScale() {
 
 function saveDisplaySettings() {
   displayStorage.setSemanticZoomThreshold(semanticZoomThreshold.value)
-  uiStorage.setMagnifierEnabled(magnifierEnabled.value)
-  displayStorage.setMagnifierZoomThreshold(magnifierZoomThreshold.value)
   window.dispatchEvent(new CustomEvent('nodus-display-settings-change'))
 }
 
@@ -57,7 +53,7 @@ function saveHoverTooltipSetting() {
 
 // Auto-save on changes
 watch(fontScale, saveFontScale)
-watch([semanticZoomThreshold, magnifierEnabled, magnifierZoomThreshold], saveDisplaySettings)
+watch(semanticZoomThreshold, saveDisplaySettings)
 watch(spellcheckEnabled, saveSpellcheckSetting)
 watch(hoverTooltipEnabled, saveHoverTooltipSetting)
 
@@ -73,8 +69,6 @@ function resetDisplayDefaults() {
   spellcheckEnabled.value = false
   hoverTooltipEnabled.value = true
   semanticZoomThreshold.value = 0.5
-  magnifierEnabled.value = true
-  magnifierZoomThreshold.value = 0.4
   saveFontScale()
   saveSpellcheckSetting()
   saveHoverTooltipSetting()
@@ -160,34 +154,11 @@ function resetDisplayDefaults() {
       <input
         v-model.number="semanticZoomThreshold"
         type="range"
-        min="0.2"
-        max="0.8"
+        min="0"
+        max="1"
         step="0.05"
       />
       <span class="hint">{{ t('settings.display.semanticZoomThresholdHint') }}</span>
-    </div>
-
-    <!-- Magnifier -->
-    <div class="setting-group">
-      <label class="checkbox-label">
-        <input v-model="magnifierEnabled" type="checkbox" />
-        {{ t('settings.display.magnifierEnabled') }}
-      </label>
-    </div>
-
-    <div v-if="magnifierEnabled" class="setting-group">
-      <label>
-        {{ t('settings.display.magnifierZoomThreshold') }}
-        <span class="value-display">{{ (magnifierZoomThreshold * 100).toFixed(0) }}%</span>
-      </label>
-      <input
-        v-model.number="magnifierZoomThreshold"
-        type="range"
-        min="0.2"
-        max="0.6"
-        step="0.05"
-      />
-      <span class="hint">{{ t('settings.display.magnifierZoomThresholdHint') }}</span>
     </div>
 
     <hr class="divider" />

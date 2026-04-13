@@ -113,6 +113,9 @@ export function useNodeVisibility(options: UseNodeVisibilityOptions) {
     return false
   })
 
+  // Hide text completely when zoomed out below 15% - text is unreadable at this scale
+  const isTextHidden = computed(() => viewState.scale.value < 0.15)
+
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   const isLODMode = computed(() => visibleNodes.value.length > lodThreshold.value)
 
@@ -153,6 +156,7 @@ export function useNodeVisibility(options: UseNodeVisibilityOptions) {
     isHugeGraph,
     isMassiveGraph,
     isSemanticZoomCollapsed,
+    isTextHidden,
     isLODMode,
     nodeDegree,
 

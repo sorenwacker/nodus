@@ -29,6 +29,7 @@ const KEYS = {
   canvasHighlightAllEdges: 'nodus_canvas_highlight_all_edges',
   canvasDefaultLayout: 'nodus_canvas_default_layout',
   canvasRadialStyle: 'nodus_canvas_radial_style',
+  canvasBubbleMode: 'nodus_canvas_bubble_mode',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
   showTagNodes: 'nodus_show_tag_nodes',
@@ -280,6 +281,12 @@ export const canvasStorage = {
   },
   setRadialStyle(value: 'compact' | 'spacious', workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasRadialStyle, workspaceId), value)
+  },
+  getBubbleMode(workspaceId?: string): boolean {
+    return localStorage.getItem(this._key(KEYS.canvasBubbleMode, workspaceId)) === 'true'
+  },
+  setBubbleMode(value: boolean, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasBubbleMode, workspaceId), String(value))
   },
 }
 

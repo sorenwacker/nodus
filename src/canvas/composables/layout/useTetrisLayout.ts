@@ -102,7 +102,8 @@ function calculateDistanceToConnected(
 }
 
 /**
- * Find the best position for a node considering packing and edge proximity
+ * Find the best position for a node using tetris-style packing
+ * Prioritizes filling gaps and packing tightly
  */
 function findBestPosition(
   nodeId: string,
@@ -120,37 +121,69 @@ function findBestPosition(
     y: number
     packScore: number
     edgeScore: number
+    fillsGap: boolean
   }
 
   const candidates: Candidate[] = []
 
   // Start position
-  candidates.push({ x: startX, y: startY, packScore: 0, edgeScore: 0 })
+  candidates.push({ x: startX, y: startY, packScore: 0, edgeScore: 0, fillsGap: false })
 
-  // Generate candidates from placed rectangles
+  // Generate candidates from placed rectangles - tetris style
   for (const rect of placed) {
+    // Right of this rectangle (same row)
     const rightX = rect.x + rect.w + gap
     if (rightX + w <= startX + maxWidth) {
-      candidates.push({ x: rightX, y: rect.y, packScore: rect.y * 10000 + rightX, edgeScore: 0 })
+      candidates.push({ x: rightX, y: rect.y, packScore: rect.y * 10000 + rightX, edgeScore: 0, fillsGap: false })
     }
 
-    candidates.push({ x: rect.x, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rect.x, edgeScore: 0 })
-    candidates.push({ x: startX, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000, edgeScore: 0 })
+    // Below this rectangle
+    candidates.push({ x: rect.x, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rect.x, edgeScore: 0, fillsGap: false })
 
+    // Start of row below
+    candidates.push({ x: startX, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000, edgeScore: 0, fillsGap: false })
+
+    // Top of layout, right of placed
     if (rightX + w <= startX + maxWidth) {
-      candidates.push({ x: rightX, y: startY, packScore: startY * 10000 + rightX, edgeScore: 0 })
+      candidates.push({ x: rightX, y: startY, packScore: startY * 10000 + rightX, edgeScore: 0, fillsGap: false })
     }
 
-    // Check gaps between placed rectangles
+    // Check for gaps between placed rectangles (tetris-style gap filling)
     for (const other of placed) {
       if (other === rect) continue
+
+      // Vertical gap below rect
       if (other.y > rect.y + rect.h + gap) {
         const gapTop = rect.y + rect.h + gap
         const gapHeight = other.y - gapTop - gap
         if (gapHeight >= h) {
-          candidates.push({ x: rect.x, y: gapTop, packScore: gapTop * 10000 + rect.x, edgeScore: 0 })
+          candidates.push({ x: rect.x, y: gapTop, packScore: gapTop * 10000 + rect.x, edgeScore: 0, fillsGap: true })
         }
       }
+
+      // Horizontal gap to the right of rect
+      if (other.x > rect.x + rect.w + gap &&
+          Math.max(rect.y, other.y) < Math.min(rect.y + rect.h, other.y + other.h)) {
+        const gapLeft = rect.x + rect.w + gap
+        const gapWidth = other.x - gapLeft - gap
+        if (gapWidth >= w) {
+          const gapY = Math.max(rect.y, other.y)
+          candidates.push({ x: gapLeft, y: gapY, packScore: gapY * 10000 + gapLeft, edgeScore: 0, fillsGap: true })
+        }
+      }
+    }
+  }
+
+  // Also try positions aligned with existing rectangle edges
+  for (const rect of placed) {
+    // Try aligning left edge
+    if (!checkOverlap(rect.x, rect.y + rect.h + gap, w, h, gap, placed)) {
+      candidates.push({ x: rect.x, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rect.x, edgeScore: 0, fillsGap: false })
+    }
+    // Try aligning right edge
+    const rightAligned = rect.x + rect.w - w
+    if (rightAligned >= startX && !checkOverlap(rightAligned, rect.y + rect.h + gap, w, h, gap, placed)) {
+      candidates.push({ x: rightAligned, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rightAligned, edgeScore: 0, fillsGap: false })
     }
   }
 
@@ -174,12 +207,18 @@ function findBestPosition(
     return { x: startX, y: maxBottom }
   }
 
-  // Sort by edge distance first (minimize edge length), then by packing score
+  // Sort: prioritize gap filling, then edge proximity, then tight packing (top-left)
   validCandidates.sort((a, b) => {
+    // Prefer filling gaps
+    if (a.fillsGap !== b.fillsGap) return a.fillsGap ? -1 : 1
+
+    // Consider edge proximity for connected nodes
     if (a.edgeScore > 0 || b.edgeScore > 0) {
       const edgeDiff = a.edgeScore - b.edgeScore
       if (Math.abs(edgeDiff) > 50) return edgeDiff
     }
+
+    // Pack tightly (prefer top-left positions)
     return a.packScore - b.packScore
   })
 

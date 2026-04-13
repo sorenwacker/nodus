@@ -110,9 +110,7 @@ export function useLayout(options: UseLayoutOptions) {
    */
   async function radialLayout(): Promise<void> {
     const selectedIds = store.getSelectedNodeIds()
-    console.log('[RadialLayout] selectedIds:', selectedIds.length, selectedIds)
     if (selectedIds.length !== 1) {
-      console.log('[RadialLayout] SKIPPING - need exactly 1 selected node, got:', selectedIds.length)
       return
     }
 
@@ -171,7 +169,6 @@ export function useLayout(options: UseLayoutOptions) {
         depths.set(node.id, outerDepth)
       }
       maxDepth = outerDepth
-      console.log('[RadialLayout] unconnected nodes placed in outer ring:', unconnectedNodes.length)
     }
 
     // Track angles assigned to each node for parent-based sorting
@@ -190,13 +187,6 @@ export function useLayout(options: UseLayoutOptions) {
     // Get radial style setting
     const radialStyle = canvasStorage.getRadialStyle()
     const isCompact = radialStyle === 'compact'
-    console.log('[RadialLayout] style:', radialStyle, 'isCompact:', isCompact)
-    console.log('[RadialLayout] nodes found via BFS:', depths.size, 'maxDepth:', maxDepth)
-    // Log nodes per depth level
-    for (let d = 0; d <= maxDepth; d++) {
-      const nodesAtD = levels.get(d) || []
-      console.log(`[RadialLayout] depth ${d}: ${nodesAtD.length} nodes`)
-    }
 
     // Calculate positions for each level
     const targets = new Map<string, { x: number; y: number }>()
@@ -205,7 +195,6 @@ export function useLayout(options: UseLayoutOptions) {
     const firstRingRadius = isCompact ? 500 : 600 // Minimum distance from center to first ring
     const baseRadius = isCompact ? 250 : 600 // Distance between subsequent rings
     const minNodeSpacing = isCompact ? 80 : 280 // Spacing between nodes on a ring (compact allows overlap)
-    console.log('[RadialLayout] baseRadius:', baseRadius, 'minNodeSpacing:', minNodeSpacing)
     const maxRadius = 50000 // Cap radius to avoid extreme coordinates (increased to fit more nodes per ring)
     const ringSpacing = isCompact ? 280 : 500 // Spacing between sub-rings when splitting large levels
 
@@ -235,14 +224,12 @@ export function useLayout(options: UseLayoutOptions) {
       const ringDistance = depth === 1 ? firstRingRadius : baseRadius
       const minRadius = lastUsedRadius + ringDistance
       const depthRadius = Math.max(depth === 1 ? firstRingRadius : depth * baseRadius, minRadius)
-      console.log(`[RadialLayout] depth ${depth}: depthRadius=${depthRadius}, lastUsedRadius=${lastUsedRadius}`)
 
       // Calculate how many nodes can fit at the max radius
       const maxNodesPerRing = Math.floor((2 * Math.PI * maxRadius) / minNodeSpacing)
       const nodeCount = nodesAtDepth.length
 
       if (nodeCount > maxNodesPerRing) {
-        console.log(`[RadialLayout] depth ${depth}: SPLITTING into ${Math.ceil(nodeCount / maxNodesPerRing)} sub-rings`)
         // Split into multiple rings
         const numRings = Math.ceil(nodeCount / maxNodesPerRing)
         let nodeIndex = 0
@@ -276,7 +263,6 @@ export function useLayout(options: UseLayoutOptions) {
         const adjustedRadius = requiredCircumference > circumference
           ? Math.min(requiredCircumference / (2 * Math.PI), maxRadius)
           : depthRadius
-        console.log(`[RadialLayout] depth ${depth}: adjustedRadius=${Math.round(adjustedRadius)} (${nodeCount} nodes need ${Math.round(requiredCircumference)}px circumference)`)
 
         // Track the radius used for this ring
         lastUsedRadius = adjustedRadius
@@ -300,12 +286,22 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     // Animate to positions
-    console.log('[RadialLayout] targets to animate:', targets.size)
     if (targets.size > 200) {
       await batchUpdatePositions(targets, store.updateNodePosition, 100)
     } else {
       animateToPositions(targets, 600)
     }
+
+    // Dispatch z-order event based on angles (angle increases clockwise from top)
+    // Nodes with higher angles should render on top
+    const angleOrder: Array<{ id: string; angle: number }> = []
+    for (const [nodeId, angle] of nodeAngles) {
+      angleOrder.push({ id: nodeId, angle })
+    }
+    // Sort by angle (ascending) so higher angles get higher z-index
+    angleOrder.sort((a, b) => a.angle - b.angle)
+    const zOrder = angleOrder.map(item => item.id)
+    window.dispatchEvent(new CustomEvent('nodus-radial-z-order', { detail: zOrder }))
   }
 
   async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid', frameId?: string) {
@@ -479,7 +475,7 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     // Gap between nodes in grid layout
-    const gridGap = 360
+    const gridGap = 24 // Tight packing gap
 
     // Frames are static - just pass through positions directly
     function expandToRealTargets(virtualTargets: Map<string, { x: number; y: number }>): Map<string, { x: number; y: number }> {

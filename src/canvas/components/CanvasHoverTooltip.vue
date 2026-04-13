@@ -66,7 +66,8 @@ defineProps<{
 .hover-tooltip {
   position: fixed;
   z-index: 9999;
-  max-width: 300px;
+  width: 280px;
+  max-height: 396px; /* A4 aspect ratio: 280 × 1.414 */
   padding: 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
@@ -74,6 +75,9 @@ defineProps<{
   box-shadow: 0 4px 12px var(--shadow-md);
   pointer-events: none;
   animation: tooltip-fade-in 0.15s ease-out;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes tooltip-fade-in {
@@ -120,7 +124,7 @@ defineProps<{
   color: var(--text-secondary);
   line-height: 1.5;
   word-break: break-word;
-  max-height: 200px;
+  flex: 1;
   overflow: hidden;
 }
 
@@ -208,6 +212,12 @@ defineProps<{
   padding-left: 8px;
   border-left: 2px solid var(--border-default);
   color: var(--text-muted);
+}
+
+.hover-tooltip-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
 }
 
 /* Cyber theme tooltip glow */

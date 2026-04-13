@@ -15,8 +15,6 @@ defineProps<{
   isLargeGraph: boolean
   /** Current global edge style */
   globalEdgeStyle: 'straight' | 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'direct'
-  /** Whether magnifier is enabled */
-  magnifierEnabled: boolean
   /** Whether neighborhood mode is active */
   neighborhoodMode: boolean
   /** Current neighborhood depth (1-5 hops) */
@@ -37,7 +35,6 @@ const emit = defineEmits<{
   (e: 'layout', type: 'grid' | 'force' | 'hierarchical' | 'radial'): void
   (e: 'fitNodesToContent'): void
   (e: 'cycleEdgeStyle'): void
-  (e: 'toggleMagnifier'): void
   (e: 'toggleNeighborhoodMode'): void
   (e: 'setNeighborhoodDepth', depth: number): void
   (e: 'createFrame'): void
@@ -213,17 +210,6 @@ const emit = defineEmits<{
         <line x1="4" y1="20" x2="20" y2="4" stroke-width="3" />
         <line x1="4" y1="12" x2="12" y2="4" />
         <line x1="12" y1="20" x2="20" y2="12" />
-      </svg>
-    </button>
-    <button
-      data-tooltip-pos="top-left"
-      :class="{ active: magnifierEnabled }"
-      :data-tooltip="t('canvas.controls.magnifier')"
-      @click="emit('toggleMagnifier')"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="10" cy="10" r="7" />
-        <line x1="15" y1="15" x2="21" y2="21" />
       </svg>
     </button>
     <button

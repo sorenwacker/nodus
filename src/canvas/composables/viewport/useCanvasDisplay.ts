@@ -1,31 +1,20 @@
 /**
  * Canvas display composable
  *
- * Handles magnifier, image thumbnails, and font scale display settings
+ * Handles image thumbnails and font scale display settings
  */
 
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
-import { storeToRefs } from 'pinia'
 import { uiStorage } from '../../../lib/storage'
 import type { Node } from '../../../types'
-import { useDisplayStore } from '../../../stores/display'
 
 export interface UseCanvasDisplayContext {
   scale: Ref<number>
   filteredNodes: ComputedRef<Node[]> | Ref<Node[]>
   isLargeGraph: ComputedRef<boolean>
-  showMagnifier: Ref<boolean>
 }
 
 export interface UseCanvasDisplayReturn {
-  // Magnifier
-  magnifierEnabled: Ref<boolean>
-  shouldShowMagnifier: ComputedRef<boolean>
-  toggleMagnifier: () => void
-  getMagnifierThreshold: () => number
-  MAGNIFIER_SIZE: number
-  MAGNIFIER_ZOOM: number
-
   // Image thumbnails
   nodeFirstImage: ComputedRef<Record<string, string | null>>
   showImageThumbnail: ComputedRef<boolean>
@@ -36,32 +25,11 @@ export interface UseCanvasDisplayReturn {
   decreaseFontScale: () => void
 }
 
-const MAGNIFIER_SIZE = 200
-const MAGNIFIER_ZOOM = 2.5
 const MIN_FONT_SCALE = 0.7
 const MAX_FONT_SCALE = 1.5
 
 export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplayReturn {
-  const { scale, filteredNodes, isLargeGraph, showMagnifier } = ctx
-
-  // Get reactive refs from display store
-  const displayStore = useDisplayStore()
-  const { magnifierZoomThreshold, magnifierEnabled: storedMagnifierEnabled } = storeToRefs(displayStore)
-
-  // Magnifier state - use store value
-  const magnifierEnabled = ref(storedMagnifierEnabled.value)
-
-  const shouldShowMagnifier = computed(() =>
-    magnifierEnabled.value &&
-    scale.value < magnifierZoomThreshold.value &&
-    showMagnifier.value &&
-    !isLargeGraph.value
-  )
-
-  function toggleMagnifier() {
-    magnifierEnabled.value = !magnifierEnabled.value
-    uiStorage.setMagnifierEnabled(magnifierEnabled.value)
-  }
+  const { scale, filteredNodes } = ctx
 
   // Extract first image URL from node content for zoomed-out thumbnail display
   const nodeFirstImage = computed(() => {
@@ -100,14 +68,6 @@ export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplay
   }
 
   return {
-    // Magnifier
-    magnifierEnabled,
-    shouldShowMagnifier,
-    toggleMagnifier,
-    getMagnifierThreshold: () => magnifierZoomThreshold.value,
-    MAGNIFIER_SIZE,
-    MAGNIFIER_ZOOM,
-
     // Image thumbnails
     nodeFirstImage,
     showImageThumbnail,
