@@ -174,15 +174,15 @@ export function useLayout(options: UseLayoutOptions) {
 
     // Get radial style setting
     const radialStyle = canvasStorage.getRadialStyle()
-    const isSpacious = radialStyle === 'spacious'
+    const isCompact = radialStyle === 'compact'
 
     // Calculate positions for each level
     const targets = new Map<string, { x: number; y: number }>()
-    // Adjust ring distance based on style - spacious has wider gaps between rings
-    const baseRadius = isSpacious ? 600 : 350 // Distance between rings
+    // Adjust ring distance based on style - compact has tighter rings
+    const baseRadius = isCompact ? 350 : 600 // Distance between rings
     const minNodeSpacing = 200 // Minimum spacing between nodes on a ring (same for both)
     const maxRadius = 20000 // Cap radius to avoid extreme coordinates
-    const ringSpacing = isSpacious ? 500 : 280 // Spacing between sub-rings when splitting large levels
+    const ringSpacing = isCompact ? 280 : 500 // Spacing between sub-rings when splitting large levels
 
     let lastUsedRadius = 0 // Track the actual radius used by the previous ring
 
