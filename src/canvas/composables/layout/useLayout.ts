@@ -161,6 +161,19 @@ export function useLayout(options: UseLayoutOptions) {
       maxDepth = Math.max(maxDepth, depth)
     }
 
+    // Find unconnected nodes (not reachable from center via BFS)
+    const unconnectedNodes = allNodes.filter(n => !depths.has(n.id))
+    if (unconnectedNodes.length > 0) {
+      // Add them as an outer ring beyond maxDepth
+      const outerDepth = maxDepth + 1
+      levels.set(outerDepth, unconnectedNodes.map(n => n.id))
+      for (const node of unconnectedNodes) {
+        depths.set(node.id, outerDepth)
+      }
+      maxDepth = outerDepth
+      console.log('[RadialLayout] unconnected nodes placed in outer ring:', unconnectedNodes.length)
+    }
+
     // Track angles assigned to each node for parent-based sorting
     const nodeAngles = new Map<string, number>()
 
