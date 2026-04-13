@@ -30,6 +30,7 @@ function saveCanvasSettings() {
   canvasStorage.setGridSnap(gridSnap.value, workspaceId.value)
   canvasStorage.setGridSize(gridSize.value, workspaceId.value)
   canvasStorage.setEdgeStyle(edgeStyle.value, workspaceId.value)
+  console.log('[CanvasSettings] Saving radialStyle:', radialStyle.value)
   canvasStorage.setRadialStyle(radialStyle.value) // Global setting
   // Notify canvas of edge style change
   window.dispatchEvent(new CustomEvent('nodus-edge-style-change', { detail: edgeStyle.value }))
