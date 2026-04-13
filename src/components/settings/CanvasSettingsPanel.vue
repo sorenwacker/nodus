@@ -118,7 +118,7 @@ watch(workspaceId, (newId) => {
       <label>{{ t('settings.radialStyle') }}</label>
       <div class="radial-style-grid">
         <label class="radial-style-option">
-          <input v-model="radialStyle" type="radio" value="compact" />
+          <input v-model="radialStyle" type="radio" name="radialStyle" value="compact" />
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="16" cy="16" r="3" fill="currentColor" />
             <circle cx="16" cy="16" r="8" />
@@ -127,7 +127,7 @@ watch(workspaceId, (newId) => {
           <span>{{ t('settings.radialStyles.compact') }}</span>
         </label>
         <label class="radial-style-option">
-          <input v-model="radialStyle" type="radio" value="spacious" />
+          <input v-model="radialStyle" type="radio" name="radialStyle" value="spacious" />
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="16" cy="16" r="2" fill="currentColor" />
             <circle cx="16" cy="16" r="9" />
