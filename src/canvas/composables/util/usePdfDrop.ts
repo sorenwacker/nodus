@@ -24,6 +24,125 @@ export interface PendingBibImport {
 
 const MAX_CLEANUP_SIZE = 15000 // Max characters to send to LLM for cleanup
 const MAX_FILENAME_LENGTH = 100
+const CHUNK_OVERLAP = 200 // Overlap between chunks to avoid cutting context
+
+/**
+ * Split text into chunks at paragraph boundaries
+ * Avoids cutting mid-sentence or mid-word
+ */
+function splitIntoChunks(text: string, maxSize: number): string[] {
+  if (text.length <= maxSize) {
+    return [text]
+  }
+
+  const chunks: string[] = []
+  let remaining = text
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxSize) {
+      chunks.push(remaining)
+      break
+    }
+
+    // Find a good break point within maxSize
+    let breakPoint = maxSize
+
+    // First try: find paragraph break (double newline)
+    const paragraphBreak = remaining.lastIndexOf('\n\n', maxSize)
+    if (paragraphBreak > maxSize * 0.5) {
+      breakPoint = paragraphBreak + 2
+    } else {
+      // Second try: find sentence end (. ! ?)
+      const sentenceMatch = remaining.slice(0, maxSize).match(/[.!?]\s+(?=[A-Z])/g)
+      if (sentenceMatch) {
+        const lastSentenceEnd = remaining.slice(0, maxSize).lastIndexOf(sentenceMatch[sentenceMatch.length - 1])
+        if (lastSentenceEnd > maxSize * 0.5) {
+          breakPoint = lastSentenceEnd + sentenceMatch[sentenceMatch.length - 1].length
+        }
+      } else {
+        // Last resort: find any whitespace
+        const spaceBreak = remaining.lastIndexOf(' ', maxSize)
+        if (spaceBreak > maxSize * 0.7) {
+          breakPoint = spaceBreak + 1
+        }
+      }
+    }
+
+    chunks.push(remaining.slice(0, breakPoint).trim())
+
+    // Start next chunk with small overlap for context continuity
+    const overlapStart = Math.max(0, breakPoint - CHUNK_OVERLAP)
+    remaining = remaining.slice(overlapStart).trim()
+  }
+
+  return chunks
+}
+
+/**
+ * Pre-process PDF text to merge broken lines before LLM cleanup
+ * PDFs often have hard line breaks in the middle of sentences
+ */
+function preProcessPdfText(text: string): string {
+  const lines = text.split('\n')
+  const merged: string[] = []
+  let currentParagraph = ''
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    // Empty line = paragraph break
+    if (!trimmed) {
+      if (currentParagraph) {
+        merged.push(currentParagraph)
+        currentParagraph = ''
+      }
+      continue
+    }
+
+    // Detect if this looks like a heading, list item, or standalone line
+    const isHeading = /^#{1,6}\s/.test(trimmed)
+    const isListItem = /^[-*•]\s|^\d+[.)]\s/.test(trimmed)
+    const isAllCaps = trimmed === trimmed.toUpperCase() && trimmed.length > 3 && /[A-Z]/.test(trimmed)
+    const isShortLine = trimmed.length < 50
+    const endsWithPunctuation = /[.!?:;]$/.test(trimmed)
+
+    // Start new paragraph for headings, list items, or lines that look like titles
+    if (isHeading || isListItem || (isAllCaps && isShortLine)) {
+      if (currentParagraph) {
+        merged.push(currentParagraph)
+        currentParagraph = ''
+      }
+      merged.push(trimmed)
+      continue
+    }
+
+    // If current paragraph is empty, start it
+    if (!currentParagraph) {
+      currentParagraph = trimmed
+    } else {
+      // Merge with previous line
+      // Add space unless previous ends with hyphen (word continuation)
+      if (currentParagraph.endsWith('-')) {
+        currentParagraph = currentParagraph.slice(0, -1) + trimmed
+      } else {
+        currentParagraph += ' ' + trimmed
+      }
+    }
+
+    // End paragraph if line ends with sentence-ending punctuation and is reasonably long
+    if (endsWithPunctuation && currentParagraph.length > 100) {
+      merged.push(currentParagraph)
+      currentParagraph = ''
+    }
+  }
+
+  // Don't forget the last paragraph
+  if (currentParagraph) {
+    merged.push(currentParagraph)
+  }
+
+  return merged.join('\n\n')
+}
 
 /**
  * Sanitize a filename for use in node titles
@@ -122,15 +241,22 @@ export function usePdfDrop(options: UsePdfDropOptions) {
   }
 
   async function cleanupChunk(rawText: string, isFirstChunk: boolean): Promise<string> {
-    const prompt = `Clean up this PDF text extraction. Fix:
-- OCR errors and garbled characters
-- Broken paragraphs (rejoin split sentences)
-- Remove page numbers, headers, footers
-- Format as clean markdown${isFirstChunk ? ' with a title heading' : ''}
-- Preserve lists, tables, and structure
+    // Pre-process to merge broken lines
+    const preprocessed = preProcessPdfText(rawText)
 
-Raw text:
-${rawText}`
+    const prompt = `Clean up this extracted PDF text. The text has been pre-processed but may still have issues.
+
+Instructions:
+1. Fix OCR errors, garbled characters, and encoding issues
+2. Ensure paragraphs flow naturally (no random line breaks mid-sentence)
+3. Remove page numbers, headers, footers, and repeated navigation text
+4. Format as clean, readable markdown${isFirstChunk ? ' starting with a # title' : ''}
+5. Preserve meaningful structure: headings, lists, tables, blockquotes
+6. Keep citations and references intact
+7. Do NOT add commentary or explanations - only output the cleaned text
+
+Text to clean:
+${preprocessed}`
 
     return llm.simpleGenerate(prompt)
   }
@@ -177,16 +303,22 @@ ${rawText}`
 
       processingStatus.value = 'Cleaning up text...'
 
-      // Clean up text with AI (truncate if too long for LLM)
-      let cleanedText: string
-      if (rawText.length <= MAX_CLEANUP_SIZE) {
-        cleanedText = await cleanupChunk(rawText, true)
-      } else {
-        // For large PDFs, clean up the first part and keep the rest raw
-        const firstPart = await cleanupChunk(rawText.slice(0, MAX_CLEANUP_SIZE), true)
-        const remainingText = rawText.slice(MAX_CLEANUP_SIZE)
-        cleanedText = firstPart + '\n\n---\n\n' + remainingText
+      // Split into chunks at natural boundaries
+      const textChunks = splitIntoChunks(rawText, MAX_CLEANUP_SIZE)
+      const cleanedChunks: string[] = []
+
+      for (let i = 0; i < textChunks.length && !aborted; i++) {
+        if (textChunks.length > 1) {
+          processingStatus.value = `Cleaning section ${i + 1}/${textChunks.length}...`
+        }
+
+        const isFirst = i === 0
+        const cleaned = await cleanupChunk(textChunks[i], isFirst)
+        cleanedChunks.push(cleaned)
       }
+
+      if (aborted) return
+      const cleanedText = cleanedChunks.join('\n\n')
 
       // Extract title from cleaned text or use filename
       const headingMatch = cleanedText.match(/^#\s+(.+)$/m)

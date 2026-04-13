@@ -9,23 +9,49 @@ import { defineTool } from '../registry'
 export function registerQueryTools(): void {
   defineTool<{ mode?: string; include_content?: boolean; max_content_length?: number }>(
     'read_graph',
-    'Read the current graph state. Modes: "titles" (compact list), "summary" (stats only), "full" (default, with content).',
+    'Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full".',
     {
       type: 'object',
       properties: {
-        mode: { type: 'string', description: '"titles" = compact title list, "summary" = stats only, "full" = with content (default)' },
-        include_content: { type: 'boolean', description: 'Include node content in full mode (default: true)' },
-        max_content_length: { type: 'number', description: 'Max chars per node content (default 300)' },
+        mode: { type: 'string', description: '"auto" = adapts to context (default), "titles" = compact, "summary" = stats only, "full" = with positions' },
+        include_content: { type: 'boolean', description: 'Include node content (auto-determined if not specified)' },
+        max_content_length: { type: 'number', description: 'Max chars per node content (auto-determined if not specified)' },
       },
       required: [],
     },
     async (args, ctx) => {
-      const mode = args.mode || 'full'
       const allNodes = ctx.store.filteredNodes
       const allEdges = ctx.store.filteredEdges
 
       if (allNodes.length === 0) {
         return 'Graph is empty. No nodes exist yet.'
+      }
+
+      // Get context limit from provider config (chars ≈ tokens * 4)
+      const contextLimit = ctx.ollamaContextLength || 8192
+      const reservedForConversation = Math.min(contextLimit * 0.6, 6000) // Reserve 60% or 6k for conversation
+      const availableTokens = contextLimit - reservedForConversation
+      const availableChars = availableTokens * 3.5 // Conservative: ~3.5 chars per token
+
+      // Estimate graph size
+      const avgTitleLen = allNodes.reduce((sum, n) => sum + n.title.length, 0) / allNodes.length
+      const avgContentLen = allNodes.reduce((sum, n) => sum + (n.markdown_content?.length || 0), 0) / allNodes.length
+      const titlesOnlySize = allNodes.length * (avgTitleLen + 20) // title + overhead
+      const fullNoContentSize = allNodes.length * (avgTitleLen + 50) // title + position + overhead
+      const fullWithContentSize = allNodes.length * (avgTitleLen + Math.min(avgContentLen, 200) + 60)
+
+      // Auto-select mode based on what fits
+      let mode = args.mode || 'auto'
+      if (mode === 'auto') {
+        if (fullWithContentSize < availableChars * 0.8) {
+          mode = 'full'
+        } else if (fullNoContentSize < availableChars * 0.8) {
+          mode = 'full' // But without content
+        } else if (titlesOnlySize < availableChars * 0.8) {
+          mode = 'titles'
+        } else {
+          mode = 'summary'
+        }
       }
 
       // Summary mode - just stats
@@ -35,28 +61,38 @@ export function registerQueryTools(): void {
           const hasEdge = allEdges.some(e => e.source_node_id === n.id || e.target_node_id === n.id)
           return !hasEdge
         }).length
-        return `GRAPH SUMMARY: ${allNodes.length} nodes (${withContent} with content, ${orphans} orphans), ${allEdges.length} edges`
+        return `GRAPH SUMMARY: ${allNodes.length} nodes (${withContent} with content, ${orphans} orphans), ${allEdges.length} edges. Context limit: ${contextLimit} tokens - use query_nodes to search specific nodes.`
       }
 
-      // Titles mode - compact list
+      // Titles mode - compact list (with truncation if needed)
       if (mode === 'titles') {
-        const titles = allNodes.map(n => n.title).join(', ')
+        let titles = allNodes.map(n => n.title).join(', ')
+        if (titles.length > availableChars) {
+          // Truncate to fit
+          const maxNodes = Math.floor(availableChars / (avgTitleLen + 2))
+          titles = allNodes.slice(0, maxNodes).map(n => n.title).join(', ')
+          return `GRAPH (showing ${maxNodes}/${allNodes.length} nodes, ${allEdges.length} edges): ${titles}...`
+        }
         return `GRAPH (${allNodes.length} nodes, ${allEdges.length} edges): ${titles}`
       }
 
-      // Full mode - breadth-first with content
-      const includeContent = args.include_content !== false
-      const maxContentLen = args.max_content_length || 300
+      // Full mode - adaptive content inclusion
+      // Auto-determine content settings if not specified
+      const canFitContent = fullWithContentSize < availableChars * 0.9
+      const includeContent = args.include_content ?? canFitContent
 
-      // Calculate available context budget
-      const contextLimit = ctx.ollamaContextLength || 8192
-      const reservedTokens = 4000
-      const availableChars = (contextLimit - reservedTokens) * 4
+      // Adaptive max content length based on available space
+      let maxContentLen = args.max_content_length
+      if (!maxContentLen && includeContent) {
+        const charsPerNode = availableChars / allNodes.length
+        maxContentLen = Math.max(50, Math.min(500, Math.floor(charsPerNode - 60)))
+      }
+      maxContentLen = maxContentLen || 200
 
-      // Build nodes breadth-first until context is filled
+      // Build nodes until context is filled
       const includedNodes: typeof allNodes = []
       const nodeDescriptions: string[] = []
-      let usedChars = 200 // overhead
+      let usedChars = 300 // overhead for structure
 
       for (const node of allNodes) {
         const content = includeContent && node.markdown_content
@@ -89,12 +125,12 @@ export function registerQueryTools(): void {
 
       const truncated = includedNodes.length < allNodes.length
       const truncationNote = truncated
-        ? `\n\nNOTE: Showing ${includedNodes.length} of ${allNodes.length} nodes (context: ${contextLimit} tokens). Use query_nodes to search.`
+        ? `\n\n[Showing ${includedNodes.length}/${allNodes.length} nodes - context: ${contextLimit} tokens. Use query_nodes("search term") for specific nodes.]`
         : ''
 
       return `CURRENT GRAPH STATE:
 
-NODES (${includedNodes.length}/${allNodes.length}):
+NODES (${includedNodes.length}/${allNodes.length})${includeContent ? ' with content' : ''}:
 ${nodeDescriptions.join('\n')}
 
 EDGES (${edgeDescriptions.length}/${allEdges.length}):

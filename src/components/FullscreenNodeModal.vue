@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { marked } from 'marked'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
+import { openExternal } from '../lib/tauri'
 import NodePicker from './NodePicker.vue'
 
 const props = defineProps<{
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'zoom-to-node', nodeId: string): void
   (e: 'render-mermaid'): void
+  (e: 'navigate-to-node', title: string): void
 }>()
 
 const store = useNodesStore()
@@ -29,6 +31,7 @@ const previewRef = ref<HTMLDivElement | null>(null)
 
 // Scroll sync state
 let isScrollingSynced = false // Prevents infinite scroll loop
+let scrollSyncTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Wikilink autocomplete state
 const showLinkPicker = ref(false)
@@ -37,6 +40,9 @@ const wikilinkStart = ref(-1)
 
 // Track if we have unsaved changes
 const hasUnsavedChanges = ref(false)
+
+// Reading mode (hide editor, show only preview) - default to reading mode
+const readingMode = ref(true)
 
 // Auto-save timer
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
@@ -220,6 +226,17 @@ function onKeydown(e: KeyboardEvent) {
     save()
     return
   }
+
+  // Cmd/Ctrl+C - handle copy manually for Tauri WebView compatibility
+  if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+    const selection = window.getSelection()
+    if (selection && selection.toString().trim()) {
+      e.preventDefault()
+      navigator.clipboard.writeText(selection.toString()).catch(err => {
+        console.error('Failed to copy:', err)
+      })
+    }
+  }
 }
 
 // Scroll sync between editor and preview
@@ -230,16 +247,20 @@ function onEditorScroll() {
   const preview = previewRef.value
 
   // Calculate scroll percentage in editor
-  const scrollPercent = editor.scrollTop / (editor.scrollHeight - editor.clientHeight)
+  const maxScroll = editor.scrollHeight - editor.clientHeight
+  if (maxScroll <= 0) return
+  const scrollPercent = editor.scrollTop / maxScroll
 
   // Apply to preview
   isScrollingSynced = true
-  preview.scrollTop = scrollPercent * (preview.scrollHeight - preview.clientHeight)
+  const previewMaxScroll = preview.scrollHeight - preview.clientHeight
+  preview.scrollTop = scrollPercent * previewMaxScroll
 
-  // Reset flag after a short delay to allow the scroll to complete
-  requestAnimationFrame(() => {
+  // Reset flag after a longer delay to prevent momentum feedback loop
+  if (scrollSyncTimeout) clearTimeout(scrollSyncTimeout)
+  scrollSyncTimeout = setTimeout(() => {
     isScrollingSynced = false
-  })
+  }, 150)
 }
 
 function onPreviewScroll() {
@@ -249,16 +270,40 @@ function onPreviewScroll() {
   const preview = previewRef.value
 
   // Calculate scroll percentage in preview
-  const scrollPercent = preview.scrollTop / (preview.scrollHeight - preview.clientHeight)
+  const maxScroll = preview.scrollHeight - preview.clientHeight
+  if (maxScroll <= 0) return
+  const scrollPercent = preview.scrollTop / maxScroll
 
   // Apply to editor
   isScrollingSynced = true
-  editor.scrollTop = scrollPercent * (editor.scrollHeight - editor.clientHeight)
+  const editorMaxScroll = editor.scrollHeight - editor.clientHeight
+  editor.scrollTop = scrollPercent * editorMaxScroll
 
-  // Reset flag after a short delay
-  requestAnimationFrame(() => {
+  // Reset flag after a longer delay to prevent momentum feedback loop
+  if (scrollSyncTimeout) clearTimeout(scrollSyncTimeout)
+  scrollSyncTimeout = setTimeout(() => {
     isScrollingSynced = false
-  })
+  }, 150)
+}
+
+// Handle clicks in preview content (for external links and wikilinks)
+function handlePreviewClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  const link = target.closest('a')
+  if (link) {
+    e.preventDefault()
+    e.stopPropagation()
+    // Check if it's a wikilink
+    if (link.classList.contains('wikilink')) {
+      const linkTarget = link.dataset.target
+      if (linkTarget) {
+        emit('navigate-to-node', linkTarget)
+      }
+    } else if (link.href) {
+      // External link - open in system browser
+      openExternal(link.href)
+    }
+  }
 }
 
 // Handle zoom to node action
@@ -284,6 +329,9 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
   if (saveTimeout) {
     clearTimeout(saveTimeout)
+  }
+  if (scrollSyncTimeout) {
+    clearTimeout(scrollSyncTimeout)
   }
 })
 </script>
@@ -322,9 +370,9 @@ onUnmounted(() => {
           </div>
 
           <!-- Split view: Editor + Preview -->
-          <div class="fullscreen-modal-body">
+          <div class="fullscreen-modal-body" :class="{ 'reading-mode': readingMode }">
             <!-- Editor pane -->
-            <div class="editor-pane">
+            <div v-if="!readingMode" class="editor-pane">
               <div class="pane-header">Editor (Markdown)</div>
               <textarea
                 ref="editorRef"
@@ -359,6 +407,7 @@ onUnmounted(() => {
                 ref="previewRef"
                 class="fullscreen-preview node-content"
                 @scroll="onPreviewScroll"
+                @click="handlePreviewClick"
                 v-html="renderedContent"
               ></div>
             </div>
@@ -366,9 +415,18 @@ onUnmounted(() => {
 
           <!-- Footer -->
           <div class="fullscreen-modal-footer">
-            <button class="fullscreen-btn-secondary" @click="handleZoomToNode">
-              Zoom to Node
-            </button>
+            <div class="footer-left">
+              <button class="fullscreen-btn-secondary" @click="handleZoomToNode">
+                Zoom to Node
+              </button>
+              <button
+                class="fullscreen-btn-secondary mode-toggle"
+                :class="{ active: readingMode }"
+                @click="readingMode = !readingMode"
+              >
+                {{ readingMode ? 'Edit Mode' : 'Reading Mode' }}
+              </button>
+            </div>
             <div class="footer-hint">
               <kbd>Esc</kbd> to close &nbsp;&middot;&nbsp; <kbd>Cmd+S</kbd> to save
             </div>
@@ -498,6 +556,7 @@ onUnmounted(() => {
   color: var(--text-main);
   resize: none;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .fullscreen-editor:focus {
@@ -510,6 +569,22 @@ onUnmounted(() => {
   overflow-y: auto;
   font-size: calc(14px * var(--font-scale, 1));
   line-height: 1.7;
+  overscroll-behavior: contain;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+/* Reading mode */
+.fullscreen-modal-body.reading-mode .preview-pane {
+  max-width: 800px;
+  margin: 0 auto;
+  border-right: none;
+}
+
+.fullscreen-modal-body.reading-mode .fullscreen-preview {
+  padding: 24px 48px;
+  font-size: calc(16px * var(--font-scale, 1));
 }
 
 /* Footer */
@@ -520,6 +595,11 @@ onUnmounted(() => {
   padding: 12px 24px;
   border-top: 1px solid var(--border-default);
   background: var(--bg-surface-alt);
+}
+
+.footer-left {
+  display: flex;
+  gap: 8px;
 }
 
 .fullscreen-btn-secondary {
@@ -536,6 +616,16 @@ onUnmounted(() => {
 .fullscreen-btn-secondary:hover {
   background: var(--bg-elevated);
   color: var(--text-main);
+}
+
+.mode-toggle.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.mode-toggle.active:hover {
+  background: var(--primary-hover);
 }
 
 .footer-hint {

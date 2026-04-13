@@ -87,12 +87,10 @@
   visibility: hidden;
 }
 
-/* Selected nodes show wrapped text even when collapsed */
+/* Selected nodes in collapsed mode - keep same text display for consistency */
 .node-card.collapsed.selected .node-header {
-  white-space: normal;
-  text-overflow: clip;
-  overflow-wrap: break-word;
-  word-break: break-word;
+  /* Keep nowrap to avoid text reflow on selection */
+  white-space: nowrap;
 }
 
 .node-header {

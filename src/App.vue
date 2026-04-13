@@ -311,37 +311,47 @@ onMounted(async () => {
   await store.initialize()
 
   // Start file watcher if current workspace has sync enabled
+  // Delay sync to let UI render first
   if (store.currentWorkspaceId) {
-    try {
-      const workspace = await import('./lib/tauri').then(m => m.getWorkspace(store.currentWorkspaceId!))
-      console.log('[App] Workspace sync settings:', {
-        sync_enabled: workspace?.sync_enabled,
-        vault_path: workspace?.vault_path
-      })
-      if (workspace?.sync_enabled && workspace?.vault_path) {
-        // First sync any missing files (added while Nodus was closed)
-        try {
-          const newNodes = await syncMissingFiles(store.currentWorkspaceId!, workspace.vault_path)
-          if (newNodes.length > 0) {
-            await store.loadNodes()
+    const workspaceId = store.currentWorkspaceId
+    // Wait for initial render to complete before starting sync
+    setTimeout(async () => {
+      try {
+        const workspace = await import('./lib/tauri').then(m => m.getWorkspace(workspaceId))
+        console.log('[App] Workspace sync settings:', {
+          sync_enabled: workspace?.sync_enabled,
+          vault_path: workspace?.vault_path
+        })
+        if (workspace?.sync_enabled && workspace?.vault_path) {
+          // Start watching for changes first (fast)
+          console.log('[App] Starting file watcher for:', workspace.vault_path)
+          await store.watchVault(workspace.vault_path)
+
+          // Then sync missing files in background (can be slow for large vaults)
+          console.log('[App] Syncing files in background...')
+          try {
+            const newNodes = await syncMissingFiles(workspaceId, workspace.vault_path)
+            if (newNodes.length > 0) {
+              console.log(`[App] Found ${newNodes.length} new files, reloading nodes`)
+              await store.loadNodes()
+            }
+            // Sync wikilinks to create edges
+            const edgesCreated = await syncAllWikilinks(workspaceId)
+            if (edgesCreated > 0) {
+              console.log(`[App] Created ${edgesCreated} edges from wikilinks`)
+              await store.loadEdges()
+            }
+            console.log('[App] Background sync complete')
+          } catch (e) {
+            console.error('[App] Failed to sync:', e)
           }
-          // Sync wikilinks to create edges
-          const edgesCreated = await syncAllWikilinks(store.currentWorkspaceId!)
-          if (edgesCreated > 0) {
-            await store.loadEdges()
-          }
-        } catch (e) {
-          console.error('[App] Failed to sync:', e)
+        } else {
+          console.log('[App] Skipping file watcher - sync not enabled or no vault path')
         }
-        // Then start watching for future changes
-        console.log('[App] Starting file watcher for:', workspace.vault_path)
-        await store.watchVault(workspace.vault_path)
-      } else {
-        console.log('[App] Skipping file watcher - sync not enabled or no vault path')
+      } catch (e) {
+        console.error('[App] Failed to start file watcher:', e)
       }
-    } catch (e) {
-      console.error('[App] Failed to start file watcher:', e)
-    }
+    }, 500) // Wait 500ms for UI to be fully interactive
   }
 
   // Register menu event handlers for macOS menu bar

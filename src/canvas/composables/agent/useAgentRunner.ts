@@ -237,7 +237,10 @@ EDGE LABELS (always use one):
 
 AVOID creating nodes for: categories, types, generic terms, placeholders. Only create nodes for specific entities.
 
-IMPORTANT - YOU ALREADY HAVE THE NODE LIST ABOVE. Do not call read_graph.
+IMPORTANT - YOU ALREADY HAVE THE NODE LIST ABOVE. Do not call read_graph unless explicitly needed.
+- smart_color, smart_move, color_matching: Already iterate through all nodes internally - DO NOT call read_graph first.
+- smart_connect: Already has access to nodes - DO NOT call read_graph first.
+- These tools work on ALL nodes automatically - just call them directly with your instruction.
 
 "connect disconnected nodes" = Use create_edges_batch only. Do NOT create new nodes.
 "for each node" = Use for_each_node directly.

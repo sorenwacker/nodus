@@ -82,8 +82,8 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     return false
   })
 
-  // Hide text completely when zoomed out below 15% - text is unreadable at this scale
-  const isTextHidden = computed(() => scale.value < 0.15)
+  // Hide text completely when zoomed out below 10% - text is unreadable at this scale
+  const isTextHidden = computed(() => scale.value < 0.10)
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   // Also activates when user manually toggles bubble mode

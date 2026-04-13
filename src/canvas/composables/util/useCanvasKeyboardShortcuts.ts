@@ -99,6 +99,17 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       return
     }
 
+    // Skip shortcuts if a modal is open (allow native copy/paste in modal content)
+    // Check both if target is inside modal AND if any modal exists in DOM
+    const modalSelectors = '.modal-content, .modal-overlay, .modal-backdrop, .settings-modal, ' +
+      '.onboarding-modal, .entity-picker-modal, .fullscreen-modal-content, ' +
+      '.plan-modal, .link-picker-modal, [role="dialog"]'
+    const isInModal = target.closest(modalSelectors)
+    const modalExists = document.querySelector(modalSelectors)
+    if (isInModal || modalExists) {
+      return
+    }
+
     // Cmd/Ctrl+F with a single node selected: start editing and open search
     if ((e.key === 'f' || e.key === 'F') && (e.metaKey || e.ctrlKey)) {
       if (selectedNodeIds.value.length === 1 && startEditingAndSearch) {

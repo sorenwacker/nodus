@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import NodePicker from '../../components/NodePicker.vue'
 import { useNodesStore } from '../../stores/nodes'
 import { useDisplayStore } from '../../stores/display'
+import { openExternal } from '../../lib/tauri'
 
 const store = useNodesStore()
 const displayStore = useDisplayStore()
@@ -147,6 +148,18 @@ function handleLinkPickerSelect(nodeId: string) {
   if (node) onLinkSelect(nodeId, node.title)
 }
 
+// Handle clicks in preview content (for external links)
+function handleContentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  const link = target.closest('a')
+  if (link && link.href && !link.classList.contains('wikilink')) {
+    e.preventDefault()
+    e.stopPropagation()
+    // External link - open in system browser
+    openExternal(link.href)
+  }
+}
+
 // Handle keyboard in editor
 function onEditorKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
@@ -215,7 +228,7 @@ function onEditorKeydown(e: KeyboardEvent) {
 
       <!-- View mode -->
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-else class="preview-content" @dblclick="startEditing" v-html="content"></div>
+      <div v-else class="preview-content" @click="handleContentClick" @dblclick="startEditing" v-html="content"></div>
 
       <div class="preview-actions">
         <template v-if="isEditing">

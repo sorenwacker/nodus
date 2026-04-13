@@ -42,11 +42,11 @@ export function registerSmartTools(): void {
 
   defineTool<{ instruction: string }>(
     'smart_color',
-    'Color nodes based on semantic criteria. LLM reasons about each node.',
+    'Color nodes into multiple categories based on what they represent. LLM semantically classifies each node.',
     {
       type: 'object',
       properties: {
-        instruction: { type: 'string', description: 'Natural language: "males blue, females pink" or "urgent red, normal green"' },
+        instruction: { type: 'string', description: 'Category-to-color mapping: "faculties blue, departments red" or "people green, organizations orange"' },
       },
       required: ['instruction'],
     },
@@ -58,11 +58,11 @@ export function registerSmartTools(): void {
 
   defineTool<{ pattern: string; color: string }>(
     'color_matching',
-    'Color nodes matching a text pattern (grep-style). Fast, no LLM reasoning.',
+    'Color nodes by text pattern OR semantic criterion. For literal text like "Faculty of..." use the exact text. For categories like "person" uses LLM.',
     {
       type: 'object',
       properties: {
-        pattern: { type: 'string', description: 'Text pattern to match (e.g., "#department", "urgent", "2024")' },
+        pattern: { type: 'string', description: 'Text pattern (e.g., "Faculty of", "Department of") OR semantic type (e.g., "person", "organization")' },
         color: { type: 'string', description: 'Color hex code: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink)' },
       },
       required: ['pattern', 'color'],

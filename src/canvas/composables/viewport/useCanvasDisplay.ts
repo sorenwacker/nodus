@@ -5,7 +5,9 @@
  */
 
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { storeToRefs } from 'pinia'
 import { uiStorage } from '../../../lib/storage'
+import { useDisplayStore } from '../../../stores/display'
 import type { Node } from '../../../types'
 
 export interface UseCanvasDisplayContext {
@@ -31,6 +33,10 @@ const MAX_FONT_SCALE = 1.5
 export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplayReturn {
   const { scale, filteredNodes } = ctx
 
+  // Get semantic zoom threshold from display store to stay in sync with collapse behavior
+  const displayStore = useDisplayStore()
+  const { semanticZoomThreshold } = storeToRefs(displayStore)
+
   // Extract first image URL from node content for zoomed-out thumbnail display
   const nodeFirstImage = computed(() => {
     const imageMap: Record<string, string | null> = {}
@@ -49,8 +55,8 @@ export function useCanvasDisplay(ctx: UseCanvasDisplayContext): UseCanvasDisplay
   })
 
   // Show image thumbnail when zoomed out enough that content is collapsed
-  // This should match the semantic zoom threshold (default 0.5)
-  const showImageThumbnail = computed(() => scale.value < 0.5)
+  // Uses the same threshold as semantic zoom collapse for consistent transitions
+  const showImageThumbnail = computed(() => scale.value < semanticZoomThreshold.value)
 
   // Font scale state
   const fontScale = ref(uiStorage.getFontScale())

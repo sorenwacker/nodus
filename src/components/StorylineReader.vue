@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
+import { openExternal } from '../lib/tauri'
 import StorylineNodeList from './StorylineNodeList.vue'
 import StorylineReaderHeader from './StorylineReaderHeader.vue'
 import StorylineEntitySidebar from './StorylineEntitySidebar.vue'
@@ -91,6 +92,20 @@ function toggleCommentCollapsed(nodeId: string) {
     collapsedComments.value.delete(nodeId)
   } else {
     collapsedComments.value.add(nodeId)
+  }
+}
+
+// Handle clicks in rendered content (for external links)
+function handleContentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  const link = target.closest('a')
+  if (link) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (link.href && !link.classList.contains('wikilink')) {
+      // External link - open in system browser
+      openExternal(link.href)
+    }
   }
 }
 
@@ -361,7 +376,7 @@ function panToEntity(entityId: string) {
                   <Icon :name="COMMENT_STYLES[getCommentMeta(node).meta.type].icon" :size="16" />
                 </div>
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div v-show="!isCommentCollapsed(node.id)" class="comment-text" v-html="getRenderedContent(node.id) || ''"></div>
+                <div v-show="!isCommentCollapsed(node.id)" class="comment-text" @click="handleContentClick" v-html="getRenderedContent(node.id) || ''"></div>
                 <span v-if="isCommentCollapsed(node.id)" class="comment-preview">
                   {{ getCommentMeta(node).text.slice(0, 50) }}{{ getCommentMeta(node).text.length > 50 ? '...' : '' }}
                 </span>
@@ -379,7 +394,7 @@ function panToEntity(entityId: string) {
                   <h2 class="section-title">{{ node.title }}</h2>
                 </header>
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="section-content" v-html="getRenderedContent(node.id) || ''"></div>
+                <div class="section-content" @click="handleContentClick" v-html="getRenderedContent(node.id) || ''"></div>
               </article>
             </template>
           </template>

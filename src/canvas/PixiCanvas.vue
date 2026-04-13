@@ -1007,6 +1007,7 @@ const llmTools = useLLMTools({
   memoryStorage,
   log: (msg: string) => agentLog.value.push(msg),
   pushContentUndo,
+  isRunning: agentRunning,
 })
 
 async function executeAgentTool(name: string, args: Record<string, unknown>): Promise<string> {

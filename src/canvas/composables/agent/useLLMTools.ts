@@ -108,13 +108,19 @@ export interface LLMToolsContext {
   memoryStorage: MemoryStorageInterface
   log: (msg: string) => void
   pushContentUndo: (id: string, content: string | null, title: string) => void
+  isRunning?: Ref<boolean>  // Optional: allows tools to check if agent was stopped
 }
 
 /**
  * LLM Tools composable
  */
 export function useLLMTools(ctx: LLMToolsContext) {
-  const { llmQueue, callOllama, store, themesStore, planState, tasks, memoryStorage, log, pushContentUndo } = ctx
+  const { llmQueue, callOllama, store, themesStore, planState, tasks, memoryStorage, log, pushContentUndo, isRunning } = ctx
+
+  /** Check if agent was stopped */
+  function isCancelled(): boolean {
+    return isRunning?.value === false
+  }
 
   /**
    * Execute an LLM-dependent tool
@@ -267,8 +273,9 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const nodes = store.getFilteredNodes()
         if (nodes.length === 0) return 'No nodes to color'
         const instruction = (args.instruction as string) || ''
-        log(`> Smart color: ${nodes.length} nodes`)
+        log(`> Smart color: ${nodes.length} nodes with semantic classification`)
 
+        // Step 1: Extract category-to-color mappings from instruction
         let colorMappings: Array<{ category: string; color: string }> = []
         try {
           const prompt = `Extract category-to-color mappings from: "${instruction}"
@@ -285,42 +292,148 @@ Output ONLY the JSON array:`
 
         if (colorMappings.length === 0) return 'Could not parse color instruction'
 
+        const categories = colorMappings.map((m) => m.category)
+        const categoryToColor = new Map(colorMappings.map((m) => [m.category.toLowerCase(), m.color]))
+        log(`> Categories: ${categories.join(', ')}`)
+
+        // Step 2: Classify each node - check tags first, then LLM
         let colored = 0
         for (const node of nodes) {
-          const nodeText = `${node.title} ${node.markdown_content || ''}`.toLowerCase()
-          for (const { category, color } of colorMappings) {
-            if (
-              nodeText.includes(category.toLowerCase()) ||
-              nodeText.includes(`#${category.toLowerCase()}`)
-            ) {
-              await store.updateNodeColor(node.id, color)
-              colored++
-              break
+          // Check if agent was stopped
+          if (isCancelled()) {
+            log(`> Stopped after ${colored} nodes`)
+            return `Stopped. Colored ${colored}/${nodes.length} nodes.`
+          }
+
+          try {
+            const content = (node.markdown_content || '').toLowerCase()
+
+            // Check for explicit tag match first (fast path)
+            let matchedCategory: string | null = null
+            for (const cat of categories) {
+              const tagPattern = `#${cat.toLowerCase()}`
+              if (content.includes(tagPattern)) {
+                matchedCategory = cat.toLowerCase()
+                break
+              }
             }
+
+            // If no tag match, use LLM for semantic classification
+            if (!matchedCategory) {
+              const prompt = `What is "${node.title}"? Classify as: ${categories.join(', ')}, or NONE.
+
+Think: What type of thing is this? Which category does it belong to?
+Answer with ONE word only (${categories.join('/')} or NONE):`
+              const response = await llmQueue.generate(prompt)
+              const responseLower = (response || 'none').toLowerCase()
+
+              // Find which category appears in response
+              for (const cat of categories) {
+                if (responseLower.includes(cat.toLowerCase())) {
+                  matchedCategory = cat.toLowerCase()
+                  break
+                }
+              }
+              if (!matchedCategory || responseLower.includes('none')) {
+                matchedCategory = 'none'
+              }
+            }
+
+            if (matchedCategory && matchedCategory !== 'none' && categoryToColor.has(matchedCategory)) {
+              const color = categoryToColor.get(matchedCategory)!
+              await store.updateNodeColor(node.id, color)
+              log(`> ${node.title} -> ${matchedCategory}`)
+              colored++
+            }
+          } catch (e) {
+            log(`> ${node.title}: classification failed - ${e}`)
           }
         }
-        return `Colored ${colored} nodes`
+        return `Colored ${colored}/${nodes.length} nodes based on semantic classification`
       }
 
       case 'color_matching': {
-        const pattern = ((args.pattern as string) || '').toLowerCase()
+        const criterion = ((args.pattern as string) || '').trim()
         const color = (args.color as string) || '#ef4444'
-        if (!pattern) return 'Pattern required'
+        if (!criterion) return 'Criterion required'
 
         const nodes = store.getFilteredNodes()
         let colored = 0
         const matchedTitles: string[] = []
-        for (const node of nodes) {
-          const nodeText =
-            `${node.title} ${node.markdown_content || ''} ${node.tags || ''}`.toLowerCase()
-          if (nodeText.includes(pattern)) {
-            await store.updateNodeColor(node.id, color)
-            colored++
-            matchedTitles.push(node.title)
+
+        // Detect if this is a literal text pattern vs semantic criterion
+        // Literal patterns: contain "...", quotes, or look like specific text (has capitals, spaces)
+        const isLiteralPattern = criterion.includes('...') ||
+          criterion.includes('"') ||
+          criterion.includes("'") ||
+          /^[A-Z][a-z]/.test(criterion) || // Starts with capital like "Faculty of"
+          / of\b/.test(criterion) || // Contains " of" (word boundary)
+          / and\b/.test(criterion) // Contains " and" (word boundary)
+
+        if (isLiteralPattern) {
+          // Simple text matching - much faster and more accurate for literal patterns
+          const searchText = criterion.replace(/\.{2,}/g, '').replace(/['"]/g, '').trim().toLowerCase()
+          log(`> color_matching: text search for "${searchText}" in ${nodes.length} nodes`)
+
+          for (const node of nodes) {
+            if (isCancelled()) {
+              log(`> Stopped after ${colored} nodes`)
+              return `Stopped. Colored ${colored}/${nodes.length} nodes.`
+            }
+
+            if (node.title.toLowerCase().includes(searchText)) {
+              await store.updateNodeColor(node.id, color)
+              matchedTitles.push(node.title)
+              colored++
+              log(`> ${node.title} -> match`)
+            }
+          }
+        } else {
+          // Semantic evaluation for abstract criteria like "person", "organization"
+          log(`> color_matching: semantic evaluation of ${nodes.length} nodes for "${criterion}"`)
+
+          for (const node of nodes) {
+            if (isCancelled()) {
+              log(`> Stopped after ${colored} nodes`)
+              return `Stopped. Colored ${colored}/${nodes.length} nodes.`
+            }
+
+            try {
+              // Check for explicit tag match first
+              const content = node.markdown_content || ''
+              const tagPattern = `#${criterion.replace(/^#/, '').toLowerCase()}`
+              if (content.toLowerCase().includes(tagPattern)) {
+                await store.updateNodeColor(node.id, color)
+                matchedTitles.push(node.title)
+                colored++
+                log(`> ${node.title} -> tag`)
+                continue
+              }
+
+              // Semantic evaluation via LLM
+              const prompt = `Is "${node.title}" a ${criterion}? Answer only YES or NO.`
+              const response = await llmQueue.generate(prompt)
+              const answer = (response || '').toUpperCase().trim()
+
+              if (answer === 'YES' || answer.startsWith('YES')) {
+                await store.updateNodeColor(node.id, color)
+                matchedTitles.push(node.title)
+                colored++
+                log(`> ${node.title} -> YES`)
+              } else {
+                log(`> ${node.title} -> NO`)
+              }
+            } catch (e) {
+              log(`> ${node.title}: failed - ${e}`)
+            }
           }
         }
+
+        if (colored === 0) {
+          return `No nodes match "${criterion}"`
+        }
         const preview = matchedTitles.slice(0, 5).join(', ')
-        return `Colored ${colored}/${nodes.length} nodes matching "${pattern}": ${preview}${colored > 5 ? '...' : ''}`
+        return `Colored ${colored}/${nodes.length} nodes: ${preview}${colored > 5 ? '...' : ''}`
       }
 
       case 'reset_edge_colors': {
