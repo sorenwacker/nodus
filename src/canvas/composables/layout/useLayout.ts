@@ -128,8 +128,9 @@ export function useLayout(options: UseLayoutOptions) {
       adjacency.get(edge.target_node_id)?.add(edge.source_node_id)
     }
 
-    // BFS to find all connected nodes and their depths
+    // BFS to find all connected nodes and their depths, tracking parent for sorting
     const depths = new Map<string, number>()
+    const parents = new Map<string, string>() // Track which node led to this one
     const queue: string[] = [centerId]
     depths.set(centerId, 0)
 
@@ -141,6 +142,7 @@ export function useLayout(options: UseLayoutOptions) {
       for (const neighborId of neighbors) {
         if (!depths.has(neighborId)) {
           depths.set(neighborId, currentDepth + 1)
+          parents.set(neighborId, nodeId)
           queue.push(neighborId)
         }
       }
@@ -156,6 +158,9 @@ export function useLayout(options: UseLayoutOptions) {
       levels.get(depth)!.push(nodeId)
       maxDepth = Math.max(maxDepth, depth)
     }
+
+    // Track angles assigned to each node for parent-based sorting
+    const nodeAngles = new Map<string, number>()
 
     // Get center node position
     const centerNode = allNodes.find(n => n.id === centerId)
@@ -179,19 +184,30 @@ export function useLayout(options: UseLayoutOptions) {
     const maxRadius = 20000 // Cap radius to avoid extreme coordinates
     const ringSpacing = isSpacious ? 600 : 300 // Spacing between sub-rings when splitting large levels
 
-    let currentRingOffset = 0 // Track additional rings from split levels
+    let lastUsedRadius = 0 // Track the actual radius used by the previous ring
 
     for (let depth = 0; depth <= maxDepth; depth++) {
-      const nodesAtDepth = levels.get(depth) || []
+      let nodesAtDepth = levels.get(depth) || []
 
       if (depth === 0) {
         // Center node stays in place
         targets.set(centerId, { x: centerNode.canvas_x, y: centerNode.canvas_y })
+        nodeAngles.set(centerId, 0)
         continue
       }
 
-      // Calculate base radius for this depth
-      const depthRadius = (depth + currentRingOffset) * baseRadius
+      // Sort nodes by their parent's angle to keep related nodes together
+      nodesAtDepth = [...nodesAtDepth].sort((a, b) => {
+        const parentA = parents.get(a)
+        const parentB = parents.get(b)
+        const angleA = parentA ? (nodeAngles.get(parentA) ?? 0) : 0
+        const angleB = parentB ? (nodeAngles.get(parentB) ?? 0) : 0
+        return angleA - angleB
+      })
+
+      // Calculate base radius for this depth - ensure it's beyond the previous ring
+      const minRadius = lastUsedRadius + baseRadius
+      const depthRadius = Math.max(depth * baseRadius, minRadius)
 
       // Calculate how many nodes can fit at the max radius
       const maxNodesPerRing = Math.floor((2 * Math.PI * maxRadius) / minNodeSpacing)
@@ -214,21 +230,26 @@ export function useLayout(options: UseLayoutOptions) {
             if (!node) continue
 
             const angle = startAngle + i * angleStep
+            nodeAngles.set(nodeId, angle)
             const x = centerX + Math.cos(angle) * ringRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
             const y = centerY + Math.sin(angle) * ringRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
 
             targets.set(nodeId, { x: Math.round(x), y: Math.round(y) })
           }
         }
-        // Track extra rings added for subsequent depths
-        currentRingOffset += numRings - 1
+        // Track the outermost ring radius used
+        lastUsedRadius = depthRadius + (numRings - 1) * ringSpacing
       } else {
         // Normal case - all nodes fit on one ring
+        // Calculate if we need to expand the radius to fit all nodes
         const circumference = 2 * Math.PI * depthRadius
         const requiredCircumference = nodeCount * minNodeSpacing
         const adjustedRadius = requiredCircumference > circumference
           ? Math.min(requiredCircumference / (2 * Math.PI), maxRadius)
           : depthRadius
+
+        // Track the radius used for this ring
+        lastUsedRadius = adjustedRadius
 
         const angleStep = (2 * Math.PI) / nodeCount
         const startAngle = -Math.PI / 2 // Start from top
@@ -239,6 +260,7 @@ export function useLayout(options: UseLayoutOptions) {
           if (!node) continue
 
           const angle = startAngle + i * angleStep
+          nodeAngles.set(nodeId, angle)
           const x = centerX + Math.cos(angle) * adjustedRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
           const y = centerY + Math.sin(angle) * adjustedRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
 
