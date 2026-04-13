@@ -173,11 +173,11 @@ export function useLayout(options: UseLayoutOptions) {
 
     // Calculate positions for each level
     const targets = new Map<string, { x: number; y: number }>()
-    // Adjust spacing based on style
-    const baseRadius = isSpacious ? 500 : 400 // Distance between rings
-    const minNodeSpacing = isSpacious ? 280 : 200 // Minimum spacing between nodes on a ring
+    // Adjust spacing based on style - spacious is 2x the compact values
+    const baseRadius = isSpacious ? 800 : 400 // Distance between rings
+    const minNodeSpacing = isSpacious ? 400 : 200 // Minimum spacing between nodes on a ring
     const maxRadius = 20000 // Cap radius to avoid extreme coordinates
-    const ringSpacing = isSpacious ? 350 : 300 // Spacing between sub-rings when splitting large levels
+    const ringSpacing = isSpacious ? 600 : 300 // Spacing between sub-rings when splitting large levels
 
     let currentRingOffset = 0 // Track additional rings from split levels
 
