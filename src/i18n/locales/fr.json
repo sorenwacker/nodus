@@ -450,6 +450,12 @@
       "straight": "Gerade",
       "direct": "Direkt"
     },
+    "radialStyle": "Style de disposition radiale",
+    "radialStyleHint": "Style d'espacement pour la disposition radiale/circulaire",
+    "radialStyles": {
+      "compact": "Compact",
+      "spacious": "Spacieux"
+    },
     "showTagNodes": "Afficher les tags comme nœuds",
     "showTagNodesHint": "Afficher les #hashtags comme nœuds de tag connectés sur le canevas",
     "workspaceDiagnostics": "Diagnostics de l'espace de travail",

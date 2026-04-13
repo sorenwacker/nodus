@@ -19,6 +19,7 @@ import {
   animateToPositions as animatePositions,
 } from './useLayoutAnimation'
 import { tetrisGridLayout } from './useTetrisLayout'
+import { canvasStorage } from '../../../lib/storage'
 
 interface Node {
   id: string
@@ -166,10 +167,19 @@ export function useLayout(options: UseLayoutOptions) {
     pushUndo()
     stopAnimation()
 
+    // Get radial style setting
+    const radialStyle = canvasStorage.getRadialStyle()
+    const isSpacious = radialStyle === 'spacious'
+
     // Calculate positions for each level
     const targets = new Map<string, { x: number; y: number }>()
-    const baseRadius = 400 // Distance between rings
-    const minNodeSpacing = 200 // Minimum spacing between nodes on a ring
+    // Adjust spacing based on style
+    const baseRadius = isSpacious ? 500 : 400 // Distance between rings
+    const minNodeSpacing = isSpacious ? 280 : 200 // Minimum spacing between nodes on a ring
+    const maxRadius = 20000 // Cap radius to avoid extreme coordinates
+    const ringSpacing = isSpacious ? 350 : 300 // Spacing between sub-rings when splitting large levels
+
+    let currentRingOffset = 0 // Track additional rings from split levels
 
     for (let depth = 0; depth <= maxDepth; depth++) {
       const nodesAtDepth = levels.get(depth) || []
@@ -180,29 +190,60 @@ export function useLayout(options: UseLayoutOptions) {
         continue
       }
 
-      const radius = depth * baseRadius
-      const circumference = 2 * Math.PI * radius
+      // Calculate base radius for this depth
+      const depthRadius = (depth + currentRingOffset) * baseRadius
+
+      // Calculate how many nodes can fit at the max radius
+      const maxNodesPerRing = Math.floor((2 * Math.PI * maxRadius) / minNodeSpacing)
       const nodeCount = nodesAtDepth.length
 
-      // Ensure nodes don't overlap - expand radius if needed
-      const requiredCircumference = nodeCount * minNodeSpacing
-      const adjustedRadius = requiredCircumference > circumference
-        ? requiredCircumference / (2 * Math.PI)
-        : radius
+      if (nodeCount > maxNodesPerRing) {
+        // Split into multiple rings
+        const numRings = Math.ceil(nodeCount / maxNodesPerRing)
+        let nodeIndex = 0
 
-      const angleStep = (2 * Math.PI) / nodeCount
-      const startAngle = -Math.PI / 2 // Start from top
+        for (let ring = 0; ring < numRings; ring++) {
+          const ringRadius = depthRadius + ring * ringSpacing
+          const nodesInThisRing = Math.min(maxNodesPerRing, nodeCount - nodeIndex)
+          const angleStep = (2 * Math.PI) / nodesInThisRing
+          const startAngle = -Math.PI / 2 + (ring * 0.1) // Slight offset for each ring
 
-      for (let i = 0; i < nodeCount; i++) {
-        const nodeId = nodesAtDepth[i]
-        const node = allNodes.find(n => n.id === nodeId)
-        if (!node) continue
+          for (let i = 0; i < nodesInThisRing && nodeIndex < nodeCount; i++, nodeIndex++) {
+            const nodeId = nodesAtDepth[nodeIndex]
+            const node = allNodes.find(n => n.id === nodeId)
+            if (!node) continue
 
-        const angle = startAngle + i * angleStep
-        const x = centerX + Math.cos(angle) * adjustedRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
-        const y = centerY + Math.sin(angle) * adjustedRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
+            const angle = startAngle + i * angleStep
+            const x = centerX + Math.cos(angle) * ringRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
+            const y = centerY + Math.sin(angle) * ringRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
 
-        targets.set(nodeId, { x: Math.round(x), y: Math.round(y) })
+            targets.set(nodeId, { x: Math.round(x), y: Math.round(y) })
+          }
+        }
+        // Track extra rings added for subsequent depths
+        currentRingOffset += numRings - 1
+      } else {
+        // Normal case - all nodes fit on one ring
+        const circumference = 2 * Math.PI * depthRadius
+        const requiredCircumference = nodeCount * minNodeSpacing
+        const adjustedRadius = requiredCircumference > circumference
+          ? Math.min(requiredCircumference / (2 * Math.PI), maxRadius)
+          : depthRadius
+
+        const angleStep = (2 * Math.PI) / nodeCount
+        const startAngle = -Math.PI / 2 // Start from top
+
+        for (let i = 0; i < nodeCount; i++) {
+          const nodeId = nodesAtDepth[i]
+          const node = allNodes.find(n => n.id === nodeId)
+          if (!node) continue
+
+          const angle = startAngle + i * angleStep
+          const x = centerX + Math.cos(angle) * adjustedRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
+          const y = centerY + Math.sin(angle) * adjustedRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
+
+          targets.set(nodeId, { x: Math.round(x), y: Math.round(y) })
+        }
       }
     }
 

@@ -508,6 +508,12 @@
       "straight": "Straight",
       "direct": "Direct"
     },
+    "radialStyle": "Radial Layout Style",
+    "radialStyleHint": "Spacing style for radial/circular layout",
+    "radialStyles": {
+      "compact": "Compact",
+      "spacious": "Spacious"
+    },
     "showTagNodes": "Show Tags as Nodes",
     "showTagNodesHint": "Display #hashtags as connected tag nodes on canvas",
     "workspaceDiagnostics": "Workspace Diagnostics",

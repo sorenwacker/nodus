@@ -19,6 +19,7 @@ const workspaceId = computed(() => store.currentWorkspaceId || undefined)
 const gridSnap = ref(canvasStorage.getGridSnap(workspaceId.value))
 const gridSize = ref(canvasStorage.getGridSize(workspaceId.value))
 const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'>(canvasStorage.getEdgeStyle(workspaceId.value))
+const radialStyle = ref<'compact' | 'spacious'>(canvasStorage.getRadialStyle(workspaceId.value))
 
 // Tag Settings
 const showTagNodes = ref(tagStorage.getShowTagNodes())
@@ -28,6 +29,7 @@ function saveCanvasSettings() {
   canvasStorage.setGridSnap(gridSnap.value, workspaceId.value)
   canvasStorage.setGridSize(gridSize.value, workspaceId.value)
   canvasStorage.setEdgeStyle(edgeStyle.value, workspaceId.value)
+  canvasStorage.setRadialStyle(radialStyle.value, workspaceId.value)
   // Notify canvas of edge style change
   window.dispatchEvent(new CustomEvent('nodus-edge-style-change', { detail: edgeStyle.value }))
 }
@@ -39,7 +41,7 @@ function saveTagSettings() {
 }
 
 // Auto-save on changes
-watch([gridSnap, gridSize, edgeStyle], saveCanvasSettings)
+watch([gridSnap, gridSize, edgeStyle, radialStyle], saveCanvasSettings)
 watch(showTagNodes, saveTagSettings)
 
 // Reload settings when workspace changes
@@ -47,6 +49,7 @@ watch(workspaceId, (newId) => {
   gridSnap.value = canvasStorage.getGridSnap(newId)
   gridSize.value = canvasStorage.getGridSize(newId)
   edgeStyle.value = canvasStorage.getEdgeStyle(newId)
+  radialStyle.value = canvasStorage.getRadialStyle(newId)
 })
 </script>
 
@@ -109,6 +112,31 @@ watch(workspaceId, (newId) => {
           <span>{{ t('settings.edgeStyles.straight') }}</span>
         </label>
       </div>
+    </div>
+
+    <div class="setting-group">
+      <label>{{ t('settings.radialStyle') }}</label>
+      <div class="radial-style-grid">
+        <label class="radial-style-option">
+          <input v-model="radialStyle" type="radio" value="compact" />
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="16" cy="16" r="3" fill="currentColor" />
+            <circle cx="16" cy="16" r="8" />
+            <circle cx="16" cy="16" r="13" />
+          </svg>
+          <span>{{ t('settings.radialStyles.compact') }}</span>
+        </label>
+        <label class="radial-style-option">
+          <input v-model="radialStyle" type="radio" value="spacious" />
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="16" cy="16" r="2" fill="currentColor" />
+            <circle cx="16" cy="16" r="9" />
+            <circle cx="16" cy="16" r="15" />
+          </svg>
+          <span>{{ t('settings.radialStyles.spacious') }}</span>
+        </label>
+      </div>
+      <span class="hint">{{ t('settings.radialStyleHint') }}</span>
     </div>
 
     <div class="setting-group">
@@ -232,6 +260,55 @@ watch(workspaceId, (newId) => {
 }
 
 .edge-style-option span {
+  font-size: 11px;
+  color: var(--text-muted, #71717a);
+}
+
+.radial-style-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.radial-style-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  background: var(--bg-canvas, #f4f4f5);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .radial-style-option {
+  background: #18181b;
+  border-color: #3f3f46;
+}
+
+.radial-style-option:hover {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.radial-style-option:has(input:checked) {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.radial-style-option input {
+  display: none;
+}
+
+.radial-style-option svg {
+  color: var(--text-muted, #71717a);
+}
+
+.radial-style-option:has(input:checked) svg {
+  color: var(--primary-color, #3b82f6);
+}
+
+.radial-style-option span {
   font-size: 11px;
   color: var(--text-muted, #71717a);
 }

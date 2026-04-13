@@ -450,6 +450,12 @@
       "straight": "Gerade",
       "direct": "Direkt"
     },
+    "radialStyle": "Estilo de diseño radial",
+    "radialStyleHint": "Estilo de espaciado para diseño radial/circular",
+    "radialStyles": {
+      "compact": "Compacto",
+      "spacious": "Espacioso"
+    },
     "showTagNodes": "Mostrar etiquetas como nodos",
     "showTagNodesHint": "Mostrar #hashtags como nodos de etiqueta conectados en el lienzo",
     "workspaceDiagnostics": "Diagnósticos del espacio de trabajo",

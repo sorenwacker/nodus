@@ -28,6 +28,7 @@ const KEYS = {
   canvasEdgeStyle: 'nodus_canvas_edge_style',
   canvasHighlightAllEdges: 'nodus_canvas_highlight_all_edges',
   canvasDefaultLayout: 'nodus_canvas_default_layout',
+  canvasRadialStyle: 'nodus_canvas_radial_style',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
   showTagNodes: 'nodus_show_tag_nodes',
@@ -271,6 +272,14 @@ export const canvasStorage = {
   },
   setDefaultLayout(value: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial', workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasDefaultLayout, workspaceId), value)
+  },
+  getRadialStyle(workspaceId?: string): 'compact' | 'spacious' {
+    const value = localStorage.getItem(this._key(KEYS.canvasRadialStyle, workspaceId))
+    if (value === 'spacious') return 'spacious'
+    return 'compact'
+  },
+  setRadialStyle(value: 'compact' | 'spacious', workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasRadialStyle, workspaceId), value)
   },
 }
 

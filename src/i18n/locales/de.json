@@ -458,6 +458,12 @@
       "straight": "Gerade",
       "direct": "Direkt"
     },
+    "radialStyle": "Radialer Layout-Stil",
+    "radialStyleHint": "Abstandsstil für radiales/kreisförmiges Layout",
+    "radialStyles": {
+      "compact": "Kompakt",
+      "spacious": "Großzügig"
+    },
     "showTagNodes": "Tags als Knoten anzeigen",
     "showTagNodesHint": "#Hashtags als verbundene Tag-Knoten auf der Leinwand anzeigen",
     "workspaceDiagnostics": "Arbeitsbereich-Diagnose",
