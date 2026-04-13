@@ -17,17 +17,20 @@ cd nodus
 npm install
 
 # Start development server
-npm run tauri:dev
+make dev
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run tauri:dev` | Start development server |
+| `make dev` | Start development server |
 | `npm test` | Run tests |
 | `npm run lint` | Lint code |
-| `npm run tauri:build` | Build for production |
+| `npm run build` | Build frontend |
+| `npm run tauri build` | Build for production |
+| `cargo test` | Run Rust tests (in src-tauri/) |
+| `cargo clippy` | Lint Rust code |
 
 ## Project Structure
 

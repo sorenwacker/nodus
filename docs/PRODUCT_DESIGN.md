@@ -1,7 +1,7 @@
 # Nodus - Product Design Document
 
-Version: 0.16.0
-Date: 2026-03-20
+Version: 0.4.24
+Date: 2026-04-11
 Status: Active Development
 
 ---
