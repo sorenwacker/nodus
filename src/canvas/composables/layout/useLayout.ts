@@ -192,6 +192,11 @@ export function useLayout(options: UseLayoutOptions) {
     const isCompact = radialStyle === 'compact'
     console.log('[RadialLayout] style:', radialStyle, 'isCompact:', isCompact)
     console.log('[RadialLayout] nodes found via BFS:', depths.size, 'maxDepth:', maxDepth)
+    // Log nodes per depth level
+    for (let d = 0; d <= maxDepth; d++) {
+      const nodesAtD = levels.get(d) || []
+      console.log(`[RadialLayout] depth ${d}: ${nodesAtD.length} nodes`)
+    }
 
     // Calculate positions for each level
     const targets = new Map<string, { x: number; y: number }>()
@@ -227,12 +232,14 @@ export function useLayout(options: UseLayoutOptions) {
       // Calculate base radius for this depth - ensure it's beyond the previous ring
       const minRadius = lastUsedRadius + baseRadius
       const depthRadius = Math.max(depth * baseRadius, minRadius)
+      console.log(`[RadialLayout] depth ${depth}: depthRadius=${depthRadius}, lastUsedRadius=${lastUsedRadius}`)
 
       // Calculate how many nodes can fit at the max radius
       const maxNodesPerRing = Math.floor((2 * Math.PI * maxRadius) / minNodeSpacing)
       const nodeCount = nodesAtDepth.length
 
       if (nodeCount > maxNodesPerRing) {
+        console.log(`[RadialLayout] depth ${depth}: SPLITTING into ${Math.ceil(nodeCount / maxNodesPerRing)} sub-rings`)
         // Split into multiple rings
         const numRings = Math.ceil(nodeCount / maxNodesPerRing)
         let nodeIndex = 0
@@ -266,6 +273,7 @@ export function useLayout(options: UseLayoutOptions) {
         const adjustedRadius = requiredCircumference > circumference
           ? Math.min(requiredCircumference / (2 * Math.PI), maxRadius)
           : depthRadius
+        console.log(`[RadialLayout] depth ${depth}: adjustedRadius=${Math.round(adjustedRadius)} (${nodeCount} nodes need ${Math.round(requiredCircumference)}px circumference)`)
 
         // Track the radius used for this ring
         lastUsedRadius = adjustedRadius
