@@ -110,7 +110,9 @@ export function useLayout(options: UseLayoutOptions) {
    */
   async function radialLayout(): Promise<void> {
     const selectedIds = store.getSelectedNodeIds()
+    console.log('[RadialLayout] selectedIds:', selectedIds.length, selectedIds)
     if (selectedIds.length !== 1) {
+      console.log('[RadialLayout] SKIPPING - need exactly 1 selected node, got:', selectedIds.length)
       return
     }
 
@@ -176,6 +178,7 @@ export function useLayout(options: UseLayoutOptions) {
     const radialStyle = canvasStorage.getRadialStyle()
     const isCompact = radialStyle === 'compact'
     console.log('[RadialLayout] style:', radialStyle, 'isCompact:', isCompact)
+    console.log('[RadialLayout] nodes found via BFS:', depths.size, 'maxDepth:', maxDepth)
 
     // Calculate positions for each level
     const targets = new Map<string, { x: number; y: number }>()
@@ -272,6 +275,7 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     // Animate to positions
+    console.log('[RadialLayout] targets to animate:', targets.size)
     if (targets.size > 200) {
       await batchUpdatePositions(targets, store.updateNodePosition, 100)
     } else {
