@@ -205,7 +205,7 @@ export function useLayout(options: UseLayoutOptions) {
     const baseRadius = isCompact ? 350 : 600 // Distance between rings
     const minNodeSpacing = isCompact ? 180 : 280 // Spacing between nodes on a ring
     console.log('[RadialLayout] baseRadius:', baseRadius, 'minNodeSpacing:', minNodeSpacing)
-    const maxRadius = 20000 // Cap radius to avoid extreme coordinates
+    const maxRadius = 50000 // Cap radius to avoid extreme coordinates (increased to fit more nodes per ring)
     const ringSpacing = isCompact ? 280 : 500 // Spacing between sub-rings when splitting large levels
 
     let lastUsedRadius = 0 // Track the actual radius used by the previous ring
