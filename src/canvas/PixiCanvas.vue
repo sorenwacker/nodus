@@ -720,10 +720,11 @@ const entityOperations = useEntityOperations({
 const { getLinkedEntities, handleEntityClick, linkToEntity, handleCreateEntity } = entityOperations
 
 // Canvas settings composable
-const canvasSettings = useCanvasSettings()
+const canvasSettings = useCanvasSettings(store.currentWorkspaceId || undefined)
 const {
   gridLockEnabled,
   highlightAllEdges,
+  edgeHideThreshold,
   nodeAgentMode,
   showHelpModal,
   snapToGrid,
@@ -1636,12 +1637,14 @@ const { edgeLines } = useEdgeRouting({
 // Edge visibility composable - filters edges and pre-computes rendering properties
 const { visibleEdgeLines } = useEdgeVisibility({
   edgeLines,
+  totalEdgeCount: computed(() => store.filteredEdges.length),
   visibleNodeIds,
   hoveredNodeId,
   selectedNodeIds: computed(() => store.selectedNodeIds),
   selectedEdge,
   highlightedEdgeIds,
   highlightAllEdges,
+  edgeHideThreshold,
   edgeStrokeWidth,
   highlightColor,
   selectedColor,

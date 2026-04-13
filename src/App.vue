@@ -21,7 +21,7 @@ const showWorkspaceEditor = ref(false)
 const vaultPath = ref('')
 const importTarget = ref<'current' | 'new'>('new')
 const importWorkspaceName = ref('')
-const keepOriginalFiles = ref(true) // Keep original files by default (safe option)
+const deleteOriginalFiles = ref(false) // Don't delete files by default (safe option)
 const showSettings = ref(false)
 const showDeleteWorkspaceDialog = ref(false)
 const deleteWorkspaceKeepFiles = ref(true)
@@ -39,7 +39,7 @@ const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
-import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks } from './lib/tauri'
+import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles } from './lib/tauri'
 
 const syncingFiles = ref(false)
 
@@ -185,7 +185,24 @@ async function syncVaultFiles() {
   if (!editingWorkspace.value?.id || !editingWorkspace.value?.vault_path) return
   syncingFiles.value = true
   try {
-    // Sync missing files
+    // Debug: Check how many nodes have file paths before linking
+    const nodesWithFilesBefore = store.filteredNodes.filter(n => n.file_path).length
+    const totalNodes = store.filteredNodes.length
+    console.log(`[App] Nodes with file paths before: ${nodesWithFilesBefore}/${totalNodes}`)
+
+    // First, link any existing nodes to their files by matching titles
+    const linked = await linkNodesToFiles(editingWorkspace.value.id, editingWorkspace.value.vault_path)
+    if (linked > 0) {
+      console.log(`[App] Linked ${linked} nodes to their files`)
+      // Reload nodes to get updated file_path values
+      await store.loadNodes()
+    }
+
+    // Then refresh existing nodes from their files
+    const updated = await store.refreshWorkspace()
+    console.log(`[App] Refreshed ${updated} existing nodes`)
+
+    // Sync missing files (create nodes for new files)
     const newNodes = await syncMissingFiles(editingWorkspace.value.id, editingWorkspace.value.vault_path) as unknown[]
     if (newNodes.length > 0) {
       await store.loadNodes()
@@ -194,9 +211,12 @@ async function syncVaultFiles() {
     // Sync all wikilinks to create edges
     const edgesCreated = await syncAllWikilinks(editingWorkspace.value.id)
 
-    if (newNodes.length > 0 || edgesCreated > 0) {
-      await store.loadEdges()
-      showToast(t('toasts.syncedFiles', { count: newNodes.length }) + (edgesCreated > 0 ? `, ${edgesCreated} links` : ''), 'success')
+    // Always reload edges after sync
+    await store.loadEdges()
+
+    const totalChanges = updated + newNodes.length + edgesCreated
+    if (totalChanges > 0) {
+      showToast(`Synced: ${updated} updated, ${newNodes.length} new nodes, ${edgesCreated} links`, 'success')
     } else {
       showToast(t('toasts.noMissingFiles'), 'info')
     }
@@ -294,6 +314,10 @@ onMounted(async () => {
   if (store.currentWorkspaceId) {
     try {
       const workspace = await import('./lib/tauri').then(m => m.getWorkspace(store.currentWorkspaceId!))
+      console.log('[App] Workspace sync settings:', {
+        sync_enabled: workspace?.sync_enabled,
+        vault_path: workspace?.vault_path
+      })
       if (workspace?.sync_enabled && workspace?.vault_path) {
         // First sync any missing files (added while Nodus was closed)
         try {
@@ -310,7 +334,10 @@ onMounted(async () => {
           console.error('[App] Failed to sync:', e)
         }
         // Then start watching for future changes
+        console.log('[App] Starting file watcher for:', workspace.vault_path)
         await store.watchVault(workspace.vault_path)
+      } else {
+        console.log('[App] Skipping file watcher - sync not enabled or no vault path')
       }
     } catch (e) {
       console.error('[App] Failed to start file watcher:', e)
@@ -346,7 +373,7 @@ async function importVault() {
       await store.switchWorkspace(ws.id)
     }
 
-    const imported = await store.importVault(vaultPath.value.trim(), !keepOriginalFiles.value, targetWorkspaceId)
+    const imported = await store.importVault(vaultPath.value.trim(), deleteOriginalFiles.value, targetWorkspaceId)
 
     // Force refresh to ensure frames and edges are visible
     await store.switchWorkspace(store.currentWorkspaceId)
@@ -354,7 +381,7 @@ async function importVault() {
     vaultPath.value = ''
     importWorkspaceName.value = ''
     importTarget.value = 'new'
-    keepOriginalFiles.value = true // Reset to safe default
+    deleteOriginalFiles.value = false // Reset to safe default
     showToast(t('toasts.importSuccess', { count: imported.length }), 'success')
   } catch (e) {
     console.error('Import failed:', e)
@@ -548,10 +575,10 @@ async function openFolderDialog() {
 
           <div class="import-options-section">
             <label class="checkbox-label">
-              <input v-model="keepOriginalFiles" type="checkbox" />
-              <span>Keep original files (recommended for Obsidian vaults)</span>
+              <input v-model="deleteOriginalFiles" type="checkbox" />
+              <span>Delete original files after import</span>
             </label>
-            <p v-if="!keepOriginalFiles" class="warning-text">
+            <p v-if="deleteOriginalFiles" class="warning-text">
               Warning: Original files will be deleted after import
             </p>
           </div>

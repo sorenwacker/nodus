@@ -12,6 +12,7 @@ import {
   getWorkspace,
 } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
+import { notifications$ } from './useNotifications'
 import type { Node, FileChangeEvent } from '../types'
 
 export interface FileSyncDeps {
@@ -20,6 +21,7 @@ export interface FileSyncDeps {
   addNode: (node: Node) => void
   removeNode: (id: string) => void
   getCurrentWorkspaceId: () => string | null
+  reloadEdges?: () => Promise<void>
 }
 
 // Extract filename from path
@@ -45,12 +47,15 @@ export function useFileSync(deps: FileSyncDeps) {
 
   async function watchVault(path: string): Promise<void> {
     await stopWatching()
+    storeLogger.info(`[FileSync] Starting vault watcher for: ${path}`)
     // Note: listen() wrapper already extracts payload, so event IS the FileChangeEvent
     watcherUnlisten = await listen<FileChangeEvent>('vault-file-changed', (event) => {
+      storeLogger.info(`[FileSync] File change detected: ${event.change_type} - ${event.path}`)
       handleFileChange(event)
     })
     await invoke('watch_vault', { path })
     isWatching.value = true
+    storeLogger.info(`[FileSync] Vault watcher started successfully`)
   }
 
   async function stopWatching(): Promise<void> {
@@ -117,21 +122,44 @@ export function useFileSync(deps: FileSyncDeps) {
         break
       }
       case 'Modified': {
+        storeLogger.info(`[FileSync] Processing modified file: ${filePath}`)
         const node = nodes.find((n) => n.file_path === filePath)
+        if (!node) {
+          storeLogger.info(`[FileSync] No matching node found for file: ${filePath}`)
+          break
+        }
+        storeLogger.info(`[FileSync] Found node: ${node.title} (${node.id})`)
+        storeLogger.info(`[FileSync] Checksums - old: ${node.checksum}, new: ${event.new_checksum}`)
         if (node && event.new_checksum && node.checksum !== event.new_checksum) {
           try {
             const content = await readTextFile(filePath)
+            storeLogger.info(`[FileSync] Read new content (${content.length} chars)`)
             deps.updateNodeInPlace(node.id, {
               markdown_content: content,
               checksum: event.new_checksum,
               updated_at: Date.now(),
             })
-            await invoke<string | null>('update_node_content', { id: node.id, content })
+            // Use update_node_content_from_file to avoid writing back to file (infinite loop)
+            await invoke('update_node_content_from_file', {
+              id: node.id,
+              content,
+              checksum: event.new_checksum,
+            })
+            storeLogger.info(`[FileSync] Content updated in DB`)
             // Sync wikilinks to create edges for new links
             const edgesCreated = await syncNodeWikilinks(node.id)
+            storeLogger.info(`[FileSync] syncNodeWikilinks returned: ${edgesCreated} new edges`)
             if (edgesCreated > 0) {
               storeLogger.info(`Created ${edgesCreated} new edges from wikilinks`)
+              // Reload edges to show the newly created ones
+              if (deps.reloadEdges) {
+                storeLogger.info(`[FileSync] Reloading edges...`)
+                await deps.reloadEdges()
+                storeLogger.info(`[FileSync] Edges reloaded`)
+              }
+              notifications$.info('External change', `${edgesCreated} new link${edgesCreated > 1 ? 's' : ''} detected`)
             }
+            storeLogger.info(`Synced external changes: ${node.title}`)
           } catch (e) {
             storeLogger.error('Failed to reload file content:', e)
             deps.updateNodeInPlace(node.id, {

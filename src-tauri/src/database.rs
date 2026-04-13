@@ -609,6 +609,57 @@ pub mod edges {
         Ok(result.rows_affected())
     }
 
+    /// Merge bidirectional wikilink edges (A->B and B->A) into single undirected edges
+    /// Returns count of edges removed
+    pub async fn merge_bidirectional_wikilinks(pool: &DbPool) -> Result<u64, DatabaseError> {
+        // Find pairs where both A->B and B->A exist as wikilinks
+        // Keep the one with smaller id, set it to undirected, delete the other
+        let result = sqlx::query(
+            r#"
+            UPDATE edges
+            SET directed = 0
+            WHERE link_type = 'wikilink'
+            AND id IN (
+                SELECT e1.id
+                FROM edges e1
+                INNER JOIN edges e2
+                    ON e1.source_node_id = e2.target_node_id
+                    AND e1.target_node_id = e2.source_node_id
+                    AND e1.link_type = 'wikilink'
+                    AND e2.link_type = 'wikilink'
+                WHERE e1.id < e2.id
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        let _updated = result.rows_affected();
+
+        // Now delete the reverse edges (the ones with larger id)
+        let delete_result = sqlx::query(
+            r#"
+            DELETE FROM edges
+            WHERE link_type = 'wikilink'
+            AND id IN (
+                SELECT e2.id
+                FROM edges e1
+                INNER JOIN edges e2
+                    ON e1.source_node_id = e2.target_node_id
+                    AND e1.target_node_id = e2.source_node_id
+                    AND e1.link_type = 'wikilink'
+                    AND e2.link_type = 'wikilink'
+                WHERE e1.id < e2.id
+                AND e1.directed = 0
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(delete_result.rows_affected())
+    }
+
     /// Remove orphan edges (edges pointing to non-existent nodes)
     pub async fn cleanup_orphans(pool: &DbPool) -> Result<u64, DatabaseError> {
         let result = sqlx::query(

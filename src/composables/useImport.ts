@@ -242,6 +242,22 @@ export function useImport(deps: ImportDeps) {
         const fetchedNodes = await invoke<Node[]>('get_nodes')
         deps.setNodes(fetchedNodes)
         storeLogger.info(`Refreshed ${updated} nodes from files`)
+
+        // Sync wikilinks to create/update edges
+        const { syncAllWikilinks } = await import('../lib/tauri')
+        const edgesCreated = await syncAllWikilinks(workspaceId)
+        if (edgesCreated > 0) {
+          storeLogger.info(`Created ${edgesCreated} edges from wikilinks`)
+        }
+
+        // Reload edges to show updated connections
+        const fetchedEdges = await invoke<Edge[]>('get_edges', { workspaceId })
+        deps.setEdges(fetchedEdges)
+        storeLogger.info(`Reloaded ${fetchedEdges.length} edges`)
+
+        notifications$.success('Workspace refreshed', `Updated ${updated} nodes, ${edgesCreated} new edges`)
+      } else {
+        notifications$.info('Workspace up to date', 'No files have changed')
       }
 
       return updated

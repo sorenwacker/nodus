@@ -25,6 +25,23 @@ pub struct WatcherState(pub Mutex<Option<VaultWatcher>>);
 /// Global file locks state for tracking active edit locks
 pub struct LocksState(pub Mutex<std::collections::HashMap<String, FileLock>>);
 
+/// Check if a markdown file should be excluded from import/sync
+/// Excludes: hidden files (starting with .), CLAUDE.md, README.md
+fn should_exclude_file(path: &std::path::Path) -> bool {
+    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+        // Exclude hidden files
+        if filename.starts_with('.') {
+            return true;
+        }
+        // Exclude special files
+        let excluded = ["CLAUDE.md", "README.md"];
+        if excluded.iter().any(|&e| filename.eq_ignore_ascii_case(e)) {
+            return true;
+        }
+    }
+    false
+}
+
 // ============================================================================
 // Node Commands
 // ============================================================================
@@ -220,7 +237,13 @@ pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, S
         .await
         .map_err(|e| e.to_string())?;
 
+    // Build title map ONCE for all nodes (performance optimization)
+    let title_to_id = build_title_to_id_map(&all_nodes);
+    println!("[SyncWikilinks] Built title map with {} entries", title_to_id.len());
+
     let mut total_created = 0;
+    let mut total_removed = 0;
+    let mut processed = 0;
 
     for node in &all_nodes {
         // Filter by workspace if specified
@@ -233,46 +256,45 @@ pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, S
         let content = node.markdown_content.clone().unwrap_or_default();
         let links = import_helpers::extract_wikilinks(&content);
 
-        if !links.is_empty() {
-            match sync_wikilinks_for_node(pool, &node.id, &links).await {
-                Ok(count) => total_created += count,
-                Err(e) => eprintln!("Failed to sync wikilinks for {}: {}", node.title, e),
+        // Sync wikilinks (add new, remove old)
+        match sync_wikilinks_for_node_with_map(pool, &node.id, &links, &title_to_id).await {
+            Ok((created, removed)) => {
+                total_created += created;
+                total_removed += removed;
             }
+            Err(e) => eprintln!("Failed to sync wikilinks for {}: {}", node.title, e),
+        }
+
+        processed += 1;
+        if processed % 50 == 0 {
+            println!("[SyncWikilinks] Processed {}/{} nodes...", processed, all_nodes.len());
         }
     }
 
+    // Merge bidirectional wikilinks into single undirected edges
+    let merged = database::edges::merge_bidirectional_wikilinks(pool)
+        .await
+        .unwrap_or(0);
+
     println!(
-        "[SyncWikilinks] Created {} edges for workspace {:?}",
-        total_created, workspace_id
+        "[SyncWikilinks] Done: {} created, {} removed, {} merged for workspace {:?}",
+        total_created, total_removed, merged, workspace_id
     );
     Ok(total_created)
 }
 
-/// Helper to sync wikilinks for a node
-async fn sync_wikilinks_for_node(
-    pool: &database::DbPool,
-    source_id: &str,
-    links: &[String],
-) -> Result<usize, String> {
-    // Build title to id map for all nodes
-    // Maps both title and relative path (from file_path) for disambiguation
-    let all_nodes = database::nodes::get_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
+/// Build title-to-id map for wikilink resolution
+fn build_title_to_id_map(nodes: &[Node]) -> std::collections::HashMap<String, String> {
     let mut title_to_id: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
-    for node in &all_nodes {
+    for node in nodes {
         // Map by title
         title_to_id.insert(node.title.to_lowercase(), node.id.clone());
 
         // Also map by relative path (e.g., "concepts/FAIR-Digital-Objects")
         if let Some(ref file_path) = node.file_path {
-            // Extract relative path without extension
-            // e.g., "/vault/concepts/FAIR.md" -> "concepts/fair"
             if let Some(stem) = std::path::Path::new(file_path).file_stem() {
                 let stem_str = stem.to_string_lossy().to_lowercase();
-                // Get parent folder name if exists
                 if let Some(parent) = std::path::Path::new(file_path).parent() {
                     if let Some(folder) = parent.file_name() {
                         let folder_str = folder.to_string_lossy().to_lowercase();
@@ -283,21 +305,33 @@ async fn sync_wikilinks_for_node(
             }
         }
     }
+    title_to_id
+}
 
-    // Get existing edges from this node
+/// Helper to sync wikilinks for a node (uses pre-built title map for performance)
+/// Returns (created_count, removed_count)
+async fn sync_wikilinks_for_node_with_map(
+    pool: &database::DbPool,
+    source_id: &str,
+    links: &[String],
+    title_to_id: &std::collections::HashMap<String, String>,
+) -> Result<(usize, usize), String> {
+    // Get existing wikilink edges from this node
     let existing_edges = database::edges::get_edges_from_node(pool, source_id)
         .await
         .map_err(|e| e.to_string())?;
-    let existing_targets: std::collections::HashSet<String> = existing_edges
+
+    let existing_wikilink_edges: Vec<_> = existing_edges
         .iter()
         .filter(|e| e.link_type == "wikilink")
+        .collect();
+
+    let existing_targets: std::collections::HashSet<String> = existing_wikilink_edges
+        .iter()
         .map(|e| e.target_node_id.clone())
         .collect();
 
-    let now = chrono::Utc::now().timestamp();
-    let mut created_count = 0;
-
-    // Process each link
+    // Process each link to get target IDs that SHOULD exist
     let unique_links: std::collections::HashSet<String> = links
         .iter()
         .map(|l| {
@@ -306,8 +340,9 @@ async fn sync_wikilinks_for_node(
         })
         .collect();
 
+    // Resolve links to target IDs
+    let mut should_exist: std::collections::HashSet<String> = std::collections::HashSet::new();
     for link in &unique_links {
-        // Try exact match first, then filename-only match
         let target_id = title_to_id
             .get(link)
             .or_else(|| {
@@ -317,28 +352,62 @@ async fn sync_wikilinks_for_node(
             })
             .cloned();
 
-        if let Some(target_id) = target_id {
-            if source_id != target_id && !existing_targets.contains(&target_id) {
-                let edge = database::edges::Edge {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    source_node_id: source_id.to_string(),
-                    target_node_id: target_id,
-                    label: None,
-                    link_type: "wikilink".to_string(),
-                    weight: 1.0,
-                    color: None,
-                    storyline_id: None,
-                    created_at: now,
-                    directed: true,
-                };
-                if database::edges::create(pool, &edge).await.is_ok() {
-                    created_count += 1;
-                }
+        if let Some(tid) = target_id {
+            if source_id != tid {
+                should_exist.insert(tid);
             }
         }
     }
 
-    Ok(created_count)
+    let now = chrono::Utc::now().timestamp();
+    let mut created_count = 0;
+    let mut removed_count = 0;
+
+    // Create new edges
+    for target_id in &should_exist {
+        if !existing_targets.contains(target_id) {
+            let edge = database::edges::Edge {
+                id: uuid::Uuid::new_v4().to_string(),
+                source_node_id: source_id.to_string(),
+                target_node_id: target_id.clone(),
+                label: None,
+                link_type: "wikilink".to_string(),
+                weight: 1.0,
+                color: None,
+                storyline_id: None,
+                created_at: now,
+                directed: true,
+            };
+            if database::edges::create(pool, &edge).await.is_ok() {
+                created_count += 1;
+            }
+        }
+    }
+
+    // Remove edges that no longer have corresponding wikilinks
+    for edge in &existing_wikilink_edges {
+        if !should_exist.contains(&edge.target_node_id)
+            && database::edges::delete(pool, &edge.id).await.is_ok()
+        {
+            removed_count += 1;
+        }
+    }
+
+    Ok((created_count, removed_count))
+}
+
+/// Helper for callers that don't have a pre-built title map
+async fn sync_wikilinks_for_node(
+    pool: &database::DbPool,
+    source_id: &str,
+    links: &[String],
+) -> Result<usize, String> {
+    let all_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    let title_to_id = build_title_to_id_map(&all_nodes);
+    let (created, _removed) = sync_wikilinks_for_node_with_map(pool, source_id, links, &title_to_id).await?;
+    Ok(created)
 }
 
 /// Create a file in the vault for a node
@@ -672,6 +741,17 @@ pub async fn deduplicate_edges() -> Result<u64, String> {
     Ok(removed)
 }
 
+/// Merge bidirectional wikilink edges into single undirected edges
+#[tauri::command]
+pub async fn merge_bidirectional_edges() -> Result<u64, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let removed = database::edges::merge_bidirectional_wikilinks(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    println!("Merged {} bidirectional edges", removed);
+    Ok(removed)
+}
+
 /// Clean up orphan edges (edges pointing to non-existent nodes)
 #[tauri::command]
 pub async fn cleanup_orphan_edges() -> Result<u64, String> {
@@ -688,6 +768,20 @@ pub async fn cleanup_orphan_edges() -> Result<u64, String> {
 pub async fn debug_get_all_edges() -> Result<Vec<database::edges::Edge>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::edges::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Update node content from file (database only, no write-back to file).
+/// Used when syncing external file changes to prevent infinite loops.
+#[tauri::command]
+pub async fn update_node_content_from_file(
+    id: String,
+    content: String,
+    checksum: String,
+) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_content_and_checksum(pool, &id, &content, &checksum)
         .await
         .map_err(|e| e.to_string())
 }
@@ -875,6 +969,11 @@ pub async fn sync_missing_files(
             continue;
         }
 
+        // Skip excluded files (CLAUDE.md, README.md, hidden files)
+        if should_exclude_file(path) {
+            continue;
+        }
+
         let path_str = path.to_string_lossy().to_string();
         if existing_paths.contains(&path_str) {
             continue; // Already has a node
@@ -945,6 +1044,122 @@ pub async fn sync_missing_files(
 
     println!("[SyncMissing] Created {} new nodes", created_nodes.len());
     Ok(created_nodes)
+}
+
+/// Link existing nodes to files by matching title to filename.
+/// This is for nodes that were created before file sync was implemented.
+/// Also re-links nodes whose file_path no longer exists.
+#[tauri::command]
+pub async fn link_nodes_to_files(
+    workspace_id: String,
+    vault_path: String,
+) -> Result<i32, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let vault_path_obj = std::path::Path::new(&vault_path);
+
+    if !vault_path_obj.exists() {
+        return Err("Vault path does not exist".to_string());
+    }
+
+    // Get all nodes in workspace
+    let all_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let workspace_nodes: Vec<_> = all_nodes
+        .iter()
+        .filter(|n| n.workspace_id.as_deref() == Some(&workspace_id))
+        .collect();
+
+    // Find nodes that need linking:
+    // 1. No file_path set
+    // 2. file_path set but file doesn't exist
+    let nodes_to_link: Vec<_> = workspace_nodes
+        .iter()
+        .filter(|n| {
+            match &n.file_path {
+                None => true,  // No path set
+                Some(path) => !std::path::Path::new(path).exists(),  // Path doesn't exist
+            }
+        })
+        .copied()
+        .collect();
+
+    println!(
+        "[LinkNodes] Workspace has {} total nodes, {} need linking (no path or path invalid)",
+        workspace_nodes.len(),
+        nodes_to_link.len()
+    );
+
+    // Debug: show nodes that need linking
+    for node in nodes_to_link.iter().take(10) {
+        println!(
+            "[LinkNodes] Need link: '{}' -> current path: {:?}",
+            node.title,
+            node.file_path
+        );
+    }
+
+    // Build a map of filename (without extension) -> file path
+    let mut filename_to_path: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    for entry in walkdir::WalkDir::new(vault_path_obj)
+        .into_iter()
+        .filter_entry(|e| !e.file_name().to_string_lossy().starts_with('.'))
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if path.extension().is_none_or(|ext| ext != "md") {
+            continue;
+        }
+
+        // Skip excluded files (CLAUDE.md, README.md, hidden files)
+        if should_exclude_file(path) {
+            continue;
+        }
+
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            let normalized = stem.to_lowercase();
+            filename_to_path.insert(normalized, path.to_string_lossy().to_string());
+        }
+    }
+
+    println!("[LinkNodes] Found {} md files in vault", filename_to_path.len());
+
+    // Match nodes to files
+    let mut linked_count = 0;
+    let mut not_found_count = 0;
+    for node in nodes_to_link {
+        let title_normalized = node.title.to_lowercase();
+        if let Some(file_path) = filename_to_path.get(&title_normalized) {
+            // Compute checksum
+            let checksum = match crate::checksum::compute_file(std::path::Path::new(file_path)) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[LinkNodes] Failed to compute checksum for {}: {}", file_path, e);
+                    continue;
+                }
+            };
+
+            // Update node with file_path and checksum (single call)
+            if let Err(e) = database::nodes::update_file_path(pool, &node.id, file_path, &checksum).await {
+                eprintln!("[LinkNodes] Failed to update file_path for {}: {}", node.title, e);
+                continue;
+            }
+
+            println!("[LinkNodes] Linked '{}' -> {}", node.title, file_path);
+            linked_count += 1;
+        } else {
+            not_found_count += 1;
+            if not_found_count <= 5 {
+                println!("[LinkNodes] No file found for node: '{}' (looking for '{}.md')", node.title, title_normalized);
+            }
+        }
+    }
+
+    println!("[LinkNodes] Linked {} nodes, {} not found", linked_count, not_found_count);
+    Ok(linked_count)
 }
 
 #[tauri::command]
@@ -1371,9 +1586,12 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
         .await
         .map_err(|e| e.to_string())?;
 
+    // Build title map ONCE for wikilink resolution (performance)
+    let title_to_id = build_title_to_id_map(&nodes);
+
     let mut updated = 0u32;
 
-    for node in nodes {
+    for node in &nodes {
         // Skip nodes not in this workspace
         if node.workspace_id != workspace_id {
             continue;
@@ -1399,15 +1617,25 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
             continue;
         }
 
-        // Update the node
-        if let Err(e) = database::nodes::update_content(pool, &node.id, &content).await {
+        // Update the node content AND checksum
+        if let Err(e) =
+            database::nodes::update_content_and_checksum(pool, &node.id, &content, &new_checksum)
+                .await
+        {
             eprintln!("Failed to update node {}: {}", node.id, e);
             continue;
+        }
+
+        // Sync wikilinks for this node to create/remove edges
+        let links = import_helpers::extract_wikilinks(&content);
+        if let Err(e) = sync_wikilinks_for_node_with_map(pool, &node.id, &links, &title_to_id).await {
+            eprintln!("Failed to sync wikilinks for node {}: {}", node.id, e);
         }
 
         updated += 1;
     }
 
+    println!("[RefreshWorkspace] Updated {} nodes", updated);
     Ok(updated)
 }
 

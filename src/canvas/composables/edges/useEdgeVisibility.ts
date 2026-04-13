@@ -22,12 +22,14 @@ export interface VisibleEdgeLine extends EdgeLine {
 
 export interface UseEdgeVisibilityContext {
   edgeLines: ComputedRef<EdgeLine[]>
+  totalEdgeCount: ComputedRef<number> // Total edges in store (before any filtering)
   visibleNodeIds: ComputedRef<Set<string>>
   hoveredNodeId: Ref<string | null>
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
   selectedEdge: Ref<string | null>
   highlightedEdgeIds: ComputedRef<Set<string>>
   highlightAllEdges?: Ref<boolean>
+  edgeHideThreshold?: Ref<number> // User setting: hide all edges when total count > this (0 = disabled)
   edgeStrokeWidth: ComputedRef<number>
   highlightColor: ComputedRef<string>
   selectedColor: ComputedRef<string>
@@ -46,12 +48,14 @@ const EDGE_VIEWPORT_FILTER_THRESHOLD = 500
 export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibilityReturn {
   const {
     edgeLines,
+    totalEdgeCount,
     visibleNodeIds,
     hoveredNodeId,
     selectedNodeIds,
     selectedEdge,
     highlightedEdgeIds,
     highlightAllEdges = ref(false), // Default to false if not provided
+    edgeHideThreshold = ref(0), // User setting: 0 = disabled (show all)
     edgeStrokeWidth,
     highlightColor,
     selectedColor,
@@ -62,9 +66,19 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
   // Get reactive refs from display store
   const displayStore = useDisplayStore()
-  const { edgeHoverThreshold } = storeToRefs(displayStore)
+  const { edgeHoverThreshold: displayEdgeThreshold } = storeToRefs(displayStore)
 
   const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
+    // Check user's edge hide threshold (from canvas settings)
+    // 0 = disabled (show all edges), any other value = hide when count exceeds it
+    const hideThreshold = edgeHideThreshold?.value ?? 0
+    const totalEdges = totalEdgeCount.value
+
+    // If user set a hide threshold > 0 and edge count exceeds it, hide all
+    if (hideThreshold > 0 && totalEdges > hideThreshold) {
+      return []
+    }
+
     let edges = edgeLines.value
     const visIds = visibleNodeIds.value
     const hovered = hoveredNodeId.value
@@ -98,7 +112,9 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
     // For very large visible edge counts, only show edges on hover/select
     // Also include neighbor's edges (2nd hop) for context
-    if (edges.length > edgeHoverThreshold.value) {
+    // BUT: if user set hideThreshold to 0, they want all edges visible - skip this logic
+    const showAllEdges = hideThreshold === 0
+    if (!showAllEdges && edges.length > displayEdgeThreshold.value) {
       if (hovered || selectedNodes.length > 0) {
         edges = edges.filter(e => {
           // Direct edges to hovered/selected nodes

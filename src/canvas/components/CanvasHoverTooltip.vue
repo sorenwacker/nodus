@@ -25,10 +25,6 @@ defineProps<{
   <div
     v-if="visible && node"
     class="hover-tooltip"
-    :style="{
-      left: (position.x + 16) + 'px',
-      top: (position.y + 16) + 'px',
-    }"
   >
     <div class="hover-tooltip-title">{{ node.title || t('canvas.node.untitled') }}</div>
 
@@ -65,6 +61,8 @@ defineProps<{
 <style scoped>
 .hover-tooltip {
   position: fixed;
+  top: 16px;
+  left: 16px;
   z-index: 9999;
   width: 280px;
   max-height: 396px; /* A4 aspect ratio: 280 × 1.414 */

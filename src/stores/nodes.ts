@@ -78,6 +78,7 @@ export const useNodesStore = defineStore('nodes', () => {
       })
     },
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
+    reloadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
   })
 
   // Import composable (initialized after createNode is defined)
@@ -1144,6 +1145,7 @@ export const useNodesStore = defineStore('nodes', () => {
     resetDefaultWorkspace,
     cleanupOrphanEdges,
     deduplicateEdges,
+    loadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
     layoutNodes,
     isNodeEditable,
     startEditing,

@@ -419,7 +419,12 @@
       "display": "Display",
       "llm": "AI",
       "zotero": "Zotero",
+      "citations": "Citations",
       "integrations": "Integrations"
+    },
+    "citations": {
+      "description": "Configure citation and reference management.",
+      "hint": "Import BibTeX or CSL-JSON files via File > Import Citations"
     },
     "advanced": "Advanced",
     "display": {
@@ -508,6 +513,8 @@
       "straight": "Straight",
       "direct": "Direct"
     },
+    "edgeHideThreshold": "Hide Edges Above",
+    "edgeHideThresholdHint": "Hide all edges when count exceeds this value (0 = always show)",
     "radialStyle": "Radial Layout Style",
     "radialStyleHint": "Spacing style for radial/circular layout",
     "radialStyles": {
@@ -543,7 +550,7 @@
     "syncEnabled": "Enable file synchronization",
     "vaultSyncHint": "When enabled, new files in the vault are added as nodes and file changes are synced.",
     "noWorkspaceSelected": "No workspace selected",
-    "syncMissingFiles": "Sync Missing Files",
+    "syncMissingFiles": "Sync Files",
     "syncing": "Syncing..."
   }
 }

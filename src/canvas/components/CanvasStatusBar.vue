@@ -28,6 +28,8 @@ defineProps<{
   agentLog: string[]
   /** Whether agent log panel is visible */
   showAgentLog: boolean
+  /** Whether file watcher is active */
+  isWatching?: boolean
 }>()
 
 const emit = defineEmits<{

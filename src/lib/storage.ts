@@ -30,6 +30,7 @@ const KEYS = {
   canvasDefaultLayout: 'nodus_canvas_default_layout',
   canvasRadialStyle: 'nodus_canvas_radial_style',
   canvasBubbleMode: 'nodus_canvas_bubble_mode',
+  canvasEdgeHideThreshold: 'nodus_canvas_edge_hide_threshold',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
   showTagNodes: 'nodus_show_tag_nodes',
@@ -287,6 +288,14 @@ export const canvasStorage = {
   },
   setBubbleMode(value: boolean, workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasBubbleMode, workspaceId), String(value))
+  },
+  // Edge hide threshold - 0 means always show, any other value hides edges when count exceeds it
+  getEdgeHideThreshold(workspaceId?: string): number {
+    const val = localStorage.getItem(this._key(KEYS.canvasEdgeHideThreshold, workspaceId))
+    return val ? parseInt(val, 10) : 0 // 0 = disabled (always show)
+  },
+  setEdgeHideThreshold(value: number, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasEdgeHideThreshold, workspaceId), String(value))
   },
 }
 

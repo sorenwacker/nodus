@@ -19,6 +19,7 @@ const workspaceId = computed(() => store.currentWorkspaceId || undefined)
 const gridSnap = ref(canvasStorage.getGridSnap(workspaceId.value))
 const gridSize = ref(canvasStorage.getGridSize(workspaceId.value))
 const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'>(canvasStorage.getEdgeStyle(workspaceId.value))
+const edgeHideThreshold = ref(canvasStorage.getEdgeHideThreshold(workspaceId.value))
 // Radial style is global (not workspace-specific)
 const radialStyle = ref<'compact' | 'spacious'>(canvasStorage.getRadialStyle())
 
@@ -30,9 +31,11 @@ function saveCanvasSettings() {
   canvasStorage.setGridSnap(gridSnap.value, workspaceId.value)
   canvasStorage.setGridSize(gridSize.value, workspaceId.value)
   canvasStorage.setEdgeStyle(edgeStyle.value, workspaceId.value)
+  canvasStorage.setEdgeHideThreshold(edgeHideThreshold.value, workspaceId.value)
   canvasStorage.setRadialStyle(radialStyle.value) // Global setting
   // Notify canvas of edge style change
   window.dispatchEvent(new CustomEvent('nodus-edge-style-change', { detail: edgeStyle.value }))
+  window.dispatchEvent(new CustomEvent('nodus-edge-hide-threshold-change', { detail: edgeHideThreshold.value }))
 }
 
 // Save Tag settings
@@ -42,7 +45,7 @@ function saveTagSettings() {
 }
 
 // Auto-save on changes
-watch([gridSnap, gridSize, edgeStyle, radialStyle], saveCanvasSettings)
+watch([gridSnap, gridSize, edgeStyle, edgeHideThreshold, radialStyle], saveCanvasSettings)
 watch(showTagNodes, saveTagSettings)
 
 // Reload settings when workspace changes (radialStyle is global, not reloaded)
@@ -50,6 +53,7 @@ watch(workspaceId, (newId) => {
   gridSnap.value = canvasStorage.getGridSnap(newId)
   gridSize.value = canvasStorage.getGridSize(newId)
   edgeStyle.value = canvasStorage.getEdgeStyle(newId)
+  edgeHideThreshold.value = canvasStorage.getEdgeHideThreshold(newId)
 })
 </script>
 
@@ -112,6 +116,18 @@ watch(workspaceId, (newId) => {
           <span>{{ t('settings.edgeStyles.straight') }}</span>
         </label>
       </div>
+    </div>
+
+    <div class="setting-group">
+      <label>{{ t('settings.edgeHideThreshold') }}</label>
+      <input
+        v-model.number="edgeHideThreshold"
+        type="number"
+        min="0"
+        max="10000"
+        step="100"
+      />
+      <span class="hint">{{ t('settings.edgeHideThresholdHint') }}</span>
     </div>
 
     <div class="setting-group">

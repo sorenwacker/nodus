@@ -22,8 +22,8 @@ const emit = defineEmits<{
   close: []
 }>()
 
-// Active tab - reduced from 6 to 4 main tabs
-const activeTab = ref<'general' | 'appearance' | 'canvas' | 'ai' | 'integrations'>('general')
+// Active tab - broken into separate integration tabs
+const activeTab = ref<'general' | 'appearance' | 'canvas' | 'ai' | 'zotero' | 'citations'>('general')
 
 // App version
 const appVersion = ref('')
@@ -90,10 +90,22 @@ function handleClose() {
           {{ t('settings.tabs.canvas') }}
         </button>
         <button
-          :class="{ active: activeTab === 'integrations' }"
-          @click="activeTab = 'integrations'"
+          :class="{ active: activeTab === 'ai' }"
+          @click="activeTab = 'ai'"
         >
-          {{ t('settings.tabs.integrations') }}
+          {{ t('settings.tabs.llm') }}
+        </button>
+        <button
+          :class="{ active: activeTab === 'zotero' }"
+          @click="activeTab = 'zotero'"
+        >
+          {{ t('settings.tabs.zotero') }}
+        </button>
+        <button
+          :class="{ active: activeTab === 'citations' }"
+          @click="activeTab = 'citations'"
+        >
+          {{ t('settings.tabs.citations') }}
         </button>
       </nav>
 
@@ -154,35 +166,31 @@ function handleClose() {
         <!-- Canvas Settings -->
         <CanvasSettingsPanel v-if="activeTab === 'canvas'" />
 
-        <!-- Integrations (AI + Zotero) -->
-        <div v-if="activeTab === 'integrations'" class="settings-section">
-          <!-- AI Section -->
-          <div class="integration-section">
-            <div class="integration-header">
-              <label class="checkbox-label">
-                <input v-model="llmEnabled" type="checkbox" />
-                <span class="integration-title">{{ t('settings.tabs.llm') }}</span>
-              </label>
-              <span class="hint">{{ t('settings.llmEnabledHint') }}</span>
-            </div>
-
-            <div v-if="llmEnabled" class="integration-content">
-              <LLMSettingsPanel />
-            </div>
+        <!-- AI Settings -->
+        <div v-if="activeTab === 'ai'" class="settings-section">
+          <div class="setting-group">
+            <label class="checkbox-label">
+              <input v-model="llmEnabled" type="checkbox" />
+              {{ t('settings.llmEnabled') }}
+            </label>
+            <span class="hint">{{ t('settings.llmEnabledHint') }}</span>
           </div>
 
-          <hr class="section-divider" />
-
-          <!-- Zotero Section -->
-          <div class="integration-section">
-            <div class="integration-header">
-              <span class="integration-title">{{ t('settings.tabs.zotero') }}</span>
-              <span class="hint">{{ t('settings.zotero.description') }}</span>
-            </div>
-            <div class="integration-content">
-              <ZoteroSettingsPanel />
-            </div>
+          <div v-if="llmEnabled">
+            <LLMSettingsPanel />
           </div>
+        </div>
+
+        <!-- Zotero Settings -->
+        <div v-if="activeTab === 'zotero'" class="settings-section">
+          <p class="section-description">{{ t('settings.zotero.description') }}</p>
+          <ZoteroSettingsPanel />
+        </div>
+
+        <!-- Citations Settings -->
+        <div v-if="activeTab === 'citations'" class="settings-section">
+          <p class="section-description">{{ t('settings.citations.description') }}</p>
+          <p class="hint">{{ t('settings.citations.hint') }}</p>
         </div>
       </div>
     </div>

@@ -11,6 +11,18 @@ pub struct MarkdownFile {
     pub folder: String,
 }
 
+/// Check if a markdown file should be excluded from import
+/// Excludes: CLAUDE.md, README.md
+fn should_exclude_file(path: &Path) -> bool {
+    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+        let excluded = ["CLAUDE.md", "README.md"];
+        if excluded.iter().any(|&e| filename.eq_ignore_ascii_case(e)) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Collect all markdown files from a vault directory
 /// Returns files and a map of folders to their file counts
 pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<String, usize>) {
@@ -30,6 +42,12 @@ pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<
         let file_path = entry.path();
 
         if file_path.extension().is_some_and(|ext| ext == "md") {
+            // Skip excluded files (CLAUDE.md, README.md)
+            if should_exclude_file(file_path) {
+                println!("  Skipping excluded file: {:?}", file_path.file_name());
+                continue;
+            }
+
             let folder = get_relative_folder(file_path, vault_path).unwrap_or_default();
             println!(
                 "  Found: {:?} in folder: '{}'",

@@ -134,6 +134,10 @@ export async function syncMissingFiles(workspaceId: string, vaultPath: string): 
   return invoke<unknown[]>('sync_missing_files', { workspaceId, vaultPath })
 }
 
+export async function linkNodesToFiles(workspaceId: string, vaultPath: string): Promise<number> {
+  return invoke<number>('link_nodes_to_files', { workspaceId, vaultPath })
+}
+
 export async function createFileForNode(nodeId: string): Promise<string> {
   return invoke<string>('create_file_for_node', { nodeId })
 }

@@ -25,10 +25,10 @@ export const useEdgesStore = defineStore('edges', () => {
   }
 
   /**
-   * Initialize edges from database
+   * Initialize/load edges from database
    * @param workspaceId - Optional workspace ID to filter edges
    */
-  async function initialize(workspaceId?: string | null): Promise<void> {
+  async function loadEdges(workspaceId?: string | null): Promise<void> {
     loading.value = true
     error.value = null
     try {
@@ -44,6 +44,9 @@ export const useEdgesStore = defineStore('edges', () => {
       loading.value = false
     }
   }
+
+  // Alias for backwards compatibility
+  const initialize = loadEdges
 
   /**
    * Filter edges to only include those where both nodes exist
@@ -344,6 +347,7 @@ export const useEdgesStore = defineStore('edges', () => {
 
     // Methods
     initialize,
+    loadEdges,
     setNodeExistsCallback,
     getEdgesForNodes,
     createEdge,
