@@ -200,10 +200,10 @@ export function useLayout(options: UseLayoutOptions) {
 
     // Calculate positions for each level
     const targets = new Map<string, { x: number; y: number }>()
-    // Adjust ring distance based on style - compact has tighter rings
+    // Adjust ring distance based on style - compact has tighter rings with overlap allowed
     // Both baseRadius and minNodeSpacing scale with style to make difference visible even with many nodes
-    const baseRadius = isCompact ? 350 : 600 // Distance between rings
-    const minNodeSpacing = isCompact ? 180 : 280 // Spacing between nodes on a ring
+    const baseRadius = isCompact ? 250 : 600 // Distance between rings
+    const minNodeSpacing = isCompact ? 80 : 280 // Spacing between nodes on a ring (compact allows overlap)
     console.log('[RadialLayout] baseRadius:', baseRadius, 'minNodeSpacing:', minNodeSpacing)
     const maxRadius = 50000 // Cap radius to avoid extreme coordinates (increased to fit more nodes per ring)
     const ringSpacing = isCompact ? 280 : 500 // Spacing between sub-rings when splitting large levels
