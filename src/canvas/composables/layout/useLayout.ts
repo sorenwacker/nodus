@@ -202,7 +202,8 @@ export function useLayout(options: UseLayoutOptions) {
     const targets = new Map<string, { x: number; y: number }>()
     // Adjust ring distance based on style - compact has tighter rings with overlap allowed
     // Both baseRadius and minNodeSpacing scale with style to make difference visible even with many nodes
-    const baseRadius = isCompact ? 250 : 600 // Distance between rings
+    const firstRingRadius = isCompact ? 500 : 600 // Minimum distance from center to first ring
+    const baseRadius = isCompact ? 250 : 600 // Distance between subsequent rings
     const minNodeSpacing = isCompact ? 80 : 280 // Spacing between nodes on a ring (compact allows overlap)
     console.log('[RadialLayout] baseRadius:', baseRadius, 'minNodeSpacing:', minNodeSpacing)
     const maxRadius = 50000 // Cap radius to avoid extreme coordinates (increased to fit more nodes per ring)
@@ -230,8 +231,10 @@ export function useLayout(options: UseLayoutOptions) {
       })
 
       // Calculate base radius for this depth - ensure it's beyond the previous ring
-      const minRadius = lastUsedRadius + baseRadius
-      const depthRadius = Math.max(depth * baseRadius, minRadius)
+      // First ring uses firstRingRadius, subsequent rings use baseRadius spacing
+      const ringDistance = depth === 1 ? firstRingRadius : baseRadius
+      const minRadius = lastUsedRadius + ringDistance
+      const depthRadius = Math.max(depth === 1 ? firstRingRadius : depth * baseRadius, minRadius)
       console.log(`[RadialLayout] depth ${depth}: depthRadius=${depthRadius}, lastUsedRadius=${lastUsedRadius}`)
 
       // Calculate how many nodes can fit at the max radius
