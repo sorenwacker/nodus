@@ -15,6 +15,22 @@ import type {
 } from './types'
 import { extractToolCallsFromContent, parseOpenAIToolCalls } from './toolCallParser'
 
+/**
+ * Sanitize message content by removing model-specific control tags
+ * Some models (Qwen) output tags like <|channel|>, <|message|>, <|end|> that
+ * can cause errors if sent back in subsequent requests
+ */
+function sanitizeContent(content: string | undefined): string {
+  if (!content) return ''
+  // Remove Qwen-style control tags
+  return content
+    .replace(/<\|channel\|>.*?(?=<\||$)/gs, '')
+    .replace(/<\|message\|>/g, '')
+    .replace(/<\|end\|>/g, '')
+    .replace(/<\|constrain\|>/g, '')
+    .trim()
+}
+
 export class OpenAICompatibleProvider implements ILLMProvider {
   readonly id = 'openai-compatible'
   readonly name = 'OpenAI Compatible'
@@ -137,12 +153,18 @@ export class OpenAICompatibleProvider implements ILLMProvider {
       },
     }))
 
+    // Sanitize message content to remove model-specific control tags
+    const sanitizedMessages = options.messages.map(m => ({
+      ...m,
+      content: typeof m.content === 'string' ? sanitizeContent(m.content) : m.content,
+    }))
+
     const response = await httpFetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
         model: this.model,
-        messages: options.messages,
+        messages: sanitizedMessages,
         ...(tools && tools.length > 0 ? { tools, tool_choice: 'auto' } : {}),
       }),
       connectTimeout: this.timeout,
