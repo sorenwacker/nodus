@@ -382,11 +382,20 @@
   left: 100%;
   top: -4px;
   min-width: 160px;
+  max-width: 280px;
+  max-height: min(400px, calc(100vh - 100px));
+  overflow-y: auto;
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   box-shadow: 0 4px 16px var(--shadow-md);
   padding: 4px 0;
+}
+
+/* Flip submenu to left side when near right edge */
+.context-submenu.flip-left {
+  left: auto;
+  right: 100%;
 }
 
 .context-menu-divider {

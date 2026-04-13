@@ -40,6 +40,14 @@ const otherWorkspaces = computed(() => {
   return props.workspaces.filter(w => w.id !== props.currentWorkspaceId)
 })
 
+// Check if submenu should flip to left side (menu too close to right edge)
+const shouldFlipSubmenu = computed(() => {
+  const submenuWidth = 200
+  const menuWidth = 180
+  const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1920
+  return props.position.x + menuWidth + submenuWidth > windowWidth - 20
+})
+
 // Entity type config for submenu
 const entityTypeConfig: Record<EntityNodeType, { icon: string; label: string }> = {
   character: { icon: 'user', label: 'Characters' },
@@ -129,6 +137,7 @@ function handleCreateEntity(type: EntityNodeType) {
     class="context-menu"
     :style="{ left: position.x + 'px', top: position.y + 'px' }"
     @click.stop
+    @wheel.stop
   >
     <div class="context-menu-item" @click="handleFitToContent">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -169,7 +178,13 @@ function handleCreateEntity(type: EntityNodeType) {
       </svg>
 
       <!-- Entity submenu -->
-      <div v-if="entitySubmenu" class="context-submenu entity-submenu">
+      <div
+        v-if="entitySubmenu"
+        class="context-submenu entity-submenu"
+        :class="{ 'flip-left': shouldFlipSubmenu }"
+        :style="{ maxHeight: '250px', overflowY: 'auto' }"
+        @wheel.stop
+      >
         <template v-for="type in entityTypesWithContent" :key="type">
           <div class="submenu-section-header">{{ entityTypeConfig[type].label }}</div>
           <div
@@ -226,7 +241,13 @@ function handleCreateEntity(type: EntityNodeType) {
       </svg>
 
       <!-- Storyline submenu -->
-      <div v-if="storylineSubmenu" class="context-submenu">
+      <div
+        v-if="storylineSubmenu"
+        class="context-submenu"
+        :class="{ 'flip-left': shouldFlipSubmenu }"
+        :style="{ maxHeight: '250px', overflowY: 'auto' }"
+        @wheel.stop
+      >
         <div
           v-for="storyline in storylines"
           :key="storyline.id"
@@ -261,7 +282,13 @@ function handleCreateEntity(type: EntityNodeType) {
       </svg>
 
       <!-- Workspace submenu -->
-      <div v-if="workspaceSubmenu" class="context-submenu">
+      <div
+        v-if="workspaceSubmenu"
+        class="context-submenu"
+        :class="{ 'flip-left': shouldFlipSubmenu }"
+        :style="{ maxHeight: '250px', overflowY: 'auto' }"
+        @wheel.stop
+      >
         <div
           v-if="currentWorkspaceId !== null"
           class="context-menu-item"
@@ -304,9 +331,19 @@ function handleCreateEntity(type: EntityNodeType) {
 </template>
 
 <style scoped>
-.entity-submenu {
+.context-submenu {
   max-height: 300px;
   overflow-y: auto;
+  z-index: 1001;
+}
+
+.context-submenu.flip-left {
+  left: auto;
+  right: 100%;
+}
+
+.entity-submenu {
+  /* Entity submenu may need smaller height due to sections */
 }
 
 .submenu-section-header {

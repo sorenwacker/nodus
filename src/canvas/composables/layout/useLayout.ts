@@ -174,7 +174,7 @@ export function useLayout(options: UseLayoutOptions) {
     // Track angles assigned to each node for parent-based sorting
     const nodeAngles = new Map<string, number>()
 
-    // Get center node position
+    // Get center node position - use node's current position as layout center
     const centerNode = allNodes.find(n => n.id === centerId)
     if (!centerNode) return
 
@@ -192,11 +192,11 @@ export function useLayout(options: UseLayoutOptions) {
     const targets = new Map<string, { x: number; y: number }>()
     // Adjust ring distance based on style - compact has tighter rings with overlap allowed
     // Both baseRadius and minNodeSpacing scale with style to make difference visible even with many nodes
-    const firstRingRadius = isCompact ? 500 : 600 // Minimum distance from center to first ring
-    const baseRadius = isCompact ? 250 : 600 // Distance between subsequent rings
-    const minNodeSpacing = isCompact ? 80 : 280 // Spacing between nodes on a ring (compact allows overlap)
-    const maxRadius = 50000 // Cap radius to avoid extreme coordinates (increased to fit more nodes per ring)
-    const ringSpacing = isCompact ? 280 : 500 // Spacing between sub-rings when splitting large levels
+    const firstRingRadius = isCompact ? 300 : 400 // Minimum distance from center to first ring
+    const baseRadius = isCompact ? 150 : 300 // Distance between subsequent rings
+    const minNodeSpacing = isCompact ? 60 : 150 // Spacing between nodes on a ring (tighter packing)
+    const maxRadius = 50000 // Cap radius for reasonable layout size
+    const ringSpacing = isCompact ? 180 : 300 // Spacing between sub-rings when splitting large levels
 
     let lastUsedRadius = 0 // Track the actual radius used by the previous ring
 
@@ -770,8 +770,8 @@ export function useLayout(options: UseLayoutOptions) {
 
     const scaleX = rect.width / contentWidth
     const scaleY = rect.height / contentHeight
-    // Minimum scale of 0.02 to keep nodes visible, max of 1 to not zoom in beyond 100%
-    viewState.scale.value = Math.max(0.02, Math.min(scaleX, scaleY, 1))
+    // Minimum scale of 0.01 to keep nodes visible, max of 1 to not zoom in beyond 100%
+    viewState.scale.value = Math.max(0.01, Math.min(scaleX, scaleY, 1))
 
     viewState.offsetX.value = (rect.width - contentWidth * viewState.scale.value) / 2 - minX * viewState.scale.value + padding * viewState.scale.value
     viewState.offsetY.value = (rect.height - contentHeight * viewState.scale.value) / 2 - minY * viewState.scale.value + padding * viewState.scale.value
