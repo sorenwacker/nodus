@@ -70,9 +70,12 @@ CREATE TABLE IF NOT EXISTS edges (
     label TEXT,
     link_type TEXT NOT NULL DEFAULT 'related',
     weight REAL NOT NULL DEFAULT 1.0,
+    color TEXT,
+    storyline_id TEXT,
     created_at INTEGER NOT NULL,
+    directed INTEGER NOT NULL DEFAULT 1,
 
-    UNIQUE(source_node_id, target_node_id)
+    UNIQUE(source_node_id, target_node_id, link_type)
 );
 
 -- 5. Typst Cache: Stores rendered SVG for performance
