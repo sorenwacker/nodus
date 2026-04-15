@@ -106,21 +106,10 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         .execute(pool)
         .await;
 
-    // Add directed column to edges - check if it exists first
-    let has_directed: bool = sqlx::query_scalar::<_, i32>(
-        "SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = 'directed'"
-    )
-    .fetch_one(pool)
-    .await
-    .map(|count| count > 0)
-    .unwrap_or(false);
-
-    if !has_directed {
-        sqlx::query("ALTER TABLE edges ADD COLUMN directed INTEGER NOT NULL DEFAULT 1")
-            .execute(pool)
-            .await
-            .map_err(|e| DatabaseError::Migration(format!("Failed to add directed column: {}", e)))?;
-    }
+    // Add directed column to edges - ignore if already exists
+    let _ = sqlx::query("ALTER TABLE edges ADD COLUMN directed INTEGER NOT NULL DEFAULT 1")
+        .execute(pool)
+        .await;
 
     Ok(())
 }

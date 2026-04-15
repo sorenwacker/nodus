@@ -336,12 +336,13 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function updateNodeContent(id: string, content: string) {
+    const trimmedContent = content.trim()
     const node = nodes.value.find(n => n.id === id)
     if (node) {
-      node.markdown_content = content
+      node.markdown_content = trimmedContent
       node.updated_at = Date.now()
       try {
-        const newChecksum = await invoke<string | null>('update_node_content', { id, content })
+        const newChecksum = await invoke<string | null>('update_node_content', { id, content: trimmedContent })
         // Update checksum if file was written (prevents watcher reload loop)
         if (newChecksum) {
           node.checksum = newChecksum
@@ -351,7 +352,7 @@ export const useNodesStore = defineStore('nodes', () => {
       }
 
       // Extract hashtags and update tags
-      const extractedTags = extractHashtags(content)
+      const extractedTags = extractHashtags(trimmedContent)
       if (extractedTags.length > 0) {
         // Merge with existing tags (deduplicate)
         let existingTags: string[] = []
@@ -375,7 +376,7 @@ export const useNodesStore = defineStore('nodes', () => {
       }
 
       // Extract wikilinks and sync edges
-      const links = extractWikilinks(content)
+      const links = extractWikilinks(trimmedContent)
 
       // Build set of target node IDs from current wikilinks
       const currentTargetIds = new Set<string>()
@@ -433,12 +434,13 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function updateNodeTitle(id: string, title: string) {
+    const trimmedTitle = title.trim()
     const node = nodes.value.find(n => n.id === id)
     if (node) {
-      node.title = title
+      node.title = trimmedTitle
       node.updated_at = Date.now()
       try {
-        await invoke('update_node_title', { id, title })
+        await invoke('update_node_title', { id, title: trimmedTitle })
       } catch (e) {
         console.error('Failed to update title:', e)
       }
@@ -492,6 +494,8 @@ export const useNodesStore = defineStore('nodes', () => {
 
     const inputWithWorkspace = {
       ...data,
+      title: data.title.trim(),
+      markdown_content: data.markdown_content?.trim() || null,
       workspace_id: validWorkspaceId,
     }
 
@@ -505,9 +509,9 @@ export const useNodesStore = defineStore('nodes', () => {
       // Fallback for development
       const node: Node = {
         id: crypto.randomUUID(),
-        title: data.title,
+        title: data.title.trim(),
         file_path: data.file_path || null,
-        markdown_content: data.markdown_content || null,
+        markdown_content: data.markdown_content?.trim() || null,
         node_type: data.node_type || 'note',
         canvas_x: data.canvas_x,
         canvas_y: data.canvas_y,

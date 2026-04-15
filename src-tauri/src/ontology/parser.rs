@@ -140,6 +140,8 @@ struct TripleCollector {
 #[derive(Default)]
 struct PropertyDefinition {
     label: Option<String>,
+    /// Language tag of current label - for preferring English
+    label_lang: Option<String>,
     description: Option<String>,
     domains: Vec<String>,
     ranges: Vec<String>,
@@ -261,22 +263,67 @@ impl TripleCollector {
                 }
             }
             Term::Literal(lit) => {
-                let value = match lit {
-                    Literal::Simple { value } => value.to_string(),
-                    Literal::LanguageTaggedString { value, .. } => value.to_string(),
-                    Literal::Typed { value, .. } => value.to_string(),
+                // Extract value and optional language tag
+                let (value, lang_tag) = match lit {
+                    Literal::Simple { value } => (value.to_string(), None),
+                    Literal::LanguageTaggedString { value, language } => {
+                        (value.to_string(), Some(language.to_string()))
+                    }
+                    Literal::Typed { value, .. } => (value.to_string(), None),
                 };
 
                 let mut subjects = self.subjects.borrow_mut();
                 let data = subjects.entry(subject_iri.clone()).or_default();
 
                 if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
-                    data.label = Some(value);
+                    // Prefer English labels over other languages
+                    // Priority: no tag/en > other languages
+                    let is_english = lang_tag.is_none()
+                        || lang_tag.as_deref() == Some("en")
+                        || lang_tag
+                            .as_ref()
+                            .map(|t| t.starts_with("en-"))
+                            .unwrap_or(false);
+
+                    let current_is_english = data.label_lang.is_none()
+                        || data.label_lang.as_deref() == Some("en")
+                        || data
+                            .label_lang
+                            .as_ref()
+                            .map(|t| t.starts_with("en-"))
+                            .unwrap_or(false);
+
+                    // Update label if:
+                    // 1. No label exists yet, OR
+                    // 2. New label is English and current is not
+                    if data.label.is_none() || (is_english && !current_is_english) {
+                        data.label = Some(value.clone());
+                        data.label_lang = lang_tag.clone();
+                    }
                 } else if predicate_iri == RDFS_COMMENT
                     || predicate_iri == DC_DESCRIPTION
                     || predicate_iri == DC_TERMS_DESCRIPTION
                 {
-                    data.description = Some(value);
+                    // Prefer English descriptions over other languages
+                    let desc_is_english = lang_tag.is_none()
+                        || lang_tag.as_deref() == Some("en")
+                        || lang_tag
+                            .as_ref()
+                            .map(|t| t.starts_with("en-"))
+                            .unwrap_or(false);
+
+                    let current_desc_is_english = data.description_lang.is_none()
+                        || data.description_lang.as_deref() == Some("en")
+                        || data
+                            .description_lang
+                            .as_ref()
+                            .map(|t| t.starts_with("en-"))
+                            .unwrap_or(false);
+
+                    if data.description.is_none() || (desc_is_english && !current_desc_is_english) {
+                        data.description = Some(value);
+                        data.description_lang = lang_tag.clone();
+                    }
                 } else if !EXCLUDED_PREDICATES.contains(&predicate_iri.as_str()) {
                     // Data property
                     data.data_properties
@@ -298,7 +345,28 @@ impl TripleCollector {
                 let mut props = self.property_definitions.borrow_mut();
                 if let Some(prop) = props.get_mut(&subject_iri) {
                     if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
-                        prop.label = data.label.clone();
+                        // Check if data has a better (more English) label than prop
+                        let data_is_english = data.label_lang.is_none()
+                            || data.label_lang.as_deref() == Some("en")
+                            || data
+                                .label_lang
+                                .as_ref()
+                                .map(|t| t.starts_with("en-"))
+                                .unwrap_or(false);
+
+                        let prop_is_english = prop.label_lang.is_none()
+                            || prop.label_lang.as_deref() == Some("en")
+                            || prop
+                                .label_lang
+                                .as_ref()
+                                .map(|t| t.starts_with("en-"))
+                                .unwrap_or(false);
+
+                        // Update if no label yet, or if data has English and prop does not
+                        if prop.label.is_none() || (data_is_english && !prop_is_english) {
+                            prop.label = data.label.clone();
+                            prop.label_lang = data.label_lang.clone();
+                        }
                     }
                     if predicate_iri == RDFS_COMMENT {
                         prop.description = data.description.clone();
@@ -464,7 +532,11 @@ impl TripleCollector {
 struct SubjectData {
     types: Vec<String>,
     label: Option<String>,
+    /// Language tag of current label (e.g., "en", "zh") - None means no tag or English
+    label_lang: Option<String>,
     description: Option<String>,
+    /// Language tag of current description
+    description_lang: Option<String>,
     data_properties: Vec<(String, String)>,
 }
 
