@@ -108,7 +108,7 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
 
     // Add directed column to edges - check first, then add if missing
     let has_directed: bool = sqlx::query_scalar::<_, i32>(
-        "SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = 'directed'"
+        "SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = 'directed'",
     )
     .fetch_one(pool)
     .await

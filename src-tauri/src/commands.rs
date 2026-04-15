@@ -239,7 +239,10 @@ pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, S
 
     // Build title map ONCE for all nodes (performance optimization)
     let title_to_id = build_title_to_id_map(&all_nodes);
-    println!("[SyncWikilinks] Built title map with {} entries", title_to_id.len());
+    println!(
+        "[SyncWikilinks] Built title map with {} entries",
+        title_to_id.len()
+    );
 
     let mut total_created = 0;
     let mut total_removed = 0;
@@ -267,7 +270,11 @@ pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, S
 
         processed += 1;
         if processed % 50 == 0 {
-            println!("[SyncWikilinks] Processed {}/{} nodes...", processed, all_nodes.len());
+            println!(
+                "[SyncWikilinks] Processed {}/{} nodes...",
+                processed,
+                all_nodes.len()
+            );
         }
     }
 
@@ -406,7 +413,8 @@ async fn sync_wikilinks_for_node(
         .await
         .map_err(|e| e.to_string())?;
     let title_to_id = build_title_to_id_map(&all_nodes);
-    let (created, _removed) = sync_wikilinks_for_node_with_map(pool, source_id, links, &title_to_id).await?;
+    let (created, _removed) =
+        sync_wikilinks_for_node_with_map(pool, source_id, links, &title_to_id).await?;
     Ok(created)
 }
 
@@ -1050,10 +1058,7 @@ pub async fn sync_missing_files(
 /// This is for nodes that were created before file sync was implemented.
 /// Also re-links nodes whose file_path no longer exists.
 #[tauri::command]
-pub async fn link_nodes_to_files(
-    workspace_id: String,
-    vault_path: String,
-) -> Result<i32, String> {
+pub async fn link_nodes_to_files(workspace_id: String, vault_path: String) -> Result<i32, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     let vault_path_obj = std::path::Path::new(&vault_path);
 
@@ -1078,8 +1083,8 @@ pub async fn link_nodes_to_files(
         .iter()
         .filter(|n| {
             match &n.file_path {
-                None => true,  // No path set
-                Some(path) => !std::path::Path::new(path).exists(),  // Path doesn't exist
+                None => true,                                       // No path set
+                Some(path) => !std::path::Path::new(path).exists(), // Path doesn't exist
             }
         })
         .copied()
@@ -1095,8 +1100,7 @@ pub async fn link_nodes_to_files(
     for node in nodes_to_link.iter().take(10) {
         println!(
             "[LinkNodes] Need link: '{}' -> current path: {:?}",
-            node.title,
-            node.file_path
+            node.title, node.file_path
         );
     }
 
@@ -1125,7 +1129,10 @@ pub async fn link_nodes_to_files(
         }
     }
 
-    println!("[LinkNodes] Found {} md files in vault", filename_to_path.len());
+    println!(
+        "[LinkNodes] Found {} md files in vault",
+        filename_to_path.len()
+    );
 
     // Match nodes to files
     let mut linked_count = 0;
@@ -1137,14 +1144,22 @@ pub async fn link_nodes_to_files(
             let checksum = match crate::checksum::compute_file(std::path::Path::new(file_path)) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("[LinkNodes] Failed to compute checksum for {}: {}", file_path, e);
+                    eprintln!(
+                        "[LinkNodes] Failed to compute checksum for {}: {}",
+                        file_path, e
+                    );
                     continue;
                 }
             };
 
             // Update node with file_path and checksum (single call)
-            if let Err(e) = database::nodes::update_file_path(pool, &node.id, file_path, &checksum).await {
-                eprintln!("[LinkNodes] Failed to update file_path for {}: {}", node.title, e);
+            if let Err(e) =
+                database::nodes::update_file_path(pool, &node.id, file_path, &checksum).await
+            {
+                eprintln!(
+                    "[LinkNodes] Failed to update file_path for {}: {}",
+                    node.title, e
+                );
                 continue;
             }
 
@@ -1153,12 +1168,18 @@ pub async fn link_nodes_to_files(
         } else {
             not_found_count += 1;
             if not_found_count <= 5 {
-                println!("[LinkNodes] No file found for node: '{}' (looking for '{}.md')", node.title, title_normalized);
+                println!(
+                    "[LinkNodes] No file found for node: '{}' (looking for '{}.md')",
+                    node.title, title_normalized
+                );
             }
         }
     }
 
-    println!("[LinkNodes] Linked {} nodes, {} not found", linked_count, not_found_count);
+    println!(
+        "[LinkNodes] Linked {} nodes, {} not found",
+        linked_count, not_found_count
+    );
     Ok(linked_count)
 }
 
@@ -1628,7 +1649,8 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
 
         // Sync wikilinks for this node to create/remove edges
         let links = import_helpers::extract_wikilinks(&content);
-        if let Err(e) = sync_wikilinks_for_node_with_map(pool, &node.id, &links, &title_to_id).await {
+        if let Err(e) = sync_wikilinks_for_node_with_map(pool, &node.id, &links, &title_to_id).await
+        {
             eprintln!("Failed to sync wikilinks for node {}: {}", node.id, e);
         }
 

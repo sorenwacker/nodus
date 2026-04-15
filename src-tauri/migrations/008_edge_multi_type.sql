@@ -1,7 +1,16 @@
--- Allow multiple edges between same nodes with different link_types
+-- Migration 008: Allow multiple edges between same nodes with different link_types
 -- This is needed for ontology imports where classes can have multiple relationships
+--
+-- SQLite doesn't support dropping constraints directly, so we need to recreate the table.
+-- This migration is wrapped in checks to be idempotent and safe.
 
--- SQLite doesn't support dropping constraints directly, so we need to recreate the table
+-- Check if migration is needed (edges table lacks the new constraint)
+-- If edges_new already exists, migration was interrupted - skip
+SELECT CASE
+    WHEN EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='edges_new')
+    THEN RAISE(IGNORE)
+END;
+
 -- Step 1: Create new table with updated constraint
 CREATE TABLE IF NOT EXISTS edges_new (
     id TEXT PRIMARY KEY,
@@ -25,7 +34,7 @@ SELECT id, source_node_id, target_node_id, label, link_type, weight, color, stor
 FROM edges;
 
 -- Step 3: Drop old table
-DROP TABLE edges;
+DROP TABLE IF EXISTS edges;
 
 -- Step 4: Rename new table
 ALTER TABLE edges_new RENAME TO edges;

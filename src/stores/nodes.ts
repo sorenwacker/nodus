@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke, getWorkspace } from '../lib/tauri'
-import { applyForceLayout } from '../canvas/layout'
 import { storeLogger } from '../lib/logger'
 import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs, getEdgeLabel } from '../lib/templates'
 import { canvasStorage } from '../lib/storage'
@@ -15,6 +14,8 @@ import { useFileSync } from '../composables/useFileSync'
 import { useImport } from '../composables/useImport'
 import { useTagNodes } from '../composables/useTagNodes'
 import { useNodeEditLocking } from '../composables/useNodeEditLocking'
+import { useNodeLayout } from '../composables/useNodeLayout'
+import { useEntityOperations } from '../composables/useEntityOperations'
 import type {
   Node,
   Edge,
@@ -27,9 +28,7 @@ import type {
   StorylineNode,
   EntityNodeType,
 } from '../types'
-import { ENTITY_NODE_TYPES } from '../types'
 import { clampCoord, clampNodeSize } from '../lib/geometry'
-import { pushOverlappingNodes as pushNodesApart } from '../lib/nodeCollision'
 import { createMockNodes } from '../lib/mockData'
 
 // Re-export types for consumers
@@ -235,9 +234,9 @@ export const useNodesStore = defineStore('nodes', () => {
       node.updated_at = Date.now()
       nodeLayoutVersion.value++ // Trigger edge re-routing
 
-      // Push overlapping nodes away
-      if (pushOthers) {
-        pushOverlappingNodes(node)
+      // Push overlapping nodes away using layout composable
+      if (pushOthers && layoutComposable) {
+        layoutComposable.pushOverlappingNodes(node)
       }
 
       try {
@@ -248,42 +247,10 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  /**
-   * Push nodes that overlap with the given node away (ripples through graph)
-   */
-  function pushOverlappingNodes(sourceNode: Node) {
-    const collisionNode = {
-      id: sourceNode.id,
-      canvas_x: sourceNode.canvas_x,
-      canvas_y: sourceNode.canvas_y,
-      width: sourceNode.width || 200,
-      height: sourceNode.height || 120,
-      workspace_id: sourceNode.workspace_id,
-    }
-
-    const collisionNodes = nodes.value.map(n => ({
-      id: n.id,
-      canvas_x: n.canvas_x,
-      canvas_y: n.canvas_y,
-      width: n.width || 200,
-      height: n.height || 120,
-      workspace_id: n.workspace_id,
-    }))
-
-    pushNodesApart(collisionNode, {
-      nodes: collisionNodes,
-      updatePosition: (id, x, y) => {
-        const node = nodes.value.find(n => n.id === id)
-        if (node) {
-          node.canvas_x = x
-          node.canvas_y = y
-          node.updated_at = Date.now()
-          invoke('update_node_position', { id, x, y })
-            .catch(e => console.error('Failed to update pushed node position:', e))
-        }
-      },
-    })
-  }
+  // Layout composable (initialized after dependencies are available)
+  let layoutComposable: ReturnType<typeof useNodeLayout> = undefined!
+  // Entity operations composable
+  let entityOpsComposable: ReturnType<typeof useEntityOperations> = undefined!
 
   function selectNode(id: string | null, addToSelection = false) {
     if (id === null) {
@@ -632,6 +599,30 @@ export const useNodesStore = defineStore('nodes', () => {
     createEdge,
   })
 
+  // Initialize layout composable
+  layoutComposable = useNodeLayout({
+    getNodes: () => nodes.value,
+    getFilteredNodes: () => filteredNodes.value,
+    getFilteredEdges: () => filteredEdges.value,
+    getFilteredFrames: () => filteredFrames.value,
+    updateNodePosition,
+    updateNodeSize: async (id, width, height) => {
+      // Update without push to avoid infinite recursion
+      await updateNodeSize(id, width, height, false)
+    },
+    incrementLayoutVersion: () => { nodeLayoutVersion.value++ },
+  })
+
+  // Initialize entity operations composable
+  entityOpsComposable = useEntityOperations({
+    getNodes: () => nodes.value,
+    getFilteredNodes: () => filteredNodes.value,
+    getNode,
+    createNode,
+    createEdge,
+    getEntityEdgesForNode: (nodeId, direction) => edgesStore.getEntityEdgesForNode(nodeId, direction),
+  })
+
   // Restore a deleted node (for undo)
   async function restoreNode(node: Node) {
     try {
@@ -803,168 +794,18 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  /**
-   * Apply force-directed layout to all nodes or a subset
-   * When frameId is provided, layout only nodes inside that frame
-   * Otherwise, nodes inside frames are excluded from layout
-   */
-  async function layoutNodes(
+  // Layout nodes - forwarded to layout composable
+  const layoutNodes = (
     nodeIds?: string[],
     options?: {
       centerX?: number
       centerY?: number
       chargeStrength?: number
       linkDistance?: number
-      frameId?: string  // If provided, layout only nodes inside this frame
-      fitToFrame?: boolean  // If true, resize nodes to fit frame
+      frameId?: string
+      fitToFrame?: boolean
     }
-  ) {
-    const frameId = options?.frameId
-    const fitToFrame = options?.fitToFrame ?? true
-
-    // Helper to check if a node is inside a specific frame (50%+ overlap)
-    const isNodeInSpecificFrame = (node: Node, frame: Frame): boolean => {
-      if (node.frame_id === frame.id) return true
-
-      const nodeWidth = node.width || 200
-      const nodeHeight = node.height || 120
-      const nodeArea = nodeWidth * nodeHeight
-
-      const overlapX = Math.max(0,
-        Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
-        Math.max(node.canvas_x, frame.canvas_x))
-      const overlapY = Math.max(0,
-        Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
-        Math.max(node.canvas_y, frame.canvas_y))
-      return overlapX * overlapY > nodeArea * 0.5
-    }
-
-    // Helper to check if a node is inside any frame
-    const isNodeInAnyFrame = (node: Node): boolean => {
-      for (const frame of filteredFrames.value) {
-        if (isNodeInSpecificFrame(node, frame)) return true
-      }
-      return false
-    }
-
-    let targetNodes: Node[]
-    let targetFrame: Frame | undefined
-
-    if (frameId) {
-      // Frame-scoped layout: only nodes inside the selected frame
-      targetFrame = filteredFrames.value.find(f => f.id === frameId)
-      if (!targetFrame) {
-        return
-      }
-
-      targetNodes = filteredNodes.value.filter(n => isNodeInSpecificFrame(n, targetFrame!))
-    } else {
-      // Canvas layout: exclude nodes inside frames
-      const allTargetNodes = nodeIds
-        ? filteredNodes.value.filter(n => nodeIds.includes(n.id))
-        : filteredNodes.value
-
-      targetNodes = allTargetNodes.filter(n => !isNodeInAnyFrame(n))
-    }
-
-    if (targetNodes.length === 0) return
-
-    const layoutNodesList = targetNodes.map(n => ({
-      id: n.id,
-      x: n.canvas_x,
-      y: n.canvas_y,
-      width: n.width || 200,
-      height: n.height || 120,
-    }))
-
-    // Calculate layout center
-    let centerX: number, centerY: number
-
-    if (targetFrame) {
-      // Center within frame
-      centerX = targetFrame.canvas_x + targetFrame.width / 2
-      centerY = targetFrame.canvas_y + targetFrame.height / 2
-    } else {
-      // Use centroid of nodes being laid out
-      centerX = layoutNodesList.reduce((sum, n) => sum + n.x, 0) / layoutNodesList.length
-      centerY = layoutNodesList.reduce((sum, n) => sum + n.y, 0) / layoutNodesList.length
-    }
-
-    // Get edges between target nodes
-    const layoutNodeIds = new Set(targetNodes.map(n => n.id))
-    const layoutEdges = filteredEdges.value
-      .filter(e => layoutNodeIds.has(e.source_node_id) && layoutNodeIds.has(e.target_node_id))
-      .map(e => ({
-        source: e.source_node_id,
-        target: e.target_node_id,
-      }))
-
-    // Adaptive iterations based on graph size
-    const nodeCount = layoutNodesList.length
-    const iterations = nodeCount > 300 ? 150 : nodeCount > 100 ? 250 : 400
-
-    // Adjust charge and link distance for frame-scoped layout
-    let chargeStrength = options?.chargeStrength
-    let linkDistance = options?.linkDistance
-
-    if (targetFrame && !chargeStrength && !linkDistance) {
-      // Tighter layout for frame-scoped
-      const frameArea = targetFrame.width * targetFrame.height
-      const nodeArea = nodeCount * 200 * 120 // Approximate average node size
-      const density = nodeArea / frameArea
-
-      // Stronger repulsion and shorter links for denser layouts
-      chargeStrength = density > 0.5 ? -200 : -300
-      linkDistance = density > 0.5 ? 80 : 120
-    }
-
-    const positions = await applyForceLayout(layoutNodesList, layoutEdges, {
-      centerX: options?.centerX ?? centerX,
-      centerY: options?.centerY ?? centerY,
-      chargeStrength,
-      linkDistance,
-      iterations,
-    })
-
-    // If frame-scoped, constrain positions to frame bounds and optionally resize nodes
-    if (targetFrame && fitToFrame) {
-      const padding = 30
-      const frameLeft = targetFrame.canvas_x + padding
-      const frameTop = targetFrame.canvas_y + padding + 30 // Extra space for title
-      const frameRight = targetFrame.canvas_x + targetFrame.width - padding
-      const frameBottom = targetFrame.canvas_y + targetFrame.height - padding
-
-      // Calculate available space and optimal node size
-      const availableWidth = frameRight - frameLeft
-      const availableHeight = frameBottom - frameTop
-      const cols = Math.ceil(Math.sqrt(nodeCount * availableWidth / availableHeight))
-      const rows = Math.ceil(nodeCount / cols)
-
-      const nodeWidth = Math.min(200, Math.max(100, (availableWidth - (cols - 1) * 20) / cols))
-      const nodeHeight = Math.min(120, Math.max(60, (availableHeight - (rows - 1) * 20) / rows))
-
-      // Resize nodes and constrain positions
-      const updates: Promise<void>[] = []
-      for (const [id, pos] of positions) {
-        // Constrain position to frame bounds
-        const constrainedX = Math.max(frameLeft, Math.min(frameRight - nodeWidth, pos.x))
-        const constrainedY = Math.max(frameTop, Math.min(frameBottom - nodeHeight, pos.y))
-
-        updates.push(updateNodePosition(id, constrainedX, constrainedY))
-        updates.push(updateNodeSize(id, nodeWidth, nodeHeight))
-      }
-      await Promise.all(updates)
-    } else {
-      // Standard position update
-      const updates: Promise<void>[] = []
-      for (const [id, pos] of positions) {
-        updates.push(updateNodePosition(id, pos.x, pos.y))
-      }
-      await Promise.all(updates)
-    }
-
-    nodeLayoutVersion.value++
-  }
+  ) => layoutComposable.layoutNodes(nodeIds, options)
 
   // Edit locking composable
   const editLocking = useNodeEditLocking({
@@ -989,98 +830,18 @@ export const useNodesStore = defineStore('nodes', () => {
   const createTagEdges = (nodeId: string, tagNames: string[]) => tagNodesComposable.createTagEdges(nodeId, tagNames)
   const getTagNodes = () => tagNodesComposable.getTagNodes()
 
-  // Entity functions
-  /**
-   * Get all entity nodes in the current workspace
-   */
-  function getEntities(): Node[] {
-    return filteredNodes.value.filter(n =>
-      ENTITY_NODE_TYPES.includes(n.node_type as EntityNodeType)
-    )
-  }
-
-  /**
-   * Get entity nodes filtered by type
-   */
-  function getEntitiesByType(entityType: EntityNodeType): Node[] {
-    return filteredNodes.value.filter(n => n.node_type === entityType)
-  }
-
-  /**
-   * Get all entity nodes linked to a specific node
-   * Returns entities that this node references via entity link types
-   */
-  function getLinkedEntities(nodeId: string): Node[] {
-    const entityEdges = edgesStore.getEntityEdgesForNode(nodeId, 'outgoing')
-    const entityIds = new Set(entityEdges.map(e => e.target_node_id))
-    return nodes.value.filter(n => entityIds.has(n.id))
-  }
-
-  /**
-   * Get all content nodes that reference a specific entity
-   */
-  function getNodesReferencingEntity(entityId: string): Node[] {
-    const entityEdges = edgesStore.getEntityEdgesForNode(entityId, 'incoming')
-    const sourceIds = new Set(entityEdges.map(e => e.source_node_id))
-    return nodes.value.filter(n => sourceIds.has(n.id))
-  }
-
-  /**
-   * Create an entity node with appropriate defaults
-   */
-  async function createEntityNode(
+  // Entity functions - forwarded to entity operations composable
+  const getEntities = () => entityOpsComposable.getEntities()
+  const getEntitiesByType = (entityType: EntityNodeType) => entityOpsComposable.getEntitiesByType(entityType)
+  const getLinkedEntities = (nodeId: string) => entityOpsComposable.getLinkedEntities(nodeId)
+  const getNodesReferencingEntity = (entityId: string) => entityOpsComposable.getNodesReferencingEntity(entityId)
+  const createEntityNode = (
     entityType: EntityNodeType,
     title: string,
-    options?: {
-      canvas_x?: number
-      canvas_y?: number
-      markdown_content?: string
-      color_theme?: string | null
-    }
-  ): Promise<Node> {
-    return createNode({
-      title,
-      node_type: entityType,
-      canvas_x: options?.canvas_x ?? 0,
-      canvas_y: options?.canvas_y ?? 0,
-      markdown_content: options?.markdown_content,
-      color_theme: options?.color_theme,
-    })
-  }
-
-  /**
-   * Link a content node to an entity with an appropriate link type
-   */
-  async function linkToEntity(
-    sourceNodeId: string,
-    entityNodeId: string,
-    linkType?: string
-  ): Promise<Edge> {
-    const entityNode = getNode(entityNodeId)
-    const inferredLinkType = linkType ?? inferEntityLinkType(entityNode?.node_type)
-    return createEdge({
-      source_node_id: sourceNodeId,
-      target_node_id: entityNodeId,
-      link_type: inferredLinkType,
-    })
-  }
-
-  /**
-   * Infer appropriate link type based on entity type
-   */
-  function inferEntityLinkType(entityType?: string): string {
-    switch (entityType) {
-      case 'character':
-      case 'location':
-        return 'appears_in'
-      case 'citation':
-        return 'references'
-      case 'term':
-        return 'defines'
-      default:
-        return 'mentions'
-    }
-  }
+    options?: { canvas_x?: number; canvas_y?: number; markdown_content?: string; color_theme?: string | null }
+  ) => entityOpsComposable.createEntityNode(entityType, title, options)
+  const linkToEntity = (sourceNodeId: string, entityNodeId: string, linkType?: string) =>
+    entityOpsComposable.linkToEntity(sourceNodeId, entityNodeId, linkType)
 
   return {
     nodes,

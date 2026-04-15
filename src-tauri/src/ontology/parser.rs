@@ -42,6 +42,16 @@ const DC_DESCRIPTION: &str = "http://purl.org/dc/elements/1.1/description";
 const DC_TERMS_DESCRIPTION: &str = "http://purl.org/dc/terms/description";
 const SKOS_PREF_LABEL: &str = "http://www.w3.org/2004/02/skos/core#prefLabel";
 
+/// Check if language tag indicates English (or no tag, which defaults to English)
+fn is_english_tag(lang_tag: &Option<String>) -> bool {
+    lang_tag.is_none()
+        || lang_tag.as_deref() == Some("en")
+        || lang_tag
+            .as_ref()
+            .map(|t| t.starts_with("en-"))
+            .unwrap_or(false)
+}
+
 /// Data property predicates to exclude from markdown content
 const EXCLUDED_PREDICATES: &[&str] = &[
     RDF_TYPE,
@@ -168,7 +178,7 @@ impl TripleCollector {
     fn process_triple(&self, triple: Triple) {
         let predicate_iri = triple.predicate.iri.to_string();
 
-        // Handle blank node subjects (for owl:Restriction)
+        // Extract subject IRI and check if it's a blank node
         let (subject_iri, is_blank_subject) = match &triple.subject {
             Subject::NamedNode(NamedNode { iri }) => (iri.to_string(), false),
             Subject::BlankNode(bn) => (format!("_:{}", bn.id), true),
@@ -177,236 +187,224 @@ impl TripleCollector {
 
         match &triple.object {
             Term::NamedNode(NamedNode { iri: obj_iri }) => {
-                let obj_iri = obj_iri.to_string();
-
-                // Handle blank node as subject
-                if is_blank_subject {
-                    // Track owl:onProperty for restrictions
-                    if predicate_iri == OWL_ON_PROPERTY {
-                        self.restriction_properties
-                            .borrow_mut()
-                            .insert(subject_iri.clone(), obj_iri.clone());
-                    }
-                    // Track owl:someValuesFrom for restrictions
-                    if predicate_iri == OWL_SOME_VALUES_FROM {
-                        self.restriction_values
-                            .borrow_mut()
-                            .insert(subject_iri.clone(), obj_iri.clone());
-                    }
-                    // Track rdf:first for list parsing
-                    if predicate_iri == RDF_FIRST {
-                        self.rdf_list_first
-                            .borrow_mut()
-                            .insert(subject_iri.clone(), obj_iri.clone());
-                    }
-                    // Track rdf:rest for list parsing (named node case like rdf:nil)
-                    if predicate_iri == RDF_REST {
-                        self.rdf_list_rest
-                            .borrow_mut()
-                            .insert(subject_iri.clone(), obj_iri);
-                    }
-                    return;
-                }
-
-                if predicate_iri == RDF_TYPE {
-                    // Track type
-                    let mut subjects = self.subjects.borrow_mut();
-                    let data = subjects.entry(subject_iri.clone()).or_default();
-                    data.types.push(obj_iri.clone());
-
-                    // If it's a class definition, track it (owl:Class or rdfs:Class)
-                    if obj_iri == OWL_CLASS || obj_iri == RDFS_CLASS {
-                        let mut classes = self.classes.borrow_mut();
-                        classes
-                            .entry(subject_iri.clone())
-                            .or_insert_with(|| OntologyClass {
-                                iri: subject_iri.clone(),
-                                label: None,
-                                description: None,
-                                restricted_properties: Vec::new(),
-                            });
-                    }
-
-                    // If it's an ObjectProperty or DatatypeProperty definition, track it
-                    if obj_iri == OWL_OBJECT_PROPERTY || obj_iri == OWL_DATATYPE_PROPERTY {
-                        let mut props = self.property_definitions.borrow_mut();
-                        props.entry(subject_iri.clone()).or_default();
-                    }
-                } else if predicate_iri == RDFS_SUBCLASS_OF {
-                    self.subclass_relations.borrow_mut().push(SubclassRelation {
-                        subclass_iri: subject_iri.clone(),
-                        superclass_iri: obj_iri,
-                    });
-                } else if predicate_iri == RDFS_DOMAIN
-                    || predicate_iri == SCHEMA_DOMAIN_INCLUDES
-                    || predicate_iri == SCHEMA_DOMAIN_INCLUDES_HTTPS
-                {
-                    // Track domain for property definitions (rdfs:domain or schema:domainIncludes)
-                    let mut props = self.property_definitions.borrow_mut();
-                    let prop = props.entry(subject_iri.clone()).or_default();
-                    prop.domains.push(obj_iri);
-                } else if predicate_iri == RDFS_RANGE
-                    || predicate_iri == SCHEMA_RANGE_INCLUDES
-                    || predicate_iri == SCHEMA_RANGE_INCLUDES_HTTPS
-                {
-                    // Track range for property definitions (rdfs:range or schema:rangeIncludes)
-                    let mut props = self.property_definitions.borrow_mut();
-                    let prop = props.entry(subject_iri.clone()).or_default();
-                    prop.ranges.push(obj_iri);
-                } else {
-                    // Object property usage (actual triple)
-                    self.object_properties.borrow_mut().push(ObjectProperty {
-                        subject_iri: subject_iri.clone(),
-                        predicate_local_name: local_name(&predicate_iri),
-                        object_iri: obj_iri,
-                    });
-                }
+                self.process_named_node_object(
+                    &subject_iri,
+                    is_blank_subject,
+                    &predicate_iri,
+                    obj_iri,
+                );
             }
             Term::Literal(lit) => {
-                // Extract value and optional language tag
-                let (value, lang_tag) = match lit {
-                    Literal::Simple { value } => (value.to_string(), None),
-                    Literal::LanguageTaggedString { value, language } => {
-                        (value.to_string(), Some(language.to_string()))
-                    }
-                    Literal::Typed { value, .. } => (value.to_string(), None),
-                };
-
-                let mut subjects = self.subjects.borrow_mut();
-                let data = subjects.entry(subject_iri.clone()).or_default();
-
-                if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
-                    // Prefer English labels over other languages
-                    // Priority: no tag/en > other languages
-                    let is_english = lang_tag.is_none()
-                        || lang_tag.as_deref() == Some("en")
-                        || lang_tag
-                            .as_ref()
-                            .map(|t| t.starts_with("en-"))
-                            .unwrap_or(false);
-
-                    let current_is_english = data.label_lang.is_none()
-                        || data.label_lang.as_deref() == Some("en")
-                        || data
-                            .label_lang
-                            .as_ref()
-                            .map(|t| t.starts_with("en-"))
-                            .unwrap_or(false);
-
-                    // Update label if:
-                    // 1. No label exists yet, OR
-                    // 2. New label is English and current is not
-                    if data.label.is_none() || (is_english && !current_is_english) {
-                        data.label = Some(value.clone());
-                        data.label_lang = lang_tag.clone();
-                    }
-                } else if predicate_iri == RDFS_COMMENT
-                    || predicate_iri == DC_DESCRIPTION
-                    || predicate_iri == DC_TERMS_DESCRIPTION
-                {
-                    // Prefer English descriptions over other languages
-                    let desc_is_english = lang_tag.is_none()
-                        || lang_tag.as_deref() == Some("en")
-                        || lang_tag
-                            .as_ref()
-                            .map(|t| t.starts_with("en-"))
-                            .unwrap_or(false);
-
-                    let current_desc_is_english = data.description_lang.is_none()
-                        || data.description_lang.as_deref() == Some("en")
-                        || data
-                            .description_lang
-                            .as_ref()
-                            .map(|t| t.starts_with("en-"))
-                            .unwrap_or(false);
-
-                    if data.description.is_none() || (desc_is_english && !current_desc_is_english) {
-                        data.description = Some(value);
-                        data.description_lang = lang_tag.clone();
-                    }
-                } else if !EXCLUDED_PREDICATES.contains(&predicate_iri.as_str()) {
-                    // Data property
-                    data.data_properties
-                        .push((local_name(&predicate_iri), value));
-                }
-
-                // Update class if this is a class definition
-                let mut classes = self.classes.borrow_mut();
-                if let Some(class) = classes.get_mut(&subject_iri) {
-                    if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
-                        class.label = data.label.clone();
-                    }
-                    if predicate_iri == RDFS_COMMENT {
-                        class.description = data.description.clone();
-                    }
-                }
-
-                // Update property definition if this is a property
-                let mut props = self.property_definitions.borrow_mut();
-                if let Some(prop) = props.get_mut(&subject_iri) {
-                    if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
-                        // Check if data has a better (more English) label than prop
-                        let data_is_english = data.label_lang.is_none()
-                            || data.label_lang.as_deref() == Some("en")
-                            || data
-                                .label_lang
-                                .as_ref()
-                                .map(|t| t.starts_with("en-"))
-                                .unwrap_or(false);
-
-                        let prop_is_english = prop.label_lang.is_none()
-                            || prop.label_lang.as_deref() == Some("en")
-                            || prop
-                                .label_lang
-                                .as_ref()
-                                .map(|t| t.starts_with("en-"))
-                                .unwrap_or(false);
-
-                        // Update if no label yet, or if data has English and prop does not
-                        if prop.label.is_none() || (data_is_english && !prop_is_english) {
-                            prop.label = data.label.clone();
-                            prop.label_lang = data.label_lang.clone();
-                        }
-                    }
-                    if predicate_iri == RDFS_COMMENT {
-                        prop.description = data.description.clone();
-                    }
-                }
+                self.process_literal_object(&subject_iri, &predicate_iri, lit);
             }
             Term::BlankNode(bn) => {
-                let bn_id = format!("_:{}", bn.id);
-
-                // Handle blank node objects (e.g., rdfs:subClassOf pointing to owl:Restriction)
-                if predicate_iri == RDFS_SUBCLASS_OF && !is_blank_subject {
-                    self.class_restrictions
-                        .borrow_mut()
-                        .entry(subject_iri.clone())
-                        .or_default()
-                        .push(bn_id.clone());
-                }
-
-                // Track rdfs:domain pointing to blank node (union class)
-                if predicate_iri == RDFS_DOMAIN && !is_blank_subject {
-                    self.property_blank_domains
-                        .borrow_mut()
-                        .insert(subject_iri.clone(), bn_id.clone());
-                }
-
-                // Track owl:unionOf from blank node to list
-                if predicate_iri == OWL_UNION_OF && is_blank_subject {
-                    self.union_of_lists
-                        .borrow_mut()
-                        .insert(subject_iri.clone(), bn_id.clone());
-                }
-
-                // Track rdf:rest pointing to another blank node (list continuation)
-                if predicate_iri == RDF_REST && is_blank_subject {
-                    self.rdf_list_rest
-                        .borrow_mut()
-                        .insert(subject_iri.clone(), bn_id);
-                }
+                self.process_blank_node_object(&subject_iri, is_blank_subject, &predicate_iri, bn);
             }
             _ => {}
+        }
+    }
+
+    /// Process triples where the object is a named node (IRI)
+    fn process_named_node_object(
+        &self,
+        subject_iri: &str,
+        is_blank_subject: bool,
+        predicate_iri: &str,
+        obj_iri: &str,
+    ) {
+        let obj_iri = obj_iri.to_string();
+
+        // Handle blank node as subject (OWL restrictions, RDF lists)
+        if is_blank_subject {
+            if predicate_iri == OWL_ON_PROPERTY {
+                self.restriction_properties
+                    .borrow_mut()
+                    .insert(subject_iri.to_string(), obj_iri.clone());
+            }
+            if predicate_iri == OWL_SOME_VALUES_FROM {
+                self.restriction_values
+                    .borrow_mut()
+                    .insert(subject_iri.to_string(), obj_iri.clone());
+            }
+            if predicate_iri == RDF_FIRST {
+                self.rdf_list_first
+                    .borrow_mut()
+                    .insert(subject_iri.to_string(), obj_iri.clone());
+            }
+            if predicate_iri == RDF_REST {
+                self.rdf_list_rest
+                    .borrow_mut()
+                    .insert(subject_iri.to_string(), obj_iri);
+            }
+            return;
+        }
+
+        if predicate_iri == RDF_TYPE {
+            let mut subjects = self.subjects.borrow_mut();
+            let data = subjects.entry(subject_iri.to_string()).or_default();
+            data.types.push(obj_iri.clone());
+
+            // Track class definitions
+            if obj_iri == OWL_CLASS || obj_iri == RDFS_CLASS {
+                let mut classes = self.classes.borrow_mut();
+                classes
+                    .entry(subject_iri.to_string())
+                    .or_insert_with(|| OntologyClass {
+                        iri: subject_iri.to_string(),
+                        label: None,
+                        description: None,
+                        restricted_properties: Vec::new(),
+                    });
+            }
+
+            // Track property definitions
+            if obj_iri == OWL_OBJECT_PROPERTY || obj_iri == OWL_DATATYPE_PROPERTY {
+                self.property_definitions
+                    .borrow_mut()
+                    .entry(subject_iri.to_string())
+                    .or_default();
+            }
+        } else if predicate_iri == RDFS_SUBCLASS_OF {
+            self.subclass_relations.borrow_mut().push(SubclassRelation {
+                subclass_iri: subject_iri.to_string(),
+                superclass_iri: obj_iri,
+            });
+        } else if predicate_iri == RDFS_DOMAIN
+            || predicate_iri == SCHEMA_DOMAIN_INCLUDES
+            || predicate_iri == SCHEMA_DOMAIN_INCLUDES_HTTPS
+        {
+            let mut props = self.property_definitions.borrow_mut();
+            props
+                .entry(subject_iri.to_string())
+                .or_default()
+                .domains
+                .push(obj_iri);
+        } else if predicate_iri == RDFS_RANGE
+            || predicate_iri == SCHEMA_RANGE_INCLUDES
+            || predicate_iri == SCHEMA_RANGE_INCLUDES_HTTPS
+        {
+            let mut props = self.property_definitions.borrow_mut();
+            props
+                .entry(subject_iri.to_string())
+                .or_default()
+                .ranges
+                .push(obj_iri);
+        } else {
+            // Object property usage
+            self.object_properties.borrow_mut().push(ObjectProperty {
+                subject_iri: subject_iri.to_string(),
+                predicate_local_name: local_name(predicate_iri),
+                object_iri: obj_iri,
+            });
+        }
+    }
+
+    /// Process triples where the object is a literal value
+    fn process_literal_object(&self, subject_iri: &str, predicate_iri: &str, lit: &Literal) {
+        let (value, lang_tag) = match lit {
+            Literal::Simple { value } => (value.to_string(), None),
+            Literal::LanguageTaggedString { value, language } => {
+                (value.to_string(), Some(language.to_string()))
+            }
+            Literal::Typed { value, .. } => (value.to_string(), None),
+        };
+
+        let mut subjects = self.subjects.borrow_mut();
+        let data = subjects.entry(subject_iri.to_string()).or_default();
+
+        if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
+            // Prefer English labels
+            let is_english = is_english_tag(&lang_tag);
+            let current_is_english = is_english_tag(&data.label_lang);
+
+            if data.label.is_none() || (is_english && !current_is_english) {
+                data.label = Some(value.clone());
+                data.label_lang = lang_tag.clone();
+            }
+        } else if predicate_iri == RDFS_COMMENT
+            || predicate_iri == DC_DESCRIPTION
+            || predicate_iri == DC_TERMS_DESCRIPTION
+        {
+            // Prefer English descriptions
+            let desc_is_english = is_english_tag(&lang_tag);
+            let current_desc_is_english = is_english_tag(&data.description_lang);
+
+            if data.description.is_none() || (desc_is_english && !current_desc_is_english) {
+                data.description = Some(value);
+                data.description_lang = lang_tag.clone();
+            }
+        } else if !EXCLUDED_PREDICATES.contains(&predicate_iri) {
+            data.data_properties
+                .push((local_name(predicate_iri), value));
+        }
+
+        // Sync to class definition if applicable
+        let mut classes = self.classes.borrow_mut();
+        if let Some(class) = classes.get_mut(subject_iri) {
+            if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
+                class.label = data.label.clone();
+            }
+            if predicate_iri == RDFS_COMMENT {
+                class.description = data.description.clone();
+            }
+        }
+
+        // Sync to property definition if applicable
+        let mut props = self.property_definitions.borrow_mut();
+        if let Some(prop) = props.get_mut(subject_iri) {
+            if predicate_iri == RDFS_LABEL || predicate_iri == SKOS_PREF_LABEL {
+                let data_is_english = is_english_tag(&data.label_lang);
+                let prop_is_english = is_english_tag(&prop.label_lang);
+
+                if prop.label.is_none() || (data_is_english && !prop_is_english) {
+                    prop.label = data.label.clone();
+                    prop.label_lang = data.label_lang.clone();
+                }
+            }
+            if predicate_iri == RDFS_COMMENT {
+                prop.description = data.description.clone();
+            }
+        }
+    }
+
+    /// Process triples where the object is a blank node
+    fn process_blank_node_object(
+        &self,
+        subject_iri: &str,
+        is_blank_subject: bool,
+        predicate_iri: &str,
+        bn: &rio_api::model::BlankNode,
+    ) {
+        let bn_id = format!("_:{}", bn.id);
+
+        // rdfs:subClassOf pointing to owl:Restriction
+        if predicate_iri == RDFS_SUBCLASS_OF && !is_blank_subject {
+            self.class_restrictions
+                .borrow_mut()
+                .entry(subject_iri.to_string())
+                .or_default()
+                .push(bn_id.clone());
+        }
+
+        // rdfs:domain pointing to blank node (union class)
+        if predicate_iri == RDFS_DOMAIN && !is_blank_subject {
+            self.property_blank_domains
+                .borrow_mut()
+                .insert(subject_iri.to_string(), bn_id.clone());
+        }
+
+        // owl:unionOf from blank node to list
+        if predicate_iri == OWL_UNION_OF && is_blank_subject {
+            self.union_of_lists
+                .borrow_mut()
+                .insert(subject_iri.to_string(), bn_id.clone());
+        }
+
+        // rdf:rest pointing to another blank node (list continuation)
+        if predicate_iri == RDF_REST && is_blank_subject {
+            self.rdf_list_rest
+                .borrow_mut()
+                .insert(subject_iri.to_string(), bn_id);
         }
     }
 
