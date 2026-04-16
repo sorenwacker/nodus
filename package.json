@@ -62,5 +62,8 @@
     "vite": "^6.4.2",
     "vitest": "^4.1.0",
     "vue-tsc": "^3.2.6"
+  },
+  "overrides": {
+    "lodash-es": "^4.18.1"
   }
 }
