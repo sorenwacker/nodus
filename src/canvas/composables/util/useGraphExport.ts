@@ -2,6 +2,22 @@ import { type Ref, type ComputedRef } from 'vue'
 import { writeText as writeClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { NODE_DEFAULTS } from '../../constants'
 
+/**
+ * Escape a string for safe inclusion in YAML double-quoted value
+ * Handles all special characters per YAML 1.2 spec
+ */
+function escapeYamlString(str: string): string {
+  if (!str) return ''
+  return str
+    .replace(/\\/g, '\\\\')    // Backslash first
+    .replace(/"/g, '\\"')       // Double quote
+    .replace(/\n/g, '\\n')      // Newline
+    .replace(/\r/g, '\\r')      // Carriage return
+    .replace(/\t/g, '\\t')      // Tab
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, '0')}`) // Control chars
+}
+
 export interface GraphNode {
   id: string
   title: string
@@ -72,8 +88,8 @@ export function useGraphExport(deps: GraphExportDeps) {
 # Neighborhood mode: ${deps.neighborhoodMode.value}
 
 nodes:
-${nodes.map(n => `  - id: "${n.id}"
-    title: "${n.title?.replace(/"/g, '\\"') || 'Untitled'}"
+${nodes.map(n => `  - id: "${escapeYamlString(n.id)}"
+    title: "${escapeYamlString(n.title) || 'Untitled'}"
     x: ${n.x}
     y: ${n.y}
     width: ${n.width}

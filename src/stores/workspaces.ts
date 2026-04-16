@@ -7,6 +7,7 @@ import { ref, computed } from 'vue'
 import { invoke } from '../lib/tauri'
 import { workspaceStorage } from '../lib/storage'
 import { storeLogger } from '../lib/logger'
+import { stripHtmlTags } from '../lib/sanitize'
 import type { Workspace } from '../types'
 
 // Maximum workspace name length
@@ -18,8 +19,8 @@ const MAX_WORKSPACE_NAME_LENGTH = 100
 function sanitizeWorkspaceName(name: string): string {
   // Trim whitespace
   let sanitized = name.trim()
-  // Remove HTML/script tags
-  sanitized = sanitized.replace(/<[^>]*>/g, '')
+  // Remove HTML/script tags using DOMPurify-based stripping
+  sanitized = stripHtmlTags(sanitized)
   // Remove control characters
   // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\x00-\x1f\x7f]/g, '')

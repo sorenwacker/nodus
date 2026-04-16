@@ -14,6 +14,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import { stripHtmlTags } from '../lib/sanitize'
 import type { ResearchResult } from './types'
 import type { Node } from '../types'
 
@@ -174,7 +175,7 @@ async function searchWikipedia(
 
     if (data.query?.search) {
       for (const item of data.query.search) {
-        const cleanSnippet = item.snippet.replace(/<[^>]+>/g, '')
+        const cleanSnippet = stripHtmlTags(item.snippet)
         results.push({
           source: 'wikipedia',
           title: item.title,

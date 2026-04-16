@@ -175,6 +175,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     let needsMermaidRender = false
     html = html.replace(mermaidRegex, (_match, code) => {
       const id = `mermaid-${mermaidCounter++}`
+      // Decode HTML entities from marked output to get original mermaid code
       const decoded = code
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
@@ -188,7 +189,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       }
       // Only trigger mermaid render if we have uncached diagrams
       needsMermaidRender = true
-      return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${decoded}</pre></div>`
+      // Escape the decoded content for safe HTML insertion, mermaid will read from textContent
+      return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${escapeText(decoded)}</pre></div>`
     })
 
     // Only schedule mermaid render if there are uncached diagrams

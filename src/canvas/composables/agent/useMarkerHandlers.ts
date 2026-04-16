@@ -8,6 +8,7 @@
 import type { Ref } from 'vue'
 import type { Node } from '../../../types'
 import type { AgentPlan } from '../../../llm/types'
+import { stripHtmlTags } from '../../../lib/sanitize'
 import {
   quickResearch,
   deepResearch,
@@ -137,7 +138,7 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
 
         if (respData.query?.search) {
           for (const item of respData.query.search) {
-            const cleanSnippet = item.snippet.replace(/<[^>]+>/g, '')
+            const cleanSnippet = stripHtmlTags(item.snippet)
             const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`
             results.push(`**${item.title}**\n${cleanSnippet}\n[${url}]`)
           }

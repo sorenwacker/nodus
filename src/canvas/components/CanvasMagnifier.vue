@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Node } from '../../types'
+import { stripHtmlTags } from '../../lib/sanitize'
 
 defineProps<{
   visible: boolean
@@ -19,7 +20,7 @@ defineProps<{
  */
 function stripMarkdown(text: string): string {
   if (!text) return ''
-  return text
+  let result = text
     // Remove code blocks first (before other processing)
     .replace(/```[\s\S]*?```/g, '')
     // Remove headers
@@ -47,8 +48,9 @@ function stripMarkdown(text: string): string {
     // Remove list markers
     .replace(/^[\s]*[-*+]\s+/gm, '- ')
     .replace(/^[\s]*\d+\.\s+/gm, '')
-    // Remove HTML tags
-    .replace(/<[^>]+>/g, '')
+  // Remove HTML tags using DOMPurify-based stripping
+  result = stripHtmlTags(result)
+  return result
     // Remove math delimiters
     .replace(/\$\$[\s\S]*?\$\$/g, '[math]')
     .replace(/\$([^$]+)\$/g, '$1')

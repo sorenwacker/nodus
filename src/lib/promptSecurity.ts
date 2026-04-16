@@ -5,12 +5,15 @@
 
 /**
  * Escape special characters that could be used for prompt injection
- * Replaces XML-like tags and control characters
+ * Replaces XML-like tags, quotes (for attribute safety), and control characters
  */
 export function escapeForPrompt(text: string): string {
   return text
+    .replace(/&/g, '&amp;')   // Ampersand first (before other entities)
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')  // Double quote for XML attribute safety
+    .replace(/'/g, '&#39;')   // Single quote for XML attribute safety
     .replace(/\[INST\]/gi, '[_INST_]')
     .replace(/\[\/INST\]/gi, '[_/INST_]')
     .replace(/```/g, "'''")

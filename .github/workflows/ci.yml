@@ -13,6 +13,8 @@ jobs:
   test-rust:
     name: Rust Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: src-tauri
@@ -65,6 +67,8 @@ jobs:
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -87,6 +91,8 @@ jobs:
   build:
     name: Build (${{ matrix.platform }})
     needs: [test-rust, test-frontend]
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
