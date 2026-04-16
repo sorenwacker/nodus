@@ -168,3 +168,13 @@ export function stripHtmlTags(html: string): string {
   // DOMPurify with no allowed tags returns text content
   return cleaned
 }
+
+/**
+ * Decode HTML entities to their character equivalents
+ * Uses the browser's built-in HTML parsing for correct decoding
+ */
+export function decodeHtmlEntities(html: string): string {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = html
+  return textarea.value
+}

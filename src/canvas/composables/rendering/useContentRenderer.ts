@@ -11,7 +11,7 @@ import {
   initTypst as initTypstWasm,
   isTypstReady,
 } from '../../../lib/typst'
-import { sanitizeSvg, sanitizeHtml, escapeText, sanitizeMermaidSvg } from '../../../lib/sanitize'
+import { sanitizeSvg, sanitizeHtml, escapeText, sanitizeMermaidSvg, decodeHtmlEntities } from '../../../lib/sanitize'
 import type { Node } from '../../../types'
 
 export interface UseContentRendererOptions {
@@ -176,12 +176,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     html = html.replace(mermaidRegex, (_match, code) => {
       const id = `mermaid-${mermaidCounter++}`
       // Decode HTML entities from marked output to get original mermaid code
-      const decoded = code
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
+      // Uses browser's built-in HTML parsing for correct entity decoding
+      const decoded = decodeHtmlEntities(code)
 
       // If we have cached SVG for this mermaid code, use it directly
       if (mermaidCache.has(decoded)) {
