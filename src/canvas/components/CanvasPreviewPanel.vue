@@ -236,8 +236,9 @@ function onEditorKeydown(e: KeyboardEvent) {
           <button class="preview-btn-primary" @click="saveAndClose">Save</button>
         </template>
         <template v-else>
-          <button @click="emit('openFullscreen')">Edit</button>
-          <button @click="emit('zoomToNode')">Zoom to Node</button>
+          <button @click="startEditing">View / Edit</button>
+          <button @click="emit('openFullscreen')">Fullscreen</button>
+          <button @click="emit('zoomToNode')">Zoom</button>
         </template>
       </div>
     </div>

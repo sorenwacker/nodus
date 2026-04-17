@@ -457,17 +457,18 @@
 
 .delete-node-btn {
   position: absolute;
-  top: calc(-16px * var(--zoom-scale, 1));
-  right: calc(-16px * var(--zoom-scale, 1));
-  width: calc(36px * var(--zoom-scale, 1));
-  height: calc(36px * var(--zoom-scale, 1));
+  /* Clamp scaling to reasonable range (0.5x to 2x of base size) */
+  top: calc(-16px * clamp(0.5, var(--zoom-scale, 1), 2));
+  right: calc(-16px * clamp(0.5, var(--zoom-scale, 1), 2));
+  width: calc(36px * clamp(0.5, var(--zoom-scale, 1), 2));
+  height: calc(36px * clamp(0.5, var(--zoom-scale, 1), 2));
   border-radius: 50%;
   border: none;
   background: transparent;
   color: var(--danger-color);
   cursor: pointer;
   padding: 0;
-  font-size: calc(13px * var(--font-scale, 1) * var(--zoom-scale, 1));
+  font-size: calc(13px * var(--font-scale, 1) * clamp(0.5, var(--zoom-scale, 1), 2));
   font-weight: 500;
   line-height: 1;
   display: flex;
@@ -480,10 +481,10 @@
 .delete-node-btn::before {
   content: 'x';
   position: absolute;
-  width: calc(22px * var(--zoom-scale, 1));
-  height: calc(22px * var(--zoom-scale, 1));
+  width: calc(22px * clamp(0.5, var(--zoom-scale, 1), 2));
+  height: calc(22px * clamp(0.5, var(--zoom-scale, 1), 2));
   border-radius: 50%;
-  border: calc(1.5px * var(--zoom-scale, 1)) solid var(--danger-border);
+  border: calc(1.5px * clamp(0.5, var(--zoom-scale, 1), 2)) solid var(--danger-border);
   background: var(--danger-bg);
   color: var(--danger-color);
   display: flex;
