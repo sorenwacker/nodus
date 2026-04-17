@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Node } from '../../types'
 
@@ -11,7 +12,7 @@ interface EdgeStats {
   total: number
 }
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   position: { x: number; y: number }
   node: Node | null
@@ -19,6 +20,29 @@ defineProps<{
   renderedContent?: string
   edgeStats?: EdgeStats | null
 }>()
+
+/**
+ * Derive a display title from the node
+ * Falls back to first line of content if no title is set
+ */
+const displayTitle = computed(() => {
+  if (props.node?.title) return props.node.title
+
+  // Try to extract title from content
+  const content = props.node?.markdown_content || props.content
+  if (!content) return t('canvas.node.untitled')
+
+  // Get first non-empty line, strip markdown headers
+  const firstLine = content.split('\n').find(line => line.trim())
+  if (!firstLine) return t('canvas.node.untitled')
+
+  // Remove markdown header prefix
+  const stripped = firstLine.replace(/^#+\s*/, '').trim()
+  if (!stripped) return t('canvas.node.untitled')
+
+  // Truncate if too long
+  return stripped.length > 50 ? stripped.slice(0, 50) + '...' : stripped
+})
 </script>
 
 <template>
@@ -26,7 +50,7 @@ defineProps<{
     v-if="visible && node"
     class="hover-tooltip"
   >
-    <div class="hover-tooltip-title">{{ node.title || t('canvas.node.untitled') }}</div>
+    <div class="hover-tooltip-title">{{ displayTitle }}</div>
 
     <!-- Edge stats -->
     <div v-if="edgeStats && edgeStats.total > 0" class="hover-tooltip-stats">

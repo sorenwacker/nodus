@@ -35,6 +35,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   const nodeSearchQuery = ref('')
   const nodeSearchIndex = ref(0)
   const nodeSearchMatches = ref<number[]>([]) // Start positions of matches
+  const searchNodeId = ref<string | null>(null) // Node being searched (for view mode)
 
   // Autosave timers
   let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
@@ -183,7 +184,13 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     e.stopPropagation()
   }
 
-  function openNodeSearch() {
+  function openNodeSearch(nodeId?: string) {
+    // Store which node we're searching (for view mode)
+    if (nodeId) {
+      searchNodeId.value = nodeId
+    } else if (editingNodeId.value) {
+      searchNodeId.value = editingNodeId.value
+    }
     showNodeSearch.value = true
     nodeSearchQuery.value = ''
     nodeSearchMatches.value = []
@@ -205,11 +212,16 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     nodeSearchQuery.value = ''
     nodeSearchMatches.value = []
     nodeSearchIndex.value = 0
-    // Refocus the textarea
-    setTimeout(() => {
-      const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
-      if (textarea) textarea.focus()
-    }, 10)
+    searchNodeId.value = null
+    // Clear any text selection
+    window.getSelection()?.removeAllRanges()
+    // Refocus the textarea if in edit mode
+    if (editingNodeId.value) {
+      setTimeout(() => {
+        const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
+        if (textarea) textarea.focus()
+      }, 10)
+    }
   }
 
   function updateNodeSearch(query: string) {
@@ -219,8 +231,20 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
       nodeSearchIndex.value = 0
       return
     }
+    // Get content to search - either from edit buffer or from node
+    let content = ''
+    if (editingNodeId.value) {
+      content = editContent.value.toLowerCase()
+    } else if (searchNodeId.value) {
+      const node = store.getNode(searchNodeId.value)
+      content = (node?.markdown_content || '').toLowerCase()
+    }
+    if (!content) {
+      nodeSearchMatches.value = []
+      nodeSearchIndex.value = 0
+      return
+    }
     // Find all matches (case-insensitive)
-    const content = editContent.value.toLowerCase()
     const searchLower = query.toLowerCase()
     const matches: number[] = []
     let pos = 0
@@ -230,7 +254,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     }
     nodeSearchMatches.value = matches
     nodeSearchIndex.value = matches.length > 0 ? 0 : -1
-    // Select first match but keep focus in search input
+    // Select first match in edit mode, or highlight in view mode
     if (matches.length > 0) {
       selectMatch(0, true)
     }
@@ -241,15 +265,65 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     if (matches.length === 0 || index < 0 || index >= matches.length) return
     const pos = matches[index]
     const len = nodeSearchQuery.value.length
-    const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
-    if (textarea) {
-      textarea.focus()
-      textarea.setSelectionRange(pos, pos + len)
-      // Scroll to selection
-      const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20
-      const linesBefore = editContent.value.substring(0, pos).split('\n').length - 1
-      textarea.scrollTop = linesBefore * lineHeight - textarea.clientHeight / 2
+
+    if (editingNodeId.value) {
+      // Edit mode: select text in textarea
+      const textarea = document.querySelector('.inline-editor') as HTMLTextAreaElement
+      if (textarea) {
+        textarea.focus()
+        textarea.setSelectionRange(pos, pos + len)
+        // Scroll to selection
+        const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20
+        const linesBefore = editContent.value.substring(0, pos).split('\n').length - 1
+        textarea.scrollTop = linesBefore * lineHeight - textarea.clientHeight / 2
+      }
+    } else if (searchNodeId.value) {
+      // View mode: use browser's native find to highlight in rendered content
+      const nodeCard = document.querySelector(`[data-node-id="${searchNodeId.value}"]`)
+      const content = nodeCard?.querySelector('.node-content')
+      if (content) {
+        // Scroll content into view
+        content.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Try to use CSS highlight API or window.find as fallback
+        const selection = window.getSelection()
+        if (selection) {
+          // Find the text node containing the match
+          const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT)
+          let currentPos = 0
+          let node: Text | null
+          while ((node = walker.nextNode() as Text)) {
+            const nodeLen = node.textContent?.length || 0
+            if (currentPos + nodeLen > pos) {
+              // Found the node containing start of match
+              const offsetInNode = pos - currentPos
+              try {
+                const range = document.createRange()
+                range.setStart(node, offsetInNode)
+                // Find end position (might be in same or different node)
+                let endNode = node
+                let endOffset = offsetInNode + len
+                let remainingLen = len
+                while (endOffset > (endNode.textContent?.length || 0)) {
+                  remainingLen -= (endNode.textContent?.length || 0) - (endNode === node ? offsetInNode : 0)
+                  const nextNode = walker.nextNode() as Text
+                  if (!nextNode) break
+                  endNode = nextNode
+                  endOffset = remainingLen
+                }
+                range.setEnd(endNode, Math.min(endOffset, endNode.textContent?.length || 0))
+                selection.removeAllRanges()
+                selection.addRange(range)
+              } catch {
+                // Selection failed - at least we scrolled
+              }
+              break
+            }
+            currentPos += nodeLen
+          }
+        }
+      }
     }
+
     // Refocus search input if requested (during typing)
     if (refocusSearch) {
       requestAnimationFrame(() => {

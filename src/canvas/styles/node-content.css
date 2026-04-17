@@ -135,15 +135,15 @@
 .node-content table {
   width: 100%;
   border-collapse: collapse;
-  margin: 8px 0;
-  font-size: calc(12px * var(--font-scale, 1));
+  margin: calc(8px * var(--zoom-scale, 1)) 0;
+  font-size: calc(12px * var(--font-scale, 1) * var(--zoom-scale, 1));
   background: transparent;
 }
 
 .node-content th,
 .node-content td {
   border: 1px solid var(--border-default);
-  padding: 8px 12px;
+  padding: calc(8px * var(--zoom-scale, 1)) calc(12px * var(--zoom-scale, 1));
   text-align: left;
   vertical-align: middle;
   background: transparent;

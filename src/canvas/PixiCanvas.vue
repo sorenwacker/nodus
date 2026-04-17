@@ -245,18 +245,23 @@ watch(
 // Re-center when workspace changes - auto-fit so nodes are visible
 watch(
   () => store.currentWorkspaceId,
-  () => {
+  async () => {
     // Exit neighborhood mode when workspace changes
     neighborhood.exit()
     // Auto-fit to content when switching workspaces (so nodes are visible)
     hasInitiallyCentered = false
-    // Use nextTick + timeout to ensure Vue reactivity has updated filteredNodes
+    // Use nextTick to wait for Vue's reactivity to update filteredNodes
+    await nextTick()
+    // Short delay to ensure computed values have propagated
     setTimeout(() => {
       if (store.filteredNodes.length > 0) {
         fitToContent()
         hasInitiallyCentered = true
+      } else {
+        // Empty workspace - center the grid
+        centerGrid()
       }
-    }, 200)
+    }, 50)
   }
 )
 
@@ -907,6 +912,20 @@ const {
   setNodeLLMAbortController,
   getNodeLLMAbortController,
 } = llmState
+
+// Auto-open log panel on error (only on error, not on regular log messages)
+watch(
+  () => agentLog.value.length,
+  (newLen, oldLen) => {
+    if (newLen > oldLen) {
+      // Check if the new message is an error
+      const lastMessage = agentLog.value[newLen - 1]
+      if (lastMessage && lastMessage.includes('ERROR')) {
+        showAgentLogPanel.value = true
+      }
+    }
+  }
+)
 
 function stopNodeLLM() {
   // Stop agent if in agent mode
@@ -1923,11 +1942,11 @@ const { exportGraphAsYaml } = graphExport
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(window as any).exportGraphAsYaml = exportGraphAsYaml
 
-// Helper to start editing a node and immediately open search
+// Helper to open search on a node (works in both view and edit modes)
 function startEditingAndSearch(nodeId: string) {
-  startEditing(nodeId)
-  // Wait for DOM to update, then open search
-  setTimeout(() => openNodeSearch(), 50)
+  // If not already editing this node, open search in view mode
+  // (no need to switch to edit mode first)
+  openNodeSearch(nodeId)
 }
 
 // Keyboard shortcuts composable - handles global canvas shortcuts

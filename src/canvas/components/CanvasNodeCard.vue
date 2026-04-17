@@ -192,8 +192,8 @@ const displayTitle = computed(() => {
       <span v-else>{{ displayTitle }}</span>
     </div>
 
-    <!-- In-node search bar (when editing and search is active) -->
-    <div v-if="showNodeSearch && isEditing && !isCollapsed" class="node-search-bar" @pointerdown.stop @keydown.stop>
+    <!-- In-node search bar (when search is active, works in both edit and view modes) -->
+    <div v-if="showNodeSearch && !isCollapsed" class="node-search-bar" @pointerdown.stop @keydown.stop>
       <input
         class="node-search-input"
         :value="nodeSearchQuery"
