@@ -164,6 +164,7 @@ function getNodeAgentTools() {
     'update_content',
     'append_content',
     'update_title',
+    'format_math',
     'node_done',
   ])
 
@@ -228,6 +229,7 @@ TOOLS:
 - update_content(content): Replace note content - THIS SAVES YOUR WORK
 - append_content(text): Add text to end of note
 - update_title(title): Change note title
+- format_math(): Convert LaTeX math to Typst format in the note
 - node_done(summary): Signal completion
 
 CRITICAL RULES:
@@ -381,6 +383,23 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                 result = `Title changed to "${args.title}"`
                 log.value.push(`  Title: ${args.title}`)
                 break
+
+              case 'format_math': {
+                // Convert LaTeX math expressions to Typst format in current content
+                const originalContent = currentContent.value
+                const convertedContent = convertLatexDocument(originalContent)
+                if (originalContent !== convertedContent) {
+                  currentContent.value = convertedContent
+                  await ctx.updateContent(convertedContent)
+                  contentWasUpdated = true
+                  result = 'Math expressions converted from LaTeX to Typst format and saved'
+                  log.value.push(`  Converted math to Typst (${convertedContent.length} chars)`)
+                } else {
+                  result = 'No LaTeX math found to convert (content unchanged)'
+                  log.value.push(`  No LaTeX math found`)
+                }
+                break
+              }
 
               case 'node_done':
                 // Check if content was actually updated

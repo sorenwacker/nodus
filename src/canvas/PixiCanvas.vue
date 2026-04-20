@@ -475,6 +475,14 @@ const previewContent = computed(() => {
   return nodeRenderedContent.value[node.id] || renderMarkdown(node.markdown_content)
 })
 
+// Connected nodes for preview panel AI context
+const previewConnectedNodes = computed(() => {
+  const node = previewNode.value
+  if (!node) return []
+  return findConnectedNodes(node.id, store.filteredEdges, store.getNode)
+    .map(({ title, content }) => ({ title, content }))
+})
+
 // Node editor composable - handles inline editing with autosave
 const nodeEditor = useNodeEditor({
   store: {
@@ -2201,12 +2209,14 @@ useCanvasKeyboardShortcuts({
         :content="previewContent"
         :raw-content="previewNode?.markdown_content || ''"
         :node-id="previewNode?.id || ''"
+        :connected-nodes="previewConnectedNodes"
         @close="closePreviewPanel"
         @zoom-to-node="zoomToPreviewNode"
         @open-fullscreen="previewNode && openFullscreenNode(previewNode.id)"
         @save="savePreviewContent"
         @save-title="savePreviewTitle"
         @render-mermaid="renderMermaidDiagrams"
+        @content-updated="savePreviewContent"
       />
 
       <!-- Controls -->

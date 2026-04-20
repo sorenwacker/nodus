@@ -5,6 +5,7 @@
  * - update_content: Replace node content
  * - append_content: Append text to node content
  * - update_title: Change node title
+ * - format_math: Convert LaTeX math to Typst format
  * - node_done: Signal node editing completion (with content validation)
  *
  * These tools return markers that are handled by useNodeAgent.
@@ -57,6 +58,20 @@ export function registerNodeEditTools(): void {
     },
     async (args, _ctx) => {
       return `__UPDATE_TITLE__:${JSON.stringify({ title: args.title })}`
+    },
+    { category: 'node-edit' }
+  )
+
+  defineTool<Record<string, never>>(
+    'format_math',
+    'Convert LaTeX math expressions in the note to Typst format. Use this when the note contains LaTeX math syntax (like $x^2$ or \\frac{a}{b}) that should be rendered as Typst math.',
+    {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    async () => {
+      return '__FORMAT_MATH__:{}'
     },
     { category: 'node-edit' }
   )

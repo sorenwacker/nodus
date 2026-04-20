@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import NodePicker from '../../components/NodePicker.vue'
 import { useNodesStore } from '../../stores/nodes'
 import { useDisplayStore } from '../../stores/display'
 import { openExternal } from '../../lib/tauri'
+import { useNodeAgent, type NodeAgentContext } from '../composables/agent/useNodeAgent'
 
+const { t } = useI18n()
 const store = useNodesStore()
 const displayStore = useDisplayStore()
 const { spellcheckEnabled } = storeToRefs(displayStore)
+const nodeAgent = useNodeAgent()
 
 const props = defineProps<{
   visible: boolean
@@ -16,6 +20,7 @@ const props = defineProps<{
   content: string
   rawContent: string
   nodeId: string
+  connectedNodes?: Array<{ title: string; content: string }>
 }>()
 
 const emit = defineEmits<{
@@ -25,12 +30,17 @@ const emit = defineEmits<{
   save: [nodeId: string, content: string]
   saveTitle: [nodeId: string, title: string]
   renderMermaid: []
+  contentUpdated: [nodeId: string, content: string]
 }>()
 
 const isEditing = ref(false)
 const editContent = ref('')
 const editTitle = ref('')
 const editorRef = ref<HTMLTextAreaElement | null>(null)
+
+// AI prompt state
+const nodePrompt = ref('')
+const isNodeLLMLoading = ref(false)
 
 // Wikilink autocomplete state
 const showLinkPicker = ref(false)
@@ -120,7 +130,7 @@ function onEditorInput(e: Event) {
 }
 
 // Handle node selection from picker
-function onLinkSelect(nodeId: string, nodeTitle: string) {
+function onLinkSelect(_nodeId: string, nodeTitle: string) {
   if (wikilinkStart.value >= 0 && editorRef.value) {
     const cursorPos = editorRef.value.selectionStart
     const before = editContent.value.slice(0, wikilinkStart.value)
@@ -171,6 +181,46 @@ function onEditorKeydown(e: KeyboardEvent) {
     }
   }
 }
+
+// AI prompt handling
+async function sendNodePrompt() {
+  if (!nodePrompt.value.trim() || isNodeLLMLoading.value || !props.nodeId) return
+
+  // Get current content - from edit buffer if editing, otherwise from props
+  const currentContent = isEditing.value ? editContent.value : props.rawContent
+
+  isNodeLLMLoading.value = true
+  const prompt = nodePrompt.value
+  nodePrompt.value = ''
+
+  try {
+    const ctx: NodeAgentContext = {
+      nodeId: props.nodeId,
+      nodeTitle: props.title || 'Untitled',
+      nodeContent: currentContent,
+      connectedNodes: props.connectedNodes || [],
+      updateContent: async (content: string) => {
+        if (isEditing.value) {
+          editContent.value = content
+        }
+        emit('contentUpdated', props.nodeId, content)
+      },
+      updateTitle: async (title: string) => {
+        emit('saveTitle', props.nodeId, title)
+      },
+    }
+
+    await nodeAgent.run(prompt, ctx)
+    setTimeout(() => emit('renderMermaid'), 100)
+  } finally {
+    isNodeLLMLoading.value = false
+  }
+}
+
+function stopNodeAgent() {
+  nodeAgent.stop()
+  isNodeLLMLoading.value = false
+}
 </script>
 
 <template>
@@ -198,6 +248,34 @@ function onEditorKeydown(e: KeyboardEvent) {
         />
         <h3 v-else @dblclick="startEditing">{{ title }}</h3>
         <button class="preview-close" @click="emit('close')">&times;</button>
+      </div>
+
+      <!-- AI toolbar -->
+      <div class="preview-ai-bar">
+        <input
+          v-model="nodePrompt"
+          type="text"
+          :placeholder="isNodeLLMLoading ? t('canvas.node.processing') : t('canvas.node.askPlaceholder')"
+          class="preview-ai-input"
+          :class="{ loading: isNodeLLMLoading }"
+          :disabled="isNodeLLMLoading"
+          @keydown.enter.stop="sendNodePrompt"
+        />
+        <button
+          v-if="!isNodeLLMLoading"
+          class="preview-ai-btn"
+          :disabled="!nodePrompt.trim()"
+          @click="sendNodePrompt"
+        >
+          AI
+        </button>
+        <button
+          v-else
+          class="preview-ai-btn preview-ai-stop"
+          @click="stopNodeAgent"
+        >
+          Stop
+        </button>
       </div>
 
       <!-- Edit mode -->
@@ -327,5 +405,67 @@ function onEditorKeydown(e: KeyboardEvent) {
 
 .wikilink-picker {
   z-index: 3000;
+}
+
+/* AI toolbar styles */
+.preview-ai-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface-alt, rgba(0, 0, 0, 0.02));
+}
+
+.preview-ai-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.preview-ai-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.preview-ai-input.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.preview-ai-input::placeholder {
+  color: var(--text-muted);
+}
+
+.preview-ai-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  background: var(--primary-color);
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.preview-ai-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.preview-ai-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preview-ai-stop {
+  background: var(--error-bg, #ef4444);
+}
+
+:global([data-theme='dark']) .preview-ai-bar {
+  background: rgba(255, 255, 255, 0.03);
 }
 </style>
