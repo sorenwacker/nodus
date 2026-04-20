@@ -1928,6 +1928,7 @@ const storylines = useStorylines({
     workspaces: store.workspaces,
   },
   contextMenuNodeId,
+  getAffectedNodeIds: () => contextMenu.affectedNodeIds.value,
   closeContextMenu,
   showToast,
 })

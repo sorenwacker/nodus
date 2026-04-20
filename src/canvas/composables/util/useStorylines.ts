@@ -18,6 +18,7 @@ export interface UseStorylinesContext {
     workspaces: Workspace[]
   }
   contextMenuNodeId: Ref<string | null>
+  getAffectedNodeIds?: () => string[]
   closeContextMenu: () => void
   showToast?: (message: string, type: 'error' | 'success' | 'info') => void
 }
@@ -29,13 +30,21 @@ export interface UseStorylinesReturn {
 }
 
 export function useStorylines(ctx: UseStorylinesContext): UseStorylinesReturn {
-  const { store, contextMenuNodeId, closeContextMenu, showToast } = ctx
+  const { store, contextMenuNodeId, getAffectedNodeIds, closeContextMenu, showToast } = ctx
 
   /**
-   * Get node IDs to operate on - selected nodes if multi-select includes context menu node,
-   * otherwise just the context menu node
+   * Get node IDs to operate on.
+   * Uses snapshot from context menu if available (preserves selection at menu open time),
+   * otherwise falls back to checking current selection.
    */
   function getTargetNodeIds(): string[] {
+    // Use snapshot from context menu if available
+    if (getAffectedNodeIds) {
+      const affected = getAffectedNodeIds()
+      if (affected.length > 0) return affected
+    }
+
+    // Fallback to original logic
     if (!contextMenuNodeId.value) return []
 
     const selectedIncludesContextNode =
