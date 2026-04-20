@@ -230,6 +230,27 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Mermaid v10+ uses foreignObject with HTML for node labels */
+.node-content .mermaid svg foreignObject {
+  overflow: visible;
+}
+
+.node-content .mermaid svg foreignObject div,
+.node-content .mermaid svg foreignObject span,
+.node-content .mermaid svg .nodeLabel,
+.node-content .mermaid svg .edgeLabel,
+.node-content .mermaid svg .label-container,
+.node-content .mermaid svg .label {
+  color: inherit;
+  fill: inherit;
+}
+
+/* Ensure mermaid text is never transparent */
+.node-content .mermaid svg [class*="label"],
+.node-content .mermaid svg [class*="Label"] {
+  opacity: 1 !important;
+}
+
 /* Light mode Mermaid overrides - force light backgrounds */
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node rect,
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node circle,
@@ -243,6 +264,13 @@
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .node .label,
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg text {
   fill: #1a1a1a !important;
+}
+
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg foreignObject div,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg foreignObject span,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .nodeLabel,
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .label {
+  color: #1a1a1a !important;
 }
 
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .node-content .mermaid svg .edgePath path {
@@ -283,6 +311,21 @@
 [data-theme='pitch-black'] .node-content .mermaid svg text,
 [data-theme='cyber'] .node-content .mermaid svg text {
   fill: var(--text-main) !important;
+}
+
+[data-theme='dark'] .node-content .mermaid svg foreignObject div,
+[data-theme='dark'] .node-content .mermaid svg foreignObject span,
+[data-theme='dark'] .node-content .mermaid svg .nodeLabel,
+[data-theme='dark'] .node-content .mermaid svg .label,
+[data-theme='pitch-black'] .node-content .mermaid svg foreignObject div,
+[data-theme='pitch-black'] .node-content .mermaid svg foreignObject span,
+[data-theme='pitch-black'] .node-content .mermaid svg .nodeLabel,
+[data-theme='pitch-black'] .node-content .mermaid svg .label,
+[data-theme='cyber'] .node-content .mermaid svg foreignObject div,
+[data-theme='cyber'] .node-content .mermaid svg foreignObject span,
+[data-theme='cyber'] .node-content .mermaid svg .nodeLabel,
+[data-theme='cyber'] .node-content .mermaid svg .label {
+  color: var(--text-main) !important;
 }
 
 [data-theme='dark'] .node-content .mermaid svg .edgePath path,

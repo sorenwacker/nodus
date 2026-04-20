@@ -83,59 +83,21 @@ export function sanitizeSvg(svg: string): string {
   return DOMPurify.sanitize(svg, svgConfig as Parameters<typeof DOMPurify.sanitize>[1])
 }
 
-// Mermaid SVG config - permissive to support foreignObject content
-const mermaidSvgConfig: DOMPurify.Config = {
-  ADD_TAGS: [
-    // Core SVG elements
-    'svg', 'g', 'defs', 'symbol', 'use', 'switch', 'desc', 'title', 'metadata',
-    'path', 'line', 'polyline', 'polygon', 'rect', 'circle', 'ellipse', 'image',
-    'text', 'tspan', 'textPath',
-    'marker', 'clipPath', 'mask', 'pattern',
-    'linearGradient', 'radialGradient', 'stop',
-    'filter', 'feGaussianBlur', 'feOffset', 'feBlend', 'feColorMatrix',
-    'feMerge', 'feMergeNode', 'feFlood', 'feComposite',
-    // Mermaid-specific
-    'foreignObject',
-    // HTML inside foreignObject for Mermaid text rendering
-    'div', 'span', 'p', 'br', 'b', 'i', 'em', 'strong', 'table', 'tr', 'td', 'th',
-    'ul', 'ol', 'li', 'pre', 'code',
-  ],
-  ADD_ATTR: [
-    // SVG namespace
-    'xmlns', 'xmlns:xlink', 'xlink:href', 'href',
-    // Positioning
-    'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',
-    'width', 'height', 'viewBox', 'preserveAspectRatio',
-    // Path/shape
-    'd', 'points', 'transform', 'pathLength',
-    // Styling
-    'fill', 'stroke', 'stroke-width', 'stroke-dasharray',
-    'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
-    'opacity', 'fill-opacity', 'stroke-opacity', 'fill-rule',
-    // Text
-    'dominant-baseline', 'text-anchor', 'alignment-baseline',
-    'font-size', 'font-family', 'font-weight', 'font-style',
-    'letter-spacing', 'dy', 'dx', 'baseline-shift',
-    // Marker/clip/filter
-    'marker-start', 'marker-mid', 'marker-end',
-    'clip-path', 'mask', 'filter',
-    'markerWidth', 'markerHeight', 'refX', 'refY', 'orient', 'markerUnits',
-    'gradientUnits', 'gradientTransform', 'offset', 'stop-color', 'stop-opacity',
-    // References
-    'id', 'class', 'style', 'data-id', 'data-node', 'data-et', 'aria-roledescription',
-    // foreignObject
-    'requiredExtensions',
-  ],
-  ALLOW_UNKNOWN_PROTOCOLS: false,
-}
-
 /**
  * Sanitize Mermaid SVG output
- * Uses DOMPurify with permissive config to support foreignObject content
- * while still removing dangerous elements like script tags and event handlers.
+ * Mermaid generates SVG from its own DSL - not from untrusted user HTML.
+ * DOMPurify aggressively strips foreignObject HTML content which breaks text rendering.
+ * We do minimal sanitization: remove script tags and event handlers only.
  */
 export function sanitizeMermaidSvg(svg: string): string {
-  return DOMPurify.sanitize(svg, mermaidSvgConfig as Parameters<typeof DOMPurify.sanitize>[1])
+  // Remove script tags
+  let clean = svg.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  // Remove event handlers (onclick, onerror, etc.)
+  clean = clean.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
+  clean = clean.replace(/\s+on\w+\s*=\s*[^\s>]+/gi, '')
+  // Remove javascript: URLs
+  clean = clean.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
+  return clean
 }
 
 /**

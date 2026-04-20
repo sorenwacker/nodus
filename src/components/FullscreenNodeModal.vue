@@ -2,9 +2,11 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { marked } from 'marked'
+import mermaid from 'mermaid'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
 import { openExternal } from '../lib/tauri'
+import { sanitizeMermaidSvg, escapeText, decodeHtmlEntities } from '../lib/sanitize'
 import NodePicker from './NodePicker.vue'
 
 const props = defineProps<{
@@ -47,6 +49,11 @@ const readingMode = ref(true)
 // Auto-save timer
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
+// Mermaid state
+let mermaidInitialized = false
+const mermaidCache = new Map<string, string>()
+let mermaidCounter = 0
+
 // Load node data when nodeId changes
 const node = computed(() => props.nodeId ? store.getNode(props.nodeId) : null)
 
@@ -78,12 +85,12 @@ watch(() => props.visible, (visible) => {
     })
     // Render mermaid diagrams when modal opens with content
     if (editContent.value?.includes('```mermaid')) {
-      nextTick(() => emit('render-mermaid'))
+      nextTick(() => renderMermaidInModal())
     }
   }
 })
 
-// Live preview - render markdown
+// Live preview - render markdown with mermaid support
 const renderedContent = computed(() => {
   if (!editContent.value) return ''
 
@@ -95,6 +102,21 @@ const renderedContent = computed(() => {
   })
 
   let html = marked.parse(editContent.value) as string
+
+  // Process mermaid code blocks - convert to .mermaid class for rendering
+  const mermaidRegex = /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g
+
+  html = html.replace(mermaidRegex, (_match, code) => {
+    const id = `mermaid-fs-${mermaidCounter++}`
+    // Decode HTML entities from marked output
+    const decoded = decodeHtmlEntities(code)
+
+    // If we have cached SVG, use it directly
+    if (mermaidCache.has(decoded)) {
+      return `<div class="mermaid-wrapper">${mermaidCache.get(decoded)}</div>`
+    }
+    return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${escapeText(decoded)}</pre></div>`
+  })
 
   // Convert [[link]] and [[link|display]] wikilinks to clickable elements
   const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
@@ -111,10 +133,61 @@ const renderedContent = computed(() => {
   return html
 })
 
+// Render mermaid diagrams within the fullscreen modal
+async function renderMermaidInModal() {
+  await nextTick()
+
+  const container = previewRef.value
+  if (!container) return
+
+  const elements = container.querySelectorAll('.mermaid')
+  if (elements.length === 0) return
+
+  // Initialize mermaid if needed
+  if (!mermaidInitialized) {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+                   document.documentElement.getAttribute('data-theme') === 'pitch-black' ||
+                   document.documentElement.getAttribute('data-theme') === 'cyber'
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: isDark ? 'dark' : 'default',
+      securityLevel: 'loose',
+    })
+    mermaidInitialized = true
+  }
+
+  for (const el of elements) {
+    // Skip if already rendered
+    if (el.querySelector('svg')) continue
+
+    const code = el.textContent?.trim() || ''
+    if (!code) continue
+
+    // Check cache
+    if (mermaidCache.has(code)) {
+      el.innerHTML = mermaidCache.get(code)!
+      continue
+    }
+
+    try {
+      const id = `m${Date.now()}${Math.random().toString(36).substr(2, 5)}`
+      const { svg } = await mermaid.render(id, code)
+      const sanitized = sanitizeMermaidSvg(svg)
+      mermaidCache.set(code, sanitized)
+      el.innerHTML = sanitized
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${escapeText(msg.substring(0, 100))}</div>`
+      mermaidCache.set(code, errorHtml)
+      el.innerHTML = errorHtml
+    }
+  }
+}
+
 // Watch for mermaid content changes and trigger rendering
 watch(renderedContent, (content) => {
   if (content && content.includes('class="mermaid"') && props.visible) {
-    nextTick(() => emit('render-mermaid'))
+    nextTick(() => renderMermaidInModal())
   }
 })
 
@@ -573,6 +646,31 @@ onUnmounted(() => {
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
+}
+
+/* Mermaid diagram text visibility */
+.fullscreen-preview :deep(.mermaid) svg text,
+.fullscreen-preview :deep(.mermaid) svg .nodeLabel,
+.fullscreen-preview :deep(.mermaid) svg .label,
+.fullscreen-preview :deep(.mermaid) svg foreignObject div,
+.fullscreen-preview :deep(.mermaid) svg foreignObject span {
+  fill: var(--text-main, #1a1a1a) !important;
+  color: var(--text-main, #1a1a1a) !important;
+}
+
+.fullscreen-preview :deep(.mermaid-wrapper) {
+  margin: 16px 0;
+  overflow-x: auto;
+}
+
+.fullscreen-preview :deep(.mermaid) {
+  display: flex;
+  justify-content: center;
+}
+
+.fullscreen-preview :deep(.mermaid) svg {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Reading mode */
