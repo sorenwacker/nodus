@@ -911,6 +911,10 @@ export const useNodesStore = defineStore('nodes', () => {
     cleanupOrphanEdges,
     deduplicateEdges,
     loadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
+    loadNodes: async () => {
+      const fetchedNodes = await invoke<Node[]>('get_nodes')
+      nodes.value = fetchedNodes
+    },
     layoutNodes,
     isNodeEditable,
     startEditing,

@@ -479,6 +479,128 @@ pub async fn create_file_for_node(node_id: String) -> Result<String, String> {
     Ok(file_path_str)
 }
 
+/// Export all nodes without files to the vault as .md files
+#[tauri::command]
+pub async fn export_nodes_to_files(workspace_id: String) -> Result<i32, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Get workspace to find vault path
+    let workspace = database::workspaces::get_by_id(pool, &workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Workspace not found")?;
+
+    let vault_path = workspace.vault_path.ok_or("Workspace has no vault path")?;
+    let vault_path_obj = std::path::Path::new(&vault_path);
+
+    if !vault_path_obj.exists() {
+        std::fs::create_dir_all(vault_path_obj).map_err(|e| e.to_string())?;
+    }
+
+    // Get all nodes in this workspace without file paths
+    let all_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let nodes_to_export: Vec<_> = all_nodes
+        .into_iter()
+        .filter(|n| {
+            if n.workspace_id.as_deref() != Some(&workspace_id) || n.deleted_at.is_some() {
+                return false;
+            }
+            // Export if no file_path OR if file doesn't exist
+            match &n.file_path {
+                None => true,
+                Some(path) => !std::path::Path::new(path).exists(),
+            }
+        })
+        .collect();
+
+    println!(
+        "[ExportNodes] Exporting {} nodes to {}",
+        nodes_to_export.len(),
+        vault_path
+    );
+
+    let mut exported_count = 0;
+
+    for node in nodes_to_export {
+        // Use title, or extract from content, or fallback to node ID
+        let base_name = if !node.title.trim().is_empty() {
+            node.title.clone()
+        } else if let Some(ref content) = node.markdown_content {
+            // Try to extract title from first # heading
+            let title_from_heading = content
+                .lines()
+                .find(|line| line.starts_with("# "))
+                .map(|line| line.trim_start_matches("# ").trim().to_string());
+
+            // Or use first non-empty line
+            let first_line = content
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .map(|line| line.trim().trim_start_matches('#').trim().to_string());
+
+            title_from_heading
+                .or(first_line)
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| format!("Untitled-{}", &node.id[..8.min(node.id.len())]))
+        } else {
+            format!("Untitled-{}", &node.id[..8.min(node.id.len())])
+        };
+
+        // Sanitize for filename (truncate to reasonable length)
+        let mut safe_title = base_name
+            .chars()
+            .take(100)
+            .collect::<String>()
+            .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
+            .replace("..", "_")
+            .trim()
+            .to_string();
+
+        // Ensure we never have an empty filename
+        if safe_title.is_empty() {
+            safe_title = format!("Untitled-{}", &node.id[..8.min(node.id.len())]);
+        }
+
+        println!("[ExportNodes] Node '{}' -> file '{}.md'", node.title, safe_title);
+
+        let file_path = vault_path_obj.join(format!("{}.md", safe_title));
+
+        // Skip if file already exists (might be from another source)
+        if file_path.exists() {
+            println!("[ExportNodes] Skipping {}: file exists", safe_title);
+            continue;
+        }
+
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        // Write content to file
+        let content = node.markdown_content.unwrap_or_default();
+        if let Err(e) = std::fs::write(&file_path, &content) {
+            eprintln!("[ExportNodes] Failed to write {}: {}", file_path_str, e);
+            continue;
+        }
+
+        // Compute checksum
+        let checksum = crate::checksum::compute_string(&content);
+
+        // Update node with file path
+        if let Err(e) =
+            database::nodes::update_file_path(pool, &node.id, &file_path_str, &checksum).await
+        {
+            eprintln!("[ExportNodes] Failed to update node {}: {}", node.id, e);
+            continue;
+        }
+
+        println!("[ExportNodes] Exported: {}", file_path_str);
+        exported_count += 1;
+    }
+
+    Ok(exported_count)
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct UpdateNodeInput {

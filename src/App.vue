@@ -39,7 +39,7 @@ const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
-import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles } from './lib/tauri'
+import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles } from './lib/tauri'
 
 const syncingFiles = ref(false)
 
@@ -202,7 +202,14 @@ async function syncVaultFiles() {
     const updated = await store.refreshWorkspace()
     console.log(`[App] Refreshed ${updated} existing nodes`)
 
-    // Sync missing files (create nodes for new files)
+    // Export nodes without files to the vault
+    const exported = await exportNodesToFiles(editingWorkspace.value.id)
+    if (exported > 0) {
+      console.log(`[App] Exported ${exported} nodes to files`)
+      await store.loadNodes()
+    }
+
+    // Sync missing files (create nodes for new files in vault)
     const newNodes = await syncMissingFiles(editingWorkspace.value.id, editingWorkspace.value.vault_path) as unknown[]
     if (newNodes.length > 0) {
       await store.loadNodes()
@@ -214,9 +221,9 @@ async function syncVaultFiles() {
     // Always reload edges after sync
     await store.loadEdges()
 
-    const totalChanges = updated + newNodes.length + edgesCreated
+    const totalChanges = updated + newNodes.length + exported + edgesCreated
     if (totalChanges > 0) {
-      showToast(`Synced: ${updated} updated, ${newNodes.length} new nodes, ${edgesCreated} links`, 'success')
+      showToast(`Synced: ${updated} updated, ${exported} exported, ${newNodes.length} imported, ${edgesCreated} links`, 'success')
     } else {
       showToast(t('toasts.noMissingFiles'), 'info')
     }

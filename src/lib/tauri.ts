@@ -142,6 +142,10 @@ export async function createFileForNode(nodeId: string): Promise<string> {
   return invoke<string>('create_file_for_node', { nodeId })
 }
 
+export async function exportNodesToFiles(workspaceId: string): Promise<number> {
+  return invoke<number>('export_nodes_to_files', { workspaceId })
+}
+
 // Convert local file path to URL that webview can access
 let convertFileSrcFunc: ((path: string) => string) | null = null
 
