@@ -24,6 +24,13 @@ export default defineConfig({
       'd3-timer',
       'd3-dispatch',
       'd3-quadtree',
+      'd3-color',
+      'd3-interpolate',
+      'd3-transition',
+      'd3-selection',
+      'd3-scale',
+      'd3-scale-chromatic',
+      'd3',
     ],
     exclude: [
       '@myriaddreamin/typst.ts',
@@ -38,6 +45,13 @@ export default defineConfig({
     commonjsOptions: {
       include: [/d3-.*/, /node_modules/],
       transformMixedEsModules: true,
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'd3': ['d3', 'd3-color', 'd3-interpolate', 'd3-transition', 'd3-selection', 'd3-scale', 'd3-scale-chromatic'],
+        },
+      },
     },
   },
 })
