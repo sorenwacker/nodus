@@ -564,7 +564,10 @@ pub async fn export_nodes_to_files(workspace_id: String) -> Result<i32, String> 
             safe_title = format!("Untitled-{}", &node.id[..8.min(node.id.len())]);
         }
 
-        println!("[ExportNodes] Node '{}' -> file '{}.md'", node.title, safe_title);
+        println!(
+            "[ExportNodes] Node '{}' -> file '{}.md'",
+            node.title, safe_title
+        );
 
         let file_path = vault_path_obj.join(format!("{}.md", safe_title));
 
