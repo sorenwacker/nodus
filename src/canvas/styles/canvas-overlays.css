@@ -665,7 +665,7 @@
 }
 
 .preview-actions button:hover {
-  opacity: 0.9;
+  background: var(--primary-hover);
 }
 
 /* Slide-in animation */

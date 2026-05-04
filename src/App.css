@@ -475,6 +475,12 @@
   cursor: pointer;
   font-size: 14px;
   color: var(--text-main);
+  transition: all 0.15s ease;
+}
+
+.cancel-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--text-muted);
 }
 
 .import-btn {
@@ -494,7 +500,7 @@
 }
 
 .import-btn:hover:not(:disabled) {
-  opacity: 0.9;
+  background: var(--primary-hover);
 }
 
 /* Toast notifications */
@@ -666,7 +672,7 @@
 }
 
 .select-folder-btn:hover {
-  opacity: 0.9;
+  background: var(--primary-hover);
 }
 
 .sync-toggle {
