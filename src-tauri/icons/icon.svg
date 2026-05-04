@@ -40,38 +40,38 @@
   </g>
 
   <!-- Edges (connections between nodes) -->
-  <g filter="url(#glow-edge)" stroke-width="14" stroke-linecap="round" fill="none">
+  <g filter="url(#glow-edge)" stroke-width="16" stroke-linecap="round" fill="none">
     <!-- Center to top-right -->
-    <line x1="256" y1="256" x2="380" y2="140" stroke="#00ffcc"/>
+    <line x1="256" y1="256" x2="420" y2="95" stroke="#00ffcc"/>
     <!-- Center to bottom-left -->
-    <line x1="256" y1="256" x2="140" y2="360" stroke="#00ffcc"/>
+    <line x1="256" y1="256" x2="85" y2="410" stroke="#00ffcc"/>
     <!-- Center to left -->
-    <line x1="256" y1="256" x2="120" y2="200" stroke="#00ccff"/>
+    <line x1="256" y1="256" x2="70" y2="170" stroke="#00ccff"/>
     <!-- Center to bottom-right -->
-    <line x1="256" y1="256" x2="370" y2="340" stroke="#ff00ff"/>
+    <line x1="256" y1="256" x2="430" y2="390" stroke="#ff00ff"/>
   </g>
 
   <!-- Outer nodes (smaller) -->
   <g filter="url(#glow-cyan)">
-    <circle cx="380" cy="140" r="28" fill="#0a0a12" stroke="#00ffcc" stroke-width="3"/>
-    <circle cx="140" cy="360" r="28" fill="#0a0a12" stroke="#00ffcc" stroke-width="3"/>
-    <circle cx="120" cy="200" r="24" fill="#0a0a12" stroke="#00ccff" stroke-width="3"/>
+    <circle cx="420" cy="95" r="36" fill="#0a0a12" stroke="#00ffcc" stroke-width="10"/>
+    <circle cx="85" cy="410" r="36" fill="#0a0a12" stroke="#00ffcc" stroke-width="10"/>
+    <circle cx="70" cy="170" r="32" fill="#0a0a12" stroke="#00ccff" stroke-width="10"/>
   </g>
 
   <!-- Magenta node -->
   <g filter="url(#glow-magenta)">
-    <circle cx="370" cy="340" r="26" fill="#0a0a12" stroke="#ff00ff" stroke-width="3"/>
+    <circle cx="430" cy="390" r="34" fill="#0a0a12" stroke="#ff00ff" stroke-width="10"/>
   </g>
 
   <!-- Center node (main, larger) -->
   <g filter="url(#glow-magenta)">
-    <circle cx="256" cy="256" r="52" fill="#0a0a12" stroke="#ff00ff" stroke-width="4"/>
-    <circle cx="256" cy="256" r="20" fill="#ff00ff" fill-opacity="0.8"/>
+    <circle cx="256" cy="256" r="68" fill="#0a0a12" stroke="#ff00ff" stroke-width="14"/>
+    <circle cx="256" cy="256" r="34" fill="#ff00ff" fill-opacity="0.8"/>
   </g>
 
   <!-- Inner node highlights -->
-  <circle cx="380" cy="140" r="10" fill="#00ffcc" fill-opacity="0.7"/>
-  <circle cx="140" cy="360" r="10" fill="#00ffcc" fill-opacity="0.7"/>
-  <circle cx="120" cy="200" r="8" fill="#00ccff" fill-opacity="0.7"/>
-  <circle cx="370" cy="340" r="9" fill="#ff00ff" fill-opacity="0.7"/>
+  <circle cx="420" cy="95" r="18" fill="#00ffcc" fill-opacity="0.7"/>
+  <circle cx="85" cy="410" r="18" fill="#00ffcc" fill-opacity="0.7"/>
+  <circle cx="70" cy="170" r="16" fill="#00ccff" fill-opacity="0.7"/>
+  <circle cx="430" cy="390" r="17" fill="#ff00ff" fill-opacity="0.7"/>
 </svg>
