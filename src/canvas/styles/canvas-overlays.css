@@ -643,6 +643,8 @@
   display: block;
 }
 
+/* Table, code, and other markdown styles are in node-content.css with shared selectors */
+
 .preview-actions {
   padding: 12px 16px;
   border-top: 1px solid var(--border-default);

@@ -287,27 +287,39 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     }
 
     // Lazy load mermaid only when needed
+    // Lazy load mermaid module
     if (!mermaidLoaded) {
       try {
         const mod = await import('mermaid')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let api: any = mod.default || mod
         if (api.default) api = api.default
-
         mermaidApi = api
-        if (typeof mermaidApi.initialize === 'function') {
-          mermaidApi.initialize({
-            startOnLoad: false,
-            theme: isDarkMode() ? 'dark' : 'default',
-            securityLevel: 'loose',
-          })
-        }
         mermaidLoaded = true
       } catch (e) {
         console.error('[Mermaid] Load error:', e)
         mermaidRenderPending = false
         return
       }
+    }
+
+    // Initialize Mermaid with appropriate built-in theme
+    if (typeof mermaidApi.initialize === 'function') {
+      mermaidApi.initialize({
+        startOnLoad: false,
+        theme: isDarkMode() ? 'dark' : 'default',
+        securityLevel: 'loose',
+      })
+    }
+
+    // Skip if no elements to render
+    if (elements.length === 0) {
+      mermaidRenderPending = false
+      if (mermaidRenderQueued) {
+        mermaidRenderQueued = false
+        setTimeout(renderMermaidDiagrams, 50)
+      }
+      return
     }
 
     let didRenderNew = false
@@ -322,9 +334,16 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         continue
       }
 
+      // Store original code as data attribute for theme change reinit
+      el.setAttribute('data-mermaid-code', code)
+
+      // Include theme in cache key so theme changes re-render
+      const dark = isDarkMode()
+      const cacheKey = `${dark ? 'dark' : 'light'}:${code}`
+
       // Check cache first
-      if (mermaidCache.has(code)) {
-        el.innerHTML = mermaidCache.get(code)!
+      if (mermaidCache.has(cacheKey)) {
+        el.innerHTML = mermaidCache.get(cacheKey)!
         didRenderNew = true
         continue
       }
@@ -334,7 +353,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         const { svg } = await mermaidApi.render(id, code)
         // Use Mermaid-specific sanitization that preserves foreignObject content
         const sanitized = sanitizeMermaidSvg(svg)
-        mermaidCache.set(code, sanitized)
+        mermaidCache.set(cacheKey, sanitized)
         el.innerHTML = sanitized
         didRenderNew = true
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -342,7 +361,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         const msg = e.message || String(e)
         // Escape error message to prevent XSS
         const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${escapeText(msg.substring(0, 100))}</div>`
-        mermaidCache.set(code, errorHtml)
+        mermaidCache.set(cacheKey, errorHtml)
         el.innerHTML = errorHtml
         didRenderNew = true
       }
@@ -434,6 +453,26 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     )
   }
 
+  // Reinitialize Mermaid with current theme (call when theme changes)
+  function reinitializeMermaid() {
+    mermaidCache.clear()
+    mermaidLoaded = false
+    mermaidApi = null
+    // Clear rendered mermaid from DOM and re-render
+    const elements = document.querySelectorAll('.node-content .mermaid, .preview-content .mermaid')
+    for (const el of elements) {
+      if (el.querySelector('svg')) {
+        // Restore the original code so it can be re-rendered
+        const code = el.getAttribute('data-mermaid-code') || ''
+        if (code) {
+          el.innerHTML = code
+        }
+      }
+    }
+    // Trigger re-render
+    setTimeout(renderMermaidDiagrams, 50)
+  }
+
   return {
     // State
     nodeRenderedContent,
@@ -446,5 +485,6 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     clearCaches,
     renderSingleNode,
     setupWatchers,
+    reinitializeMermaid,
   }
 }

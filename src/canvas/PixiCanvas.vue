@@ -146,6 +146,11 @@ const {
   startZooming,
 } = viewState
 
+// Watch for theme changes to reinitialize Mermaid with correct theme
+watch(isDarkMode, () => {
+  reinitializeMermaid()
+})
+
 onMounted(() => {
   // Setup display settings listener for reactive updates
   displayStore.setupListener()
@@ -465,6 +470,7 @@ const {
   renderTypstMath,
   renderMermaidDiagrams,
   setupWatchers: setupContentWatchers,
+  reinitializeMermaid,
 } = contentRenderer
 
 // Preview content computed - renders on-demand if not cached

@@ -251,10 +251,10 @@ export const canvasStorage = {
   },
   getEdgeStyle(workspaceId?: string): 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' | 'direct' {
     const value = localStorage.getItem(this._key(KEYS.canvasEdgeStyle, workspaceId))
-    if (value === 'diagonal' || value === 'curved' || value === 'hyperbolic' || value === 'straight' || value === 'direct') {
+    if (value === 'orthogonal' || value === 'diagonal' || value === 'curved' || value === 'hyperbolic' || value === 'straight' || value === 'direct') {
       return value
     }
-    return 'orthogonal'
+    return 'hyperbolic'
   },
   setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' | 'direct', workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasEdgeStyle, workspaceId), value)
