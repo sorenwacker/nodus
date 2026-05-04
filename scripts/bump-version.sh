@@ -1,58 +1,38 @@
 #!/bin/bash
-# Bump version in all project files
-# Usage: ./scripts/bump-version.sh [patch|minor|major]
+# Bump version in package.json and Cargo.toml
+# Usage: ./scripts/bump-version.sh 0.4.33
 
 set -e
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -z "$1" ]; then
+  echo "Usage: $0 <version>"
+  echo "Example: $0 0.4.33"
+  exit 1
+fi
 
-# Get current version from package.json
-CURRENT_VERSION=$(grep '"version"' "$ROOT_DIR/package.json" | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
+VERSION="$1"
 
-# Parse version components
-IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+# Validate version format
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: Version must be in format X.Y.Z (e.g., 0.4.33)"
+  exit 1
+fi
 
-# Determine bump type
-BUMP_TYPE="${1:-patch}"
-
-case "$BUMP_TYPE" in
-  major)
-    MAJOR=$((MAJOR + 1))
-    MINOR=0
-    PATCH=0
-    ;;
-  minor)
-    MINOR=$((MINOR + 1))
-    PATCH=0
-    ;;
-  patch)
-    PATCH=$((PATCH + 1))
-    ;;
-  *)
-    # If argument looks like a version number, use it directly
-    if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      NEW_VERSION="$1"
-    else
-      echo "Usage: $0 [patch|minor|major|x.y.z]"
-      exit 1
-    fi
-    ;;
-esac
-
-NEW_VERSION="${NEW_VERSION:-$MAJOR.$MINOR.$PATCH}"
-
-echo "$CURRENT_VERSION -> $NEW_VERSION"
+echo "Bumping version to $VERSION..."
 
 # Update package.json
-sed -i '' "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" "$ROOT_DIR/package.json"
+sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
+echo "Updated package.json"
 
-# Update package-lock.json
-sed -i '' "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/g" "$ROOT_DIR/package-lock.json"
+# Update Cargo.toml
+sed -i '' "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+echo "Updated src-tauri/Cargo.toml"
 
-# Update src-tauri/Cargo.toml
-sed -i '' "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$ROOT_DIR/src-tauri/Cargo.toml"
+# Verify changes
+echo ""
+echo "Verification:"
+grep '"version"' package.json | head -1
+grep '^version' src-tauri/Cargo.toml
 
-# Update src-tauri/tauri.conf.json
-sed -i '' "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" "$ROOT_DIR/src-tauri/tauri.conf.json"
-
-echo "$NEW_VERSION"
+echo ""
+echo "Done. Now run: git add -A && git commit -m 'Bump version to $VERSION'"

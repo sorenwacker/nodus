@@ -34,6 +34,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify version consistency
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          TAG_BASE=$(echo "$TAG" | sed 's/-.*//')
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+          echo "Tag version: $TAG_BASE"
+          echo "package.json: $PKG_VERSION"
+          echo "Cargo.toml: $CARGO_VERSION"
+
+          if [ "$TAG_BASE" != "$PKG_VERSION" ]; then
+            echo "::error::Tag ($TAG_BASE) doesn't match package.json ($PKG_VERSION)"
+            exit 1
+          fi
+          if [ "$TAG_BASE" != "$CARGO_VERSION" ]; then
+            echo "::error::Tag ($TAG_BASE) doesn't match Cargo.toml ($CARGO_VERSION)"
+            exit 1
+          fi
+          echo "All versions match!"
+
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
