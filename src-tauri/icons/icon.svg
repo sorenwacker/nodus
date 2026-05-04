@@ -18,7 +18,7 @@
     </filter>
     <!-- Edge glow -->
     <filter id="glow-edge" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feGaussianBlur stdDeviation="10" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
@@ -40,7 +40,7 @@
   </g>
 
   <!-- Edges (connections between nodes) -->
-  <g filter="url(#glow-edge)" stroke-width="4" stroke-linecap="round" fill="none">
+  <g filter="url(#glow-edge)" stroke-width="14" stroke-linecap="round" fill="none">
     <!-- Center to top-right -->
     <line x1="256" y1="256" x2="380" y2="140" stroke="#00ffcc"/>
     <!-- Center to bottom-left -->
