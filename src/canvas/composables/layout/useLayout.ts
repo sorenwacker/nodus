@@ -307,23 +307,14 @@ export function useLayout(options: UseLayoutOptions) {
       }
     }
 
-    // If center node is in a frame, constrain all positions to stay within frame
-    let finalTargets = targets
-    if (centerFrameId) {
-      const allFrames = store.getFilteredFrames()
-      const frame = allFrames.find(f => f.id === centerFrameId)
-      if (frame) {
-        // Build node size map for constraint calculation
-        const nodeMap = new Map<string, NodeSize>()
-        for (const nodeId of targets.keys()) {
-          const node = allNodes.find(n => n.id === nodeId)
-          if (node) {
-            nodeMap.set(nodeId, { width: node.width, height: node.height })
-          }
-        }
-        finalTargets = constrainNodesToFrame(targets, nodeMap, frame)
-      }
-    }
+    // Constrain to frame OR push out of frames (same pattern as other layouts)
+    const nodeMap = new Map(allNodes.map(n => [n.id, { width: n.width, height: n.height }]))
+    const targetFrame = centerFrameId
+      ? store.getFilteredFrames().find(f => f.id === centerFrameId)
+      : undefined
+    const finalTargets = targetFrame
+      ? constrainNodesToFrame(targets, nodeMap, targetFrame)
+      : pushOutOfFrames(targets, nodeMap)
 
     // Animate to positions
     if (finalTargets.size > 200) {
