@@ -124,17 +124,15 @@ export function useLayout(options: UseLayoutOptions) {
     const allEdges = store.getFilteredEdges()
 
     // Determine which nodes should be moved by radial layout
-    // Nodes in different frames than center should not be moved
-    const centerFrameId = centerNode.frame_id
+    // Only move nodes that share the same frame context as center
+    const centerFrameId = centerNode.frame_id || null
     const nodeIdsToLayout = new Set(allNodes.filter(n => {
-      // Always include the center node
-      if (n.id === centerId) return true
-      // If node is in a frame different from center's frame, exclude it
-      if (n.frame_id && n.frame_id !== centerFrameId) return false
-      // If center is in a frame, only include nodes in that frame
-      if (centerFrameId && n.frame_id !== centerFrameId) return false
-      return true
+      const nodeFrameId = n.frame_id || null
+      // Include if both are in the same frame (or both unframed)
+      return nodeFrameId === centerFrameId
     }).map(n => n.id))
+
+    console.log('[RadialLayout] Center frame:', centerFrameId, 'Nodes to layout:', nodeIdsToLayout.size, 'Total nodes:', allNodes.length)
 
     // Build adjacency map
     const adjacency = new Map<string, Set<string>>()
