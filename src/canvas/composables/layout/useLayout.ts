@@ -107,6 +107,20 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   /**
+   * Apply frame constraints to positions - either constrain within a frame or push out of all frames
+   */
+  function applyFrameConstraints(
+    positions: Map<string, { x: number; y: number }>,
+    nodes: Node[],
+    targetFrame?: Frame
+  ): Map<string, { x: number; y: number }> {
+    const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+    return targetFrame
+      ? constrainNodesToFrame(positions, nodeMap, targetFrame)
+      : pushOutOfFrames(positions, nodeMap)
+  }
+
+  /**
    * Radial/concentric layout - places selected node at center with neighbors in rings
    * Only affects nodes in the same frame context as the center node
    */
@@ -307,14 +321,11 @@ export function useLayout(options: UseLayoutOptions) {
       }
     }
 
-    // Constrain to frame OR push out of frames (same pattern as other layouts)
-    const nodeMap = new Map(allNodes.map(n => [n.id, { width: n.width, height: n.height }]))
+    // Constrain to frame OR push out of frames
     const targetFrame = centerFrameId
       ? store.getFilteredFrames().find(f => f.id === centerFrameId)
       : undefined
-    const finalTargets = targetFrame
-      ? constrainNodesToFrame(targets, nodeMap, targetFrame)
-      : pushOutOfFrames(targets, nodeMap)
+    const finalTargets = applyFrameConstraints(targets, allNodes, targetFrame)
 
     // Animate to positions
     if (finalTargets.size > 200) {
@@ -413,10 +424,7 @@ export function useLayout(options: UseLayoutOptions) {
       })
 
       // Push nodes out of frames OR constrain to frame boundaries
-      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-      const finalPositions = targetFrame
-        ? constrainNodesToFrame(positions, nodeMap, targetFrame)
-        : pushOutOfFrames(positions, nodeMap)
+      const finalPositions = applyFrameConstraints(positions, nodes, targetFrame)
 
       // Batch update positions to avoid blocking UI
       await batchUpdatePositions(finalPositions, store.updateNodePosition, 200)
@@ -569,10 +577,7 @@ export function useLayout(options: UseLayoutOptions) {
       }
 
       // Push nodes out of frames OR constrain to frame boundaries
-      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-      const finalTargets = targetFrame
-        ? constrainNodesToFrame(nodeTargets, nodeMap, targetFrame)
-        : pushOutOfFrames(nodeTargets, nodeMap)
+      const finalTargets = applyFrameConstraints(nodeTargets, nodes, targetFrame)
 
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
@@ -649,10 +654,7 @@ export function useLayout(options: UseLayoutOptions) {
       }
 
       // Push nodes out of frames OR constrain to frame boundaries
-      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-      const finalTargets = targetFrame
-        ? constrainNodesToFrame(nodeTargets, nodeMap, targetFrame)
-        : pushOutOfFrames(nodeTargets, nodeMap)
+      const finalTargets = applyFrameConstraints(nodeTargets, nodes, targetFrame)
 
       // For large graphs, use batch updates instead of animation (much faster)
       if (virtualNodes.length > 500) {
@@ -772,10 +774,7 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     // Push nodes out of frames OR constrain to frame boundaries
-    const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-    const finalTargets = targetFrame
-      ? constrainNodesToFrame(targets, nodeMap, targetFrame)
-      : pushOutOfFrames(targets, nodeMap)
+    const finalTargets = applyFrameConstraints(targets, nodes, targetFrame)
 
     animateToPositions(finalTargets, 500)
   }
@@ -906,11 +905,8 @@ export function useLayout(options: UseLayoutOptions) {
       centerY,
     })
 
-    // Build node map for frame collision detection
-    const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-
     // Post-process: push nodes out of frames
-    const positions = pushOutOfFrames(calculatedPositions, nodeMap)
+    const positions = applyFrameConstraints(calculatedPositions, nodes)
 
     // Apply positions
     const animate = options?.animate !== false
