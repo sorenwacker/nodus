@@ -127,6 +127,8 @@ export function useLayout(options: UseLayoutOptions) {
    * - If center is NOT in a frame, only unframed nodes are moved (framed nodes are NEVER touched)
    */
   async function radialLayout(): Promise<void> {
+    console.log('>>> RADIAL LAYOUT STARTING (new code) <<<')
+
     const selectedIds = store.getSelectedNodeIds()
     if (selectedIds.length !== 1) {
       return
@@ -142,22 +144,46 @@ export function useLayout(options: UseLayoutOptions) {
     const allNodes = store.getFilteredNodes()
     const allEdges = store.getFilteredEdges()
 
-    // Determine which nodes can be moved by radial layout
-    // CRITICAL: Only move nodes that share the same frame context as center
-    const centerFrameId = centerNode.frame_id
+    // Get all frames for spatial overlap checking
+    const allFrames = store.getFilteredFrames()
+
+    // Helper to check if a node is inside ANY frame (by frame_id OR 50%+ spatial overlap)
+    const getNodeFrameId = (node: Node): string | null => {
+      // First check explicit frame_id
+      if (node.frame_id) return node.frame_id
+
+      // Then check spatial overlap with any frame
+      const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+      const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+      for (const frame of allFrames) {
+        if (isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, frame)) {
+          return frame.id
+        }
+      }
+      return null
+    }
+
+    // Determine center node's frame (by frame_id OR spatial overlap)
+    const centerFrameId = getNodeFrameId(centerNode)
     const centerIsFramed = !!centerFrameId
 
     // Filter nodes to only those that should be laid out
+    // Uses same logic as other layouts: frame_id OR spatial overlap
     const nodesToLayout = allNodes.filter(n => {
+      const nodeFrameId = getNodeFrameId(n)
       if (centerIsFramed) {
         // Center is in a frame - only include nodes in the SAME frame
-        return n.frame_id === centerFrameId
+        return nodeFrameId === centerFrameId
       } else {
-        // Center is NOT in a frame - NEVER move framed nodes
-        return !n.frame_id
+        // Center is NOT in a frame - NEVER move nodes that are in any frame
+        return !nodeFrameId
       }
     })
     const nodeIdsToLayout = new Set(nodesToLayout.map(n => n.id))
+
+    console.log('>>> Center isFramed:', centerIsFramed, 'centerFrameId:', centerFrameId)
+    console.log('>>> Total:', allNodes.length, 'In frames:', allNodes.length - nodesToLayout.length, 'Unframed:', nodesToLayout.length)
+    console.log('>>> Will layout:', nodesToLayout.length, 'nodes')
 
     // Build adjacency map
     const adjacency = new Map<string, Set<string>>()
@@ -330,6 +356,20 @@ export function useLayout(options: UseLayoutOptions) {
           targets.set(nodeId, { x: Math.round(x), y: Math.round(y) })
         }
       }
+    }
+
+    // SAFETY CHECK: Verify no framed nodes are in targets when center is unframed
+    console.log('>>> Targets count:', targets.size)
+    if (!centerIsFramed) {
+      let framedInTargets = 0
+      for (const [nodeId] of targets) {
+        const node = allNodes.find(n => n.id === nodeId)
+        if (node && getNodeFrameId(node)) {
+          framedInTargets++
+          console.error('BUG: Framed node in targets!', nodeId, 'frameId:', getNodeFrameId(node))
+        }
+      }
+      console.log('>>> Framed nodes in targets:', framedInTargets, '(should be 0)')
     }
 
     // Constrain to frame OR push out of frames
