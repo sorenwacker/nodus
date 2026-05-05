@@ -821,6 +821,7 @@ const layout = useLayout({
     getFilteredEdges: () => [...store.filteredEdges],
     getFilteredFrames: () => [...store.filteredFrames],
     getSelectedNodeIds: () => [...store.selectedNodeIds],
+    getNode: store.getNode,
     updateNodePosition: store.updateNodePosition,
     updateFramePosition: store.updateFramePosition,
     layoutNodes: store.layoutNodes,

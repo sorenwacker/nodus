@@ -51,6 +51,7 @@ interface Store {
   getFilteredEdges: () => Edge[]
   getFilteredFrames: () => Frame[]
   getSelectedNodeIds: () => string[]
+  getNode: (id: string) => Node | undefined
   updateNodePosition: (id: string, x: number, y: number) => void
   updateFramePosition: (id: string, x: number, y: number) => void
   layoutNodes: (nodeIds?: string[], options?: { centerX: number; centerY: number }) => Promise<void>
@@ -111,16 +112,13 @@ export function useLayout(options: UseLayoutOptions) {
    */
   async function radialLayout(): Promise<void> {
     const selectedIds = store.getSelectedNodeIds()
-    console.log('[RadialLayout] Selected nodes:', selectedIds.length)
     if (selectedIds.length !== 1) {
-      console.log('[RadialLayout] Requires exactly 1 selected node, aborting')
       return
     }
 
     const centerId = selectedIds[0]
     const centerNode = store.getNode(centerId)
     if (!centerNode) {
-      console.log('[RadialLayout] Center node not found, aborting')
       return
     }
 
@@ -136,8 +134,6 @@ export function useLayout(options: UseLayoutOptions) {
       // Include if both are in the same frame (or both unframed)
       return nodeFrameId === centerFrameId
     }).map(n => n.id))
-
-    console.log('[RadialLayout] Center frame:', centerFrameId, 'Nodes to layout:', nodeIdsToLayout.size, 'Total nodes:', allNodes.length)
 
     // Build adjacency map
     const adjacency = new Map<string, Set<string>>()
