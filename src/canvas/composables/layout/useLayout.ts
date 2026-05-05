@@ -107,6 +107,7 @@ export function useLayout(options: UseLayoutOptions) {
 
   /**
    * Radial/concentric layout - places selected node at center with neighbors in rings
+   * Only affects nodes in the same frame context as the center node
    */
   async function radialLayout(): Promise<void> {
     const selectedIds = store.getSelectedNodeIds()
@@ -115,8 +116,19 @@ export function useLayout(options: UseLayoutOptions) {
     }
 
     const centerId = selectedIds[0]
-    const allNodes = store.getFilteredNodes()
-    const allEdges = store.getFilteredEdges()
+    const centerNode = store.getNode(centerId)
+    if (!centerNode) return
+
+    // Only layout nodes in the same frame context
+    const centerFrameId = centerNode.frame_id
+    const allFilteredNodes = store.getFilteredNodes()
+    const allNodes = allFilteredNodes.filter(n => n.frame_id === centerFrameId)
+
+    // Only consider edges between nodes in the same frame
+    const nodeIdSet = new Set(allNodes.map(n => n.id))
+    const allEdges = store.getFilteredEdges().filter(
+      e => nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
+    )
 
     // Build adjacency map
     const adjacency = new Map<string, Set<string>>()
@@ -174,10 +186,7 @@ export function useLayout(options: UseLayoutOptions) {
     // Track angles assigned to each node for parent-based sorting
     const nodeAngles = new Map<string, number>()
 
-    // Get center node position - use node's current position as layout center
-    const centerNode = allNodes.find(n => n.id === centerId)
-    if (!centerNode) return
-
+    // Use center node's current position as layout center
     const centerX = centerNode.canvas_x + (centerNode.width || NODE_DEFAULTS.WIDTH) / 2
     const centerY = centerNode.canvas_y + (centerNode.height || NODE_DEFAULTS.HEIGHT) / 2
 
