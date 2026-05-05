@@ -380,6 +380,18 @@ function toggleNeighborhoodMode(nodeId?: string) {
 function layoutNeighborhood(focusId: string) {
   return neighborhood.layout(focusId)
 }
+
+// Handle double-click on node: navigate in neighborhood mode, otherwise edit
+function handleNodeDoubleClick(nodeId: string) {
+  // In neighborhood mode, double-click navigates to clicked node's neighborhood
+  if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
+    focusNodeId.value = nodeId
+    layoutNeighborhood(nodeId)
+    return
+  }
+  // Otherwise, start editing
+  startEditing(nodeId)
+}
 function getVisualNode(nodeId: string) {
   return neighborhood.getVisualNode(nodeId)
 }
@@ -2068,7 +2080,7 @@ useCanvasKeyboardShortcuts({
         @node-pointerdown="onNodePointerDown"
         @node-pointerenter="onNodePointerEnter"
         @node-pointerleave="onNodePointerLeave"
-        @node-dblclick="startEditing"
+        @node-dblclick="handleNodeDoubleClick"
         @node-contextmenu="onLODNodeContextMenu"
         @canvas-contextmenu="onLODCanvasContextMenu"
       />
@@ -2150,7 +2162,7 @@ useCanvasKeyboardShortcuts({
           @pointerenter="onNodePointerEnter($event, node.id)"
           @pointermove="onNodePointerMove($event)"
           @pointerleave="onNodePointerLeave"
-          @dblclick="startEditing(node.id)"
+          @dblclick="handleNodeDoubleClick(node.id)"
           @start-editing-title="startEditingTitle(node.id)"
           @save-title="saveTitleEditing"
           @cancel-title="cancelTitleEditing"

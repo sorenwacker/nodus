@@ -4,7 +4,7 @@
  * Uses Tauri backend when available, falls back to WASM in browser mode
  */
 import { ref, watch, nextTick } from 'vue'
-import { marked } from 'marked'
+import { marked } from '../../../lib/markdown'
 import { invoke, isTauri } from '../../../lib/tauri'
 import {
   renderMath as renderMathWasm,
@@ -22,13 +22,6 @@ export interface UseContentRendererOptions {
 
 export function useContentRenderer(options: UseContentRendererOptions) {
   const { getFilteredNodes, isDarkMode, debounceMs = 50 } = options
-
-  // Configure marked
-  marked.use({
-    gfm: true,
-    breaks: true,
-    async: false,
-  })
 
   // Caches
   const markdownCache = new Map<string, string>()

@@ -1,14 +1,8 @@
 import { ref } from 'vue'
-import { marked } from 'marked'
+import { marked } from '../lib/markdown'
 import { invoke } from '@tauri-apps/api/core'
 import { sanitizeHtml, sanitizeSvg } from '../lib/sanitize'
 import type { Node } from '../types'
-
-// Configure marked
-marked.use({
-  breaks: true,
-  gfm: true,
-})
 
 // Math cache for rendered SVGs
 const mathSvgCache = new Map<string, string>()

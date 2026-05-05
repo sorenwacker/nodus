@@ -17,6 +17,7 @@ interface Edge {
   id: string
   source_node_id: string
   target_node_id: string
+  directed?: boolean
 }
 
 interface Store {
@@ -107,15 +108,17 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
 
   // Toggle neighborhood mode for a node
   function toggle(nodeId?: string) {
-    const targetId = nodeId || store.getSelectedNodeIds()[0] || focusNodeId.value
-
-    // If already in neighborhood mode and clicking the same node (or no node specified), exit
-    if (neighborhoodMode.value && (!nodeId || focusNodeId.value === targetId)) {
+    // If already in neighborhood mode, pressing toggle again exits (regardless of selection)
+    if (neighborhoodMode.value) {
       neighborhoodMode.value = false
       focusNodeId.value = null
       neighborhoodPositions.value = new Map()
-    } else if (targetId) {
-      // Enter or navigate to new focus
+      return
+    }
+
+    // Enter neighborhood mode on selected or specified node
+    const targetId = nodeId || store.getSelectedNodeIds()[0]
+    if (targetId) {
       focusNodeId.value = targetId
       layout(targetId)
       neighborhoodMode.value = true
@@ -173,13 +176,24 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     const edges = store.getFilteredEdges()
     const incomingFrom = new Set<string>()
     const outgoingTo = new Set<string>()
+    const undirectedNeighbors = new Set<string>()
 
     for (const edge of edges) {
-      if (edge.target_node_id === focusId && edge.source_node_id !== focusId) {
-        incomingFrom.add(edge.source_node_id)
-      }
-      if (edge.source_node_id === focusId && edge.target_node_id !== focusId) {
-        outgoingTo.add(edge.target_node_id)
+      // Undirected edges (directed: false) are bidirectional
+      if (edge.directed === false) {
+        if (edge.source_node_id === focusId && edge.target_node_id !== focusId) {
+          undirectedNeighbors.add(edge.target_node_id)
+        } else if (edge.target_node_id === focusId && edge.source_node_id !== focusId) {
+          undirectedNeighbors.add(edge.source_node_id)
+        }
+      } else {
+        // Directed edges
+        if (edge.target_node_id === focusId && edge.source_node_id !== focusId) {
+          incomingFrom.add(edge.source_node_id)
+        }
+        if (edge.source_node_id === focusId && edge.target_node_id !== focusId) {
+          outgoingTo.add(edge.target_node_id)
+        }
       }
     }
 
@@ -187,7 +201,14 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     const children: string[] = []
     const siblings: string[] = []
 
+    // Undirected neighbors are always siblings (left/right)
+    for (const id of undirectedNeighbors) {
+      siblings.push(id)
+    }
+
+    // Check for bidirectional directed edges (both incoming and outgoing)
     for (const id of incomingFrom) {
+      if (undirectedNeighbors.has(id)) continue // Already added as sibling
       if (outgoingTo.has(id)) {
         siblings.push(id)
       } else {
@@ -195,6 +216,7 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
       }
     }
     for (const id of outgoingTo) {
+      if (undirectedNeighbors.has(id)) continue // Already added as sibling
       if (!incomingFrom.has(id)) {
         children.push(id)
       }

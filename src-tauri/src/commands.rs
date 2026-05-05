@@ -225,7 +225,12 @@ pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
     let content = node.markdown_content.unwrap_or_default();
     let links = import_helpers::extract_wikilinks(&content);
 
-    sync_wikilinks_for_node(pool, &node_id, &links).await
+    let created = sync_wikilinks_for_node(pool, &node_id, &links).await?;
+
+    // Merge any bidirectional edges that were created
+    let _ = database::edges::merge_bidirectional_wikilinks(pool).await;
+
+    Ok(created)
 }
 
 /// Sync all wikilinks for all nodes in a workspace

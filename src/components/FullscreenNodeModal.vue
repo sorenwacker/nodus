@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
-import { marked } from 'marked'
+import { marked } from '../lib/markdown'
 import mermaid from 'mermaid'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
@@ -93,13 +93,6 @@ watch(() => props.visible, (visible) => {
 // Live preview - render markdown with mermaid support
 const renderedContent = computed(() => {
   if (!editContent.value) return ''
-
-  // Configure marked inline
-  marked.use({
-    gfm: true,
-    breaks: true,
-    async: false,
-  })
 
   let html = marked.parse(editContent.value) as string
 

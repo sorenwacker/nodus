@@ -32,6 +32,16 @@ export const useEdgesStore = defineStore('edges', () => {
     loading.value = true
     error.value = null
     try {
+      // Merge bidirectional wikilinks first to clean up duplicates
+      try {
+        const merged = await invoke<number>('merge_bidirectional_edges')
+        if (merged > 0) {
+          storeLogger.info(`Merged ${merged} bidirectional edges`)
+        }
+      } catch (e) {
+        storeLogger.warn('Failed to merge bidirectional edges:', e)
+      }
+
       const fetchedEdges = await invoke<Edge[]>('get_edges', { workspaceId: workspaceId ?? null })
       storeLogger.debug(`Loaded ${fetchedEdges.length} edges for workspace ${workspaceId}`)
       // Deduplicate edges on load

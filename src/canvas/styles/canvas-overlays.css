@@ -631,6 +631,11 @@
   overflow-x: auto;
 }
 
+.preview-content pre code {
+  background: none;
+  padding: 0;
+}
+
 .preview-content a {
   color: var(--primary-color);
 }

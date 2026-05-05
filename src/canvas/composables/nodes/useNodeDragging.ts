@@ -76,8 +76,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
   const {
     store,
     snapToGrid,
-    neighborhoodMode,
-    focusNodeId,
     isLODMode,
     isSemanticZoomCollapsed,
     editingNodeId,
@@ -86,7 +84,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     isCreatingEdge,
     edgeStartNode,
     edgePreviewEnd,
-    layoutNeighborhood,
     pushOverlappingNodesAway,
     pushUndo,
     screenToCanvas,
@@ -183,13 +180,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       optimizeNodeEntrypoints(nodeId, edgeDefs, optNodeMap)
     } catch (err) {
       console.error('[optimizeNodeEntrypoints] Error:', err)
-    }
-
-    // In neighborhood mode, clicking a neighbor navigates to its neighborhood
-    if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
-      focusNodeId.value = nodeId
-      // Layout and center on the new focus (synchronous)
-      layoutNeighborhood(nodeId)
     }
 
     const pos = screenToCanvas(e.clientX, e.clientY)

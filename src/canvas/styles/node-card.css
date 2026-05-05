@@ -105,6 +105,11 @@
   overflow-wrap: break-word;
   word-break: break-word;
   cursor: inherit;
+  outline: none;
+}
+
+.node-header:focus {
+  outline: none;
 }
 
 .title-editor {
