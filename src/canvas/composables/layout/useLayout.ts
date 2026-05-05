@@ -142,11 +142,17 @@ export function useLayout(options: UseLayoutOptions) {
 
     // Determine which nodes should be moved by radial layout
     // Only move nodes that share the same frame context as center
-    const centerFrameId = centerNode.frame_id || null
+    const centerFrameId = centerNode.frame_id
+    const centerIsFramed = !!centerFrameId
     const nodeIdsToLayout = new Set(allNodes.filter(n => {
-      const nodeFrameId = n.frame_id || null
-      // Include if both are in the same frame (or both unframed)
-      return nodeFrameId === centerFrameId
+      const nodeIsFramed = !!n.frame_id
+      if (centerIsFramed) {
+        // Center is in a frame - only include nodes in the SAME frame
+        return n.frame_id === centerFrameId
+      } else {
+        // Center is NOT in a frame - only include nodes NOT in any frame
+        return !nodeIsFramed
+      }
     }).map(n => n.id))
 
     // Build adjacency map
