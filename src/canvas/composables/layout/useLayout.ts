@@ -111,13 +111,18 @@ export function useLayout(options: UseLayoutOptions) {
    */
   async function radialLayout(): Promise<void> {
     const selectedIds = store.getSelectedNodeIds()
+    console.log('[RadialLayout] Selected nodes:', selectedIds.length)
     if (selectedIds.length !== 1) {
+      console.log('[RadialLayout] Requires exactly 1 selected node, aborting')
       return
     }
 
     const centerId = selectedIds[0]
     const centerNode = store.getNode(centerId)
-    if (!centerNode) return
+    if (!centerNode) {
+      console.log('[RadialLayout] Center node not found, aborting')
+      return
+    }
 
     // Get all nodes and edges
     const allNodes = store.getFilteredNodes()
