@@ -119,20 +119,22 @@ export function useLayout(options: UseLayoutOptions) {
     const centerNode = store.getNode(centerId)
     if (!centerNode) return
 
-    // Only layout nodes in the same frame context
-    const centerFrameId = centerNode.frame_id
-    const allFilteredNodes = store.getFilteredNodes()
-    // If center is in a frame, only layout nodes in that frame
-    // If center is not in a frame, layout all unframed nodes
-    const allNodes = centerFrameId
-      ? allFilteredNodes.filter(n => n.frame_id === centerFrameId)
-      : allFilteredNodes.filter(n => !n.frame_id)
+    // Get all nodes and edges
+    const allNodes = store.getFilteredNodes()
+    const allEdges = store.getFilteredEdges()
 
-    // Only consider edges between nodes in the same frame
-    const nodeIdSet = new Set(allNodes.map(n => n.id))
-    const allEdges = store.getFilteredEdges().filter(
-      e => nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
-    )
+    // Determine which nodes should be moved by radial layout
+    // Nodes in different frames than center should not be moved
+    const centerFrameId = centerNode.frame_id
+    const nodeIdsToLayout = new Set(allNodes.filter(n => {
+      // Always include the center node
+      if (n.id === centerId) return true
+      // If node is in a frame different from center's frame, exclude it
+      if (n.frame_id && n.frame_id !== centerFrameId) return false
+      // If center is in a frame, only include nodes in that frame
+      if (centerFrameId && n.frame_id !== centerFrameId) return false
+      return true
+    }).map(n => n.id))
 
     // Build adjacency map
     const adjacency = new Map<string, Set<string>>()
@@ -260,6 +262,10 @@ export function useLayout(options: UseLayoutOptions) {
 
             const angle = startAngle + i * angleStep
             nodeAngles.set(nodeId, angle)
+
+            // Only move nodes that should be laid out (skip nodes in other frames)
+            if (!nodeIdsToLayout.has(nodeId)) continue
+
             const x = centerX + Math.cos(angle) * ringRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
             const y = centerY + Math.sin(angle) * ringRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
 
@@ -290,6 +296,10 @@ export function useLayout(options: UseLayoutOptions) {
 
           const angle = startAngle + i * angleStep
           nodeAngles.set(nodeId, angle)
+
+          // Only move nodes that should be laid out (skip nodes in other frames)
+          if (!nodeIdsToLayout.has(nodeId)) continue
+
           const x = centerX + Math.cos(angle) * adjustedRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
           const y = centerY + Math.sin(angle) * adjustedRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
 
