@@ -119,10 +119,14 @@ export function useLayout(options: UseLayoutOptions) {
     const centerNode = store.getNode(centerId)
     if (!centerNode) return
 
-    // Only layout nodes in the same frame context (treat null/undefined as "no frame")
-    const centerFrameId = centerNode.frame_id ?? null
+    // Only layout nodes in the same frame context
+    const centerFrameId = centerNode.frame_id
     const allFilteredNodes = store.getFilteredNodes()
-    const allNodes = allFilteredNodes.filter(n => (n.frame_id ?? null) === centerFrameId)
+    // If center is in a frame, only layout nodes in that frame
+    // If center is not in a frame, layout all unframed nodes
+    const allNodes = centerFrameId
+      ? allFilteredNodes.filter(n => n.frame_id === centerFrameId)
+      : allFilteredNodes.filter(n => !n.frame_id)
 
     // Only consider edges between nodes in the same frame
     const nodeIdSet = new Set(allNodes.map(n => n.id))
