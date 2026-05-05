@@ -7,6 +7,7 @@ import { ref, computed } from 'vue'
 import { providerRegistry } from './providers'
 import type { ChatMessage } from './types'
 import type { LLMTool } from './providers/types'
+import { withRetry } from './retry'
 
 type RequestType = 'generate' | 'chat'
 
@@ -116,10 +117,23 @@ class LLMQueue {
       const provider = providerRegistry.getActiveProvider()
 
       if (request.type === 'generate') {
-        const result = await provider.generate({
-          prompt: request.prompt,
-          system: request.system,
-        })
+        // Use retry logic for generate requests
+        const result = await withRetry(
+          async () => {
+            if (this.cancelled) throw new Error('Cancelled')
+            return provider.generate({
+              prompt: request.prompt,
+              system: request.system,
+            })
+          },
+          {
+            maxRetries: 2,
+            initialDelayMs: 1000,
+            onRetry: (attempt, error, delayMs) => {
+              console.log(`[LLM Queue] Retry ${attempt} after ${delayMs}ms: ${error.message}`)
+            },
+          }
+        )
 
         if (this.cancelled) {
           request.reject(new Error('Cancelled'))
@@ -128,15 +142,28 @@ class LLMQueue {
           request.resolve(result.content)
         }
       } else {
-        const result = await provider.chat({
-          messages: request.messages.map(m => ({
-            role: m.role,
-            content: m.content,
-            tool_calls: m.tool_calls,
-            tool_call_id: m.tool_call_id,
-          })),
-          tools: request.tools,
-        })
+        // Use retry logic for chat requests
+        const result = await withRetry(
+          async () => {
+            if (this.cancelled) throw new Error('Cancelled')
+            return provider.chat({
+              messages: request.messages.map(m => ({
+                role: m.role,
+                content: m.content,
+                tool_calls: m.tool_calls,
+                tool_call_id: m.tool_call_id,
+              })),
+              tools: request.tools,
+            })
+          },
+          {
+            maxRetries: 2,
+            initialDelayMs: 1000,
+            onRetry: (attempt, error, delayMs) => {
+              console.log(`[LLM Queue] Retry ${attempt} after ${delayMs}ms: ${error.message}`)
+            },
+          }
+        )
 
         if (this.cancelled) {
           request.reject(new Error('Cancelled'))

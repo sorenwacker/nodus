@@ -41,6 +41,7 @@ export function isNodeInFrame(
 /**
  * Push nodes out of frame boundaries after layout calculation.
  * Ensures nodes don't end up inside frames.
+ * Iterates until no more overlaps occur (handles adjacent frames).
  */
 export function pushNodesOutOfFrames(
   positions: Map<string, { x: number; y: number }>,
@@ -51,6 +52,7 @@ export function pushNodesOutOfFrames(
 
   const result = new Map<string, { x: number; y: number }>()
   const framePadding = 20
+  const maxIterations = 10 // Prevent infinite loops
 
   for (const [nodeId, pos] of positions) {
     const nodeInfo = nodeMap.get(nodeId)
@@ -59,36 +61,45 @@ export function pushNodesOutOfFrames(
     let newX = pos.x
     let newY = pos.y
 
-    // Check collision with each frame and push out
-    for (const frame of frames) {
-      const nodeRight = newX + nodeWidth
-      const nodeBottom = newY + nodeHeight
-      const frameRight = frame.canvas_x + frame.width
-      const frameBottom = frame.canvas_y + frame.height
+    // Iterate until no overlaps or max iterations reached
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      let hasOverlap = false
 
-      // Check if node overlaps frame
-      const overlapX = newX < frameRight && nodeRight > frame.canvas_x
-      const overlapY = newY < frameBottom && nodeBottom > frame.canvas_y
+      for (const frame of frames) {
+        const nodeRight = newX + nodeWidth
+        const nodeBottom = newY + nodeHeight
+        const frameRight = frame.canvas_x + frame.width
+        const frameBottom = frame.canvas_y + frame.height
 
-      if (overlapX && overlapY) {
-        // Calculate push distances for each direction
-        const pushLeft = nodeRight - frame.canvas_x
-        const pushRight = frameRight - newX
-        const pushUp = nodeBottom - frame.canvas_y
-        const pushDown = frameBottom - newY
+        // Check if node overlaps frame
+        const overlapX = newX < frameRight && nodeRight > frame.canvas_x
+        const overlapY = newY < frameBottom && nodeBottom > frame.canvas_y
 
-        // Find minimum push distance and apply
-        const minPush = Math.min(pushLeft, pushRight, pushUp, pushDown)
-        if (minPush === pushLeft) {
-          newX = frame.canvas_x - nodeWidth - framePadding
-        } else if (minPush === pushRight) {
-          newX = frameRight + framePadding
-        } else if (minPush === pushUp) {
-          newY = frame.canvas_y - nodeHeight - framePadding
-        } else {
-          newY = frameBottom + framePadding
+        if (overlapX && overlapY) {
+          hasOverlap = true
+
+          // Calculate push distances for each direction
+          const pushLeft = nodeRight - frame.canvas_x
+          const pushRight = frameRight - newX
+          const pushUp = nodeBottom - frame.canvas_y
+          const pushDown = frameBottom - newY
+
+          // Find minimum push distance and apply
+          const minPush = Math.min(pushLeft, pushRight, pushUp, pushDown)
+          if (minPush === pushLeft) {
+            newX = frame.canvas_x - nodeWidth - framePadding
+          } else if (minPush === pushRight) {
+            newX = frameRight + framePadding
+          } else if (minPush === pushUp) {
+            newY = frame.canvas_y - nodeHeight - framePadding
+          } else {
+            newY = frameBottom + framePadding
+          }
         }
       }
+
+      // Exit early if no overlaps found
+      if (!hasOverlap) break
     }
 
     result.set(nodeId, { x: newX, y: newY })

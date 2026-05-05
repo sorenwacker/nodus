@@ -58,17 +58,35 @@ export function registerSmartTools(): void {
 
   defineTool<{ pattern: string; color: string }>(
     'color_matching',
-    'Color nodes by text pattern OR semantic criterion. For literal text like "Faculty of..." use the exact text. For categories like "person" uses LLM.',
+    'Color nodes by SEMANTIC criterion (what nodes represent). Use for categories like "person", "organization", "question". NOT for text patterns - use color_regex instead.',
     {
       type: 'object',
       properties: {
-        pattern: { type: 'string', description: 'Text pattern (e.g., "Faculty of", "Department of") OR semantic type (e.g., "person", "organization")' },
+        pattern: { type: 'string', description: 'Semantic type (e.g., "person", "organization", "question", "assumption")' },
         color: { type: 'string', description: 'Color hex code: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink)' },
       },
       required: ['pattern', 'color'],
     },
     async (_args, _ctx) => {
       return `__UNHANDLED__:color_matching`
+    },
+    { category: 'smart' }
+  )
+
+  defineTool<{ regex: string; color: string; field?: string }>(
+    'color_regex',
+    'Color nodes by regex pattern on title. Use for "starts with x" (^x), "ends with .md" (\\.md$), "contains foo" (foo). Fast batch operation, no LLM needed.',
+    {
+      type: 'object',
+      properties: {
+        regex: { type: 'string', description: 'JavaScript regex pattern: ^x (starts with x), foo$ (ends with foo), \\d+ (contains numbers)' },
+        color: { type: 'string', description: 'Color hex code: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink)' },
+        field: { type: 'string', description: 'Field to match: "title" (default) or "content"' },
+      },
+      required: ['regex', 'color'],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:color_regex`
     },
     { category: 'smart' }
   )

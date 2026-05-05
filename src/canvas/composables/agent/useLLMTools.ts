@@ -11,6 +11,11 @@ import type { Node } from '../../../types'
 import type { AgentTask, AgentPlan } from '../../../llm/types'
 import { quickResearch } from '../../../llm/research'
 import { evalMathExpr } from '../../../llm/utils'
+import {
+  batchClassifyNodes,
+  batchClassifyForMove,
+  batchClassifyForConnect,
+} from '../../../llm/batchClassifier'
 
 /**
  * LLM Queue interface (subset of llmQueue)
@@ -191,35 +196,25 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const nodes = store.getFilteredNodes()
         if (nodes.length === 0) return 'No nodes to move'
         const instruction = (args.instruction as string) || ''
-        log(`> Smart move: ${nodes.length} nodes`)
+        log(`> Smart move: ${nodes.length} nodes (batch classification)`)
 
-        let categories: string[] = []
-        try {
-          const prompt = `Extract category names from: "${instruction}"\nList ONLY categories separated by comma:`
-          const response = await llmQueue.generate(prompt)
-          categories = (response || '')
-            .toLowerCase()
-            .split(/[,\n]+/)
-            .map((c: string) => c.trim())
-            .filter((c: string) => c.length > 1)
-        } catch {
-          /* ignore LLM errors, use fallback categories */
-        }
-        if (categories.length < 2) categories = ['left', 'right']
+        // Use batch classification instead of per-node LLM calls
+        const nodeClassifications = await batchClassifyForMove(
+          nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
+          instruction,
+          llmQueue,
+          { log, isCancelled }
+        )
 
+        // Group nodes by classification
         const groups: Map<string, typeof nodes> = new Map()
         for (const node of nodes) {
-          try {
-            const prompt = `Classify "${node.title}" into ONE of: ${categories.join(', ')}\nAnswer with ONLY the category:`
-            const response = await llmQueue.generate(prompt)
-            const group = (response || 'other').toLowerCase().trim().split(/\s+/)[0]
-            if (!groups.has(group)) groups.set(group, [])
-            groups.get(group)!.push(node)
-          } catch {
-            /* ignore classification errors */
-          }
+          const group = nodeClassifications.get(node.id) || 'other'
+          if (!groups.has(group)) groups.set(group, [])
+          groups.get(group)!.push(node)
         }
 
+        // Position nodes by group
         let moved = 0
         const spacing = 250
         let groupX = 100
@@ -237,29 +232,26 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const nodes = store.getFilteredNodes()
         if (nodes.length < 2) return 'Need at least 2 nodes'
         const groupsArg = (args.groups as string) || ''
-        log(`> Smart connect: ${nodes.length} nodes`)
+        log(`> Smart connect: ${nodes.length} nodes (batch classification)`)
 
-        const nodeGroups: Map<string, string> = new Map()
-        for (const node of nodes) {
-          try {
-            const prompt = `Classify "${node.title}" into ONE of: ${groupsArg}\nAnswer with ONLY the group name:`
-            const response = await llmQueue.generate(prompt)
-            nodeGroups.set(
-              node.id,
-              (response || 'other').toLowerCase().trim().split(/\s+/)[0]
-            )
-          } catch {
-            /* ignore classification errors */
-          }
-        }
+        // Use batch classification instead of per-node LLM calls
+        const nodeClassifications = await batchClassifyForConnect(
+          nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
+          groupsArg,
+          llmQueue,
+          { log, isCancelled }
+        )
 
-        let edgeCount = 0
+        // Group nodes by classification
         const groupedNodes = new Map<string, string[]>()
-        for (const [id, group] of nodeGroups) {
+        for (const node of nodes) {
+          const group = nodeClassifications.get(node.id) || 'other'
           if (!groupedNodes.has(group)) groupedNodes.set(group, [])
-          groupedNodes.get(group)!.push(id)
+          groupedNodes.get(group)!.push(node.id)
         }
 
+        // Create edges within groups
+        let edgeCount = 0
         for (const [, ids] of groupedNodes) {
           for (let i = 0; i < ids.length - 1; i++) {
             await store.createEdge({ source_node_id: ids[i], target_node_id: ids[i + 1] })
@@ -273,7 +265,7 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const nodes = store.getFilteredNodes()
         if (nodes.length === 0) return 'No nodes to color'
         const instruction = (args.instruction as string) || ''
-        log(`> Smart color: ${nodes.length} nodes with semantic classification`)
+        log(`> Smart color: ${nodes.length} nodes (batch classification)`)
 
         // Step 1: Extract category-to-color mappings from instruction
         let colorMappings: Array<{ category: string; color: string }> = []
@@ -296,57 +288,28 @@ Output ONLY the JSON array:`
         const categoryToColor = new Map(colorMappings.map((m) => [m.category.toLowerCase(), m.color]))
         log(`> Categories: ${categories.join(', ')}`)
 
-        // Step 2: Classify each node - check tags first, then LLM
+        // Step 2: Use batch classification instead of per-node LLM calls
+        const nodeClassifications = await batchClassifyNodes(
+          nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
+          categories,
+          llmQueue,
+          { log, isCancelled }
+        )
+
+        // Step 3: Apply colors based on classifications
         let colored = 0
         for (const node of nodes) {
-          // Check if agent was stopped
           if (isCancelled()) {
             log(`> Stopped after ${colored} nodes`)
             return `Stopped. Colored ${colored}/${nodes.length} nodes.`
           }
 
-          try {
-            const content = (node.markdown_content || '').toLowerCase()
-
-            // Check for explicit tag match first (fast path)
-            let matchedCategory: string | null = null
-            for (const cat of categories) {
-              const tagPattern = `#${cat.toLowerCase()}`
-              if (content.includes(tagPattern)) {
-                matchedCategory = cat.toLowerCase()
-                break
-              }
-            }
-
-            // If no tag match, use LLM for semantic classification
-            if (!matchedCategory) {
-              const prompt = `What is "${node.title}"? Classify as: ${categories.join(', ')}, or NONE.
-
-Think: What type of thing is this? Which category does it belong to?
-Answer with ONE word only (${categories.join('/')} or NONE):`
-              const response = await llmQueue.generate(prompt)
-              const responseLower = (response || 'none').toLowerCase()
-
-              // Find which category appears in response
-              for (const cat of categories) {
-                if (responseLower.includes(cat.toLowerCase())) {
-                  matchedCategory = cat.toLowerCase()
-                  break
-                }
-              }
-              if (!matchedCategory || responseLower.includes('none')) {
-                matchedCategory = 'none'
-              }
-            }
-
-            if (matchedCategory && matchedCategory !== 'none' && categoryToColor.has(matchedCategory)) {
-              const color = categoryToColor.get(matchedCategory)!
-              await store.updateNodeColor(node.id, color)
-              log(`> ${node.title} -> ${matchedCategory}`)
-              colored++
-            }
-          } catch (e) {
-            log(`> ${node.title}: classification failed - ${e}`)
+          const matchedCategory = nodeClassifications.get(node.id)
+          if (matchedCategory && categoryToColor.has(matchedCategory)) {
+            const color = categoryToColor.get(matchedCategory)!
+            await store.updateNodeColor(node.id, color)
+            log(`> ${node.title} -> ${matchedCategory}`)
+            colored++
           }
         }
         return `Colored ${colored}/${nodes.length} nodes based on semantic classification`
@@ -434,6 +397,42 @@ Answer with ONE word only (${categories.join('/')} or NONE):`
         }
         const preview = matchedTitles.slice(0, 5).join(', ')
         return `Colored ${colored}/${nodes.length} nodes: ${preview}${colored > 5 ? '...' : ''}`
+      }
+
+      case 'color_regex': {
+        const regexStr = ((args.regex as string) || '').trim()
+        const color = (args.color as string) || '#ef4444'
+        const field = (args.field as string) || 'title'
+        if (!regexStr) return 'Regex pattern required'
+
+        let regex: RegExp
+        try {
+          regex = new RegExp(regexStr, 'i')
+        } catch (e) {
+          return `Invalid regex: ${e}`
+        }
+
+        const nodes = store.getFilteredNodes()
+        const matchedTitles: string[] = []
+        let colored = 0
+
+        log(`> color_regex: matching /${regexStr}/i on ${field} in ${nodes.length} nodes`)
+
+        for (const node of nodes) {
+          const text = field === 'content' ? (node.markdown_content || '') : node.title
+          if (regex.test(text)) {
+            await store.updateNodeColor(node.id, color)
+            matchedTitles.push(node.title)
+            colored++
+          }
+        }
+
+        if (colored === 0) {
+          return `No nodes match regex /${regexStr}/`
+        }
+        const preview = matchedTitles.slice(0, 5).join(', ')
+        log(`> Colored ${colored} nodes: ${preview}${colored > 5 ? '...' : ''}`)
+        return `Colored ${colored}/${nodes.length} nodes matching /${regexStr}/: ${preview}${colored > 5 ? '...' : ''}`
       }
 
       case 'reset_edge_colors': {

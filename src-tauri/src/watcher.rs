@@ -163,6 +163,7 @@ impl VaultWatcher {
         );
 
         for entry in walkdir::WalkDir::new(&self.watched_path)
+            .follow_links(true)
             .into_iter()
             .filter_entry(|e| {
                 // Skip hidden files and directories (starting with .)

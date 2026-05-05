@@ -31,19 +31,18 @@ const emit = defineEmits<{
     class="canvas-frame"
     :class="{ selected: selectedFrameId === frame.id }"
     :style="{
-      transform: `translate(${frame.canvas_x}px, ${frame.canvas_y}px)`,
+      transform: `translate3d(${frame.canvas_x}px, ${frame.canvas_y}px, 0)`,
       width: frame.width + 'px',
       height: frame.height + 'px',
-      borderColor: frame.color || 'var(--border-subtle)',
-      borderWidth: '1.5px',
-      backgroundColor: frame.color ? frame.color + '30' : 'rgba(128, 128, 128, 0.08)',
+      '--frame-color': frame.color || 'var(--border-subtle)',
+      '--border-width': Math.max(2, 2 / scale) + 'px',
+      backgroundColor: frame.color ? frame.color + '20' : 'rgba(128, 128, 128, 0.05)',
     }"
     @dblclick.stop="$emit('dblclick', frame.id)"
   >
     <!-- Title label on top - drag handle -->
     <div
       class="frame-header"
-      :style="{ transform: `scale(${1/scale}) translateY(-100%)`, transformOrigin: 'left top' }"
       @pointerdown.stop="emit('pointerdown', $event, frame.id)"
     >
       <input
@@ -96,18 +95,24 @@ const emit = defineEmits<{
   position: absolute;
   top: 0;
   left: 0;
-  border: 1.5px solid var(--border-subtle);
+  border: none;
   border-radius: 12px;
   background: transparent;
   pointer-events: none;
   z-index: 0;
   overflow: visible;
+  /* Use inset box-shadow instead of border - renders smoother during transforms */
+  /* Use CSS variable for width to counter-scale based on zoom level */
+  box-shadow: inset 0 0 0 var(--border-width, 2px) var(--frame-color, var(--border-subtle));
+  /* GPU acceleration */
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .canvas-frame.selected {
-  border-color: var(--primary-color) !important;
-  border-width: 2px !important;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25), 0 0 16px rgba(59, 130, 246, 0.15);
+  box-shadow: inset 0 0 0 var(--border-width, 2px) var(--primary-color), 0 0 0 4px rgba(59, 130, 246, 0.25), 0 0 16px rgba(59, 130, 246, 0.15);
   background: rgba(59, 130, 246, 0.06);
   z-index: 100;
 }
@@ -116,6 +121,7 @@ const emit = defineEmits<{
   position: absolute;
   top: 0;
   left: 8px;
+  transform: translateY(-100%);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -125,30 +131,31 @@ const emit = defineEmits<{
 }
 
 .frame-title {
-  font-size: 12px;
+  font-size: 36px;
   font-weight: 600;
   color: var(--text-main);
   background: var(--bg-node);
-  padding: 4px 10px;
+  padding: 8px 16px;
   border-radius: 4px;
-  border: 1px solid var(--border-default);
+  border: none;
   white-space: nowrap;
-  box-shadow: 0 2px 6px var(--shadow-sm);
+  box-shadow: inset 0 0 0 1px var(--border-default), 0 2px 6px var(--shadow-sm);
   opacity: 1;
 }
 
 /* Title color is set via inline style to match frame color */
 
 .frame-title-editor {
-  font-size: 11px;
+  font-size: 36px;
   font-weight: 600;
   color: var(--text-main);
   background: var(--bg-surface);
-  padding: 3px 8px;
+  padding: 8px 16px;
   border-radius: 4px;
-  border: 1px solid var(--primary-color);
+  border: none;
+  box-shadow: inset 0 0 0 1px var(--primary-color);
   outline: none;
-  min-width: 80px;
+  min-width: 100px;
 }
 
 .frame-delete-btn {
