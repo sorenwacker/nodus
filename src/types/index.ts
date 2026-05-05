@@ -99,6 +99,7 @@ export interface Frame {
   height: number
   color: string | null
   workspace_id: string | null
+  folder_path: string | null
 }
 
 export interface Workspace {

@@ -971,6 +971,101 @@ pub async fn update_node_file_path(id: String, file_path: Option<String>) -> Res
         .map_err(|e| e.to_string())
 }
 
+/// Move a node's file to a different folder
+/// Used for folder-frame sync when nodes are dragged between frames
+#[tauri::command]
+pub async fn move_node_file(node_id: String, target_folder: String) -> Result<String, String> {
+    use crate::watcher::FileLock;
+    use std::path::Path;
+
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Get node by ID
+    let node = database::nodes::get_by_id(pool, &node_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Node not found".to_string())?;
+
+    // Check if node has a file_path
+    let old_path_str = node
+        .file_path
+        .ok_or_else(|| "Node has no associated file".to_string())?;
+    let old_path = Path::new(&old_path_str);
+
+    // Check if source file exists
+    if !old_path.exists() {
+        return Err(format!("Source file does not exist: {}", old_path_str));
+    }
+
+    // Get filename from old path
+    let filename = old_path
+        .file_name()
+        .ok_or_else(|| "Invalid file path".to_string())?;
+
+    // Calculate new path
+    let target_dir = Path::new(&target_folder);
+    let mut new_path = target_dir.join(filename);
+
+    // Handle filename conflicts by appending number suffix
+    if new_path.exists() && new_path != old_path {
+        let stem = new_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("file")
+            .to_string();
+        let ext = new_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("md")
+            .to_string();
+
+        let mut counter = 1;
+        loop {
+            let new_name = format!("{}-{}.{}", stem, counter, ext);
+            new_path = target_dir.join(&new_name);
+            if !new_path.exists() {
+                break;
+            }
+            counter += 1;
+            if counter > 100 {
+                return Err("Too many filename conflicts".to_string());
+            }
+        }
+    }
+
+    // If paths are the same, nothing to do
+    if new_path == old_path {
+        return Ok(old_path_str);
+    }
+
+    // Acquire exclusive lock on the source file
+    let _lock = FileLock::exclusive(old_path)
+        .map_err(|e| format!("Failed to lock file: {}", e))?;
+
+    // Create target directory if it doesn't exist
+    if !target_dir.exists() {
+        std::fs::create_dir_all(target_dir)
+            .map_err(|e| format!("Failed to create target directory: {}", e))?;
+    }
+
+    // Move the file
+    std::fs::rename(old_path, &new_path)
+        .map_err(|e| format!("Failed to move file: {}", e))?;
+
+    // Lock is released on drop
+
+    // Update node.file_path in database
+    let new_path_str = new_path.to_string_lossy().to_string();
+    let checksum = crate::checksum::compute_file(&new_path)
+        .map_err(|e| format!("Failed to compute checksum: {}", e))?;
+
+    database::nodes::update_file_path(pool, &node_id, &new_path_str, &checksum)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(new_path_str)
+}
+
 #[tauri::command]
 pub async fn update_node_size(id: String, width: f64, height: f64) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
@@ -1392,6 +1487,7 @@ pub async fn import_vault(
             height: frame_height,
             color: None,
             workspace_id: workspace_id.clone(),
+            folder_path: Some(folder.clone()),
             created_at: now,
             updated_at: now,
         };
@@ -2352,6 +2448,7 @@ pub struct CreateFrameInput {
     pub height: f64,
     pub color: Option<String>,
     pub workspace_id: Option<String>,
+    pub folder_path: Option<String>,
 }
 
 #[tauri::command]
@@ -2368,6 +2465,7 @@ pub async fn create_frame(input: CreateFrameInput) -> Result<Frame, String> {
         height: input.height,
         color: input.color,
         workspace_id: input.workspace_id,
+        folder_path: input.folder_path,
         created_at: now,
         updated_at: now,
     };
@@ -2407,6 +2505,18 @@ pub async fn update_frame_title(id: String, title: String) -> Result<(), String>
 pub async fn update_frame_color(id: String, color: Option<String>) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::frames::update_color(pool, &id, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Assign a node to a frame (or remove from frame if frameId is None)
+#[tauri::command]
+pub async fn assign_node_to_frame(
+    node_id: String,
+    frame_id: Option<String>,
+) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_frame_id(pool, &node_id, frame_id.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

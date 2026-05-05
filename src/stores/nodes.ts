@@ -78,6 +78,18 @@ export const useNodesStore = defineStore('nodes', () => {
     },
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
     reloadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
+    // Frame sync dependencies for folder-frame sync
+    getFrames: () => framesStore.frames,
+    assignNodeToFrame: (nodeId: string, frameId: string | null) => {
+      const node = nodes.value.find((n) => n.id === nodeId)
+      if (node && node.frame_id !== frameId) {
+        node.frame_id = frameId
+        invoke('assign_node_to_frame', { nodeId, frameId }).catch((e) =>
+          storeLogger.error('Failed to assign node to frame:', e)
+        )
+      }
+    },
+    getVaultPath: () => workspaceStore.currentVaultPath,
   })
 
   // Import composable (initialized after createNode is defined)
@@ -794,6 +806,37 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
+  /**
+   * Move a node's file to a different folder
+   * Used for folder-frame sync when nodes are dragged between frames
+   */
+  async function moveNodeFile(nodeId: string, targetFolder: string): Promise<string> {
+    const newPath = await invoke<string>('move_node_file', { nodeId, targetFolder })
+    // Update local node state
+    const node = nodes.value.find((n) => n.id === nodeId)
+    if (node) {
+      node.file_path = newPath
+    }
+    return newPath
+  }
+
+  /**
+   * Update a node's file path in local state (for use by node dragging)
+   */
+  function updateNodeFilePath(nodeId: string, filePath: string) {
+    const node = nodes.value.find((n) => n.id === nodeId)
+    if (node) {
+      node.file_path = filePath
+    }
+  }
+
+  /**
+   * Get the current workspace vault path
+   */
+  function getVaultPath(): string | null {
+    return workspaceStore.currentVaultPath
+  }
+
   // Layout nodes - forwarded to layout composable
   const layoutNodes = (
     nodeIds?: string[],
@@ -942,5 +985,10 @@ export const useNodesStore = defineStore('nodes', () => {
     getNodesReferencingEntity,
     createEntityNode,
     linkToEntity,
+    // File-folder sync
+    moveNodeFile,
+    updateNodeFilePath,
+    getVaultPath,
+    markProgrammaticMove: fileSync.markProgrammaticMove,
   }
 })

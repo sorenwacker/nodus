@@ -13,7 +13,7 @@ import {
 } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import { notifications$ } from './useNotifications'
-import type { Node, FileChangeEvent } from '../types'
+import type { Node, FileChangeEvent, Frame } from '../types'
 
 export interface FileSyncDeps {
   getNodes: () => Node[]
@@ -22,11 +22,29 @@ export interface FileSyncDeps {
   removeNode: (id: string) => void
   getCurrentWorkspaceId: () => string | null
   reloadEdges?: () => Promise<void>
+  // Frame sync dependencies (optional for backward compatibility)
+  getFrames?: () => Frame[]
+  assignNodeToFrame?: (nodeId: string, frameId: string | null) => void
+  getVaultPath?: () => string | null
 }
 
 // Extract filename from path
 function getFilename(filePath: string): string {
   return filePath.split('/').pop() || filePath
+}
+
+// Extract relative folder path from file path and vault path
+function getRelativeFolder(filePath: string, vaultPath: string | null): string {
+  if (!vaultPath) return ''
+  // Normalize paths
+  const normalizedFile = filePath.replace(/\\/g, '/')
+  const normalizedVault = vaultPath.replace(/\\/g, '/').replace(/\/$/, '')
+
+  if (!normalizedFile.startsWith(normalizedVault)) return ''
+
+  const relativePath = normalizedFile.slice(normalizedVault.length + 1)
+  const lastSlash = relativePath.lastIndexOf('/')
+  return lastSlash > 0 ? relativePath.slice(0, lastSlash) : ''
 }
 
 // Pending deletion for move detection
@@ -44,6 +62,50 @@ export function useFileSync(deps: FileSyncDeps) {
   // Buffer for detecting file moves (delete + create with same filename)
   const pendingDeletions = new Map<string, PendingDeletion>()
   const MOVE_DETECTION_DELAY = 500 // ms to wait for matching create event
+
+  // Track node IDs being moved programmatically to avoid watcher reacting to our own moves
+  const pendingProgrammaticMoves = new Set<string>()
+
+  /**
+   * Find frame that matches a folder path
+   */
+  function findFrameForFolder(folderPath: string): Frame | undefined {
+    if (!deps.getFrames) return undefined
+    const frames = deps.getFrames()
+    return frames.find((f) => f.folder_path === folderPath)
+  }
+
+  /**
+   * Assign node to frame based on its file path
+   */
+  function assignNodeToFrameByPath(nodeId: string, filePath: string): void {
+    if (!deps.assignNodeToFrame || !deps.getVaultPath) return
+
+    const vaultPath = deps.getVaultPath()
+    const folderPath = getRelativeFolder(filePath, vaultPath)
+    const frame = findFrameForFolder(folderPath)
+
+    deps.assignNodeToFrame(nodeId, frame?.id ?? null)
+  }
+
+  /**
+   * Mark a node as being moved programmatically
+   * Call this before invoking move_node_file to prevent duplicate handling
+   */
+  function markProgrammaticMove(nodeId: string): void {
+    pendingProgrammaticMoves.add(nodeId)
+  }
+
+  /**
+   * Check if a move event should be handled (not a programmatic move)
+   */
+  function shouldHandleMoveEvent(nodeId: string): boolean {
+    if (pendingProgrammaticMoves.has(nodeId)) {
+      pendingProgrammaticMoves.delete(nodeId)
+      return false
+    }
+    return true
+  }
 
   async function watchVault(path: string): Promise<void> {
     await stopWatching()
@@ -93,7 +155,16 @@ export function useFileSync(deps: FileSyncDeps) {
         // Check if this is a move (matching pending deletion by filename)
         const pendingDeletion = pendingDeletions.get(filename)
         if (pendingDeletion) {
-          // This is a move! Cancel the deletion and update the path
+          // Check if this is a programmatic move (initiated by us)
+          if (!shouldHandleMoveEvent(pendingDeletion.nodeId)) {
+            // Skip - this is our programmatic move, already handled
+            clearTimeout(pendingDeletion.timeoutId)
+            pendingDeletions.delete(filename)
+            storeLogger.info(`Skipping programmatic move event for: ${filePath}`)
+            break
+          }
+
+          // This is an external move! Cancel the deletion and update the path
           clearTimeout(pendingDeletion.timeoutId)
           pendingDeletions.delete(filename)
 
@@ -104,6 +175,9 @@ export function useFileSync(deps: FileSyncDeps) {
           // Update file_path in database
           await invoke('update_node_file_path', { id: pendingDeletion.nodeId, filePath })
           storeLogger.info(`File moved: ${pendingDeletion.filePath} -> ${filePath}`)
+
+          // Update frame assignment based on new folder
+          assignNodeToFrameByPath(pendingDeletion.nodeId, filePath)
           break
         }
 
@@ -115,6 +189,9 @@ export function useFileSync(deps: FileSyncDeps) {
             const node = (await createNodeFromFile(filePath, workspaceId)) as Node
             deps.addNode(node)
             storeLogger.info(`Created node from new file: ${filePath}`)
+
+            // Auto-assign to frame based on folder path
+            assignNodeToFrameByPath(node.id, filePath)
           } catch (e) {
             storeLogger.error('Failed to create node from file:', e)
           }
@@ -206,5 +283,6 @@ export function useFileSync(deps: FileSyncDeps) {
     watchVault,
     stopWatching,
     handleFileChange,
+    markProgrammaticMove,
   }
 }

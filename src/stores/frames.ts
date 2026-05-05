@@ -60,7 +60,8 @@ export const useFramesStore = defineStore('frames', () => {
     width = 400,
     height = 300,
     title = 'Frame',
-    workspaceId: string | null = null
+    workspaceId: string | null = null,
+    folderPath: string | null = null
   ): Frame {
     const frame: Frame = {
       id: crypto.randomUUID(),
@@ -71,6 +72,7 @@ export const useFramesStore = defineStore('frames', () => {
       height,
       color: null,
       workspace_id: workspaceId,
+      folder_path: folderPath,
     }
     frames.value.push(frame)
 
@@ -85,6 +87,7 @@ export const useFramesStore = defineStore('frames', () => {
         height: frame.height,
         color: frame.color,
         workspaceId: frame.workspace_id,
+        folderPath: frame.folder_path,
       },
     }).catch((e) => storeLogger.error('Failed to create frame:', e))
 
@@ -198,6 +201,17 @@ export const useFramesStore = defineStore('frames', () => {
     return workspaceFrames.find((f) => isPointInFrame(x, y, f.id))
   }
 
+  /**
+   * Find frame by folder path within a workspace
+   */
+  function findFrameByFolderPath(
+    folderPath: string,
+    workspaceId: string | null
+  ): Frame | undefined {
+    const workspaceFrames = getFramesForWorkspace(workspaceId)
+    return workspaceFrames.find((f) => f.folder_path === folderPath)
+  }
+
   return {
     // State
     frames,
@@ -219,6 +233,7 @@ export const useFramesStore = defineStore('frames', () => {
     getFrame,
     isPointInFrame,
     findFrameAtPoint,
+    findFrameByFolderPath,
   }
 })
 

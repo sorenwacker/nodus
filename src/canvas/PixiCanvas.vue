@@ -1477,6 +1477,7 @@ const nodeDragging = useNodeDragging({
     set nodeLayoutVersion(v: number) {
       store.nodeLayoutVersion = v
     },
+    updateNodeFilePath: store.updateNodeFilePath,
   },
   scale,
   offset: computed(() => ({ x: offsetX.value, y: offsetY.value })),
@@ -1505,6 +1506,10 @@ const nodeDragging = useNodeDragging({
     lastDragEndTime = time
   },
   onFullscreenOpen: openFullscreenNode,
+  // File-folder sync
+  moveNodeFile: store.moveNodeFile,
+  markProgrammaticMove: store.markProgrammaticMove,
+  getVaultPath: store.getVaultPath,
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 

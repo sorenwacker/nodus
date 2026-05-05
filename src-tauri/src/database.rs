@@ -121,6 +121,11 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
             .await;
     }
 
+    // Add folder_path column to frames for folder-frame sync
+    let _ = sqlx::query(include_str!("../migrations/010_frame_folder_path.sql"))
+        .execute(pool)
+        .await;
+
     Ok(())
 }
 
@@ -440,7 +445,6 @@ pub mod nodes {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub async fn update_frame_id(
         pool: &DbPool,
         id: &str,
@@ -1207,6 +1211,7 @@ pub mod frames {
         pub height: f64,
         pub color: Option<String>,
         pub workspace_id: Option<String>,
+        pub folder_path: Option<String>,
         pub created_at: i64,
         pub updated_at: i64,
     }
@@ -1221,8 +1226,8 @@ pub mod frames {
     pub async fn create(pool: &DbPool, frame: &Frame) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO frames (id, title, canvas_x, canvas_y, width, height, color, workspace_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO frames (id, title, canvas_x, canvas_y, width, height, color, workspace_id, folder_path, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
         )
         .bind(&frame.id)
@@ -1233,6 +1238,7 @@ pub mod frames {
         .bind(frame.height)
         .bind(&frame.color)
         .bind(&frame.workspace_id)
+        .bind(&frame.folder_path)
         .bind(frame.created_at)
         .bind(frame.updated_at)
         .execute(pool)
@@ -1328,6 +1334,50 @@ pub mod frames {
                     "SELECT * FROM frames WHERE title = ? AND workspace_id IS NULL",
                 )
                 .bind(title)
+                .fetch_optional(pool)
+                .await?
+            }
+        };
+        Ok(frame)
+    }
+
+    #[allow(dead_code)]
+    pub async fn update_folder_path(
+        pool: &DbPool,
+        id: &str,
+        folder_path: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE frames SET folder_path = ?, updated_at = ? WHERE id = ?")
+            .bind(folder_path)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub async fn get_by_folder_path_and_workspace(
+        pool: &DbPool,
+        folder_path: &str,
+        workspace_id: Option<&str>,
+    ) -> Result<Option<Frame>, DatabaseError> {
+        let frame = match workspace_id {
+            Some(ws_id) => {
+                sqlx::query_as::<_, Frame>(
+                    "SELECT * FROM frames WHERE folder_path = ? AND workspace_id = ?",
+                )
+                .bind(folder_path)
+                .bind(ws_id)
+                .fetch_optional(pool)
+                .await?
+            }
+            None => {
+                sqlx::query_as::<_, Frame>(
+                    "SELECT * FROM frames WHERE folder_path = ? AND workspace_id IS NULL",
+                )
+                .bind(folder_path)
                 .fetch_optional(pool)
                 .await?
             }

@@ -40,13 +40,19 @@ interface DbWorkspace {
   name: string
   color: string | null
   vault_path: string | null
+  sync_enabled: boolean
   created_at: number
   updated_at: number
 }
 
+// Extended workspace type for internal use with vault_path
+interface InternalWorkspace extends Workspace {
+  vault_path?: string | null
+}
+
 export const useWorkspaceStore = defineStore('workspaces', () => {
   // Initialize from localStorage for quick startup, but database is source of truth
-  const workspaces = ref<Workspace[]>(workspaceStorage.getAll())
+  const workspaces = ref<InternalWorkspace[]>(workspaceStorage.getAll())
   const currentWorkspaceId = ref<string | null>(workspaceStorage.getCurrent())
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -55,6 +61,9 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
   const currentWorkspace = computed(() =>
     workspaces.value.find((w) => w.id === currentWorkspaceId.value)
   )
+
+  // Get current workspace vault path
+  const currentVaultPath = computed(() => currentWorkspace.value?.vault_path ?? null)
 
   // Persist workspaces to localStorage (cache for quick startup)
   function saveWorkspacesToStorage() {
@@ -67,11 +76,12 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     const dbWorkspaces = await invoke<DbWorkspace[]>('get_workspaces')
     storeLogger.debug(`[Workspace] DB workspaces: ${JSON.stringify(dbWorkspaces.map(w => ({ id: w.id, name: w.name })))}`)
 
-    // Convert database workspaces to frontend format
-    const loadedWorkspaces: Workspace[] = dbWorkspaces.map((w) => ({
+    // Convert database workspaces to frontend format (including vault_path for sync)
+    const loadedWorkspaces: InternalWorkspace[] = dbWorkspaces.map((w) => ({
       id: w.id,
       name: w.name,
       created_at: w.created_at,
+      vault_path: w.vault_path,
     }))
 
     // Update local state from database
@@ -224,6 +234,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     workspaces,
     currentWorkspaceId,
     currentWorkspace,
+    currentVaultPath,
     loading,
     error,
 

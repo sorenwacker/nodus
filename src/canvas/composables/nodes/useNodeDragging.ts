@@ -20,7 +20,12 @@ export interface UseNodeDraggingContext {
     assignNodesToFrame: (nodeIds: string[], frameId: string | null) => void
     refreshNodeFromFile: (id: string) => void
     nodeLayoutVersion: number
+    updateNodeFilePath?: (nodeId: string, filePath: string) => void
   }
+  // File sync dependencies (optional)
+  moveNodeFile?: (nodeId: string, targetFolder: string) => Promise<string>
+  markProgrammaticMove?: (nodeId: string) => void
+  getVaultPath?: () => string | null
   scale: Ref<number>
   offset: Ref<{ x: number; y: number }>
   canvasRef: Ref<HTMLDivElement | null>
@@ -330,6 +335,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         const nodeHeight = node.height || 120
         const nodeArea = nodeWidth * nodeHeight
         let assignedFrameId: string | null = null
+        let assignedFrame: Frame | undefined
 
         for (const frame of store.frames) {
           const overlapX = Math.max(
@@ -346,6 +352,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
           if (overlapArea > nodeArea * 0.5) {
             assignedFrameId = frame.id
+            assignedFrame = frame
             break
           }
         }
@@ -353,6 +360,36 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         // Update frame assignment (null removes from frame)
         if (node.frame_id !== assignedFrameId) {
           store.assignNodesToFrame([nodeId], assignedFrameId)
+
+          // Move file to frame's folder if:
+          // 1. Node has a file_path
+          // 2. Target frame has a folder_path
+          // 3. File move function is available
+          if (
+            node.file_path &&
+            ctx.moveNodeFile &&
+            ctx.getVaultPath
+          ) {
+            const vaultPath = ctx.getVaultPath()
+            if (vaultPath) {
+              const targetFolder = assignedFrame?.folder_path
+                ? `${vaultPath}/${assignedFrame.folder_path}`
+                : vaultPath // Move to vault root if no frame or frame has no folder_path
+
+              // Mark as programmatic move to prevent watcher from reacting
+              ctx.markProgrammaticMove?.(nodeId)
+
+              // Move file asynchronously
+              ctx.moveNodeFile(nodeId, targetFolder)
+                .then((newPath) => {
+                  // Update local node state with new file path
+                  store.updateNodeFilePath?.(nodeId, newPath)
+                })
+                .catch((err) => {
+                  console.error(`Failed to move file for node ${nodeId}:`, err)
+                })
+            }
+          }
         }
       }
     }
