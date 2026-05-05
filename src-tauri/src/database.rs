@@ -166,6 +166,42 @@ pub mod nodes {
         Ok(nodes)
     }
 
+    /// Get all soft-deleted nodes for a workspace
+    pub async fn get_deleted(pool: &DbPool, workspace_id: &str) -> Result<Vec<Node>, DatabaseError> {
+        let nodes = sqlx::query_as::<_, Node>(
+            "SELECT * FROM nodes WHERE deleted_at IS NOT NULL AND workspace_id = ? ORDER BY deleted_at DESC",
+        )
+        .bind(workspace_id)
+        .fetch_all(pool)
+        .await?;
+        Ok(nodes)
+    }
+
+    /// Restore nodes whose files still exist on disk
+    pub async fn restore_if_file_exists(pool: &DbPool, workspace_id: &str) -> Result<usize, DatabaseError> {
+        // Get all deleted nodes with file paths
+        let deleted_nodes = sqlx::query_as::<_, Node>(
+            "SELECT * FROM nodes WHERE deleted_at IS NOT NULL AND workspace_id = ? AND file_path IS NOT NULL",
+        )
+        .bind(workspace_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut restored = 0;
+        for node in deleted_nodes {
+            if let Some(ref path) = node.file_path {
+                if std::path::Path::new(path).exists() {
+                    sqlx::query("UPDATE nodes SET deleted_at = NULL WHERE id = ?")
+                        .bind(&node.id)
+                        .execute(pool)
+                        .await?;
+                    restored += 1;
+                }
+            }
+        }
+        Ok(restored)
+    }
+
     pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Node>, DatabaseError> {
         let node =
             sqlx::query_as::<_, Node>("SELECT * FROM nodes WHERE id = ? AND deleted_at IS NULL")

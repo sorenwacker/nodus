@@ -145,6 +145,8 @@ fn main() {
             commands::delete_node,
             commands::delete_nodes,
             commands::restore_node,
+            commands::get_deleted_nodes,
+            commands::restore_nodes_with_files,
             commands::update_node_position,
             commands::update_node_content,
             commands::update_node_content_from_file,

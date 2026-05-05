@@ -725,6 +725,24 @@ pub async fn restore_node(node: Node) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Get all soft-deleted nodes for a workspace
+#[tauri::command]
+pub async fn get_deleted_nodes(workspace_id: String) -> Result<Vec<Node>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::get_deleted(pool, &workspace_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Restore nodes whose files still exist on disk
+#[tauri::command]
+pub async fn restore_nodes_with_files(workspace_id: String) -> Result<usize, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::restore_if_file_exists(pool, &workspace_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn update_node_position(id: String, x: f64, y: f64) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
@@ -1165,6 +1183,14 @@ pub async fn sync_missing_files(
 
     if !vault_path.exists() {
         return Err("Vault path does not exist".to_string());
+    }
+
+    // First, restore any soft-deleted nodes whose files still exist
+    let restored = database::nodes::restore_if_file_exists(pool, &workspace_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    if restored > 0 {
+        println!("[SyncMissing] Restored {} soft-deleted nodes with existing files", restored);
     }
 
     // Get all existing file paths for this workspace
