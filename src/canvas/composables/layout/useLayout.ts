@@ -307,11 +307,29 @@ export function useLayout(options: UseLayoutOptions) {
       }
     }
 
+    // If center node is in a frame, constrain all positions to stay within frame
+    let finalTargets = targets
+    if (centerFrameId) {
+      const allFrames = store.getFilteredFrames()
+      const frame = allFrames.find(f => f.id === centerFrameId)
+      if (frame) {
+        // Build node size map for constraint calculation
+        const nodeMap = new Map<string, NodeSize>()
+        for (const nodeId of targets.keys()) {
+          const node = allNodes.find(n => n.id === nodeId)
+          if (node) {
+            nodeMap.set(nodeId, { width: node.width, height: node.height })
+          }
+        }
+        finalTargets = constrainNodesToFrame(targets, nodeMap, frame)
+      }
+    }
+
     // Animate to positions
-    if (targets.size > 200) {
-      await batchUpdatePositions(targets, store.updateNodePosition, 100)
+    if (finalTargets.size > 200) {
+      await batchUpdatePositions(finalTargets, store.updateNodePosition, 100)
     } else {
-      animateToPositions(targets, 600)
+      animateToPositions(finalTargets, 600)
     }
 
     // Dispatch z-order event based on angles (angle increases clockwise from top)
