@@ -127,8 +127,6 @@ export function useLayout(options: UseLayoutOptions) {
    * - If center is NOT in a frame, only unframed nodes are moved (framed nodes are NEVER touched)
    */
   async function radialLayout(): Promise<void> {
-    console.log('>>> RADIAL LAYOUT STARTING (new code) <<<')
-
     const selectedIds = store.getSelectedNodeIds()
     if (selectedIds.length !== 1) {
       return
@@ -181,9 +179,6 @@ export function useLayout(options: UseLayoutOptions) {
     })
     const nodeIdsToLayout = new Set(nodesToLayout.map(n => n.id))
 
-    console.log('>>> Center isFramed:', centerIsFramed, 'centerFrameId:', centerFrameId)
-    console.log('>>> Total:', allNodes.length, 'In frames:', allNodes.length - nodesToLayout.length, 'Unframed:', nodesToLayout.length)
-    console.log('>>> Will layout:', nodesToLayout.length, 'nodes')
 
     // Build adjacency map
     const adjacency = new Map<string, Set<string>>()
@@ -356,20 +351,6 @@ export function useLayout(options: UseLayoutOptions) {
           targets.set(nodeId, { x: Math.round(x), y: Math.round(y) })
         }
       }
-    }
-
-    // SAFETY CHECK: Verify no framed nodes are in targets when center is unframed
-    console.log('>>> Targets count:', targets.size)
-    if (!centerIsFramed) {
-      let framedInTargets = 0
-      for (const [nodeId] of targets) {
-        const node = allNodes.find(n => n.id === nodeId)
-        if (node && getNodeFrameId(node)) {
-          framedInTargets++
-          console.error('BUG: Framed node in targets!', nodeId, 'frameId:', getNodeFrameId(node))
-        }
-      }
-      console.log('>>> Framed nodes in targets:', framedInTargets, '(should be 0)')
     }
 
     // Constrain to frame OR push out of frames
