@@ -122,7 +122,9 @@ export function useLayout(options: UseLayoutOptions) {
 
   /**
    * Radial/concentric layout - places selected node at center with neighbors in rings
-   * Only affects nodes in the same frame context as the center node
+   * Only affects nodes in the same frame context as the center node:
+   * - If center is in a frame, only nodes in that same frame are moved
+   * - If center is NOT in a frame, only unframed nodes are moved (framed nodes are NEVER touched)
    */
   async function radialLayout(): Promise<void> {
     const selectedIds = store.getSelectedNodeIds()
@@ -140,20 +142,22 @@ export function useLayout(options: UseLayoutOptions) {
     const allNodes = store.getFilteredNodes()
     const allEdges = store.getFilteredEdges()
 
-    // Determine which nodes should be moved by radial layout
-    // Only move nodes that share the same frame context as center
+    // Determine which nodes can be moved by radial layout
+    // CRITICAL: Only move nodes that share the same frame context as center
     const centerFrameId = centerNode.frame_id
     const centerIsFramed = !!centerFrameId
-    const nodeIdsToLayout = new Set(allNodes.filter(n => {
-      const nodeIsFramed = !!n.frame_id
+
+    // Filter nodes to only those that should be laid out
+    const nodesToLayout = allNodes.filter(n => {
       if (centerIsFramed) {
         // Center is in a frame - only include nodes in the SAME frame
         return n.frame_id === centerFrameId
       } else {
-        // Center is NOT in a frame - only include nodes NOT in any frame
-        return !nodeIsFramed
+        // Center is NOT in a frame - NEVER move framed nodes
+        return !n.frame_id
       }
-    }).map(n => n.id))
+    })
+    const nodeIdsToLayout = new Set(nodesToLayout.map(n => n.id))
 
     // Build adjacency map
     const adjacency = new Map<string, Set<string>>()
@@ -196,8 +200,9 @@ export function useLayout(options: UseLayoutOptions) {
       maxDepth = Math.max(maxDepth, depth)
     }
 
-    // Find unconnected nodes (not reachable from center via BFS)
-    const unconnectedNodes = allNodes.filter(n => !depths.has(n.id))
+    // Find unconnected nodes that should be laid out (not reachable from center via BFS)
+    // IMPORTANT: Only include nodes from nodesToLayout, not all nodes
+    const unconnectedNodes = nodesToLayout.filter(n => !depths.has(n.id))
     if (unconnectedNodes.length > 0) {
       // Add them as an outer ring beyond maxDepth
       const outerDepth = maxDepth + 1
