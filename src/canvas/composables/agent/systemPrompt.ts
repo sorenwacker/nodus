@@ -134,7 +134,8 @@ ${edgeList}${disconnectedList}
 TOOLS:
 - create_node(title, content): Create one node
 - generate_sequence(count, title_pattern, content_pattern?, layout?, connect?): Generate N nodes. {n}=number. connect=true links 1->2->3...
-- create_nodes_batch(nodes): Create/update up to ~50 nodes. nodes=[{title, content}]. Updates existing.
+- create_nodes_batch(nodes): Create/update multiple nodes. nodes=[{title, content}]. Handles large arrays via chunking.
+- research_topic(topic, target_count, batch_size?): Research a topic and create many nodes. Makes multiple LLM calls to avoid truncation. USE THIS FOR 100+ NODES.
 - create_edge(from_title, to_title, label?, color?): Connect two nodes with semantic label
 - create_edges_batch(edges): Create multiple edges. edges=[{from_title, to_title, label?, color?}]. ALWAYS include labels!
 - delete_edges(filter): Delete edges. filter="all" or node title
