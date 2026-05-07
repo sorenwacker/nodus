@@ -1062,8 +1062,7 @@ pub async fn move_node_file(node_id: String, target_folder: String) -> Result<St
     }
 
     // Acquire exclusive lock on the source file
-    let _lock = FileLock::exclusive(old_path)
-        .map_err(|e| format!("Failed to lock file: {}", e))?;
+    let _lock = FileLock::exclusive(old_path).map_err(|e| format!("Failed to lock file: {}", e))?;
 
     // Create target directory if it doesn't exist
     if !target_dir.exists() {
@@ -1072,8 +1071,7 @@ pub async fn move_node_file(node_id: String, target_folder: String) -> Result<St
     }
 
     // Move the file
-    std::fs::rename(old_path, &new_path)
-        .map_err(|e| format!("Failed to move file: {}", e))?;
+    std::fs::rename(old_path, &new_path).map_err(|e| format!("Failed to move file: {}", e))?;
 
     // Lock is released on drop
 
@@ -1190,7 +1188,10 @@ pub async fn sync_missing_files(
         .await
         .map_err(|e| e.to_string())?;
     if restored > 0 {
-        println!("[SyncMissing] Restored {} soft-deleted nodes with existing files", restored);
+        println!(
+            "[SyncMissing] Restored {} soft-deleted nodes with existing files",
+            restored
+        );
     }
 
     // Get all existing file paths for this workspace
@@ -2542,10 +2543,7 @@ pub async fn update_frame_color(id: String, color: Option<String>) -> Result<(),
 
 /// Assign a node to a frame (or remove from frame if frameId is None)
 #[tauri::command]
-pub async fn assign_node_to_frame(
-    node_id: String,
-    frame_id: Option<String>,
-) -> Result<(), String> {
+pub async fn assign_node_to_frame(node_id: String, frame_id: Option<String>) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_frame_id(pool, &node_id, frame_id.as_deref())
         .await

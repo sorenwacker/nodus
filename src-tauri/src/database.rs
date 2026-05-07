@@ -167,7 +167,10 @@ pub mod nodes {
     }
 
     /// Get all soft-deleted nodes for a workspace
-    pub async fn get_deleted(pool: &DbPool, workspace_id: &str) -> Result<Vec<Node>, DatabaseError> {
+    pub async fn get_deleted(
+        pool: &DbPool,
+        workspace_id: &str,
+    ) -> Result<Vec<Node>, DatabaseError> {
         let nodes = sqlx::query_as::<_, Node>(
             "SELECT * FROM nodes WHERE deleted_at IS NOT NULL AND workspace_id = ? ORDER BY deleted_at DESC",
         )
@@ -178,7 +181,10 @@ pub mod nodes {
     }
 
     /// Restore nodes whose files still exist on disk
-    pub async fn restore_if_file_exists(pool: &DbPool, workspace_id: &str) -> Result<usize, DatabaseError> {
+    pub async fn restore_if_file_exists(
+        pool: &DbPool,
+        workspace_id: &str,
+    ) -> Result<usize, DatabaseError> {
         // Get all deleted nodes with file paths
         let deleted_nodes = sqlx::query_as::<_, Node>(
             "SELECT * FROM nodes WHERE deleted_at IS NOT NULL AND workspace_id = ? AND file_path IS NOT NULL",
