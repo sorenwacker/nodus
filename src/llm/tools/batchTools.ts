@@ -78,7 +78,7 @@ export function registerBatchTools(): void {
 
   defineTool<{ nodes: Array<{ title?: string; content?: string; mode?: string }> }>(
     'create_nodes_batch',
-    'Create or update multiple nodes (up to ~50). For larger batches, use generate_sequence.',
+    'Create or update multiple nodes. Handles any size array by processing in chunks.',
     {
       type: 'object',
       properties: {
@@ -109,41 +109,56 @@ export function registerBatchTools(): void {
         return 'Error: nodes must be a non-empty array'
       }
 
-      const existingByTitle = new Map(
-        ctx.store.filteredNodes.map(n => [n.title.toLowerCase(), n])
-      )
-
+      const CHUNK_SIZE = 30
+      const totalNodes = nodesList.length
       const pos = ctx.screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
       const created: string[] = []
       const updated: string[] = []
-      let newIndex = 0
+      let globalIndex = 0
 
-      for (const n of nodesList) {
-        const title = n.title || `Node ${newIndex + 1}`
-        const existing = existingByTitle.get(title.toLowerCase())
+      ctx.log(`> Processing ${totalNodes} nodes in chunks of ${CHUNK_SIZE}...`)
 
-        if (existing) {
-          const newContent = n.mode === 'append'
-            ? (existing.markdown_content || '') + '\n\n' + cleanContent(n.content || '')
-            : cleanContent(n.content || '')
-          await ctx.store.updateNodeContent(existing.id, newContent)
-          updated.push(title)
-        } else {
-          const cols = Math.ceil(Math.sqrt(nodesList.length))
-          const x = pos.x + (newIndex % cols) * 250
-          const y = pos.y + Math.floor(newIndex / cols) * 180
+      for (let chunkStart = 0; chunkStart < totalNodes; chunkStart += CHUNK_SIZE) {
+        const chunk = nodesList.slice(chunkStart, chunkStart + CHUNK_SIZE)
+        const chunkNum = Math.floor(chunkStart / CHUNK_SIZE) + 1
+        const totalChunks = Math.ceil(totalNodes / CHUNK_SIZE)
 
-          await ctx.store.createNode({
-            title,
-            node_type: 'note',
-            markdown_content: cleanContent(n.content || ''),
-            canvas_x: ctx.snapToGrid(x),
-            canvas_y: ctx.snapToGrid(y),
-          })
-          created.push(title)
-          newIndex++
+        ctx.log(`> Chunk ${chunkNum}/${totalChunks} (${chunk.length} nodes)...`)
+
+        // Refresh existing nodes map for each chunk to catch newly created ones
+        const existingByTitle = new Map(
+          ctx.store.filteredNodes.map(n => [n.title.toLowerCase(), n])
+        )
+
+        for (const n of chunk) {
+          const title = n.title || `Node ${globalIndex + 1}`
+          const existing = existingByTitle.get(title.toLowerCase())
+
+          if (existing) {
+            const newContent = n.mode === 'append'
+              ? (existing.markdown_content || '') + '\n\n' + cleanContent(n.content || '')
+              : cleanContent(n.content || '')
+            await ctx.store.updateNodeContent(existing.id, newContent)
+            updated.push(title)
+          } else {
+            const cols = Math.ceil(Math.sqrt(totalNodes))
+            const x = pos.x + (globalIndex % cols) * 250
+            const y = pos.y + Math.floor(globalIndex / cols) * 180
+
+            await ctx.store.createNode({
+              title,
+              node_type: 'note',
+              markdown_content: cleanContent(n.content || ''),
+              canvas_x: ctx.snapToGrid(x),
+              canvas_y: ctx.snapToGrid(y),
+            })
+            created.push(title)
+            globalIndex++
+          }
         }
       }
+
+      ctx.log(`> Done: ${created.length} created, ${updated.length} updated`)
 
       const parts = []
       if (created.length) parts.push(`created ${created.length}`)
