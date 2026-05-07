@@ -227,9 +227,46 @@ jobs:
 
           rclone copy assets/ r2:binaries/nodus/
 
+  # Cleanup old versions from R2 (keep last 5)
+  cleanup-r2:
+    needs: upload-r2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup old versions
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://78836246513c4e18ead5fd9349aea200.r2.cloudflarestorage.com
+        run: |
+          curl -s https://rclone.org/install.sh | sudo bash
+
+          # List all versioned files, extract versions, sort, keep only versions to delete
+          KEEP_VERSIONS=5
+
+          # Get unique version numbers from filenames (e.g., Nodus_0.4.35_xxx -> 0.4.35)
+          rclone ls r2:binaries/nodus/ | awk '{print $2}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -V | uniq > all_versions.txt
+
+          TOTAL=$(wc -l < all_versions.txt)
+          if [ "$TOTAL" -gt "$KEEP_VERSIONS" ]; then
+            DELETE_COUNT=$((TOTAL - KEEP_VERSIONS))
+            head -n "$DELETE_COUNT" all_versions.txt > versions_to_delete.txt
+
+            echo "Keeping last $KEEP_VERSIONS versions, deleting $DELETE_COUNT old versions:"
+            cat versions_to_delete.txt
+
+            while read -r VERSION; do
+              echo "Deleting files for version $VERSION..."
+              rclone delete r2:binaries/nodus/ --include "*${VERSION}*"
+            done < versions_to_delete.txt
+          else
+            echo "Only $TOTAL versions found, keeping all (threshold: $KEEP_VERSIONS)"
+          fi
+
   # Trigger website to update download links
   trigger-website:
-    needs: upload-r2
+    needs: [upload-r2, cleanup-r2]
     runs-on: ubuntu-latest
     steps:
       - name: Trigger sorenwacker.net update
