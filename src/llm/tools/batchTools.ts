@@ -276,4 +276,99 @@ export function registerBatchTools(): void {
     },
     { category: 'batch' }
   )
+
+  defineTool<{ topic: string; target_count: number; batch_size?: number }>(
+    'research_topic',
+    'Research a topic and create many nodes. Makes multiple LLM calls to avoid truncation.',
+    {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'The topic to research (e.g., "the brain", "machine learning")' },
+        target_count: { type: 'number', description: 'Target number of nodes to create' },
+        batch_size: { type: 'number', description: 'Nodes per batch (default 20)' },
+      },
+      required: ['topic', 'target_count'],
+    },
+    async (args, ctx) => {
+      const { providerRegistry } = await import('../providers')
+      const provider = providerRegistry.getActiveProvider()
+
+      const topic = args.topic
+      const targetCount = Math.min(args.target_count || 100, 2000)
+      const batchSize = args.batch_size || 20
+      const batches = Math.ceil(targetCount / batchSize)
+
+      const pos = ctx.screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
+      const createdTitles = new Set<string>()
+      let totalCreated = 0
+
+      ctx.log(`> Researching "${topic}" - target: ${targetCount} nodes in ${batches} batches`)
+
+      for (let batch = 0; batch < batches && totalCreated < targetCount; batch++) {
+        const remaining = targetCount - totalCreated
+        const thisCount = Math.min(batchSize, remaining)
+
+        ctx.log(`> Batch ${batch + 1}/${batches}: generating ${thisCount} subtopics...`)
+
+        // Build prompt that asks for unique subtopics not already created
+        const existingList = Array.from(createdTitles).slice(-50).join(', ')
+        const avoidClause = existingList
+          ? `\nAVOID these already covered: ${existingList}`
+          : ''
+
+        try {
+          const result = await provider.generate({
+            prompt: `List exactly ${thisCount} specific subtopics about "${topic}".
+Return ONLY a JSON array of objects with "title" and "content" keys.
+Each content should be 2-3 sentences.
+Be specific and diverse - cover different aspects.${avoidClause}
+
+Example format:
+[{"title": "Subtopic Name", "content": "Brief description..."}]`,
+            system: 'You are a research assistant. Return only valid JSON, no markdown.',
+          })
+
+          // Parse the response
+          let nodes: Array<{ title: string; content: string }> = []
+          try {
+            const jsonMatch = result.content.match(/\[[\s\S]*\]/)
+            if (jsonMatch) {
+              nodes = JSON.parse(jsonMatch[0])
+            }
+          } catch {
+            ctx.log(`> Batch ${batch + 1}: failed to parse response`)
+            continue
+          }
+
+          // Create the nodes
+          const cols = Math.ceil(Math.sqrt(targetCount))
+          for (const n of nodes) {
+            if (totalCreated >= targetCount) break
+            if (createdTitles.has(n.title.toLowerCase())) continue
+
+            const x = pos.x + (totalCreated % cols) * 250
+            const y = pos.y + Math.floor(totalCreated / cols) * 180
+
+            await ctx.store.createNode({
+              title: n.title,
+              node_type: 'note',
+              markdown_content: cleanContent(n.content || ''),
+              canvas_x: ctx.snapToGrid(x),
+              canvas_y: ctx.snapToGrid(y),
+            })
+
+            createdTitles.add(n.title.toLowerCase())
+            totalCreated++
+          }
+
+          ctx.log(`> Batch ${batch + 1}: created ${nodes.length} nodes (total: ${totalCreated})`)
+        } catch (err) {
+          ctx.log(`> Batch ${batch + 1} error: ${err}`)
+        }
+      }
+
+      return `Created ${totalCreated} nodes about "${topic}"`
+    },
+    { category: 'batch' }
+  )
 }
