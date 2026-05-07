@@ -474,7 +474,6 @@ const { copySelectedNodes, pasteNodes } = clipboard
 // Content renderer composable - handles markdown, math, mermaid rendering with caching
 const contentRenderer = useContentRenderer({
   getFilteredNodes: () => store.filteredNodes,
-  isDarkMode: () => isDarkMode.value,
 })
 const {
   nodeRenderedContent,

@@ -16,12 +16,11 @@ import type { Node } from '../../../types'
 
 export interface UseContentRendererOptions {
   getFilteredNodes: () => Node[]
-  isDarkMode: () => boolean
   debounceMs?: number
 }
 
 export function useContentRenderer(options: UseContentRendererOptions) {
-  const { getFilteredNodes, isDarkMode, debounceMs = 50 } = options
+  const { getFilteredNodes, debounceMs = 50 } = options
 
   // Caches
   const markdownCache = new Map<string, string>()
@@ -297,10 +296,13 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     }
 
     // Initialize Mermaid with appropriate built-in theme
+    // Read theme directly from DOM to avoid race conditions with reactive state
     if (typeof mermaidApi.initialize === 'function') {
+      const theme = document.documentElement.getAttribute('data-theme') || 'light'
+      const isDark = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
       mermaidApi.initialize({
         startOnLoad: false,
-        theme: isDarkMode() ? 'dark' : 'default',
+        theme: isDark ? 'dark' : 'default',
         securityLevel: 'loose',
       })
     }
@@ -331,7 +333,9 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       el.setAttribute('data-mermaid-code', code)
 
       // Include theme in cache key so theme changes re-render
-      const dark = isDarkMode()
+      // Read directly from DOM to match initialization
+      const theme = document.documentElement.getAttribute('data-theme') || 'light'
+      const dark = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
       const cacheKey = `${dark ? 'dark' : 'light'}:${code}`
 
       // Check cache first
