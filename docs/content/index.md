@@ -194,7 +194,7 @@ hide:
 <div class="screenshot-section">
   <h2>Visual Knowledge Work</h2>
   <p class="subtitle">Research, notes, and diagrams on one infinite canvas</p>
-  <img src="images/nodus-screenshot.png" alt="Nodus canvas view" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.3);">
+  <img src="../assets/nodus-screenshot.png" alt="Nodus canvas view" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.3);">
 </div>
 
 
