@@ -3,6 +3,7 @@
  * Single source of truth for all persisted state
  */
 import type { Workspace } from '../types'
+import type { SessionMemory, StackTask } from '../llm/types'
 
 // Storage key definitions with types
 const KEYS = {
@@ -387,6 +388,118 @@ export const storylineReadingStorage = {
 
   clearPosition(storylineId: string): void {
     localStorage.removeItem(this._key(storylineId))
+  },
+}
+
+/**
+ * Agent memory storage - session, stack, and facts
+ * Workspace-scoped for multi-workspace support
+ */
+export const agentMemoryStorage = {
+  // Key helpers
+  _sessionKey(workspaceId: string): string {
+    return `nodus_agent_session_${workspaceId}`
+  },
+  _stackKey(workspaceId: string): string {
+    return `nodus_agent_stack_${workspaceId}`
+  },
+
+  // Session memory operations
+  getSession(workspaceId: string): SessionMemory | null {
+    const data = localStorage.getItem(this._sessionKey(workspaceId))
+    if (!data) return null
+    try {
+      return JSON.parse(data) as SessionMemory
+    } catch {
+      return null
+    }
+  },
+
+  setSession(workspaceId: string, session: SessionMemory): void {
+    localStorage.setItem(this._sessionKey(workspaceId), JSON.stringify(session))
+  },
+
+  clearSession(workspaceId: string): void {
+    localStorage.removeItem(this._sessionKey(workspaceId))
+  },
+
+  updateProgress(workspaceId: string, progress: number, completedAction?: string): void {
+    const session = this.getSession(workspaceId)
+    if (!session) return
+
+    session.progress = Math.min(100, Math.max(0, progress))
+    if (completedAction) {
+      session.completed.push(completedAction)
+    }
+    this.setSession(workspaceId, session)
+  },
+
+  updateCurrentStep(workspaceId: string, step: string | null): void {
+    const session = this.getSession(workspaceId)
+    if (!session) return
+
+    session.current_step = step
+    this.setSession(workspaceId, session)
+  },
+
+  addBlocker(workspaceId: string, blocker: string): void {
+    const session = this.getSession(workspaceId)
+    if (!session) return
+
+    if (!session.blockers.includes(blocker)) {
+      session.blockers.push(blocker)
+      this.setSession(workspaceId, session)
+    }
+  },
+
+  // Stack (LIFO todo queue) operations
+  getStack(workspaceId: string): StackTask[] {
+    const data = localStorage.getItem(this._stackKey(workspaceId))
+    if (!data) return []
+    try {
+      return JSON.parse(data) as StackTask[]
+    } catch {
+      return []
+    }
+  },
+
+  pushTask(workspaceId: string, task: Omit<StackTask, 'id' | 'created_at'>): StackTask {
+    const stack = this.getStack(workspaceId)
+    const newTask: StackTask = {
+      ...task,
+      id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+    }
+    stack.push(newTask)
+    localStorage.setItem(this._stackKey(workspaceId), JSON.stringify(stack))
+    return newTask
+  },
+
+  popTask(workspaceId: string): StackTask | null {
+    const stack = this.getStack(workspaceId)
+    if (stack.length === 0) return null
+
+    const task = stack.pop()!
+    localStorage.setItem(this._stackKey(workspaceId), JSON.stringify(stack))
+    return task
+  },
+
+  peekTask(workspaceId: string): StackTask | null {
+    const stack = this.getStack(workspaceId)
+    return stack.length > 0 ? stack[stack.length - 1] : null
+  },
+
+  clearStack(workspaceId: string): void {
+    localStorage.removeItem(this._stackKey(workspaceId))
+  },
+
+  // Combined getter for system prompt
+  getAgentMemory(workspaceId: string): { session: SessionMemory | null; stack: StackTask[]; facts: string[] } {
+    return {
+      session: this.getSession(workspaceId),
+      stack: this.getStack(workspaceId),
+      facts: memoryStorage.getMemories(workspaceId),
+    }
   },
 }
 

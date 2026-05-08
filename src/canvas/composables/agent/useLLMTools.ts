@@ -101,6 +101,21 @@ export interface MemoryStorageInterface {
 }
 
 /**
+ * Agent memory storage interface (session + stack)
+ */
+export interface AgentMemoryStorageInterface {
+  getSession: (workspaceId: string) => import('../../../llm/types').SessionMemory | null
+  setSession: (workspaceId: string, session: import('../../../llm/types').SessionMemory) => void
+  clearSession: (workspaceId: string) => void
+  updateProgress: (workspaceId: string, progress: number, completedAction?: string) => void
+  getStack: (workspaceId: string) => import('../../../llm/types').StackTask[]
+  pushTask: (workspaceId: string, task: Omit<import('../../../llm/types').StackTask, 'id' | 'created_at'>) => import('../../../llm/types').StackTask
+  popTask: (workspaceId: string) => import('../../../llm/types').StackTask | null
+  peekTask: (workspaceId: string) => import('../../../llm/types').StackTask | null
+  clearStack: (workspaceId: string) => void
+}
+
+/**
  * Context for LLM tools
  */
 export interface LLMToolsContext {
@@ -111,6 +126,7 @@ export interface LLMToolsContext {
   planState: PlanStateInterface
   tasks: Ref<AgentTask[]>
   memoryStorage: MemoryStorageInterface
+  agentMemoryStorage: AgentMemoryStorageInterface
   log: (msg: string) => void
   pushContentUndo: (id: string, content: string | null, title: string) => void
   isRunning?: Ref<boolean>  // Optional: allows tools to check if agent was stopped
@@ -120,7 +136,7 @@ export interface LLMToolsContext {
  * LLM Tools composable
  */
 export function useLLMTools(ctx: LLMToolsContext) {
-  const { llmQueue, callOllama, store, themesStore, planState, tasks, memoryStorage, log, pushContentUndo, isRunning } = ctx
+  const { llmQueue, callOllama, store, themesStore, planState, tasks, memoryStorage, agentMemoryStorage, log, pushContentUndo, isRunning } = ctx
 
   /** Check if agent was stopped */
   function isCancelled(): boolean {
@@ -694,6 +710,146 @@ Apply the changes and output the complete updated YAML. Output ONLY the YAML, no
 
         log(`[memory] ${message}`)
         return `Remembered for this workspace: ${message}`
+      }
+
+      // Session memory tools
+      case 'set_goal': {
+        let parsedArgs = args
+        if (typeof args === 'string') {
+          try {
+            parsedArgs = JSON.parse(args)
+          } catch {
+            parsedArgs = {}
+          }
+        }
+        const goal = (parsedArgs.goal as string) || ''
+        const steps = (parsedArgs.steps as string[]) || []
+        if (!goal) return 'No goal provided'
+
+        const workspaceId = store.currentWorkspaceId || 'default'
+        agentMemoryStorage.setSession(workspaceId, {
+          goal,
+          progress: 0,
+          completed: [],
+          current_step: steps.length > 0 ? steps[0] : null,
+          next_steps: steps.slice(1),
+          blockers: [],
+          started_at: new Date().toISOString(),
+        })
+
+        log(`[session] Goal set: ${goal}`)
+        return `Goal set: ${goal}${steps.length > 0 ? ` (${steps.length} steps planned)` : ''}`
+      }
+
+      case 'update_progress': {
+        let parsedArgs = args
+        if (typeof args === 'string') {
+          try {
+            parsedArgs = JSON.parse(args)
+          } catch {
+            parsedArgs = {}
+          }
+        }
+        const progress = (parsedArgs.progress as number) ?? 0
+        const completedAction = (parsedArgs.completed_action as string) || undefined
+
+        const workspaceId = store.currentWorkspaceId || 'default'
+        const session = agentMemoryStorage.getSession(workspaceId)
+        if (!session) return 'No active goal session'
+
+        agentMemoryStorage.updateProgress(workspaceId, progress, completedAction)
+
+        log(`[session] Progress: ${progress}%${completedAction ? ` (${completedAction})` : ''}`)
+        return `Progress updated to ${progress}%${completedAction ? ` - completed: ${completedAction}` : ''}`
+      }
+
+      case 'complete_goal': {
+        let parsedArgs = args
+        if (typeof args === 'string') {
+          try {
+            parsedArgs = JSON.parse(args)
+          } catch {
+            parsedArgs = {}
+          }
+        }
+        const summary = (parsedArgs.summary as string) || 'Goal completed'
+
+        const workspaceId = store.currentWorkspaceId || 'default'
+        const session = agentMemoryStorage.getSession(workspaceId)
+        if (!session) return 'No active goal session'
+
+        // Store completion as a fact for future reference
+        memoryStorage.addMemory(workspaceId, `Completed: ${session.goal} - ${summary}`)
+        agentMemoryStorage.clearSession(workspaceId)
+
+        log(`[session] Goal completed: ${summary}`)
+        return `Goal completed: ${summary}`
+      }
+
+      // Stack (todo queue) tools
+      case 'push_task': {
+        let parsedArgs = args
+        if (typeof args === 'string') {
+          try {
+            parsedArgs = JSON.parse(args)
+          } catch {
+            parsedArgs = {}
+          }
+        }
+        const description = (parsedArgs.description as string) || ''
+        const priorityStr = (parsedArgs.priority as string) || 'medium'
+        const context = (parsedArgs.context as Record<string, unknown>) || undefined
+        if (!description) return 'No task description provided'
+
+        const priority = ['high', 'medium', 'low'].includes(priorityStr)
+          ? (priorityStr as 'high' | 'medium' | 'low')
+          : 'medium'
+
+        const workspaceId = store.currentWorkspaceId || 'default'
+        const task = agentMemoryStorage.pushTask(workspaceId, { description, priority, context })
+        const stack = agentMemoryStorage.getStack(workspaceId)
+
+        log(`[stack] Pushed: ${description} [${priority}]`)
+        return `Task added to stack (${stack.length} total): ${task.description}`
+      }
+
+      case 'pop_task': {
+        const workspaceId = store.currentWorkspaceId || 'default'
+        const task = agentMemoryStorage.popTask(workspaceId)
+
+        if (!task) {
+          log('[stack] Empty - no task to pop')
+          return 'Stack is empty'
+        }
+
+        const remaining = agentMemoryStorage.getStack(workspaceId).length
+        log(`[stack] Popped: ${task.description}`)
+        return `Task: ${task.description} [${task.priority}]${task.context ? `\nContext: ${JSON.stringify(task.context)}` : ''}\n(${remaining} tasks remaining)`
+      }
+
+      case 'peek_stack': {
+        const workspaceId = store.currentWorkspaceId || 'default'
+        const stack = agentMemoryStorage.getStack(workspaceId)
+
+        if (stack.length === 0) {
+          return 'Stack is empty'
+        }
+
+        const stackList = stack
+          .map((t, i) => `${stack.length - i}. [${t.priority.toUpperCase()}] ${t.description}`)
+          .reverse()
+          .join('\n')
+
+        return `Task stack (${stack.length} tasks, top first):\n${stackList}`
+      }
+
+      case 'clear_stack': {
+        const workspaceId = store.currentWorkspaceId || 'default'
+        const count = agentMemoryStorage.getStack(workspaceId).length
+        agentMemoryStorage.clearStack(workspaceId)
+
+        log(`[stack] Cleared ${count} tasks`)
+        return `Stack cleared (${count} tasks removed)`
       }
 
       case 'create_plan': {

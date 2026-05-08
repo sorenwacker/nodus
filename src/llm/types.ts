@@ -85,3 +85,37 @@ export interface ResearchResult {
   url?: string
   nodeId?: string
 }
+
+/**
+ * Session memory for tracking current conversation goal and progress
+ * Cleared when agent completes or user starts new task
+ */
+export interface SessionMemory {
+  goal: string
+  progress: number // 0-100
+  completed: string[]
+  current_step: string | null
+  next_steps: string[]
+  blockers: string[]
+  started_at: string // ISO timestamp
+}
+
+/**
+ * A task in the agent's todo stack (LIFO queue)
+ */
+export interface StackTask {
+  id: string
+  description: string
+  priority: 'high' | 'medium' | 'low'
+  context?: Record<string, unknown>
+  created_at: string // ISO timestamp
+}
+
+/**
+ * Combined agent memory structure
+ */
+export interface AgentMemory {
+  session: SessionMemory | null
+  stack: StackTask[]
+  facts: string[] // existing memories
+}

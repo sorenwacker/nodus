@@ -121,4 +121,120 @@ export function registerPlanningTools(): void {
     },
     { category: 'utility' }
   )
+
+  // Session memory tools
+  defineTool<{ goal: string; steps?: string[] }>(
+    'set_goal',
+    'Start tracking a new goal. Clears previous session memory.',
+    {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'The goal to accomplish' },
+        steps: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of planned steps'
+        },
+      },
+      required: ['goal'],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:set_goal`
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<{ progress: number; completed_action?: string }>(
+    'update_progress',
+    'Update progress on current goal (0-100%).',
+    {
+      type: 'object',
+      properties: {
+        progress: { type: 'number', description: 'Progress percentage (0-100)' },
+        completed_action: { type: 'string', description: 'Description of action just completed' },
+      },
+      required: ['progress'],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:update_progress`
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<{ summary: string }>(
+    'complete_goal',
+    'Mark current goal as complete and clear session memory.',
+    {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', description: 'Summary of what was accomplished' },
+      },
+      required: ['summary'],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:complete_goal`
+    },
+    { category: 'planning' }
+  )
+
+  // Stack (todo queue) tools
+  defineTool<{ description: string; priority?: string; context?: Record<string, unknown> }>(
+    'push_task',
+    'Add a task to the todo stack for later. Tasks are processed LIFO (last in, first out).',
+    {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: 'Task description' },
+        priority: { type: 'string', description: 'Priority: high, medium, low (default: medium)' },
+        context: { type: 'object', description: 'Optional context data for the task' },
+      },
+      required: ['description'],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:push_task`
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<Record<string, never>>(
+    'pop_task',
+    'Get and remove the top task from the stack.',
+    {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:pop_task`
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<Record<string, never>>(
+    'peek_stack',
+    'View the task stack without removing tasks.',
+    {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:peek_stack`
+    },
+    { category: 'planning' }
+  )
+
+  defineTool<Record<string, never>>(
+    'clear_stack',
+    'Clear all tasks from the stack.',
+    {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:clear_stack`
+    },
+    { category: 'planning' }
+  )
 }

@@ -1,7 +1,7 @@
 # Nodus Makefile
 # Development workflow automation
 
-.PHONY: help install dev build test clean docker-dev docker-build lint fmt audit kill
+.PHONY: help install dev build test clean docker-dev docker-build lint fmt audit kill docs docs-build docs-rust
 
 # Default target
 help:
@@ -149,6 +149,12 @@ clean-build:
 # =============================================================================
 
 docs:
+	uvx --with mkdocs-material mkdocs serve
+
+docs-build:
+	uvx --with mkdocs-material mkdocs build
+
+docs-rust:
 	cd src-tauri && cargo doc --open
 
 # =============================================================================

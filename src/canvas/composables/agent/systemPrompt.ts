@@ -5,7 +5,7 @@
  */
 
 import type { AgentMode, AgentPlan, ChatMessage } from '../../../llm/types'
-import { llmStorage, memoryStorage } from '../../../lib/storage'
+import { llmStorage, agentMemoryStorage } from '../../../lib/storage'
 import { DEFAULT_AGENT_PROMPT } from '../../../llm/prompts'
 import { getModeSystemPrompt } from '../../../llm/agentModes'
 import { escapeForPrompt } from '../../../lib/promptSecurity'
@@ -97,10 +97,56 @@ export function buildSystemPrompt(
 
   const customRules = llmStorage.getAgentPrompt(DEFAULT_AGENT_PROMPT)
 
-  // Load workspace memories
-  const memories = memoryStorage.getMemories(workspaceId)
-  const memorySection = memories.length > 0
-    ? `\nMEMORY (from previous sessions):\n${memories.map(m => `- ${m}`).join('\n')}\n`
+  // Load agent memory (session, stack, facts)
+  const agentMemory = agentMemoryStorage.getAgentMemory(workspaceId)
+
+  // Build session memory section
+  let sessionSection = ''
+  if (agentMemory.session) {
+    const s = agentMemory.session
+    const completedList = s.completed.length > 0
+      ? s.completed.slice(-5).map(c => `  - ${c}`).join('\n')
+      : '  (none yet)'
+    const nextList = s.next_steps.length > 0
+      ? s.next_steps.slice(0, 3).map(n => `  - ${n}`).join('\n')
+      : '  (none)'
+    const blockerList = s.blockers.length > 0
+      ? `\n  Blockers:\n${s.blockers.map(b => `  - ${b}`).join('\n')}`
+      : ''
+
+    sessionSection = `
+SESSION (current goal):
+  Goal: ${s.goal}
+  Progress: ${s.progress}%
+  Current step: ${s.current_step || '(none)'}
+  Completed:
+${completedList}
+  Next steps:
+${nextList}${blockerList}
+`
+  }
+
+  // Build stack memory section
+  let stackSection = ''
+  if (agentMemory.stack.length > 0) {
+    const stackList = agentMemory.stack
+      .map((t, i) => `  ${agentMemory.stack.length - i}. [${t.priority.toUpperCase()}] ${t.description}`)
+      .reverse()
+      .join('\n')
+    stackSection = `
+STACK (${agentMemory.stack.length} pending tasks, top first):
+${stackList}
+`
+  }
+
+  // Build facts memory section (long-term)
+  const factsSection = agentMemory.facts.length > 0
+    ? `\nFACTS (remembered):\n${agentMemory.facts.map(m => `- ${m}`).join('\n')}\n`
+    : ''
+
+  // Combined memory section
+  const memorySection = sessionSection || stackSection || factsSection
+    ? `${sessionSection}${stackSection}${factsSection}`
     : ''
 
   // Get mode-specific prompt addition
@@ -159,7 +205,14 @@ TOOLS:
 - think(thought): Express your reasoning before acting.
 - plan(tasks): Create a task list for multi-step operations.
 - update_task(task_index, status): Update task status.
-- remember(message): Store important info for this workspace's memory
+- remember(message): Store important info for this workspace's memory (long-term facts)
+- set_goal(goal, steps?): Start tracking a new goal with optional steps
+- update_progress(progress, completed_action?): Update goal progress (0-100%)
+- complete_goal(summary): Mark goal complete, clear session
+- push_task(description, priority?, context?): Add task to todo stack (LIFO)
+- pop_task(): Get and remove top task from stack
+- peek_stack(): View stack without removing
+- clear_stack(): Clear all pending tasks
 - done(summary): Call when finished
 
 EDGE LABELS (always use one):
