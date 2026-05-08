@@ -9,6 +9,7 @@ docs_dir = "content/"
 repo_url = "https://github.com/sorenwacker/nodus"
 
 extra_css = ["assets/nightsky.css"]
+extra_js = ["assets/lightbox.js"]
 
 nav = [
     {"Home" = "index.md"},

@@ -213,13 +213,13 @@ hide:
   <h2>Visual Knowledge Work</h2>
   <p class="subtitle">Research, notes, and diagrams on one infinite canvas</p>
   <div class="gallery">
-    <img src="./assets/nodus-screenshot.png" alt="Nodus canvas view">
-    <img src="./assets/nodus-screenshot-2.png" alt="Nodus knowledge graph">
-    <img src="./assets/nodus-screenshot-3.png" alt="Nodus connections">
-    <img src="./assets/nodus-screenshot-4.png" alt="Nodus editing">
-    <img src="./assets/nodus-screenshot-5.png" alt="Nodus themes">
-    <img src="./assets/nodus-screenshot-6.png" alt="Nodus layout">
-    <img src="./assets/nodus-screenshot-7.png" alt="Nodus overview">
+    <img src="./assets/nodus-screenshot.png" alt="Nodus canvas view" onclick="openLightbox(this.src)">
+    <img src="./assets/nodus-screenshot-2.png" alt="Nodus knowledge graph" onclick="openLightbox(this.src)">
+    <img src="./assets/nodus-screenshot-3.png" alt="Nodus connections" onclick="openLightbox(this.src)">
+    <img src="./assets/nodus-screenshot-4.png" alt="Nodus editing" onclick="openLightbox(this.src)">
+    <img src="./assets/nodus-screenshot-5.png" alt="Nodus themes" onclick="openLightbox(this.src)">
+    <img src="./assets/nodus-screenshot-6.png" alt="Nodus layout" onclick="openLightbox(this.src)">
+    <img src="./assets/nodus-screenshot-7.png" alt="Nodus overview" onclick="openLightbox(this.src)">
   </div>
 </div>
 
@@ -233,3 +233,4 @@ hide:
 <div class="footer-note">
   <p><strong>Disclaimer:</strong> This software is provided "as-is" without warranty. The author is not liable for data loss, API costs, or other damages.</p>
 </div>
+
