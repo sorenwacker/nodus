@@ -109,6 +109,24 @@ hide:
   font-size: 1.2rem;
   margin-bottom: 3rem;
 }
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.gallery img {
+  width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+.gallery img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
 .screenshot-placeholder {
   max-width: 1000px;
   margin: 0 auto;
@@ -194,7 +212,15 @@ hide:
 <div class="screenshot-section">
   <h2>Visual Knowledge Work</h2>
   <p class="subtitle">Research, notes, and diagrams on one infinite canvas</p>
-  <img src="../assets/nodus-screenshot.png" alt="Nodus canvas view" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.3);">
+  <div class="gallery">
+    <img src="./assets/nodus-screenshot.png" alt="Nodus canvas view">
+    <img src="./assets/nodus-screenshot-2.png" alt="Nodus knowledge graph">
+    <img src="./assets/nodus-screenshot-3.png" alt="Nodus connections">
+    <img src="./assets/nodus-screenshot-4.png" alt="Nodus editing">
+    <img src="./assets/nodus-screenshot-5.png" alt="Nodus themes">
+    <img src="./assets/nodus-screenshot-6.png" alt="Nodus layout">
+    <img src="./assets/nodus-screenshot-7.png" alt="Nodus overview">
+  </div>
 </div>
 
 
