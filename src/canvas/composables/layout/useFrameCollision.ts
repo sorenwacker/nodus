@@ -18,6 +18,7 @@ export interface NodeSize {
 
 /**
  * Check if a node is spatially inside a frame (50%+ overlap)
+ * Used for determining which frame a node "belongs to"
  */
 export function isNodeInFrame(
   nodeX: number,
@@ -39,8 +40,56 @@ export function isNodeInFrame(
 }
 
 /**
- * Push nodes out of frame boundaries after layout calculation.
- * Ensures nodes don't end up inside frames.
+ * Check if a node has ANY overlap with a frame (even 1 pixel)
+ * Used for layout protection - nodes touching frames shouldn't be moved by global layout
+ */
+export function isNodeTouchingFrame(
+  nodeX: number,
+  nodeY: number,
+  nodeWidth: number,
+  nodeHeight: number,
+  frame: FrameRect,
+  padding = 0
+): boolean {
+  const nodeRight = nodeX + nodeWidth
+  const nodeBottom = nodeY + nodeHeight
+  const frameRight = frame.canvas_x + frame.width
+  const frameBottom = frame.canvas_y + frame.height
+
+  // Check if rectangles overlap (including padding zone)
+  const overlapX = nodeX - padding < frameRight && nodeRight + padding > frame.canvas_x
+  const overlapY = nodeY - padding < frameBottom && nodeBottom + padding > frame.canvas_y
+
+  return overlapX && overlapY
+}
+
+/**
+ * Check if a node's center is inside a frame
+ * Alternative containment check
+ */
+export function isNodeCenterInFrame(
+  nodeX: number,
+  nodeY: number,
+  nodeWidth: number,
+  nodeHeight: number,
+  frame: FrameRect
+): boolean {
+  const nodeCenterX = nodeX + nodeWidth / 2
+  const nodeCenterY = nodeY + nodeHeight / 2
+  const frameRight = frame.canvas_x + frame.width
+  const frameBottom = frame.canvas_y + frame.height
+
+  return (
+    nodeCenterX >= frame.canvas_x &&
+    nodeCenterX <= frameRight &&
+    nodeCenterY >= frame.canvas_y &&
+    nodeCenterY <= frameBottom
+  )
+}
+
+/**
+ * Push nodes fully out of frame boundaries after layout calculation.
+ * Ensures no part of a node overlaps with frames.
  * Iterates until no more overlaps occur (handles adjacent frames).
  */
 export function pushNodesOutOfFrames(
@@ -51,7 +100,7 @@ export function pushNodesOutOfFrames(
   if (frames.length === 0) return positions
 
   const result = new Map<string, { x: number; y: number }>()
-  const framePadding = 20
+  const framePadding = 30 // Gap between node edge and frame edge
   const maxIterations = 10 // Prevent infinite loops
 
   for (const [nodeId, pos] of positions) {
@@ -109,14 +158,15 @@ export function pushNodesOutOfFrames(
 }
 
 /**
- * Constrain nodes to stay within a frame's boundaries.
+ * Constrain nodes to stay fully within a frame's boundaries.
  * Used for frame-scoped layout to prevent nodes from leaving the frame.
+ * Ensures the entire node rectangle stays inside the frame with padding.
  */
 export function constrainNodesToFrame(
   positions: Map<string, { x: number; y: number }>,
   nodeMap: Map<string, NodeSize>,
   frame: FrameRect,
-  padding = 20
+  padding = 30
 ): Map<string, { x: number; y: number }> {
   const result = new Map<string, { x: number; y: number }>()
 
@@ -125,15 +175,19 @@ export function constrainNodesToFrame(
     const nodeWidth = nodeInfo?.width || NODE_DEFAULTS.WIDTH
     const nodeHeight = nodeInfo?.height || NODE_DEFAULTS.HEIGHT
 
-    // Constrain X position
+    // Constrain X position - ensure full node width stays inside
     const minX = frame.canvas_x + padding
     const maxX = frame.canvas_x + frame.width - nodeWidth - padding
-    const newX = Math.max(minX, Math.min(maxX, pos.x))
+    // Handle case where frame is smaller than node
+    const clampedMaxX = Math.max(minX, maxX)
+    const newX = Math.max(minX, Math.min(clampedMaxX, pos.x))
 
-    // Constrain Y position
+    // Constrain Y position - ensure full node height stays inside
     const minY = frame.canvas_y + padding
     const maxY = frame.canvas_y + frame.height - nodeHeight - padding
-    const newY = Math.max(minY, Math.min(maxY, pos.y))
+    // Handle case where frame is smaller than node
+    const clampedMaxY = Math.max(minY, maxY)
+    const newY = Math.max(minY, Math.min(clampedMaxY, pos.y))
 
     result.set(nodeId, { x: newX, y: newY })
   }

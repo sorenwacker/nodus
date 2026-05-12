@@ -23,9 +23,16 @@ export interface UseNodeDraggingContext {
     updateNodeFilePath?: (nodeId: string, filePath: string) => void
   }
   // File sync dependencies (optional)
-  moveNodeFile?: (nodeId: string, targetFolder: string) => Promise<string>
+  checkFileCollision?: (nodeId: string, targetFolder: string) => Promise<string | null>
+  moveNodeFile?: (nodeId: string, targetFolder: string, collisionResolution?: string) => Promise<string>
   markProgrammaticMove?: (nodeId: string) => void
   getVaultPath?: () => string | null
+  // Collision dialog callback - returns resolution: 'cancel', 'rename:newname', or 'replace'
+  showCollisionDialog?: (
+    sourceFileName: string,
+    targetFolder: string,
+    existingFileName: string
+  ) => Promise<{ resolution: 'cancel' | 'rename' | 'replace'; newName?: string }>
   scale: Ref<number>
   offset: Ref<{ x: number; y: number }>
   canvasRef: Ref<HTMLDivElement | null>
@@ -317,6 +324,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       }
 
       // Assign nodes to frame if dropped inside one
+      // Uses hysteresis for resistance: harder to enter (70%), easier to stay (exit at 20%)
       for (const nodeId of draggedNodeIds) {
         const node = store.getNode(nodeId)
         if (!node) continue
@@ -324,30 +332,65 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         const nodeWidth = node.width || 200
         const nodeHeight = node.height || 120
         const nodeArea = nodeWidth * nodeHeight
-        let assignedFrameId: string | null = null
+        const currentFrameId = node.frame_id
+        let assignedFrameId: string | null = currentFrameId // Keep current by default
         let assignedFrame: Frame | undefined
 
-        for (const frame of store.frames) {
-          const overlapX = Math.max(
-            0,
-            Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
-              Math.max(node.canvas_x, frame.canvas_x)
-          )
-          const overlapY = Math.max(
-            0,
-            Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
-              Math.max(node.canvas_y, frame.canvas_y)
-          )
-          const overlapArea = overlapX * overlapY
+        // Check overlap with current frame first (for exit resistance)
+        if (currentFrameId) {
+          const currentFrame = store.frames.find(f => f.id === currentFrameId)
+          if (currentFrame) {
+            const overlapX = Math.max(
+              0,
+              Math.min(node.canvas_x + nodeWidth, currentFrame.canvas_x + currentFrame.width) -
+                Math.max(node.canvas_x, currentFrame.canvas_x)
+            )
+            const overlapY = Math.max(
+              0,
+              Math.min(node.canvas_y + nodeHeight, currentFrame.canvas_y + currentFrame.height) -
+                Math.max(node.canvas_y, currentFrame.canvas_y)
+            )
+            const overlapArea = overlapX * overlapY
 
-          if (overlapArea > nodeArea * 0.5) {
-            assignedFrameId = frame.id
-            assignedFrame = frame
-            break
+            // Exit resistance: need to drag mostly out (< 20% overlap) to leave frame
+            const overlapRatio = overlapArea / nodeArea
+            if (overlapRatio < 0.2) {
+              assignedFrameId = null // Exiting current frame
+              assignedFrame = undefined
+            } else {
+              // Stay in current frame
+              assignedFrameId = currentFrameId
+              assignedFrame = currentFrame
+            }
           }
         }
 
-        // Update frame assignment (null removes from frame)
+        // If not in a frame or just exited, check for entering a new frame
+        if (!assignedFrameId) {
+          for (const frame of store.frames) {
+            const overlapX = Math.max(
+              0,
+              Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
+                Math.max(node.canvas_x, frame.canvas_x)
+            )
+            const overlapY = Math.max(
+              0,
+              Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
+                Math.max(node.canvas_y, frame.canvas_y)
+            )
+            const overlapArea = overlapX * overlapY
+
+            // Entry resistance: need significant overlap (70%) to enter a frame
+            const entryRatio = overlapArea / nodeArea
+            if (entryRatio > 0.7) {
+              assignedFrameId = frame.id
+              assignedFrame = frame
+              break
+            }
+          }
+        }
+
+        // Update frame assignment if changed
         if (node.frame_id !== assignedFrameId) {
           store.assignNodesToFrame([nodeId], assignedFrameId)
 
@@ -366,18 +409,53 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
                 ? `${vaultPath}/${assignedFrame.folder_path}`
                 : vaultPath // Move to vault root if no frame or frame has no folder_path
 
-              // Mark as programmatic move to prevent watcher from reacting
-              ctx.markProgrammaticMove?.(nodeId)
+              // Check for collision first if collision check is available
+              const handleFileMove = async () => {
+                let collisionResolution: string | undefined
 
-              // Move file asynchronously
-              ctx.moveNodeFile(nodeId, targetFolder)
-                .then((newPath) => {
-                  // Update local node state with new file path
+                // Check if there's a collision
+                if (ctx.checkFileCollision && ctx.showCollisionDialog) {
+                  const collisionFileName = await ctx.checkFileCollision(nodeId, targetFolder)
+
+                  if (collisionFileName) {
+                    // Show dialog and get user's choice
+                    const sourceFileName = node.file_path!.split('/').pop() || 'file.md'
+                    const dialogResult = await ctx.showCollisionDialog(
+                      sourceFileName,
+                      targetFolder,
+                      collisionFileName
+                    )
+
+                    if (dialogResult.resolution === 'cancel') {
+                      // User cancelled - revert frame assignment
+                      store.assignNodesToFrame([nodeId], node.frame_id)
+                      return
+                    }
+
+                    if (dialogResult.resolution === 'rename' && dialogResult.newName) {
+                      collisionResolution = dialogResult.newName
+                    } else if (dialogResult.resolution === 'replace') {
+                      collisionResolution = 'replace'
+                    }
+                  }
+                }
+
+                // Mark as programmatic move to prevent watcher from reacting
+                ctx.markProgrammaticMove?.(nodeId)
+
+                // Move file
+                try {
+                  const newPath = await ctx.moveNodeFile!(nodeId, targetFolder, collisionResolution)
                   store.updateNodeFilePath?.(nodeId, newPath)
-                })
-                .catch((err) => {
+                } catch (err) {
                   console.error(`Failed to move file for node ${nodeId}:`, err)
-                })
+                  // Revert frame assignment on failure
+                  store.assignNodesToFrame([nodeId], node.frame_id)
+                }
+              }
+
+              // Execute file move asynchronously
+              handleFileMove()
             }
           }
         }

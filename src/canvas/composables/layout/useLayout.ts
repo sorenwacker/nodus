@@ -468,42 +468,46 @@ export function useLayout(options: UseLayoutOptions) {
       console.warn(`Very large graph (${nodes.length} nodes) - ${layout} layout may be slow`)
     }
 
-    // Helper to check if a node is spatially inside a frame (50%+ overlap)
-    const checkNodeInFrame = (node: Node, frame: Frame): boolean => {
-      const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-      const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-      return isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, frame)
-    }
-
-    // Create frame map first for spatial checks
+    // Create frame map for lookups
     const frameMap = new Map(allFrames.map(f => [f.id, f]))
 
     // When frameId is provided, layout nodes inside that frame directly
-    // (don't filter them out as "framed nodes")
     let virtualNodes: Node[]
+
+    // Track which nodes belong to which frame
+    const frameNodes = new Map<string, Node[]>() // frame_id -> nodes in that frame
+    const unframedNodes: Node[] = []
 
     if (frameId) {
       // Layout nodes inside the selected frame
       virtualNodes = [...nodes]
     } else {
-      // Group nodes by frame (check both frame_id and spatial overlap)
-      const frameNodes = new Map<string, Node[]>() // frame_id -> nodes in that frame
-      const unframedNodes: Node[] = []
+      // Group nodes by frame membership
+      // Primary: use frame_id from database (authoritative)
+      // Fallback: spatial check for nodes without frame_id (newly placed nodes)
 
       for (const node of nodes) {
-        // Check explicit frame_id first
-        if (node.frame_id && frameMap.has(node.frame_id)) {
-          if (!frameNodes.has(node.frame_id)) {
-            frameNodes.set(node.frame_id, [])
+        // Primary check: explicit frame_id is authoritative
+        if (node.frame_id) {
+          if (frameMap.has(node.frame_id)) {
+            if (!frameNodes.has(node.frame_id)) {
+              frameNodes.set(node.frame_id, [])
+            }
+            frameNodes.get(node.frame_id)!.push(node)
           }
-          frameNodes.get(node.frame_id)!.push(node)
+          // Even if frame doesn't exist, node with frame_id is considered "framed"
           continue
         }
 
-        // Check spatial overlap with any frame
+        // Fallback: spatial check for nodes without frame_id
+        // Only use this for unassigned nodes (e.g., during import)
         let inFrame = false
+        const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+        const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+
         for (const frame of allFrames) {
-          if (checkNodeInFrame(node, frame)) {
+          // Use 50% overlap to determine if spatially inside
+          if (isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, frame)) {
             if (!frameNodes.has(frame.id)) {
               frameNodes.set(frame.id, [])
             }
@@ -517,7 +521,7 @@ export function useLayout(options: UseLayoutOptions) {
           unframedNodes.push(node)
         }
       }
-      // Only layout unframed nodes - frames and their contents stay fixed
+      // Only layout unframed nodes - nodes with frame_id stay fixed
       virtualNodes = [...unframedNodes]
     }
 
@@ -548,14 +552,12 @@ export function useLayout(options: UseLayoutOptions) {
     // Gap between nodes in grid layout
     const gridGap = 24 // Tight packing gap
 
-    // Frames are static - just pass through positions directly
-    function expandToRealTargets(virtualTargets: Map<string, { x: number; y: number }>): Map<string, { x: number; y: number }> {
-      return virtualTargets
-    }
-
     if (layout === 'force') {
       // Get edges for force layout
       const edges = store.getFilteredEdges()
+
+      // Build layout nodes from virtualNodes (already filtered for frame-scoped or global)
+      // For global layout: only unframed nodes participate - frames and their contents stay fixed
       const layoutNodes = virtualNodes.map(n => ({
         id: n.id,
         x: n.canvas_x,
@@ -563,18 +565,21 @@ export function useLayout(options: UseLayoutOptions) {
         width: n.width || NODE_DEFAULTS.WIDTH,
         height: n.height || NODE_DEFAULTS.HEIGHT,
       }))
+
+      // Build a set of all layout node IDs
+      const layoutNodeIds = new Set(layoutNodes.map(n => n.id))
+
+      // Build edges - only include edges between nodes that are in the layout
       const layoutEdges = edges
-        .filter(e => {
-          const nodeIdSet = new Set(virtualNodes.map(n => n.id))
-          return nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
-        })
         .map(e => ({
           source: e.source_node_id,
           target: e.target_node_id,
         }))
+        .filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target))
+        .filter(e => e.source !== e.target)
 
-      // Scale iterations based on node count (fewer for huge graphs)
-      const n = virtualNodes.length
+      // Scale iterations based on node count
+      const n = layoutNodes.length
       const iterations = n > 2000 ? 30 : n > 1000 ? 50 : n > 500 ? 80 : n > 200 ? 100 : n > 100 ? 200 : 400
       const positions = await applyForceLayout(layoutNodes, layoutEdges, {
         centerX,
@@ -582,37 +587,25 @@ export function useLayout(options: UseLayoutOptions) {
         iterations,
       })
 
-      // Convert to targets map, expanding frames
-      const virtualTargets = new Map<string, { x: number; y: number }>()
-      for (const [id, pos] of positions) {
-        virtualTargets.set(id, pos)
-      }
-      const realTargets = expandToRealTargets(virtualTargets)
+      // Apply frame constraints
+      let finalTargets: Map<string, { x: number; y: number }>
 
-      // Apply frame movements
-      for (const [id, delta] of realTargets) {
-        if (id.startsWith('__frame_move__')) {
-          const frameId = id.replace('__frame_move__', '')
-          const frame = frameMap.get(frameId)
-          if (frame) {
-            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
-          }
-        }
-      }
-
-      // Remove frame move markers and apply positions
-      const nodeTargets = new Map<string, { x: number; y: number }>()
-      for (const [id, pos] of realTargets) {
-        if (!id.startsWith('__frame_move__')) {
-          nodeTargets.set(id, pos)
-        }
+      if (frameId) {
+        // Frame-scoped: constrain nodes to stay inside the frame
+        finalTargets = targetFrame
+          ? constrainNodesToFrame(positions, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
+          : positions
+      } else {
+        // Global: push unframed nodes out of all frames
+        // Framed nodes don't move at all (they weren't in the layout)
+        finalTargets = pushOutOfFrames(
+          positions,
+          new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+        )
       }
 
-      // Push nodes out of frames OR constrain to frame boundaries
-      const finalTargets = applyFrameConstraints(nodeTargets, nodes, targetFrame)
-
-      // For large graphs, use batch updates instead of animation (much faster)
-      if (virtualNodes.length > 500) {
+      // Apply positions
+      if (finalTargets.size > 500) {
         await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
       } else {
         animateToPositions(finalTargets, 800)
@@ -623,6 +616,8 @@ export function useLayout(options: UseLayoutOptions) {
     if (layout === 'hierarchical') {
       // Get edges for hierarchical layout
       const edges = store.getFilteredEdges()
+
+      // Build layout nodes from virtualNodes
       const layoutNodes = virtualNodes.map(n => ({
         id: n.id,
         x: n.canvas_x,
@@ -630,22 +625,60 @@ export function useLayout(options: UseLayoutOptions) {
         width: n.width || NODE_DEFAULTS.WIDTH,
         height: n.height || NODE_DEFAULTS.HEIGHT,
       }))
+
+      // For global layout (no frameId), include frames as virtual nodes
+      const FRAME_PREFIX = '___FRAME___'
+      const frameSnapshot = new Map<string, { x: number; y: number }>()
+      const nodeToFrameId = new Map<string, string>()
+
+      if (!frameId) {
+        // Global layout: add frames as virtual nodes
+        for (const frame of allFrames) {
+          frameSnapshot.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
+          layoutNodes.push({
+            id: FRAME_PREFIX + frame.id,
+            x: frame.canvas_x + frame.width / 2,
+            y: frame.canvas_y + frame.height / 2,
+            width: frame.width,
+            height: frame.height,
+          })
+        }
+
+        // Map framed nodes to their frame
+        for (const [fId, nodesInFrame] of frameNodes) {
+          for (const node of nodesInFrame) {
+            nodeToFrameId.set(node.id, fId)
+          }
+        }
+      }
+
+      // Build a set of all layout node IDs
+      const layoutNodeIds = new Set(layoutNodes.map(n => n.id))
+
+      // Build edges
       const layoutEdges = edges
-        .filter(e => {
-          const nodeIdSet = new Set(virtualNodes.map(n => n.id))
-          return nodeIdSet.has(e.source_node_id) && nodeIdSet.has(e.target_node_id)
+        .map(e => {
+          if (!frameId) {
+            const sourceFrameId = nodeToFrameId.get(e.source_node_id)
+            const targetFrameId = nodeToFrameId.get(e.target_node_id)
+            return {
+              source: sourceFrameId ? FRAME_PREFIX + sourceFrameId : e.source_node_id,
+              target: targetFrameId ? FRAME_PREFIX + targetFrameId : e.target_node_id,
+            }
+          }
+          return {
+            source: e.source_node_id,
+            target: e.target_node_id,
+          }
         })
-        .map(e => ({
-          source: e.source_node_id,
-          target: e.target_node_id,
-        }))
+        .filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target))
+        .filter(e => e.source !== e.target)
 
       // For very large graphs, use simpler ranker
-      const ranker = virtualNodes.length > 2000 ? 'longest-path' : 'network-simplex'
+      const ranker = layoutNodes.length > 2000 ? 'longest-path' : 'network-simplex'
 
-      // Use requestIdleCallback or setTimeout to avoid blocking UI
+      // Use setTimeout to avoid blocking UI
       const positions = await new Promise<Map<string, { x: number; y: number }>>((resolve) => {
-        // Give the UI a chance to update before heavy computation
         setTimeout(() => {
           const result = applyHierarchicalLayout(layoutNodes, layoutEdges, {
             direction: 'TB',
@@ -659,37 +692,76 @@ export function useLayout(options: UseLayoutOptions) {
         }, 10)
       })
 
-      // Convert to targets map, expanding frames
-      const virtualTargets = new Map<string, { x: number; y: number }>()
-      for (const [id, pos] of positions) {
-        virtualTargets.set(id, pos)
-      }
-      const realTargets = expandToRealTargets(virtualTargets)
-
-      // Apply frame movements
-      for (const [id, delta] of realTargets) {
-        if (id.startsWith('__frame_move__')) {
-          const frameId = id.replace('__frame_move__', '')
-          const frame = frameMap.get(frameId)
-          if (frame) {
-            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
-          }
-        }
-      }
-
-      // Remove frame move markers and animate nodes
+      // Build final targets map
       const nodeTargets = new Map<string, { x: number; y: number }>()
-      for (const [id, pos] of realTargets) {
-        if (!id.startsWith('__frame_move__')) {
+
+      // Add regular node positions
+      for (const [id, pos] of positions) {
+        if (!id.startsWith(FRAME_PREFIX)) {
           nodeTargets.set(id, pos)
         }
       }
 
-      // Push nodes out of frames OR constrain to frame boundaries
-      const finalTargets = applyFrameConstraints(nodeTargets, nodes, targetFrame)
+      // For global layout, move frames and their contents together
+      if (!frameId) {
+        for (const frame of allFrames) {
+          const virtualId = FRAME_PREFIX + frame.id
+          const newPos = positions.get(virtualId)
+          if (!newPos) continue
 
-      // For large graphs, use batch updates instead of animation (much faster)
-      if (virtualNodes.length > 500) {
+          const oldPos = frameSnapshot.get(frame.id)
+          if (!oldPos) continue
+
+          const oldCenterX = oldPos.x + frame.width / 2
+          const oldCenterY = oldPos.y + frame.height / 2
+          const deltaX = newPos.x - oldCenterX
+          const deltaY = newPos.y - oldCenterY
+
+          if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
+
+          store.updateFramePosition(frame.id, oldPos.x + deltaX, oldPos.y + deltaY)
+
+          const nodesInFrame = frameNodes.get(frame.id) || []
+          for (const node of nodesInFrame) {
+            nodeTargets.set(node.id, {
+              x: node.canvas_x + deltaX,
+              y: node.canvas_y + deltaY,
+            })
+          }
+        }
+      }
+
+      // Apply frame constraints
+      let finalTargets: Map<string, { x: number; y: number }>
+
+      if (frameId) {
+        // Frame-scoped: constrain nodes to stay inside the frame
+        finalTargets = targetFrame
+          ? constrainNodesToFrame(nodeTargets, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
+          : nodeTargets
+      } else {
+        // Global: push unframed nodes out of frames
+        const unframedIds = new Set(virtualNodes.map(n => n.id))
+        const unframedTargets = new Map<string, { x: number; y: number }>()
+        const framedTargets = new Map<string, { x: number; y: number }>()
+
+        for (const [id, pos] of nodeTargets) {
+          if (unframedIds.has(id)) {
+            unframedTargets.set(id, pos)
+          } else {
+            framedTargets.set(id, pos)
+          }
+        }
+
+        const pushedUnframed = pushOutOfFrames(
+          unframedTargets,
+          new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+        )
+
+        finalTargets = new Map([...pushedUnframed, ...framedTargets])
+      }
+
+      if (finalTargets.size > 500) {
         await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
       } else {
         animateToPositions(finalTargets, 600)
@@ -725,27 +797,8 @@ export function useLayout(options: UseLayoutOptions) {
       const offsetX = centerX - layoutCenterX
       const offsetY = centerY - layoutCenterY
 
-      const virtualTargets = new Map<string, { x: number; y: number }>()
       for (const [id, pos] of trialTargets) {
-        virtualTargets.set(id, { x: pos.x + offsetX, y: pos.y + offsetY })
-      }
-
-      const realTargets = expandToRealTargets(virtualTargets)
-      for (const [id, pos] of realTargets) {
-        if (!id.startsWith('__frame_move__')) {
-          targets.set(id, pos)
-        }
-      }
-
-      // Move frames
-      for (const [id, delta] of realTargets) {
-        if (id.startsWith('__frame_move__')) {
-          const frameId = id.replace('__frame_move__', '')
-          const frame = frameMap.get(frameId)
-          if (frame) {
-            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
-          }
-        }
+        targets.set(id, { x: pos.x + offsetX, y: pos.y + offsetY })
       }
     } else if (layout === 'horizontal') {
       const sorted = [...virtualNodes].sort((a, b) => (b.height || NODE_DEFAULTS.HEIGHT) - (a.height || NODE_DEFAULTS.HEIGHT))
@@ -753,27 +806,10 @@ export function useLayout(options: UseLayoutOptions) {
       let x = centerX - totalWidth / 2
       const maxHeight = Math.max(...sorted.map(n => n.height || NODE_DEFAULTS.HEIGHT))
 
-      const virtualTargets = new Map<string, { x: number; y: number }>()
       for (const node of sorted) {
         const h = node.height || NODE_DEFAULTS.HEIGHT
-        virtualTargets.set(node.id, { x, y: centerY - maxHeight / 2 + (maxHeight - h) / 2 })
+        targets.set(node.id, { x, y: centerY - maxHeight / 2 + (maxHeight - h) / 2 })
         x += (node.width || NODE_DEFAULTS.WIDTH) + gridGap
-      }
-
-      const realTargets = expandToRealTargets(virtualTargets)
-      for (const [id, pos] of realTargets) {
-        if (!id.startsWith('__frame_move__')) {
-          targets.set(id, pos)
-        }
-      }
-      for (const [id, delta] of realTargets) {
-        if (id.startsWith('__frame_move__')) {
-          const frameId = id.replace('__frame_move__', '')
-          const frame = frameMap.get(frameId)
-          if (frame) {
-            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
-          }
-        }
       }
     } else if (layout === 'vertical') {
       const sorted = [...virtualNodes].sort((a, b) => (b.width || NODE_DEFAULTS.WIDTH) - (a.width || NODE_DEFAULTS.WIDTH))
@@ -781,27 +817,10 @@ export function useLayout(options: UseLayoutOptions) {
       let y = centerY - totalHeight / 2
       const maxWidth = Math.max(...sorted.map(n => n.width || NODE_DEFAULTS.WIDTH))
 
-      const virtualTargets = new Map<string, { x: number; y: number }>()
       for (const node of sorted) {
         const w = node.width || NODE_DEFAULTS.WIDTH
-        virtualTargets.set(node.id, { x: centerX - maxWidth / 2 + (maxWidth - w) / 2, y })
+        targets.set(node.id, { x: centerX - maxWidth / 2 + (maxWidth - w) / 2, y })
         y += (node.height || NODE_DEFAULTS.HEIGHT) + gridGap
-      }
-
-      const realTargets = expandToRealTargets(virtualTargets)
-      for (const [id, pos] of realTargets) {
-        if (!id.startsWith('__frame_move__')) {
-          targets.set(id, pos)
-        }
-      }
-      for (const [id, delta] of realTargets) {
-        if (id.startsWith('__frame_move__')) {
-          const frameId = id.replace('__frame_move__', '')
-          const frame = frameMap.get(frameId)
-          if (frame) {
-            store.updateFramePosition(frameId, frame.canvas_x + delta.x, frame.canvas_y + delta.y)
-          }
-        }
       }
     }
 

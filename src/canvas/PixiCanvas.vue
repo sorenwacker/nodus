@@ -7,9 +7,10 @@ import { useDisplayStore } from '../stores/display'
 import type { Node, Edge } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
+import { resolveWikilink } from '../lib/wikilink'
 import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
-import { llmStorage, memoryStorage } from '../lib/storage'
+import { llmStorage, memoryStorage, agentMemoryStorage } from '../lib/storage'
 import {
   useMinimap,
   useViewState,
@@ -86,6 +87,7 @@ import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
 import FullscreenNodeModal from '../components/FullscreenNodeModal.vue'
+import FileMoveCollisionDialog from '../components/FileMoveCollisionDialog.vue'
 import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 
@@ -111,6 +113,39 @@ const showToast = inject<(message: string, type: 'error' | 'success' | 'info') =
 const planState = usePlanState()
 // Destructure refs for template auto-unwrapping
 const { currentPlan: planCurrentPlan, showApprovalModal: planShowApprovalModal } = planState
+
+// File move collision dialog state
+const showCollisionDialog = ref(false)
+const collisionDialogData = ref<{
+  sourceFileName: string
+  targetFolder: string
+  existingFileName: string
+  resolve: (result: { resolution: 'cancel' | 'rename' | 'replace'; newName?: string }) => void
+} | null>(null)
+
+function handleCollisionDialogResolve(resolution: 'cancel' | 'rename' | 'replace', newName?: string) {
+  if (collisionDialogData.value) {
+    collisionDialogData.value.resolve({ resolution, newName })
+  }
+  showCollisionDialog.value = false
+  collisionDialogData.value = null
+}
+
+async function showFileMoveCollisionDialog(
+  sourceFileName: string,
+  targetFolder: string,
+  existingFileName: string
+): Promise<{ resolution: 'cancel' | 'rename' | 'replace'; newName?: string }> {
+  return new Promise((resolve) => {
+    collisionDialogData.value = {
+      sourceFileName,
+      targetFolder,
+      existingFileName,
+      resolve,
+    }
+    showCollisionDialog.value = true
+  })
+}
 
 // Reactive theme tracking
 const isDarkMode = ref(false)
@@ -433,6 +468,13 @@ async function savePreviewTitle(nodeId: string, title: string) {
   await store.updateNodeTitle(nodeId, title)
 }
 
+function handlePreviewNavigateToNode(nodeId: string) {
+  // Select the linked node - this will update the preview panel
+  store.selectNode(nodeId)
+  // Optionally zoom to the node
+  zoomToNode(nodeId, 1)
+}
+
 // Zoom to node with consistent scale (used by context menu)
 function zoomToNodeDefault(nodeId: string) {
   zoomToNode(nodeId, 1)
@@ -474,6 +516,7 @@ const { copySelectedNodes, pasteNodes } = clipboard
 // Content renderer composable - handles markdown, math, mermaid rendering with caching
 const contentRenderer = useContentRenderer({
   getFilteredNodes: () => store.filteredNodes,
+  getFilteredFrames: () => store.filteredFrames,
 })
 const {
   nodeRenderedContent,
@@ -835,8 +878,78 @@ const layout = useLayout({
 })
 const isLayouting = ref(false)
 
+// Expand all frames to fit their contained nodes
+function expandAllFramesToFitNodes() {
+  const padding = 30
+
+  for (const frame of store.filteredFrames) {
+    // Only use frame_id - database is source of truth
+    // This prevents node mix-ups when frames overlap
+    const nodesInFrame = store.filteredNodes.filter(node => node.frame_id === frame.id)
+
+    if (nodesInFrame.length === 0) continue
+
+    // Find the bounding box of all nodes in frame
+    let minLeft = frame.canvas_x + frame.width
+    let minTop = frame.canvas_y + frame.height
+    let maxRight = frame.canvas_x
+    let maxBottom = frame.canvas_y
+
+    for (const node of nodesInFrame) {
+      const nodeWidth = node.width || 200
+      const nodeHeight = node.height || 120
+
+      minLeft = Math.min(minLeft, node.canvas_x)
+      minTop = Math.min(minTop, node.canvas_y)
+      maxRight = Math.max(maxRight, node.canvas_x + nodeWidth)
+      maxBottom = Math.max(maxBottom, node.canvas_y + nodeHeight)
+    }
+
+    // Calculate new frame bounds
+    let newX = frame.canvas_x
+    let newY = frame.canvas_y
+    let newWidth = frame.width
+    let newHeight = frame.height
+
+    // Expand left if nodes extend past it
+    if (minLeft - padding < frame.canvas_x) {
+      const expandBy = frame.canvas_x - (minLeft - padding)
+      newX = minLeft - padding
+      newWidth += expandBy
+    }
+
+    // Expand top if nodes extend past it
+    if (minTop - padding < frame.canvas_y) {
+      const expandBy = frame.canvas_y - (minTop - padding)
+      newY = minTop - padding
+      newHeight += expandBy
+    }
+
+    // Expand right if nodes extend past it
+    if (maxRight + padding > newX + newWidth) {
+      newWidth = maxRight + padding - newX
+    }
+
+    // Expand bottom if nodes extend past it
+    if (maxBottom + padding > newY + newHeight) {
+      newHeight = maxBottom + padding - newY
+    }
+
+    // Update frame if changed
+    const posChanged = newX !== frame.canvas_x || newY !== frame.canvas_y
+    const sizeChanged = newWidth !== frame.width || newHeight !== frame.height
+
+    if (posChanged) {
+      store.updateFramePosition(frame.id, newX, newY)
+    }
+    if (sizeChanged) {
+      store.updateFrameSize(frame.id, newWidth, newHeight)
+    }
+  }
+}
+
 async function autoLayoutNodes(
-  type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' = 'grid'
+  type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid'
 ) {
   isLayouting.value = true
   const frameId = store.selectedFrameId
@@ -847,6 +960,9 @@ async function autoLayoutNodes(
     } else {
       await layout.autoLayout(type, frameId ?? undefined)
     }
+
+    // After layout, expand frames to fit any nodes that moved outside
+    setTimeout(() => expandAllFramesToFitNodes(), 100)
   } finally {
     isLayouting.value = false
   }
@@ -1050,6 +1166,7 @@ const llmTools = useLLMTools({
   planState,
   tasks: agentTasks,
   memoryStorage,
+  agentMemoryStorage,
   log: (msg: string) => agentLog.value.push(msg),
   pushContentUndo,
   isRunning: agentRunning,
@@ -1422,6 +1539,66 @@ watch(
   { deep: true }
 )
 
+// Auto-expand frame when node inside it grows beyond boundaries
+function expandFrameToFitNode(nodeId: string, nodeWidth: number, nodeHeight: number, nodeX: number, nodeY: number) {
+  const node = store.getNode(nodeId)
+  if (!node) return
+
+  // Only expand if node has explicit frame_id - don't use spatial check during resize
+  // This prevents accidentally switching frames when frames overlap
+  if (!node.frame_id) return
+
+  const containingFrame = store.filteredFrames.find(f => f.id === node.frame_id)
+  if (!containingFrame) return
+
+  const nodeRight = nodeX + nodeWidth
+  const nodeBottom = nodeY + nodeHeight
+  const padding = 30
+
+  // Calculate new frame bounds to contain the node
+  let newX = containingFrame.canvas_x
+  let newY = containingFrame.canvas_y
+  let newWidth = containingFrame.width
+  let newHeight = containingFrame.height
+
+  // Expand left edge if node extends past it
+  if (nodeX - padding < containingFrame.canvas_x) {
+    const expandBy = containingFrame.canvas_x - (nodeX - padding)
+    newX = nodeX - padding
+    newWidth += expandBy
+  }
+
+  // Expand top edge if node extends past it
+  if (nodeY - padding < containingFrame.canvas_y) {
+    const expandBy = containingFrame.canvas_y - (nodeY - padding)
+    newY = nodeY - padding
+    newHeight += expandBy
+  }
+
+  // Expand right edge if node extends past it
+  const frameRight = newX + newWidth
+  if (nodeRight + padding > frameRight) {
+    newWidth = nodeRight + padding - newX
+  }
+
+  // Expand bottom edge if node extends past it
+  const frameBottom = newY + newHeight
+  if (nodeBottom + padding > frameBottom) {
+    newHeight = nodeBottom + padding - newY
+  }
+
+  // Update frame if changed
+  const posChanged = newX !== containingFrame.canvas_x || newY !== containingFrame.canvas_y
+  const sizeChanged = newWidth !== containingFrame.width || newHeight !== containingFrame.height
+
+  if (posChanged) {
+    store.updateFramePosition(containingFrame.id, newX, newY)
+  }
+  if (sizeChanged) {
+    store.updateFrameSize(containingFrame.id, newWidth, newHeight)
+  }
+}
+
 // Node resizing composable
 const nodeResizing = useNodeResizing({
   store: {
@@ -1446,6 +1623,7 @@ const nodeResizing = useNodeResizing({
   isSemanticZoomCollapsed,
   isLODMode,
   getVisualNode,
+  expandFrameToFitNode,
 })
 const { resizingNode, resizePreview, onResizePointerDown } = nodeResizing
 
@@ -1461,6 +1639,17 @@ function openFullscreenNode(nodeId: string) {
 function closeFullscreenNode() {
   showFullscreenModal.value = false
   fullscreenNodeId.value = null
+}
+
+function handleNavigateToNode(title: string) {
+  const linkedNode = resolveWikilink(title, {
+    nodes: store.filteredNodes,
+    frames: store.filteredFrames,
+  })
+  if (linkedNode) {
+    // Open the linked node in fullscreen
+    fullscreenNodeId.value = linkedNode.id
+  }
 }
 
 // Node dragging composable
@@ -1519,9 +1708,11 @@ const nodeDragging = useNodeDragging({
   },
   onFullscreenOpen: openFullscreenNode,
   // File-folder sync
+  checkFileCollision: store.checkFileCollision,
   moveNodeFile: store.moveNodeFile,
   markProgrammaticMove: store.markProgrammaticMove,
   getVaultPath: store.getVaultPath,
+  showCollisionDialog: showFileMoveCollisionDialog,
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
@@ -2241,6 +2432,7 @@ useCanvasKeyboardShortcuts({
         @save-title="savePreviewTitle"
         @render-mermaid="renderMermaidDiagrams"
         @content-updated="savePreviewContent"
+        @navigate-to-node="handlePreviewNavigateToNode"
       />
 
       <!-- Controls -->
@@ -2279,6 +2471,16 @@ useCanvasKeyboardShortcuts({
         @close="closeFullscreenNode"
         @zoom-to-node="(id) => { closeFullscreenNode(); zoomToNode(id, 1) }"
         @render-mermaid="renderMermaidDiagrams"
+        @navigate-to-node="handleNavigateToNode"
+      />
+
+      <!-- File Move Collision Dialog -->
+      <FileMoveCollisionDialog
+        v-if="showCollisionDialog && collisionDialogData"
+        :source-file-name="collisionDialogData.sourceFileName"
+        :target-folder="collisionDialogData.targetFolder"
+        :existing-file-name="collisionDialogData.existingFileName"
+        @resolve="handleCollisionDialogResolve"
       />
 
       <!-- Status Bar -->

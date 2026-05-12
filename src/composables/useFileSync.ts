@@ -13,6 +13,7 @@ import {
 } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import { notifications$ } from './useNotifications'
+import { extractFrontmatterTitle, extractFrontmatterTags } from '../lib/extraction'
 import type { Node, FileChangeEvent, Frame } from '../types'
 
 export interface FileSyncDeps {
@@ -26,6 +27,9 @@ export interface FileSyncDeps {
   getFrames?: () => Frame[]
   assignNodeToFrame?: (nodeId: string, frameId: string | null) => void
   getVaultPath?: () => string | null
+  // Frontmatter sync (optional)
+  updateNodeTitle?: (id: string, title: string) => Promise<void>
+  updateNodeTags?: (id: string, tags: string[]) => Promise<void>
 }
 
 // Extract filename from path
@@ -211,11 +215,42 @@ export function useFileSync(deps: FileSyncDeps) {
           try {
             const content = await readTextFile(filePath)
             storeLogger.info(`[FileSync] Read new content (${content.length} chars)`)
-            deps.updateNodeInPlace(node.id, {
+
+            // Extract frontmatter metadata (title, tags)
+            const fmTitle = extractFrontmatterTitle(content)
+            const fmTags = extractFrontmatterTags(content)
+
+            const updates: Partial<Node> = {
               markdown_content: content,
               checksum: event.new_checksum,
               updated_at: Date.now(),
-            })
+            }
+
+            // Update title from frontmatter if present
+            if (fmTitle && fmTitle !== node.title) {
+              updates.title = fmTitle
+              storeLogger.info(`[FileSync] Updated title from frontmatter: ${fmTitle}`)
+              // Persist to database
+              if (deps.updateNodeTitle) {
+                deps.updateNodeTitle(node.id, fmTitle).catch(e =>
+                  storeLogger.error('Failed to persist frontmatter title:', e)
+                )
+              }
+            }
+
+            // Update tags from frontmatter if present
+            if (fmTags && fmTags.length > 0) {
+              updates.tags = JSON.stringify(fmTags)
+              storeLogger.info(`[FileSync] Updated tags from frontmatter: ${fmTags.join(', ')}`)
+              // Persist to database
+              if (deps.updateNodeTags) {
+                deps.updateNodeTags(node.id, fmTags).catch(e =>
+                  storeLogger.error('Failed to persist frontmatter tags:', e)
+                )
+              }
+            }
+
+            deps.updateNodeInPlace(node.id, updates)
             // Use update_node_content_from_file to avoid writing back to file (infinite loop)
             await invoke('update_node_content_from_file', {
               id: node.id,
@@ -223,17 +258,18 @@ export function useFileSync(deps: FileSyncDeps) {
               checksum: event.new_checksum,
             })
             storeLogger.info(`[FileSync] Content updated in DB`)
-            // Sync wikilinks to create edges for new links
+            // Sync wikilinks to create/remove edges
             const edgesCreated = await syncNodeWikilinks(node.id)
             storeLogger.info(`[FileSync] syncNodeWikilinks returned: ${edgesCreated} new edges`)
+
+            // Always reload edges to reflect both additions and deletions
+            if (deps.reloadEdges) {
+              storeLogger.info(`[FileSync] Reloading edges...`)
+              await deps.reloadEdges()
+              storeLogger.info(`[FileSync] Edges reloaded`)
+            }
+
             if (edgesCreated > 0) {
-              storeLogger.info(`Created ${edgesCreated} new edges from wikilinks`)
-              // Reload edges to show the newly created ones
-              if (deps.reloadEdges) {
-                storeLogger.info(`[FileSync] Reloading edges...`)
-                await deps.reloadEdges()
-                storeLogger.info(`[FileSync] Edges reloaded`)
-              }
               notifications$.info('External change', `${edgesCreated} new link${edgesCreated > 1 ? 's' : ''} detected`)
             }
             storeLogger.info(`Synced external changes: ${node.title}`)

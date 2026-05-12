@@ -514,10 +514,10 @@
 /* Node Preview Panel - shown when zoomed out */
 .node-preview-panel {
   position: absolute;
-  top: 60px;
+  top: 8px;
   right: 16px;
   width: 480px;
-  max-height: calc(100% - 120px);
+  max-height: calc(98% - 60px);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 8px;

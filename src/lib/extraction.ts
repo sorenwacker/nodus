@@ -88,3 +88,91 @@ export function extractSemanticScholarId(content: string | null): string | null 
 
   return null
 }
+
+/**
+ * Extract title from YAML frontmatter
+ * Supports: title: "My Title" or title: My Title
+ */
+export function extractFrontmatterTitle(content: string | null): string | null {
+  if (!content) return null
+
+  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (frontmatterMatch) {
+    // Match title: value (with optional quotes)
+    const titleMatch = frontmatterMatch[1].match(/^title:\s*["']?([^"'\n]+)["']?\s*$/m)
+    if (titleMatch) {
+      return titleMatch[1].trim()
+    }
+  }
+
+  return null
+}
+
+/**
+ * Extract tags from YAML frontmatter
+ * Supports:
+ * - tags: [tag1, tag2, tag3]
+ * - tags: tag1, tag2, tag3
+ * - tags:
+ *   - tag1
+ *   - tag2
+ */
+export function extractFrontmatterTags(content: string | null): string[] | null {
+  if (!content) return null
+
+  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!frontmatterMatch) return null
+
+  const frontmatter = frontmatterMatch[1]
+
+  // Try array format: tags: [tag1, tag2]
+  const arrayMatch = frontmatter.match(/^tags:\s*\[([^\]]+)\]\s*$/m)
+  if (arrayMatch) {
+    return arrayMatch[1]
+      .split(',')
+      .map(t => t.trim().replace(/^["']|["']$/g, ''))
+      .filter(t => t.length > 0)
+  }
+
+  // Try inline format: tags: tag1, tag2
+  const inlineMatch = frontmatter.match(/^tags:\s*([^[\n]+)$/m)
+  if (inlineMatch && !inlineMatch[1].trim().startsWith('-')) {
+    return inlineMatch[1]
+      .split(',')
+      .map(t => t.trim().replace(/^["']|["']$/g, ''))
+      .filter(t => t.length > 0)
+  }
+
+  // Try YAML list format:
+  // tags:
+  //   - tag1
+  //   - tag2
+  const listMatch = frontmatter.match(/^tags:\s*\n((?:\s+-\s+.+\n?)+)/m)
+  if (listMatch) {
+    return listMatch[1]
+      .split('\n')
+      .map(line => line.replace(/^\s+-\s+/, '').trim())
+      .filter(t => t.length > 0)
+  }
+
+  return null
+}
+
+/**
+ * Extract all frontmatter metadata at once
+ */
+export function extractFrontmatter(content: string | null): {
+  title: string | null
+  tags: string[] | null
+  doi: string | null
+  zoteroKey: string | null
+  semanticScholarId: string | null
+} {
+  return {
+    title: extractFrontmatterTitle(content),
+    tags: extractFrontmatterTags(content),
+    doi: extractDOI(content),
+    zoteroKey: extractZoteroKey(content),
+    semanticScholarId: extractSemanticScholarId(content),
+  }
+}
