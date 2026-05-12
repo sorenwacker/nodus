@@ -211,7 +211,7 @@ function handleClose() {
 .settings-modal {
   background: var(--bg-node, #ffffff);
   border-radius: 12px;
-  width: 520px;
+  width: 680px;
   max-width: 90vw;
   max-height: 85vh;
   display: flex;

@@ -49,6 +49,7 @@ import {
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
 import { useLayout, useNeighborhoodMode } from './composables/layout'
+import { resolveFrameOverlaps, type FrameWithId } from './composables/layout/useFrameCollision'
 import { useFrames } from './composables/frames'
 import {
   useCanvasKeyboardShortcuts,
@@ -99,6 +100,7 @@ const {
   pushCreationUndo,
   pushColorUndo,
   pushSizeUndo,
+  pushFramePositionUndo,
 } = useUndoHandlers()
 
 // Content renderer is configured via composable
@@ -808,6 +810,46 @@ const nodeAgent = useNodeAgent()
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
 
+// Resolve frame-to-frame collisions after drag or resize
+function resolveFrameCollisions() {
+  const allFrames = store.filteredFrames
+  if (allFrames.length < 2) return
+
+  // Build frames with ID for collision detection
+  const framesForCollision: FrameWithId[] = allFrames.map(f => ({
+    id: f.id,
+    canvas_x: f.canvas_x,
+    canvas_y: f.canvas_y,
+    width: f.width,
+    height: f.height,
+    parent_frame_id: f.parent_frame_id,
+  }))
+
+  // Resolve overlaps (40px gap, max 10 iterations)
+  const resolvedPositions = resolveFrameOverlaps(framesForCollision, 40, 10)
+
+  // Apply resolved positions and move contained nodes
+  for (const frame of allFrames) {
+    const resolvedPos = resolvedPositions.get(frame.id)
+    if (!resolvedPos) continue
+
+    const deltaX = resolvedPos.x - frame.canvas_x
+    const deltaY = resolvedPos.y - frame.canvas_y
+
+    // Skip if no movement needed
+    if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
+
+    // Update frame position
+    store.updateFramePosition(frame.id, resolvedPos.x, resolvedPos.y)
+
+    // Move contained nodes with the frame (use frame_id from database)
+    const nodesInFrame = store.filteredNodes.filter(n => n.frame_id === frame.id)
+    for (const node of nodesInFrame) {
+      store.updateNodePosition(node.id, node.canvas_x + deltaX, node.canvas_y + deltaY)
+    }
+  }
+}
+
 // Frame operations composable
 const frames = useFrames({
   store: {
@@ -840,6 +882,8 @@ const frames = useFrames({
   },
   screenToCanvas,
   snapToGrid,
+  resolveFrameCollisions,
+  pushFramePositionUndo,
 })
 const {
   editingFrameId,
@@ -878,91 +922,20 @@ const layout = useLayout({
 })
 const isLayouting = ref(false)
 
-// Expand all frames to fit their contained nodes
-function expandAllFramesToFitNodes() {
-  const padding = 30
-
-  for (const frame of store.filteredFrames) {
-    // Only use frame_id - database is source of truth
-    // This prevents node mix-ups when frames overlap
-    const nodesInFrame = store.filteredNodes.filter(node => node.frame_id === frame.id)
-
-    if (nodesInFrame.length === 0) continue
-
-    // Find the bounding box of all nodes in frame
-    let minLeft = frame.canvas_x + frame.width
-    let minTop = frame.canvas_y + frame.height
-    let maxRight = frame.canvas_x
-    let maxBottom = frame.canvas_y
-
-    for (const node of nodesInFrame) {
-      const nodeWidth = node.width || 200
-      const nodeHeight = node.height || 120
-
-      minLeft = Math.min(minLeft, node.canvas_x)
-      minTop = Math.min(minTop, node.canvas_y)
-      maxRight = Math.max(maxRight, node.canvas_x + nodeWidth)
-      maxBottom = Math.max(maxBottom, node.canvas_y + nodeHeight)
-    }
-
-    // Calculate new frame bounds
-    let newX = frame.canvas_x
-    let newY = frame.canvas_y
-    let newWidth = frame.width
-    let newHeight = frame.height
-
-    // Expand left if nodes extend past it
-    if (minLeft - padding < frame.canvas_x) {
-      const expandBy = frame.canvas_x - (minLeft - padding)
-      newX = minLeft - padding
-      newWidth += expandBy
-    }
-
-    // Expand top if nodes extend past it
-    if (minTop - padding < frame.canvas_y) {
-      const expandBy = frame.canvas_y - (minTop - padding)
-      newY = minTop - padding
-      newHeight += expandBy
-    }
-
-    // Expand right if nodes extend past it
-    if (maxRight + padding > newX + newWidth) {
-      newWidth = maxRight + padding - newX
-    }
-
-    // Expand bottom if nodes extend past it
-    if (maxBottom + padding > newY + newHeight) {
-      newHeight = maxBottom + padding - newY
-    }
-
-    // Update frame if changed
-    const posChanged = newX !== frame.canvas_x || newY !== frame.canvas_y
-    const sizeChanged = newWidth !== frame.width || newHeight !== frame.height
-
-    if (posChanged) {
-      store.updateFramePosition(frame.id, newX, newY)
-    }
-    if (sizeChanged) {
-      store.updateFrameSize(frame.id, newWidth, newHeight)
-    }
-  }
-}
-
 async function autoLayoutNodes(
   type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid'
 ) {
   isLayouting.value = true
   const frameId = store.selectedFrameId
   try {
-    // If force layout and a frame is selected, use the frame-aware layoutNodes
-    if (type === 'force' && frameId) {
-      await store.layoutNodes(undefined, { frameId, fitToFrame: false })
+    // When a frame is selected, use the simpler frame-aware force layout
+    // This ensures nodes stay inside their frame
+    if (frameId && (type === 'force' || type === 'grid')) {
+      await store.layoutNodes(undefined, { frameId, fitToFrame: true })
     } else {
       await layout.autoLayout(type, frameId ?? undefined)
     }
-
-    // After layout, expand frames to fit any nodes that moved outside
-    setTimeout(() => expandAllFramesToFitNodes(), 100)
+    // Frame expansion only happens from user resize, not layout
   } finally {
     isLayouting.value = false
   }

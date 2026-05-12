@@ -234,6 +234,7 @@ pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
 }
 
 /// Sync all wikilinks for all nodes in a workspace
+/// Reads from files when available (not just database content) to ensure accurate sync
 #[tauri::command]
 pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
@@ -261,7 +262,18 @@ pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, S
             }
         }
 
-        let content = node.markdown_content.clone().unwrap_or_default();
+        // Read from file if available (more accurate than database content)
+        let (content, _source) = if let Some(ref file_path) = node.file_path {
+            match std::fs::read_to_string(file_path) {
+                Ok(c) => (c, "file"),
+                Err(_) => (
+                    node.markdown_content.clone().unwrap_or_default(),
+                    "db-fallback",
+                ),
+            }
+        } else {
+            (node.markdown_content.clone().unwrap_or_default(), "db")
+        };
         let links = import_helpers::extract_wikilinks(&content);
 
         // Sync wikilinks (add new, remove old)
@@ -994,10 +1006,57 @@ pub async fn update_node_file_path(id: String, file_path: Option<String>) -> Res
         .map_err(|e| e.to_string())
 }
 
+/// Check if moving a node's file would cause a collision
+/// Returns the conflicting filename if collision exists, None otherwise
+#[tauri::command]
+pub async fn check_file_collision(
+    node_id: String,
+    target_folder: String,
+) -> Result<Option<String>, String> {
+    use std::path::Path;
+
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+
+    // Get node by ID
+    let node = database::nodes::get_by_id(pool, &node_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Node not found".to_string())?;
+
+    // Check if node has a file_path
+    let old_path_str = match node.file_path {
+        Some(p) => p,
+        None => return Ok(None), // No file, no collision possible
+    };
+    let old_path = Path::new(&old_path_str);
+
+    // Get filename from old path
+    let filename = match old_path.file_name() {
+        Some(f) => f,
+        None => return Err("Invalid file path".to_string()),
+    };
+
+    // Calculate new path
+    let target_dir = Path::new(&target_folder);
+    let new_path = target_dir.join(filename);
+
+    // Check for collision (different path but file exists)
+    if new_path.exists() && new_path != old_path {
+        Ok(Some(filename.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Move a node's file to a different folder
 /// Used for folder-frame sync when nodes are dragged between frames
+/// collision_resolution: "auto" (default, auto-rename), "replace" (overwrite), or a new filename
 #[tauri::command]
-pub async fn move_node_file(node_id: String, target_folder: String) -> Result<String, String> {
+pub async fn move_node_file(
+    node_id: String,
+    target_folder: String,
+    collision_resolution: Option<String>,
+) -> Result<String, String> {
     use crate::watcher::FileLock;
     use std::path::Path;
 
@@ -1029,29 +1088,52 @@ pub async fn move_node_file(node_id: String, target_folder: String) -> Result<St
     let target_dir = Path::new(&target_folder);
     let mut new_path = target_dir.join(filename);
 
-    // Handle filename conflicts by appending number suffix
+    // Handle filename conflicts based on collision_resolution parameter
     if new_path.exists() && new_path != old_path {
-        let stem = new_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("file")
-            .to_string();
-        let ext = new_path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("md")
-            .to_string();
+        let resolution = collision_resolution.as_deref().unwrap_or("auto");
 
-        let mut counter = 1;
-        loop {
-            let new_name = format!("{}-{}.{}", stem, counter, ext);
-            new_path = target_dir.join(&new_name);
-            if !new_path.exists() {
-                break;
+        match resolution {
+            "replace" => {
+                // Delete the existing file first
+                std::fs::remove_file(&new_path)
+                    .map_err(|e| format!("Failed to remove existing file: {}", e))?;
             }
-            counter += 1;
-            if counter > 100 {
-                return Err("Too many filename conflicts".to_string());
+            "auto" => {
+                // Auto-rename by appending number suffix
+                let stem = new_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("file")
+                    .to_string();
+                let ext = new_path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("md")
+                    .to_string();
+
+                let mut counter = 1;
+                loop {
+                    let new_name = format!("{}-{}.{}", stem, counter, ext);
+                    new_path = target_dir.join(&new_name);
+                    if !new_path.exists() {
+                        break;
+                    }
+                    counter += 1;
+                    if counter > 100 {
+                        return Err("Too many filename conflicts".to_string());
+                    }
+                }
+            }
+            custom_name => {
+                // Use custom filename provided by the user
+                new_path = target_dir.join(custom_name);
+                // Check if this custom name also conflicts
+                if new_path.exists() && new_path != old_path {
+                    return Err(format!(
+                        "The custom filename '{}' also exists in the target folder",
+                        custom_name
+                    ));
+                }
             }
         }
     }
@@ -1089,10 +1171,19 @@ pub async fn move_node_file(node_id: String, target_folder: String) -> Result<St
 
 #[tauri::command]
 pub async fn update_node_size(id: String, width: f64, height: f64) -> Result<(), String> {
+    println!(
+        "[update_node_size] id={}, width={}, height={}",
+        id, width, height
+    );
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_size(pool, &id, width, height)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            eprintln!("[update_node_size] ERROR: {}", e);
+            e.to_string()
+        })?;
+    println!("[update_node_size] Success for {}", id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -1513,6 +1604,7 @@ pub async fn import_vault(
         let frame = database::frames::Frame {
             id: frame_id.clone(),
             title: frame_title.to_string(),
+            parent_frame_id: None,
             canvas_x: frame_x,
             canvas_y: frame_y,
             width: frame_width,
@@ -2474,6 +2566,7 @@ pub async fn get_frames() -> Result<Vec<Frame>, String> {
 pub struct CreateFrameInput {
     pub id: String,
     pub title: String,
+    pub parent_frame_id: Option<String>,
     pub canvas_x: f64,
     pub canvas_y: f64,
     pub width: f64,
@@ -2491,6 +2584,7 @@ pub async fn create_frame(input: CreateFrameInput) -> Result<Frame, String> {
     let frame = Frame {
         id: input.id,
         title: input.title,
+        parent_frame_id: input.parent_frame_id,
         canvas_x: input.canvas_x,
         canvas_y: input.canvas_y,
         width: input.width,
@@ -2537,6 +2631,17 @@ pub async fn update_frame_title(id: String, title: String) -> Result<(), String>
 pub async fn update_frame_color(id: String, color: Option<String>) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::frames::update_color(pool, &id, color.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_frame_parent(
+    id: String,
+    parent_frame_id: Option<String>,
+) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::frames::update_parent(pool, &id, parent_frame_id.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

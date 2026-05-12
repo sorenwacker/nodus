@@ -556,8 +556,7 @@ export function useLayout(options: UseLayoutOptions) {
       // Get edges for force layout
       const edges = store.getFilteredEdges()
 
-      // Build layout nodes from virtualNodes (already filtered for frame-scoped or global)
-      // For global layout: only unframed nodes participate - frames and their contents stay fixed
+      // Build layout nodes from virtualNodes
       const layoutNodes = virtualNodes.map(n => ({
         id: n.id,
         x: n.canvas_x,
@@ -566,15 +565,51 @@ export function useLayout(options: UseLayoutOptions) {
         height: n.height || NODE_DEFAULTS.HEIGHT,
       }))
 
+      // For global layout (no frameId), include frames as virtual nodes
+      const FRAME_PREFIX = '___FRAME___'
+      const frameSnapshot = new Map<string, { x: number; y: number }>()
+      const nodeToFrameId = new Map<string, string>()
+
+      if (!frameId) {
+        // Global layout: add frames as virtual nodes
+        for (const frame of allFrames) {
+          frameSnapshot.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
+          layoutNodes.push({
+            id: FRAME_PREFIX + frame.id,
+            x: frame.canvas_x + frame.width / 2,
+            y: frame.canvas_y + frame.height / 2,
+            width: frame.width,
+            height: frame.height,
+          })
+        }
+
+        // Map framed nodes to their frame
+        for (const [fId, nodesInFrame] of frameNodes) {
+          for (const node of nodesInFrame) {
+            nodeToFrameId.set(node.id, fId)
+          }
+        }
+      }
+
       // Build a set of all layout node IDs
       const layoutNodeIds = new Set(layoutNodes.map(n => n.id))
 
-      // Build edges - only include edges between nodes that are in the layout
+      // Build edges - remap framed nodes to their frame's virtual node
       const layoutEdges = edges
-        .map(e => ({
-          source: e.source_node_id,
-          target: e.target_node_id,
-        }))
+        .map(e => {
+          if (!frameId) {
+            const sourceFrameId = nodeToFrameId.get(e.source_node_id)
+            const targetFrameId = nodeToFrameId.get(e.target_node_id)
+            return {
+              source: sourceFrameId ? FRAME_PREFIX + sourceFrameId : e.source_node_id,
+              target: targetFrameId ? FRAME_PREFIX + targetFrameId : e.target_node_id,
+            }
+          }
+          return {
+            source: e.source_node_id,
+            target: e.target_node_id,
+          }
+        })
         .filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target))
         .filter(e => e.source !== e.target)
 
@@ -587,21 +622,73 @@ export function useLayout(options: UseLayoutOptions) {
         iterations,
       })
 
+      // Build final targets map
+      const nodeTargets = new Map<string, { x: number; y: number }>()
+
+      // Add regular node positions
+      for (const [id, pos] of positions) {
+        if (!id.startsWith(FRAME_PREFIX)) {
+          nodeTargets.set(id, pos)
+        }
+      }
+
+      // For global layout, move frames and their contents together
+      if (!frameId) {
+        for (const frame of allFrames) {
+          const virtualId = FRAME_PREFIX + frame.id
+          const newPos = positions.get(virtualId)
+          if (!newPos) continue
+
+          const oldPos = frameSnapshot.get(frame.id)
+          if (!oldPos) continue
+
+          const oldCenterX = oldPos.x + frame.width / 2
+          const oldCenterY = oldPos.y + frame.height / 2
+          const deltaX = newPos.x - oldCenterX
+          const deltaY = newPos.y - oldCenterY
+
+          if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
+
+          store.updateFramePosition(frame.id, oldPos.x + deltaX, oldPos.y + deltaY)
+
+          const nodesInFrame = frameNodes.get(frame.id) || []
+          for (const node of nodesInFrame) {
+            nodeTargets.set(node.id, {
+              x: node.canvas_x + deltaX,
+              y: node.canvas_y + deltaY,
+            })
+          }
+        }
+      }
+
       // Apply frame constraints
       let finalTargets: Map<string, { x: number; y: number }>
 
       if (frameId) {
         // Frame-scoped: constrain nodes to stay inside the frame
         finalTargets = targetFrame
-          ? constrainNodesToFrame(positions, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
-          : positions
+          ? constrainNodesToFrame(nodeTargets, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
+          : nodeTargets
       } else {
         // Global: push unframed nodes out of all frames
-        // Framed nodes don't move at all (they weren't in the layout)
-        finalTargets = pushOutOfFrames(
-          positions,
+        const unframedIds = new Set(virtualNodes.map(n => n.id))
+        const unframedTargets = new Map<string, { x: number; y: number }>()
+        const framedTargets = new Map<string, { x: number; y: number }>()
+
+        for (const [id, pos] of nodeTargets) {
+          if (unframedIds.has(id)) {
+            unframedTargets.set(id, pos)
+          } else {
+            framedTargets.set(id, pos)
+          }
+        }
+
+        const pushedUnframed = pushOutOfFrames(
+          unframedTargets,
           new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
         )
+
+        finalTargets = new Map([...pushedUnframed, ...framedTargets])
       }
 
       // Apply positions

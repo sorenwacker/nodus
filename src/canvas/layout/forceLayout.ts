@@ -65,18 +65,33 @@ export async function applyForceLayout(
   options: ForceLayoutOptions = {}
 ): Promise<Map<string, { x: number; y: number }>> {
   const {
-    centerX = 0,
-    centerY = 0,
+    centerX: optionCenterX,
+    centerY: optionCenterY,
     chargeStrength = -20000,
     linkDistance = 350,
     iterations = 300,
-    gravityStrength = 0.03,
+    gravityStrength = 0.01, // Reduced gravity to minimize drift
     onTick,
   } = options
 
   if (nodes.length === 0) {
     return new Map()
   }
+
+  // Calculate the current center of mass of the graph
+  // This preserves the graph position when running layout multiple times
+  let initialCenterX = 0
+  let initialCenterY = 0
+  for (const node of nodes) {
+    initialCenterX += node.x + node.width / 2
+    initialCenterY += node.y + node.height / 2
+  }
+  initialCenterX /= nodes.length
+  initialCenterY /= nodes.length
+
+  // Use provided center or the graph's current center
+  const centerX = optionCenterX ?? initialCenterX
+  const centerY = optionCenterY ?? initialCenterY
 
   // Dynamic import to avoid bundling issues with d3-timer
   const {
@@ -108,22 +123,7 @@ export async function applyForceLayout(
       target: e.target,
     }))
 
-  // Pre-pass: move distant nodes closer to center before simulation
-  // This ensures outliers can converge in limited iterations
-  const maxInitialDistance = 2000
-  for (const node of simNodes) {
-    const dx = (node.x || 0) - centerX
-    const dy = (node.y || 0) - centerY
-    const dist = Math.sqrt(dx * dx + dy * dy)
-    if (dist > maxInitialDistance) {
-      // Pull node to maxInitialDistance from center
-      const scale = maxInitialDistance / dist
-      node.x = centerX + dx * scale
-      node.y = centerY + dy * scale
-    }
-  }
-
-  // Create simulation - disconnected graphs should separate naturally
+  // Create simulation - use center of mass as gravity target
   const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(simNodes)
     .force('link', forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks)
       .id(d => d.id)
@@ -134,7 +134,7 @@ export async function applyForceLayout(
       .distanceMin(10)
       .distanceMax(3000)
       .theta(simNodes.length > 200 ? 0.9 : 0.7))
-    // Weak gravity - just prevents infinite drift, allows disconnected graphs to separate
+    // Very weak gravity centered on the graph's own center - prevents drift without pulling
     .force('gravityX', forceX<SimNode>(centerX).strength(gravityStrength))
     .force('gravityY', forceY<SimNode>(centerY).strength(gravityStrength))
     .force('collide', forceCollide<SimNode>()
@@ -170,12 +170,26 @@ export async function applyForceLayout(
     }
   }
 
-  // Return new positions
+  // Calculate the new center of mass after simulation
+  let newCenterX = 0
+  let newCenterY = 0
+  for (const node of simNodes) {
+    newCenterX += (node.x || 0) + node.width / 2
+    newCenterY += (node.y || 0) + node.height / 2
+  }
+  newCenterX /= simNodes.length
+  newCenterY /= simNodes.length
+
+  // Calculate offset to preserve original center of mass
+  const offsetX = initialCenterX - newCenterX
+  const offsetY = initialCenterY - newCenterY
+
+  // Return new positions, offset to preserve graph center
   const positions = new Map<string, { x: number; y: number }>()
   for (const node of simNodes) {
     positions.set(node.id, {
-      x: Math.round(node.x || 0),
-      y: Math.round(node.y || 0),
+      x: Math.round((node.x || 0) + offsetX),
+      y: Math.round((node.y || 0) + offsetY),
     })
   }
 

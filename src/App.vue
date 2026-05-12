@@ -78,11 +78,14 @@ const undoRedo = useUndoRedo({
     restoreNode: store.restoreNode,
     restoreEdge: store.restoreEdge,
     deleteNode: store.deleteNode,
+    // Frame operations for undo
+    getFilteredFrames: () => store.filteredFrames,
+    updateFramePosition: store.updateFramePosition,
   },
   showToast,
 })
 
-const { undoStack, redoStack, pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, undo, redo } = undoRedo
+const { undoStack, redoStack, pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, undo, redo } = undoRedo
 
 // Expose undo functions to child components
 provide('pushUndo', pushUndo)
@@ -91,6 +94,7 @@ provide('pushDeletionUndo', pushDeletionUndo)
 provide('pushCreationUndo', pushCreationUndo)
 provide('pushColorUndo', pushColorUndo)
 provide('pushSizeUndo', pushSizeUndo)
+provide('pushFramePositionUndo', pushFramePositionUndo)
 
 // Reset all nodes to default size
 async function resetAllNodeSizes() {
@@ -342,12 +346,13 @@ onMounted(async () => {
               console.log(`[App] Found ${newNodes.length} new files, reloading nodes`)
               await store.loadNodes()
             }
-            // Sync wikilinks to create edges
+            // Sync wikilinks to create/remove edges
             const edgesCreated = await syncAllWikilinks(workspaceId)
             if (edgesCreated > 0) {
               console.log(`[App] Created ${edgesCreated} edges from wikilinks`)
-              await store.loadEdges()
             }
+            // Always reload edges to reflect any deletions
+            await store.loadEdges()
             console.log('[App] Background sync complete')
           } catch (e) {
             console.error('[App] Failed to sync:', e)

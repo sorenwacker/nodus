@@ -47,8 +47,8 @@ export function applyHierarchicalLayout(
     direction = 'TB',
     nodeSpacingX = 150,
     nodeSpacingY = 240,
-    centerX = 0,
-    centerY = 0,
+    centerX: optionCenterX,
+    centerY: optionCenterY,
     align,
     ranker = 'network-simplex',
   } = options
@@ -56,6 +56,21 @@ export function applyHierarchicalLayout(
   if (nodes.length === 0) {
     return new Map()
   }
+
+  // Calculate the current center of mass of the graph
+  // This preserves the graph position when running layout multiple times
+  let initialCenterX = 0
+  let initialCenterY = 0
+  for (const node of nodes) {
+    initialCenterX += node.x + node.width / 2
+    initialCenterY += node.y + node.height / 2
+  }
+  initialCenterX /= nodes.length
+  initialCenterY /= nodes.length
+
+  // Use provided center or the graph's current center of mass
+  const centerX = optionCenterX ?? initialCenterX
+  const centerY = optionCenterY ?? initialCenterY
 
   // Create dagre graph
   const g = new dagre.graphlib.Graph()

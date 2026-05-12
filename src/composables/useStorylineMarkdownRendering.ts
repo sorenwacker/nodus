@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { marked } from '../lib/markdown'
 import { invoke } from '@tauri-apps/api/core'
 import { sanitizeHtml, sanitizeSvg } from '../lib/sanitize'
+import { useNodesStore } from '../stores/nodes'
 import type { Node } from '../types'
 
 // Math cache for rendered SVGs
@@ -53,6 +54,19 @@ export function useStorylineMarkdownRendering() {
 
     // Render markdown
     let html = marked.parse(processedContent) as string
+
+    // Convert [[link]] and [[link|display]] wikilinks to clickable elements
+    const store = useNodesStore()
+    const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
+    html = html.replace(wikilinkRegex, (_match, target, display) => {
+      const displayText = display || target
+      const targetTrimmed = target.trim()
+      const targetExists = store.filteredNodes.some(
+        n => n.title.toLowerCase() === targetTrimmed.toLowerCase()
+      )
+      const missingClass = targetExists ? '' : ' missing'
+      return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
+    })
 
     // Render math to SVG and restore
     for (const [id, { math, isDisplay }] of mathPlaceholders) {

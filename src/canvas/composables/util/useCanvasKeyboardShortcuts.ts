@@ -173,8 +173,11 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     }
 
     // Cmd+C / Ctrl+C copies selected nodes as JSON
+    // But only if there's no text selection (allow native copy for selected text)
     if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
-      if (selectedNodeIds.value.length > 0) {
+      const textSelection = window.getSelection()
+      const hasTextSelection = textSelection && textSelection.toString().trim().length > 0
+      if (selectedNodeIds.value.length > 0 && !hasTextSelection) {
         e.preventDefault()
         copySelectedNodes()
       }

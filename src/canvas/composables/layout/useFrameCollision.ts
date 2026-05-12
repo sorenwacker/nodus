@@ -194,3 +194,154 @@ export function constrainNodesToFrame(
 
   return result
 }
+
+// ============================================================================
+// Frame-to-Frame Collision Detection and Resolution
+// ============================================================================
+
+export interface FrameWithId extends FrameRect {
+  id: string
+  parent_frame_id?: string | null
+}
+
+/**
+ * Check if two frames overlap (including gap between them).
+ * Returns true if frames are overlapping or closer than the specified gap.
+ */
+export function doFramesOverlap(
+  frame1: FrameRect,
+  frame2: FrameRect,
+  gap = 40
+): boolean {
+  const f1Right = frame1.canvas_x + frame1.width + gap
+  const f1Bottom = frame1.canvas_y + frame1.height + gap
+  const f2Right = frame2.canvas_x + frame2.width + gap
+  const f2Bottom = frame2.canvas_y + frame2.height + gap
+
+  // Check for overlap with gap padding
+  const overlapX = frame1.canvas_x < f2Right && f1Right > frame2.canvas_x
+  const overlapY = frame1.canvas_y < f2Bottom && f1Bottom > frame2.canvas_y
+
+  return overlapX && overlapY
+}
+
+/**
+ * Calculate the separation vector needed to push frame2 away from frame1.
+ * Returns { dx, dy } representing the minimum displacement to eliminate overlap.
+ * Push direction is determined by the dominant axis (horizontal or vertical).
+ */
+export function calculateFrameSeparation(
+  frame1: FrameRect,
+  frame2: FrameRect,
+  gap = 40
+): { dx: number; dy: number } {
+  // Calculate centers
+  const center1X = frame1.canvas_x + frame1.width / 2
+  const center1Y = frame1.canvas_y + frame1.height / 2
+  const center2X = frame2.canvas_x + frame2.width / 2
+  const center2Y = frame2.canvas_y + frame2.height / 2
+
+  // Vector from frame1 center to frame2 center
+  const vecX = center2X - center1X
+  const vecY = center2Y - center1Y
+
+  // Calculate overlap amounts in each direction
+  const overlapRight = (frame1.canvas_x + frame1.width + gap) - frame2.canvas_x
+  const overlapLeft = (frame2.canvas_x + frame2.width + gap) - frame1.canvas_x
+  const overlapBottom = (frame1.canvas_y + frame1.height + gap) - frame2.canvas_y
+  const overlapTop = (frame2.canvas_y + frame2.height + gap) - frame1.canvas_y
+
+  // Determine push direction based on center offset (dominant axis)
+  if (Math.abs(vecX) >= Math.abs(vecY)) {
+    // Push horizontally
+    if (vecX >= 0) {
+      // Frame2 is to the right, push right
+      return { dx: overlapRight, dy: 0 }
+    } else {
+      // Frame2 is to the left, push left
+      return { dx: -overlapLeft, dy: 0 }
+    }
+  } else {
+    // Push vertically
+    if (vecY >= 0) {
+      // Frame2 is below, push down
+      return { dx: 0, dy: overlapBottom }
+    } else {
+      // Frame2 is above, push up
+      return { dx: 0, dy: -overlapTop }
+    }
+  }
+}
+
+/**
+ * Resolve all frame overlaps by iteratively pushing frames apart.
+ * Child frames (with parent_frame_id) are skipped - they move with their parent.
+ * Returns a map of frame IDs to their new positions.
+ */
+export function resolveFrameOverlaps(
+  frames: FrameWithId[],
+  gap = 40,
+  maxIterations = 10
+): Map<string, { x: number; y: number }> {
+  // Filter out child frames - they move with their parents
+  const topLevelFrames = frames.filter(f => !f.parent_frame_id)
+
+  // Create mutable positions map
+  const positions = new Map<string, { x: number; y: number }>()
+  for (const frame of topLevelFrames) {
+    positions.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
+  }
+
+  // Create size map for overlap checks
+  const sizes = new Map<string, { width: number; height: number }>()
+  for (const frame of topLevelFrames) {
+    sizes.set(frame.id, { width: frame.width, height: frame.height })
+  }
+
+  // Iteratively resolve overlaps
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    let hasOverlap = false
+
+    // Check all frame pairs
+    for (let i = 0; i < topLevelFrames.length; i++) {
+      for (let j = i + 1; j < topLevelFrames.length; j++) {
+        const frame1 = topLevelFrames[i]
+        const frame2 = topLevelFrames[j]
+        const pos1 = positions.get(frame1.id)!
+        const pos2 = positions.get(frame2.id)!
+        const size1 = sizes.get(frame1.id)!
+        const size2 = sizes.get(frame2.id)!
+
+        // Build temporary rects for overlap check
+        const rect1: FrameRect = {
+          canvas_x: pos1.x,
+          canvas_y: pos1.y,
+          width: size1.width,
+          height: size1.height,
+        }
+        const rect2: FrameRect = {
+          canvas_x: pos2.x,
+          canvas_y: pos2.y,
+          width: size2.width,
+          height: size2.height,
+        }
+
+        if (doFramesOverlap(rect1, rect2, gap)) {
+          hasOverlap = true
+          const separation = calculateFrameSeparation(rect1, rect2, gap)
+
+          // Push the second frame (frame2) away
+          positions.set(frame2.id, {
+            x: pos2.x + separation.dx,
+            y: pos2.y + separation.dy,
+          })
+        }
+      }
+    }
+
+    // Exit early if no overlaps found
+    if (!hasOverlap) break
+  }
+
+  return positions
+}

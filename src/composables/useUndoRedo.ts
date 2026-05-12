@@ -35,7 +35,12 @@ interface SizeSnapshot {
   sizes: Map<string, { width: number; height: number; x: number; y: number }>
 }
 
-export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot
+interface FramePositionSnapshot {
+  type: 'frame-position'
+  frames: Map<string, { x: number; y: number }>
+}
+
+export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot
 
 export interface UndoRedoStore {
   getNode: (id: string) => Node | undefined
@@ -48,6 +53,9 @@ export interface UndoRedoStore {
   restoreNode: (node: Node) => Promise<void>
   restoreEdge: (edge: Edge) => Promise<void>
   deleteNode: (id: string) => Promise<void>
+  // Frame operations
+  getFilteredFrames?: () => Array<{ id: string; canvas_x: number; canvas_y: number }>
+  updateFramePosition?: (id: string, x: number, y: number) => void
 }
 
 export interface UseUndoRedoOptions {
@@ -140,6 +148,25 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     redoStack.value = []
   }
 
+  function captureFramePositionSnapshot(): FramePositionSnapshot | null {
+    if (!store.getFilteredFrames) return null
+    const frames = new Map<string, { x: number; y: number }>()
+    for (const frame of store.getFilteredFrames()) {
+      frames.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
+    }
+    return { type: 'frame-position', frames }
+  }
+
+  function pushFramePositionUndo() {
+    const snapshot = captureFramePositionSnapshot()
+    if (!snapshot || snapshot.frames.size === 0) return
+    undoStack.value.push(snapshot)
+    if (undoStack.value.length > maxUndo) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
   async function undo() {
     if (undoStack.value.length === 0) {
       showToast('Nothing to undo', 'info')
@@ -221,6 +248,19 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodePosition(id, size.x, size.y)
       }
       showToast('Undo resize', 'info')
+    } else if (snapshot.type === 'frame-position') {
+      // Save current frame positions for redo
+      const currentSnapshot = captureFramePositionSnapshot()
+      if (currentSnapshot) {
+        redoStack.value.push(currentSnapshot)
+      }
+      // Restore old frame positions
+      if (store.updateFramePosition) {
+        for (const [id, pos] of snapshot.frames) {
+          store.updateFramePosition(id, pos.x, pos.y)
+        }
+      }
+      showToast('Undo frame position', 'info')
     }
   }
 
@@ -287,6 +327,19 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodePosition(id, size.x, size.y)
       }
       showToast('Redo resize', 'info')
+    } else if (snapshot.type === 'frame-position') {
+      // Save current frame positions for undo
+      const currentSnapshot = captureFramePositionSnapshot()
+      if (currentSnapshot) {
+        undoStack.value.push(currentSnapshot)
+      }
+      // Apply redo frame positions
+      if (store.updateFramePosition) {
+        for (const [id, pos] of snapshot.frames) {
+          store.updateFramePosition(id, pos.x, pos.y)
+        }
+      }
+      showToast('Redo frame position', 'info')
     }
   }
 
@@ -312,6 +365,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     pushCreationUndo,
     pushColorUndo,
     pushSizeUndo,
+    pushFramePositionUndo,
     undo,
     redo,
     canUndo,

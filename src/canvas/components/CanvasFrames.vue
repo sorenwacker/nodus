@@ -36,7 +36,7 @@ const emit = defineEmits<{
       height: frame.height + 'px',
       '--frame-color': frame.color || 'var(--border-subtle)',
       '--border-width': Math.max(2, 2 / scale) + 'px',
-      backgroundColor: frame.color ? frame.color + '20' : 'rgba(128, 128, 128, 0.05)',
+      backgroundColor: frame.color ? frame.color + '40' : 'rgba(128, 128, 128, 0.12)',
     }"
     @dblclick.stop="$emit('dblclick', frame.id)"
   >
@@ -112,7 +112,11 @@ const emit = defineEmits<{
 }
 
 .canvas-frame.selected {
-  box-shadow: inset 0 0 0 var(--border-width, 2px) var(--primary-color), 0 0 0 4px rgba(59, 130, 246, 0.25), 0 0 16px rgba(59, 130, 246, 0.15);
+  box-shadow:
+    inset 0 0 0 var(--border-width, 2px) var(--primary-color),
+    0 0 0 4px rgba(59, 130, 246, 0.3),
+    0 0 20px rgba(59, 130, 246, 0.25),
+    0 0 40px rgba(59, 130, 246, 0.15);
   background: rgba(59, 130, 246, 0.06);
   z-index: 100;
 }
@@ -160,61 +164,60 @@ const emit = defineEmits<{
 
 .frame-delete-btn {
   position: absolute;
-  top: -16px;
-  right: -16px;
-  width: 36px;
-  height: 36px;
+  top: -12px;
+  right: -12px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: none;
-  background: transparent;
+  border: 1.5px solid var(--danger-border);
+  background: var(--danger-bg);
   color: var(--danger-color);
   cursor: pointer;
   padding: 0;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
   pointer-events: auto;
-}
-
-.frame-delete-btn::before {
-  content: 'x';
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1.5px solid var(--danger-border);
-  background: var(--danger-bg);
-  color: var(--danger-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 2px 6px var(--shadow-sm);
   transition: background 0.1s, color 0.1s;
 }
 
-.frame-delete-btn:hover::before {
+.frame-delete-btn::before {
+  content: '\00d7'; /* multiplication sign × - cleaner than 'x' */
+}
+
+.frame-delete-btn:hover {
   background: var(--danger-color);
   color: white;
 }
 
-/* Resize handles - only show when selected */
+/* Resize handles - always interactive, visible on hover */
 .resize-edge,
 .resize-corner {
   position: absolute;
   z-index: 5;
   opacity: 0;
-  transition: opacity 0.15s;
-  pointer-events: none;
+  transition: opacity 0.15s, background 0.15s;
+  pointer-events: auto;
+  background: transparent;
 }
 
+/* Show resize handles when hovering directly on them */
+.resize-edge:hover,
+.resize-corner:hover {
+  opacity: 0.6;
+  background: var(--text-muted);
+  border-radius: 2px;
+}
+
+/* More visible when frame is selected */
 .canvas-frame.selected .resize-edge,
 .canvas-frame.selected .resize-corner {
-  pointer-events: auto;
-  opacity: 0.5;
+  opacity: 0.4;
   z-index: 101;
   background: var(--primary-color);
 }

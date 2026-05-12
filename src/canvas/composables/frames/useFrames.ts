@@ -54,10 +54,14 @@ export interface UseFramesOptions {
   viewState: ViewState
   screenToCanvas: (x: number, y: number) => Point
   snapToGrid: (value: number) => number
+  /** Callback to resolve frame-to-frame overlaps after drag or resize */
+  resolveFrameCollisions?: () => void
+  /** Callback to capture frame positions for undo before drag starts */
+  pushFramePositionUndo?: () => void
 }
 
 export function useFrames(options: UseFramesOptions) {
-  const { store, viewState, screenToCanvas, snapToGrid } = options
+  const { store, viewState, screenToCanvas, snapToGrid, resolveFrameCollisions, pushFramePositionUndo } = options
 
   // State
   const draggingFrame = ref<string | null>(null)
@@ -77,6 +81,9 @@ export function useFrames(options: UseFramesOptions) {
 
     const frame = store.frames.find(f => f.id === frameId)
     if (!frame) return
+
+    // Capture frame positions for undo before starting drag
+    pushFramePositionUndo?.()
 
     draggingFrame.value = frameId
     const pos = screenToCanvas(e.clientX, e.clientY)
@@ -132,6 +139,8 @@ export function useFrames(options: UseFramesOptions) {
     frameContainedNodes.value.clear()
     document.removeEventListener('pointermove', onDrag)
     document.removeEventListener('pointerup', stopDrag)
+    // Resolve frame-to-frame collisions after drag ends
+    resolveFrameCollisions?.()
   }
 
   function startResize(e: PointerEvent, frameId: string, direction = 'se') {
@@ -193,6 +202,8 @@ export function useFrames(options: UseFramesOptions) {
     resizingFrame.value = null
     document.removeEventListener('pointermove', onResize)
     document.removeEventListener('pointerup', stopResize)
+    // Resolve frame-to-frame collisions after resize ends
+    resolveFrameCollisions?.()
   }
 
   function startEditingTitle(frameId: string) {

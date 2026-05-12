@@ -184,6 +184,9 @@ export const useNodesStore = defineStore('nodes', () => {
       const fetchedNodes = await invoke<Node[]>('get_nodes')
       nodes.value = fetchedNodes
 
+      // Debug: log node sizes from database
+      console.log('[Nodes] Node sizes from DB:', fetchedNodes.slice(0, 5).map(n => ({ id: n.id.slice(0, 8), title: n.title, width: n.width, height: n.height })))
+
       storeLogger.debug(`[Nodes] Loaded ${fetchedNodes.length} total nodes`)
       const workspaceIds = [...new Set(fetchedNodes.map(n => n.workspace_id))]
       storeLogger.debug(`[Nodes] Workspace IDs in nodes: ${JSON.stringify(workspaceIds)}`)
@@ -269,7 +272,9 @@ export const useNodesStore = defineStore('nodes', () => {
       }
 
       try {
+        console.log(`[Nodes] Saving size for ${id}: ${clampedWidth}x${clampedHeight}`)
         await invoke('update_node_size', { id, width: clampedWidth, height: clampedHeight })
+        console.log(`[Nodes] Size saved successfully for ${id}`)
       } catch (e) {
         console.error('Failed to update size:', e)
       }

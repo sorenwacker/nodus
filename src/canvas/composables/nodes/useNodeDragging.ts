@@ -83,15 +83,12 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
   const {
     store,
     snapToGrid,
-    isLODMode,
-    isSemanticZoomCollapsed,
     editingNodeId,
     editingTitleId,
     selectedEdge,
     isCreatingEdge,
     edgeStartNode,
     edgePreviewEnd,
-    pushOverlappingNodesAway,
     pushUndo,
     screenToCanvas,
     zoomToNode,
@@ -285,7 +282,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
     // Check if drag ended over storyline panel
     const storylinePanel = document.querySelector('.storyline-panel')
-    let droppedOnStoryline = false
     if (storylinePanel && draggedNodeIds.length > 0) {
       const rect = storylinePanel.getBoundingClientRect()
       if (
@@ -294,7 +290,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         e.clientY >= rect.top &&
         e.clientY <= rect.bottom
       ) {
-        droppedOnStoryline = true
         // Reset nodes to original positions (don't move them on canvas)
         if (multiDragInitial.value.size > 0) {
           for (const [id, initial] of multiDragInitial.value) {
@@ -312,20 +307,12 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       }
     }
 
-    // Push overlapping nodes away after drag (only if not dropped on storyline)
-    // Skip in dot mode (LOD or semantic zoom collapsed) - circles are small, pushing based on full node size doesn't make sense
-    if (!droppedOnStoryline && !isLODMode.value && !isSemanticZoomCollapsed.value) {
-      if (multiDragInitial.value.size > 0) {
-        for (const id of multiDragInitial.value.keys()) {
-          pushOverlappingNodesAway(id)
-        }
-      } else if (draggingNode.value) {
-        pushOverlappingNodesAway(draggingNode.value)
-      }
+    // Collision pushing disabled - was causing layout chaos by pushing nodes across frame boundaries
+    // TODO: If re-enabling, must respect frame boundaries (only push nodes in same frame)
 
-      // Assign nodes to frame if dropped inside one
-      // Uses hysteresis for resistance: harder to enter (70%), easier to stay (exit at 20%)
-      for (const nodeId of draggedNodeIds) {
+    // Assign nodes to frame if dropped inside one
+    // Uses hysteresis for resistance: harder to enter (70%), easier to stay (exit at 20%)
+    for (const nodeId of draggedNodeIds) {
         const node = store.getNode(nodeId)
         if (!node) continue
 
@@ -459,7 +446,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
             }
           }
         }
-      }
     }
 
     draggingNode.value = null

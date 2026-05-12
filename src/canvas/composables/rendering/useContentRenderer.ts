@@ -12,15 +12,16 @@ import {
   isTypstReady,
 } from '../../../lib/typst'
 import { sanitizeSvg, sanitizeHtml, escapeText, sanitizeMermaidSvg, decodeHtmlEntities } from '../../../lib/sanitize'
-import type { Node } from '../../../types'
+import type { Node, Frame } from '../../../types'
 
 export interface UseContentRendererOptions {
   getFilteredNodes: () => Node[]
+  getFilteredFrames?: () => Frame[]
   debounceMs?: number
 }
 
 export function useContentRenderer(options: UseContentRendererOptions) {
-  const { getFilteredNodes, debounceMs = 50 } = options
+  const { getFilteredNodes, getFilteredFrames, debounceMs = 50 } = options
 
   // Caches
   const markdownCache = new Map<string, string>()
@@ -191,10 +192,44 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     html = html.replace(wikilinkRegex, (_match, target, display) => {
       const displayText = display || target
       const targetTrimmed = target.trim()
+      // Extract path parts for frame-based resolution (e.g., "folder/note" -> ["folder", "note"])
+      const pathParts = targetTrimmed.split('/')
+      const targetWithoutPath = pathParts[pathParts.length - 1]
+
       // Check if target node exists for styling
-      const targetExists = getFilteredNodes().some(
-        n => n.title.toLowerCase() === targetTrimmed.toLowerCase()
-      )
+      let targetExists = false
+      const nodes = getFilteredNodes()
+      const frames = getFilteredFrames?.() || []
+
+      // 1. Try exact title match
+      targetExists = nodes.some(n => n.title.toLowerCase() === targetTrimmed.toLowerCase())
+
+      // 2. Try file path match
+      if (!targetExists) {
+        targetExists = nodes.some(n => n.file_path?.toLowerCase().includes(targetTrimmed.toLowerCase()))
+      }
+
+      // 3. Try frame + node title match (e.g., "folder/note" -> frame "folder" + node "note")
+      if (!targetExists && pathParts.length >= 2) {
+        const framePath = pathParts.slice(0, -1).join('/')
+        const frame = frames.find(f =>
+          f.title.toLowerCase() === framePath.toLowerCase() ||
+          f.folder_path?.toLowerCase().includes(framePath.toLowerCase())
+        )
+        if (frame) {
+          // Find node with matching title inside this frame
+          targetExists = nodes.some(n =>
+            n.title.toLowerCase() === targetWithoutPath.toLowerCase() &&
+            n.frame_id === frame.id
+          )
+        }
+      }
+
+      // 4. Fallback: filename-only match
+      if (!targetExists) {
+        targetExists = nodes.some(n => n.title.toLowerCase() === targetWithoutPath.toLowerCase())
+      }
+
       const missingClass = targetExists ? '' : ' missing'
       return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
     })

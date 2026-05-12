@@ -87,9 +87,38 @@ export function useFileSync(deps: FileSyncDeps) {
 
     const vaultPath = deps.getVaultPath()
     const folderPath = getRelativeFolder(filePath, vaultPath)
-    const frame = findFrameForFolder(folderPath)
+
+    storeLogger.info(`[FileSync] Assigning node to frame - folderPath: "${folderPath}"`)
+
+    // Find frame by exact folder_path match
+    let frame = findFrameForFolder(folderPath)
+
+    // If not found, try to find parent folder frame
+    if (!frame && folderPath) {
+      const frames = deps.getFrames?.() || []
+      // Try to match parent folders
+      const parts = folderPath.split('/')
+      for (let i = parts.length - 1; i >= 0 && !frame; i--) {
+        const parentPath = parts.slice(0, i + 1).join('/')
+        frame = frames.find((f) => f.folder_path === parentPath)
+        if (frame) {
+          storeLogger.info(`[FileSync] Found parent frame: "${frame.title}" for folder "${parentPath}"`)
+        }
+      }
+    }
+
+    if (frame) {
+      storeLogger.info(`[FileSync] Assigning to frame: "${frame.title}" (${frame.id})`)
+    } else {
+      storeLogger.info(`[FileSync] No frame found for folder: "${folderPath}"`)
+    }
 
     deps.assignNodeToFrame(nodeId, frame?.id ?? null)
+
+    // Dispatch event to trigger frame expansion in canvas
+    if (frame) {
+      window.dispatchEvent(new CustomEvent('nodus-expand-frames'))
+    }
   }
 
   /**

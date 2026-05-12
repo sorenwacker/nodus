@@ -181,7 +181,7 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
       iterations,
     })
 
-    // If frame-scoped, constrain positions to frame bounds and optionally resize nodes
+    // If frame-scoped, constrain positions to frame bounds (preserve node sizes)
     if (targetFrame && fitToFrame) {
       const padding = 30
       const frameLeft = targetFrame.canvas_x + padding
@@ -189,24 +189,20 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
       const frameRight = targetFrame.canvas_x + targetFrame.width - padding
       const frameBottom = targetFrame.canvas_y + targetFrame.height - padding
 
-      // Calculate available space and optimal node size
-      const availableWidth = frameRight - frameLeft
-      const availableHeight = frameBottom - frameTop
-      const cols = Math.ceil(Math.sqrt(nodeCount * availableWidth / availableHeight))
-      const rows = Math.ceil(nodeCount / cols)
-
-      const nodeWidth = Math.min(200, Math.max(100, (availableWidth - (cols - 1) * 20) / cols))
-      const nodeHeight = Math.min(120, Math.max(60, (availableHeight - (rows - 1) * 20) / rows))
-
-      // Resize nodes and constrain positions
+      // Constrain positions only - preserve existing node sizes
       const updates: Promise<void>[] = []
       for (const [id, pos] of positions) {
-        // Constrain position to frame bounds
+        // Get the actual node to use its current size for boundary calculations
+        const node = deps.getNodes().find(n => n.id === id)
+        const nodeWidth = node?.width || 200
+        const nodeHeight = node?.height || 120
+
+        // Constrain position to frame bounds using the node's current size
         const constrainedX = Math.max(frameLeft, Math.min(frameRight - nodeWidth, pos.x))
         const constrainedY = Math.max(frameTop, Math.min(frameBottom - nodeHeight, pos.y))
 
         updates.push(deps.updateNodePosition(id, constrainedX, constrainedY))
-        updates.push(deps.updateNodeSize(id, nodeWidth, nodeHeight))
+        // Do NOT resize nodes - preserve user's custom sizes
       }
       await Promise.all(updates)
     } else {

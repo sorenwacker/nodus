@@ -63,6 +63,17 @@ function createMockContext(mockLLMResponse?: (prompt: string) => string): LLMToo
     memoryStorage: {
       addMemory: vi.fn(),
     },
+    agentMemoryStorage: {
+      getSession: vi.fn().mockReturnValue(null),
+      setSession: vi.fn(),
+      clearSession: vi.fn(),
+      updateProgress: vi.fn(),
+      getStack: vi.fn().mockReturnValue([]),
+      pushTask: vi.fn().mockReturnValue({ id: 'task_1', description: 'test', priority: 'medium', created_at: new Date().toISOString() }),
+      popTask: vi.fn().mockReturnValue(null),
+      peekTask: vi.fn().mockReturnValue(null),
+      clearStack: vi.fn(),
+    },
     log: vi.fn(),
     pushContentUndo: vi.fn(),
     isRunning: ref(true),

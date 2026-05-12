@@ -61,11 +61,8 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     neighborhoodMode,
     focusNodeId,
     layoutNeighborhood,
-    pushOverlappingNodesAway,
     setLastDragEndTime,
     pushSizeUndo,
-    isSemanticZoomCollapsed,
-    isLODMode,
     getVisualNode,
     expandFrameToFitNode,
   } = ctx
@@ -245,12 +242,11 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
       }
 
       // In neighborhood mode, re-layout to adapt to new sizes
-      // Skip push-away in dot mode (semantic zoom collapsed or LOD mode)
       if (neighborhoodMode.value && focusNodeId.value) {
         setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
-      } else if (!isSemanticZoomCollapsed?.value && !isLODMode?.value) {
-        pushOverlappingNodesAway(nodeId)
       }
+      // Collision pushing disabled - was causing layout chaos by pushing nodes across frame boundaries
+      // TODO: If re-enabling, must respect frame boundaries (only push nodes in same frame)
 
       // Auto-expand frame if node extends beyond frame boundaries
       if (expandFrameToFitNode) {

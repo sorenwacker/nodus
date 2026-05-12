@@ -96,7 +96,7 @@ const deleteButtonStyle = computed(() => ({
 
 const isEditingTitle = computed(() => props.editingTitleId === props.node.id)
 const showDeleteButton = computed(() =>
-  props.isSelected && !props.isEditing && !props.isCollapsed
+  props.isSelected && !props.isEditing
 )
 
 // Entity badges - only show for non-entity nodes that have linked entities

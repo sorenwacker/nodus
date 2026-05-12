@@ -6,6 +6,8 @@ import NodePicker from '../../components/NodePicker.vue'
 import { useNodesStore } from '../../stores/nodes'
 import { useDisplayStore } from '../../stores/display'
 import { openExternal } from '../../lib/tauri'
+import { notifications$ } from '../../composables/useNotifications'
+import { resolveWikilink } from '../../lib/wikilink'
 import { useNodeAgent, type NodeAgentContext } from '../composables/agent/useNodeAgent'
 
 const { t } = useI18n()
@@ -31,6 +33,7 @@ const emit = defineEmits<{
   saveTitle: [nodeId: string, title: string]
   renderMermaid: []
   contentUpdated: [nodeId: string, content: string]
+  navigateToNode: [nodeId: string]
 }>()
 
 const isEditing = ref(false)
@@ -158,15 +161,35 @@ function handleLinkPickerSelect(nodeId: string) {
   if (node) onLinkSelect(nodeId, node.title)
 }
 
-// Handle clicks in preview content (for external links)
+// Handle clicks in preview content (for external links and wikilinks)
 function handleContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   const link = target.closest('a')
-  if (link && link.href && !link.classList.contains('wikilink')) {
+  if (link) {
     e.preventDefault()
     e.stopPropagation()
-    // External link - open in system browser
-    openExternal(link.href)
+    if (link.classList.contains('wikilink')) {
+      // Wikilink - navigate to linked node
+      const linkTarget = link.dataset.target
+      if (linkTarget) {
+        const linkedNode = resolveWikilink(linkTarget, {
+          nodes: store.nodes,
+          frames: store.filteredFrames,
+        })
+        if (linkedNode) {
+          emit('navigateToNode', linkedNode.id)
+        } else {
+          // Node doesn't exist - show notification
+          notifications$.next({
+            type: 'warning',
+            message: `Node "${linkTarget}" not found`,
+          })
+        }
+      }
+    } else if (link.href) {
+      // External link - open in system browser
+      openExternal(link.href)
+    }
   }
 }
 
@@ -389,6 +412,21 @@ function stopNodeAgent() {
 
 .preview-content {
   cursor: text;
+}
+
+.preview-content :deep(a.wikilink) {
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.preview-content :deep(a.wikilink:hover) {
+  text-decoration: underline;
+}
+
+.preview-content :deep(a.wikilink.missing) {
+  color: var(--danger-color, #dc2626);
+  opacity: 0.7;
 }
 
 .preview-header h3 {

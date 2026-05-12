@@ -53,6 +53,8 @@ export const useFramesStore = defineStore('frames', () => {
 
   /**
    * Create a new frame
+   * Returns a Frame object. The database persist happens asynchronously.
+   * Use createFrameAsync if you need to wait for database persistence.
    */
   function createFrame(
     x: number,
@@ -61,11 +63,13 @@ export const useFramesStore = defineStore('frames', () => {
     height = 300,
     title = 'Frame',
     workspaceId: string | null = null,
-    folderPath: string | null = null
+    folderPath: string | null = null,
+    parentFrameId: string | null = null
   ): Frame {
     const frame: Frame = {
       id: crypto.randomUUID(),
       title,
+      parent_frame_id: parentFrameId,
       canvas_x: x,
       canvas_y: y,
       width,
@@ -76,11 +80,21 @@ export const useFramesStore = defineStore('frames', () => {
     }
     frames.value.push(frame)
 
-    // Persist to database
-    invoke('create_frame', {
+    // Persist to database - fire and forget for backward compatibility
+    persistFrame(frame).catch((e) => storeLogger.error('Failed to create frame:', e))
+
+    return frame
+  }
+
+  /**
+   * Persist a frame to the database
+   */
+  async function persistFrame(frame: Frame): Promise<void> {
+    await invoke('create_frame', {
       input: {
         id: frame.id,
         title: frame.title,
+        parentFrameId: frame.parent_frame_id,
         canvasX: frame.canvas_x,
         canvasY: frame.canvas_y,
         width: frame.width,
@@ -89,7 +103,38 @@ export const useFramesStore = defineStore('frames', () => {
         workspaceId: frame.workspace_id,
         folderPath: frame.folder_path,
       },
-    }).catch((e) => storeLogger.error('Failed to create frame:', e))
+    })
+  }
+
+  /**
+   * Create a new frame and wait for database persistence
+   */
+  async function createFrameAsync(
+    x: number,
+    y: number,
+    width = 400,
+    height = 300,
+    title = 'Frame',
+    workspaceId: string | null = null,
+    folderPath: string | null = null,
+    parentFrameId: string | null = null
+  ): Promise<Frame> {
+    const frame: Frame = {
+      id: crypto.randomUUID(),
+      title,
+      parent_frame_id: parentFrameId,
+      canvas_x: x,
+      canvas_y: y,
+      width,
+      height,
+      color: null,
+      workspace_id: workspaceId,
+      folder_path: folderPath,
+    }
+    frames.value.push(frame)
+
+    // Persist to database and wait for completion
+    await persistFrame(frame)
 
     return frame
   }
@@ -150,6 +195,41 @@ export const useFramesStore = defineStore('frames', () => {
         storeLogger.error('Failed to update frame color:', e)
       )
     }
+  }
+
+  /**
+   * Update frame parent (for nesting frames)
+   */
+  function updateFrameParent(id: string, parentFrameId: string | null): void {
+    const frame = frames.value.find((f) => f.id === id)
+    if (frame) {
+      frame.parent_frame_id = parentFrameId
+      invoke('update_frame_parent', { id, parentFrameId }).catch((e) =>
+        storeLogger.error('Failed to update frame parent:', e)
+      )
+    }
+  }
+
+  /**
+   * Get child frames of a parent frame
+   */
+  function getChildFrames(parentFrameId: string | null): Frame[] {
+    return frames.value.filter((f) => f.parent_frame_id === parentFrameId)
+  }
+
+  /**
+   * Get the full path of frame titles (for nested frames)
+   */
+  function getFramePath(frameId: string): string[] {
+    const path: string[] = []
+    let currentFrame = getFrame(frameId)
+    while (currentFrame) {
+      path.unshift(currentFrame.title)
+      currentFrame = currentFrame.parent_frame_id
+        ? getFrame(currentFrame.parent_frame_id)
+        : undefined
+    }
+    return path
   }
 
   /**
@@ -224,10 +304,14 @@ export const useFramesStore = defineStore('frames', () => {
     initialize,
     getFramesForWorkspace,
     createFrame,
+    createFrameAsync,
     updateFramePosition,
     updateFrameSize,
     updateFrameTitle,
     updateFrameColor,
+    updateFrameParent,
+    getChildFrames,
+    getFramePath,
     deleteFrame,
     selectFrame,
     getFrame,

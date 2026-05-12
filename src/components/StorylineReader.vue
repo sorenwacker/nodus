@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick } from 'v
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import { openExternal } from '../lib/tauri'
+import { resolveWikilink } from '../lib/wikilink'
 import StorylineNodeList from './StorylineNodeList.vue'
 import StorylineReaderHeader from './StorylineReaderHeader.vue'
 import StorylineEntitySidebar from './StorylineEntitySidebar.vue'
@@ -95,14 +96,36 @@ function toggleCommentCollapsed(nodeId: string) {
   }
 }
 
-// Handle clicks in rendered content (for external links)
+// Handle clicks in rendered content (for external links and wikilinks)
 function handleContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   const link = target.closest('a')
   if (link) {
     e.preventDefault()
     e.stopPropagation()
-    if (link.href && !link.classList.contains('wikilink')) {
+    if (link.classList.contains('wikilink')) {
+      // Wikilink - navigate to linked node
+      const linkTarget = link.dataset.target
+      if (linkTarget) {
+        const linkedNode = resolveWikilink(linkTarget, {
+          nodes: store.filteredNodes,
+          frames: store.filteredFrames,
+        })
+        if (linkedNode) {
+          // Check if the linked node is in this storyline
+          const nodeIndex = nodes.value.findIndex(n => n.id === linkedNode.id)
+          if (nodeIndex >= 0) {
+            // Navigate within storyline
+            goToNode(nodeIndex)
+          } else {
+            // Navigate to node on canvas
+            store.selectNode(linkedNode.id)
+            emit('close')
+            window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: linkedNode.id } }))
+          }
+        }
+      }
+    } else if (link.href) {
       // External link - open in system browser
       openExternal(link.href)
     }
@@ -733,6 +756,26 @@ function panToEntity(entityId: string) {
 
 .section-content :deep(a:hover) {
   text-decoration: underline;
+}
+
+.section-content :deep(a.wikilink) {
+  color: var(--primary-color);
+  cursor: pointer;
+}
+
+.section-content :deep(a.wikilink.missing) {
+  color: var(--danger-color, #dc2626);
+  opacity: 0.7;
+}
+
+.comment-text :deep(a.wikilink) {
+  color: var(--primary-color);
+  cursor: pointer;
+}
+
+.comment-text :deep(a.wikilink.missing) {
+  color: var(--danger-color, #dc2626);
+  opacity: 0.7;
 }
 
 .section-content :deep(strong) {

@@ -552,5 +552,19 @@
     "noWorkspaceSelected": "No workspace selected",
     "syncMissingFiles": "Sync Files",
     "syncing": "Syncing..."
+  },
+  "fileMove": {
+    "collision": {
+      "title": "File Already Exists",
+      "message": "A file with the same name already exists in the target folder.",
+      "moving": "Moving:",
+      "to": "To:",
+      "existing": "Existing:",
+      "options": "Choose an option:",
+      "rename": "Rename",
+      "renameDesc": "Save with a new name",
+      "replace": "Replace",
+      "replaceDesc": "Overwrite the existing file (cannot be undone)"
+    }
   }
 }

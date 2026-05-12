@@ -93,6 +93,7 @@ export interface Edge {
 export interface Frame {
   id: string
   title: string
+  parent_frame_id: string | null  // Enables nested frames
   canvas_x: number
   canvas_y: number
   width: number

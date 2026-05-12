@@ -69,7 +69,7 @@ const htmlConfig: DOMPurify.Config = {
   ALLOWED_ATTR: [
     'href', 'target', 'rel', 'class', 'id', 'style',
     'src', 'alt', 'title', 'width', 'height',
-    'data-math', 'data-mermaid',
+    'data-math', 'data-mermaid', 'data-target',
     'colspan', 'rowspan',
   ],
   ALLOW_DATA_ATTR: true,

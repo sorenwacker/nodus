@@ -126,6 +126,11 @@ async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         .execute(pool)
         .await;
 
+    // Add parent_frame_id column for nested frames support
+    let _ = sqlx::query(include_str!("../migrations/011_frame_parent.sql"))
+        .execute(pool)
+        .await;
+
     Ok(())
 }
 
@@ -1247,6 +1252,7 @@ pub mod frames {
     pub struct Frame {
         pub id: String,
         pub title: String,
+        pub parent_frame_id: Option<String>,
         pub canvas_x: f64,
         pub canvas_y: f64,
         pub width: f64,
@@ -1268,12 +1274,13 @@ pub mod frames {
     pub async fn create(pool: &DbPool, frame: &Frame) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO frames (id, title, canvas_x, canvas_y, width, height, color, workspace_id, folder_path, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO frames (id, title, parent_frame_id, canvas_x, canvas_y, width, height, color, workspace_id, folder_path, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
         )
         .bind(&frame.id)
         .bind(&frame.title)
+        .bind(&frame.parent_frame_id)
         .bind(frame.canvas_x)
         .bind(frame.canvas_y)
         .bind(frame.width)
@@ -1341,6 +1348,21 @@ pub mod frames {
         let now = chrono::Utc::now().timestamp_millis();
         sqlx::query("UPDATE frames SET color = ?, updated_at = ? WHERE id = ?")
             .bind(color)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_parent(
+        pool: &DbPool,
+        id: &str,
+        parent_frame_id: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE frames SET parent_frame_id = ?, updated_at = ? WHERE id = ?")
+            .bind(parent_frame_id)
             .bind(now)
             .bind(id)
             .execute(pool)

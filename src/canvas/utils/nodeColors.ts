@@ -4,15 +4,15 @@
  * Handles legacy color mapping, theme color conversion, and node background generation
  */
 
-// Light theme colors (rgba tints)
+// Light theme colors (rgba tints) - 28% opacity for better visibility
 const lightColors = [
-  'rgba(239, 68, 68, 0.18)',   // red
-  'rgba(249, 115, 22, 0.18)',  // orange
-  'rgba(234, 179, 8, 0.18)',   // yellow
-  'rgba(34, 197, 94, 0.18)',   // green
-  'rgba(59, 130, 246, 0.18)',  // blue
-  'rgba(168, 85, 247, 0.18)',  // purple
-  'rgba(236, 72, 153, 0.18)',  // pink
+  'rgba(239, 68, 68, 0.28)',   // red
+  'rgba(249, 115, 22, 0.28)',  // orange
+  'rgba(234, 179, 8, 0.28)',   // yellow
+  'rgba(34, 197, 94, 0.28)',   // green
+  'rgba(59, 130, 246, 0.28)',  // blue
+  'rgba(168, 85, 247, 0.28)',  // purple
+  'rgba(236, 72, 153, 0.28)',  // pink
 ]
 
 // Dark theme colors (solid dark backgrounds)
@@ -34,7 +34,7 @@ for (let i = 0; i < lightColors.length; i++) {
   darkToLight[darkColors[i]] = lightColors[i]
 }
 
-// Also map old opacity values
+// Also map old opacity values (0.08 and 0.18)
 const oldLightColors = [
   'rgba(239, 68, 68, 0.08)',
   'rgba(249, 115, 22, 0.08)',
@@ -44,44 +44,62 @@ const oldLightColors = [
   'rgba(168, 85, 247, 0.08)',
   'rgba(236, 72, 153, 0.08)',
 ]
+const old18LightColors = [
+  'rgba(239, 68, 68, 0.18)',
+  'rgba(249, 115, 22, 0.18)',
+  'rgba(234, 179, 8, 0.18)',
+  'rgba(34, 197, 94, 0.18)',
+  'rgba(59, 130, 246, 0.18)',
+  'rgba(168, 85, 247, 0.18)',
+  'rgba(236, 72, 153, 0.18)',
+]
 for (let i = 0; i < oldLightColors.length; i++) {
   lightToDark[oldLightColors[i]] = darkColors[i]
-  darkToLight[darkColors[i]] = lightColors[i] // Map to new opacity
+  lightToDark[old18LightColors[i]] = darkColors[i]
+  darkToLight[darkColors[i]] = lightColors[i] // Map to new 0.28 opacity
 }
 
-// Map legacy color values to current colors
+// Map legacy color values to current colors (28% opacity)
 const legacyColorMap: Record<string, string> = {
   // Old solid pastels -> new rgba
-  '#fecaca': 'rgba(239, 68, 68, 0.18)',
-  '#fed7aa': 'rgba(249, 115, 22, 0.18)',
-  '#fef08a': 'rgba(234, 179, 8, 0.18)',
-  '#bbf7d0': 'rgba(34, 197, 94, 0.18)',
-  '#bfdbfe': 'rgba(59, 130, 246, 0.18)',
-  '#e9d5ff': 'rgba(168, 85, 247, 0.18)',
-  '#fbcfe8': 'rgba(236, 72, 153, 0.18)',
+  '#fecaca': 'rgba(239, 68, 68, 0.28)',
+  '#fed7aa': 'rgba(249, 115, 22, 0.28)',
+  '#fef08a': 'rgba(234, 179, 8, 0.28)',
+  '#bbf7d0': 'rgba(34, 197, 94, 0.28)',
+  '#bfdbfe': 'rgba(59, 130, 246, 0.28)',
+  '#e9d5ff': 'rgba(168, 85, 247, 0.28)',
+  '#fbcfe8': 'rgba(236, 72, 153, 0.28)',
   // Old very light pastels
-  '#fef2f2': 'rgba(239, 68, 68, 0.18)',
-  '#fff7ed': 'rgba(249, 115, 22, 0.18)',
-  '#fefce8': 'rgba(234, 179, 8, 0.18)',
-  '#f0fdf4': 'rgba(34, 197, 94, 0.18)',
-  '#eff6ff': 'rgba(59, 130, 246, 0.18)',
-  '#faf5ff': 'rgba(168, 85, 247, 0.18)',
-  '#fdf2f8': 'rgba(236, 72, 153, 0.18)',
+  '#fef2f2': 'rgba(239, 68, 68, 0.28)',
+  '#fff7ed': 'rgba(249, 115, 22, 0.28)',
+  '#fefce8': 'rgba(234, 179, 8, 0.28)',
+  '#f0fdf4': 'rgba(34, 197, 94, 0.28)',
+  '#eff6ff': 'rgba(59, 130, 246, 0.28)',
+  '#faf5ff': 'rgba(168, 85, 247, 0.28)',
+  '#fdf2f8': 'rgba(236, 72, 153, 0.28)',
   // Old rgba values with different alphas
-  'rgba(239, 68, 68, 0.08)': 'rgba(239, 68, 68, 0.18)',
-  'rgba(249, 115, 22, 0.08)': 'rgba(249, 115, 22, 0.18)',
-  'rgba(234, 179, 8, 0.08)': 'rgba(234, 179, 8, 0.18)',
-  'rgba(34, 197, 94, 0.08)': 'rgba(34, 197, 94, 0.18)',
-  'rgba(59, 130, 246, 0.08)': 'rgba(59, 130, 246, 0.18)',
-  'rgba(168, 85, 247, 0.08)': 'rgba(168, 85, 247, 0.18)',
-  'rgba(236, 72, 153, 0.08)': 'rgba(236, 72, 153, 0.18)',
-  'rgba(239, 68, 68, 0.15)': 'rgba(239, 68, 68, 0.18)',
-  'rgba(249, 115, 22, 0.15)': 'rgba(249, 115, 22, 0.18)',
-  'rgba(234, 179, 8, 0.15)': 'rgba(234, 179, 8, 0.18)',
-  'rgba(34, 197, 94, 0.15)': 'rgba(34, 197, 94, 0.18)',
-  'rgba(59, 130, 246, 0.15)': 'rgba(59, 130, 246, 0.18)',
-  'rgba(168, 85, 247, 0.15)': 'rgba(168, 85, 247, 0.18)',
-  'rgba(236, 72, 153, 0.15)': 'rgba(236, 72, 153, 0.18)',
+  'rgba(239, 68, 68, 0.08)': 'rgba(239, 68, 68, 0.28)',
+  'rgba(249, 115, 22, 0.08)': 'rgba(249, 115, 22, 0.28)',
+  'rgba(234, 179, 8, 0.08)': 'rgba(234, 179, 8, 0.28)',
+  'rgba(34, 197, 94, 0.08)': 'rgba(34, 197, 94, 0.28)',
+  'rgba(59, 130, 246, 0.08)': 'rgba(59, 130, 246, 0.28)',
+  'rgba(168, 85, 247, 0.08)': 'rgba(168, 85, 247, 0.28)',
+  'rgba(236, 72, 153, 0.08)': 'rgba(236, 72, 153, 0.28)',
+  'rgba(239, 68, 68, 0.15)': 'rgba(239, 68, 68, 0.28)',
+  'rgba(249, 115, 22, 0.15)': 'rgba(249, 115, 22, 0.28)',
+  'rgba(234, 179, 8, 0.15)': 'rgba(234, 179, 8, 0.28)',
+  'rgba(34, 197, 94, 0.15)': 'rgba(34, 197, 94, 0.28)',
+  'rgba(59, 130, 246, 0.15)': 'rgba(59, 130, 246, 0.28)',
+  'rgba(168, 85, 247, 0.15)': 'rgba(168, 85, 247, 0.28)',
+  'rgba(236, 72, 153, 0.15)': 'rgba(236, 72, 153, 0.28)',
+  // Old 0.18 opacity -> new 0.28
+  'rgba(239, 68, 68, 0.18)': 'rgba(239, 68, 68, 0.28)',
+  'rgba(249, 115, 22, 0.18)': 'rgba(249, 115, 22, 0.28)',
+  'rgba(234, 179, 8, 0.18)': 'rgba(234, 179, 8, 0.28)',
+  'rgba(34, 197, 94, 0.18)': 'rgba(34, 197, 94, 0.28)',
+  'rgba(59, 130, 246, 0.18)': 'rgba(59, 130, 246, 0.28)',
+  'rgba(168, 85, 247, 0.18)': 'rgba(168, 85, 247, 0.28)',
+  'rgba(236, 72, 153, 0.18)': 'rgba(236, 72, 153, 0.28)',
 }
 
 /**
