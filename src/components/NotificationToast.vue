@@ -89,11 +89,11 @@ function getColor(type: Notification['type']): string {
 <style scoped>
 .notification-container {
   position: fixed;
-  top: 60px;
+  bottom: 60px;
   right: 16px;
   z-index: 10000;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 8px;
   max-width: 400px;
   pointer-events: none;
