@@ -5,6 +5,7 @@ import { useNodesStore } from './stores/nodes'
 import { useThemesStore } from './stores/themes'
 import { useAppSearch } from './composables/useAppSearch'
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
+import { useNotifications } from './composables/useNotifications'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
@@ -43,21 +44,17 @@ import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles
 
 const syncingFiles = ref(false)
 
-// Toast notifications
-interface Toast {
-  id: number
-  message: string
-  type: 'error' | 'success' | 'info'
-}
-const toasts = ref<Toast[]>([])
-let toastId = 0
+// Toast notifications - use unified notification system
+const notifications = useNotifications()
 
 function showToast(message: string, type: 'error' | 'success' | 'info' = 'info') {
-  const id = ++toastId
-  toasts.value.push({ id, message, type })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter(t => t.id !== id)
-  }, 4000)
+  if (type === 'error') {
+    notifications.error(message)
+  } else if (type === 'success') {
+    notifications.success(message)
+  } else {
+    notifications.info(message)
+  }
 }
 
 // Provide toast function to child components
@@ -761,19 +758,8 @@ async function openFolderDialog() {
     <!-- Onboarding Flow -->
     <OnboardingFlow @complete="onOnboardingComplete" />
 
-    <!-- Global notifications (for critical errors) -->
+    <!-- Global notifications -->
     <NotificationToast />
-
-    <div class="toast-container">
-      <div
-        v-for="toast in toasts"
-        :key="toast.id"
-        class="toast"
-        :class="toast.type"
-      >
-        {{ toast.message }}
-      </div>
-    </div>
   </div>
 </template>
 

@@ -337,7 +337,12 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function updateNodeContent(id: string, content: string) {
-    const trimmedContent = content.trim()
+    // Remove trailing whitespace from each line, then trim the whole content
+    const trimmedContent = content
+      .split('\n')
+      .map(line => line.trimEnd())
+      .join('\n')
+      .trim()
     const node = nodes.value.find(n => n.id === id)
     if (node) {
       node.markdown_content = trimmedContent
