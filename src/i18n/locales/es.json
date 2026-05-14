@@ -51,6 +51,11 @@
       "addFrame": "Agregar marco - Agrupar nodos seleccionados",
       "clickToPlace": "Haga clic en el lienzo para colocar el marco (Esc para cancelar)"
     },
+    "hover": {
+      "incoming": "Aristas entrantes (citado por)",
+      "outgoing": "Aristas salientes (cita)",
+      "bidirectional": "Conexiones bidireccionales"
+    },
     "status": {
       "layoutRunning": "Ejecutando disposición...",
       "stop": "Detener",
@@ -61,7 +66,8 @@
       "showAgentLog": "Mostrar registro del agente",
       "log": "Registro",
       "hint": "Desplazar arriba/abajo: zoom | Desplazar lateralmente: mover | Alt+arrastrar: enlazar | Doble clic: nuevo",
-      "cancelPdf": "Cancelar procesamiento PDF"
+      "cancelPdf": "Cancelar procesamiento PDF",
+      "cancelImport": "Cancelar importación"
     },
     "controls": {
       "zoomIn": "Acercar",
@@ -79,8 +85,14 @@
       "neighborhoodDepth": "Profundidad del vecindario (saltos)",
       "hop": "salto",
       "hops": "saltos",
+      "highlightEdges": "Resaltar todas las aristas - Hacer todas las aristas más visibles",
+      "bubbleMode": "Modo burbuja - Mostrar nodos como círculos",
       "help": "Ayuda - Atajos de teclado y uso",
       "organizeFrames": "Organizar marcos - Atraer miembros, expulsar otros"
+    },
+    "search": {
+      "placeholder": "Buscar nodos...",
+      "noResults": "No se encontraron nodos coincidentes"
     }
   },
   "llm": {
@@ -152,6 +164,10 @@
     "agentPrompt": {
       "label": "Prompt del agente (constructor de grafos)",
       "reset": "Restablecer"
+    },
+    "costWarning": {
+      "title": "Pueden aplicarse costos de API",
+      "message": "Los proveedores de LLM pueden cobrar según el uso de tokens. Monitorea tu uso en el panel del proveedor."
     }
   },
   "workspace": {
@@ -326,7 +342,9 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "remove": "Quitar",
-    "add": "Agregar"
+    "add": "Agregar",
+    "clear": "Limpiar",
+    "loading": "Cargando"
   },
   "plan": {
     "reviewPlan": "Revisar plan",
@@ -390,7 +408,9 @@
     "cannotDeleteDefault": "No se puede eliminar el espacio de trabajo predeterminado",
     "workspaceReset": "Espacio de trabajo restablecido al contenido inicial",
     "importSuccess": "{count} nodos importados",
-    "importFailed": "Error al importar el vault"
+    "importFailed": "Error al importar el vault",
+    "syncedFiles": "{count} archivos sincronizados",
+    "noMissingFiles": "Todos los archivos ya están sincronizados"
   },
   "settings": {
     "title": "Configuración",
@@ -402,7 +422,12 @@
       "display": "Visualización",
       "llm": "IA",
       "zotero": "Zotero",
+      "citations": "Citas",
       "integrations": "Integraciones"
+    },
+    "citations": {
+      "description": "Configurar la gestión de citas y referencias.",
+      "hint": "Importar archivos BibTeX o CSL-JSON a través de Archivo > Importar citas"
     },
     "advanced": "Avanzado",
     "display": {
@@ -436,7 +461,45 @@
       "collections": "Colecciones",
       "loading": "Cargando colecciones...",
       "noCollections": "No se encontraron colecciones",
-      "collectionsHint": "Colecciones de su biblioteca Zotero"
+      "collectionsHint": "Colecciones de su biblioteca Zotero",
+      "items": "elementos",
+      "import": "Importar",
+      "importing": "Importando",
+      "cloud": {
+        "title": "Zotero Cloud",
+        "hint": "Conectar con Zotero Cloud para sincronizar citas bidireccionalmente",
+        "userId": "ID de usuario",
+        "userIdPlaceholder": "Tu ID de usuario de Zotero (numérico)",
+        "apiKey": "Clave API",
+        "apiKeyPlaceholder": "Tu clave API de Zotero",
+        "testConnection": "Probar conexión",
+        "testing": "Probando...",
+        "valid": "Conectado",
+        "invalid": "Conexión fallida",
+        "getKey": "Obtén tu clave API en",
+        "refresh": "Actualizar",
+        "importAll": "Importar todos los elementos"
+      },
+      "citationGraph": {
+        "title": "Grafo de citas",
+        "build": "Construir grafo de citas",
+        "building": "Construyendo...",
+        "hint": "Descubrir relaciones de citación usando Semantic Scholar",
+        "scanning": "Analizando artículos...",
+        "fetching": "Obteniendo citas...",
+        "creating": "Creando aristas...",
+        "done": "Listo",
+        "result": "{edges} aristas y {stubs} nodos provisionales creados",
+        "noPapers": "No se encontraron artículos con DOI",
+        "createStubs": "Crear nodos provisionales para artículos faltantes",
+        "stubsHint": "Los nodos provisionales muestran enlaces de citas a artículos que no están en tu biblioteca"
+      },
+      "export": {
+        "toZotero": "Guardar en Zotero",
+        "exporting": "Guardando...",
+        "success": "Guardado en Zotero",
+        "error": "Error al guardar en Zotero"
+      }
     },
     "language": "Idioma",
     "llmEnabled": "Funciones de IA",
@@ -450,8 +513,8 @@
       "diagonal": "Diagonal",
       "curved": "Curvo",
       "hyperbolic": "Hiperbólico",
-      "straight": "Gerade",
-      "direct": "Direkt"
+      "straight": "Recto",
+      "direct": "Directo"
     },
     "radialStyle": "Estilo de diseño radial",
     "radialStyleHint": "Estilo de espaciado para diseño radial/circular",
@@ -486,6 +549,31 @@
     "licenseText": "Uso personal y comercial permitido. Redistribución prohibida sin permiso escrito.",
     "themeCount": "disponibles",
     "themeHint": "Usa el agente de IA para crear temas personalizados",
-    "deleteTheme": "¿Eliminar este tema personalizado?"
+    "deleteTheme": "¿Eliminar este tema personalizado?",
+    "edgeHideThreshold": "Ocultar aristas arriba de",
+    "edgeHideThresholdHint": "Ocultar todas las aristas cuando el conteo exceda este valor (0 = siempre mostrar)",
+    "vaultSync": "Sincronización del vault",
+    "selectFolder": "Seleccionar carpeta",
+    "changeFolder": "Cambiar carpeta",
+    "selectVaultFolder": "Seleccionar carpeta del vault",
+    "syncEnabled": "Habilitar sincronización de archivos",
+    "vaultSyncHint": "Cuando está habilitado, los nuevos archivos en el vault se agregan como nodos y los cambios de archivos se sincronizan.",
+    "noWorkspaceSelected": "Ningún espacio de trabajo seleccionado",
+    "syncMissingFiles": "Sincronizar archivos",
+    "syncing": "Sincronizando..."
+  },
+  "fileMove": {
+    "collision": {
+      "title": "El archivo ya existe",
+      "message": "Un archivo con el mismo nombre ya existe en la carpeta de destino.",
+      "moving": "Moviendo:",
+      "to": "A:",
+      "existing": "Existente:",
+      "options": "Elige una opción:",
+      "rename": "Renombrar",
+      "renameDesc": "Guardar con un nuevo nombre",
+      "replace": "Reemplazar",
+      "replaceDesc": "Sobrescribir el archivo existente (no se puede deshacer)"
+    }
   }
 }

@@ -51,6 +51,11 @@
       "addFrame": "Aggiungi cornice - Raggruppa nodi selezionati",
       "clickToPlace": "Clicca sulla tela per posizionare la cornice (Esc per annullare)"
     },
+    "hover": {
+      "incoming": "Archi entranti (citato da)",
+      "outgoing": "Archi uscenti (cita)",
+      "bidirectional": "Connessioni bidirezionali"
+    },
     "status": {
       "layoutRunning": "Layout in corso...",
       "stop": "Ferma",
@@ -61,7 +66,8 @@
       "showAgentLog": "Mostra registro agente",
       "log": "Registro",
       "hint": "Scorri su/giù: zoom | Scorri lateralmente: sposta | Alt+trascina: collega | Doppio clic: nuovo",
-      "cancelPdf": "Annulla elaborazione PDF"
+      "cancelPdf": "Annulla elaborazione PDF",
+      "cancelImport": "Annulla importazione"
     },
     "controls": {
       "zoomIn": "Ingrandisci",
@@ -79,8 +85,14 @@
       "neighborhoodDepth": "Profondità vicinato (salti)",
       "hop": "salto",
       "hops": "salti",
+      "highlightEdges": "Evidenzia tutti gli archi - Rendi tutti gli archi più visibili",
+      "bubbleMode": "Modalità bolla - Mostra nodi come cerchi",
       "help": "Aiuto - Scorciatoie da tastiera e utilizzo",
       "organizeFrames": "Organizza cornici - Attira membri, respingi altri"
+    },
+    "search": {
+      "placeholder": "Cerca nodi...",
+      "noResults": "Nessun nodo corrispondente trovato"
     }
   },
   "llm": {
@@ -152,6 +164,10 @@
     "agentPrompt": {
       "label": "Prompt agente (costruttore di grafi)",
       "reset": "Ripristina"
+    },
+    "costWarning": {
+      "title": "Potrebbero essere applicati costi API",
+      "message": "I provider LLM potrebbero addebitare in base all'utilizzo dei token. Monitora il tuo utilizzo nella dashboard del provider."
     }
   },
   "workspace": {
@@ -326,7 +342,9 @@
     "delete": "Elimina",
     "edit": "Modifica",
     "remove": "Rimuovi",
-    "add": "Aggiungi"
+    "add": "Aggiungi",
+    "clear": "Cancella",
+    "loading": "Caricamento"
   },
   "plan": {
     "reviewPlan": "Rivedi piano",
@@ -390,7 +408,9 @@
     "cannotDeleteDefault": "Impossibile eliminare lo spazio di lavoro predefinito",
     "workspaceReset": "Spazio di lavoro reimpostato al contenuto iniziale",
     "importSuccess": "{count} nodi importati",
-    "importFailed": "Importazione vault fallita"
+    "importFailed": "Importazione vault fallita",
+    "syncedFiles": "{count} file sincronizzati",
+    "noMissingFiles": "Tutti i file sono già sincronizzati"
   },
   "settings": {
     "title": "Impostazioni",
@@ -402,7 +422,12 @@
       "display": "Visualizzazione",
       "llm": "IA",
       "zotero": "Zotero",
+      "citations": "Citazioni",
       "integrations": "Integrazioni"
+    },
+    "citations": {
+      "description": "Configura la gestione delle citazioni e dei riferimenti.",
+      "hint": "Importa file BibTeX o CSL-JSON tramite File > Importa citazioni"
     },
     "advanced": "Avanzate",
     "display": {
@@ -436,7 +461,45 @@
       "collections": "Collezioni",
       "loading": "Caricamento collezioni...",
       "noCollections": "Nessuna collezione trovata",
-      "collectionsHint": "Collezioni dalla tua libreria Zotero"
+      "collectionsHint": "Collezioni dalla tua libreria Zotero",
+      "items": "elementi",
+      "import": "Importa",
+      "importing": "Importazione",
+      "cloud": {
+        "title": "Zotero Cloud",
+        "hint": "Connetti a Zotero Cloud per sincronizzare le citazioni bidirezionalmente",
+        "userId": "ID utente",
+        "userIdPlaceholder": "Il tuo ID utente Zotero (numerico)",
+        "apiKey": "Chiave API",
+        "apiKeyPlaceholder": "La tua chiave API Zotero",
+        "testConnection": "Testa connessione",
+        "testing": "Test...",
+        "valid": "Connesso",
+        "invalid": "Connessione fallita",
+        "getKey": "Ottieni la tua chiave API su",
+        "refresh": "Aggiorna",
+        "importAll": "Importa tutti gli elementi"
+      },
+      "citationGraph": {
+        "title": "Grafo citazioni",
+        "build": "Costruisci grafo citazioni",
+        "building": "Costruzione...",
+        "hint": "Scopri relazioni di citazione usando Semantic Scholar",
+        "scanning": "Analisi articoli...",
+        "fetching": "Recupero citazioni...",
+        "creating": "Creazione archi...",
+        "done": "Fatto",
+        "result": "{edges} archi e {stubs} nodi provvisori creati",
+        "noPapers": "Nessun articolo con DOI trovato",
+        "createStubs": "Crea nodi provvisori per articoli mancanti",
+        "stubsHint": "I nodi provvisori mostrano i link di citazione ad articoli non presenti nella tua libreria"
+      },
+      "export": {
+        "toZotero": "Salva in Zotero",
+        "exporting": "Salvataggio...",
+        "success": "Salvato in Zotero",
+        "error": "Salvataggio in Zotero fallito"
+      }
     },
     "language": "Lingua",
     "llmEnabled": "Funzionalità IA",
@@ -450,8 +513,8 @@
       "diagonal": "Diagonale",
       "curved": "Curvo",
       "hyperbolic": "Iperbolico",
-      "straight": "Gerade",
-      "direct": "Direkt"
+      "straight": "Dritto",
+      "direct": "Diretto"
     },
     "radialStyle": "Stile layout radiale",
     "radialStyleHint": "Stile di spaziatura per layout radiale/circolare",
@@ -486,6 +549,31 @@
     "licenseText": "Uso personale e commerciale consentito. Ridistribuzione vietata senza autorizzazione scritta.",
     "themeCount": "disponibili",
     "themeHint": "Usa l'agente IA per creare temi personalizzati",
-    "deleteTheme": "Eliminare questo tema personalizzato?"
+    "deleteTheme": "Eliminare questo tema personalizzato?",
+    "edgeHideThreshold": "Nascondi archi sopra",
+    "edgeHideThresholdHint": "Nascondi tutti gli archi quando il conteggio supera questo valore (0 = mostra sempre)",
+    "vaultSync": "Sincronizzazione vault",
+    "selectFolder": "Seleziona cartella",
+    "changeFolder": "Cambia cartella",
+    "selectVaultFolder": "Seleziona cartella vault",
+    "syncEnabled": "Abilita sincronizzazione file",
+    "vaultSyncHint": "Quando abilitato, i nuovi file nel vault vengono aggiunti come nodi e le modifiche ai file vengono sincronizzate.",
+    "noWorkspaceSelected": "Nessuno spazio di lavoro selezionato",
+    "syncMissingFiles": "Sincronizza file",
+    "syncing": "Sincronizzazione..."
+  },
+  "fileMove": {
+    "collision": {
+      "title": "Il file esiste già",
+      "message": "Un file con lo stesso nome esiste già nella cartella di destinazione.",
+      "moving": "Spostamento:",
+      "to": "In:",
+      "existing": "Esistente:",
+      "options": "Scegli un'opzione:",
+      "rename": "Rinomina",
+      "renameDesc": "Salva con un nuovo nome",
+      "replace": "Sostituisci",
+      "replaceDesc": "Sovrascrivi il file esistente (non può essere annullato)"
+    }
   }
 }

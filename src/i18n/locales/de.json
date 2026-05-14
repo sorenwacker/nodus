@@ -89,6 +89,10 @@
       "hops": "Schritte",
       "help": "Hilfe - Tastenkombinationen und Nutzung",
       "organizeFrames": "Rahmen organisieren - Mitglieder einziehen, andere rausschieben"
+    },
+    "search": {
+      "placeholder": "Knoten suchen...",
+      "noResults": "Keine passenden Knoten gefunden"
     }
   },
   "llm": {
@@ -160,6 +164,10 @@
     "agentPrompt": {
       "label": "Agent-Prompt (Graph-Builder)",
       "reset": "Zurücksetzen"
+    },
+    "costWarning": {
+      "title": "API-Kosten können anfallen",
+      "message": "LLM-Anbieter können nach Token-Nutzung abrechnen. Überwachen Sie Ihre Nutzung im Dashboard des Anbieters."
     }
   },
   "workspace": {
@@ -334,7 +342,9 @@
     "delete": "Löschen",
     "edit": "Bearbeiten",
     "remove": "Entfernen",
-    "add": "Hinzufügen"
+    "add": "Hinzufügen",
+    "clear": "Leeren",
+    "loading": "Laden"
   },
   "plan": {
     "reviewPlan": "Plan überprüfen",
@@ -398,7 +408,9 @@
     "cannotDeleteDefault": "Standard-Arbeitsbereich kann nicht gelöscht werden",
     "workspaceReset": "Standard-Arbeitsbereich auf Startinhalt zurückgesetzt",
     "importSuccess": "{count} Knoten importiert",
-    "importFailed": "Vault-Import fehlgeschlagen"
+    "importFailed": "Vault-Import fehlgeschlagen",
+    "syncedFiles": "{count} Dateien synchronisiert",
+    "noMissingFiles": "Alle Dateien sind bereits synchronisiert"
   },
   "settings": {
     "title": "Einstellungen",
@@ -410,7 +422,12 @@
       "display": "Anzeige",
       "llm": "KI",
       "zotero": "Zotero",
+      "citations": "Zitate",
       "integrations": "Integrationen"
+    },
+    "citations": {
+      "description": "Zitat- und Referenzverwaltung konfigurieren.",
+      "hint": "BibTeX oder CSL-JSON Dateien über Datei > Zitate importieren"
     },
     "advanced": "Erweitert",
     "display": {
@@ -444,7 +461,45 @@
       "collections": "Sammlungen",
       "loading": "Sammlungen werden geladen...",
       "noCollections": "Keine Sammlungen gefunden",
-      "collectionsHint": "Sammlungen aus Ihrer Zotero-Bibliothek"
+      "collectionsHint": "Sammlungen aus Ihrer Zotero-Bibliothek",
+      "items": "Einträge",
+      "import": "Importieren",
+      "importing": "Importiere",
+      "cloud": {
+        "title": "Zotero Cloud",
+        "hint": "Mit Zotero Cloud verbinden für bidirektionale Zitat-Synchronisation",
+        "userId": "Benutzer-ID",
+        "userIdPlaceholder": "Ihre Zotero Benutzer-ID (numerisch)",
+        "apiKey": "API-Schlüssel",
+        "apiKeyPlaceholder": "Ihr Zotero API-Schlüssel",
+        "testConnection": "Verbindung testen",
+        "testing": "Teste...",
+        "valid": "Verbunden",
+        "invalid": "Verbindung fehlgeschlagen",
+        "getKey": "API-Schlüssel erhalten unter",
+        "refresh": "Aktualisieren",
+        "importAll": "Alle Einträge importieren"
+      },
+      "citationGraph": {
+        "title": "Zitationsgraph",
+        "build": "Zitationsgraph erstellen",
+        "building": "Erstelle...",
+        "hint": "Zitationsbeziehungen mit Semantic Scholar entdecken",
+        "scanning": "Scanne Paper...",
+        "fetching": "Hole Zitate...",
+        "creating": "Erstelle Kanten...",
+        "done": "Fertig",
+        "result": "{edges} Kanten und {stubs} Stub-Knoten erstellt",
+        "noPapers": "Keine Paper mit DOI gefunden",
+        "createStubs": "Stub-Knoten für fehlende Paper erstellen",
+        "stubsHint": "Stub-Knoten zeigen Zitationslinks zu Papern die nicht in Ihrer Bibliothek sind"
+      },
+      "export": {
+        "toZotero": "In Zotero speichern",
+        "exporting": "Speichere...",
+        "success": "In Zotero gespeichert",
+        "error": "Speichern in Zotero fehlgeschlagen"
+      }
     },
     "language": "Sprache",
     "llmEnabled": "KI-Funktionen",
@@ -461,6 +516,8 @@
       "straight": "Gerade",
       "direct": "Direkt"
     },
+    "edgeHideThreshold": "Kanten ausblenden ab",
+    "edgeHideThresholdHint": "Alle Kanten ausblenden wenn Anzahl diesen Wert überschreitet (0 = immer anzeigen)",
     "radialStyle": "Radialer Layout-Stil",
     "radialStyleHint": "Abstandsstil für radiales/kreisförmiges Layout",
     "radialStyles": {
@@ -494,6 +551,29 @@
     "licenseText": "Persönliche und kommerzielle Nutzung erlaubt. Weiterverbreitung ohne schriftliche Genehmigung untersagt.",
     "themeCount": "verfügbar",
     "themeHint": "Verwenden Sie den KI-Agenten, um benutzerdefinierte Designs zu erstellen",
-    "deleteTheme": "Dieses benutzerdefinierte Design löschen?"
+    "deleteTheme": "Dieses benutzerdefinierte Design löschen?",
+    "vaultSync": "Vault-Synchronisation",
+    "selectFolder": "Ordner wählen",
+    "changeFolder": "Ordner ändern",
+    "selectVaultFolder": "Vault-Ordner auswählen",
+    "syncEnabled": "Dateisynchronisation aktivieren",
+    "vaultSyncHint": "Bei Aktivierung werden neue Dateien im Vault als Knoten hinzugefügt und Dateiänderungen synchronisiert.",
+    "noWorkspaceSelected": "Kein Arbeitsbereich ausgewählt",
+    "syncMissingFiles": "Dateien synchronisieren",
+    "syncing": "Synchronisiere..."
+  },
+  "fileMove": {
+    "collision": {
+      "title": "Datei existiert bereits",
+      "message": "Eine Datei mit dem gleichen Namen existiert bereits im Zielordner.",
+      "moving": "Verschiebe:",
+      "to": "Nach:",
+      "existing": "Vorhanden:",
+      "options": "Option wählen:",
+      "rename": "Umbenennen",
+      "renameDesc": "Mit neuem Namen speichern",
+      "replace": "Ersetzen",
+      "replaceDesc": "Vorhandene Datei überschreiben (nicht rückgängig machbar)"
+    }
   }
 }

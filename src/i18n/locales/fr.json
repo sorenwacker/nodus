@@ -51,6 +51,11 @@
       "addFrame": "Ajouter un cadre - Grouper les nœuds sélectionnés",
       "clickToPlace": "Cliquez sur le canevas pour placer le cadre (Échap pour annuler)"
     },
+    "hover": {
+      "incoming": "Arêtes entrantes (cité par)",
+      "outgoing": "Arêtes sortantes (cite)",
+      "bidirectional": "Connexions bidirectionnelles"
+    },
     "status": {
       "layoutRunning": "Disposition en cours...",
       "stop": "Arrêter",
@@ -61,7 +66,8 @@
       "showAgentLog": "Afficher le journal de l'agent",
       "log": "Journal",
       "hint": "Défiler haut/bas: zoom | Défiler latéralement: déplacer | Alt+glisser: lier | Double-clic: nouveau",
-      "cancelPdf": "Annuler le traitement PDF"
+      "cancelPdf": "Annuler le traitement PDF",
+      "cancelImport": "Annuler l'importation"
     },
     "controls": {
       "zoomIn": "Zoom avant",
@@ -79,8 +85,14 @@
       "neighborhoodDepth": "Profondeur de voisinage (sauts)",
       "hop": "saut",
       "hops": "sauts",
+      "highlightEdges": "Surligner toutes les arêtes - Rendre toutes les arêtes plus visibles",
+      "bubbleMode": "Mode bulle - Afficher les nœuds comme des cercles",
       "help": "Aide - Raccourcis clavier et utilisation",
       "organizeFrames": "Organiser les cadres - Attirer les membres, repousser les autres"
+    },
+    "search": {
+      "placeholder": "Rechercher des nœuds...",
+      "noResults": "Aucun nœud correspondant trouvé"
     }
   },
   "llm": {
@@ -152,6 +164,10 @@
     "agentPrompt": {
       "label": "Prompt agent (constructeur de graphe)",
       "reset": "Réinitialiser"
+    },
+    "costWarning": {
+      "title": "Des frais API peuvent s'appliquer",
+      "message": "Les fournisseurs de LLM peuvent facturer selon l'utilisation des tokens. Surveillez votre utilisation sur le tableau de bord du fournisseur."
     }
   },
   "workspace": {
@@ -326,7 +342,9 @@
     "delete": "Supprimer",
     "edit": "Modifier",
     "remove": "Retirer",
-    "add": "Ajouter"
+    "add": "Ajouter",
+    "clear": "Effacer",
+    "loading": "Chargement"
   },
   "plan": {
     "reviewPlan": "Examiner le plan",
@@ -390,7 +408,9 @@
     "cannotDeleteDefault": "Impossible de supprimer l'espace de travail par défaut",
     "workspaceReset": "Espace de travail réinitialisé au contenu de démarrage",
     "importSuccess": "{count} noeuds importés",
-    "importFailed": "Échec de l'importation du vault"
+    "importFailed": "Échec de l'importation du vault",
+    "syncedFiles": "{count} fichiers synchronisés",
+    "noMissingFiles": "Tous les fichiers sont déjà synchronisés"
   },
   "settings": {
     "title": "Paramètres",
@@ -402,7 +422,12 @@
       "display": "Affichage",
       "llm": "IA",
       "zotero": "Zotero",
+      "citations": "Citations",
       "integrations": "Intégrations"
+    },
+    "citations": {
+      "description": "Configurer la gestion des citations et références.",
+      "hint": "Importer des fichiers BibTeX ou CSL-JSON via Fichier > Importer des citations"
     },
     "advanced": "Avancé",
     "display": {
@@ -436,7 +461,45 @@
       "collections": "Collections",
       "loading": "Chargement des collections...",
       "noCollections": "Aucune collection trouvée",
-      "collectionsHint": "Collections de votre bibliothèque Zotero"
+      "collectionsHint": "Collections de votre bibliothèque Zotero",
+      "items": "éléments",
+      "import": "Importer",
+      "importing": "Importation",
+      "cloud": {
+        "title": "Zotero Cloud",
+        "hint": "Connectez-vous à Zotero Cloud pour synchroniser les citations bidirectionnellement",
+        "userId": "ID utilisateur",
+        "userIdPlaceholder": "Votre ID utilisateur Zotero (numérique)",
+        "apiKey": "Clé API",
+        "apiKeyPlaceholder": "Votre clé API Zotero",
+        "testConnection": "Tester la connexion",
+        "testing": "Test...",
+        "valid": "Connecté",
+        "invalid": "Connexion échouée",
+        "getKey": "Obtenez votre clé API sur",
+        "refresh": "Actualiser",
+        "importAll": "Importer tous les éléments"
+      },
+      "citationGraph": {
+        "title": "Graphe de citations",
+        "build": "Construire le graphe de citations",
+        "building": "Construction...",
+        "hint": "Découvrir les relations de citation avec Semantic Scholar",
+        "scanning": "Analyse des articles...",
+        "fetching": "Récupération des citations...",
+        "creating": "Création des arêtes...",
+        "done": "Terminé",
+        "result": "{edges} arêtes et {stubs} nœuds provisoires créés",
+        "noPapers": "Aucun article avec DOI trouvé",
+        "createStubs": "Créer des nœuds provisoires pour les articles manquants",
+        "stubsHint": "Les nœuds provisoires montrent les liens de citation vers des articles absents de votre bibliothèque"
+      },
+      "export": {
+        "toZotero": "Enregistrer dans Zotero",
+        "exporting": "Enregistrement...",
+        "success": "Enregistré dans Zotero",
+        "error": "Échec de l'enregistrement dans Zotero"
+      }
     },
     "language": "Langue",
     "llmEnabled": "Fonctionnalités IA",
@@ -450,8 +513,8 @@
       "diagonal": "Diagonal",
       "curved": "Courbe",
       "hyperbolic": "Hyperbolique",
-      "straight": "Gerade",
-      "direct": "Direkt"
+      "straight": "Droit",
+      "direct": "Direct"
     },
     "radialStyle": "Style de disposition radiale",
     "radialStyleHint": "Style d'espacement pour la disposition radiale/circulaire",
@@ -486,6 +549,31 @@
     "licenseText": "Usage personnel et commercial autorisé. Redistribution interdite sans autorisation écrite.",
     "themeCount": "disponibles",
     "themeHint": "Utilisez l'agent IA pour créer des thèmes personnalisés",
-    "deleteTheme": "Supprimer ce thème personnalisé ?"
+    "deleteTheme": "Supprimer ce thème personnalisé ?",
+    "edgeHideThreshold": "Masquer les arêtes au-dessus de",
+    "edgeHideThresholdHint": "Masquer toutes les arêtes quand le nombre dépasse cette valeur (0 = toujours afficher)",
+    "vaultSync": "Synchronisation du vault",
+    "selectFolder": "Sélectionner un dossier",
+    "changeFolder": "Changer de dossier",
+    "selectVaultFolder": "Sélectionner le dossier du vault",
+    "syncEnabled": "Activer la synchronisation des fichiers",
+    "vaultSyncHint": "Lorsqu'activé, les nouveaux fichiers du vault sont ajoutés comme nœuds et les modifications sont synchronisées.",
+    "noWorkspaceSelected": "Aucun espace de travail sélectionné",
+    "syncMissingFiles": "Synchroniser les fichiers",
+    "syncing": "Synchronisation..."
+  },
+  "fileMove": {
+    "collision": {
+      "title": "Le fichier existe déjà",
+      "message": "Un fichier avec le même nom existe déjà dans le dossier cible.",
+      "moving": "Déplacement :",
+      "to": "Vers :",
+      "existing": "Existant :",
+      "options": "Choisissez une option :",
+      "rename": "Renommer",
+      "renameDesc": "Enregistrer avec un nouveau nom",
+      "replace": "Remplacer",
+      "replaceDesc": "Écraser le fichier existant (irréversible)"
+    }
   }
 }
