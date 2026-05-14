@@ -462,3 +462,38 @@
   background: var(--danger-bg);
   color: var(--danger-color);
 }
+
+/* Tag nodes - pill-shaped badges that don't scale with zoom */
+.node-card.tag-node {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  border-radius: 20px;
+  min-height: auto;
+  padding: 4px 12px;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2px 4px var(--shadow-sm);
+}
+
+.node-card.tag-node .node-header {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.node-card.tag-node .node-content,
+.node-card.tag-node .inline-editor,
+.node-card.tag-node .resize-handle,
+.node-card.tag-node .delete-node-btn {
+  display: none;
+}
+
+.node-card.tag-node.selected {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), 0 2px 8px var(--shadow-md);
+}

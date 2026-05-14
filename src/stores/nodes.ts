@@ -381,17 +381,11 @@ export const useNodesStore = defineStore('nodes', () => {
         }
 
         // Create tag nodes if setting is enabled
-        if (tagStorage.getShowTagNodes()) {
-          console.log('[TagNodes] Setting enabled, creating edges for tags:', extractedTags)
-          if (tagNodesComposable) {
-            try {
-              await tagNodesComposable.createTagEdges(id, extractedTags)
-              console.log('[TagNodes] Created tag edges successfully')
-            } catch (e) {
-              console.error('[TagNodes] Failed to create tag edges:', e)
-            }
-          } else {
-            console.warn('[TagNodes] Composable not initialized')
+        if (tagStorage.getShowTagNodes() && tagNodesComposable) {
+          try {
+            await tagNodesComposable.createTagEdges(id, extractedTags)
+          } catch (e) {
+            console.error('Failed to create tag edges:', e)
           }
         }
       }
@@ -1065,33 +1059,24 @@ export const useNodesStore = defineStore('nodes', () => {
 
   // Sync all existing hashtags to tag nodes
   async function syncAllTagNodes() {
-    console.log('[TagNodes] syncAllTagNodes called')
-    if (!tagNodesComposable) {
-      console.warn('[TagNodes] Composable not initialized in syncAllTagNodes')
-      return
-    }
-    let count = 0
+    if (!tagNodesComposable) return
     for (const node of nodes.value) {
       if (node.node_type === 'tag') continue // Skip tag nodes themselves
       if (!node.tags) continue
       try {
         const tags = JSON.parse(node.tags)
         if (Array.isArray(tags) && tags.length > 0) {
-          console.log(`[TagNodes] Creating edges for node ${node.title} with tags:`, tags)
           await tagNodesComposable.createTagEdges(node.id, tags)
-          count++
         }
       } catch {
         // Invalid JSON in tags
       }
     }
-    console.log(`[TagNodes] Synced ${count} nodes with tags`)
   }
 
   // Remove all tag nodes
   async function removeAllTagNodes() {
     const tagNodes = nodes.value.filter(n => n.node_type === 'tag')
-    console.log(`[TagNodes] Removing ${tagNodes.length} tag nodes`)
     for (const tagNode of tagNodes) {
       await deleteNode(tagNode.id)
     }
@@ -1100,7 +1085,6 @@ export const useNodesStore = defineStore('nodes', () => {
   // Listen for tag nodes setting change
   const handleTagNodesChange = async (e: Event) => {
     const enabled = (e as CustomEvent).detail
-    console.log('[TagNodes] Setting changed to:', enabled)
     if (enabled) {
       await syncAllTagNodes()
     } else {

@@ -1927,8 +1927,10 @@ function getNodeStyle(node: {
   width?: number
   height?: number
   color_theme?: string | null
+  node_type?: string
 }) {
   const isResizing = resizingNode.value === node.id
+  const isTagNode = node.node_type === 'tag'
   const x = isResizing ? resizePreview.value.x : node.canvas_x
   const y = isResizing ? resizePreview.value.y : node.canvas_y
   const width = isResizing ? resizePreview.value.width : node.width || NODE_DEFAULTS.WIDTH
@@ -1937,15 +1939,17 @@ function getNodeStyle(node: {
   // Calculate screen position (node layer is outside canvas-content scale transform)
   const screenX = x * scale.value + offsetX.value
   const screenY = y * scale.value + offsetY.value
-  const screenWidth = width * scale.value
-  const screenHeight = height * scale.value
+
+  // Tag nodes render at fixed size (don't scale with zoom)
+  const screenWidth = isTagNode ? 'auto' : (width * scale.value) + 'px'
+  const screenHeight = isTagNode ? 'auto' : (height * scale.value) + 'px'
 
   const style: Record<string, string> = {
     '--zoom-scale': String(scale.value),
     transform: `translate(${screenX}px, ${screenY}px)`,
-    width: screenWidth + 'px',
-    height: screenHeight + 'px',
-    borderWidth: (nodeBorderWidth.value * scale.value) + 'px',
+    width: screenWidth,
+    height: screenHeight,
+    borderWidth: isTagNode ? '2px' : (nodeBorderWidth.value * scale.value) + 'px',
   }
 
   // Apply z-index from radial layout angle order (if set)
@@ -1954,11 +1958,11 @@ function getNodeStyle(node: {
     style.zIndex = String(zIndex)
   }
 
-  // Apply color theme background if set
-  if (node.color_theme) {
+  // Apply color theme background if set (tag nodes use primary color from CSS)
+  if (!isTagNode && node.color_theme) {
     const bg = getNodeBackground(node.color_theme)
     if (bg) style.background = bg
-  } else if (isSemanticZoomCollapsed.value && !store.selectedNodeIds.includes(node.id)) {
+  } else if (!isTagNode && isSemanticZoomCollapsed.value && !store.selectedNodeIds.includes(node.id)) {
     // Collapsed non-selected nodes get canvas background
     style.background = 'var(--bg-canvas)'
     style.borderColor = 'var(--text-muted)'

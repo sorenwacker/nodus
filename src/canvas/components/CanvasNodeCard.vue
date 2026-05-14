@@ -76,16 +76,19 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const isTagNode = computed(() => props.node.node_type === 'tag')
+
 const classes = computed(() => ({
   selected: props.isSelected,
   dragging: props.isDragging,
   resizing: props.isResizing,
   editing: props.isEditing,
-  collapsed: props.isCollapsed,
-  'text-hidden': props.isTextHidden,
+  collapsed: props.isCollapsed && !isTagNode.value, // Tag nodes never collapse
+  'text-hidden': props.isTextHidden && !isTagNode.value, // Tag nodes always show text
   'neighborhood-mode': props.isNeighborhoodMode,
   'neighborhood-focus': props.isNeighborhoodFocus,
   'neighbor-highlighted': props.isNeighborHighlighted,
+  'tag-node': isTagNode.value,
 }))
 
 // Delete button scales with the node (no counter-scale needed)
