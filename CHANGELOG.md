@@ -2,7 +2,7 @@
 
 All notable changes to Nodus are documented in this file.
 
-## [0.5.0-rc.2] - 2026-05-14
+## [0.5.0] - 2026-05-14
 
 ### Added
 - Zoom mode setting: choose between "Scroll to Zoom" and "Pinch to Zoom"
