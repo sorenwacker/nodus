@@ -2,6 +2,34 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [0.5.0-rc.2] - 2026-05-14
+
+### Added
+- Zoom mode setting: choose between "Scroll to Zoom" and "Pinch to Zoom"
+- Pinch zoom momentum for smooth glide after releasing gesture
+- Selection-aware AI tools (update, append, rename, color, delete selected nodes)
+- Frame-to-frame collision detection and resolution
+- Auto-organize nodes when resizing frames (pulls overlapping nodes inside)
+
+### Changed
+- Unified AI interface: removed NodeLLMBar, CanvasLLMBar handles all operations
+- Selected nodes become both context AND targets for AI operations
+- CanvasLLMBar shows selection badge and dynamic placeholder
+- Frames hidden in neighborhood view mode
+
+### Removed
+- NodeLLMBar component (functionality merged into CanvasLLMBar)
+- Organize frames button (now automatic on resize)
+
+## [0.5.0-rc.1] - 2026-05-12
+
+### Added
+- Frame collision detection and layout improvements
+- Toast notifications positioning above controls bar
+
+### Fixed
+- Flaky performance test threshold for CI
+
 ## [0.4.20-rc.1] - 2026-04-10
 
 ### Added
