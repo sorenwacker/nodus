@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/sorenwacker/nodus?style=flat-square)](https://github.com/sorenwacker/nodus/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/sorenwacker/nodus/ci.yml?branch=main&style=flat-square)](https://github.com/sorenwacker/nodus/actions)
 
-Local-first knowledge graph with EU sovereignty. A canvas-based visual thinking tool where research nodes, Typst math, and Obsidian vaults live on a single workspace.
+Visual knowledge graph for thinking and research. A canvas-based tool where research nodes, Typst math, and Obsidian vaults live on a single workspace.
 
 ## Download
 

@@ -1,0 +1,1464 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Local-first knowledge graph with EU sovereignty">
+      
+      
+      
+        <link rel="canonical" href="https://sorenwacker.github.io/nodus/content/features/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../images/logo.svg">
+      <meta name="generator" content="zensical-0.0.40">
+    
+    
+      
+        <title>Features - Nodus</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.fba56155.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/nightsky.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#features" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../index.md" title="Nodus" class="md-header__button md-logo" aria-label="Nodus" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="Nodus">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Nodus
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Features
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/sorenwacker/nodus" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sorenwacker/nodus
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../index.md" class="md-tabs__link">
+        
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../downloads.md" class="md-tabs__link">
+        
+  
+  Downloads
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../getting-started.md" class="md-tabs__link">
+        
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../features.md" class="md-tabs__link">
+        
+  
+  Features
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../typst-math-reference.md" class="md-tabs__link">
+        
+  
+  Typst Math Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../development.md" class="md-tabs__link">
+        
+  
+  Development
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../index.md" title="Nodus" class="md-nav__button md-logo" aria-label="Nodus" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="Nodus">
+
+    </a>
+    Nodus
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sorenwacker/nodus" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sorenwacker/nodus
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../downloads.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Downloads
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting Started
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Features
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../typst-math-reference.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Typst Math Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Development
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#canvas" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Canvas
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Canvas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#infinite-canvas" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Infinite Canvas
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#node-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Node Types
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Frames
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#selection-multi-select" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Selection &amp; Multi-Select
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fullscreen-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fullscreen Editor
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connections" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Connections
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connections">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#edge-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Edge Types
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Edge Routing
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbor-highlighting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Neighbor Highlighting
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighborhood-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Neighborhood View
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storylines" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Storylines
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#math-with-typst" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Math with Typst
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Math with Typst">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Examples
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#obsidian-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Obsidian Integration
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Obsidian Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vault-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Vault Import
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bi-directional-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Bi-directional Sync
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workspace-separation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Workspace Separation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#citation-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Citation Management
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Citation Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#zotero-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Zotero Integration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantic-scholar-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Semantic Scholar Integration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bibtex-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BibTeX Import
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        LLM Integration
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LLM Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported Providers
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Agent Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Layout Algorithms
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Export Options
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Export Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#typst-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Typst Export
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pdf-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PDF Generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#markdown-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Markdown Export
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Storage
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Storage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-first-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Local-First Architecture
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#privacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Privacy
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keyboard-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Keyboard Shortcuts
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#themes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Themes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="features">Features</h1>
+<h2 id="canvas">Canvas</h2>
+<h3 id="infinite-canvas">Infinite Canvas</h3>
+<p>Pan and zoom freely across an infinite workspace. Semantic zooming adjusts detail level:</p>
+<ul>
+<li><strong>Zoomed in</strong>: Full content, edit handles, detailed view</li>
+<li><strong>Zoomed out</strong>: Titles only, collapsed cards for performance</li>
+</ul>
+<h3 id="node-types">Node Types</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Note</strong></td>
+<td>General purpose markdown notes</td>
+</tr>
+<tr>
+<td><strong>Citation</strong></td>
+<td>Academic references with DOI support</td>
+</tr>
+<tr>
+<td><strong>Comment</strong></td>
+<td>Annotations and commentary</td>
+</tr>
+<tr>
+<td><strong>Character</strong></td>
+<td>Entity node for people/characters</td>
+</tr>
+<tr>
+<td><strong>Location</strong></td>
+<td>Entity node for places</td>
+</tr>
+<tr>
+<td><strong>Term</strong></td>
+<td>Entity node for definitions/concepts</td>
+</tr>
+<tr>
+<td><strong>Item</strong></td>
+<td>Entity node for objects/artifacts</td>
+</tr>
+</tbody>
+</table>
+<h3 id="frames">Frames</h3>
+<p>Group related nodes visually. Frames act as containers that can be moved together with all contained nodes.</p>
+<h3 id="selection-multi-select">Selection &amp; Multi-Select</h3>
+<ul>
+<li>Click to select single node</li>
+<li>Shift+Click to add to selection</li>
+<li>Lasso selection for multiple nodes</li>
+<li>Bulk operations on selection</li>
+</ul>
+<h3 id="fullscreen-editor">Fullscreen Editor</h3>
+<p>Open any node in a fullscreen split-view editor for focused writing:</p>
+<ul>
+<li><strong>Trigger</strong>: Cmd+Click (Mac) or Ctrl+Click (Windows/Linux) on any node</li>
+<li><strong>Split view</strong>: Markdown editor on left, live preview on right</li>
+<li><strong>Auto-save</strong>: Changes save automatically with 500ms debounce</li>
+<li><strong>Keyboard shortcuts</strong>:</li>
+<li><code>Escape</code> - Save and close</li>
+<li><code>Cmd/Ctrl+S</code> - Save immediately</li>
+<li><strong>Features</strong>:</li>
+<li>Title editing in header</li>
+<li>Wikilink autocomplete (type <code>[[</code> to trigger)</li>
+<li>Mermaid diagram preview</li>
+<li>"Zoom to Node" button to locate node on canvas</li>
+</ul>
+<hr />
+<h2 id="connections">Connections</h2>
+<h3 id="edge-types">Edge Types</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Color</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Related</td>
+<td>Gray</td>
+<td>General association</td>
+</tr>
+<tr>
+<td>Cites</td>
+<td>Blue</td>
+<td>Academic citation</td>
+</tr>
+<tr>
+<td>Supports</td>
+<td>Green</td>
+<td>Supporting evidence</td>
+</tr>
+<tr>
+<td>Contradicts</td>
+<td>Orange</td>
+<td>Opposing viewpoint</td>
+</tr>
+<tr>
+<td>Blocks</td>
+<td>Red</td>
+<td>Dependency or blocker</td>
+</tr>
+</tbody>
+</table>
+<h3 id="edge-routing">Edge Routing</h3>
+<p>Multiple routing styles for visual clarity:</p>
+<ul>
+<li><strong>Orthogonal</strong> - 90-degree angles, clean diagrams</li>
+<li><strong>Curved</strong> - Bezier curves, organic flow</li>
+<li><strong>Straight</strong> - Direct lines</li>
+<li><strong>Hyperbolic</strong> - Smooth curves avoiding nodes</li>
+</ul>
+<h3 id="neighbor-highlighting">Neighbor Highlighting</h3>
+<p>When selecting a node, connected neighbors are highlighted for context.</p>
+<h3 id="neighborhood-view">Neighborhood View</h3>
+<p>Focus on a specific node and its connections:
+- Toggle neighborhood mode to hide unrelated nodes
+- Adjust depth (1-5 hops) to control how far connections extend
+- Useful for exploring dense graphs</p>
+<hr />
+<h2 id="storylines">Storylines</h2>
+<p>Create linear narratives through your knowledge graph:</p>
+<ul>
+<li>Order nodes into a sequence</li>
+<li>Navigate through storyline in reader mode</li>
+<li>Export storylines as documents</li>
+<li>Color-code storyline edges</li>
+</ul>
+<hr />
+<h2 id="math-with-typst">Math with Typst</h2>
+<p>Native Typst integration for fast mathematical typesetting:</p>
+<ul>
+<li><strong>Sub-second rendering</strong> - No LaTeX compile times</li>
+<li><strong>Modern syntax</strong> - Cleaner than LaTeX</li>
+<li><strong>Inline and block</strong> - Both supported</li>
+</ul>
+<h3 id="examples">Examples</h3>
+<p>Inline math: <code>$x^2 + y^2 = z^2$</code></p>
+<p>Block math:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$$
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>integral_0^infinity e^(-x^2) dif x = sqrt(pi)/2
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>$$
+</code></pre></div></p>
+<p>See <a href="../typst-math-reference/">Typst Math Reference</a> for complete syntax.</p>
+<hr />
+<h2 id="obsidian-integration">Obsidian Integration</h2>
+<h3 id="vault-import">Vault Import</h3>
+<p>Import existing Obsidian vaults:</p>
+<ul>
+<li>Markdown content preserved</li>
+<li>Wiki-links <code>[[link]]</code> converted to edges</li>
+<li>Folder structure respected</li>
+<li>Automatic force-directed layout</li>
+</ul>
+<h3 id="bi-directional-sync">Bi-directional Sync</h3>
+<p>Changes sync between Nodus and your vault folder:</p>
+<ul>
+<li>Edit in Nodus → updates Obsidian vault</li>
+<li>Edit in Obsidian → updates Nodus canvas</li>
+<li>File watcher detects external changes</li>
+</ul>
+<h3 id="workspace-separation">Workspace Separation</h3>
+<p>Each imported vault becomes a separate workspace, keeping projects organized.</p>
+<hr />
+<h2 id="citation-management">Citation Management</h2>
+<h3 id="zotero-integration">Zotero Integration</h3>
+<p>Connect to your local Zotero database:</p>
+<ul>
+<li>Browse and import collections</li>
+<li>DOI extraction and linking</li>
+<li>Create citation nodes with metadata</li>
+</ul>
+<h3 id="semantic-scholar-integration">Semantic Scholar Integration</h3>
+<p>Fetch citations for papers with DOIs:</p>
+<ul>
+<li>Right-click citation nodes and select "Fetch Citations"</li>
+<li>Automatically creates nodes for referenced papers</li>
+<li>Builds citation network on your canvas</li>
+</ul>
+<h3 id="bibtex-import">BibTeX Import</h3>
+<p>Import <code>.bib</code> files directly to create citation nodes with:</p>
+<ul>
+<li>Author, title, year</li>
+<li>DOI links</li>
+<li>Journal/conference info</li>
+</ul>
+<hr />
+<h2 id="llm-integration">LLM Integration</h2>
+<p>Connect AI assistants for research help:</p>
+<h3 id="supported-providers">Supported Providers</h3>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ollama</td>
+<td>Local</td>
+<td>Privacy-first, no data leaves device</td>
+</tr>
+<tr>
+<td>OpenAI</td>
+<td>Cloud</td>
+<td>GPT-4, GPT-3.5</td>
+</tr>
+<tr>
+<td>Anthropic</td>
+<td>Cloud</td>
+<td>Claude models</td>
+</tr>
+<tr>
+<td>OpenAI-compatible</td>
+<td>Cloud</td>
+<td>Any compatible API</td>
+</tr>
+</tbody>
+</table>
+<h3 id="agent-features">Agent Features</h3>
+<ul>
+<li>Research assistance</li>
+<li>Content summarization</li>
+<li>Smart node connections</li>
+<li>Task automation</li>
+</ul>
+<hr />
+<h2 id="layout-algorithms">Layout Algorithms</h2>
+<p>Automatic arrangement of nodes:</p>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Force-directed</td>
+<td>General graphs, organic layout</td>
+</tr>
+<tr>
+<td>Grid</td>
+<td>Structured content</td>
+</tr>
+<tr>
+<td>Hierarchical</td>
+<td>Trees and DAGs</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="export-options">Export Options</h2>
+<h3 id="typst-export">Typst Export</h3>
+<p>Export canvas as Typst document for further editing.</p>
+<h3 id="pdf-generation">PDF Generation</h3>
+<p>Generate PDFs directly using Typst compilation.</p>
+<h3 id="markdown-export">Markdown Export</h3>
+<p>Export nodes as standard Markdown files.</p>
+<hr />
+<h2 id="data-storage">Data Storage</h2>
+<h3 id="local-first-architecture">Local-First Architecture</h3>
+<p>All data stored on your device:</p>
+<ul>
+<li><strong>SQLite</strong> - Metadata, positions, connections</li>
+<li><strong>Markdown files</strong> - Content (Obsidian-compatible)</li>
+<li><strong>No cloud required</strong> - Works fully offline</li>
+</ul>
+<h3 id="privacy">Privacy</h3>
+<ul>
+<li>No telemetry</li>
+<li>No data collection</li>
+<li>Your data stays yours</li>
+</ul>
+<hr />
+<h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>macOS</th>
+<th>Windows/Linux</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>New node</td>
+<td>Double-click</td>
+<td>Double-click</td>
+</tr>
+<tr>
+<td>Delete</td>
+<td><code>Backspace</code></td>
+<td><code>Delete</code></td>
+</tr>
+<tr>
+<td>Select all</td>
+<td><code>Cmd+A</code></td>
+<td><code>Ctrl+A</code></td>
+</tr>
+<tr>
+<td>Undo</td>
+<td><code>Cmd+Z</code></td>
+<td><code>Ctrl+Z</code></td>
+</tr>
+<tr>
+<td>Redo</td>
+<td><code>Cmd+Shift+Z</code></td>
+<td><code>Ctrl+Shift+Z</code></td>
+</tr>
+<tr>
+<td>Zoom in</td>
+<td><code>Cmd+=</code></td>
+<td><code>Ctrl+=</code></td>
+</tr>
+<tr>
+<td>Zoom out</td>
+<td><code>Cmd+-</code></td>
+<td><code>Ctrl+-</code></td>
+</tr>
+<tr>
+<td>Fit view</td>
+<td><code>F</code></td>
+<td><code>F</code></td>
+</tr>
+<tr>
+<td>Layout</td>
+<td><code>L</code></td>
+<td><code>L</code></td>
+</tr>
+<tr>
+<td>Neighborhood view</td>
+<td><code>N</code></td>
+<td><code>N</code></td>
+</tr>
+<tr>
+<td>Reset node sizes</td>
+<td><code>Shift+R</code></td>
+<td><code>Shift+R</code></td>
+</tr>
+<tr>
+<td>Help</td>
+<td><code>?</code></td>
+<td><code>?</code></td>
+</tr>
+<tr>
+<td>Fullscreen edit</td>
+<td><code>Cmd+Click</code></td>
+<td><code>Ctrl+Click</code></td>
+</tr>
+<tr>
+<td>Find in node</td>
+<td><code>Cmd+F</code></td>
+<td><code>Ctrl+F</code></td>
+</tr>
+<tr>
+<td>Settings</td>
+<td><code>Cmd+,</code></td>
+<td><code>Ctrl+,</code></td>
+</tr>
+</tbody>
+</table>
+<p>See Settings → Keyboard Shortcuts for full list.</p>
+<hr />
+<h2 id="themes">Themes</h2>
+<table>
+<thead>
+<tr>
+<th>Theme</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Light</strong></td>
+<td>Clean, bright interface</td>
+</tr>
+<tr>
+<td><strong>Dark</strong></td>
+<td>Easy on the eyes</td>
+</tr>
+<tr>
+<td><strong>Pitch Black</strong></td>
+<td>OLED-optimized, true black background</td>
+</tr>
+<tr>
+<td><strong>Cyber</strong></td>
+<td>Neon cyan/magenta aesthetic</td>
+</tr>
+</tbody>
+</table>
+<p>Node colors can be customized individually.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sorenwacker/nodus" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["navigation.instant","navigation.sections","navigation.top","navigation.tabs","search.highlight","content.code.copy","content.tabs.link"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.dbc0afdc.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,5 +1,5 @@
 ---
-title: Nodus - Local-First Knowledge Graph
+title: Nodus - Visual Knowledge Graph
 hide:
   - navigation
   - toc
@@ -172,7 +172,7 @@ hide:
 
 <div class="hero">
   <h1>Nodus</h1>
-  <p class="tagline">Local-first knowledge graph with EU sovereignty. Canvas-based visual thinking where your data stays yours.</p>
+  <p class="tagline">Visual knowledge graph for thinking and research. Canvas-based visual thinking where your data stays yours.</p>
   <div class="buttons">
     <a href="downloads/" class="btn btn-primary">Download Now</a>
     <a href="https://github.com/sorenwacker/nodus" class="btn btn-secondary">View on GitHub</a>

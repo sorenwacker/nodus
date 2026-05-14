@@ -1,7 +1,7 @@
 {
   "name": "nodus",
   "version": "0.5.0",
-  "description": "Local-first knowledge graph with EU sovereignty",
+  "description": "Visual knowledge graph for thinking and research",
   "type": "module",
   "scripts": {
     "dev": "vite",
