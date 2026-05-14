@@ -4,7 +4,7 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 
 const { t } = useI18n()
 
-defineProps<{
+const props = defineProps<{
   graphPrompt: string
   isLoading: boolean
   isRunning: boolean
@@ -12,6 +12,7 @@ defineProps<{
   agentTasks: Array<{ id: string; status: string; description: string }>
   agentLog: string[]
   showLog: boolean
+  selectedCount?: number
 }>()
 
 defineEmits<{
@@ -31,10 +32,13 @@ async function copyLog(log: string[]) {
 <template>
   <div class="graph-llm-bar">
     <div class="llm-input-row">
+      <span v-if="props.selectedCount && props.selectedCount > 0" class="selection-badge">
+        {{ t('canvas.agent.selectedCount', { count: props.selectedCount }) }}
+      </span>
       <input
         :value="graphPrompt"
         type="text"
-        :placeholder="t('canvas.agent.placeholder')"
+        :placeholder="props.selectedCount && props.selectedCount > 0 ? t('canvas.agent.placeholderSelected') : t('canvas.agent.placeholder')"
         class="llm-input"
         :disabled="isLoading"
         @input="$emit('update:graphPrompt', ($event.target as HTMLInputElement).value)"
@@ -104,6 +108,16 @@ async function copyLog(log: string[]) {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.selection-badge {
+  padding: 4px 8px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .llm-input {

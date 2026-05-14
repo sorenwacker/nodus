@@ -10,6 +10,8 @@
   "canvas": {
     "agent": {
       "placeholder": "Frage zum Graph stellen...",
+      "placeholderSelected": "Frage zu ausgewählten Knoten stellen...",
+      "selectedCount": "{count} ausgewählt",
       "clearMemory": "Konversationsspeicher löschen",
       "clearLog": "Protokoll löschen",
       "sendPrompt": "Anfrage senden",
@@ -85,7 +87,8 @@
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
       "hop": "Schritt",
       "hops": "Schritte",
-      "help": "Hilfe - Tastenkombinationen und Nutzung"
+      "help": "Hilfe - Tastenkombinationen und Nutzung",
+      "organizeFrames": "Rahmen organisieren - Mitglieder einziehen, andere rausschieben"
     }
   },
   "llm": {
@@ -463,6 +466,12 @@
     "radialStyles": {
       "compact": "Kompakt",
       "spacious": "Großzügig"
+    },
+    "zoomMode": "Zoom-Modus",
+    "zoomModeHint": "Wie Zwei-Finger-Trackpad-Gesten das Zoomen steuern",
+    "zoomModes": {
+      "scroll": "Scrollen zum Zoomen",
+      "pinch": "Pinch zum Zoomen"
     },
     "showTagNodes": "Tags als Knoten anzeigen",
     "showTagNodesHint": "#Hashtags als verbundene Tag-Knoten auf der Leinwand anzeigen",

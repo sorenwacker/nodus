@@ -39,6 +39,9 @@ export interface ToolContext {
   ollamaContextLength: number
   // Undo support for content changes
   pushContentUndo?: (nodeId: string, oldContent: string | null, oldTitle: string) => void
+  // Selection state for selection-aware tools
+  selectedNodeIds?: string[]
+  editingNodeId?: string | null
 }
 
 // Store interface - enables swapping implementations

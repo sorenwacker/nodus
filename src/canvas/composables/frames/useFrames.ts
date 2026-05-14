@@ -58,10 +58,12 @@ export interface UseFramesOptions {
   resolveFrameCollisions?: () => void
   /** Callback to capture frame positions for undo before drag starts */
   pushFramePositionUndo?: () => void
+  /** Callback to organize nodes after frame resize (pull members in, push others out) */
+  organizeFrameNodes?: (frameId: string) => void
 }
 
 export function useFrames(options: UseFramesOptions) {
-  const { store, viewState, screenToCanvas, snapToGrid, resolveFrameCollisions, pushFramePositionUndo } = options
+  const { store, viewState, screenToCanvas, snapToGrid, resolveFrameCollisions, pushFramePositionUndo, organizeFrameNodes } = options
 
   // State
   const draggingFrame = ref<string | null>(null)
@@ -199,11 +201,16 @@ export function useFrames(options: UseFramesOptions) {
   }
 
   function stopResize() {
+    const frameId = resizingFrame.value
     resizingFrame.value = null
     document.removeEventListener('pointermove', onResize)
     document.removeEventListener('pointerup', stopResize)
     // Resolve frame-to-frame collisions after resize ends
     resolveFrameCollisions?.()
+    // Organize nodes: pull members in, push non-members out
+    if (frameId) {
+      organizeFrameNodes?.(frameId)
+    }
   }
 
   function startEditingTitle(frameId: string) {

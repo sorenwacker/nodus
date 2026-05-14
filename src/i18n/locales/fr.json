@@ -10,6 +10,8 @@
   "canvas": {
     "agent": {
       "placeholder": "Poser une question sur le graphe...",
+      "placeholderSelected": "Question sur les nœuds sélectionnés...",
+      "selectedCount": "{count} sélectionné(s)",
       "clearMemory": "Effacer la mémoire de conversation",
       "clearLog": "Effacer le journal",
       "sendPrompt": "Envoyer",
@@ -77,7 +79,8 @@
       "neighborhoodDepth": "Profondeur de voisinage (sauts)",
       "hop": "saut",
       "hops": "sauts",
-      "help": "Aide - Raccourcis clavier et utilisation"
+      "help": "Aide - Raccourcis clavier et utilisation",
+      "organizeFrames": "Organiser les cadres - Attirer les membres, repousser les autres"
     }
   },
   "llm": {
@@ -455,6 +458,12 @@
     "radialStyles": {
       "compact": "Compact",
       "spacious": "Spacieux"
+    },
+    "zoomMode": "Mode de zoom",
+    "zoomModeHint": "Comment les gestes à deux doigts du trackpad contrôlent le zoom",
+    "zoomModes": {
+      "scroll": "Défilement pour zoomer",
+      "pinch": "Pincement pour zoomer"
     },
     "showTagNodes": "Afficher les tags comme nœuds",
     "showTagNodesHint": "Afficher les #hashtags comme nœuds de tag connectés sur le canevas",

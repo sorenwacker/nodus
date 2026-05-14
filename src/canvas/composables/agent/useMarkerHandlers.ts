@@ -29,19 +29,31 @@ export interface PlanStateInterface {
 }
 
 /**
+ * Store interface for selection operations
+ */
+export interface MarkerStoreInterface {
+  updateNodeContent?: (id: string, content: string) => Promise<void>
+  updateNodeTitle?: (id: string, title: string) => Promise<void>
+  updateNodeColor?: (id: string, color: string) => Promise<void>
+  deleteNode?: (id: string) => Promise<void>
+  getNode?: (id: string) => Node | undefined
+}
+
+/**
  * Context for marker handlers
  */
 export interface MarkerHandlerContext {
   planState: PlanStateInterface
   nodes: Ref<Node[]>
   log: (msg: string) => void
+  store?: MarkerStoreInterface
 }
 
 /**
  * Marker handler composable
  */
 export function useMarkerHandlers(ctx: MarkerHandlerContext) {
-  const { planState, nodes, log } = ctx
+  const { planState, nodes, log, store } = ctx
 
   /**
    * Handle markers in tool results
@@ -230,6 +242,158 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
       } catch (e) {
         console.error('[MarkerHandlers] Completeness check error:', e)
         return `Completeness check failed: ${e}`
+      }
+    }
+
+    // Selection update content marker
+    if (result.startsWith('__SELECTION_UPDATE_CONTENT__:') && store?.updateNodeContent) {
+      try {
+        const data = JSON.parse(result.replace('__SELECTION_UPDATE_CONTENT__:', ''))
+        const nodeIds: string[] = data.nodeIds || []
+        const content: string = data.content || ''
+
+        for (const nodeId of nodeIds) {
+          await store.updateNodeContent(nodeId, content)
+          log(`> Updated content for node ${nodeId}`)
+        }
+
+        return `Updated content for ${nodeIds.length} node(s)`
+      } catch (e) {
+        console.error('[MarkerHandlers] Selection update content error:', e)
+        return `Failed to update content: ${e}`
+      }
+    }
+
+    // Selection append marker
+    if (result.startsWith('__SELECTION_APPEND__:') && store?.updateNodeContent && store?.getNode) {
+      try {
+        const data = JSON.parse(result.replace('__SELECTION_APPEND__:', ''))
+        const nodeIds: string[] = data.nodeIds || []
+        const text: string = data.text || ''
+
+        for (const nodeId of nodeIds) {
+          const node = store.getNode(nodeId)
+          if (node) {
+            const newContent = (node.markdown_content || '') + '\n\n' + text
+            await store.updateNodeContent(nodeId, newContent)
+            log(`> Appended to node ${nodeId}`)
+          }
+        }
+
+        return `Appended text to ${nodeIds.length} node(s)`
+      } catch (e) {
+        console.error('[MarkerHandlers] Selection append error:', e)
+        return `Failed to append: ${e}`
+      }
+    }
+
+    // Selection rename marker
+    if (result.startsWith('__SELECTION_RENAME__:') && store?.updateNodeTitle) {
+      try {
+        const data = JSON.parse(result.replace('__SELECTION_RENAME__:', ''))
+        const nodeId: string = data.nodeId || ''
+        const title: string = data.title || ''
+
+        await store.updateNodeTitle(nodeId, title)
+        log(`> Renamed node to "${title}"`)
+
+        return `Renamed node to "${title}"`
+      } catch (e) {
+        console.error('[MarkerHandlers] Selection rename error:', e)
+        return `Failed to rename: ${e}`
+      }
+    }
+
+    // Selection color marker
+    if (result.startsWith('__SELECTION_COLOR__:') && store?.updateNodeColor) {
+      try {
+        const data = JSON.parse(result.replace('__SELECTION_COLOR__:', ''))
+        const nodeIds: string[] = data.nodeIds || []
+        const color: string = data.color || ''
+
+        for (const nodeId of nodeIds) {
+          await store.updateNodeColor(nodeId, color)
+        }
+        log(`> Colored ${nodeIds.length} node(s) ${color}`)
+
+        return `Colored ${nodeIds.length} node(s) ${color}`
+      } catch (e) {
+        console.error('[MarkerHandlers] Selection color error:', e)
+        return `Failed to color: ${e}`
+      }
+    }
+
+    // Selection delete marker
+    if (result.startsWith('__SELECTION_DELETE__:') && store?.deleteNode) {
+      try {
+        const data = JSON.parse(result.replace('__SELECTION_DELETE__:', ''))
+        const nodeIds: string[] = data.nodeIds || []
+
+        for (const nodeId of nodeIds) {
+          await store.deleteNode(nodeId)
+        }
+        log(`> Deleted ${nodeIds.length} node(s)`)
+
+        return `Deleted ${nodeIds.length} node(s)`
+      } catch (e) {
+        console.error('[MarkerHandlers] Selection delete error:', e)
+        return `Failed to delete: ${e}`
+      }
+    }
+
+    // Selection summarize marker - returns instruction for LLM to process
+    if (result.startsWith('__SELECTION_SUMMARIZE__:')) {
+      try {
+        const data = JSON.parse(result.replace('__SELECTION_SUMMARIZE__:', ''))
+        const nodeIds: string[] = data.nodeIds || []
+        const instruction: string = data.instruction || 'Summarize the key points'
+
+        // Build content from selected nodes
+        const contentParts: string[] = []
+        for (const nodeId of nodeIds) {
+          const node = nodes.value.find(n => n.id === nodeId)
+          if (node) {
+            contentParts.push(`## ${node.title}\n${node.markdown_content || '(empty)'}`)
+          }
+        }
+
+        if (contentParts.length === 0) {
+          return 'No content to summarize'
+        }
+
+        // Return content for agent to process
+        return `SUMMARIZE (${instruction}):\n${contentParts.join('\n\n')}`
+      } catch (e) {
+        console.error('[MarkerHandlers] Selection summarize error:', e)
+        return `Failed to prepare summary: ${e}`
+      }
+    }
+
+    // Selection expand marker - returns instruction for LLM to process
+    if (result.startsWith('__SELECTION_EXPAND__:')) {
+      try {
+        const data = JSON.parse(result.replace('__SELECTION_EXPAND__:', ''))
+        const nodeIds: string[] = data.nodeIds || []
+        const instruction: string = data.instruction || 'Expand with more detail'
+
+        // Build content from selected nodes
+        const contentParts: string[] = []
+        for (const nodeId of nodeIds) {
+          const node = nodes.value.find(n => n.id === nodeId)
+          if (node) {
+            contentParts.push(`## ${node.title}\n${node.markdown_content || '(empty)'}`)
+          }
+        }
+
+        if (contentParts.length === 0) {
+          return 'No content to expand'
+        }
+
+        // Return content for agent to process with update tool
+        return `EXPAND (${instruction}) - Use update_selected_content to apply changes:\n${contentParts.join('\n\n')}`
+      } catch (e) {
+        console.error('[MarkerHandlers] Selection expand error:', e)
+        return `Failed to prepare expansion: ${e}`
       }
     }
 

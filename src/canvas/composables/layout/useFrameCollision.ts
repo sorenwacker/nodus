@@ -196,6 +196,88 @@ export function constrainNodesToFrame(
 }
 
 // ============================================================================
+// Frame Node Organization - Attract members, repel non-members
+// ============================================================================
+
+export interface NodeForOrganize {
+  id: string
+  canvas_x: number
+  canvas_y: number
+  width?: number
+  height?: number
+}
+
+export interface FrameForOrganize extends FrameRect {
+  id: string
+}
+
+/**
+ * Organize nodes relative to a single frame after resize:
+ * - Any node overlapping the frame gets pulled fully inside
+ * - Nodes not touching the frame stay where they are
+ *
+ * This ensures nodes stay in their frame when you resize it smaller.
+ */
+export function organizeFrameNodes(
+  nodes: NodeForOrganize[],
+  frame: FrameForOrganize,
+  padding = 20
+): Map<string, { x: number; y: number }> {
+  const result = new Map<string, { x: number; y: number }>()
+
+  for (const node of nodes) {
+    const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+    const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+
+    // Check if node overlaps frame at all
+    const isTouching = isNodeTouchingFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, frame, 0)
+
+    if (isTouching) {
+      // Node overlaps frame - constrain it to be fully inside
+      const minX = frame.canvas_x + padding
+      const minY = frame.canvas_y + padding
+      const maxX = frame.canvas_x + frame.width - nodeWidth - padding
+      const maxY = frame.canvas_y + frame.height - nodeHeight - padding
+
+      // Clamp position to frame bounds (handle small frames)
+      const clampedMaxX = Math.max(minX, maxX)
+      const clampedMaxY = Math.max(minY, maxY)
+      const newX = Math.max(minX, Math.min(clampedMaxX, node.canvas_x))
+      const newY = Math.max(minY, Math.min(clampedMaxY, node.canvas_y))
+
+      result.set(node.id, { x: newX, y: newY })
+    } else {
+      // Node doesn't touch frame - keep position
+      result.set(node.id, { x: node.canvas_x, y: node.canvas_y })
+    }
+  }
+
+  return result
+}
+
+/**
+ * Check if a node is fully inside a frame (with padding)
+ */
+export function isNodeFullyInsideFrame(
+  nodeX: number,
+  nodeY: number,
+  nodeWidth: number,
+  nodeHeight: number,
+  frame: FrameRect,
+  padding = 0
+): boolean {
+  const nodeRight = nodeX + nodeWidth
+  const nodeBottom = nodeY + nodeHeight
+
+  return (
+    nodeX >= frame.canvas_x + padding &&
+    nodeRight <= frame.canvas_x + frame.width - padding &&
+    nodeY >= frame.canvas_y + padding &&
+    nodeBottom <= frame.canvas_y + frame.height - padding
+  )
+}
+
+// ============================================================================
 // Frame-to-Frame Collision Detection and Resolution
 // ============================================================================
 

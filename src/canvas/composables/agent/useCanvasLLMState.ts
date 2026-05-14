@@ -6,13 +6,11 @@ import { llmStorage } from '../../../lib/storage'
  * Provides reactive state for prompts, loading indicators, and panel visibility.
  */
 export function useCanvasLLMState() {
-  // Prompt inputs
+  // Prompt input
   const graphPrompt = ref('')
-  const nodePrompt = ref('')
 
-  // Loading states
+  // Loading state
   const isGraphLLMLoading = ref(false)
-  const isNodeLLMLoading = ref(false)
 
   // Panel visibility
   const showAgentLogPanel = ref(false)
@@ -20,44 +18,22 @@ export function useCanvasLLMState() {
   // LLM feature toggle (persisted)
   const llmEnabled = ref(llmStorage.getLLMEnabled())
 
-  // AbortController for canceling node LLM requests
-  let nodeLLMAbortController: AbortController | null = null
-
-  function setNodeLLMAbortController(controller: AbortController | null) {
-    nodeLLMAbortController = controller
-  }
-
-  function getNodeLLMAbortController(): AbortController | null {
-    return nodeLLMAbortController
-  }
-
   function clearGraphPrompt() {
     graphPrompt.value = ''
   }
 
-  function clearNodePrompt() {
-    nodePrompt.value = ''
-  }
-
   return {
-    // Prompt refs
+    // Prompt ref
     graphPrompt,
-    nodePrompt,
 
-    // Loading states
+    // Loading state
     isGraphLLMLoading,
-    isNodeLLMLoading,
 
     // Panel visibility
     showAgentLogPanel,
     llmEnabled,
 
-    // Abort controller management
-    setNodeLLMAbortController,
-    getNodeLLMAbortController,
-
     // Helpers
     clearGraphPrompt,
-    clearNodePrompt,
   }
 }

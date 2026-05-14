@@ -39,6 +39,9 @@ interface EdgeInfo {
   link_type: string | null
 }
 
+/** Max characters for node content in selected nodes section */
+const MAX_CONTENT_LENGTH = 500
+
 /**
  * Generate system prompt with current node state and memories
  * Uses XML-like structured separators to prevent prompt injection
@@ -48,7 +51,8 @@ export function buildSystemPrompt(
   edges: EdgeInfo[],
   workspaceId: string,
   mode: AgentMode,
-  plan?: AgentPlan | null
+  plan?: AgentPlan | null,
+  selectedNodeIds?: string[]
 ): SystemPromptMessage {
   let nodeList = 'No nodes yet. Canvas is empty.'
 
@@ -152,6 +156,26 @@ ${stackList}
   // Get mode-specific prompt addition
   const modePrompt = getModeSystemPrompt(mode)
 
+  // Build selected nodes section with full content
+  let selectedSection = ''
+  if (selectedNodeIds && selectedNodeIds.length > 0) {
+    const selectedNodes = nodes.filter(n => selectedNodeIds.includes(n.id))
+    if (selectedNodes.length > 0) {
+      const selectedList = selectedNodes.map((n, i) => {
+        const content = n.markdown_content
+          ? truncateText(escapeForPrompt(n.markdown_content), MAX_CONTENT_LENGTH)
+          : '(empty)'
+        return `${i+1}. "${escapeForPrompt(truncateText(n.title, MAX_TITLE_LENGTH))}" (id: ${n.id})\n<content>${content}</content>`
+      }).join('\n')
+      selectedSection = `
+SELECTED NODES (${selectedNodes.length}):
+${selectedList}
+
+When user says "this node", "these nodes", "selected", use selection tools (update_selected_content, append_to_selected, rename_selected, color_selected, delete_selected, expand_selected, summarize_selected).
+`
+    }
+  }
+
   // Include plan context if executing
   let planSection = ''
   if (plan && mode === 'execute') {
@@ -170,7 +194,7 @@ ${stackList}
 ${modePrompt}
 ${planSection}
 CANVAS: x right, y down.
-${memorySection}
+${memorySection}${selectedSection}
 NODES (${nodes.length}):
 ${nodeList}
 
@@ -214,6 +238,16 @@ TOOLS:
 - peek_stack(): View stack without removing
 - clear_stack(): Clear all pending tasks
 - done(summary): Call when finished
+
+SELECTION TOOLS (only when nodes are selected):
+- update_selected_content(content): Replace content of selected node(s)
+- append_to_selected(text): Append text to selected node(s)
+- rename_selected(title): Rename the selected node (single selection only)
+- color_selected(color): Color all selected nodes
+- delete_selected(): Delete all selected nodes
+- connect_selected_to(target_title, label?): Connect selected to another node
+- expand_selected(instruction?): Expand selected with more detail
+- summarize_selected(instruction?): Create summary of selected nodes
 
 EDGE LABELS (always use one):
 - Hierarchy: "contains", "part of", "includes", "has"

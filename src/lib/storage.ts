@@ -32,6 +32,7 @@ const KEYS = {
   canvasRadialStyle: 'nodus_canvas_radial_style',
   canvasBubbleMode: 'nodus_canvas_bubble_mode',
   canvasEdgeHideThreshold: 'nodus_canvas_edge_hide_threshold',
+  canvasZoomMode: 'nodus_canvas_zoom_mode',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
   showTagNodes: 'nodus_show_tag_nodes',
@@ -297,6 +298,15 @@ export const canvasStorage = {
   },
   setEdgeHideThreshold(value: number, workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasEdgeHideThreshold, workspaceId), String(value))
+  },
+  // Zoom mode: 'scroll' (default) = two-finger scroll zooms, 'pinch' = only pinch zooms
+  getZoomMode(): 'scroll' | 'pinch' {
+    const value = localStorage.getItem(KEYS.canvasZoomMode)
+    if (value === 'pinch') return 'pinch'
+    return 'scroll'
+  },
+  setZoomMode(value: 'scroll' | 'pinch'): void {
+    localStorage.setItem(KEYS.canvasZoomMode, value)
   },
 }
 

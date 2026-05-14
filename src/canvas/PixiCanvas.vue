@@ -10,7 +10,7 @@ import { openExternal } from '../lib/tauri'
 import { resolveWikilink } from '../lib/wikilink'
 import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
-import { llmStorage, memoryStorage, agentMemoryStorage } from '../lib/storage'
+import { memoryStorage, agentMemoryStorage } from '../lib/storage'
 import {
   useMinimap,
   useViewState,
@@ -39,17 +39,15 @@ import {
 import { useLasso, useContextMenu } from './composables/selection'
 import {
   useAgentRunner,
-  useNodeAgent,
   useLLMTools,
   useMarkerHandlers,
   usePlanHandlers,
   useCanvasLLMState,
   type AgentContext,
-  type NodeAgentContext,
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
 import { useLayout, useNeighborhoodMode } from './composables/layout'
-import { resolveFrameOverlaps, type FrameWithId } from './composables/layout/useFrameCollision'
+import { resolveFrameOverlaps, organizeFrameNodes, type FrameWithId, type FrameForOrganize, type NodeForOrganize } from './composables/layout/useFrameCollision'
 import { useFrames } from './composables/frames'
 import {
   useCanvasKeyboardShortcuts,
@@ -62,10 +60,7 @@ import {
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
 import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
-import {
-  findConnectedNodes,
-  buildChainContext,
-} from './utils/graphTraversal'
+import { findConnectedNodes } from './utils/graphTraversal'
 import ImportOptionsModal from '../components/ImportOptionsModal.vue'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
@@ -75,7 +70,6 @@ import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
 import CanvasLLMBar from './components/CanvasLLMBar.vue'
 import CanvasHoverTooltip from './components/CanvasHoverTooltip.vue'
 import CanvasMinimap from './components/CanvasMinimap.vue'
-import NodeLLMBar from './components/NodeLLMBar.vue'
 import CanvasFrames from './components/CanvasFrames.vue'
 import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
 import CanvasNodeCard from './components/CanvasNodeCard.vue'
@@ -800,12 +794,9 @@ const {
   gridLockEnabled,
   highlightAllEdges,
   edgeHideThreshold,
-  nodeAgentMode,
   showHelpModal,
   snapToGrid,
 } = canvasSettings
-
-const nodeAgent = useNodeAgent()
 
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
@@ -850,6 +841,60 @@ function resolveFrameCollisions() {
   }
 }
 
+/**
+ * Organize nodes for a specific frame:
+ * - Nodes 50%+ inside get pulled fully inside
+ * - Nodes just overlapping (<50%) get pushed out
+ */
+async function organizeFrame(frameId: string) {
+  const frame = store.filteredFrames.find(f => f.id === frameId)
+  if (!frame) return
+
+  const allNodes = store.filteredNodes
+
+  // Build node data
+  const nodesForOrganize: NodeForOrganize[] = allNodes.map(n => ({
+    id: n.id,
+    canvas_x: n.canvas_x,
+    canvas_y: n.canvas_y,
+    width: n.width,
+    height: n.height,
+  }))
+
+  // Build frame data
+  const frameForOrganize: FrameForOrganize = {
+    id: frame.id,
+    canvas_x: frame.canvas_x,
+    canvas_y: frame.canvas_y,
+    width: frame.width,
+    height: frame.height,
+  }
+
+  // Run organization
+  const newPositions = organizeFrameNodes(nodesForOrganize, frameForOrganize, 20)
+
+  // Apply new positions
+  for (const [nodeId, pos] of newPositions) {
+    const node = store.getNode(nodeId)
+    if (!node) continue
+
+    const dx = Math.abs(pos.x - node.canvas_x)
+    const dy = Math.abs(pos.y - node.canvas_y)
+    if (dx > 1 || dy > 1) {
+      await store.updateNodePosition(nodeId, pos.x, pos.y)
+    }
+  }
+}
+
+/**
+ * Organize all frames - pull members in, push non-members out
+ */
+async function organizeFrames() {
+  for (const frame of store.filteredFrames) {
+    await organizeFrame(frame.id)
+  }
+}
+
 // Frame operations composable
 const frames = useFrames({
   store: {
@@ -884,6 +929,7 @@ const frames = useFrames({
   snapToGrid,
   resolveFrameCollisions,
   pushFramePositionUndo,
+  organizeFrameNodes: (frameId: string) => organizeFrame(frameId),
 })
 const {
   editingFrameId,
@@ -1019,13 +1065,9 @@ const {
 const llmState = useCanvasLLMState()
 const {
   graphPrompt,
-  nodePrompt,
   isGraphLLMLoading,
-  isNodeLLMLoading,
   showAgentLogPanel,
   llmEnabled,
-  setNodeLLMAbortController,
-  getNodeLLMAbortController,
 } = llmState
 
 // Auto-open log panel on error (only on error, not on regular log messages)
@@ -1041,19 +1083,6 @@ watch(
     }
   }
 )
-
-function stopNodeLLM() {
-  // Stop agent if in agent mode
-  if (nodeAgentMode.value === 'agent') {
-    nodeAgent.stop()
-  }
-  const controller = getNodeLLMAbortController()
-  if (controller) {
-    controller.abort()
-    setNodeLLMAbortController(null)
-  }
-  isNodeLLMLoading.value = false
-}
 
 // PDF drop composable
 const pdfDrop = usePdfDrop({
@@ -1102,23 +1131,18 @@ function onPromptKeydown(e: KeyboardEvent) {
   }
 }
 
-function onNodePromptKeydown(e: KeyboardEvent) {
-  if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    const prev = navigateHistory('up')
-    if (prev !== null) nodePrompt.value = prev
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    const next = navigateHistory('down')
-    if (next !== null) nodePrompt.value = next
-  }
-}
-
 // Marker handlers composable for processing tool result markers
 const markerHandlers = useMarkerHandlers({
   planState,
   nodes: computed(() => store.filteredNodes),
   log: (msg: string) => agentLog.value.push(msg),
+  store: {
+    updateNodeContent: store.updateNodeContent,
+    updateNodeTitle: store.updateNodeTitle,
+    updateNodeColor: store.updateNodeColor,
+    deleteNode: store.deleteNode,
+    getNode: store.getNode,
+  },
 })
 
 // LLM tools composable for handling LLM-dependent tools
@@ -1168,6 +1192,9 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     ollamaContextLength: ollamaContextLength.value,
     // Enable undo for AI content changes
     pushContentUndo,
+    // Selection state for selection-aware tools
+    selectedNodeIds: store.selectedNodeIds,
+    editingNodeId: editingNodeId.value,
   }
 
   // Try extracted executor (handles simple tools)
@@ -1207,6 +1234,7 @@ const agentContext: AgentContext = {
       : store.filteredNodes
   },
   filteredEdges: () => store.filteredEdges,
+  selectedNodeIds: () => [...store.selectedNodeIds],
   cleanupOrphanEdges: () => store.cleanupOrphanEdges(),
   workspaceId: () => store.currentWorkspaceId || 'default',
   model: ollamaModel,
@@ -1256,117 +1284,6 @@ async function sendGraphPrompt() {
     alert(e instanceof Error ? e.message : 'Unknown error')
   } finally {
     isGraphLLMLoading.value = false
-  }
-}
-
-async function sendNodePrompt() {
-  // Work with editing node or selected node
-  const nodeId = editingNodeId.value || store.selectedNodeIds[0]
-  if (!nodePrompt.value.trim() || isNodeLLMLoading.value || !nodeId) return
-
-  const node = store.getNode(nodeId)
-  if (!node) return
-
-  const isEditing = editingNodeId.value === nodeId
-  // Get current content from editing buffer or store
-  const currentContent = isEditing ? editContent.value : node.markdown_content || ''
-
-  // Save undo state before AI modifies content (use current content, not stored)
-  pushContentUndo(nodeId, currentContent, node.title)
-
-  isNodeLLMLoading.value = true
-  const prompt = nodePrompt.value
-  nodePrompt.value = ''
-  savePromptToHistory(prompt)
-
-  try {
-    // Use agent mode if enabled
-    if (nodeAgentMode.value === 'agent') {
-      // Get ALL connected nodes via BFS traversal
-      const allConnected = findConnectedNodes(nodeId, store.filteredEdges, store.getNode)
-      const connectedNodes = allConnected.map(({ title, content }) => ({ title, content }))
-
-      const ctx: NodeAgentContext = {
-        nodeId,
-        nodeTitle: node.title || 'Untitled',
-        nodeContent: currentContent,
-        connectedNodes,
-        updateContent: async (content: string) => {
-          if (isEditing) {
-            editContent.value = content
-          } else {
-            await store.updateNodeContent(nodeId, content)
-          }
-        },
-        updateTitle: async (title: string) => {
-          await store.updateNodeTitle(nodeId, title)
-        },
-      }
-
-      // Clear any leftover logs and run agent
-      nodeAgent.log.value = []
-      await nodeAgent.run(prompt, ctx)
-      // Merge node agent logs to global log
-      nodeAgent.log.value.forEach(msg => agentLog.value.push(msg))
-      setTimeout(renderMermaidDiagrams, 100)
-
-      // Auto-fit after agent updates
-      if (node.auto_fit) {
-        setTimeout(() => {
-          renderMermaidDiagrams()
-          setTimeout(() => fitNodeToContent(nodeId), 100)
-        }, 50)
-      }
-      return
-    }
-
-    // Simple mode: direct LLM call
-    // Traverse full chain of connected nodes (BFS)
-    const chainNodes = findConnectedNodes(nodeId, store.filteredEdges, store.getNode)
-
-    // Build context with content from chain (respecting limit)
-    const contextLimit = llmStorage.getChainContextLimit()
-    const chainContext = buildChainContext(chainNodes, contextLimit)
-
-    const hasContext = chainContext.length > 0
-    const nodeSystemPrompt = `You are editing a note in a knowledge graph. ${hasContext ? 'IMPORTANT: Consider the CONNECTED NODES context below - they provide relevant information that may disambiguate or enrich the current note.' : ''}
-
-CRITICAL: Do NOT fabricate information. Do NOT invent citations, organizations, frameworks, dates, or facts. Only use information from:
-1. The user's request
-2. The current note content
-3. The connected nodes context (if provided)
-If you don't have information, say so or omit it - never make things up.
-
-Output the updated note content directly. NO preamble ("Here is", "Sure", etc). NO code fences unless content IS code.
-Format: Obsidian markdown with [[wikilinks]], #tags, **bold**, lists.
-${chainContext}
-CURRENT NOTE TO EDIT:
-Title: ${node.title || 'Untitled'}
-Content:
-${currentContent || '(empty)'}`
-
-    const response = await callOllama(prompt, nodeSystemPrompt)
-
-    if (isEditing) {
-      // Update the editing buffer
-      editContent.value = response
-    } else {
-      // Directly update the node content in store
-      await store.updateNodeContent(nodeId, response)
-      setTimeout(renderMermaidDiagrams, 100)
-    }
-
-    // Auto-fit after LLM updates content (if enabled for this node)
-    if (node.auto_fit) {
-      setTimeout(() => {
-        renderMermaidDiagrams()
-        setTimeout(() => fitNodeToContent(nodeId), 100)
-      }, 50)
-    }
-  } catch (e) {
-    alert(e instanceof Error ? e.message : String(e))
-  } finally {
-    isNodeLLMLoading.value = false
   }
 }
 
@@ -1749,7 +1666,6 @@ function saveEditing(e?: FocusEvent) {
   }
   editingNodeId.value = null
   editContent.value = ''
-  nodePrompt.value = ''
 }
 
 function onEditorKeydown(e: KeyboardEvent) {
@@ -1931,7 +1847,6 @@ async function fitNodeNow(nodeId: string): Promise<void> {
     // Clear editing state
     editingNodeId.value = null
     editContent.value = ''
-    nodePrompt.value = ''
   }
 
   // Force update rendered content for this node
@@ -2186,6 +2101,7 @@ useCanvasKeyboardShortcuts({
       :agent-tasks="agentTasks"
       :agent-log="agentLog"
       :show-log="showAgentLogPanel"
+      :selected-count="store.selectedNodeIds.length"
       @update:graph-prompt="graphPrompt = $event"
       @send="sendGraphPrompt"
       @stop="stopAgent"
@@ -2250,8 +2166,9 @@ useCanvasKeyboardShortcuts({
       />
 
       <div class="canvas-content" :style="{ transform }">
-        <!-- Frames (rendered first, below edges) -->
+        <!-- Frames (rendered first, below edges) - hidden in neighborhood mode -->
         <CanvasFrames
+          v-if="!neighborhoodMode"
           :frames="store.filteredFrames"
           :selected-frame-id="store.selectedFrameId"
           :editing-frame-id="editingFrameId"
@@ -2345,34 +2262,6 @@ useCanvasKeyboardShortcuts({
         />
       </div>
 
-      <!-- Floating Node LLM bar (positioned in screen coordinates, outside canvas transform) -->
-      <!-- Hidden when zoomed out (semantic zoom collapsed) since node content isn't editable -->
-      <NodeLLMBar
-        v-if="getVisualNode(store.selectedNodeIds[0] || editingNodeId!)"
-        :visible="
-          llmEnabled &&
-          !isSemanticZoomCollapsed &&
-          (store.selectedNodeIds.length === 1 || !!editingNodeId)
-        "
-        :node-prompt="nodePrompt"
-        :is-loading="isNodeLLMLoading"
-        :node-x="
-          getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_x * scale + offsetX
-        "
-        :node-y="
-          getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.canvas_y * scale + offsetY
-        "
-        :node-width="
-          (getVisualNode(store.selectedNodeIds[0] || editingNodeId!)!.width ||
-            NODE_DEFAULTS.WIDTH) * scale
-        "
-        :scale="1"
-        @update:node-prompt="nodePrompt = $event"
-        @send="sendNodePrompt"
-        @stop="stopNodeLLM"
-        @keydown="onNodePromptKeydown"
-      />
-
       <!-- Edge edit panel -->
       <CanvasEdgePanel
         :selected-edge="selectedEdge"
@@ -2429,6 +2318,7 @@ useCanvasKeyboardShortcuts({
         @toggle-neighborhood-mode="toggleNeighborhoodMode()"
         @set-neighborhood-depth="setDepth"
         @create-frame="createFrameAtCenter"
+        @organize-frames="organizeFrames"
         @show-help="showHelpModal = true"
         @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
         @toggle-bubble-mode="toggleBubbleMode"

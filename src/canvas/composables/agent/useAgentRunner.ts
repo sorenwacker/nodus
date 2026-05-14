@@ -73,6 +73,9 @@ export interface AgentContext {
   cleanupOrphanEdges: () => void
   workspaceId: () => string
 
+  // Selection state for selection-aware tools
+  selectedNodeIds?: () => string[]
+
   // LLM settings
   model: Ref<string>
   contextLength: Ref<number>
@@ -225,8 +228,9 @@ export function useAgentRunner(ctx: AgentContext) {
     // Build initial messages with current node state, memories, and mode
     // Include recent conversation history for context continuity
     const recentHistory = ctx.conversationHistory.value.slice(-6) // Last 3 exchanges
+    const selectedIds = ctx.selectedNodeIds?.() || []
     const messages: ChatMessage[] = [
-      buildSystemPrompt(ctx.filteredNodes(), ctx.filteredEdges(), ctx.workspaceId(), mode.value, currentPlan.value),
+      buildSystemPrompt(ctx.filteredNodes(), ctx.filteredEdges(), ctx.workspaceId(), mode.value, currentPlan.value, selectedIds),
       ...recentHistory,
       { role: 'user', content: enhancedRequest },
     ]

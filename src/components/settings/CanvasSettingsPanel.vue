@@ -20,19 +20,21 @@ const gridSnap = ref(canvasStorage.getGridSnap(workspaceId.value))
 const gridSize = ref(canvasStorage.getGridSize(workspaceId.value))
 const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'>(canvasStorage.getEdgeStyle(workspaceId.value))
 const edgeHideThreshold = ref(canvasStorage.getEdgeHideThreshold(workspaceId.value))
-// Radial style is global (not workspace-specific)
+// Global settings (not workspace-specific)
 const radialStyle = ref<'compact' | 'spacious'>(canvasStorage.getRadialStyle())
+const zoomMode = ref<'scroll' | 'pinch'>(canvasStorage.getZoomMode())
 
 // Tag Settings
 const showTagNodes = ref(tagStorage.getShowTagNodes())
 
-// Save Canvas settings (workspace-specific, except radialStyle which is global)
+// Save Canvas settings (workspace-specific, except radialStyle/zoomMode which are global)
 function saveCanvasSettings() {
   canvasStorage.setGridSnap(gridSnap.value, workspaceId.value)
   canvasStorage.setGridSize(gridSize.value, workspaceId.value)
   canvasStorage.setEdgeStyle(edgeStyle.value, workspaceId.value)
   canvasStorage.setEdgeHideThreshold(edgeHideThreshold.value, workspaceId.value)
   canvasStorage.setRadialStyle(radialStyle.value) // Global setting
+  canvasStorage.setZoomMode(zoomMode.value) // Global setting
   // Notify canvas of edge style change
   window.dispatchEvent(new CustomEvent('nodus-edge-style-change', { detail: edgeStyle.value }))
   window.dispatchEvent(new CustomEvent('nodus-edge-hide-threshold-change', { detail: edgeHideThreshold.value }))
@@ -45,7 +47,7 @@ function saveTagSettings() {
 }
 
 // Auto-save on changes
-watch([gridSnap, gridSize, edgeStyle, edgeHideThreshold, radialStyle], saveCanvasSettings)
+watch([gridSnap, gridSize, edgeStyle, edgeHideThreshold, radialStyle, zoomMode], saveCanvasSettings)
 watch(showTagNodes, saveTagSettings)
 
 // Reload settings when workspace changes (radialStyle is global, not reloaded)
@@ -153,6 +155,28 @@ watch(workspaceId, (newId) => {
         </label>
       </div>
       <span class="hint">{{ t('settings.radialStyleHint') }}</span>
+    </div>
+
+    <div class="setting-group">
+      <label>{{ t('settings.zoomMode') }}</label>
+      <div class="zoom-mode-grid">
+        <label class="zoom-mode-option">
+          <input v-model="zoomMode" type="radio" name="zoomMode" value="scroll" />
+          <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M16 4 L16 20 M12 8 L16 4 L20 8 M12 16 L16 20 L20 16" />
+          </svg>
+          <span>{{ t('settings.zoomModes.scroll') }}</span>
+        </label>
+        <label class="zoom-mode-option">
+          <input v-model="zoomMode" type="radio" name="zoomMode" value="pinch" />
+          <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 8 L4 4 M24 8 L28 4 M8 16 L4 20 M24 16 L28 20" />
+            <circle cx="16" cy="12" r="4" />
+          </svg>
+          <span>{{ t('settings.zoomModes.pinch') }}</span>
+        </label>
+      </div>
+      <span class="hint">{{ t('settings.zoomModeHint') }}</span>
     </div>
 
     <div class="setting-group">
@@ -325,6 +349,55 @@ watch(workspaceId, (newId) => {
 }
 
 .radial-style-option span {
+  font-size: 11px;
+  color: var(--text-muted, #71717a);
+}
+
+.zoom-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.zoom-mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  background: var(--bg-canvas, #f4f4f5);
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .zoom-mode-option {
+  background: #18181b;
+  border-color: #3f3f46;
+}
+
+.zoom-mode-option:hover {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.zoom-mode-option:has(input:checked) {
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.zoom-mode-option input {
+  display: none;
+}
+
+.zoom-mode-option svg {
+  color: var(--text-muted, #71717a);
+}
+
+.zoom-mode-option:has(input:checked) svg {
+  color: var(--primary-color, #3b82f6);
+}
+
+.zoom-mode-option span {
   font-size: 11px;
   color: var(--text-muted, #71717a);
 }

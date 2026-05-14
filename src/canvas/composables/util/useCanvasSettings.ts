@@ -14,9 +14,6 @@ export function useCanvasSettings(workspaceId?: string) {
   const highlightAllEdges = ref(false)
   const edgeHideThreshold = ref(canvasStorage.getEdgeHideThreshold(workspaceId))
 
-  // Node agent mode - always agent (tools enabled)
-  const nodeAgentMode = ref<'simple' | 'agent'>('agent')
-
   // Help modal visibility
   const showHelpModal = ref(false)
 
@@ -61,7 +58,6 @@ export function useCanvasSettings(workspaceId?: string) {
     gridSize,
     highlightAllEdges,
     edgeHideThreshold,
-    nodeAgentMode,
     showHelpModal,
 
     // Toggles

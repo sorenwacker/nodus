@@ -10,6 +10,8 @@
   "canvas": {
     "agent": {
       "placeholder": "Chiedi informazioni sul grafo...",
+      "placeholderSelected": "Chiedi sui nodi selezionati...",
+      "selectedCount": "{count} selezionato/i",
       "clearMemory": "Cancella memoria conversazione",
       "clearLog": "Cancella registro",
       "sendPrompt": "Invia",
@@ -77,7 +79,8 @@
       "neighborhoodDepth": "Profondità vicinato (salti)",
       "hop": "salto",
       "hops": "salti",
-      "help": "Aiuto - Scorciatoie da tastiera e utilizzo"
+      "help": "Aiuto - Scorciatoie da tastiera e utilizzo",
+      "organizeFrames": "Organizza cornici - Attira membri, respingi altri"
     }
   },
   "llm": {
@@ -455,6 +458,12 @@
     "radialStyles": {
       "compact": "Compatto",
       "spacious": "Spazioso"
+    },
+    "zoomMode": "Modalità zoom",
+    "zoomModeHint": "Come i gesti a due dita sul trackpad controllano lo zoom",
+    "zoomModes": {
+      "scroll": "Scorri per zoom",
+      "pinch": "Pizzica per zoom"
     },
     "showTagNodes": "Mostra tag come nodi",
     "showTagNodesHint": "Mostra #hashtag come nodi tag connessi sulla tela",

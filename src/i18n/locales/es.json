@@ -10,6 +10,8 @@
   "canvas": {
     "agent": {
       "placeholder": "Preguntar sobre el grafo...",
+      "placeholderSelected": "Preguntar sobre nodos seleccionados...",
+      "selectedCount": "{count} seleccionado(s)",
       "clearMemory": "Borrar memoria de conversación",
       "clearLog": "Borrar registro",
       "sendPrompt": "Enviar",
@@ -77,7 +79,8 @@
       "neighborhoodDepth": "Profundidad del vecindario (saltos)",
       "hop": "salto",
       "hops": "saltos",
-      "help": "Ayuda - Atajos de teclado y uso"
+      "help": "Ayuda - Atajos de teclado y uso",
+      "organizeFrames": "Organizar marcos - Atraer miembros, expulsar otros"
     }
   },
   "llm": {
@@ -455,6 +458,12 @@
     "radialStyles": {
       "compact": "Compacto",
       "spacious": "Espacioso"
+    },
+    "zoomMode": "Modo de zoom",
+    "zoomModeHint": "Cómo los gestos de dos dedos en el trackpad controlan el zoom",
+    "zoomModes": {
+      "scroll": "Desplazar para zoom",
+      "pinch": "Pellizcar para zoom"
     },
     "showTagNodes": "Mostrar etiquetas como nodos",
     "showTagNodesHint": "Mostrar #hashtags como nodos de etiqueta conectados en el lienzo",

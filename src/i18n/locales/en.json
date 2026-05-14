@@ -10,6 +10,8 @@
   "canvas": {
     "agent": {
       "placeholder": "Ask about the graph...",
+      "placeholderSelected": "Ask about selected nodes...",
+      "selectedCount": "{count} selected",
       "clearMemory": "Clear conversation memory",
       "clearLog": "Clear log",
       "sendPrompt": "Send prompt",
@@ -85,7 +87,8 @@
       "neighborhoodDepth": "Neighborhood depth (hops)",
       "hop": "hop",
       "hops": "hops",
-      "help": "Help - Keyboard shortcuts and usage"
+      "help": "Help - Keyboard shortcuts and usage",
+      "organizeFrames": "Organize Frames - Pull members in, push others out"
     },
     "search": {
       "placeholder": "Search nodes...",
@@ -520,6 +523,12 @@
     "radialStyles": {
       "compact": "Compact",
       "spacious": "Spacious"
+    },
+    "zoomMode": "Zoom Mode",
+    "zoomModeHint": "How two-finger trackpad gestures control zoom",
+    "zoomModes": {
+      "scroll": "Scroll to Zoom",
+      "pinch": "Pinch to Zoom"
     },
     "showTagNodes": "Show Tags as Nodes",
     "showTagNodesHint": "Display #hashtags as connected tag nodes on canvas",
