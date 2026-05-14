@@ -36,6 +36,7 @@ export function useTagNodes(deps: TagNodeDeps) {
       n => n.node_type === 'tag' && n.title.toLowerCase() === normalizedTag
     )
     if (existingTagNode) {
+      console.log(`[TagNodes] Found existing tag node for "${tagName}":`, existingTagNode.id)
       return existingTagNode
     }
 
@@ -51,6 +52,7 @@ export function useTagNodes(deps: TagNodeDeps) {
       }
     }
 
+    console.log(`[TagNodes] Creating new tag node for "${tagName}" at (${x}, ${y})`)
     // Create tag node with distinct properties
     const tagNode = await deps.createNode({
       title: tagName,
@@ -62,6 +64,7 @@ export function useTagNodes(deps: TagNodeDeps) {
       color_theme: 'var(--primary-color)',
       workspace_id: deps.getCurrentWorkspaceId() || undefined,
     })
+    console.log(`[TagNodes] Created tag node:`, tagNode.id)
 
     return tagNode
   }
