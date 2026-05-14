@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { invoke, getWorkspace } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs, getEdgeLabel } from '../lib/templates'
-import { canvasStorage } from '../lib/storage'
+import { canvasStorage, tagStorage } from '../lib/storage'
 import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
 import { useStorylinesStore } from './storylines'
@@ -378,6 +378,15 @@ export const useNodesStore = defineStore('nodes', () => {
           await invoke('update_node_tags', { id, tags: mergedTags })
         } catch (e) {
           console.error('Failed to update tags:', e)
+        }
+
+        // Create tag nodes if setting is enabled
+        if (tagStorage.getShowTagNodes() && tagNodesComposable) {
+          try {
+            await tagNodesComposable.createTagEdges(id, extractedTags)
+          } catch (e) {
+            console.error('Failed to create tag edges:', e)
+          }
         }
       }
 
@@ -1048,6 +1057,42 @@ export const useNodesStore = defineStore('nodes', () => {
   const createTagEdges = (nodeId: string, tagNames: string[]) => tagNodesComposable.createTagEdges(nodeId, tagNames)
   const getTagNodes = () => tagNodesComposable.getTagNodes()
 
+  // Sync all existing hashtags to tag nodes
+  async function syncAllTagNodes() {
+    if (!tagNodesComposable) return
+    for (const node of nodes.value) {
+      if (node.node_type === 'tag') continue // Skip tag nodes themselves
+      if (!node.tags) continue
+      try {
+        const tags = JSON.parse(node.tags)
+        if (Array.isArray(tags) && tags.length > 0) {
+          await tagNodesComposable.createTagEdges(node.id, tags)
+        }
+      } catch {
+        // Invalid JSON in tags
+      }
+    }
+  }
+
+  // Remove all tag nodes
+  async function removeAllTagNodes() {
+    const tagNodes = nodes.value.filter(n => n.node_type === 'tag')
+    for (const tagNode of tagNodes) {
+      await deleteNode(tagNode.id)
+    }
+  }
+
+  // Listen for tag nodes setting change
+  const handleTagNodesChange = async (e: Event) => {
+    const enabled = (e as CustomEvent).detail
+    if (enabled) {
+      await syncAllTagNodes()
+    } else {
+      await removeAllTagNodes()
+    }
+  }
+  window.addEventListener('nodus-tag-nodes-change', handleTagNodesChange)
+
   // Entity functions - forwarded to entity operations composable
   const getEntities = () => entityOpsComposable.getEntities()
   const getEntitiesByType = (entityType: EntityNodeType) => entityOpsComposable.getEntitiesByType(entityType)
@@ -1154,6 +1199,8 @@ export const useNodesStore = defineStore('nodes', () => {
     getOrCreateTagNode,
     createTagEdges,
     getTagNodes,
+    syncAllTagNodes,
+    removeAllTagNodes,
     // Entity management
     getEntities,
     getEntitiesByType,

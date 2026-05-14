@@ -123,11 +123,12 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
   }
 
   function onWheel(e: WheelEvent) {
-    // Check if inside a scrollable element
+    // Check if inside a scrollable element (but allow pinch zoom to pass through)
     const target = e.target as HTMLElement
     const scrollable = target.closest('.node-content') || target.closest('.inline-editor')
 
-    if (scrollable) {
+    if (scrollable && !e.ctrlKey) {
+      // Only handle scroll events, not pinch zoom (ctrlKey)
       const el = scrollable as HTMLElement
       const canScroll = el.scrollHeight > el.clientHeight
 
