@@ -38,7 +38,6 @@ const emit = defineEmits<{
   (e: 'toggleNeighborhoodMode'): void
   (e: 'setNeighborhoodDepth', depth: number): void
   (e: 'createFrame'): void
-  (e: 'organizeFrames'): void
   (e: 'showHelp'): void
   (e: 'toggleHighlightEdges'): void
   (e: 'toggleBubbleMode'): void
@@ -266,18 +265,6 @@ const emit = defineEmits<{
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <line x1="9" y1="3" x2="9" y2="21" />
-      </svg>
-    </button>
-    <button
-      data-tooltip-pos="top-left"
-      :data-tooltip="t('canvas.controls.organizeFrames')"
-      @click="emit('organizeFrames')"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <!-- Magnet icon -->
-        <path d="M6 3v7a6 6 0 0 0 12 0V3" />
-        <line x1="6" y1="3" x2="6" y2="7" stroke-width="4" />
-        <line x1="18" y1="3" x2="18" y2="7" stroke-width="4" />
       </svg>
     </button>
     <button

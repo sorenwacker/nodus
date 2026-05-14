@@ -886,15 +886,6 @@ async function organizeFrame(frameId: string) {
   }
 }
 
-/**
- * Organize all frames - pull members in, push non-members out
- */
-async function organizeFrames() {
-  for (const frame of store.filteredFrames) {
-    await organizeFrame(frame.id)
-  }
-}
-
 // Frame operations composable
 const frames = useFrames({
   store: {
@@ -2318,7 +2309,6 @@ useCanvasKeyboardShortcuts({
         @toggle-neighborhood-mode="toggleNeighborhoodMode()"
         @set-neighborhood-depth="setDepth"
         @create-frame="createFrameAtCenter"
-        @organize-frames="organizeFrames"
         @show-help="showHelpModal = true"
         @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
         @toggle-bubble-mode="toggleBubbleMode"
