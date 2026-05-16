@@ -18,6 +18,7 @@ import { registerThemeTools } from './themeTools'
 import { registerResearchTools } from './researchTools'
 import { registerNodeEditTools } from './nodeEditTools'
 import { registerSelectionTools } from './selectionTools'
+import { registerKnowledgeBaseTools } from './knowledgeBaseTools'
 
 export { resetPositionCounter } from './nodeTools'
 
@@ -43,6 +44,7 @@ export function registerCoreTools(): void {
   registerResearchTools()
   registerNodeEditTools()
   registerSelectionTools()
+  registerKnowledgeBaseTools()
 }
 
 // Ensure tools are registered before exporting

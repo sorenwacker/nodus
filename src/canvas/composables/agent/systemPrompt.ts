@@ -99,6 +99,15 @@ export function buildSystemPrompt(
     ? `\nDISCONNECTED NODES (${disconnectedNodes.length}): ${disconnectedNodes.map(n => `"${escapeForPrompt(truncateText(n.title, MAX_TITLE_LENGTH))}"`).join(', ')}`
     : ''
 
+  // Edge ratio warning - CRITICAL for knowledge graphs
+  const edgeRatio = nodes.length > 0 ? edges.length / nodes.length : 1
+  let edgeWarning = ''
+  if (nodes.length >= 5 && edgeRatio < 0.3) {
+    edgeWarning = `\n\n*** CRITICAL: Graph has ${nodes.length} nodes but only ${edges.length} edges! You MUST use create_edges_batch to connect nodes BEFORE calling done(). ***`
+  } else if (nodes.length >= 3 && edgeRatio < 0.5) {
+    edgeWarning = `\n\n** WARNING: Low edge ratio (${edges.length}/${nodes.length}). Use create_edges_batch to connect related nodes. **`
+  }
+
   const customRules = llmStorage.getAgentPrompt(DEFAULT_AGENT_PROMPT)
 
   // Load agent memory (session, stack, facts)
@@ -199,7 +208,7 @@ NODES (${nodes.length}):
 ${nodeList}
 
 EDGES (${edges.length}):
-${edgeList}${disconnectedList}
+${edgeList}${disconnectedList}${edgeWarning}
 
 TOOLS:
 - create_node(title, content): Create one node
@@ -223,7 +232,10 @@ TOOLS:
 - color_regex(regex, color, field?): REGEX coloring - match text patterns on title. Use ^x for "starts with x", x$ for "ends with x", foo for "contains foo".
 - reset_edge_colors(): Reset all edge colors to default.
 - smart_connect(groups): Connect nodes within groups.
-- research(query, sources?): Research topic across web + local nodes. sources=["local","web","wikipedia"]
+- research(query, sources?): Quick research across web + local nodes. sources=["local","web","wikipedia"]
+- build_knowledge_base(topic, scope?, target_nodes?, phases?): BUILD COMPREHENSIVE KNOWLEDGE GRAPHS. Runs phases: timeline, events, people, concepts, connections. Use for "create a knowledge base about X".
+- check_progress(topic?): Ask supervisor to evaluate graph completeness. Returns issues and actions needed.
+- expand_aspect(aspect, depth?): Deep-dive into a specific aspect to fill gaps identified by check_progress.
 - create_plan(title, steps): Create a plan for user approval. steps=[{description, details?}]
 - request_approval(plan_id?, message?): Request user approval for current plan.
 - think(thought): Express your reasoning before acting.
@@ -267,6 +279,13 @@ COLOR TOOL SELECTION:
 - "color nodes ending with .md" → color_regex(regex="\\.md$", color)  // $ = ends with
 - "color nodes containing foo" → color_regex(regex="foo", color)
 - "color people/organizations/questions" → color_matching(pattern="person", color)  // semantic meaning
+
+KNOWLEDGE BASE BUILDING:
+- "create a knowledge base about X" → build_knowledge_base(topic, scope?)
+- "research X comprehensively" → build_knowledge_base(topic)
+- After build_knowledge_base, supervisor returns findings → use create_nodes_batch to add them
+- Call check_progress to see what's missing, then expand_aspect to fill gaps
+- Do NOT call done() until check_progress says COMPLETE
 
 "connect disconnected nodes" = Use create_edges_batch only. Do NOT create new nodes.
 "for each node" = Use for_each_node directly.

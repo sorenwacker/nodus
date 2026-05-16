@@ -110,17 +110,21 @@ export function registerNodeTools(): void {
       let created = 0
       let failed = 0
 
+      ctx.log(`> Creating ${args.edges.length} edges...`)
+
       for (const edge of args.edges) {
         const fromNode = ctx.store.filteredNodes.find(n => n.title === edge.from_title)
         const toNode = ctx.store.filteredNodes.find(n => n.title === edge.to_title)
 
         if (!fromNode) {
           results.push(`Skip: "${edge.from_title}" not found`)
+          ctx.log(`    ! "${edge.from_title}" not found`)
           failed++
           continue
         }
         if (!toNode) {
           results.push(`Skip: "${edge.to_title}" not found`)
+          ctx.log(`    ! "${edge.to_title}" not found`)
           failed++
           continue
         }
@@ -131,8 +135,12 @@ export function registerNodeTools(): void {
           label: edge.label,
           color: edge.color,
         })
+        const label = edge.label ? ` [${edge.label}]` : ''
+        ctx.log(`    → "${edge.from_title}" → "${edge.to_title}"${label}`)
         created++
       }
+
+      ctx.log(`> Done: ${created} edges created, ${failed} failed`)
 
       if (failed > 0) {
         return `Created ${created} edges, ${failed} failed: ${results.join('; ')}`

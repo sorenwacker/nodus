@@ -194,6 +194,7 @@ async function searchWikipedia(
 
 /**
  * Fetch full Wikipedia article content
+ * Handles disambiguation pages by following the first real article link
  */
 export async function fetchWikipediaArticle(
   title: string,
@@ -214,13 +215,61 @@ export async function fetchWikipediaArticle(
       const pageId = Object.keys(pages)[0]
       if (pageId && pageId !== '-1') {
         const extract = pages[pageId].extract
-        return extract ? extract.slice(0, 8000) : null
+        if (extract) {
+          // Check if this is a disambiguation page (very short content or "may refer to" pattern)
+          if (extract.length < 200 || extract.includes('may refer to')) {
+            log?.(`> "${title}" appears to be a disambiguation page, trying alternatives...`)
+
+            // Try common suffixes for historical topics
+            const alternatives = [
+              `${title} (historiography)`,
+              `${title} (history)`,
+              `Early ${title}`,
+              `${title} period`,
+            ]
+
+            for (const alt of alternatives) {
+              const altContent = await fetchWikipediaArticleDirect(alt)
+              if (altContent && altContent.length > 500) {
+                log?.(`> Found: "${alt}"`)
+                return altContent.slice(0, 8000)
+              }
+            }
+
+            // Return what we have if no alternatives work
+            return extract.length > 50 ? extract.slice(0, 8000) : null
+          }
+          return extract.slice(0, 8000)
+        }
       }
     }
 
     return null
   } catch (e) {
     console.error('[Research] Wikipedia article fetch error:', e)
+    return null
+  }
+}
+
+/**
+ * Direct Wikipedia fetch without disambiguation handling (to avoid recursion)
+ */
+async function fetchWikipediaArticleDirect(title: string): Promise<string | null> {
+  try {
+    const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=false&explaintext=true&format=json&origin=*`
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    if (!resp.ok) return null
+
+    const data = await resp.json()
+    const pages = data.query?.pages
+    if (pages) {
+      const pageId = Object.keys(pages)[0]
+      if (pageId && pageId !== '-1') {
+        return pages[pageId].extract || null
+      }
+    }
+    return null
+  } catch {
     return null
   }
 }

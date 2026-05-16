@@ -199,12 +199,22 @@ class ToolRegistry {
       args = (rawArgs as Record<string, unknown>) || {}
     }
 
-    ctx.log(`> ${name}(${JSON.stringify(args).slice(0, 50)}...)`)
+    // Log tool call with more context
+    const argsStr = JSON.stringify(args)
+    const preview = argsStr.length > 100 ? argsStr.slice(0, 100) + '...' : argsStr
+    ctx.log(`> ${name}(${preview})`)
 
     try {
-      return await tool.handler(args, ctx)
+      const result = await tool.handler(args, ctx)
+      // Log result summary for important operations
+      if (result && !result.startsWith('__')) {
+        const resultPreview = result.length > 80 ? result.slice(0, 80) + '...' : result
+        ctx.log(`  → ${resultPreview}`)
+      }
+      return result
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
+      ctx.log(`  → ERROR: ${msg}`)
       return `Error executing ${name}: ${msg}`
     }
   }

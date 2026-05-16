@@ -397,6 +397,110 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
       }
     }
 
+    // Knowledge base phase incomplete marker
+    if (result.startsWith('__KB_PHASE_INCOMPLETE__:')) {
+      try {
+        const data = JSON.parse(result.replace('__KB_PHASE_INCOMPLETE__:', ''))
+        const phase = data.phase || 'unknown'
+        const evaluation = data.evaluation || {}
+        const instruction = data.instruction || 'Continue research'
+        const findings = data.findings || []
+        const concepts = data.concepts || []
+
+        log(`[Supervisor] Phase "${phase}" incomplete: ${evaluation.message || ''}`)
+
+        // Format findings for agent to create nodes
+        const findingsList = findings
+          .slice(0, 10)
+          .map((f: { claim: string }) => `- ${f.claim}`)
+          .join('\n')
+
+        const conceptsList = concepts.slice(0, 15).join(', ')
+
+        return `PHASE INCOMPLETE: ${phase}
+
+SUPERVISOR INSTRUCTION: ${instruction}
+
+RESEARCH FINDINGS (create nodes for these):
+${findingsList}
+
+KEY CONCEPTS: ${conceptsList}
+
+ACTION REQUIRED: Use create_nodes_batch to add nodes for the findings above, then create_edges_batch to connect them. Call check_progress when done.`
+      } catch (e) {
+        console.error('[MarkerHandlers] KB phase incomplete error:', e)
+        return `Phase incomplete - continue research`
+      }
+    }
+
+    // Knowledge base build complete marker
+    if (result.startsWith('__KB_BUILD_COMPLETE__:')) {
+      try {
+        const data = JSON.parse(result.replace('__KB_BUILD_COMPLETE__:', ''))
+        const topic = data.topic || 'topic'
+        const totalNodes = data.totalNodes || 0
+        const totalEdges = data.totalEdges || 0
+        const findings = data.findings || []
+        const suggestedFollowUps = data.suggestedFollowUps || []
+
+        log(`[Supervisor] Knowledge base complete: ${totalNodes} nodes, ${totalEdges} edges`)
+
+        // If there are still findings to add
+        if (findings.length > 0 && totalNodes < 30) {
+          const findingsList = findings
+            .slice(0, 20)
+            .map((f: { claim: string }) => `- ${f.claim}`)
+            .join('\n')
+
+          return `KNOWLEDGE BASE RESEARCH COMPLETE for "${topic}"
+
+Current state: ${totalNodes} nodes, ${totalEdges} edges
+
+REMAINING FINDINGS (create nodes):
+${findingsList}
+
+${suggestedFollowUps.length > 0 ? `SUGGESTED FOLLOW-UPS:\n${suggestedFollowUps.slice(0, 5).map((s: string) => `- ${s}`).join('\n')}` : ''}
+
+ACTION: Use create_nodes_batch for findings, create_edges_batch to connect, then call done().`
+        }
+
+        return `KNOWLEDGE BASE COMPLETE: "${topic}" - ${totalNodes} nodes, ${totalEdges} edges. Call done() to finish.`
+      } catch (e) {
+        console.error('[MarkerHandlers] KB build complete error:', e)
+        return `Knowledge base research complete`
+      }
+    }
+
+    // Expand aspect marker
+    if (result.startsWith('__EXPAND_ASPECT__:')) {
+      try {
+        const data = JSON.parse(result.replace('__EXPAND_ASPECT__:', ''))
+        const aspect = data.aspect || 'aspect'
+        const findings = data.findings || []
+        const concepts = data.concepts || []
+        const coverageScore = data.coverageScore || 0
+
+        log(`[Expand] "${aspect}": ${findings.length} findings, ${coverageScore}% coverage`)
+
+        const findingsList = findings
+          .slice(0, 15)
+          .map((f: { claim: string }) => `- ${f.claim}`)
+          .join('\n')
+
+        return `ASPECT RESEARCH: ${aspect} (${coverageScore}% coverage)
+
+FINDINGS (create nodes):
+${findingsList}
+
+CONCEPTS: ${concepts.slice(0, 10).join(', ')}
+
+ACTION: Use create_nodes_batch for these findings, then create_edges_batch to connect to existing graph.`
+      } catch (e) {
+        console.error('[MarkerHandlers] Expand aspect error:', e)
+        return `Aspect research complete`
+      }
+    }
+
     // No marker found
     return null
   }

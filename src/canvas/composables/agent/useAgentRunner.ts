@@ -367,6 +367,13 @@ export function useAgentRunner(ctx: AgentContext) {
             const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
 
+            // Log graph state after mutations
+            if (['create_node', 'create_nodes_batch', 'create_edge', 'create_edges_batch', 'delete_node', 'delete_matching'].includes(tc.function.name)) {
+              const nodes = ctx.filteredNodes()
+              const edges = ctx.filteredEdges()
+              ctx.log.value.push(`  [Graph: ${nodes.length} nodes, ${edges.length} edges]`)
+            }
+
             // Check for special markers
             if (result.startsWith('AGENT_DONE:')) {
               ctx.conversationHistory.value.push({

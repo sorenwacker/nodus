@@ -98,25 +98,71 @@ export function registerPlanningTools(): void {
 
   defineTool<{ summary: string; force?: boolean }>(
     'done',
-    'Signal that the agent has completed all work. For graph tasks, include edges before calling done.',
+    'Signal completion. BLOCKED if graph has nodes but no edges - you MUST create edges first with create_edges_batch.',
     {
       type: 'object',
       properties: {
         summary: { type: 'string', description: 'Brief summary of what was accomplished' },
-        force: { type: 'boolean', description: 'Set to true to complete without edges (for non-graph tasks)' },
+        force: { type: 'boolean', description: 'ONLY for non-graph tasks like answering questions. NEVER use for knowledge base or research tasks.' },
       },
       required: ['summary'],
     },
     async (args, ctx) => {
       const nodes = ctx.store.filteredNodes
       const edges = ctx.store.filteredEdges
+      const edgeRatio = nodes.length > 0 ? edges.length / nodes.length : 1
 
-      // Only warn about missing edges if not forced and we have many nodes
-      // This catches graph-creation tasks while allowing simple node creation
-      if (!args.force && nodes.length > 3 && edges.length === 0) {
-        return `NOTE: Graph has ${nodes.length} nodes but no edges. If this is a mindmap/hierarchy, use create_edges_batch to connect them. If standalone nodes are intended, call done(summary, force=true).`
+      // Find disconnected nodes
+      const connectedIds = new Set<string>()
+      for (const e of edges) {
+        connectedIds.add(e.source_node_id)
+        connectedIds.add(e.target_node_id)
+      }
+      const disconnected = nodes.filter(n => !connectedIds.has(n.id))
+
+      // BLOCK completion if graph has many nodes but few edges
+      if (nodes.length >= 5 && edgeRatio < 0.3) {
+        ctx.log(`> BLOCKED: Cannot complete - graph needs edges (${nodes.length} nodes, ${edges.length} edges)`)
+
+        // List disconnected nodes
+        const disconnectedList = disconnected.length > 0
+          ? `\n\nDISCONNECTED NODES (${disconnected.length}):\n${disconnected.slice(0, 20).map(n => `- "${n.title}"`).join('\n')}${disconnected.length > 20 ? `\n... and ${disconnected.length - 20} more` : ''}`
+          : ''
+
+        return `ERROR: Cannot complete. You created ${nodes.length} nodes but only ${edges.length} edges.
+${disconnectedList}
+
+Connect these nodes using create_edges_batch:
+- Timeline events: "leads to", "followed by", "preceded"
+- People to events: "participated in", "caused", "led"
+- Concepts: "related to", "part of", "influences"
+
+Example:
+create_edges_batch({edges: [
+  {from_title: "${disconnected[0]?.title || 'Node A'}", to_title: "${disconnected[1]?.title || 'Node B'}", label: "related to"},
+  {from_title: "${disconnected[2]?.title || 'Node C'}", to_title: "${nodes[0]?.title || 'Node D'}", label: "influences"},
+  ...
+]})
+
+Create at least ${Math.ceil(nodes.length * 0.5)} edges, then call done() again.`
       }
 
+      // Warn about low edge ratio
+      if (nodes.length >= 3 && edgeRatio < 0.5) {
+        ctx.log(`> Warning: Low edge ratio (${edgeRatio.toFixed(2)})`)
+        const disconnectedList = disconnected.length > 0
+          ? ` Disconnected: ${disconnected.slice(0, 10).map(n => `"${n.title}"`).join(', ')}${disconnected.length > 10 ? ` (+${disconnected.length - 10} more)` : ''}`
+          : ''
+        return `WARNING: Graph has ${nodes.length} nodes but only ${edges.length} edges.${disconnectedList} Add connections with create_edges_batch.`
+      }
+
+      // Block force on research tasks
+      if (args.force && nodes.length >= 10) {
+        ctx.log(`> BLOCKED: force=true rejected for research task`)
+        return `ERROR: Cannot use force=true on a knowledge graph with ${nodes.length} nodes. Create edges first.`
+      }
+
+      ctx.log(`> Completed: ${nodes.length} nodes, ${edges.length} edges`)
       return `AGENT_DONE: ${args.summary || 'completed'} (${nodes.length} nodes, ${edges.length} edges)`
     },
     { category: 'utility' }

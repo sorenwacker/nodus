@@ -140,6 +140,7 @@ export function registerBatchTools(): void {
               : cleanContent(n.content || '')
             await ctx.store.updateNodeContent(existing.id, newContent)
             updated.push(title)
+            ctx.log(`    ~ "${title}" (updated)`)
           } else {
             const cols = Math.ceil(Math.sqrt(totalNodes))
             const x = pos.x + (globalIndex % cols) * 250
@@ -153,6 +154,7 @@ export function registerBatchTools(): void {
               canvas_y: ctx.snapToGrid(y),
             })
             created.push(title)
+            ctx.log(`    + "${title}"`)
             globalIndex++
           }
         }
