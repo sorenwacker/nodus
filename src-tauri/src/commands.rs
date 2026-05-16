@@ -1881,6 +1881,14 @@ pub async fn set_workspace_vault_path(
 }
 
 #[tauri::command]
+pub async fn rename_workspace(id: String, new_name: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::workspaces::rename(pool, &id, &new_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_workspace(id: String) -> Result<Option<database::workspaces::Workspace>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::workspaces::get_by_id(pool, &id)

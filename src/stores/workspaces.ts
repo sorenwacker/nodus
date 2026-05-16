@@ -170,11 +170,18 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     saveWorkspacesToStorage()
   }
 
-  function renameWorkspace(id: string, newName: string) {
+  async function renameWorkspace(id: string, newName: string) {
     const workspace = workspaces.value.find((w) => w.id === id)
     if (workspace) {
-      workspace.name = sanitizeWorkspaceName(newName)
+      const sanitizedName = sanitizeWorkspaceName(newName)
+      workspace.name = sanitizedName
       saveWorkspacesToStorage()
+      // Persist to database
+      try {
+        await invoke('rename_workspace', { id, newName: sanitizedName })
+      } catch (e) {
+        storeLogger.error('[Workspaces] Failed to persist workspace rename:', e)
+      }
     }
   }
 

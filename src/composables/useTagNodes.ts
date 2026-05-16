@@ -57,9 +57,8 @@ export function useTagNodes(deps: TagNodeDeps) {
       node_type: 'tag',
       canvas_x: x,
       canvas_y: y,
-      width: 100,
-      height: 40,
-      color_theme: 'var(--primary-color)',
+      width: 70,
+      height: 22,
       workspace_id: deps.getCurrentWorkspaceId() || undefined,
     })
 

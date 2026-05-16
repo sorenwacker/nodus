@@ -193,12 +193,16 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     // Build node map for efficient lookup
     const nodeMap = new Map<string, NodeRect>()
     for (const node of displayNodes.value) {
+      // Tag nodes use smaller dimensions for edge routing (fit-content sizing)
+      const isTagNode = node.node_type === 'tag'
+      const tagWidth = Math.min(node.title.length * 8 + 20, 120) // Estimate based on title length
+      const tagHeight = 24
       nodeMap.set(node.id, {
         id: node.id,
         canvas_x: node.canvas_x,
         canvas_y: node.canvas_y,
-        width: node.width || NODE_DEFAULTS.WIDTH,
-        height: getNodeHeight(node, false),
+        width: isTagNode ? tagWidth : (node.width || NODE_DEFAULTS.WIDTH),
+        height: isTagNode ? tagHeight : getNodeHeight(node, false),
       })
     }
 

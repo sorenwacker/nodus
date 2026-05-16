@@ -170,6 +170,7 @@ fn main() {
             commands::create_workspace,
             commands::get_workspaces,
             commands::delete_workspace,
+            commands::rename_workspace,
             commands::set_workspace_sync,
             commands::set_workspace_vault_path,
             commands::get_workspace,

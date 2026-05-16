@@ -142,7 +142,6 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     if (e?.relatedTarget) {
       const related = e.relatedTarget as HTMLElement
       if (
-        related.closest('.node-llm-bar-floating') ||
         related.closest('.node-color-bar') ||
         related.closest('.graph-llm-bar') ||
         related.closest('.node-search-bar')

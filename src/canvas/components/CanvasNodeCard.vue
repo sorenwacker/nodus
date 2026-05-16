@@ -164,12 +164,17 @@ const displayTitle = computed(() => {
     @pointerleave="emit('pointerleave')"
     @dblclick.stop="emit('dblclick')"
   >
-    <!-- Image thumbnail when zoomed out -->
-    <div v-if="showThumbnail && thumbnailSrc" class="node-thumbnail">
+    <!-- Tag node title (always visible, simplified display) -->
+    <div v-if="isTagNode" class="node-header">
+      <span>{{ displayTitle }}</span>
+    </div>
+
+    <!-- Image thumbnail when zoomed out (non-tag nodes only) -->
+    <div v-else-if="showThumbnail && thumbnailSrc" class="node-thumbnail">
       <img :src="thumbnailSrc" :alt="node.title" />
     </div>
 
-    <!-- Node title header (always show when collapsed, or when has title/editing) -->
+    <!-- Node title header (collapsed, or when has title/editing) -->
     <div
       v-else-if="node.title || isEditing || isEditingTitle || isCollapsed"
       class="node-header"

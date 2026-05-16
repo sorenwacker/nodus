@@ -817,6 +817,17 @@ pub mod workspaces {
         Ok(())
     }
 
+    pub async fn rename(pool: &DbPool, id: &str, new_name: &str) -> Result<(), DatabaseError> {
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query("UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?")
+            .bind(new_name)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Workspace>, DatabaseError> {
         let workspace = sqlx::query_as::<_, Workspace>("SELECT * FROM workspaces WHERE id = ?")
             .bind(id)

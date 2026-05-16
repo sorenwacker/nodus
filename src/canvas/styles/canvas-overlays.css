@@ -428,42 +428,7 @@
   width: 320px;
 }
 
-/* Tag node styling - smaller, pill-shaped */
-.node-card[data-node-type="tag"] {
-  min-width: 60px;
-  max-width: 150px;
-  min-height: 32px;
-  height: auto !important;
-  border-radius: 16px;
-  background: var(--primary-color);
-  color: white;
-  border: 2px solid var(--primary-color);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-}
-
-.node-card[data-node-type="tag"] .node-header {
-  display: none;
-}
-
-.node-card[data-node-type="tag"] .node-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 14px;
-  font-size: calc(12px * var(--font-scale, 1));
-  font-weight: 600;
-  color: white;
-  text-align: center;
-}
-
-.node-card[data-node-type="tag"]:hover {
-  border-color: var(--primary-color);
-  filter: brightness(1.1);
-}
-
-.node-card[data-node-type="tag"].selected {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(59, 130, 246, 0.3);
-}
+/* Tag node styling is handled by node-card.css via .tag-node class */
 
 /* Comment node styling - italic, dashed border, muted appearance */
 .node-card[data-node-type="comment"] {

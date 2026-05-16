@@ -463,28 +463,31 @@
   color: var(--danger-color);
 }
 
-/* Tag nodes - pill-shaped badges that don't scale with zoom */
+/* Tag nodes - small pill-shaped badges */
 .node-card.tag-node {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
-  border-radius: 20px;
-  min-height: auto;
-  padding: 4px 12px;
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+  border-radius: calc(50px * var(--zoom-scale, 1));
+  min-height: unset;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 2px 4px var(--shadow-sm);
+  box-shadow: none;
+  border-width: calc(1px * var(--zoom-scale, 1));
 }
 
 .node-card.tag-node .node-header {
-  background: transparent;
+  background: none;
   border: none;
-  padding: 0;
+  border-bottom: none;
+  padding: calc(3px * var(--zoom-scale, 1)) calc(8px * var(--zoom-scale, 1));
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: white;
+  font-size: calc(13px * var(--zoom-scale, 1));
+  line-height: 1;
+  font-weight: 500;
+  color: var(--text-main);
   text-align: center;
   white-space: nowrap;
+  overflow: visible;
 }
 
 .node-card.tag-node .node-content,
@@ -495,5 +498,5 @@
 }
 
 .node-card.tag-node.selected {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), 0 2px 8px var(--shadow-md);
+  box-shadow: 0 0 0 calc(3px * var(--zoom-scale, 1)) rgba(255, 255, 255, 0.5), 0 2px 8px var(--shadow-md);
 }

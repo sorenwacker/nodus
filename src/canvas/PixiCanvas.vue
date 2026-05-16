@@ -1328,13 +1328,12 @@ function onCanvasPointerDown(e: PointerEvent) {
   // Left click/primary touch - start panning or lasso if not on a node
   if (e.button === 0) {
     const target = e.target as HTMLElement
-    // Don't pan if clicking on a node, edge, panel, frame, or node AI toolbar
+    // Don't pan if clicking on a node, edge, panel, or frame
     if (
       target.closest('.node-card') ||
       target.closest('.edge-line') ||
       target.closest('.edge-panel') ||
-      target.closest('.canvas-frame') ||
-      target.closest('.node-llm-bar-floating')
+      target.closest('.canvas-frame')
     ) {
       return
     }
@@ -1629,7 +1628,6 @@ function saveEditing(e?: FocusEvent) {
   if (e?.relatedTarget) {
     const related = e.relatedTarget as HTMLElement
     if (
-      related.closest('.node-llm-bar-floating') ||
       related.closest('.collapsed-color-bar') ||
       related.closest('.graph-llm-bar') ||
       related.closest('.node-search-bar') ||
@@ -1940,16 +1938,16 @@ function getNodeStyle(node: {
   const screenX = x * scale.value + offsetX.value
   const screenY = y * scale.value + offsetY.value
 
-  // Tag nodes render at fixed size (don't scale with zoom)
-  const screenWidth = isTagNode ? 'auto' : (width * scale.value) + 'px'
-  const screenHeight = isTagNode ? 'auto' : (height * scale.value) + 'px'
+  // Tag nodes fit content, regular nodes use stored dimensions
+  const screenWidth = isTagNode ? 'fit-content' : (width * scale.value) + 'px'
+  const screenHeight = isTagNode ? 'fit-content' : (height * scale.value) + 'px'
 
   const style: Record<string, string> = {
     '--zoom-scale': String(scale.value),
     transform: `translate(${screenX}px, ${screenY}px)`,
     width: screenWidth,
     height: screenHeight,
-    borderWidth: isTagNode ? '2px' : (nodeBorderWidth.value * scale.value) + 'px',
+    borderWidth: (nodeBorderWidth.value * scale.value) + 'px',
   }
 
   // Apply z-index from radial layout angle order (if set)
@@ -1958,10 +1956,16 @@ function getNodeStyle(node: {
     style.zIndex = String(zIndex)
   }
 
-  // Apply color theme background if set (tag nodes use primary color from CSS)
-  if (!isTagNode && node.color_theme) {
+  // Apply color theme background if set
+  if (node.color_theme) {
     const bg = getNodeBackground(node.color_theme)
-    if (bg) style.background = bg
+    if (bg) {
+      style.background = bg
+      // Tag nodes use background color for border too
+      if (isTagNode) {
+        style.borderColor = bg
+      }
+    }
   } else if (!isTagNode && isSemanticZoomCollapsed.value && !store.selectedNodeIds.includes(node.id)) {
     // Collapsed non-selected nodes get canvas background
     style.background = 'var(--bg-canvas)'
