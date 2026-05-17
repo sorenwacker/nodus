@@ -106,12 +106,15 @@ export function formatStubCitation(data: {
   doi?: string
   semanticScholarId?: string
   year?: number
+  venue?: string
   authors?: Array<{ name: string }>
 }): string {
   const lines: string[] = ['---']
 
   if (data.doi) lines.push(`doi: ${data.doi}`)
   if (data.semanticScholarId) lines.push(`semantic_scholar_id: ${data.semanticScholarId}`)
+  if (data.year) lines.push(`date: ${data.year}`)
+  if (data.venue) lines.push(`journal: "${data.venue}"`)
   lines.push('---')
   lines.push('')
   lines.push(`# ${data.title || 'Untitled'}`)

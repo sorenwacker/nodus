@@ -465,6 +465,7 @@
       "items": "items",
       "import": "Import",
       "importing": "Importing",
+      "importAll": "Import All Items",
       "cloud": {
         "title": "Zotero Cloud",
         "hint": "Connect to Zotero Cloud to sync citations bidirectionally",

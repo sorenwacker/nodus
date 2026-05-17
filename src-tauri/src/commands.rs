@@ -2878,3 +2878,12 @@ pub async fn get_zotero_collection_items(
     let path = PathBuf::from(zotero_path);
     crate::zotero::get_collection_items(&path, &collection_key).await
 }
+
+/// Get ALL items from Zotero library (not limited to a collection)
+#[tauri::command]
+pub async fn get_zotero_all_items(
+    zotero_path: String,
+) -> Result<Vec<crate::zotero::ZoteroItem>, String> {
+    let path = PathBuf::from(zotero_path);
+    crate::zotero::get_all_items(&path).await
+}

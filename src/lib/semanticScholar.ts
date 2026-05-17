@@ -27,6 +27,7 @@ export interface SemanticScholarReference {
   title: string
   authors?: Array<{ authorId: string; name: string }>
   year?: number
+  venue?: string
   externalIds?: {
     DOI?: string
   }
@@ -199,7 +200,7 @@ export class SemanticScholarProvider {
 
     try {
       const response = await this.rateLimitedFetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paperId}/references?fields=paperId,title,authors,year,externalIds&limit=${limit}`
+        `https://api.semanticscholar.org/graph/v1/paper/${paperId}/references?fields=paperId,title,authors,year,venue,externalIds&limit=${limit}`
       )
 
       if (!response.ok) {
@@ -240,7 +241,7 @@ export class SemanticScholarProvider {
     try {
       while (hasMore) {
         const response = await this.rateLimitedFetch(
-          `https://api.semanticscholar.org/graph/v1/paper/${paperId}/citations?fields=paperId,title,authors,year,externalIds&limit=${pageSize}&offset=${offset}`
+          `https://api.semanticscholar.org/graph/v1/paper/${paperId}/citations?fields=paperId,title,authors,year,venue,externalIds&limit=${pageSize}&offset=${offset}`
         )
 
         if (!response.ok) {

@@ -45,6 +45,7 @@ function formatStubContent(ref: SemanticScholarReference): string {
     doi: ref.externalIds?.DOI,
     semanticScholarId: ref.paperId,
     year: ref.year,
+    venue: ref.venue,
     authors: ref.authors?.map(a => ({ name: a.name })),
   })
 }
@@ -74,11 +75,14 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
   const fetchCancelled = ref(false)
   const fetchProgress = ref<{ current: number; total: number; paperTitle: string; paperIndex?: number; paperCount?: number } | null>(null)
 
-  // Build paper index from current nodes (by DOI and Semantic Scholar ID)
-  function buildPaperIndex(): { byDOI: Map<string, string>; bySSId: Map<string, string> } {
+  // Build paper index from current nodes (by DOI, Semantic Scholar ID, and title)
+  function buildPaperIndex(): { byDOI: Map<string, string>; bySSId: Map<string, string>; byTitle: Map<string, string> } {
     const byDOI = new Map<string, string>()
     const bySSId = new Map<string, string>()
+    const byTitle = new Map<string, string>()
     const nodes = ctx.getNodes()
+
+    console.log(`[CitationGraph] Building paper index from ${nodes.length} nodes`)
 
     for (const node of nodes) {
       const doi = extractDOI(node.markdown_content)
@@ -90,22 +94,54 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
       if (ssId) {
         bySSId.set(ssId, node.id)
       }
+      // Also index by normalized title for fallback matching
+      if (node.title) {
+        byTitle.set(normalizeTitle(node.title), node.id)
+      }
     }
 
-    return { byDOI, bySSId }
+    console.log(`[CitationGraph] Index built: ${byDOI.size} DOIs, ${bySSId.size} SS IDs, ${byTitle.size} titles`)
+    return { byDOI, bySSId, byTitle }
   }
 
-  // Find existing node by DOI or Semantic Scholar ID
+  // Normalize title for comparison (lowercase, remove punctuation, collapse spaces)
+  function normalizeTitle(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  // Find existing node by DOI, Semantic Scholar ID, or title
   function findExistingNode(
     doi: string | undefined,
     ssId: string,
-    index: { byDOI: Map<string, string>; bySSId: Map<string, string> }
+    title: string | undefined,
+    index: { byDOI: Map<string, string>; bySSId: Map<string, string>; byTitle: Map<string, string> }
   ): string | undefined {
     if (doi) {
       const byDoi = index.byDOI.get(doi.toLowerCase())
-      if (byDoi) return byDoi
+      if (byDoi) {
+        console.log(`[CitationGraph] Found existing node by DOI ${doi}: ${byDoi}`)
+        return byDoi
+      }
     }
-    return index.bySSId.get(ssId)
+    const bySSId = index.bySSId.get(ssId)
+    if (bySSId) {
+      console.log(`[CitationGraph] Found existing node by SS ID ${ssId}: ${bySSId}`)
+      return bySSId
+    }
+    // Fallback to title matching
+    if (title) {
+      const normalizedTitle = normalizeTitle(title)
+      const byTitle = index.byTitle.get(normalizedTitle)
+      if (byTitle) {
+        console.log(`[CitationGraph] Found existing node by title "${title}": ${byTitle}`)
+        return byTitle
+      }
+    }
+    return undefined
   }
 
   // Check if edge already exists
@@ -126,15 +162,15 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
   }
 
   /**
-   * Fetch citations for a single node
-   * Creates full paper nodes for papers that cite this paper
+   * Fetch papers for a single node
+   * @param direction - 'citations' (who cites this), 'references' (what this cites), or 'both'
    */
-  async function fetchCitationsForNode(
+  async function fetchPapersForNode(
     nodeId: string,
-    options?: { maxCitations?: number; paperIndex?: number; paperCount?: number }
+    direction: 'citations' | 'references' | 'both',
+    options?: { maxPapers?: number; paperIndex?: number; paperCount?: number }
   ): Promise<{ edgesCreated: number; papersCreated: number }> {
-    // No limit by default - fetch all citing papers
-    const maxCitations = options?.maxCitations ?? Infinity
+    const maxPapers = options?.maxPapers ?? Infinity
     const batchPaperIndex = options?.paperIndex
     const batchPaperCount = options?.paperCount
     const nodes = ctx.getNodes()
@@ -144,115 +180,194 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     const doi = extractDOI(node.markdown_content)
     if (!doi) return { edgesCreated: 0, papersCreated: 0 }
 
-    // Check if already cancelled before starting
     if (fetchCancelled.value) {
       return { edgesCreated: 0, papersCreated: 0 }
     }
 
-    // Reset progress state (but NOT fetchCancelled - that persists across papers)
     isFetchingCitations.value = true
     fetchProgress.value = { current: 0, total: 0, paperTitle: node.title, paperIndex: batchPaperIndex, paperCount: batchPaperCount }
 
-    // Get paper from Semantic Scholar
     const paper = await semanticScholar.getPaperByDOI(doi)
     if (!paper) {
-      // Don't clear progress - let caller handle it for batch operations
+      console.warn(`[CitationGraph] Paper not found in Semantic Scholar for DOI: ${doi}`)
       return { edgesCreated: 0, papersCreated: 0 }
     }
 
-    // Build paper index for duplicate detection (by DOI and Semantic Scholar ID)
+    console.log(`[CitationGraph] Found paper: ${paper.title} (${paper.paperId})`)
+    console.log(`[CitationGraph] Fetching direction: ${direction}`)
+
     const paperIndex = buildPaperIndex()
     const workspaceId = ctx.getCurrentWorkspaceId()
 
-    // Get references and citations (sequential to respect rate limits)
-    const references = await semanticScholar.getReferences(paper.paperId)
-    const citations = await semanticScholar.getCitations(paper.paperId)
+    // Fetch based on direction
+    const references = (direction === 'references' || direction === 'both')
+      ? await semanticScholar.getReferences(paper.paperId)
+      : []
+    const citations = (direction === 'citations' || direction === 'both')
+      ? await semanticScholar.getCitations(paper.paperId)
+      : []
+
+    console.log(`[CitationGraph] Found ${references.length} references, ${citations.length} citations`)
 
     let edgesCreated = 0
     let papersCreated = 0
 
-    // Create edges for references (this paper cites them)
-    // Only connect to existing nodes, don't create nodes for references
-    for (const ref of references) {
-      const targetNodeId = findExistingNode(ref.externalIds?.DOI, ref.paperId, paperIndex)
-      if (targetNodeId && !edgeExists(nodeId, targetNodeId, 'cites')) {
-        await ctx.createEdge({
-          source_node_id: nodeId,
-          target_node_id: targetNodeId,
-          link_type: 'cites',
-        })
-        edgesCreated++
-      }
-    }
+    // Process references (papers this node cites) - create stubs + edges
+    if (references.length > 0) {
+      console.log(`[CitationGraph] Processing ${references.length} references...`)
+      fetchProgress.value = { current: 0, total: references.length, paperTitle: node.title, paperIndex: batchPaperIndex, paperCount: batchPaperCount }
 
-    // Update progress with total
-    fetchProgress.value = { current: 0, total: citations.length, paperTitle: node.title, paperIndex: batchPaperIndex, paperCount: batchPaperCount }
+      for (let i = 0; i < references.length; i++) {
+        if (fetchCancelled.value) break
+        if (papersCreated >= maxPapers) break
 
-    // Create paper nodes for citations (papers that cite this paper)
-    for (let i = 0; i < citations.length; i++) {
-      // Check for cancellation
-      if (fetchCancelled.value) break
-      if (papersCreated >= maxCitations) break
+        const ref = references[i]
+        console.log(`[CitationGraph] Reference ${i + 1}: "${ref.title}" (DOI: ${ref.externalIds?.DOI}, paperId: ${ref.paperId})`)
+        fetchProgress.value = { current: i + 1, total: references.length, paperTitle: ref.title || 'Unknown', paperIndex: batchPaperIndex, paperCount: batchPaperCount }
 
-      const cit = citations[i]
+        // Check if paper already exists
+        let targetNodeId = findExistingNode(ref.externalIds?.DOI, ref.paperId, ref.title, paperIndex)
+        console.log(`[CitationGraph] Existing node for reference: ${targetNodeId || 'none'}`)
 
-      // Update progress
-      fetchProgress.value = { current: i + 1, total: citations.length, paperTitle: cit.title || 'Unknown', paperIndex: batchPaperIndex, paperCount: batchPaperCount }
+        // Create stub node if not found
+        if (!targetNodeId && ref.title) {
+          console.log(`[CitationGraph] Creating stub node for reference: "${ref.title}"`)
+          const content = formatStubContent(ref)
 
-      // Check if paper already exists (by DOI or Semantic Scholar ID)
-      let sourceNodeId = findExistingNode(cit.externalIds?.DOI, cit.paperId, paperIndex)
+          // Position references BELOW the source node (fan layout)
+          const radius = 500
+          const angleStep = 0.12
+          const startAngle = -Math.PI / 2 // Start from directly below
+          const side = papersCreated % 2 === 0 ? 1 : -1
+          const level = Math.floor((papersCreated + 1) / 2)
+          const angle = startAngle + side * level * angleStep
 
-      // Create paper node if not found
-      // Note: We use stub content (from citation list) to avoid extra API calls
-      // Full details can be fetched later when user expands the node
-      if (!sourceNodeId && cit.title) {
-        const content = formatStubContent(cit)
+          const offsetX = Math.cos(angle) * radius
+          const offsetY = -Math.sin(angle) * radius
 
-        // Calculate position in a fan/arc layout above the source node
-        const radius = 500
-        const angleStep = 0.12 // ~7 degrees between each paper
-        const startAngle = Math.PI / 2 // Start from directly above
-        // Alternate left/right for symmetric fan: 0, -1, +1, -2, +2, ...
-        const side = papersCreated % 2 === 0 ? 1 : -1
-        const level = Math.floor((papersCreated + 1) / 2)
-        const angle = startAngle + side * level * angleStep
+          const newNode = await ctx.createNode({
+            title: ref.title,
+            markdown_content: content,
+            canvas_x: node.canvas_x + node.width / 2 + offsetX - 160,
+            canvas_y: node.canvas_y + offsetY,
+            width: 320,
+            height: 220,
+            workspace_id: workspaceId || undefined,
+          })
+          targetNodeId = newNode.id
 
-        const offsetX = Math.cos(angle) * radius
-        const offsetY = -Math.sin(angle) * radius // Negative because canvas Y increases downward
-
-        const newNode = await ctx.createNode({
-          title: cit.title,
-          markdown_content: content,
-          canvas_x: node.canvas_x + node.width / 2 + offsetX - 160,
-          canvas_y: node.canvas_y + offsetY,
-          width: 320,
-          height: 220,
-          workspace_id: workspaceId || undefined,
-        })
-        sourceNodeId = newNode.id
-        // Update index to prevent duplicates in this run
-        if (cit.externalIds?.DOI) {
-          paperIndex.byDOI.set(cit.externalIds.DOI.toLowerCase(), newNode.id)
+          if (ref.externalIds?.DOI) {
+            paperIndex.byDOI.set(ref.externalIds.DOI.toLowerCase(), newNode.id)
+          }
+          paperIndex.bySSId.set(ref.paperId, newNode.id)
+          if (ref.title) {
+            paperIndex.byTitle.set(normalizeTitle(ref.title), newNode.id)
+          }
+          papersCreated++
         }
-        paperIndex.bySSId.set(cit.paperId, newNode.id)
-        papersCreated++
-      }
 
-      // Create edge: citing paper -> cited paper (the node we're fetching citations FOR)
-      if (sourceNodeId && !edgeExists(sourceNodeId, nodeId, 'cites')) {
-        await ctx.createEdge({
-          source_node_id: sourceNodeId,
-          target_node_id: nodeId,
-          link_type: 'cites',
-        })
-        edgesCreated++
+        // Create edge: this node -> reference (this paper cites the reference)
+        if (targetNodeId && !edgeExists(nodeId, targetNodeId, 'cites')) {
+          await ctx.createEdge({
+            source_node_id: nodeId,
+            target_node_id: targetNodeId,
+            link_type: 'cites',
+            label: 'cites',
+          })
+          edgesCreated++
+        }
       }
     }
 
-    // Don't clear progress state here - let the caller (handleFetchCitations) do it
-    // This keeps the progress bar visible between papers in a batch
+    // Process citations (papers that cite this node) - create stubs + edges
+    if (citations.length > 0) {
+      fetchProgress.value = { current: 0, total: citations.length, paperTitle: node.title, paperIndex: batchPaperIndex, paperCount: batchPaperCount }
+
+      for (let i = 0; i < citations.length; i++) {
+        if (fetchCancelled.value) break
+        if (papersCreated >= maxPapers) break
+
+        const cit = citations[i]
+        fetchProgress.value = { current: i + 1, total: citations.length, paperTitle: cit.title || 'Unknown', paperIndex: batchPaperIndex, paperCount: batchPaperCount }
+
+        // Check if paper already exists
+        let sourceNodeId = findExistingNode(cit.externalIds?.DOI, cit.paperId, cit.title, paperIndex)
+
+        // Create stub node if not found
+        if (!sourceNodeId && cit.title) {
+          const content = formatStubContent(cit)
+
+          // Position citations ABOVE the source node (fan layout)
+          const radius = 500
+          const angleStep = 0.12
+          const startAngle = Math.PI / 2 // Start from directly above
+          const side = papersCreated % 2 === 0 ? 1 : -1
+          const level = Math.floor((papersCreated + 1) / 2)
+          const angle = startAngle + side * level * angleStep
+
+          const offsetX = Math.cos(angle) * radius
+          const offsetY = -Math.sin(angle) * radius
+
+          const newNode = await ctx.createNode({
+            title: cit.title,
+            markdown_content: content,
+            canvas_x: node.canvas_x + node.width / 2 + offsetX - 160,
+            canvas_y: node.canvas_y + offsetY,
+            width: 320,
+            height: 220,
+            workspace_id: workspaceId || undefined,
+          })
+          sourceNodeId = newNode.id
+
+          if (cit.externalIds?.DOI) {
+            paperIndex.byDOI.set(cit.externalIds.DOI.toLowerCase(), newNode.id)
+          }
+          paperIndex.bySSId.set(cit.paperId, newNode.id)
+          if (cit.title) {
+            paperIndex.byTitle.set(normalizeTitle(cit.title), newNode.id)
+          }
+          papersCreated++
+        }
+
+        // Create edge: citing paper -> this node (the citing paper cites this one)
+        if (sourceNodeId && !edgeExists(sourceNodeId, nodeId, 'cites')) {
+          await ctx.createEdge({
+            source_node_id: sourceNodeId,
+            target_node_id: nodeId,
+            link_type: 'cites',
+            label: 'cites',
+          })
+          edgesCreated++
+        }
+      }
+    }
 
     return { edgesCreated, papersCreated }
+  }
+
+  // Convenience wrappers
+  async function fetchCitationsForNode(
+    nodeId: string,
+    options?: { maxCitations?: number; paperIndex?: number; paperCount?: number }
+  ): Promise<{ edgesCreated: number; papersCreated: number }> {
+    console.log(`[CitationGraph] fetchCitationsForNode called for ${nodeId}`)
+    return fetchPapersForNode(nodeId, 'citations', { ...options, maxPapers: options?.maxCitations })
+  }
+
+  async function fetchReferencesForNode(
+    nodeId: string,
+    options?: { maxReferences?: number; paperIndex?: number; paperCount?: number }
+  ): Promise<{ edgesCreated: number; papersCreated: number }> {
+    console.log(`[CitationGraph] fetchReferencesForNode called for ${nodeId}`)
+    return fetchPapersForNode(nodeId, 'references', { ...options, maxPapers: options?.maxReferences })
+  }
+
+  async function fetchBothForNode(
+    nodeId: string,
+    options?: { maxPapers?: number; paperIndex?: number; paperCount?: number }
+  ): Promise<{ edgesCreated: number; papersCreated: number }> {
+    console.log(`[CitationGraph] fetchBothForNode called for ${nodeId}`)
+    return fetchPapersForNode(nodeId, 'both', options)
   }
 
   /**
@@ -363,8 +478,8 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
         // Process references (papers this node cites)
         let stubsCreated = 0
         for (const ref of references) {
-          // Find existing node by DOI or Semantic Scholar ID
-          let targetNodeId = findExistingNode(ref.externalIds?.DOI, ref.paperId, paperIndex)
+          // Find existing node by DOI, Semantic Scholar ID, or title
+          let targetNodeId = findExistingNode(ref.externalIds?.DOI, ref.paperId, ref.title, paperIndex)
 
           // Create stub node if not found and stubs enabled
           if (!targetNodeId && createStubs && stubsCreated < maxStubsPerPaper) {
@@ -385,6 +500,9 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
               paperIndex.byDOI.set(ref.externalIds.DOI.toLowerCase(), stubNode.id)
             }
             paperIndex.bySSId.set(ref.paperId, stubNode.id)
+            if (ref.title) {
+              paperIndex.byTitle.set(normalizeTitle(ref.title), stubNode.id)
+            }
             stubNodesCreated++
             stubsCreated++
           }
@@ -395,6 +513,7 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
               source_node_id: node.id,
               target_node_id: targetNodeId,
               link_type: 'cites',
+            label: 'cites',
             })
             edgesCreated++
           }
@@ -402,8 +521,8 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
         // Process citations (papers that cite this node)
         for (const cit of citations) {
-          // Find existing node by DOI or Semantic Scholar ID
-          const sourceNodeId = findExistingNode(cit.externalIds?.DOI, cit.paperId, paperIndex)
+          // Find existing node by DOI, Semantic Scholar ID, or title
+          const sourceNodeId = findExistingNode(cit.externalIds?.DOI, cit.paperId, cit.title, paperIndex)
 
           // Only connect to existing nodes for citations
           // (we don't create stubs for papers that cite us)
@@ -412,6 +531,7 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
               source_node_id: sourceNodeId,
               target_node_id: node.id,
               link_type: 'cites',
+            label: 'cites',
             })
             edgesCreated++
           }
@@ -466,6 +586,8 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     // Actions
     buildCitationGraph,
     fetchCitationsForNode,
+    fetchReferencesForNode,
+    fetchBothForNode,
     cancelBuild,
     cancelFetch,
     resetFetchState,

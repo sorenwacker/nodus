@@ -34,6 +34,9 @@ const emit = defineEmits<{
   (e: 'link-to-entity', entityId: string): void
   (e: 'create-entity', type: EntityNodeType): void
   (e: 'fetch-citations'): void
+  (e: 'fetch-references'): void
+  (e: 'fetch-both'): void
+  (e: 'add-to-zotero'): void
 }>()
 
 const otherWorkspaces = computed(() => {
@@ -117,6 +120,21 @@ function handleMoveToWorkspace(workspaceId: string | null) {
 
 function handleFetchCitations() {
   emit('fetch-citations')
+  emit('close')
+}
+
+function handleFetchReferences() {
+  emit('fetch-references')
+  emit('close')
+}
+
+function handleFetchBoth() {
+  emit('fetch-both')
+  emit('close')
+}
+
+function handleAddToZotero() {
+  emit('add-to-zotero')
   emit('close')
 }
 
@@ -216,13 +234,36 @@ function handleCreateEntity(type: EntityNodeType) {
       </div>
     </div>
 
-    <!-- Fetch Citations (for nodes with DOI) -->
-    <div v-if="doiCount && doiCount > 0" class="context-menu-item" @click="handleFetchCitations">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-      </svg>
-      <span>Fetch Citations{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
-    </div>
+    <!-- Fetch Citations/References (for nodes with DOI) -->
+    <template v-if="doiCount && doiCount > 0">
+      <div class="context-menu-item" @click="handleFetchCitations">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+        <span>Fetch Citations{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+      </div>
+      <div class="context-menu-item" @click="handleFetchReferences">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+        <span>Fetch References{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+      </div>
+      <div class="context-menu-item" @click="handleFetchBoth">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M5 5l7 7 7-7M5 19l7-7 7 7"/>
+        </svg>
+        <span>Fetch Both{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+      </div>
+      <div class="context-menu-item" @click="handleAddToZotero">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          <line x1="12" y1="6" x2="12" y2="14"/>
+          <line x1="8" y1="10" x2="16" y2="10"/>
+        </svg>
+        <span>Add to Zotero{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+      </div>
+    </template>
 
     <div class="context-menu-divider"></div>
 

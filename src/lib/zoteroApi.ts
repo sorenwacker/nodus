@@ -169,6 +169,50 @@ export class ZoteroWebApi {
   }
 
   /**
+   * Get all DOIs in the library (for duplicate checking)
+   * Returns a Set of DOIs for fast lookup
+   */
+  async getAllDOIs(): Promise<Set<string>> {
+    try {
+      const dois = new Set<string>()
+      let start = 0
+      const limit = 100
+      let hasMore = true
+
+      // Paginate through all items
+      while (hasMore) {
+        const response = await this.request<Array<{ data: ZoteroApiItem }>>(
+          'GET',
+          `/items/top?itemType=-attachment&format=json&limit=${limit}&start=${start}`
+        )
+
+        if (response.length === 0) {
+          hasMore = false
+          continue
+        }
+
+        for (const item of response) {
+          if (item.data?.DOI) {
+            dois.add(item.data.DOI)
+          }
+        }
+
+        if (response.length < limit) {
+          hasMore = false
+        } else {
+          start += limit
+        }
+      }
+
+      console.log(`[Zotero API] Loaded ${dois.size} DOIs from library`)
+      return dois
+    } catch (e) {
+      console.error('[Zotero API] Failed to fetch DOIs:', e)
+      return new Set()
+    }
+  }
+
+  /**
    * Create a new item in Zotero
    */
   async createItem(item: ZoteroApiItem): Promise<string> {

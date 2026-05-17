@@ -99,6 +99,7 @@ pub fn detect_zotero_path() -> Option<PathBuf> {
 }
 
 /// Open a read-only connection to the Zotero database
+/// Copies to temp file to avoid locking conflicts with running Zotero
 async fn open_zotero_db(zotero_path: &Path) -> Result<SqlitePool, String> {
     let db_path = zotero_path.join("zotero.sqlite");
 
@@ -106,15 +107,32 @@ async fn open_zotero_db(zotero_path: &Path) -> Result<SqlitePool, String> {
         return Err(format!("Zotero database not found at {:?}", db_path));
     }
 
-    // Open in read-only mode to avoid conflicts with Zotero
+    // Copy database to temp file to avoid locking conflicts
+    let temp_dir = std::env::temp_dir();
+    let temp_db = temp_dir.join("nodus_zotero_copy.sqlite");
+
+    // Copy the main database file
+    std::fs::copy(&db_path, &temp_db)
+        .map_err(|e| format!("Failed to copy Zotero database: {}", e))?;
+
+    // Also copy WAL and SHM files if they exist (for consistency)
+    let wal_path = zotero_path.join("zotero.sqlite-wal");
+    let shm_path = zotero_path.join("zotero.sqlite-shm");
+    if wal_path.exists() {
+        let _ = std::fs::copy(&wal_path, temp_dir.join("nodus_zotero_copy.sqlite-wal"));
+    }
+    if shm_path.exists() {
+        let _ = std::fs::copy(&shm_path, temp_dir.join("nodus_zotero_copy.sqlite-shm"));
+    }
+
     let options = SqliteConnectOptions::new()
-        .filename(&db_path)
+        .filename(&temp_db)
         .read_only(true)
         .create_if_missing(false);
 
     SqlitePool::connect_with(options)
         .await
-        .map_err(|e| format!("Failed to open Zotero database: {}", e))
+        .map_err(|e| format!("Failed to open Zotero database copy: {}", e))
 }
 
 /// Get all collections from the Zotero library
@@ -130,7 +148,6 @@ pub async fn get_collections(zotero_path: &Path) -> Result<Vec<ZoteroCollection>
             (SELECT COUNT(*) FROM collectionItems ci WHERE ci.collectionID = c.collectionID) as itemCount
         FROM collections c
         LEFT JOIN collections pc ON c.parentCollectionID = pc.collectionID
-        WHERE c.libraryID = 1
         ORDER BY c.collectionName
         "#,
     )
@@ -171,10 +188,73 @@ pub async fn get_collection_items(
         JOIN collections c ON ci.collectionID = c.collectionID
         WHERE c.key = ?
           AND it.typeName NOT IN ('attachment', 'note')
-          AND i.libraryID = 1
         "#,
     )
     .bind(collection_key)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| format!("Failed to query items: {}", e))?;
+
+    let mut items = Vec::new();
+
+    for row in item_rows {
+        let item_key: String = row.get("key");
+        let item_type: String = row.get("itemType");
+
+        // Get item fields
+        let fields = get_item_fields(&pool, &item_key).await?;
+
+        // Get creators
+        let creators = get_item_creators(&pool, &item_key).await?;
+
+        // Get attachments
+        let attachments = get_item_attachments(&pool, &item_key).await?;
+
+        // Get collections this item belongs to
+        let collections = get_item_collections(&pool, &item_key).await?;
+
+        items.push(ZoteroItem {
+            key: item_key,
+            item_type,
+            title: fields.get("title").cloned(),
+            creators,
+            date: fields.get("date").cloned(),
+            publication_title: fields
+                .get("publicationTitle")
+                .or(fields.get("bookTitle"))
+                .cloned(),
+            publisher: fields.get("publisher").cloned(),
+            volume: fields.get("volume").cloned(),
+            issue: fields.get("issue").cloned(),
+            pages: fields.get("pages").cloned(),
+            doi: fields.get("DOI").cloned(),
+            url: fields.get("url").cloned(),
+            abstract_note: fields.get("abstractNote").cloned(),
+            attachments,
+            collections,
+        });
+    }
+
+    pool.close().await;
+    Ok(items)
+}
+
+/// Get ALL items from the library (not just in collections)
+pub async fn get_all_items(zotero_path: &Path) -> Result<Vec<ZoteroItem>, String> {
+    let pool = open_zotero_db(zotero_path).await?;
+
+    // Get all items (excluding attachments and notes)
+    let item_rows = sqlx::query(
+        r#"
+        SELECT DISTINCT
+            i.key,
+            it.typeName as itemType
+        FROM items i
+        JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+        WHERE it.typeName NOT IN ('attachment', 'note')
+        ORDER BY i.dateAdded DESC
+        "#,
+    )
     .fetch_all(&pool)
     .await
     .map_err(|e| format!("Failed to query items: {}", e))?;

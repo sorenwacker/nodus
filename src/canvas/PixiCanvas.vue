@@ -85,6 +85,7 @@ import FullscreenNodeModal from '../components/FullscreenNodeModal.vue'
 import FileMoveCollisionDialog from '../components/FileMoveCollisionDialog.vue'
 import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
+import { useZotero } from '../composables/useZotero'
 
 // Undo handlers
 const {
@@ -757,7 +758,51 @@ const {
   contextMenuNodeHasDOI,
   contextMenuDOICount,
   handleFetchCitations,
+  handleFetchReferences,
+  handleFetchBoth,
 } = citationFetch
+
+// Zotero integration
+const zotero = useZotero()
+
+async function handleAddToZotero() {
+  console.log('[Zotero] handleAddToZotero called')
+  const affectedIds = contextMenu.affectedNodeIds.value
+  console.log('[Zotero] affectedIds:', affectedIds.length)
+  if (affectedIds.length === 0) return
+
+  const nodes = affectedIds
+    .map(id => store.getNode(id))
+    .filter((n): n is Node => n !== undefined)
+
+  console.log('[Zotero] nodes to add:', nodes.length)
+  if (nodes.length === 0) return
+
+  console.log('[Zotero] calling addNodesToZotero...')
+  const result = await zotero.addNodesToZotero(nodes)
+  console.log('[Zotero] result:', result)
+
+  if (result.cancelled) {
+    if (result.added > 0) {
+      showToast(`Stopped - added ${result.added} item(s) to Zotero`, 'warning')
+    } else {
+      showToast('Cancelled', 'info')
+    }
+  } else if (result.added > 0) {
+    const parts: string[] = []
+    if (result.duplicates > 0) parts.push(`${result.duplicates} duplicates`)
+    if (result.skipped > 0) parts.push(`${result.skipped} no content`)
+    const extraMsg = parts.length > 0 ? ` (${parts.join(', ')})` : ''
+    showToast(`Added ${result.added} item(s) to Zotero${extraMsg}`, 'success')
+  } else if (result.duplicates > 0) {
+    showToast(`No items added - ${result.duplicates} already in Zotero`, 'info')
+  } else if (result.skipped > 0) {
+    showToast(`No items added - ${result.skipped} node(s) had no content`, 'warning')
+  }
+  if (result.errors.length > 0) {
+    showToast(result.errors[0], 'error')
+  }
+}
 
 // Link picker composable
 const linkPicker = useLinkPicker({
@@ -2411,6 +2456,9 @@ useCanvasKeyboardShortcuts({
         @link-to-entity="linkToEntity"
         @create-entity="handleCreateEntity"
         @fetch-citations="handleFetchCitations()"
+        @fetch-references="handleFetchReferences()"
+        @fetch-both="handleFetchBoth()"
+        @add-to-zotero="handleAddToZotero()"
         @update:storyline-submenu="contextMenuStorylineSubmenu = $event"
         @update:workspace-submenu="contextMenuWorkspaceSubmenu = $event"
         @update:entity-submenu="contextMenuEntitySubmenu = $event"
@@ -2448,6 +2496,30 @@ useCanvasKeyboardShortcuts({
               {{ waitStatus.reason === 'backoff' ? 'Rate limited, retrying in' : 'Next request in' }}
               {{ waitStatus.remainingSeconds }}s
             </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zotero add progress indicator -->
+      <div v-if="zotero.addToZoteroProgress.value" class="citation-fetch-progress">
+        <div class="citation-fetch-content">
+          <div class="citation-fetch-header">
+            <span class="citation-fetch-title">Adding to Zotero</span>
+            <button class="citation-fetch-cancel" @click="zotero.cancelAddToZotero()">
+              Stop
+            </button>
+          </div>
+          <div class="citation-fetch-info">
+            <div class="citation-fetch-count">
+              {{ zotero.addToZoteroProgress.value.current }} / {{ zotero.addToZoteroProgress.value.total }}
+            </div>
+            <div class="citation-fetch-paper">{{ zotero.addToZoteroProgress.value.currentItem }}</div>
+            <div class="citation-fetch-bar">
+              <div
+                class="citation-fetch-bar-fill"
+                :style="{ width: `${(zotero.addToZoteroProgress.value.current / Math.max(zotero.addToZoteroProgress.value.total, 1)) * 100}%` }"
+              ></div>
+            </div>
           </div>
         </div>
       </div>

@@ -225,6 +225,7 @@ fn main() {
             commands::detect_zotero_path,
             commands::list_zotero_collections,
             commands::get_zotero_collection_items,
+            commands::get_zotero_all_items,
             render_typst_math,
         ])
         .run(tauri::generate_context!())

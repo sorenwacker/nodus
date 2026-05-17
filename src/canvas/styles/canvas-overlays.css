@@ -741,8 +741,7 @@
 .citation-fetch-progress {
   position: absolute;
   bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 20px;
   z-index: 200;
   pointer-events: auto;
 }

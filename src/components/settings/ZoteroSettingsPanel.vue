@@ -239,6 +239,26 @@ async function importCollection(collectionKey: string) {
   }
 }
 
+// Import ALL items from local Zotero library
+async function importAllLocalItems() {
+  if (importingCollection.value) return
+
+  importingCollection.value = 'all-local'
+  try {
+    const result = await zotero.importAllToCanvas(
+      store.createNode,
+      { workspaceId: store.currentWorkspaceId || undefined }
+    )
+    if (result.nodesCreated > 0) {
+      await store.layoutNodes(result.nodeIds)
+    }
+  } catch (e) {
+    console.error('Failed to import all items:', e)
+  } finally {
+    importingCollection.value = null
+  }
+}
+
 // Build citation graph
 async function buildGraph() {
   citationGraphResult.value = null
@@ -288,6 +308,20 @@ async function buildGraph() {
     <!-- Collections with Import -->
     <div v-if="zotero.isConnected.value" class="setting-group">
       <label>{{ t('settings.zotero.collections') }} ({{ zotero.collections.value.length }})</label>
+
+      <!-- Import All Items button (always visible when connected) -->
+      <button
+        class="import-all-btn"
+        :disabled="importingCollection === 'all-local'"
+        @click="importAllLocalItems"
+      >
+        <template v-if="importingCollection === 'all-local' && zotero.importProgress.value">
+          {{ zotero.importProgress.value.current }}/{{ zotero.importProgress.value.total }}
+        </template>
+        <template v-else>
+          {{ t('settings.zotero.importAll') }}
+        </template>
+      </button>
 
       <div v-if="zotero.isLoading.value" class="loading">
         {{ t('settings.zotero.loading') }}
