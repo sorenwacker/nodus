@@ -76,8 +76,9 @@ async function testCloudConnection() {
     )
     if (response.ok) {
       cloudStatus.value = 'valid'
-      // Fetch all collections
+      // Fetch all collections (both into local state and shared composable)
       await fetchCloudCollections()
+      await zotero.loadCollections()
     } else {
       cloudStatus.value = 'invalid'
     }
@@ -274,37 +275,6 @@ async function buildGraph() {
 
 <template>
   <div class="settings-section">
-    <!-- Local Zotero Library -->
-    <div class="setting-group">
-      <label>{{ t('settings.zotero.library') }}</label>
-
-      <div v-if="!zotero.isConnected.value" class="zotero-connect">
-        <button
-          class="detect-btn"
-          :disabled="zotero.isLoading.value"
-          @click="zotero.detectZotero()"
-        >
-          {{ zotero.isLoading.value ? t('settings.zotero.detecting') : t('settings.zotero.detect') }}
-        </button>
-        <span class="hint">{{ t('settings.zotero.detectHint') }}</span>
-      </div>
-
-      <div v-else class="zotero-connected">
-        <div class="connected-status">
-          <span class="status-icon">&#10003;</span>
-          <span>{{ t('settings.zotero.connected') }}</span>
-          <button class="disconnect-btn" @click="zotero.disconnect()">
-            {{ t('settings.zotero.disconnect') }}
-          </button>
-        </div>
-        <div class="zotero-path">{{ zotero.zoteroPath.value }}</div>
-      </div>
-
-      <div v-if="zotero.error.value" class="error-message">
-        {{ zotero.error.value }}
-      </div>
-    </div>
-
     <!-- Collections with Import -->
     <div v-if="zotero.isConnected.value" class="setting-group">
       <label>{{ t('settings.zotero.collections') }} ({{ zotero.collections.value.length }})</label>
@@ -617,43 +587,6 @@ async function buildGraph() {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.status-icon {
-  color: #22c55e;
-  font-weight: bold;
-}
-
-.disconnect-btn {
-  margin-left: auto;
-  padding: 4px 12px;
-  font-size: 12px;
-  background: transparent;
-  border: 1px solid var(--border-node, #e4e4e7);
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-muted, #71717a);
-}
-
-.disconnect-btn:hover {
-  background: var(--bg-canvas, #f4f4f5);
-  color: var(--text-main, #18181b);
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .disconnect-btn {
-  border-color: #3f3f46;
-}
-
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .disconnect-btn:hover {
-  background: #3f3f46;
-  color: #f4f4f5;
-}
-
-.zotero-path {
-  font-size: 12px;
-  color: var(--text-muted, #71717a);
-  font-family: monospace;
-  word-break: break-all;
 }
 
 .error-message {

@@ -10,7 +10,6 @@ mod pdf;
 mod themes;
 mod typst_render;
 mod watcher;
-mod zotero;
 
 use std::sync::Mutex;
 #[cfg(target_os = "macos")]
@@ -222,10 +221,6 @@ fn main() {
             commands::delete_frame,
             commands::assign_node_to_frame,
             commands::import_ontology,
-            commands::detect_zotero_path,
-            commands::list_zotero_collections,
-            commands::get_zotero_collection_items,
-            commands::get_zotero_all_items,
             render_typst_math,
         ])
         .run(tauri::generate_context!())

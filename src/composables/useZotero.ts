@@ -1,17 +1,16 @@
 /**
  * Zotero library integration composable
  *
- * Provides access to Zotero's local library for importing citations
- * and collections directly into Nodus.
+ * Provides access to Zotero Cloud library via Web API for importing
+ * and exporting citations.
  */
 import { ref, computed } from 'vue'
-import { invoke } from '../lib/tauri'
-import { zoteroApi } from '../lib/zoteroApi'
+import { zoteroApi, type ZoteroApiItem } from '../lib/zoteroApi'
 import { zoteroStorage } from '../lib/storage'
 import type { CreateNodeInput } from '../types'
 
 /**
- * Zotero collection
+ * Zotero collection (from Web API)
  */
 export interface ZoteroCollection {
   key: string
@@ -30,17 +29,7 @@ export interface ZoteroCreator {
 }
 
 /**
- * Zotero attachment
- */
-export interface ZoteroAttachment {
-  key: string
-  title: string | null
-  path: string | null
-  content_type: string | null
-}
-
-/**
- * Zotero library item
+ * Zotero library item (internal format)
  */
 export interface ZoteroItem {
   key: string
@@ -56,7 +45,6 @@ export interface ZoteroItem {
   doi: string | null
   url: string | null
   abstract_note: string | null
-  attachments: ZoteroAttachment[]
   collections: string[]
 }
 
@@ -71,107 +59,75 @@ export interface ImportResult {
   nodeIds: string[]
 }
 
+/**
+ * Metadata extracted from node content
+ */
+export interface ExtractedMetadata {
+  doi: string | null
+  date: string | null
+  journal: string | null
+  creators: Array<{ firstName?: string; lastName?: string; creatorType: string }>
+}
+
 // Singleton state - shared across all useZotero() calls
-const ZOTERO_PATH_KEY = 'nodus_zotero_path'
-
-const storedPath = typeof localStorage !== 'undefined' ? localStorage.getItem(ZOTERO_PATH_KEY) : null
-
-console.log('[Zotero] Initializing with stored path:', storedPath)
-console.log('[Zotero] API configured:', zoteroStorage.isConfigured())
-
-const zoteroPath = ref<string | null>(storedPath)
 const collections = ref<ZoteroCollection[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const importProgress = ref<ImportProgress | null>(null)
 
-// Auto-load collections if we have a stored path
-if (storedPath) {
-  // Defer to avoid blocking - will load collections in background
-  setTimeout(async () => {
-    try {
-      const { invoke } = await import('../lib/tauri')
-      const result = await invoke<ZoteroCollection[]>('list_zotero_collections', {
-        zoteroPath: storedPath,
-      })
-      collections.value = result
-    } catch (e) {
-      console.warn('Failed to auto-load Zotero collections:', e)
-      // Clear invalid path
-      localStorage.removeItem(ZOTERO_PATH_KEY)
-      zoteroPath.value = null
-    }
-  }, 100)
+/**
+ * Convert Web API item to internal ZoteroItem format
+ */
+function convertApiItem(apiItem: ZoteroApiItem): ZoteroItem {
+  return {
+    key: apiItem.key || '',
+    item_type: apiItem.itemType,
+    title: apiItem.title || null,
+    creators: (apiItem.creators || []).map(c => ({
+      first_name: c.firstName || null,
+      last_name: c.lastName || c.name || null,
+      creator_type: c.creatorType,
+    })),
+    date: apiItem.date || null,
+    publication_title: apiItem.publicationTitle || null,
+    publisher: apiItem.publisher || null,
+    volume: apiItem.volume || null,
+    issue: apiItem.issue || null,
+    pages: apiItem.pages || null,
+    doi: apiItem.DOI || null,
+    url: apiItem.url || null,
+    abstract_note: apiItem.abstractNote || null,
+    collections: apiItem.collections || [],
+  }
 }
 
 export function useZotero() {
   // State is defined at module level (singleton)
 
   // Computed
-  const isConnected = computed(() => zoteroPath.value !== null)
+  const isConnected = computed(() => zoteroApi.isConfigured)
 
   const topLevelCollections = computed(() =>
     collections.value.filter(c => c.parent_key === null)
   )
 
   /**
-   * Detect and connect to local Zotero library
-   */
-  async function detectZotero(): Promise<boolean> {
-    isLoading.value = true
-    error.value = null
-
-    try {
-      const path = await invoke<string | null>('detect_zotero_path')
-      zoteroPath.value = path
-
-      if (path) {
-        localStorage.setItem(ZOTERO_PATH_KEY, path)
-        await loadCollections()
-        return true
-      }
-      return false
-    } catch (e) {
-      error.value = String(e)
-      return false
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  /**
-   * Set custom Zotero library path
-   */
-  async function setZoteroPath(path: string): Promise<boolean> {
-    zoteroPath.value = path
-    error.value = null
-
-    try {
-      await loadCollections()
-      localStorage.setItem(ZOTERO_PATH_KEY, path)
-      return true
-    } catch (e) {
-      error.value = String(e)
-      zoteroPath.value = null
-      localStorage.removeItem(ZOTERO_PATH_KEY)
-      return false
-    }
-  }
-
-  /**
-   * Load collections from Zotero
+   * Load collections from Zotero via Web API
    */
   async function loadCollections(): Promise<void> {
-    if (!zoteroPath.value) return
+    if (!zoteroApi.isConfigured) return
 
     isLoading.value = true
     error.value = null
 
     try {
-      const result = await invoke<ZoteroCollection[]>('list_zotero_collections', {
-        zoteroPath: zoteroPath.value,
-      })
-      collections.value = result
+      const apiCollections = await zoteroApi.getCollections()
+      collections.value = apiCollections.map(c => ({
+        key: c.key,
+        name: c.data.name,
+        parent_key: c.data.parentCollection === false ? null : c.data.parentCollection,
+        item_count: 0, // Web API doesn't return item count directly
+      }))
     } catch (e) {
       error.value = String(e)
       collections.value = []
@@ -181,20 +137,17 @@ export function useZotero() {
   }
 
   /**
-   * Get items in a collection
+   * Get items in a collection via Web API
    */
   async function getCollectionItems(collectionKey: string): Promise<ZoteroItem[]> {
-    if (!zoteroPath.value) return []
+    if (!zoteroApi.isConfigured) return []
 
     isLoading.value = true
     error.value = null
 
     try {
-      const items = await invoke<ZoteroItem[]>('get_zotero_collection_items', {
-        zoteroPath: zoteroPath.value,
-        collectionKey,
-      })
-      return items
+      const apiItems = await zoteroApi.getCollectionItems(collectionKey)
+      return apiItems.map(convertApiItem)
     } catch (e) {
       error.value = String(e)
       return []
@@ -204,19 +157,17 @@ export function useZotero() {
   }
 
   /**
-   * Get ALL items from library (not limited to a collection)
+   * Get ALL items from library via Web API
    */
   async function getAllItems(): Promise<ZoteroItem[]> {
-    if (!zoteroPath.value) return []
+    if (!zoteroApi.isConfigured) return []
 
     isLoading.value = true
     error.value = null
 
     try {
-      const items = await invoke<ZoteroItem[]>('get_zotero_all_items', {
-        zoteroPath: zoteroPath.value,
-      })
-      return items
+      const apiItems = await zoteroApi.getItems()
+      return apiItems.map(convertApiItem)
     } catch (e) {
       error.value = String(e)
       return []
@@ -251,16 +202,6 @@ export function useZotero() {
     if (authors.length === 1) return formatCreator(authors[0])
     if (authors.length === 2) return `${formatCreator(authors[0])} & ${formatCreator(authors[1])}`
     return `${formatCreator(authors[0])} et al.`
-  }
-
-  /**
-   * Disconnect from Zotero
-   */
-  function disconnect(): void {
-    zoteroPath.value = null
-    collections.value = []
-    error.value = null
-    localStorage.removeItem(ZOTERO_PATH_KEY)
   }
 
   /**
@@ -326,10 +267,10 @@ export function useZotero() {
   }
 
   /**
-   * Import a Zotero collection to canvas as nodes
+   * Import Zotero items to canvas as nodes (shared implementation)
    */
-  async function importCollectionToCanvas(
-    collectionKey: string,
+  async function importItemsToCanvas(
+    items: ZoteroItem[],
     createNode: (data: CreateNodeInput) => Promise<{ id: string }>,
     options?: {
       workspaceId?: string
@@ -337,7 +278,6 @@ export function useZotero() {
       startY?: number
     }
   ): Promise<ImportResult> {
-    const items = await getCollectionItems(collectionKey)
     if (items.length === 0) {
       return { nodesCreated: 0, nodeIds: [] }
     }
@@ -386,6 +326,22 @@ export function useZotero() {
 
     importProgress.value = null
     return { nodesCreated: nodeIds.length, nodeIds }
+  }
+
+  /**
+   * Import a Zotero collection to canvas as nodes
+   */
+  async function importCollectionToCanvas(
+    collectionKey: string,
+    createNode: (data: CreateNodeInput) => Promise<{ id: string }>,
+    options?: {
+      workspaceId?: string
+      startX?: number
+      startY?: number
+    }
+  ): Promise<ImportResult> {
+    const items = await getCollectionItems(collectionKey)
+    return importItemsToCanvas(items, createNode, options)
   }
 
   /**
@@ -400,71 +356,25 @@ export function useZotero() {
     }
   ): Promise<ImportResult> {
     const items = await getAllItems()
-    if (items.length === 0) {
-      return { nodesCreated: 0, nodeIds: [] }
-    }
-
-    const nodeIds: string[] = []
-    const startX = options?.startX ?? 100
-    const startY = options?.startY ?? 100
-    const nodeWidth = 300
-    const nodeHeight = 200
-    const cols = Math.ceil(Math.sqrt(items.length))
-    const padding = 40
-
-    importProgress.value = { current: 0, total: items.length, currentItem: '' }
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      importProgress.value = {
-        current: i + 1,
-        total: items.length,
-        currentItem: item.title || 'Untitled',
-      }
-
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      const x = startX + col * (nodeWidth + padding)
-      const y = startY + row * (nodeHeight + padding)
-
-      const markdown = formatItemAsMarkdown(item)
-
-      try {
-        const node = await createNode({
-          title: item.title || 'Untitled',
-          markdown_content: markdown,
-          node_type: 'citation',
-          canvas_x: x,
-          canvas_y: y,
-          width: nodeWidth,
-          height: nodeHeight,
-          workspace_id: options?.workspaceId,
-        })
-        nodeIds.push(node.id)
-      } catch (e) {
-        console.error(`Failed to create node for ${item.title}:`, e)
-      }
-    }
-
-    importProgress.value = null
-    return { nodesCreated: nodeIds.length, nodeIds }
+    return importItemsToCanvas(items, createNode, options)
   }
 
   /**
    * Extract metadata from node content
    */
-  function extractMetadata(nodeContent: string): {
-    doi: string | null
-    date: string | null
-    journal: string | null
-    creators: Array<{ firstName?: string; lastName?: string; creatorType: string }>
-  } {
+  function extractMetadata(nodeContent: string): ExtractedMetadata {
+    // Limit input size for regex safety (first 10KB should contain all metadata)
+    const MAX_CONTENT_SIZE = 10 * 1024
+    const content = nodeContent.length > MAX_CONTENT_SIZE
+      ? nodeContent.slice(0, MAX_CONTENT_SIZE)
+      : nodeContent
+
     let doi: string | null = null
     let date: string | null = null
     let journal: string | null = null
 
     // Extract from frontmatter
-    const frontmatterMatch = nodeContent.match(/^---\s*\n([\s\S]*?)\n---/)
+    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
     if (frontmatterMatch) {
       const fm = frontmatterMatch[1]
       const doiMatch = fm.match(/^doi:\s*(.+)$/m)
@@ -477,15 +387,15 @@ export function useZotero() {
 
     // Extract year from body if date not in frontmatter
     if (!date) {
-      const yearMatch = nodeContent.match(/^\*(\d{4})\*$/m) ||
-                        nodeContent.match(/\*\((\d{4})\)\*/) ||
-                        nodeContent.match(/\((\d{4})\)/)
+      const yearMatch = content.match(/^\*(\d{4})\*$/m) ||
+                        content.match(/\*\((\d{4})\)\*/) ||
+                        content.match(/\((\d{4})\)/)
       if (yearMatch) date = yearMatch[1]
     }
 
     // Extract journal/venue from publication info line
     if (!journal) {
-      const pubInfoMatch = nodeContent.match(/^\*([^*]+)\*$/m)
+      const pubInfoMatch = content.match(/^\*([^*]+)\*$/m)
       if (pubInfoMatch) {
         const pubInfo = pubInfoMatch[1]
         const parts = pubInfo.split(',')
@@ -496,7 +406,7 @@ export function useZotero() {
     }
 
     // Extract authors from body
-    const authorsMatch = nodeContent.match(/\*\*Authors:\*\*\s*(.+)/i)
+    const authorsMatch = content.match(/\*\*Authors:\*\*\s*(.+)/i)
     const creators: Array<{ firstName?: string; lastName?: string; creatorType: string }> = []
     if (authorsMatch) {
       const authorStr = authorsMatch[1].replace(/, et al\.?$/i, '')
@@ -519,6 +429,60 @@ export function useZotero() {
     }
 
     return { doi, date, journal, creators }
+  }
+
+  /**
+   * Build Zotero item data from node title and content
+   */
+  function buildZoteroItemData(title: string, content: string) {
+    const { doi, date, journal, creators } = extractMetadata(content)
+    return {
+      itemData: {
+        itemType: 'journalArticle' as const,
+        title,
+        creators: creators.map(c => ({
+          creatorType: c.creatorType,
+          firstName: c.firstName,
+          lastName: c.lastName,
+        })),
+        date: date || undefined,
+        publicationTitle: journal || undefined,
+        DOI: doi || undefined,
+        url: doi ? `https://doi.org/${doi}` : undefined,
+      },
+      doi,
+    }
+  }
+
+  // Rate limiting constants
+  const DELAY_MS = 200 // 200ms between requests (5 per second max)
+  const BACKOFF_BASE_MS = 2000 // Base delay for exponential backoff
+  const MAX_RETRIES = 3
+
+  /**
+   * Retry an async operation with exponential backoff
+   */
+  async function retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    onRetry?: (waitTime: number, retriesLeft: number) => void
+  ): Promise<T> {
+    let retries = MAX_RETRIES
+    while (retries > 0) {
+      try {
+        return await operation()
+      } catch (e) {
+        const errMsg = String(e)
+        if (errMsg.includes('429') && retries > 1) {
+          const waitTime = (MAX_RETRIES + 1 - retries) * BACKOFF_BASE_MS
+          onRetry?.(waitTime, retries - 1)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+          retries--
+        } else {
+          throw e
+        }
+      }
+    }
+    throw new Error('Max retries exceeded')
   }
 
   /**
@@ -552,25 +516,11 @@ export function useZotero() {
       return null
     }
 
-    const { doi, date, journal, creators } = extractMetadata(nodeContent)
+    const { itemData, doi } = buildZoteroItemData(nodeTitle, nodeContent)
 
     // Check for duplicate by DOI (using pre-fetched set)
     if (doi && existingDOIs?.has(doi)) {
       return 'duplicate'
-    }
-
-    const itemData = {
-      itemType: 'journalArticle' as const,
-      title: nodeTitle,
-      creators: creators.map(c => ({
-        creatorType: c.creatorType,
-        firstName: c.firstName,
-        lastName: c.lastName,
-      })),
-      date: date || undefined,
-      publicationTitle: journal || undefined,
-      DOI: doi || undefined,
-      url: doi ? `https://doi.org/${doi}` : undefined,
     }
 
     try {
@@ -610,8 +560,6 @@ export function useZotero() {
     let duplicates = 0
     addToZoteroCancelled.value = false
 
-    console.log(`[Zotero] Adding ${nodes.length} nodes to Zotero`)
-
     // Fetch all existing DOIs once (for fast duplicate checking)
     addToZoteroProgress.value = { current: 0, total: nodes.length, currentItem: 'Loading existing DOIs...' }
     const existingDOIs = await zoteroApi.getAllDOIs()
@@ -639,15 +587,10 @@ export function useZotero() {
       nodesToAdd.push({ title: node.title, markdown_content: node.markdown_content })
     }
 
-    console.log(`[Zotero] ${nodesToAdd.length} to add, ${duplicates} duplicates, ${skipped} skipped`)
-
     // Process sequentially with delay to avoid rate limiting
-    const DELAY_MS = 200 // 200ms between requests (5 per second max)
-
     for (let i = 0; i < nodesToAdd.length; i++) {
       // Check for cancellation
       if (addToZoteroCancelled.value) {
-        console.log(`[Zotero] Cancelled after ${added} items`)
         break
       }
 
@@ -658,56 +601,31 @@ export function useZotero() {
         currentItem: node.title,
       }
 
-      const { doi, date, journal, creators } = extractMetadata(node.markdown_content)
-      const itemData = {
-        itemType: 'journalArticle' as const,
-        title: node.title,
-        creators: creators.map(c => ({
-          creatorType: c.creatorType,
-          firstName: c.firstName,
-          lastName: c.lastName,
-        })),
-        date: date || undefined,
-        publicationTitle: journal || undefined,
-        DOI: doi || undefined,
-        url: doi ? `https://doi.org/${doi}` : undefined,
-      }
+      const { itemData } = buildZoteroItemData(node.title, node.markdown_content)
 
-      // Retry logic for rate limiting
-      let retries = 3
-      let success = false
-      while (retries > 0 && !success) {
-        try {
-          await zoteroApi.createItem(itemData)
-          added++
-          success = true
-        } catch (e) {
-          const errMsg = String(e)
-          if (errMsg.includes('429') && retries > 1) {
-            // Rate limited - wait and retry
-            const waitTime = (4 - retries) * 2000 // 2s, 4s, 6s
+      try {
+        await retryWithBackoff(
+          () => zoteroApi.createItem(itemData),
+          (waitTime) => {
             addToZoteroProgress.value = {
               current: i + 1,
               total: nodesToAdd.length,
               currentItem: `Rate limited, waiting ${waitTime / 1000}s...`,
             }
-            await new Promise(resolve => setTimeout(resolve, waitTime))
-            retries--
-          } else {
-            errors.push(`${node.title}: ${errMsg}`)
-            retries = 0
           }
-        }
+        )
+        added++
+      } catch (e) {
+        errors.push(`${node.title}: ${String(e)}`)
       }
 
       // Small delay between requests to avoid rate limiting
-      if (i < nodesToAdd.length - 1 && success) {
+      if (i < nodesToAdd.length - 1) {
         await new Promise(resolve => setTimeout(resolve, DELAY_MS))
       }
     }
 
     addToZoteroProgress.value = null
-    console.log(`[Zotero] Done: ${added} added, ${duplicates} duplicates, ${skipped} skipped, ${errors.length} errors`)
     return { added, errors, skipped, duplicates, cancelled: addToZoteroCancelled.value }
   }
 
@@ -716,7 +634,6 @@ export function useZotero() {
 
   return {
     // State
-    zoteroPath,
     collections,
     isLoading,
     error,
@@ -726,15 +643,12 @@ export function useZotero() {
     topLevelCollections,
     isApiConfigured,
     // Actions
-    detectZotero,
-    setZoteroPath,
     loadCollections,
     getCollectionItems,
     getChildCollections,
     formatCreator,
     formatCreators,
     formatItemAsMarkdown,
-    disconnect,
     importCollectionToCanvas,
     getAllItems,
     importAllToCanvas,

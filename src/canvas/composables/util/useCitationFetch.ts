@@ -71,7 +71,6 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
   // Computed: count of affected nodes with DOIs (uses context menu's snapshot)
   const contextMenuDOICount = computed(() => {
     const affectedIds = getAffectedNodeIds()
-    console.log('[DOI Count] affectedIds:', affectedIds.length)
     if (affectedIds.length === 0) {
       return 0
     }
@@ -82,7 +81,6 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
         count++
       }
     }
-    console.log('[DOI Count] nodes with DOI:', count)
     return count
   })
 
@@ -104,7 +102,6 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
     const direction = currentFetchDirection.value
 
     try {
-      console.log(`[CitationFetch] Processing queue with direction: ${direction}`)
       while (paperQueue.value.length > 0) {
         // Check for cancellation
         if (citationGraph.isCancelled.value) {
@@ -115,30 +112,25 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
 
         const nodeId = paperQueue.value[0]
         queueProcessedPapers.value++
-        console.log(`[CitationFetch] Processing node ${nodeId}, direction: ${direction}`)
 
         // Use the appropriate fetch function based on direction
         let result: { papersCreated: number; edgesCreated: number }
         if (direction === 'citations') {
-          console.log(`[CitationFetch] Calling fetchCitationsForNode`)
           result = await citationGraph.fetchCitationsForNode(nodeId, {
             paperIndex: queueProcessedPapers.value,
             paperCount: queueTotalPapers.value,
           })
         } else if (direction === 'references') {
-          console.log(`[CitationFetch] Calling fetchReferencesForNode`)
           result = await citationGraph.fetchReferencesForNode(nodeId, {
             paperIndex: queueProcessedPapers.value,
             paperCount: queueTotalPapers.value,
           })
         } else {
-          console.log(`[CitationFetch] Calling fetchBothForNode`)
           result = await citationGraph.fetchBothForNode(nodeId, {
             paperIndex: queueProcessedPapers.value,
             paperCount: queueTotalPapers.value,
           })
         }
-        console.log(`[CitationFetch] Result: ${result.papersCreated} papers, ${result.edgesCreated} edges`)
 
         totalPapers += result.papersCreated
         totalEdges += result.edgesCreated
@@ -184,11 +176,9 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
    * Papers are fetched sequentially, new papers can be added while fetching
    */
   async function addToFetchQueue(direction: 'citations' | 'references' | 'both'): Promise<void> {
-    console.log(`[CitationFetch] addToFetchQueue called with direction: ${direction}`)
     // Get nodes to process from context menu's affected nodes snapshot
     const nodeIds: string[] = []
     const affectedIds = getAffectedNodeIds()
-    console.log(`[CitationFetch] Affected node IDs: ${affectedIds.join(', ')}`)
 
     for (const id of affectedIds) {
       const node = store.getNode(id)
@@ -228,19 +218,16 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
 
   /** Fetch papers that cite these nodes */
   async function handleFetchCitations(): Promise<void> {
-    console.log('[CitationFetch] handleFetchCitations called')
     return addToFetchQueue('citations')
   }
 
   /** Fetch papers that these nodes cite (references) */
   async function handleFetchReferences(): Promise<void> {
-    console.log('[CitationFetch] handleFetchReferences called')
     return addToFetchQueue('references')
   }
 
   /** Fetch both citations and references */
   async function handleFetchBoth(): Promise<void> {
-    console.log('[CitationFetch] handleFetchBoth called')
     return addToFetchQueue('both')
   }
 

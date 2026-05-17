@@ -14,6 +14,41 @@ import { extractDOI, extractZoteroKey } from '../lib/extraction'
 // Re-export for backwards compatibility
 export { extractDOI, extractZoteroKey }
 
+// Layout constants for fan positioning
+const LAYOUT_RADIUS = 500
+const LAYOUT_ANGLE_STEP = 0.12
+const STUB_NODE_WIDTH = 320
+const STUB_NODE_HEIGHT = 220
+
+/**
+ * Calculate fan layout position for a paper relative to source node
+ * @param sourceX - Source node X position
+ * @param sourceY - Source node Y position
+ * @param sourceWidth - Source node width
+ * @param index - Index of paper being positioned
+ * @param direction - 'above' for citations, 'below' for references
+ */
+function calculateFanPosition(
+  sourceX: number,
+  sourceY: number,
+  sourceWidth: number,
+  index: number,
+  direction: 'above' | 'below'
+): { x: number; y: number } {
+  const startAngle = direction === 'above' ? Math.PI / 2 : -Math.PI / 2
+  const side = index % 2 === 0 ? 1 : -1
+  const level = Math.floor((index + 1) / 2)
+  const angle = startAngle + side * level * LAYOUT_ANGLE_STEP
+
+  const offsetX = Math.cos(angle) * LAYOUT_RADIUS
+  const offsetY = -Math.sin(angle) * LAYOUT_RADIUS
+
+  return {
+    x: sourceX + sourceWidth / 2 + offsetX - STUB_NODE_WIDTH / 2,
+    y: sourceY + offsetY,
+  }
+}
+
 export interface CitationGraphProgress {
   phase: 'scanning' | 'fetching' | 'creating' | 'done'
   current: number
@@ -82,8 +117,6 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     const byTitle = new Map<string, string>()
     const nodes = ctx.getNodes()
 
-    console.log(`[CitationGraph] Building paper index from ${nodes.length} nodes`)
-
     for (const node of nodes) {
       const doi = extractDOI(node.markdown_content)
       if (doi) {
@@ -100,7 +133,6 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
       }
     }
 
-    console.log(`[CitationGraph] Index built: ${byDOI.size} DOIs, ${bySSId.size} SS IDs, ${byTitle.size} titles`)
     return { byDOI, bySSId, byTitle }
   }
 
@@ -122,24 +154,15 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
   ): string | undefined {
     if (doi) {
       const byDoi = index.byDOI.get(doi.toLowerCase())
-      if (byDoi) {
-        console.log(`[CitationGraph] Found existing node by DOI ${doi}: ${byDoi}`)
-        return byDoi
-      }
+      if (byDoi) return byDoi
     }
     const bySSId = index.bySSId.get(ssId)
-    if (bySSId) {
-      console.log(`[CitationGraph] Found existing node by SS ID ${ssId}: ${bySSId}`)
-      return bySSId
-    }
+    if (bySSId) return bySSId
     // Fallback to title matching
     if (title) {
       const normalizedTitle = normalizeTitle(title)
       const byTitle = index.byTitle.get(normalizedTitle)
-      if (byTitle) {
-        console.log(`[CitationGraph] Found existing node by title "${title}": ${byTitle}`)
-        return byTitle
-      }
+      if (byTitle) return byTitle
     }
     return undefined
   }
@@ -189,12 +212,8 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
     const paper = await semanticScholar.getPaperByDOI(doi)
     if (!paper) {
-      console.warn(`[CitationGraph] Paper not found in Semantic Scholar for DOI: ${doi}`)
       return { edgesCreated: 0, papersCreated: 0 }
     }
-
-    console.log(`[CitationGraph] Found paper: ${paper.title} (${paper.paperId})`)
-    console.log(`[CitationGraph] Fetching direction: ${direction}`)
 
     const paperIndex = buildPaperIndex()
     const workspaceId = ctx.getCurrentWorkspaceId()
@@ -207,14 +226,11 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
       ? await semanticScholar.getCitations(paper.paperId)
       : []
 
-    console.log(`[CitationGraph] Found ${references.length} references, ${citations.length} citations`)
-
     let edgesCreated = 0
     let papersCreated = 0
 
     // Process references (papers this node cites) - create stubs + edges
     if (references.length > 0) {
-      console.log(`[CitationGraph] Processing ${references.length} references...`)
       fetchProgress.value = { current: 0, total: references.length, paperTitle: node.title, paperIndex: batchPaperIndex, paperCount: batchPaperCount }
 
       for (let i = 0; i < references.length; i++) {
@@ -222,36 +238,23 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
         if (papersCreated >= maxPapers) break
 
         const ref = references[i]
-        console.log(`[CitationGraph] Reference ${i + 1}: "${ref.title}" (DOI: ${ref.externalIds?.DOI}, paperId: ${ref.paperId})`)
         fetchProgress.value = { current: i + 1, total: references.length, paperTitle: ref.title || 'Unknown', paperIndex: batchPaperIndex, paperCount: batchPaperCount }
 
         // Check if paper already exists
         let targetNodeId = findExistingNode(ref.externalIds?.DOI, ref.paperId, ref.title, paperIndex)
-        console.log(`[CitationGraph] Existing node for reference: ${targetNodeId || 'none'}`)
 
         // Create stub node if not found
         if (!targetNodeId && ref.title) {
-          console.log(`[CitationGraph] Creating stub node for reference: "${ref.title}"`)
           const content = formatStubContent(ref)
-
-          // Position references BELOW the source node (fan layout)
-          const radius = 500
-          const angleStep = 0.12
-          const startAngle = -Math.PI / 2 // Start from directly below
-          const side = papersCreated % 2 === 0 ? 1 : -1
-          const level = Math.floor((papersCreated + 1) / 2)
-          const angle = startAngle + side * level * angleStep
-
-          const offsetX = Math.cos(angle) * radius
-          const offsetY = -Math.sin(angle) * radius
+          const pos = calculateFanPosition(node.canvas_x, node.canvas_y, node.width, papersCreated, 'below')
 
           const newNode = await ctx.createNode({
             title: ref.title,
             markdown_content: content,
-            canvas_x: node.canvas_x + node.width / 2 + offsetX - 160,
-            canvas_y: node.canvas_y + offsetY,
-            width: 320,
-            height: 220,
+            canvas_x: pos.x,
+            canvas_y: pos.y,
+            width: STUB_NODE_WIDTH,
+            height: STUB_NODE_HEIGHT,
             workspace_id: workspaceId || undefined,
           })
           targetNodeId = newNode.id
@@ -296,25 +299,15 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
         // Create stub node if not found
         if (!sourceNodeId && cit.title) {
           const content = formatStubContent(cit)
-
-          // Position citations ABOVE the source node (fan layout)
-          const radius = 500
-          const angleStep = 0.12
-          const startAngle = Math.PI / 2 // Start from directly above
-          const side = papersCreated % 2 === 0 ? 1 : -1
-          const level = Math.floor((papersCreated + 1) / 2)
-          const angle = startAngle + side * level * angleStep
-
-          const offsetX = Math.cos(angle) * radius
-          const offsetY = -Math.sin(angle) * radius
+          const pos = calculateFanPosition(node.canvas_x, node.canvas_y, node.width, papersCreated, 'above')
 
           const newNode = await ctx.createNode({
             title: cit.title,
             markdown_content: content,
-            canvas_x: node.canvas_x + node.width / 2 + offsetX - 160,
-            canvas_y: node.canvas_y + offsetY,
-            width: 320,
-            height: 220,
+            canvas_x: pos.x,
+            canvas_y: pos.y,
+            width: STUB_NODE_WIDTH,
+            height: STUB_NODE_HEIGHT,
             workspace_id: workspaceId || undefined,
           })
           sourceNodeId = newNode.id
@@ -350,7 +343,6 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     nodeId: string,
     options?: { maxCitations?: number; paperIndex?: number; paperCount?: number }
   ): Promise<{ edgesCreated: number; papersCreated: number }> {
-    console.log(`[CitationGraph] fetchCitationsForNode called for ${nodeId}`)
     return fetchPapersForNode(nodeId, 'citations', { ...options, maxPapers: options?.maxCitations })
   }
 
@@ -358,7 +350,6 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     nodeId: string,
     options?: { maxReferences?: number; paperIndex?: number; paperCount?: number }
   ): Promise<{ edgesCreated: number; papersCreated: number }> {
-    console.log(`[CitationGraph] fetchReferencesForNode called for ${nodeId}`)
     return fetchPapersForNode(nodeId, 'references', { ...options, maxPapers: options?.maxReferences })
   }
 
@@ -366,7 +357,6 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     nodeId: string,
     options?: { maxPapers?: number; paperIndex?: number; paperCount?: number }
   ): Promise<{ edgesCreated: number; papersCreated: number }> {
-    console.log(`[CitationGraph] fetchBothForNode called for ${nodeId}`)
     return fetchPapersForNode(nodeId, 'both', options)
   }
 
@@ -537,6 +527,7 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
           }
         }
       } catch (error) {
+        console.error(`[CitationGraph] Error processing ${node.title}:`, error)
         errors.push(`Error processing ${node.title}: ${error}`)
       }
     }

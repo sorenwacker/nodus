@@ -85,7 +85,12 @@ export class ZoteroWebApi {
       throw new Error('Zotero API not configured. Please add User ID and API Key in settings.')
     }
 
-    const url = `${this.baseUrl}/users/${this.userId}${endpoint}`
+    // Validate userId is numeric (Zotero user IDs are always integers)
+    if (!/^\d+$/.test(this.userId)) {
+      throw new Error('Invalid Zotero User ID. User ID must be numeric.')
+    }
+
+    const url = `${this.baseUrl}/users/${encodeURIComponent(this.userId)}${endpoint}`
     const headers: HeadersInit = {
       'Zotero-API-Key': this.apiKey,
       'Zotero-API-Version': '3',
@@ -148,10 +153,7 @@ export class ZoteroWebApi {
       'GET',
       `/collections/${collectionKey}/items?itemType=-attachment&format=json`
     )
-    // Zotero API v3 wraps item data in a 'data' property
-    return response
-      .filter(item => item.data && item.data.itemType !== 'attachment')
-      .map(item => ({ ...item.data, key: item.key || item.data.key }))
+    return transformApiItems(response)
   }
 
   /**
@@ -162,10 +164,7 @@ export class ZoteroWebApi {
       'GET',
       '/items/top?itemType=-attachment&format=json'
     )
-    // Zotero API v3 wraps item data in a 'data' property
-    return response
-      .filter(item => item.data && item.data.itemType !== 'attachment')
-      .map(item => ({ ...item.data, key: item.key || item.data.key }))
+    return transformApiItems(response)
   }
 
   /**
@@ -335,6 +334,18 @@ export class ZoteroWebApi {
 
     return item
   }
+}
+
+/**
+ * Transform API response items to ZoteroApiItem array
+ * Filters out attachments and unwraps the data property
+ */
+function transformApiItems(
+  response: Array<{ key: string; data: ZoteroApiItem }>
+): ZoteroApiItem[] {
+  return response
+    .filter(item => item.data && item.data.itemType !== 'attachment')
+    .map(item => ({ ...item.data, key: item.key || item.data.key }))
 }
 
 // Singleton instance
