@@ -2323,9 +2323,9 @@ useCanvasKeyboardShortcuts({
         @delete="deleteSelectedEdge"
       />
 
-      <!-- Node Preview Panel (shown when zoomed out and node selected) -->
+      <!-- Node Preview Panel (shown when zoomed out and node selected, hide during drag) -->
       <CanvasPreviewPanel
-        :visible="showPreviewPanel && !!previewNode"
+        :visible="showPreviewPanel && !!previewNode && !isDraggingRef"
         :title="previewNode?.title || ''"
         :content="previewContent"
         :raw-content="previewNode?.markdown_content || ''"
@@ -2405,9 +2405,9 @@ useCanvasKeyboardShortcuts({
         @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
       />
 
-      <!-- Hover tooltip (when zoomed out) -->
+      <!-- Hover tooltip (when zoomed out, hide during drag) -->
       <CanvasHoverTooltip
-        :visible="showHoverTooltip"
+        :visible="showHoverTooltip && !isDraggingRef"
         :position="hoverMousePos"
         :node="hoveredNode"
         :content="tooltipContent"
