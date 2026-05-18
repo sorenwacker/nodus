@@ -5,6 +5,7 @@
  * Allows exporting citations created in Nodus to Zotero.
  */
 import { zoteroStorage } from './storage'
+import { parseFrontmatterRaw, extractCitationMetadata } from './extraction'
 
 // Zotero API types
 export interface ZoteroApiCollection {
@@ -257,6 +258,7 @@ export class ZoteroWebApi {
 
   /**
    * Create item from node content
+   * Uses shared extraction utilities for frontmatter parsing
    */
   createItemFromNode(
     title: string,
@@ -269,64 +271,44 @@ export class ZoteroWebApi {
 
     if (!content) return item
 
-    // Parse frontmatter
-    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
-    if (frontmatterMatch) {
-      const frontmatter = frontmatterMatch[1]
+    // Use shared extraction utilities
+    const frontmatter = parseFrontmatterRaw(content)
+    const metadata = extractCitationMetadata(content)
 
-      // Extract DOI
-      const doiMatch = frontmatter.match(/^doi:\s*(.+)$/m)
-      if (doiMatch) {
-        item.DOI = doiMatch[1].trim()
+    // Apply frontmatter values
+    if (frontmatter) {
+      if (frontmatter.doi) {
+        item.DOI = frontmatter.doi
       }
 
-      // Extract type
-      const typeMatch = frontmatter.match(/^type:\s*(.+)$/m)
-      if (typeMatch) {
-        const type = typeMatch[1].trim().toLowerCase()
-        // Map common types
+      // Map item type
+      if (frontmatter.type) {
+        const type = frontmatter.type.toLowerCase()
         if (type === 'book') item.itemType = 'book'
         else if (type === 'thesis' || type === 'dissertation') item.itemType = 'thesis'
         else if (type === 'conference' || type === 'inproceedings') item.itemType = 'conferencePaper'
         else if (type === 'webpage' || type === 'website') item.itemType = 'webpage'
       }
 
-      // Extract journal
-      const journalMatch = frontmatter.match(/^journal:\s*"?(.+?)"?\s*$/m)
-      if (journalMatch) {
-        item.publicationTitle = journalMatch[1]
+      if (frontmatter.journal) {
+        item.publicationTitle = frontmatter.journal
       }
 
-      // Extract date/year
-      const dateMatch = frontmatter.match(/^date:\s*(.+)$/m)
-      if (dateMatch) {
-        item.date = dateMatch[1].trim()
+      if (frontmatter.date) {
+        item.date = frontmatter.date
       }
     }
 
-    // Parse body for authors
-    const authorsMatch = content.match(/\*\*Authors:\*\*\s*(.+)/)
-    if (authorsMatch) {
-      const authorString = authorsMatch[1]
-      // Remove "et al." and split by comma
-      const authorList = authorString
-        .replace(/,?\s*et\s+al\.?$/i, '')
-        .split(/,\s*/)
-
-      item.creators = authorList.map(author => {
-        const parts = author.trim().split(/\s+/)
-        if (parts.length === 1) {
-          return { creatorType: 'author', name: parts[0] }
-        }
-        return {
-          creatorType: 'author',
-          firstName: parts.slice(0, -1).join(' '),
-          lastName: parts[parts.length - 1],
-        }
-      })
+    // Apply extracted metadata
+    if (metadata.creators.length > 0) {
+      item.creators = metadata.creators.map(c => ({
+        creatorType: c.creatorType,
+        firstName: c.firstName,
+        lastName: c.lastName,
+      }))
     }
 
-    // Extract abstract
+    // Extract abstract (not covered by shared utility)
     const abstractMatch = content.match(/## Abstract\s*\n\s*\n([\s\S]*?)(?=\n##|\n---|\n*$)/)
     if (abstractMatch) {
       item.abstractNote = abstractMatch[1].trim()

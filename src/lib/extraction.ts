@@ -176,3 +176,119 @@ export function extractFrontmatter(content: string | null): {
     semanticScholarId: extractSemanticScholarId(content),
   }
 }
+
+/**
+ * Parse raw YAML frontmatter into key-value pairs
+ * Returns null if no frontmatter found
+ */
+export function parseFrontmatterRaw(content: string | null): Record<string, string> | null {
+  if (!content) return null
+
+  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!frontmatterMatch) return null
+
+  const result: Record<string, string> = {}
+  const lines = frontmatterMatch[1].split('\n')
+
+  for (const line of lines) {
+    const match = line.match(/^(\w+):\s*(.*)$/)
+    if (match) {
+      const key = match[1]
+      let value = match[2].trim()
+      // Remove surrounding quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1)
+      }
+      result[key] = value
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : null
+}
+
+/**
+ * Citation metadata extracted from node content
+ */
+export interface ExtractedCitationMetadata {
+  doi: string | null
+  date: string | null
+  journal: string | null
+  itemType: string | null
+  creators: Array<{ firstName?: string; lastName?: string; creatorType: string }>
+}
+
+/**
+ * Extract citation metadata from markdown content
+ * Parses frontmatter and body text for DOI, date, journal, and authors
+ */
+export function extractCitationMetadata(content: string | null): ExtractedCitationMetadata {
+  const result: ExtractedCitationMetadata = {
+    doi: null,
+    date: null,
+    journal: null,
+    itemType: null,
+    creators: [],
+  }
+
+  if (!content) return result
+
+  // Limit input size for safety (first 10KB should contain all metadata)
+  const MAX_CONTENT_SIZE = 10 * 1024
+  const text = content.length > MAX_CONTENT_SIZE
+    ? content.slice(0, MAX_CONTENT_SIZE)
+    : content
+
+  // Extract from frontmatter
+  const frontmatter = parseFrontmatterRaw(text)
+  if (frontmatter) {
+    result.doi = frontmatter.doi || null
+    result.date = frontmatter.date || null
+    result.journal = frontmatter.journal || null
+    result.itemType = frontmatter.type || null
+  }
+
+  // Extract year from body if date not in frontmatter
+  if (!result.date) {
+    const yearMatch = text.match(/^\*(\d{4})\*$/m) ||
+                      text.match(/\*\((\d{4})\)\*/) ||
+                      text.match(/\((\d{4})\)/)
+    if (yearMatch) result.date = yearMatch[1]
+  }
+
+  // Extract journal/venue from publication info line
+  if (!result.journal) {
+    const pubInfoMatch = text.match(/^\*([^*]+)\*$/m)
+    if (pubInfoMatch) {
+      const pubInfo = pubInfoMatch[1]
+      const parts = pubInfo.split(',')
+      if (parts.length > 0 && !parts[0].match(/^\d{4}$/)) {
+        result.journal = parts[0].trim()
+      }
+    }
+  }
+
+  // Extract authors from body
+  const authorsMatch = text.match(/\*\*Authors:\*\*\s*(.+)/i)
+  if (authorsMatch) {
+    const authorStr = authorsMatch[1].replace(/, et al\.?$/i, '')
+    const authorNames = authorStr.split(/,\s*/)
+    for (const name of authorNames) {
+      const parts = name.trim().split(/\s+/)
+      if (parts.length >= 2) {
+        result.creators.push({
+          firstName: parts.slice(0, -1).join(' '),
+          lastName: parts[parts.length - 1],
+          creatorType: 'author',
+        })
+      } else if (parts.length === 1) {
+        result.creators.push({
+          lastName: parts[0],
+          creatorType: 'author',
+        })
+      }
+    }
+  }
+
+  return result
+}

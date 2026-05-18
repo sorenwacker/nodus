@@ -9,10 +9,10 @@ import { semanticScholar } from '../lib/semanticScholar'
 import type { SemanticScholarReference } from '../lib/semanticScholar'
 import type { Node, CreateNodeInput, CreateEdgeInput } from '../types'
 import { formatStubCitation } from '../lib/citationFormat'
-import { extractDOI, extractZoteroKey } from '../lib/extraction'
+import { extractDOI, extractZoteroKey, extractSemanticScholarId } from '../lib/extraction'
 
 // Re-export for backwards compatibility
-export { extractDOI, extractZoteroKey }
+export { extractDOI, extractZoteroKey, extractSemanticScholarId }
 
 // Layout constants for fan positioning
 const LAYOUT_RADIUS = 500
@@ -83,24 +83,6 @@ function formatStubContent(ref: SemanticScholarReference): string {
     venue: ref.venue,
     authors: ref.authors?.map(a => ({ name: a.name })),
   })
-}
-
-
-/**
- * Extract Semantic Scholar ID from node content
- */
-function extractSemanticScholarId(content: string | null): string | null {
-  if (!content) return null
-
-  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
-  if (frontmatterMatch) {
-    const idMatch = frontmatterMatch[1].match(/^semantic_scholar_id:\s*(.+)$/m)
-    if (idMatch) {
-      return idMatch[1].trim()
-    }
-  }
-
-  return null
 }
 
 export function useCitationGraph(ctx: UseCitationGraphContext) {

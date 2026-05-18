@@ -7,6 +7,9 @@
 import { ref, computed } from 'vue'
 import { zoteroApi, type ZoteroApiItem } from '../lib/zoteroApi'
 import { zoteroStorage } from '../lib/storage'
+import { formatCitationAsMarkdown } from '../lib/citationFormat'
+import { extractCitationMetadata } from '../lib/extraction'
+import { retryWithBackoff } from '../lib/retry'
 import type { CreateNodeInput } from '../types'
 
 /**
@@ -57,16 +60,6 @@ export interface ImportProgress {
 export interface ImportResult {
   nodesCreated: number
   nodeIds: string[]
-}
-
-/**
- * Metadata extracted from node content
- */
-export interface ExtractedMetadata {
-  doi: string | null
-  date: string | null
-  journal: string | null
-  creators: Array<{ firstName?: string; lastName?: string; creatorType: string }>
 }
 
 // Singleton state - shared across all useZotero() calls
@@ -206,64 +199,27 @@ export function useZotero() {
 
   /**
    * Format Zotero item as markdown content with frontmatter
-   * Stores DOI and Zotero key for citation graph lookup
+   * Uses shared citation formatting utility
    */
   function formatItemAsMarkdown(item: ZoteroItem): string {
-    const frontmatter: string[] = ['---']
-    if (item.doi) frontmatter.push(`doi: ${item.doi}`)
-    frontmatter.push(`zotero_key: ${item.key}`)
-    if (item.item_type) frontmatter.push(`type: ${item.item_type}`)
-    if (item.date) frontmatter.push(`date: ${item.date}`)
-    if (item.publication_title) frontmatter.push(`journal: "${item.publication_title}"`)
-    frontmatter.push('---')
-
-    const lines: string[] = [frontmatter.join('\n'), '']
-
-    // Title
-    if (item.title) {
-      lines.push(`# ${item.title}`)
-      lines.push('')
-    }
-
-    // Authors
-    if (item.creators && item.creators.length > 0) {
-      const authors = item.creators
-        .filter(c => c.creator_type === 'author')
-        .map(c => formatCreator(c))
-        .join(', ')
-      if (authors) {
-        lines.push(`**Authors:** ${authors}`)
-        lines.push('')
-      }
-    }
-
-    // Publication info
-    const pubInfo: string[] = []
-    if (item.publication_title) pubInfo.push(item.publication_title)
-    if (item.volume) pubInfo.push(`Vol. ${item.volume}`)
-    if (item.issue) pubInfo.push(`Issue ${item.issue}`)
-    if (item.pages) pubInfo.push(`pp. ${item.pages}`)
-    if (item.date) pubInfo.push(`(${item.date})`)
-    if (pubInfo.length > 0) {
-      lines.push(`*${pubInfo.join(', ')}*`)
-      lines.push('')
-    }
-
-    // DOI link
-    if (item.doi) {
-      lines.push(`**DOI:** [${item.doi}](https://doi.org/${item.doi})`)
-      lines.push('')
-    }
-
-    // Abstract
-    if (item.abstract_note) {
-      lines.push('## Abstract')
-      lines.push('')
-      lines.push(item.abstract_note)
-      lines.push('')
-    }
-
-    return lines.join('\n')
+    return formatCitationAsMarkdown({
+      title: item.title || 'Untitled',
+      doi: item.doi || undefined,
+      zoteroKey: item.key,
+      itemType: item.item_type,
+      date: item.date || undefined,
+      journal: item.publication_title || undefined,
+      volume: item.volume || undefined,
+      issue: item.issue || undefined,
+      pages: item.pages || undefined,
+      authors: item.creators
+        ?.filter(c => c.creator_type === 'author')
+        .map(c => ({
+          firstName: c.first_name || undefined,
+          lastName: c.last_name || undefined,
+        })),
+      abstract: item.abstract_note || undefined,
+    })
   }
 
   /**
@@ -361,74 +317,10 @@ export function useZotero() {
 
   /**
    * Extract metadata from node content
+   * Uses shared extraction utility
    */
-  function extractMetadata(nodeContent: string): ExtractedMetadata {
-    // Limit input size for regex safety (first 10KB should contain all metadata)
-    const MAX_CONTENT_SIZE = 10 * 1024
-    const content = nodeContent.length > MAX_CONTENT_SIZE
-      ? nodeContent.slice(0, MAX_CONTENT_SIZE)
-      : nodeContent
-
-    let doi: string | null = null
-    let date: string | null = null
-    let journal: string | null = null
-
-    // Extract from frontmatter
-    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
-    if (frontmatterMatch) {
-      const fm = frontmatterMatch[1]
-      const doiMatch = fm.match(/^doi:\s*(.+)$/m)
-      if (doiMatch) doi = doiMatch[1].trim()
-      const dateMatch = fm.match(/^date:\s*(.+)$/m)
-      if (dateMatch) date = dateMatch[1].trim()
-      const journalMatch = fm.match(/^journal:\s*"?([^"]+)"?$/m)
-      if (journalMatch) journal = journalMatch[1].trim()
-    }
-
-    // Extract year from body if date not in frontmatter
-    if (!date) {
-      const yearMatch = content.match(/^\*(\d{4})\*$/m) ||
-                        content.match(/\*\((\d{4})\)\*/) ||
-                        content.match(/\((\d{4})\)/)
-      if (yearMatch) date = yearMatch[1]
-    }
-
-    // Extract journal/venue from publication info line
-    if (!journal) {
-      const pubInfoMatch = content.match(/^\*([^*]+)\*$/m)
-      if (pubInfoMatch) {
-        const pubInfo = pubInfoMatch[1]
-        const parts = pubInfo.split(',')
-        if (parts.length > 0 && !parts[0].match(/^\d{4}$/)) {
-          journal = parts[0].trim()
-        }
-      }
-    }
-
-    // Extract authors from body
-    const authorsMatch = content.match(/\*\*Authors:\*\*\s*(.+)/i)
-    const creators: Array<{ firstName?: string; lastName?: string; creatorType: string }> = []
-    if (authorsMatch) {
-      const authorStr = authorsMatch[1].replace(/, et al\.?$/i, '')
-      const authorNames = authorStr.split(/,\s*/)
-      for (const name of authorNames) {
-        const parts = name.trim().split(/\s+/)
-        if (parts.length >= 2) {
-          creators.push({
-            firstName: parts.slice(0, -1).join(' '),
-            lastName: parts[parts.length - 1],
-            creatorType: 'author',
-          })
-        } else if (parts.length === 1) {
-          creators.push({
-            lastName: parts[0],
-            creatorType: 'author',
-          })
-        }
-      }
-    }
-
-    return { doi, date, journal, creators }
+  function extractMetadata(nodeContent: string) {
+    return extractCitationMetadata(nodeContent)
   }
 
   /**
@@ -456,34 +348,6 @@ export function useZotero() {
 
   // Rate limiting constants
   const DELAY_MS = 200 // 200ms between requests (5 per second max)
-  const BACKOFF_BASE_MS = 2000 // Base delay for exponential backoff
-  const MAX_RETRIES = 3
-
-  /**
-   * Retry an async operation with exponential backoff
-   */
-  async function retryWithBackoff<T>(
-    operation: () => Promise<T>,
-    onRetry?: (waitTime: number, retriesLeft: number) => void
-  ): Promise<T> {
-    let retries = MAX_RETRIES
-    while (retries > 0) {
-      try {
-        return await operation()
-      } catch (e) {
-        const errMsg = String(e)
-        if (errMsg.includes('429') && retries > 1) {
-          const waitTime = (MAX_RETRIES + 1 - retries) * BACKOFF_BASE_MS
-          onRetry?.(waitTime, retries - 1)
-          await new Promise(resolve => setTimeout(resolve, waitTime))
-          retries--
-        } else {
-          throw e
-        }
-      }
-    }
-    throw new Error('Max retries exceeded')
-  }
 
   /**
    * Add a paper to Zotero library via Web API
@@ -606,12 +470,14 @@ export function useZotero() {
       try {
         await retryWithBackoff(
           () => zoteroApi.createItem(itemData),
-          (waitTime) => {
-            addToZoteroProgress.value = {
-              current: i + 1,
-              total: nodesToAdd.length,
-              currentItem: `Rate limited, waiting ${waitTime / 1000}s...`,
-            }
+          {
+            onRetry: (waitTime) => {
+              addToZoteroProgress.value = {
+                current: i + 1,
+                total: nodesToAdd.length,
+                currentItem: `Rate limited, waiting ${waitTime / 1000}s...`,
+              }
+            },
           }
         )
         added++
