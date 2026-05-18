@@ -104,7 +104,7 @@ const store = useNodesStore()
 const themesStore = useThemesStore()
 const agentTasksStore = useAgentTasksStore()
 const displayStore = useDisplayStore()
-const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
+const showToast = inject<(message: string, type: 'error' | 'success' | 'info' | 'warning') => void>('showToast')
 
 // Plan state for interactive approval flow
 const planState = usePlanState()

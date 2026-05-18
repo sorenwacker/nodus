@@ -25,6 +25,7 @@ export interface UseGraphMetricsReturn {
   isHugeGraph: ComputedRef<boolean>
   isMassiveGraph: ComputedRef<boolean>
   isSemanticZoomCollapsed: ComputedRef<boolean>
+  isTextHidden: ComputedRef<boolean>
   isLODMode: ComputedRef<boolean>
   isBubbleModeForced: ComputedRef<boolean>
   nodeDegree: ComputedRef<Record<string, number>>
