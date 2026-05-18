@@ -10,12 +10,14 @@ defineProps<{
   nodeCount: number
   hasEntities: boolean
   showEntitySidebar: boolean
+  showReferencesSidebar: boolean
 }>()
 
 defineEmits<{
   (e: 'close'): void
   (e: 'toggle-toc'): void
   (e: 'toggle-entities'): void
+  (e: 'toggle-references'): void
 }>()
 </script>
 
@@ -43,6 +45,15 @@ defineEmits<{
         @click="$emit('toggle-entities')"
       >
         <Icon name="user" :size="18" />
+      </button>
+      <button
+        class="refs-toggle"
+        :class="{ active: showReferencesSidebar }"
+        :aria-label="showReferencesSidebar ? 'Hide references' : 'Show references'"
+        :aria-expanded="showReferencesSidebar"
+        @click="$emit('toggle-references')"
+      >
+        <Icon name="link" :size="18" />
       </button>
       <button
         class="close-btn"
@@ -127,6 +138,30 @@ defineEmits<{
 }
 
 .entity-toggle.active {
+  background: var(--primary-bg, rgba(59, 130, 246, 0.1));
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.refs-toggle {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refs-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-main);
+}
+
+.refs-toggle.active {
   background: var(--primary-bg, rgba(59, 130, 246, 0.1));
   border-color: var(--primary-color);
   color: var(--primary-color);

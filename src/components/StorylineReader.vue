@@ -7,6 +7,7 @@ import { resolveWikilink } from '../lib/wikilink'
 import StorylineNodeList from './StorylineNodeList.vue'
 import StorylineReaderHeader from './StorylineReaderHeader.vue'
 import StorylineEntitySidebar from './StorylineEntitySidebar.vue'
+import StorylineReferencesSidebar from './StorylineReferencesSidebar.vue'
 import StorylineReaderFooter from './StorylineReaderFooter.vue'
 import Icon from './Icon.vue'
 import { useStorylineNavigation } from '../composables/useStorylineNavigation'
@@ -35,6 +36,7 @@ const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
 const showToc = ref(true)
 const showEntitySidebar = ref(false)
+const showReferencesSidebar = ref(true) // Show by default
 const collapsedComments = ref<Set<string>>(new Set())
 
 // Navigation composable
@@ -323,9 +325,11 @@ function panToEntity(entityId: string) {
         :node-count="nodes.length"
         :has-entities="hasEntities"
         :show-entity-sidebar="showEntitySidebar"
+        :show-references-sidebar="showReferencesSidebar"
         @close="$emit('close')"
         @toggle-toc="showToc = !showToc"
         @toggle-entities="showEntitySidebar = !showEntitySidebar"
+        @toggle-references="showReferencesSidebar = !showReferencesSidebar"
       />
 
       <div class="reader-body">
@@ -436,6 +440,19 @@ function panToEntity(entityId: string) {
             @pan-to-entity="panToEntity"
           />
         </aside>
+
+        <!-- References Sidebar -->
+        <StorylineReferencesSidebar
+          v-if="showReferencesSidebar"
+          :nodes="nodes"
+          :active-index="activeNodeIndex"
+          :content-ref="contentRef"
+          @navigate-to-node="(nodeId) => {
+            const idx = nodes.findIndex(n => n.id === nodeId)
+            if (idx >= 0) goToNode(idx)
+          }"
+          @pan-to-canvas="panToEntity"
+        />
       </div>
 
       <!-- Navigation Footer -->
