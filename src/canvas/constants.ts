@@ -23,22 +23,3 @@ export const LAYOUT_GAPS = {
   SIBLING_VERTICAL: 80,
 } as const
 
-/** Edge routing constants */
-export const EDGE_ROUTING = {
-  /** Standoff distance from node edge */
-  STANDOFF: 120,
-  /** Perpendicular offset for angled entry */
-  ANGLE_OFFSET: 12,
-  /** Port spacing for parallel edges */
-  PORT_SPACING: 20,
-} as const
-
-/**
- * Get node dimensions with defaults
- */
-export function getNodeDimensions(node: { width?: number; height?: number }): { width: number; height: number } {
-  return {
-    width: node.width || NODE_DEFAULTS.WIDTH,
-    height: node.height || NODE_DEFAULTS.HEIGHT,
-  }
-}
