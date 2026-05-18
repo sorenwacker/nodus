@@ -2,7 +2,7 @@
  * LLM Tools Composable
  *
  * Handles tools that require LLM calls or complex state manipulation.
- * These tools were extracted from PixiCanvas.vue switch cases.
+ * Uses extracted tool handlers from llm/tools/handlers/ where available.
  */
 
 import type { Ref } from 'vue'
@@ -12,10 +12,14 @@ import type { AgentTask, AgentPlan } from '../../../llm/types'
 import { quickResearch } from '../../../llm/research'
 import { evalMathExpr } from '../../../llm/utils'
 import {
-  batchClassifyNodes,
   batchClassifyForMove,
   batchClassifyForConnect,
 } from '../../../llm/batchClassifier'
+import {
+  executeRegisteredTool,
+  hasToolHandler,
+  type ToolContext,
+} from '../../../llm/tools/handlers'
 
 /**
  * LLM Queue interface (subset of llmQueue)
@@ -151,6 +155,25 @@ export function useLLMTools(ctx: LLMToolsContext) {
     name: string,
     args: Record<string, unknown>
   ): Promise<string | null> {
+    // Check if tool has an extracted handler in the registry
+    if (hasToolHandler(name)) {
+      const toolCtx: ToolContext = {
+        llmQueue,
+        callOllama,
+        store,
+        themesStore,
+        planState,
+        tasks,
+        memoryStorage,
+        agentMemoryStorage,
+        log,
+        pushContentUndo,
+        isCancelled,
+      }
+      return executeRegisteredTool(name, args, toolCtx)
+    }
+
+    // Handle remaining tools that haven't been extracted yet
     switch (name) {
       case 'for_each_node': {
         let nodes = [...store.getFilteredNodes()]
@@ -277,194 +300,8 @@ export function useLLMTools(ctx: LLMToolsContext) {
         return `Created ${edgeCount} edges in ${groupedNodes.size} groups`
       }
 
-      case 'smart_color': {
-        const nodes = store.getFilteredNodes()
-        if (nodes.length === 0) return 'No nodes to color'
-        const instruction = (args.instruction as string) || ''
-        log(`> Smart color: ${nodes.length} nodes (batch classification)`)
-
-        // Step 1: Extract category-to-color mappings from instruction
-        let colorMappings: Array<{ category: string; color: string }> = []
-        try {
-          const prompt = `Extract category-to-color mappings from: "${instruction}"
-Output as JSON array: [{"category":"name","color":"#hex"}]
-Available colors: #ef4444 (red), #f97316 (orange), #eab308 (yellow), #22c55e (green), #3b82f6 (blue), #8b5cf6 (purple), #ec4899 (pink), #6b7280 (gray)
-Example: "departments red, people blue" -> [{"category":"departments","color":"#ef4444"},{"category":"people","color":"#3b82f6"}]
-Output ONLY the JSON array:`
-          const response = await llmQueue.generate(prompt)
-          const match = (response || '').match(/\[[\s\S]*\]/)
-          if (match) colorMappings = JSON.parse(match[0])
-        } catch {
-          /* ignore LLM errors */
-        }
-
-        if (colorMappings.length === 0) return 'Could not parse color instruction'
-
-        const categories = colorMappings.map((m) => m.category)
-        const categoryToColor = new Map(colorMappings.map((m) => [m.category.toLowerCase(), m.color]))
-        log(`> Categories: ${categories.join(', ')}`)
-
-        // Step 2: Use batch classification instead of per-node LLM calls
-        const nodeClassifications = await batchClassifyNodes(
-          nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
-          categories,
-          llmQueue,
-          { log, isCancelled }
-        )
-
-        // Step 3: Apply colors based on classifications
-        let colored = 0
-        for (const node of nodes) {
-          if (isCancelled()) {
-            log(`> Stopped after ${colored} nodes`)
-            return `Stopped. Colored ${colored}/${nodes.length} nodes.`
-          }
-
-          const matchedCategory = nodeClassifications.get(node.id)
-          if (matchedCategory && categoryToColor.has(matchedCategory)) {
-            const color = categoryToColor.get(matchedCategory)!
-            await store.updateNodeColor(node.id, color)
-            log(`> ${node.title} -> ${matchedCategory}`)
-            colored++
-          }
-        }
-        return `Colored ${colored}/${nodes.length} nodes based on semantic classification`
-      }
-
-      case 'color_matching': {
-        const criterion = ((args.pattern as string) || '').trim()
-        const color = (args.color as string) || '#ef4444'
-        if (!criterion) return 'Criterion required'
-
-        const nodes = store.getFilteredNodes()
-        let colored = 0
-        const matchedTitles: string[] = []
-
-        // Detect if this is a literal text pattern vs semantic criterion
-        // Literal patterns: contain "...", quotes, or look like specific text (has capitals, spaces)
-        const isLiteralPattern = criterion.includes('...') ||
-          criterion.includes('"') ||
-          criterion.includes("'") ||
-          /^[A-Z][a-z]/.test(criterion) || // Starts with capital like "Faculty of"
-          / of\b/.test(criterion) || // Contains " of" (word boundary)
-          / and\b/.test(criterion) // Contains " and" (word boundary)
-
-        if (isLiteralPattern) {
-          // Simple text matching - much faster and more accurate for literal patterns
-          const searchText = criterion.replace(/\.{2,}/g, '').replace(/['"]/g, '').trim().toLowerCase()
-          log(`> color_matching: text search for "${searchText}" in ${nodes.length} nodes`)
-
-          for (const node of nodes) {
-            if (isCancelled()) {
-              log(`> Stopped after ${colored} nodes`)
-              return `Stopped. Colored ${colored}/${nodes.length} nodes.`
-            }
-
-            if (node.title.toLowerCase().includes(searchText)) {
-              await store.updateNodeColor(node.id, color)
-              matchedTitles.push(node.title)
-              colored++
-              log(`> ${node.title} -> match`)
-            }
-          }
-        } else {
-          // Semantic evaluation for abstract criteria like "person", "organization"
-          log(`> color_matching: semantic evaluation of ${nodes.length} nodes for "${criterion}"`)
-
-          for (const node of nodes) {
-            if (isCancelled()) {
-              log(`> Stopped after ${colored} nodes`)
-              return `Stopped. Colored ${colored}/${nodes.length} nodes.`
-            }
-
-            try {
-              // Check for explicit tag match first
-              const content = node.markdown_content || ''
-              const tagPattern = `#${criterion.replace(/^#/, '').toLowerCase()}`
-              if (content.toLowerCase().includes(tagPattern)) {
-                await store.updateNodeColor(node.id, color)
-                matchedTitles.push(node.title)
-                colored++
-                log(`> ${node.title} -> tag`)
-                continue
-              }
-
-              // Semantic evaluation via LLM
-              const prompt = `Is "${node.title}" a ${criterion}? Answer only YES or NO.`
-              const response = await llmQueue.generate(prompt)
-              const answer = (response || '').toUpperCase().trim()
-
-              if (answer === 'YES' || answer.startsWith('YES')) {
-                await store.updateNodeColor(node.id, color)
-                matchedTitles.push(node.title)
-                colored++
-                log(`> ${node.title} -> YES`)
-              } else {
-                log(`> ${node.title} -> NO`)
-              }
-            } catch (e) {
-              log(`> ${node.title}: failed - ${e}`)
-            }
-          }
-        }
-
-        if (colored === 0) {
-          return `No nodes match "${criterion}"`
-        }
-        const preview = matchedTitles.slice(0, 5).join(', ')
-        return `Colored ${colored}/${nodes.length} nodes: ${preview}${colored > 5 ? '...' : ''}`
-      }
-
-      case 'color_regex': {
-        const regexStr = ((args.regex as string) || '').trim()
-        const color = (args.color as string) || '#ef4444'
-        const field = (args.field as string) || 'title'
-        if (!regexStr) return 'Regex pattern required'
-
-        let regex: RegExp
-        try {
-          regex = new RegExp(regexStr, 'i')
-        } catch (e) {
-          return `Invalid regex: ${e}`
-        }
-
-        const nodes = store.getFilteredNodes()
-        const matchedTitles: string[] = []
-        let colored = 0
-
-        log(`> color_regex: matching /${regexStr}/i on ${field} in ${nodes.length} nodes`)
-
-        for (const node of nodes) {
-          const text = field === 'content' ? (node.markdown_content || '') : node.title
-          if (regex.test(text)) {
-            await store.updateNodeColor(node.id, color)
-            matchedTitles.push(node.title)
-            colored++
-          }
-        }
-
-        if (colored === 0) {
-          return `No nodes match regex /${regexStr}/`
-        }
-        const preview = matchedTitles.slice(0, 5).join(', ')
-        log(`> Colored ${colored} nodes: ${preview}${colored > 5 ? '...' : ''}`)
-        return `Colored ${colored}/${nodes.length} nodes matching /${regexStr}/: ${preview}${colored > 5 ? '...' : ''}`
-      }
-
-      case 'reset_edge_colors': {
-        if (!store.updateEdgeColor) {
-          return 'Edge operations not available'
-        }
-        const edges = store.getFilteredEdges()
-        let reset = 0
-        for (const edge of edges) {
-          if (edge.color) {
-            await store.updateEdgeColor(edge.id, null)
-            reset++
-          }
-        }
-        return `Reset ${reset}/${edges.length} edge colors to default`
-      }
+      // Color handlers (smart_color, color_matching, color_regex, reset_edge_colors)
+      // are now handled by the tool registry above
 
       case 'web_search': {
         const query = (args.query as string) || ''
@@ -499,146 +336,8 @@ Output ONLY the JSON array:`
         }
       }
 
-      case 'create_theme': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const themeName = (parsedArgs.name as string) || 'custom-theme'
-        const description = (parsedArgs.description as string) || ''
-        log(`> Creating theme: ${themeName}`)
-
-        try {
-          const prompt = `Create a YAML theme configuration based on this description: "${description}"
-
-The theme should have this structure:
-name: "${themeName}"
-display_name: "${themeName
-            .split('-')
-            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(' ')}"
-description: "${description}"
-is_dark: false (or true if it's a dark theme)
-variables:
-  bg_canvas: "#hex"
-  bg_surface: "#hex"
-  bg_surface_alt: "#hex"
-  bg_elevated: "#hex"
-  text_main: "#hex"
-  text_secondary: "#hex"
-  text_muted: "#hex"
-  border_default: "#hex"
-  border_subtle: "#hex"
-  primary_color: "#hex"
-  danger_color: "#hex"
-  danger_bg: "#hex"
-  danger_border: "#hex"
-  dot_color: "#hex"
-  shadow_sm: "rgba(...)"
-  shadow_md: "rgba(...)"
-
-Make colors match the description. Be creative! Output ONLY the YAML, no explanations.`
-
-          const yamlContent = await llmQueue.generate(prompt)
-          if (!yamlContent) return 'Failed to generate theme'
-
-          let cleanYaml = yamlContent.trim()
-          if (cleanYaml.startsWith('```')) {
-            cleanYaml = cleanYaml.replace(/^```(yaml)?\n?/, '').replace(/\n?```$/, '')
-          }
-
-          const newTheme = await themesStore.createTheme({
-            name: themeName,
-            display_name: themeName
-              .split('-')
-              .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-              .join(' '),
-            yaml_content: cleanYaml,
-          })
-
-          themesStore.setTheme(newTheme.name)
-          return `Created and applied theme "${themeName}"`
-        } catch (e) {
-          console.error('[LLMTools] Error creating theme:', e)
-          return `Failed to create theme: ${e}`
-        }
-      }
-
-      case 'update_theme': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const themeName = (parsedArgs.name as string) || ''
-        const changes = (parsedArgs.changes as string) || ''
-        if (!themeName) return 'Theme name required'
-        log(`> Updating theme: ${themeName}`)
-
-        try {
-          const theme = themesStore.themes.find((t) => t.name === themeName)
-          if (!theme) return `Theme "${themeName}" not found`
-          if (theme.is_builtin === 1) return 'Cannot modify built-in themes'
-
-          const prompt = `Update this theme YAML based on the instruction: "${changes}"
-
-Current theme YAML:
-${theme.yaml_content}
-
-Apply the changes and output the complete updated YAML. Output ONLY the YAML, no explanations.`
-
-          const yamlContent = await llmQueue.generate(prompt)
-          if (!yamlContent) return 'Failed to generate updated theme'
-
-          let cleanYaml = yamlContent.trim()
-          if (cleanYaml.startsWith('```')) {
-            cleanYaml = cleanYaml.replace(/^```(yaml)?\n?/, '').replace(/\n?```$/, '')
-          }
-
-          await themesStore.updateTheme({
-            id: theme.id,
-            yaml_content: cleanYaml,
-            display_name: theme.display_name,
-          })
-
-          return `Updated theme "${themeName}"`
-        } catch (e) {
-          return `Failed to update theme: ${e}`
-        }
-      }
-
-      case 'apply_theme': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const themeName = (parsedArgs.name as string) || ''
-        if (!themeName) return 'Theme name required'
-
-        const theme = themesStore.themes.find((t) => t.name === themeName)
-        if (!theme)
-          return `Theme "${themeName}" not found. Available: ${themesStore.themes.map((t) => t.name).join(', ')}`
-
-        themesStore.setTheme(themeName)
-        return `Applied theme "${themeName}"`
-      }
-
-      case 'list_themes': {
-        const builtin = themesStore.builtinThemes.map((t) => t.name)
-        const custom = themesStore.customThemes.map((t) => t.name)
-        return `Built-in themes: ${builtin.join(', ')}\nCustom themes: ${custom.length > 0 ? custom.join(', ') : '(none)'}\nCurrent: ${themesStore.currentThemeName}`
-      }
+      // Theme handlers (create_theme, update_theme, apply_theme, list_themes)
+      // are now handled by the tool registry above
 
       case 'plan': {
         let parsedArgs = args
@@ -693,164 +392,9 @@ Apply the changes and output the complete updated YAML. Output ONLY the YAML, no
         return `Task ${taskIndex + 1} updated: ${oldStatus} -> ${status}`
       }
 
-      case 'remember': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const message = (parsedArgs.message as string) || ''
-        if (!message) return 'Nothing to remember'
-
-        const workspaceId = store.currentWorkspaceId || 'default'
-        memoryStorage.addMemory(workspaceId, message)
-
-        log(`[memory] ${message}`)
-        return `Remembered for this workspace: ${message}`
-      }
-
-      // Session memory tools
-      case 'set_goal': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const goal = (parsedArgs.goal as string) || ''
-        const steps = (parsedArgs.steps as string[]) || []
-        if (!goal) return 'No goal provided'
-
-        const workspaceId = store.currentWorkspaceId || 'default'
-        agentMemoryStorage.setSession(workspaceId, {
-          goal,
-          progress: 0,
-          completed: [],
-          current_step: steps.length > 0 ? steps[0] : null,
-          next_steps: steps.slice(1),
-          blockers: [],
-          started_at: new Date().toISOString(),
-        })
-
-        log(`[session] Goal set: ${goal}`)
-        return `Goal set: ${goal}${steps.length > 0 ? ` (${steps.length} steps planned)` : ''}`
-      }
-
-      case 'update_progress': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const progress = (parsedArgs.progress as number) ?? 0
-        const completedAction = (parsedArgs.completed_action as string) || undefined
-
-        const workspaceId = store.currentWorkspaceId || 'default'
-        const session = agentMemoryStorage.getSession(workspaceId)
-        if (!session) return 'No active goal session'
-
-        agentMemoryStorage.updateProgress(workspaceId, progress, completedAction)
-
-        log(`[session] Progress: ${progress}%${completedAction ? ` (${completedAction})` : ''}`)
-        return `Progress updated to ${progress}%${completedAction ? ` - completed: ${completedAction}` : ''}`
-      }
-
-      case 'complete_goal': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const summary = (parsedArgs.summary as string) || 'Goal completed'
-
-        const workspaceId = store.currentWorkspaceId || 'default'
-        const session = agentMemoryStorage.getSession(workspaceId)
-        if (!session) return 'No active goal session'
-
-        // Store completion as a fact for future reference
-        memoryStorage.addMemory(workspaceId, `Completed: ${session.goal} - ${summary}`)
-        agentMemoryStorage.clearSession(workspaceId)
-
-        log(`[session] Goal completed: ${summary}`)
-        return `Goal completed: ${summary}`
-      }
-
-      // Stack (todo queue) tools
-      case 'push_task': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const description = (parsedArgs.description as string) || ''
-        const priorityStr = (parsedArgs.priority as string) || 'medium'
-        const context = (parsedArgs.context as Record<string, unknown>) || undefined
-        if (!description) return 'No task description provided'
-
-        const priority = ['high', 'medium', 'low'].includes(priorityStr)
-          ? (priorityStr as 'high' | 'medium' | 'low')
-          : 'medium'
-
-        const workspaceId = store.currentWorkspaceId || 'default'
-        const task = agentMemoryStorage.pushTask(workspaceId, { description, priority, context })
-        const stack = agentMemoryStorage.getStack(workspaceId)
-
-        log(`[stack] Pushed: ${description} [${priority}]`)
-        return `Task added to stack (${stack.length} total): ${task.description}`
-      }
-
-      case 'pop_task': {
-        const workspaceId = store.currentWorkspaceId || 'default'
-        const task = agentMemoryStorage.popTask(workspaceId)
-
-        if (!task) {
-          log('[stack] Empty - no task to pop')
-          return 'Stack is empty'
-        }
-
-        const remaining = agentMemoryStorage.getStack(workspaceId).length
-        log(`[stack] Popped: ${task.description}`)
-        return `Task: ${task.description} [${task.priority}]${task.context ? `\nContext: ${JSON.stringify(task.context)}` : ''}\n(${remaining} tasks remaining)`
-      }
-
-      case 'peek_stack': {
-        const workspaceId = store.currentWorkspaceId || 'default'
-        const stack = agentMemoryStorage.getStack(workspaceId)
-
-        if (stack.length === 0) {
-          return 'Stack is empty'
-        }
-
-        const stackList = stack
-          .map((t, i) => `${stack.length - i}. [${t.priority.toUpperCase()}] ${t.description}`)
-          .reverse()
-          .join('\n')
-
-        return `Task stack (${stack.length} tasks, top first):\n${stackList}`
-      }
-
-      case 'clear_stack': {
-        const workspaceId = store.currentWorkspaceId || 'default'
-        const count = agentMemoryStorage.getStack(workspaceId).length
-        agentMemoryStorage.clearStack(workspaceId)
-
-        log(`[stack] Cleared ${count} tasks`)
-        return `Stack cleared (${count} tasks removed)`
-      }
+      // Memory handlers (remember, set_goal, update_progress, complete_goal)
+      // and stack handlers (push_task, pop_task, peek_stack, clear_stack)
+      // are now handled by the tool registry above
 
       case 'create_plan': {
         let parsedArgs = args
