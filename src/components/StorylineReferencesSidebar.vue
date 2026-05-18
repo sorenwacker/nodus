@@ -6,9 +6,29 @@
 import { computed } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
-import { extractWikilinks } from '../lib/contentParser'
 import Icon from './Icon.vue'
 import type { Node } from '../types'
+
+interface WikilinkMatch {
+  target: string
+  index: number
+}
+
+/**
+ * Extract wikilinks with their position in the content
+ */
+function extractWikilinksWithPosition(content: string): WikilinkMatch[] {
+  const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
+  const links: WikilinkMatch[] = []
+  let match
+  while ((match = wikilinkRegex.exec(content)) !== null) {
+    links.push({
+      target: match[1].trim(),
+      index: match.index,
+    })
+  }
+  return links
+}
 
 const props = defineProps<{
   nodes: Node[]
@@ -39,7 +59,7 @@ const references = computed<LinkedReference[]>(() => {
   if (!node?.markdown_content) return []
 
   const content = node.markdown_content
-  const wikilinks = extractWikilinks(content)
+  const wikilinks = extractWikilinksWithPosition(content)
   const refs: LinkedReference[] = []
   const seen = new Set<string>()
 
