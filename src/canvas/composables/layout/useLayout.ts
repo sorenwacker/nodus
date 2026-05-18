@@ -70,6 +70,174 @@ export interface UseLayoutOptions {
   pushUndo: () => void
 }
 
+// Constant for frame virtual node prefix
+const FRAME_PREFIX = '___FRAME___'
+
+/**
+ * Shared context for frame-aware layout algorithms
+ */
+interface FrameAwareLayoutContext {
+  virtualNodes: Node[]
+  allFrames: Frame[]
+  frameNodes: Map<string, Node[]>
+  frameId: string | null
+  centerX: number
+  centerY: number
+  nodes: Node[]
+  targetFrame: FrameRect | null
+}
+
+/**
+ * Prepare layout data structures for frame-aware layouts (force, hierarchical)
+ */
+function prepareFrameAwareLayout(
+  ctx: FrameAwareLayoutContext,
+  edges: Edge[]
+): {
+  layoutNodes: Array<{ id: string; x: number; y: number; width: number; height: number }>
+  layoutEdges: Array<{ source: string; target: string }>
+  frameSnapshot: Map<string, { x: number; y: number }>
+  nodeToFrameId: Map<string, string>
+} {
+  const { virtualNodes, allFrames, frameNodes, frameId } = ctx
+
+  // Build layout nodes from virtualNodes
+  const layoutNodes = virtualNodes.map(n => ({
+    id: n.id,
+    x: n.canvas_x,
+    y: n.canvas_y,
+    width: n.width || NODE_DEFAULTS.WIDTH,
+    height: n.height || NODE_DEFAULTS.HEIGHT,
+  }))
+
+  const frameSnapshot = new Map<string, { x: number; y: number }>()
+  const nodeToFrameId = new Map<string, string>()
+
+  if (!frameId) {
+    // Global layout: add frames as virtual nodes
+    for (const frame of allFrames) {
+      frameSnapshot.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
+      layoutNodes.push({
+        id: FRAME_PREFIX + frame.id,
+        x: frame.canvas_x + frame.width / 2,
+        y: frame.canvas_y + frame.height / 2,
+        width: frame.width,
+        height: frame.height,
+      })
+    }
+
+    // Map framed nodes to their frame
+    for (const [fId, nodesInFrame] of frameNodes) {
+      for (const node of nodesInFrame) {
+        nodeToFrameId.set(node.id, fId)
+      }
+    }
+  }
+
+  // Build a set of all layout node IDs
+  const layoutNodeIds = new Set(layoutNodes.map(n => n.id))
+
+  // Build edges - remap framed nodes to their frame's virtual node
+  const layoutEdges = edges
+    .map(e => {
+      if (!frameId) {
+        const sourceFrameId = nodeToFrameId.get(e.source_node_id)
+        const targetFrameId = nodeToFrameId.get(e.target_node_id)
+        return {
+          source: sourceFrameId ? FRAME_PREFIX + sourceFrameId : e.source_node_id,
+          target: targetFrameId ? FRAME_PREFIX + targetFrameId : e.target_node_id,
+        }
+      }
+      return {
+        source: e.source_node_id,
+        target: e.target_node_id,
+      }
+    })
+    .filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target))
+    .filter(e => e.source !== e.target)
+
+  return { layoutNodes, layoutEdges, frameSnapshot, nodeToFrameId }
+}
+
+/**
+ * Process layout results for frame-aware layouts
+ * Handles frame movement and constraint application
+ */
+function processFrameAwareLayoutResults(
+  ctx: FrameAwareLayoutContext,
+  positions: Map<string, { x: number; y: number }>,
+  frameSnapshot: Map<string, { x: number; y: number }>,
+  updateFramePosition: (id: string, x: number, y: number) => void,
+  pushOutOfFrames: (targets: Map<string, { x: number; y: number }>, nodeSizes: Map<string, NodeSize>) => Map<string, { x: number; y: number }>
+): Map<string, { x: number; y: number }> {
+  const { virtualNodes, allFrames, frameNodes, frameId, nodes, targetFrame } = ctx
+
+  // Build final targets map - exclude frame virtual nodes
+  const nodeTargets = new Map<string, { x: number; y: number }>()
+  for (const [id, pos] of positions) {
+    if (!id.startsWith(FRAME_PREFIX)) {
+      nodeTargets.set(id, pos)
+    }
+  }
+
+  // For global layout, move frames and their contents together
+  if (!frameId) {
+    for (const frame of allFrames) {
+      const virtualId = FRAME_PREFIX + frame.id
+      const newPos = positions.get(virtualId)
+      if (!newPos) continue
+
+      const oldPos = frameSnapshot.get(frame.id)
+      if (!oldPos) continue
+
+      const oldCenterX = oldPos.x + frame.width / 2
+      const oldCenterY = oldPos.y + frame.height / 2
+      const deltaX = newPos.x - oldCenterX
+      const deltaY = newPos.y - oldCenterY
+
+      if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
+
+      updateFramePosition(frame.id, oldPos.x + deltaX, oldPos.y + deltaY)
+
+      const nodesInFrame = frameNodes.get(frame.id) || []
+      for (const node of nodesInFrame) {
+        nodeTargets.set(node.id, {
+          x: node.canvas_x + deltaX,
+          y: node.canvas_y + deltaY,
+        })
+      }
+    }
+  }
+
+  // Apply frame constraints
+  if (frameId) {
+    // Frame-scoped: constrain nodes to stay inside the frame
+    return targetFrame
+      ? constrainNodesToFrame(nodeTargets, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
+      : nodeTargets
+  } else {
+    // Global: push unframed nodes out of frames
+    const unframedIds = new Set(virtualNodes.map(n => n.id))
+    const unframedTargets = new Map<string, { x: number; y: number }>()
+    const framedTargets = new Map<string, { x: number; y: number }>()
+
+    for (const [id, pos] of nodeTargets) {
+      if (unframedIds.has(id)) {
+        unframedTargets.set(id, pos)
+      } else {
+        framedTargets.set(id, pos)
+      }
+    }
+
+    const pushedUnframed = pushOutOfFrames(
+      unframedTargets,
+      new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+    )
+
+    return new Map([...pushedUnframed, ...framedTargets])
+  }
+}
+
 export function useLayout(options: UseLayoutOptions) {
   const { store, viewState, pushUndo } = options
 
@@ -552,306 +720,69 @@ export function useLayout(options: UseLayoutOptions) {
     // Gap between nodes in grid layout
     const gridGap = 24 // Tight packing gap
 
-    if (layout === 'force') {
-      // Get edges for force layout
+    if (layout === 'force' || layout === 'hierarchical') {
       const edges = store.getFilteredEdges()
 
-      // Build layout nodes from virtualNodes
-      const layoutNodes = virtualNodes.map(n => ({
-        id: n.id,
-        x: n.canvas_x,
-        y: n.canvas_y,
-        width: n.width || NODE_DEFAULTS.WIDTH,
-        height: n.height || NODE_DEFAULTS.HEIGHT,
-      }))
-
-      // For global layout (no frameId), include frames as virtual nodes
-      const FRAME_PREFIX = '___FRAME___'
-      const frameSnapshot = new Map<string, { x: number; y: number }>()
-      const nodeToFrameId = new Map<string, string>()
-
-      if (!frameId) {
-        // Global layout: add frames as virtual nodes
-        for (const frame of allFrames) {
-          frameSnapshot.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
-          layoutNodes.push({
-            id: FRAME_PREFIX + frame.id,
-            x: frame.canvas_x + frame.width / 2,
-            y: frame.canvas_y + frame.height / 2,
-            width: frame.width,
-            height: frame.height,
-          })
-        }
-
-        // Map framed nodes to their frame
-        for (const [fId, nodesInFrame] of frameNodes) {
-          for (const node of nodesInFrame) {
-            nodeToFrameId.set(node.id, fId)
-          }
-        }
-      }
-
-      // Build a set of all layout node IDs
-      const layoutNodeIds = new Set(layoutNodes.map(n => n.id))
-
-      // Build edges - remap framed nodes to their frame's virtual node
-      const layoutEdges = edges
-        .map(e => {
-          if (!frameId) {
-            const sourceFrameId = nodeToFrameId.get(e.source_node_id)
-            const targetFrameId = nodeToFrameId.get(e.target_node_id)
-            return {
-              source: sourceFrameId ? FRAME_PREFIX + sourceFrameId : e.source_node_id,
-              target: targetFrameId ? FRAME_PREFIX + targetFrameId : e.target_node_id,
-            }
-          }
-          return {
-            source: e.source_node_id,
-            target: e.target_node_id,
-          }
-        })
-        .filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target))
-        .filter(e => e.source !== e.target)
-
-      // Scale iterations based on node count
-      const n = layoutNodes.length
-      const iterations = n > 2000 ? 30 : n > 1000 ? 50 : n > 500 ? 80 : n > 200 ? 100 : n > 100 ? 200 : 400
-      const positions = await applyForceLayout(layoutNodes, layoutEdges, {
+      // Use shared helpers for frame-aware layout preparation
+      const ctx: FrameAwareLayoutContext = {
+        virtualNodes,
+        allFrames,
+        frameNodes,
+        frameId: frameId || null,
         centerX,
         centerY,
-        iterations,
-      })
-
-      // Build final targets map
-      const nodeTargets = new Map<string, { x: number; y: number }>()
-
-      // Add regular node positions
-      for (const [id, pos] of positions) {
-        if (!id.startsWith(FRAME_PREFIX)) {
-          nodeTargets.set(id, pos)
-        }
+        nodes,
+        targetFrame: targetFrame || null,
       }
+      const { layoutNodes, layoutEdges, frameSnapshot } = prepareFrameAwareLayout(ctx, edges)
 
-      // For global layout, move frames and their contents together
-      if (!frameId) {
-        for (const frame of allFrames) {
-          const virtualId = FRAME_PREFIX + frame.id
-          const newPos = positions.get(virtualId)
-          if (!newPos) continue
+      // Execute the specific layout algorithm
+      let positions: Map<string, { x: number; y: number }>
 
-          const oldPos = frameSnapshot.get(frame.id)
-          if (!oldPos) continue
-
-          const oldCenterX = oldPos.x + frame.width / 2
-          const oldCenterY = oldPos.y + frame.height / 2
-          const deltaX = newPos.x - oldCenterX
-          const deltaY = newPos.y - oldCenterY
-
-          if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
-
-          store.updateFramePosition(frame.id, oldPos.x + deltaX, oldPos.y + deltaY)
-
-          const nodesInFrame = frameNodes.get(frame.id) || []
-          for (const node of nodesInFrame) {
-            nodeTargets.set(node.id, {
-              x: node.canvas_x + deltaX,
-              y: node.canvas_y + deltaY,
-            })
-          }
-        }
-      }
-
-      // Apply frame constraints
-      let finalTargets: Map<string, { x: number; y: number }>
-
-      if (frameId) {
-        // Frame-scoped: constrain nodes to stay inside the frame
-        finalTargets = targetFrame
-          ? constrainNodesToFrame(nodeTargets, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
-          : nodeTargets
-      } else {
-        // Global: push unframed nodes out of all frames
-        const unframedIds = new Set(virtualNodes.map(n => n.id))
-        const unframedTargets = new Map<string, { x: number; y: number }>()
-        const framedTargets = new Map<string, { x: number; y: number }>()
-
-        for (const [id, pos] of nodeTargets) {
-          if (unframedIds.has(id)) {
-            unframedTargets.set(id, pos)
-          } else {
-            framedTargets.set(id, pos)
-          }
-        }
-
-        const pushedUnframed = pushOutOfFrames(
-          unframedTargets,
-          new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-        )
-
-        finalTargets = new Map([...pushedUnframed, ...framedTargets])
-      }
-
-      // Apply positions
-      if (finalTargets.size > 500) {
-        await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
-      } else {
-        animateToPositions(finalTargets, 800)
-      }
-      return
-    }
-
-    if (layout === 'hierarchical') {
-      // Get edges for hierarchical layout
-      const edges = store.getFilteredEdges()
-
-      // Build layout nodes from virtualNodes
-      const layoutNodes = virtualNodes.map(n => ({
-        id: n.id,
-        x: n.canvas_x,
-        y: n.canvas_y,
-        width: n.width || NODE_DEFAULTS.WIDTH,
-        height: n.height || NODE_DEFAULTS.HEIGHT,
-      }))
-
-      // For global layout (no frameId), include frames as virtual nodes
-      const FRAME_PREFIX = '___FRAME___'
-      const frameSnapshot = new Map<string, { x: number; y: number }>()
-      const nodeToFrameId = new Map<string, string>()
-
-      if (!frameId) {
-        // Global layout: add frames as virtual nodes
-        for (const frame of allFrames) {
-          frameSnapshot.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
-          layoutNodes.push({
-            id: FRAME_PREFIX + frame.id,
-            x: frame.canvas_x + frame.width / 2,
-            y: frame.canvas_y + frame.height / 2,
-            width: frame.width,
-            height: frame.height,
-          })
-        }
-
-        // Map framed nodes to their frame
-        for (const [fId, nodesInFrame] of frameNodes) {
-          for (const node of nodesInFrame) {
-            nodeToFrameId.set(node.id, fId)
-          }
-        }
-      }
-
-      // Build a set of all layout node IDs
-      const layoutNodeIds = new Set(layoutNodes.map(n => n.id))
-
-      // Build edges
-      const layoutEdges = edges
-        .map(e => {
-          if (!frameId) {
-            const sourceFrameId = nodeToFrameId.get(e.source_node_id)
-            const targetFrameId = nodeToFrameId.get(e.target_node_id)
-            return {
-              source: sourceFrameId ? FRAME_PREFIX + sourceFrameId : e.source_node_id,
-              target: targetFrameId ? FRAME_PREFIX + targetFrameId : e.target_node_id,
-            }
-          }
-          return {
-            source: e.source_node_id,
-            target: e.target_node_id,
-          }
+      if (layout === 'force') {
+        // Scale iterations based on node count
+        const n = layoutNodes.length
+        const iterations = n > 2000 ? 30 : n > 1000 ? 50 : n > 500 ? 80 : n > 200 ? 100 : n > 100 ? 200 : 400
+        positions = await applyForceLayout(layoutNodes, layoutEdges, {
+          centerX,
+          centerY,
+          iterations,
         })
-        .filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target))
-        .filter(e => e.source !== e.target)
-
-      // For very large graphs, use simpler ranker
-      const ranker = layoutNodes.length > 2000 ? 'longest-path' : 'network-simplex'
-
-      // Use setTimeout to avoid blocking UI
-      const positions = await new Promise<Map<string, { x: number; y: number }>>((resolve) => {
-        setTimeout(() => {
-          const result = applyHierarchicalLayout(layoutNodes, layoutEdges, {
-            direction: 'TB',
-            nodeSpacingX: 150,
-            nodeSpacingY: 360,
-            centerX,
-            centerY,
-            ranker,
-          })
-          resolve(result)
-        }, 10)
-      })
-
-      // Build final targets map
-      const nodeTargets = new Map<string, { x: number; y: number }>()
-
-      // Add regular node positions
-      for (const [id, pos] of positions) {
-        if (!id.startsWith(FRAME_PREFIX)) {
-          nodeTargets.set(id, pos)
-        }
-      }
-
-      // For global layout, move frames and their contents together
-      if (!frameId) {
-        for (const frame of allFrames) {
-          const virtualId = FRAME_PREFIX + frame.id
-          const newPos = positions.get(virtualId)
-          if (!newPos) continue
-
-          const oldPos = frameSnapshot.get(frame.id)
-          if (!oldPos) continue
-
-          const oldCenterX = oldPos.x + frame.width / 2
-          const oldCenterY = oldPos.y + frame.height / 2
-          const deltaX = newPos.x - oldCenterX
-          const deltaY = newPos.y - oldCenterY
-
-          if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
-
-          store.updateFramePosition(frame.id, oldPos.x + deltaX, oldPos.y + deltaY)
-
-          const nodesInFrame = frameNodes.get(frame.id) || []
-          for (const node of nodesInFrame) {
-            nodeTargets.set(node.id, {
-              x: node.canvas_x + deltaX,
-              y: node.canvas_y + deltaY,
-            })
-          }
-        }
-      }
-
-      // Apply frame constraints
-      let finalTargets: Map<string, { x: number; y: number }>
-
-      if (frameId) {
-        // Frame-scoped: constrain nodes to stay inside the frame
-        finalTargets = targetFrame
-          ? constrainNodesToFrame(nodeTargets, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
-          : nodeTargets
       } else {
-        // Global: push unframed nodes out of frames
-        const unframedIds = new Set(virtualNodes.map(n => n.id))
-        const unframedTargets = new Map<string, { x: number; y: number }>()
-        const framedTargets = new Map<string, { x: number; y: number }>()
+        // For very large graphs, use simpler ranker
+        const ranker = layoutNodes.length > 2000 ? 'longest-path' : 'network-simplex'
 
-        for (const [id, pos] of nodeTargets) {
-          if (unframedIds.has(id)) {
-            unframedTargets.set(id, pos)
-          } else {
-            framedTargets.set(id, pos)
-          }
-        }
-
-        const pushedUnframed = pushOutOfFrames(
-          unframedTargets,
-          new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-        )
-
-        finalTargets = new Map([...pushedUnframed, ...framedTargets])
+        // Use setTimeout to avoid blocking UI
+        positions = await new Promise<Map<string, { x: number; y: number }>>((resolve) => {
+          setTimeout(() => {
+            const result = applyHierarchicalLayout(layoutNodes, layoutEdges, {
+              direction: 'TB',
+              nodeSpacingX: 150,
+              nodeSpacingY: 360,
+              centerX,
+              centerY,
+              ranker,
+            })
+            resolve(result)
+          }, 10)
+        })
       }
 
+      // Use shared helper to process results (frame movement + constraints)
+      const finalTargets = processFrameAwareLayoutResults(
+        ctx,
+        positions,
+        frameSnapshot,
+        store.updateFramePosition,
+        pushOutOfFrames
+      )
+
+      // Apply positions with animation or batch update
+      const animationDuration = layout === 'force' ? 800 : 600
       if (finalTargets.size > 500) {
         await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
       } else {
-        animateToPositions(finalTargets, 600)
+        animateToPositions(finalTargets, animationDuration)
       }
       return
     }
