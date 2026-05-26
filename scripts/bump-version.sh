@@ -16,6 +16,17 @@ fi
 
 # Get current version from package.json
 CURRENT=$(grep '"version"' package.json | head -1 | sed 's/.*"version": "\([^"]*\)".*/\1/')
+
+if [ -z "$CURRENT" ]; then
+  echo "Error: Could not extract version from package.json" >&2
+  exit 1
+fi
+
+if ! [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+  echo "Error: Invalid version format in package.json: $CURRENT" >&2
+  exit 1
+fi
+
 IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
 case "$1" in
@@ -38,17 +49,22 @@ case "$1" in
     VERSION="$1"
     # Validate version format
     if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
-      echo "Error: Version must be in format X.Y.Z or X.Y.Z-tag (e.g., 0.5.1 or 0.5.1-rc.1)"
+      echo "Error: Version must be in format X.Y.Z or X.Y.Z-tag (e.g., 0.5.1 or 0.5.1-rc.1)" >&2
       exit 1
     fi
     ;;
 esac
 
-# Update package.json
-sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
-
-# Update Cargo.toml
-sed -i '' "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+# Cross-platform sed in-place editing
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS
+  sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
+  sed -i '' "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+else
+  # Linux/other
+  sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
+  sed -i "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+fi
 
 # Output ONLY the new version (used by Makefile)
 echo "$VERSION"
