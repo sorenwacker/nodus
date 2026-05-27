@@ -446,7 +446,6 @@ function panToEntity(entityId: string) {
           v-if="showReferencesSidebar"
           :nodes="nodes"
           :active-index="activeNodeIndex"
-          :content-ref="contentRef"
           @navigate-to-node="(nodeId) => {
             const idx = nodes.findIndex(n => n.id === nodeId)
             if (idx >= 0) goToNode(idx)

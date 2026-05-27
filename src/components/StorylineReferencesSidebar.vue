@@ -3,7 +3,7 @@
  * Storyline References Sidebar
  * Shows linked documents at the position where they appear in the text
  */
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
 import Icon from './Icon.vue'
@@ -12,12 +12,13 @@ import type { Node } from '../types'
 interface WikilinkMatch {
   target: string
   index: number
+  nodeIndex: number // which storyline node this is from
 }
 
 /**
  * Extract wikilinks with their position in the content
  */
-function extractWikilinksWithPosition(content: string): WikilinkMatch[] {
+function extractWikilinksWithPosition(content: string, nodeIndex: number): WikilinkMatch[] {
   const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
   const links: WikilinkMatch[] = []
   let match
@@ -25,6 +26,7 @@ function extractWikilinksWithPosition(content: string): WikilinkMatch[] {
     links.push({
       target: match[1].trim(),
       index: match.index,
+      nodeIndex,
     })
   }
   return links
@@ -33,7 +35,6 @@ function extractWikilinksWithPosition(content: string): WikilinkMatch[] {
 const props = defineProps<{
   nodes: Node[]
   activeIndex: number
-  contentRef: HTMLElement | null
 }>()
 
 const emit = defineEmits<{
@@ -42,105 +43,142 @@ const emit = defineEmits<{
 }>()
 
 const store = useNodesStore()
+const sidebarRef = ref<HTMLElement | null>(null)
 
 interface LinkedReference {
-  id: string
+  key: string // unique key for each occurrence
+  id: string | null
   title: string
   target: string
   preview: string
-  position: number // relative position in content (0-1)
+  sectionIndex: number // which section/node this link is in
+  charPosition: number // character position within that section
   isInStoryline: boolean
   storylineIndex?: number
+  isMissing: boolean
 }
 
-// Extract wikilinks from the current node and resolve them
+// Extract wikilinks from ALL nodes in the storyline
 const references = computed<LinkedReference[]>(() => {
-  const node = props.nodes[props.activeIndex]
-  if (!node?.markdown_content) return []
-
-  const content = node.markdown_content
-  const wikilinks = extractWikilinksWithPosition(content)
   const refs: LinkedReference[] = []
-  const seen = new Set<string>()
 
-  for (const link of wikilinks) {
-    // Resolve the wikilink to a node
-    const linkedNode = resolveWikilink(link.target, {
-      nodes: store.filteredNodes,
-      frames: store.filteredFrames,
-    })
+  for (let nodeIdx = 0; nodeIdx < props.nodes.length; nodeIdx++) {
+    const node = props.nodes[nodeIdx]
+    if (!node?.markdown_content) continue
+    // Skip comment nodes - they don't typically have substantive references
+    if (node.node_type === 'comment') continue
 
-    if (!linkedNode || seen.has(linkedNode.id)) continue
-    seen.add(linkedNode.id)
+    const content = node.markdown_content
+    const wikilinks = extractWikilinksWithPosition(content, nodeIdx)
 
-    // Calculate relative position in content
-    const position = link.index / content.length
+    for (let i = 0; i < wikilinks.length; i++) {
+      const link = wikilinks[i]
 
-    // Check if this node is in the current storyline
-    const storylineIndex = props.nodes.findIndex(n => n.id === linkedNode.id)
-    const isInStoryline = storylineIndex >= 0
+      // Resolve the wikilink to a node
+      const linkedNode = resolveWikilink(link.target, {
+        nodes: store.filteredNodes,
+        frames: store.filteredFrames,
+      })
 
-    // Get preview text
-    const preview = linkedNode.markdown_content?.slice(0, 150) || ''
+      const isMissing = !linkedNode
 
-    refs.push({
-      id: linkedNode.id,
-      title: linkedNode.title,
-      target: link.target,
-      preview: preview.replace(/^#.*\n/, '').trim(), // Remove first heading
-      position,
-      isInStoryline,
-      storylineIndex: isInStoryline ? storylineIndex : undefined,
-    })
+      // Check if this node is in the current storyline
+      const storylineIndex = linkedNode
+        ? props.nodes.findIndex(n => n.id === linkedNode.id)
+        : -1
+      const isInStoryline = storylineIndex >= 0
+
+      // Get preview text
+      const preview = linkedNode?.markdown_content?.slice(0, 150) || ''
+
+      refs.push({
+        key: `${nodeIdx}-${i}-${link.target}`,
+        id: linkedNode?.id || null,
+        title: linkedNode?.title || link.target,
+        target: link.target,
+        preview: preview.replace(/^#.*\n/, '').trim(),
+        sectionIndex: nodeIdx,
+        charPosition: link.index,
+        isInStoryline,
+        storylineIndex: isInStoryline ? storylineIndex : undefined,
+        isMissing,
+      })
+    }
   }
 
   return refs
 })
 
+// Filter to show only references from the active section
+const activeReferences = computed(() => {
+  return references.value.filter(r => r.sectionIndex === props.activeIndex)
+})
+
+// Sync sidebar scroll with content scroll
+watch(() => props.activeIndex, () => {
+  nextTick(() => {
+    // Scroll sidebar to show references for active section
+    if (sidebarRef.value) {
+      const firstRef = sidebarRef.value.querySelector(`[data-section="${props.activeIndex}"]`)
+      if (firstRef) {
+        firstRef.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+  })
+})
+
 function handleRefClick(ref: LinkedReference) {
+  if (ref.isMissing) return
+
   if (ref.isInStoryline && ref.storylineIndex !== undefined) {
-    emit('navigate-to-node', ref.id)
-  } else {
+    emit('navigate-to-node', ref.id!)
+  } else if (ref.id) {
     emit('pan-to-canvas', ref.id)
   }
-}
-
-function getPositionStyle(position: number) {
-  // Map position (0-1) to top offset with some padding
-  const topPercent = Math.min(85, Math.max(5, position * 80 + 5))
-  return { top: `${topPercent}%` }
 }
 </script>
 
 <template>
-  <aside class="references-sidebar">
+  <aside ref="sidebarRef" class="references-sidebar">
     <div class="sidebar-header">
       <h3 class="sidebar-title">References</h3>
-      <span class="ref-count">{{ references.length }}</span>
+      <span class="ref-count">{{ activeReferences.length }}</span>
     </div>
 
     <div class="references-container">
-      <div v-if="references.length === 0" class="empty-state">
+      <div v-if="activeReferences.length === 0" class="empty-state">
         <Icon name="link" :size="20" />
         <p>No linked documents in this section</p>
       </div>
 
       <div
-        v-for="ref in references"
-        :key="ref.id"
+        v-for="ref in activeReferences"
+        :key="ref.key"
+        :data-section="ref.sectionIndex"
         class="reference-card"
-        :class="{ 'in-storyline': ref.isInStoryline }"
-        :style="getPositionStyle(ref.position)"
+        :class="{
+          'in-storyline': ref.isInStoryline,
+          'is-missing': ref.isMissing
+        }"
         @click="handleRefClick(ref)"
       >
         <div class="ref-header">
-          <Icon v-if="ref.isInStoryline" name="book-open" :size="12" class="ref-icon storyline" />
+          <Icon v-if="ref.isMissing" name="alert-circle" :size="12" class="ref-icon missing" />
+          <Icon v-else-if="ref.isInStoryline" name="book-open" :size="12" class="ref-icon storyline" />
           <Icon v-else name="external-link" :size="12" class="ref-icon external" />
           <span class="ref-title">{{ ref.title }}</span>
         </div>
-        <p v-if="ref.preview" class="ref-preview">{{ ref.preview.slice(0, 100) }}{{ ref.preview.length > 100 ? '...' : '' }}</p>
+        <p v-if="ref.preview && !ref.isMissing" class="ref-preview">
+          {{ ref.preview.slice(0, 100) }}{{ ref.preview.length > 100 ? '...' : '' }}
+        </p>
+        <p v-else-if="ref.isMissing" class="ref-preview missing-hint">
+          Node not found: [[{{ ref.target }}]]
+        </p>
         <div class="ref-footer">
-          <span v-if="ref.isInStoryline" class="ref-location">
+          <span v-if="ref.isMissing" class="ref-location missing">
+            Missing
+          </span>
+          <span v-else-if="ref.isInStoryline" class="ref-location">
             Section {{ (ref.storylineIndex || 0) + 1 }}
           </span>
           <span v-else class="ref-location">
@@ -148,6 +186,11 @@ function getPositionStyle(position: number) {
           </span>
         </div>
       </div>
+    </div>
+
+    <!-- Show total reference count across all sections -->
+    <div v-if="references.length > 0" class="sidebar-footer">
+      <span class="total-refs">{{ references.length }} total references</span>
     </div>
   </aside>
 </template>
@@ -274,6 +317,41 @@ function getPositionStyle(position: number) {
 }
 
 .ref-location {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ref-location.missing {
+  color: var(--danger-color, #dc2626);
+}
+
+.reference-card.is-missing {
+  opacity: 0.7;
+  border-color: var(--danger-color, #dc2626);
+  cursor: default;
+}
+
+.reference-card.is-missing:hover {
+  border-color: var(--danger-color, #dc2626);
+  box-shadow: none;
+}
+
+.ref-icon.missing {
+  color: var(--danger-color, #dc2626);
+}
+
+.missing-hint {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+.total-refs {
   font-size: 11px;
   color: var(--text-muted);
 }
