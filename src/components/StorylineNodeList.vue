@@ -67,8 +67,9 @@ function getCommentStyle(node: Node) {
 
 function getCommentDisplayText(node: Node): string {
   const { text } = getCommentMeta(node)
-  const truncated = text.slice(0, 40)
-  return truncated + (text.length > 40 ? '...' : '')
+  const maxDisplayLength = 40
+  const truncated = text.slice(0, maxDisplayLength)
+  return truncated + (text.length > maxDisplayLength ? '...' : '')
 }
 
 const showingInsertPicker = ref<number | null>(null)
@@ -123,6 +124,16 @@ function onDragLeave() {
   dragOverIndex.value = null
 }
 
+// Reorder nodes by moving from one index to another
+function reorderNodes(fromIndex: number, toIndex: number) {
+  const nodesCopy = [...props.nodes]
+  const [removed] = nodesCopy.splice(fromIndex, 1)
+  // Adjust target index when moving down (since we removed an element before it)
+  const adjustedTarget = toIndex > fromIndex ? toIndex - 1 : toIndex
+  nodesCopy.splice(adjustedTarget, 0, removed)
+  emit('reorder', nodesCopy.map(n => n.id))
+}
+
 function onDrop(e: DragEvent, targetIndex: number) {
   e.preventDefault()
   dragOverIndex.value = null
@@ -133,22 +144,62 @@ function onDrop(e: DragEvent, targetIndex: number) {
     return
   }
 
-  const fromIndex = draggingNodeIndex.value
-  const nodesCopy = [...props.nodes]
-  const [removed] = nodesCopy.splice(fromIndex, 1)
-
-  // Adjust target index when dragging down (since we removed an element before it)
-  const adjustedTarget = targetIndex > fromIndex ? targetIndex - 1 : targetIndex
-  nodesCopy.splice(adjustedTarget, 0, removed)
-
-  const newOrder = nodesCopy.map(n => n.id)
-  emit('reorder', newOrder)
+  reorderNodes(draggingNodeIndex.value, targetIndex)
   draggingNodeIndex.value = null
 }
 
 function onDragEnd() {
   draggingNodeIndex.value = null
   dragOverIndex.value = null
+}
+
+// Handle drag over insert zones between nodes
+function onDragOverInsertZone(e: DragEvent, index: number) {
+  if (draggingNodeIndex.value === null) return
+  // Don't show drop indicator if dragging to same position or adjacent
+  if (draggingNodeIndex.value === index || draggingNodeIndex.value === index - 1) return
+  e.preventDefault()
+  dragOverIndex.value = index
+}
+
+// Handle drop on insert zones between nodes
+function onDropInsertZone(e: DragEvent, targetIndex: number) {
+  e.preventDefault()
+  dragOverIndex.value = null
+
+  if (draggingNodeIndex.value === null) return
+  const fromIndex = draggingNodeIndex.value
+  // No-op if dropping at same position or right after current position
+  if (fromIndex === targetIndex || fromIndex === targetIndex - 1) {
+    draggingNodeIndex.value = null
+    return
+  }
+
+  reorderNodes(fromIndex, targetIndex)
+  draggingNodeIndex.value = null
+}
+
+// Handle drag over the end drop zone
+function onDragOverEnd(e: DragEvent) {
+  if (draggingNodeIndex.value === null) return
+  e.preventDefault()
+  dragOverIndex.value = props.nodes.length
+}
+
+// Handle drop on the end drop zone
+function onDropEnd(e: DragEvent) {
+  e.preventDefault()
+  dragOverIndex.value = null
+
+  if (draggingNodeIndex.value === null) return
+  // Already at the end
+  if (draggingNodeIndex.value === props.nodes.length - 1) {
+    draggingNodeIndex.value = null
+    return
+  }
+
+  reorderNodes(draggingNodeIndex.value, props.nodes.length)
+  draggingNodeIndex.value = null
 }
 </script>
 
@@ -175,12 +226,18 @@ function onDragEnd() {
 
     <template v-else>
       <template v-for="(node, index) in nodes" :key="node.id">
-        <!-- Insert zone before each node -->
+        <!-- Insert zone before each node - also accepts drops for reordering -->
         <div
           class="insert-zone"
-          :class="{ active: hoveringInsertIndex === index || showingInsertPicker === index }"
+          :class="{
+            active: hoveringInsertIndex === index || showingInsertPicker === index,
+            'drag-over': dragOverIndex === index && draggingNodeIndex !== index && draggingNodeIndex !== index - 1
+          }"
           @mouseenter="hoveringInsertIndex = index"
           @mouseleave="hoveringInsertIndex = null"
+          @dragover="onDragOverInsertZone($event, index)"
+          @dragleave="onDragLeave"
+          @drop="onDropInsertZone($event, index)"
         >
           <button class="insert-btn" :data-tooltip="t('storyline.insertNode')" @click="toggleInsertPicker(index)">
             <Icon name="plus" :size="compact ? 10 : 12" />
@@ -231,12 +288,18 @@ function onDragEnd() {
         </div>
       </template>
 
-      <!-- Insert zone at the end -->
+      <!-- Insert zone at the end - also accepts drops for reordering -->
       <div
         class="insert-zone insert-zone-end"
-        :class="{ active: hoveringInsertIndex === nodes.length || showingInsertPicker === nodes.length }"
+        :class="{
+          active: hoveringInsertIndex === nodes.length || showingInsertPicker === nodes.length,
+          'drag-over': dragOverIndex === nodes.length
+        }"
         @mouseenter="hoveringInsertIndex = nodes.length"
         @mouseleave="hoveringInsertIndex = null"
+        @dragover="onDragOverEnd"
+        @dragleave="onDragLeave"
+        @drop="onDropEnd"
       >
         <button class="insert-btn" :data-tooltip="t('storyline.addNode')" @click="toggleInsertPicker(nodes.length)">
           <Icon name="plus" :size="compact ? 10 : 12" />
@@ -396,6 +459,14 @@ function onDragEnd() {
 .node-item.drag-over {
   border-top: 2px solid var(--primary-color);
   margin-top: -2px;
+}
+
+.insert-zone.drag-over,
+.insert-zone-end.drag-over {
+  height: 28px;
+  border-top: 2px solid var(--primary-color);
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 4px;
 }
 
 .drag-handle {

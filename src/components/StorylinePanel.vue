@@ -6,6 +6,7 @@ import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
 import type { Node, Storyline, EntityNodeType } from '../types'
+import type { ComponentPublicInstance } from 'vue'
 import { ENTITY_NODE_TYPES } from '../types'
 
 const { t } = useI18n()
@@ -20,6 +21,7 @@ const showToast = inject<(message: string, type: 'error' | 'success' | 'info') =
 
 const selectedStorylineId = ref<string | null>(null)
 const newStorylineTitle = ref('')
+const nodeListRef = ref<ComponentPublicInstance | null>(null)
 const isCreating = ref(false)
 const editingStorylineId = ref<string | null>(null)
 const editTitle = ref('')
@@ -37,7 +39,6 @@ const selectedStorylineNodes = computed(() => {
   const _version = storylineNodesVersion.value // Force reactivity on Map changes
   if (!selectedStorylineId.value) return []
   const nodeIds = storylineNodes.value.get(selectedStorylineId.value) || []
-  console.log('[StorylinePanel] selectedStorylineNodes computed', { version: _version, nodeIds })
   return nodeIds.map(id => store.getNode(id)).filter((n): n is Node => n !== undefined)
 })
 
@@ -213,16 +214,40 @@ async function updateStorylineColor(event: Event) {
   }
 }
 
+// Calculate insertion position from Y coordinate
+function calculateDropPosition(clientY: number): number {
+  // Use template ref to access DOM, fallback to querySelector for robustness
+  const nodeListEl = nodeListRef.value?.$el ?? document.querySelector('.storyline-nodes-list .node-list')
+  if (!nodeListEl) return selectedStorylineNodes.value.length
+
+  const nodeItems = nodeListEl.querySelectorAll('.node-item')
+  if (nodeItems.length === 0) return 0
+
+  // Find which position based on Y coordinate
+  for (let i = 0; i < nodeItems.length; i++) {
+    const rect = nodeItems[i].getBoundingClientRect()
+    const midpoint = rect.top + rect.height / 2
+    if (clientY < midpoint) {
+      return i
+    }
+  }
+  // If below all items, insert at end
+  return nodeItems.length
+}
+
 // Handle nodes dropped from canvas
 async function handleNodeDrop(event: Event) {
   const e = event as CustomEvent<{ nodeIds: string[], x: number, y: number }>
-  const { nodeIds } = e.detail
+  const { nodeIds, y } = e.detail
 
   // If we're in a storyline view, add to that storyline
   if (selectedStorylineId.value) {
     try {
+      // Calculate insertion position from Y coordinate
+      let position = calculateDropPosition(y)
       for (const nodeId of nodeIds) {
-        await store.addNodeToStoryline(selectedStorylineId.value, nodeId)
+        await store.addNodeToStoryline(selectedStorylineId.value, nodeId, position)
+        position++ // Increment for next node to maintain order
       }
       showToast?.(`Added ${nodeIds.length} node(s) to storyline`, 'success')
     } catch (err) {
@@ -392,6 +417,7 @@ watch(() => store.currentWorkspaceId, () => {
 
       <div class="storyline-nodes-list">
         <StorylineNodeList
+          ref="nodeListRef"
           :nodes="selectedStorylineNodes"
           :storyline-id="selectedStorylineId!"
           @node-click="handleNodeClick"
