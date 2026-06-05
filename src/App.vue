@@ -12,6 +12,7 @@ import NotificationToast from './components/NotificationToast.vue'
 import OnboardingFlow from './components/OnboardingFlow.vue'
 import StorylinePanel from './components/StorylinePanel.vue'
 import StorylineReader from './components/StorylineReader.vue'
+import McpApprovalModal from './components/McpApprovalModal.vue'
 
 const { t } = useI18n()
 const store = useNodesStore()
@@ -36,11 +37,17 @@ const { searchQuery, showSearch, searchResults, toggleSearch, closeSearch, selec
 const currentTheme = computed(() => themesStore.currentThemeName)
 const showStorylinePanel = ref(false)
 const readerStorylineId = ref<string | null>(null)
+const mcpPendingConnectionId = ref<string | null>(null)
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
 import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles } from './lib/tauri'
+
+// MCP Server
+import { useMcpServer } from './composables/useMcpServer'
+import { useEdgesStore } from './stores/edges'
+import { useStorylinesStore } from './stores/storylines'
 
 const syncingFiles = ref(false)
 
@@ -60,7 +67,7 @@ function showToast(message: string, type: 'error' | 'success' | 'info' = 'info')
 // Provide toast function to child components
 provide('showToast', showToast)
 
-// Undo/Redo composable
+// Undo/Redo composable (initialized before MCP for undo integration)
 import { useUndoRedo } from './composables/useUndoRedo'
 
 const undoRedo = useUndoRedo({
@@ -82,7 +89,72 @@ const undoRedo = useUndoRedo({
   showToast,
 })
 
-const { undoStack, redoStack, pushUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, undo, redo } = undoRedo
+const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, undo, redo } = undoRedo
+
+// MCP Server setup (with undo integration)
+const edgesStore = useEdgesStore()
+const storylinesStore = useStorylinesStore()
+const mcpServer = useMcpServer({
+  store: {
+    getFilteredNodes: () => store.filteredNodes,
+    getFilteredEdges: () => edgesStore.edges,
+    getNode: store.getNode,
+    createNode: store.createNode,
+    updateNodeContent: store.updateNodeContent,
+    updateNodeTitle: store.updateNodeTitle,
+    updateNodePosition: store.updateNodePosition,
+    updateNodeSize: store.updateNodeSize,
+    updateNodeColor: store.updateNodeColor,
+    deleteNode: store.deleteNode,
+    createEdge: store.createEdge,
+    deleteEdge: store.deleteEdge,
+    updateEdgeDirected: edgesStore.updateEdgeDirected,
+    // Frame operations
+    getFilteredFrames: () => store.filteredFrames,
+    getFrame: (id: string) => store.filteredFrames.find(f => f.id === id),
+    createFrame: store.createFrame,
+    updateFramePosition: store.updateFramePosition,
+    updateFrameSize: store.updateFrameSize,
+    updateFrameTitle: store.updateFrameTitle,
+    updateFrameColor: store.updateFrameColor,
+    deleteFrame: store.deleteFrame,
+    assignNodesToFrame: store.assignNodesToFrame,
+    // Storyline operations
+    getFilteredStorylines: () => storylinesStore.filteredStorylines,
+    getStoryline: (id: string) => storylinesStore.filteredStorylines.find(s => s.id === id),
+    getStorylineNodes: storylinesStore.getStorylineNodes,
+    createStoryline: storylinesStore.createStoryline,
+    updateStoryline: storylinesStore.updateStoryline,
+    deleteStoryline: storylinesStore.deleteStoryline,
+    addNodeToStoryline: storylinesStore.addNodeToStoryline,
+    removeNodeFromStoryline: storylinesStore.removeNodeFromStoryline,
+    reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
+  },
+  undo: {
+    pushPositionUndo,
+    pushDeletionUndo,
+    pushCreationUndo,
+  },
+  onConnectionRequest: (connectionId) => {
+    mcpPendingConnectionId.value = connectionId
+  },
+  onConnectionClosed: (connectionId) => {
+    if (mcpPendingConnectionId.value === connectionId) {
+      mcpPendingConnectionId.value = null
+    }
+  },
+})
+
+async function handleMcpApprove(connectionId: string) {
+  await mcpServer.approveConnection(connectionId)
+  mcpPendingConnectionId.value = null
+  showToast(t('mcp.approve') + ' - Connection approved', 'success')
+}
+
+async function handleMcpReject(connectionId: string) {
+  await mcpServer.rejectConnection(connectionId)
+  mcpPendingConnectionId.value = null
+}
 
 // Expose undo functions to child components
 provide('pushUndo', pushUndo)
@@ -92,6 +164,10 @@ provide('pushCreationUndo', pushCreationUndo)
 provide('pushColorUndo', pushColorUndo)
 provide('pushSizeUndo', pushSizeUndo)
 provide('pushFramePositionUndo', pushFramePositionUndo)
+
+// Expose MCP status to child components
+provide('mcpRunning', mcpServer.isRunning)
+provide('mcpConnections', mcpServer.approvedConnections)
 
 // Reset all nodes to default size
 async function resetAllNodeSizes() {
@@ -760,6 +836,14 @@ async function openFolderDialog() {
 
     <!-- Global notifications -->
     <NotificationToast />
+
+    <!-- MCP Connection Approval -->
+    <McpApprovalModal
+      v-if="mcpPendingConnectionId"
+      :connection-id="mcpPendingConnectionId"
+      @approve="handleMcpApprove"
+      @reject="handleMcpReject"
+    />
   </div>
 </template>
 

@@ -11,7 +11,8 @@ import type { Node, Frame } from '../../../types'
 export interface UseNodeDraggingContext {
   store: {
     getNode: (id: string) => Node | undefined
-    updateNodePosition: (id: string, x: number, y: number) => void
+    updateNodePosition: (id: string, x: number, y: number, options?: { skipLayoutTrigger?: boolean }) => void
+    triggerLayoutUpdate: () => void
     selectNode: (id: string, multi: boolean) => void
     selectedNodeIds: string[]
     filteredNodes: Node[]
@@ -253,16 +254,17 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     if (!draggingNode.value) return
 
     // Move all selected nodes if multi-dragging
+    // Skip layout trigger during drag for performance - will trigger once at drag end
     if (multiDragInitial.value.size > 0) {
       for (const [id, initial] of multiDragInitial.value) {
         const newX = snapToGrid(initial.x + dx)
         const newY = snapToGrid(initial.y + dy)
-        store.updateNodePosition(id, newX, newY)
+        store.updateNodePosition(id, newX, newY, { skipLayoutTrigger: true })
       }
     } else {
       const newX = snapToGrid(dragStart.value.nodeX + dx)
       const newY = snapToGrid(dragStart.value.nodeY + dy)
-      store.updateNodePosition(draggingNode.value, newX, newY)
+      store.updateNodePosition(draggingNode.value, newX, newY, { skipLayoutTrigger: true })
     }
   }
 
@@ -447,6 +449,9 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
           }
         }
     }
+
+    // Trigger layout update once at drag end (was skipped during drag for performance)
+    store.triggerLayoutUpdate()
 
     draggingNode.value = null
     multiDragInitial.value.clear()

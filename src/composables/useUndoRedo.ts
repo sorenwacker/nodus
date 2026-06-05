@@ -90,6 +90,21 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     redoStack.value = []
   }
 
+  /**
+   * Push a position snapshot with specific positions (for MCP undo integration)
+   */
+  function pushPositionUndo(positions: Map<string, { x: number; y: number }>) {
+    if (positions.size === 0) return
+    undoStack.value.push({
+      type: 'position',
+      positions: new Map(positions),
+    })
+    if (undoStack.value.length > maxUndo) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
   function pushContentUndo(nodeId: string, oldContent: string | null, oldTitle: string) {
     undoStack.value.push({
       type: 'content',
@@ -360,6 +375,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     undoStack,
     redoStack,
     pushUndo,
+    pushPositionUndo,
     pushContentUndo,
     pushDeletionUndo,
     pushCreationUndo,

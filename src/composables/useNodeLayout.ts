@@ -95,11 +95,9 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
     }
 
     // Helper to check if a node is inside any frame
+    // frame_id is the single source of truth - no visual overlap fallback
     const isNodeInAnyFrame = (node: Node): boolean => {
-      for (const frame of filteredFrames) {
-        if (isNodeInSpecificFrame(node, frame)) return true
-      }
-      return false
+      return !!node.frame_id
     }
 
     let targetNodes: Node[]

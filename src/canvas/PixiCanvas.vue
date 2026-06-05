@@ -106,6 +106,10 @@ const agentTasksStore = useAgentTasksStore()
 const displayStore = useDisplayStore()
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info' | 'warning') => void>('showToast')
 
+// MCP status from App.vue
+const mcpRunning = inject<import('vue').Ref<boolean>>('mcpRunning')
+const mcpConnections = inject<import('vue').Ref<string[]>>('mcpConnections')
+
 // Plan state for interactive approval flow
 const planState = usePlanState()
 // Destructure refs for template auto-unwrapping
@@ -413,12 +417,17 @@ function layoutNeighborhood(focusId: string) {
   return neighborhood.layout(focusId)
 }
 
-// Handle double-click on node: navigate in neighborhood mode, otherwise edit
+// Handle double-click on node: navigate in neighborhood mode, zoom when zoomed out, otherwise edit
 function handleNodeDoubleClick(nodeId: string) {
   // In neighborhood mode, double-click navigates to clicked node's neighborhood
   if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
     focusNodeId.value = nodeId
     layoutNeighborhood(nodeId)
+    return
+  }
+  // When zoomed out (LOD mode or semantic zoom collapsed), zoom to the node instead of editing
+  if (isLODMode.value || isSemanticZoomCollapsed.value) {
+    zoomToNode(nodeId, 1)
     return
   }
   // Otherwise, start editing
@@ -1582,6 +1591,7 @@ const nodeDragging = useNodeDragging({
   store: {
     getNode: store.getNode,
     updateNodePosition: store.updateNodePosition,
+    triggerLayoutUpdate: store.triggerLayoutUpdate,
     selectNode: store.selectNode,
     get selectedNodeIds() {
       return store.selectedNodeIds
@@ -2207,6 +2217,7 @@ useCanvasKeyboardShortcuts({
         @node-dblclick="handleNodeDoubleClick"
         @node-contextmenu="onLODNodeContextMenu"
         @canvas-contextmenu="onLODCanvasContextMenu"
+        @canvas-dblclick="onCanvasDoubleClick"
       />
 
       <div class="canvas-content" :style="{ transform }">
@@ -2401,6 +2412,8 @@ useCanvasKeyboardShortcuts({
         :pdf-status="pdfDrop.processingStatus.value"
         :agent-log="agentLog"
         :show-agent-log="showAgentLogPanel"
+        :mcp-running="mcpRunning?.value"
+        :mcp-connections="mcpConnections?.value?.length"
         @stop-pdf="pdfDrop.stop()"
         @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
       />

@@ -72,16 +72,33 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   )
 
   // Semantic zoom collapse - show title only when zoomed out
-  // Triggers at configured threshold for any graph, or +20% for massive graphs
-  const isSemanticZoomCollapsed = computed(() => {
-    const s = scale.value
+  // Uses hysteresis to prevent flickering when zooming near threshold
+  const SEMANTIC_ZOOM_HYSTERESIS = 0.05 // 5% hysteresis band
+  const semanticZoomCollapsed = ref(scale.value < semanticZoomThreshold.value)
+
+  // Watch scale changes and apply hysteresis
+  watch(scale, (s) => {
     const threshold = semanticZoomThreshold.value
-    // Always collapse below threshold
-    if (s < threshold) return true
-    // Collapse massive graphs below threshold + 20%
-    if (isMassiveGraph.value && s < threshold + 0.2) return true
-    return false
+    const massiveThreshold = threshold + 0.2
+
+    if (semanticZoomCollapsed.value) {
+      // Currently collapsed - need to zoom IN past threshold + hysteresis to expand
+      const expandThreshold = isMassiveGraph.value
+        ? massiveThreshold + SEMANTIC_ZOOM_HYSTERESIS
+        : threshold + SEMANTIC_ZOOM_HYSTERESIS
+      if (s >= expandThreshold) {
+        semanticZoomCollapsed.value = false
+      }
+    } else {
+      // Currently expanded - need to zoom OUT past threshold to collapse
+      const collapseThreshold = isMassiveGraph.value ? massiveThreshold : threshold
+      if (s < collapseThreshold) {
+        semanticZoomCollapsed.value = true
+      }
+    }
   })
+
+  const isSemanticZoomCollapsed = computed(() => semanticZoomCollapsed.value)
 
   // Hide text completely when zoomed out below 10% - text is unreadable at this scale
   const isTextHidden = computed(() => scale.value < 0.10)

@@ -239,21 +239,57 @@ export const useNodesStore = defineStore('nodes', () => {
     return neighbors
   }
 
-  async function updateNodePosition(id: string, x: number, y: number) {
+  async function updateNodePosition(
+    id: string,
+    x: number,
+    y: number,
+    options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean }
+  ) {
     const node = nodes.value.find(n => n.id === id)
     if (node) {
-      const clampedX = clampCoord(x)
-      const clampedY = clampCoord(y)
-      node.canvas_x = clampedX
-      node.canvas_y = clampedY
+      let finalX = clampCoord(x)
+      let finalY = clampCoord(y)
+
+      // Enforce frame containment if requested and node is in a frame
+      if (options?.enforceFrame && node.frame_id) {
+        const frame = framesStore.frames.find(f => f.id === node.frame_id)
+        if (frame) {
+          const padding = 20
+          const titleHeight = 50
+          const nodeWidth = node.width || 200
+          const nodeHeight = node.height || 120
+          // Clamp to frame bounds
+          finalX = Math.max(
+            frame.canvas_x + padding,
+            Math.min(frame.canvas_x + frame.width - nodeWidth - padding, finalX)
+          )
+          finalY = Math.max(
+            frame.canvas_y + padding + titleHeight,
+            Math.min(frame.canvas_y + frame.height - nodeHeight - padding, finalY)
+          )
+        }
+      }
+
+      node.canvas_x = finalX
+      node.canvas_y = finalY
       node.updated_at = Date.now()
-      nodeLayoutVersion.value++ // Trigger edge re-routing
+      // Skip layout trigger during drag for performance - caller should trigger once at drag end
+      if (!options?.skipLayoutTrigger) {
+        nodeLayoutVersion.value++
+      }
       try {
-        await invoke('update_node_position', { id, x: clampedX, y: clampedY })
+        await invoke('update_node_position', { id, x: finalX, y: finalY })
       } catch (e) {
         console.error('Failed to update position:', e)
       }
     }
+  }
+
+  /**
+   * Manually trigger layout version update (call after drag ends)
+   */
+  function triggerLayoutUpdate() {
+    nodeLayoutVersion.value++
   }
 
   async function updateNodeSize(id: string, width: number, height: number, pushOthers = false) {
@@ -433,8 +469,8 @@ export const useNodesStore = defineStore('nodes', () => {
 
         if (reverseEdge) {
           // Reverse edge exists - make it non-directional instead of creating duplicate
-          if (reverseEdge.is_directional !== false) {
-            await edgesStore.updateEdge(reverseEdge.id, { is_directional: false })
+          if (reverseEdge.directed !== false) {
+            await edgesStore.updateEdgeDirected(reverseEdge.id, false)
           }
         } else {
           // No edge in either direction - create new one
@@ -1131,6 +1167,7 @@ export const useNodesStore = defineStore('nodes', () => {
     getNeighborIds,
     findNodeByTitle,
     updateNodePosition,
+    triggerLayoutUpdate,
     updateNodeSize,
     updateNodeContent,
     updateNodeTitle,
