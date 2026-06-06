@@ -41,7 +41,7 @@
   box-shadow: 0 3px 8px var(--shadow-md);
   /* Center content vertically */
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
 }
 
 /* Light mode: stronger borders when zoomed out for visibility */
@@ -67,13 +67,23 @@
   color: var(--text-main);
   letter-spacing: calc(-0.5px * var(--zoom-scale, 1));
   text-shadow: 0 1px 3px var(--shadow-sm);
-  /* Center text, single line with ellipsis when zoomed out */
+  /* Center text, wrap to max 3 lines when zoomed out */
   text-align: center;
-  line-height: 1.15;
+  line-height: 1.2;
   width: 100%;
   background: transparent;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  /* Allow wrapping to 3 lines max */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* Prevent mid-word breaks - only break at spaces */
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: none;
+  /* Ensure header can expand to fit content */
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .node-card.collapsed .node-content,
@@ -87,10 +97,9 @@
   visibility: hidden;
 }
 
-/* Selected nodes in collapsed mode - keep same text display for consistency */
+/* Selected nodes in collapsed mode - same text display as unselected */
 .node-card.collapsed.selected .node-header {
-  /* Keep nowrap to avoid text reflow on selection */
-  white-space: nowrap;
+  /* Allow wrapping same as unselected */
 }
 
 .node-header {
@@ -102,8 +111,10 @@
   background: var(--bg-surface-alt);
   border-radius: calc(7px * var(--zoom-scale, 1)) calc(7px * var(--zoom-scale, 1)) 0 0;
   overflow: hidden;
+  /* Prevent mid-word breaks - only break at spaces */
+  word-break: normal;
   overflow-wrap: break-word;
-  word-break: break-word;
+  hyphens: none;
   cursor: inherit;
   outline: none;
 }
