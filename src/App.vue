@@ -394,6 +394,17 @@ onMounted(async () => {
   // Then initialize data
   await store.initialize()
 
+  // Auto-start MCP server if enabled in settings
+  const mcpEnabled = localStorage.getItem('nodus-mcp-enabled') === 'true'
+  if (mcpEnabled) {
+    try {
+      await mcpServer.startServer()
+      console.log('[App] MCP server auto-started')
+    } catch (e) {
+      console.error('[App] Failed to auto-start MCP server:', e)
+    }
+  }
+
   // Start file watcher if current workspace has sync enabled
   // Delay sync to let UI render first
   if (store.currentWorkspaceId) {
