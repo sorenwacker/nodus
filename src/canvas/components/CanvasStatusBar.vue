@@ -3,9 +3,17 @@
  * CanvasStatusBar - displays canvas statistics and status indicators
  * Shows node/edge counts, layout status, performance mode, and shortcuts hint
  */
+import { inject, computed, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+
+// Inject MCP state directly from App.vue for reliable reactivity
+const mcpRunningRef = inject<Ref<boolean>>('mcpRunning')
+const mcpConnectionsRef = inject<Ref<string[]>>('mcpConnections')
+
+const mcpIsRunning = computed(() => mcpRunningRef?.value ?? false)
+const mcpConnectionCount = computed(() => mcpConnectionsRef?.value?.length ?? 0)
 
 defineProps<{
   /** Number of currently visible nodes */
@@ -51,6 +59,10 @@ const emit = defineEmits<{
     <span>{{ visibleNodeCount }}/{{ totalNodeCount }} {{ t('canvas.status.nodes') }}</span>
     <span class="sep">|</span>
     <span>{{ visibleEdgeCount }}/{{ totalEdgeCount }} {{ t('canvas.status.edges') }}</span>
+    <span class="sep">|</span>
+    <span class="mcp-status" :class="{ active: mcpIsRunning, connected: mcpConnectionCount > 0 }">
+      MCP: {{ mcpIsRunning ? 'on' : 'off' }}
+    </span>
     <button
       v-if="agentLog.length > 0"
       class="agent-log-toggle"
@@ -146,5 +158,22 @@ const emit = defineEmits<{
 .agent-log-toggle:hover {
   background: var(--bg-elevated);
   border-color: var(--primary-color);
+}
+
+.mcp-status {
+  background: var(--text-muted);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.mcp-status.active {
+  background: #3b82f6;
+}
+
+.mcp-status.connected {
+  background: #22c55e;
 }
 </style>

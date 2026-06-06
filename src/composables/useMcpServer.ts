@@ -49,7 +49,16 @@ export function useMcpServer(options: UseMcpServerOptions) {
       isRunning.value = true
       console.log(`[MCP] Server started on port ${serverPort}`)
     } catch (e) {
-      error.value = String(e)
+      const errorMsg = String(e)
+      // If server is already running, that's not an error - just sync state
+      if (errorMsg.includes('already running')) {
+        console.log('[MCP] Server already running, syncing state')
+        const status = await getStatus()
+        isRunning.value = status.running
+        port.value = status.port
+        return
+      }
+      error.value = errorMsg
       console.error('[MCP] Failed to start server:', e)
       throw e
     }

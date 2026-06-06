@@ -5,7 +5,7 @@
  * Configure and control the MCP WebSocket server for AI tool integrations.
  * Uses shared MCP state from App.vue via inject.
  */
-import { ref, computed, onMounted, watch, inject, type Ref } from 'vue'
+import { computed, onMounted, inject, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -16,63 +16,39 @@ const mcpConnections = inject<Ref<string[]>>('mcpConnections')
 const mcpPort = inject<Ref<number | null>>('mcpPort')
 const mcpStartServer = inject<() => Promise<void>>('mcpStartServer')
 const mcpStopServer = inject<() => Promise<void>>('mcpStopServer')
-
-// Local state
-const isEnabled = ref(false)
-const error = ref<string | null>(null)
+const mcpGetStatus = inject<() => Promise<{ running: boolean; port: number | null }>>('mcpGetStatus')
 
 // Computed from injected state
 const isRunning = computed(() => mcpRunning?.value ?? false)
 const port = computed(() => mcpPort?.value ?? null)
 const activeConnections = computed(() => mcpConnections?.value?.length ?? 0)
+const error = computed(() => null) // TODO: inject error state if needed
 
-// Load MCP enabled state from localStorage
 const MCP_ENABLED_KEY = 'nodus-mcp-enabled'
-let initialLoad = true
 
 onMounted(async () => {
-  // Sync isEnabled with actual server state on mount
-  const storedEnabled = localStorage.getItem(MCP_ENABLED_KEY) === 'true'
-  isEnabled.value = storedEnabled || isRunning.value
-  // Save the synced state
-  localStorage.setItem(MCP_ENABLED_KEY, isEnabled.value ? 'true' : 'false')
-  initialLoad = false
-
-  // Auto-start if enabled but not running
-  if (isEnabled.value && !isRunning.value) {
-    await startServer()
+  // Sync state with backend
+  if (mcpGetStatus && mcpRunning) {
+    try {
+      const status = await mcpGetStatus()
+      mcpRunning.value = status.running
+    } catch (e) {
+      console.error('[McpSettings] Failed to get status:', e)
+    }
   }
 })
 
-// Watch enabled toggle - skip initial load to prevent stopping server
-watch(isEnabled, async (enabled) => {
-  if (initialLoad) return
-  localStorage.setItem(MCP_ENABLED_KEY, enabled ? 'true' : 'false')
-  if (enabled && !isRunning.value) {
-    await startServer()
-  } else if (!enabled && isRunning.value) {
-    await stopServer()
-  }
-})
-
-async function startServer() {
-  if (!mcpStartServer) return
-  try {
-    error.value = null
-    await mcpStartServer()
-  } catch (e) {
-    error.value = String(e)
-    isEnabled.value = false
-  }
-}
-
-async function stopServer() {
-  if (!mcpStopServer) return
-  try {
-    error.value = null
-    await mcpStopServer()
-  } catch (e) {
-    error.value = String(e)
+async function toggleServer() {
+  if (isRunning.value) {
+    if (mcpStopServer) {
+      await mcpStopServer()
+      localStorage.setItem(MCP_ENABLED_KEY, 'false')
+    }
+  } else {
+    if (mcpStartServer) {
+      await mcpStartServer()
+      localStorage.setItem(MCP_ENABLED_KEY, 'true')
+    }
   }
 }
 
@@ -91,13 +67,13 @@ const configSnippet = `{
   <div class="mcp-settings">
     <div class="setting-group">
       <label class="checkbox-label">
-        <input v-model="isEnabled" type="checkbox" />
+        <input type="checkbox" :checked="isRunning" @change="toggleServer" />
         {{ t('mcp.enableServer') }}
       </label>
       <span class="hint">{{ t('mcp.serverHint') }}</span>
     </div>
 
-    <div v-if="isEnabled" class="server-status">
+    <div v-if="isRunning" class="server-status">
       <div class="status-row">
         <span class="status-label">{{ t('mcp.status') }}:</span>
         <span :class="['status-value', { running: isRunning }]">
