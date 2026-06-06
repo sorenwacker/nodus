@@ -30,6 +30,7 @@ export interface UseCanvasKeyboardShortcutsContext {
   // Layout
   layoutNodes: () => void
   fitToContent: () => void
+  fitSelectedFrameToContents: () => void
 
   // Neighborhood mode
   toggleNeighborhoodMode: (nodeId?: string) => void
@@ -68,6 +69,7 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     startEditingAndSearch,
     layoutNodes,
     fitToContent,
+    fitSelectedFrameToContents,
     toggleNeighborhoodMode,
     fontScale,
     increaseFontScale,
@@ -164,6 +166,12 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       fitToContent()
+    }
+
+    // S key snugs/shrinks selected frame to fit its contents
+    if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey && selectedFrameId.value) {
+      e.preventDefault()
+      fitSelectedFrameToContents()
     }
 
     // Cmd+A / Ctrl+A selects all nodes

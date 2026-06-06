@@ -39,6 +39,7 @@ const shortcuts = computed(() => [
   // Layout
   { category: t('shortcuts.categories.layout'), key: t('shortcuts.keys.layout'), desc: t('shortcuts.descriptions.autoLayout') },
   { category: t('shortcuts.categories.layout'), key: t('shortcuts.keys.resetSizes'), desc: t('shortcuts.descriptions.resetSizes') },
+  { category: t('shortcuts.categories.layout'), key: 'S', desc: 'Snug frame to fit contents' },
 
   // Data
   { category: t('shortcuts.categories.data'), key: t('shortcuts.keys.dropFiles'), desc: t('shortcuts.descriptions.importFiles') },
