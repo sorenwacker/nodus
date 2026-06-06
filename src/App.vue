@@ -165,9 +165,12 @@ provide('pushColorUndo', pushColorUndo)
 provide('pushSizeUndo', pushSizeUndo)
 provide('pushFramePositionUndo', pushFramePositionUndo)
 
-// Expose MCP status to child components
+// Expose MCP status and controls to child components
 provide('mcpRunning', mcpServer.isRunning)
 provide('mcpConnections', mcpServer.approvedConnections)
+provide('mcpPort', mcpServer.port)
+provide('mcpStartServer', mcpServer.startServer)
+provide('mcpStopServer', mcpServer.stopServer)
 
 // Reset all nodes to default size
 async function resetAllNodeSizes() {

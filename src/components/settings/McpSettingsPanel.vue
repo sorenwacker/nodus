@@ -3,28 +3,35 @@
  * MCP Server Settings Panel
  *
  * Configure and control the MCP WebSocket server for AI tool integrations.
+ * Uses shared MCP state from App.vue via inject.
  */
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, inject, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '../../lib/tauri'
 
 const { t } = useI18n()
 
-// MCP server state
+// Inject shared MCP state from App.vue
+const mcpRunning = inject<Ref<boolean>>('mcpRunning')
+const mcpConnections = inject<Ref<string[]>>('mcpConnections')
+const mcpPort = inject<Ref<number | null>>('mcpPort')
+const mcpStartServer = inject<() => Promise<void>>('mcpStartServer')
+const mcpStopServer = inject<() => Promise<void>>('mcpStopServer')
+
+// Local state
 const isEnabled = ref(false)
-const isRunning = ref(false)
-const port = ref<number | null>(null)
-const activeConnections = ref(0)
 const error = ref<string | null>(null)
+
+// Computed from injected state
+const isRunning = computed(() => mcpRunning?.value ?? false)
+const port = computed(() => mcpPort?.value ?? null)
+const activeConnections = computed(() => mcpConnections?.value?.length ?? 0)
 
 // Load MCP enabled state from localStorage
 const MCP_ENABLED_KEY = 'nodus-mcp-enabled'
 let initialLoad = true
 
 onMounted(async () => {
-  await refreshStatus()
   // Sync isEnabled with actual server state on mount
-  // This prevents the watch from stopping a running server
   const storedEnabled = localStorage.getItem(MCP_ENABLED_KEY) === 'true'
   isEnabled.value = storedEnabled || isRunning.value
   // Save the synced state
@@ -48,24 +55,11 @@ watch(isEnabled, async (enabled) => {
   }
 })
 
-async function refreshStatus() {
-  try {
-    const status = await invoke<{ running: boolean; port: number | null; pending_connections: number }>('get_mcp_status')
-    isRunning.value = status.running
-    port.value = status.port
-    activeConnections.value = status.pending_connections
-    error.value = null
-  } catch (e) {
-    error.value = String(e)
-  }
-}
-
 async function startServer() {
+  if (!mcpStartServer) return
   try {
     error.value = null
-    const serverPort = await invoke<number>('start_mcp_server')
-    port.value = serverPort
-    isRunning.value = true
+    await mcpStartServer()
   } catch (e) {
     error.value = String(e)
     isEnabled.value = false
@@ -73,11 +67,10 @@ async function startServer() {
 }
 
 async function stopServer() {
+  if (!mcpStopServer) return
   try {
-    await invoke('stop_mcp_server')
-    port.value = null
-    isRunning.value = false
-    activeConnections.value = 0
+    error.value = null
+    await mcpStopServer()
   } catch (e) {
     error.value = String(e)
   }
