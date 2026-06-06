@@ -86,6 +86,7 @@ import FileMoveCollisionDialog from '../components/FileMoveCollisionDialog.vue'
 import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 import { useZotero } from '../composables/useZotero'
+import { notifications$ } from '../composables/useNotifications'
 
 // Undo handlers
 const {
@@ -96,6 +97,7 @@ const {
   pushColorUndo,
   pushSizeUndo,
   pushFramePositionUndo,
+  pushFrameAssignmentUndo,
 } = useUndoHandlers()
 
 // Content renderer is configured via composable
@@ -548,24 +550,33 @@ const previewConnectedNodes = computed(() => {
 })
 
 // Colors currently in use in nodes and frames (for color bar)
+// Returns objects with value (stored) and display (shown in dot)
 const colorsInUse = computed(() => {
-  const colors = new Set<string>()
+  const colorValues = new Set<string>()
 
   // Collect colors from nodes
   for (const node of store.filteredNodes) {
     if (node.color_theme) {
-      colors.add(node.color_theme)
+      colorValues.add(node.color_theme)
     }
   }
 
   // Collect colors from frames
   for (const frame of store.filteredFrames) {
     if (frame.color) {
-      colors.add(frame.color)
+      colorValues.add(frame.color)
     }
   }
 
-  return Array.from(colors)
+  // Map stored values to display colors using nodeColors palette
+  return Array.from(colorValues).map(value => {
+    // Find matching preset color to get display value
+    const preset = nodeColors.value.find(c => c.value === value)
+    return {
+      value,
+      display: preset?.display || value // fallback to stored value if no match
+    }
+  })
 })
 
 // Node editor composable - handles inline editing with autosave
@@ -610,6 +621,7 @@ const edgeManipulation = useEdgeManipulation({
     createEdge: store.createEdge,
     deleteEdge: store.deleteEdge,
     updateEdgeDirected: store.updateEdgeDirected,
+    updateEdgeLabel: store.updateEdgeLabel,
     selectNode: store.selectNode,
   },
   screenToCanvas,
@@ -630,6 +642,11 @@ const {
   makeDirectional,
   insertNodeOnEdge,
 } = edgeManipulation
+
+// Handler for edge label save confirmation
+function onEdgeLabelSave() {
+  notifications$.success('Edge label saved')
+}
 
 // Canvas zoom composable - handles wheel zoom/pan
 const canvasZoom = useCanvasZoom({
@@ -867,6 +884,7 @@ const {
   gridLockEnabled,
   highlightAllEdges,
   edgeHideThreshold,
+  edgeLabelSize,
   showHelpModal,
   snapToGrid,
 } = canvasSettings
@@ -982,6 +1000,7 @@ const frames = useFrames({
     updateFrameSize: store.updateFrameSize,
     updateFrameTitle: store.updateFrameTitle,
     updateNodePosition: store.updateNodePosition,
+    assignNodesToFrame: store.assignNodesToFrame,
   },
   viewState: {
     scale,
@@ -1038,20 +1057,51 @@ async function autoLayoutNodes(
   isLayouting.value = true
   const frameId = store.selectedFrameId
   try {
-    // When a frame is selected, use the simpler frame-aware force layout
-    // This ensures nodes stay inside their frame
-    if (frameId && (type === 'force' || type === 'grid')) {
-      await store.layoutNodes(undefined, { frameId, fitToFrame: true })
-    } else {
-      await layout.autoLayout(type, frameId ?? undefined)
-    }
-    // Frame expansion only happens from user resize, not layout
+    // Use autoLayout for all layout types - it handles frame-scoped layouts correctly
+    await layout.autoLayout(type, frameId ?? undefined)
   } finally {
     isLayouting.value = false
   }
 }
 function fitToContent() {
   layout.fitToContent()
+}
+
+// Fit selected frame to snugly wrap its contents
+function fitSelectedFrameToContents() {
+  const frameId = store.selectedFrameId
+  if (!frameId) return
+
+  const frame = store.frames.find(f => f.id === frameId)
+  if (!frame) return
+
+  // Get nodes assigned to this frame
+  const nodesInFrame = store.filteredNodes.filter(n => n.frame_id === frameId)
+  if (nodesInFrame.length === 0) return
+
+  // Calculate bounding box of nodes
+  const padding = 30
+  const titleHeight = 40
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const node of nodesInFrame) {
+    const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+    const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+    minX = Math.min(minX, node.canvas_x)
+    minY = Math.min(minY, node.canvas_y)
+    maxX = Math.max(maxX, node.canvas_x + nodeWidth)
+    maxY = Math.max(maxY, node.canvas_y + nodeHeight)
+  }
+
+  // Calculate new frame dimensions
+  const newX = minX - padding
+  const newY = minY - padding - titleHeight
+  const newWidth = maxX - minX + padding * 2
+  const newHeight = maxY - minY + padding * 2 + titleHeight
+
+  // Update frame position and size
+  store.updateFramePosition(frameId, newX, newY)
+  store.updateFrameSize(frameId, newWidth, newHeight)
 }
 
 // Auto-fit is per-node (stored on node.auto_fit)
@@ -1352,7 +1402,8 @@ async function sendGraphPrompt() {
 }
 
 // Collapsed height constant for semantic zoom
-const COLLAPSED_NODE_HEIGHT = 48
+// Height to accommodate 2 lines of title text + padding
+const COLLAPSED_NODE_HEIGHT = 140
 
 // Get node height - use stored height or estimate from content
 // When semantic zoom is active, returns collapsed height instead
@@ -1652,6 +1703,7 @@ const nodeDragging = useNodeDragging({
   layoutNeighborhood,
   pushOverlappingNodesAway,
   pushUndo,
+  pushFrameAssignmentUndo,
   screenToCanvas,
   zoomToNode,
   optimizeNodeEntrypoints,
@@ -2150,6 +2202,7 @@ useCanvasKeyboardShortcuts({
   startEditingAndSearch,
   layoutNodes: () => store.layoutNodes(undefined, { frameId: store.selectedFrameId ?? undefined }),
   fitToContent,
+  fitSelectedFrameToContents,
   toggleNeighborhoodMode,
   fontScale,
   increaseFontScale,
@@ -2264,6 +2317,7 @@ useCanvasKeyboardShortcuts({
           :edges="visibleEdgeLines"
           :is-large-graph="isLargeGraph"
           :edge-stroke-width="edgeStrokeWidth"
+          :edge-label-size="edgeLabelSize"
           :lasso-points="lassoPoints"
           :is-lasso-selecting="isLassoSelecting"
           :current-theme="currentTheme"
@@ -2346,6 +2400,7 @@ useCanvasKeyboardShortcuts({
         :is-edge-directed="isEdgeDirected"
         @close="selectedEdge = null"
         @change-label="changeEdgeLabel"
+        @save-label="onEdgeLabelSave"
         @change-color="changeEdgeColor"
         @reverse="reverseEdge"
         @make-non-directional="makeNonDirectional"

@@ -10,7 +10,6 @@ import type { LayoutNode as StrategyLayoutNode, LayoutEdge as StrategyLayoutEdge
 import {
   pushNodesOutOfFrames,
   constrainNodesToFrame,
-  isNodeInFrame,
   type FrameRect,
   type NodeSize,
 } from './useFrameCollision'
@@ -244,6 +243,9 @@ export function useLayout(options: UseLayoutOptions) {
   // Animation state
   const animationState = createLayoutAnimator()
 
+  // Flag to prevent concurrent layout operations (rapid clicking)
+  let isLayoutInProgress = false
+
   function stopAnimation() {
     animationState.stop()
   }
@@ -289,6 +291,51 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   /**
+   * Constrain all nodes with frame_id to be positioned inside their assigned frames.
+   * Called after layout to ensure framed nodes stay in bounds.
+   */
+  async function constrainFramedNodesToTheirFrames(): Promise<void> {
+    const allNodes = store.getFilteredNodes()
+    const allFrames = store.getFilteredFrames()
+    const frameMap = new Map(allFrames.map(f => [f.id, f]))
+
+    // Group nodes by their frame_id
+    const nodesByFrame = new Map<string, Node[]>()
+    for (const node of allNodes) {
+      if (node.frame_id && frameMap.has(node.frame_id)) {
+        if (!nodesByFrame.has(node.frame_id)) {
+          nodesByFrame.set(node.frame_id, [])
+        }
+        nodesByFrame.get(node.frame_id)!.push(node)
+      }
+    }
+
+    // For each frame, constrain its assigned nodes
+    const allUpdates = new Map<string, { x: number; y: number }>()
+
+    for (const [frameId, nodes] of nodesByFrame) {
+      const frame = frameMap.get(frameId)!
+      const positions = new Map(nodes.map(n => [n.id, { x: n.canvas_x, y: n.canvas_y }]))
+      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
+
+      const constrained = constrainNodesToFrame(positions, nodeMap, frame)
+
+      // Only include nodes that actually moved
+      for (const [nodeId, pos] of constrained) {
+        const node = nodes.find(n => n.id === nodeId)
+        if (node && (Math.abs(node.canvas_x - pos.x) > 1 || Math.abs(node.canvas_y - pos.y) > 1)) {
+          allUpdates.set(nodeId, pos)
+        }
+      }
+    }
+
+    // Apply all updates
+    if (allUpdates.size > 0) {
+      await batchUpdatePositions(allUpdates, store.updateNodePosition, 50)
+    }
+  }
+
+  /**
    * Radial/concentric layout - places selected node at center with neighbors in rings
    * Only affects nodes in the same frame context as the center node:
    * - If center is in a frame, only nodes in that same frame are moved
@@ -310,31 +357,16 @@ export function useLayout(options: UseLayoutOptions) {
     const allNodes = store.getFilteredNodes()
     const allEdges = store.getFilteredEdges()
 
-    // Get all frames for spatial overlap checking
-    const allFrames = store.getFilteredFrames()
-
-    // Helper to check if a node is inside ANY frame (by frame_id OR 50%+ spatial overlap)
+    // frame_id is the ONLY source of truth - no spatial fallback
     const getNodeFrameId = (node: Node): string | null => {
-      // First check explicit frame_id
-      if (node.frame_id) return node.frame_id
-
-      // Then check spatial overlap with any frame
-      const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-      const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-      for (const frame of allFrames) {
-        if (isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, frame)) {
-          return frame.id
-        }
-      }
-      return null
+      return node.frame_id || null
     }
 
-    // Determine center node's frame (by frame_id OR spatial overlap)
+    // Determine center node's frame (frame_id only)
     const centerFrameId = getNodeFrameId(centerNode)
     const centerIsFramed = !!centerFrameId
 
-    // Filter nodes to only those that should be laid out
-    // Uses same logic as other layouts: frame_id OR spatial overlap
+    // Filter nodes to only those that should be laid out (frame_id only)
     const nodesToLayout = allNodes.filter(n => {
       const nodeFrameId = getNodeFrameId(n)
       if (centerIsFramed) {
@@ -547,7 +579,21 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   async function autoLayout(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid', frameId?: string) {
+    // Prevent concurrent layout operations (rapid clicking)
+    if (isLayoutInProgress) {
+      console.debug('[Layout] Skipping - layout already in progress')
+      return
+    }
+    isLayoutInProgress = true
 
+    try {
+      await _autoLayoutImpl(layout, frameId)
+    } finally {
+      isLayoutInProgress = false
+    }
+  }
+
+  async function _autoLayoutImpl(layout: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid', frameId?: string) {
     // Radial layout is handled separately (requires exactly one selected node)
     if (layout === 'radial') {
       await radialLayout()
@@ -568,15 +614,9 @@ export function useLayout(options: UseLayoutOptions) {
         return
       }
 
-      // Helper to check if a node is inside the target frame (explicit frame_id or 50%+ overlap)
-      const isNodeInTargetFrame = (node: Node): boolean => {
-        if (node.frame_id === frameId) return true
-        const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-        const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-        return isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, targetFrame!)
-      }
-
-      nodes = allNodes.filter(n => isNodeInTargetFrame(n))
+      // Only include nodes explicitly assigned to this frame via frame_id
+      // Do NOT use visual overlap - that creates inconsistent state and breaks undo
+      nodes = allNodes.filter(n => n.frame_id === frameId)
     } else {
       nodes = selectedIds.length > 0
         ? allNodes.filter(n => selectedIds.includes(n.id))
@@ -617,10 +657,27 @@ export function useLayout(options: UseLayoutOptions) {
         height: n.height || NODE_DEFAULTS.HEIGHT,
       }))
 
+      // Calculate appropriate gap for frame-scoped layouts
+      let gap = 360
+      if (targetFrame) {
+        // Calculate gap to fit nodes within frame
+        const padding = 30
+        const availableWidth = targetFrame.width - 2 * padding
+        const availableHeight = targetFrame.height - 2 * padding
+        const avgWidth = fastNodes.reduce((s, n) => s + n.width, 0) / fastNodes.length
+        const avgHeight = fastNodes.reduce((s, n) => s + n.height, 0) / fastNodes.length
+        const cols = Math.ceil(Math.sqrt(nodes.length))
+        const rows = Math.ceil(nodes.length / cols)
+        // Gap that would fit nodes in available space
+        const maxGapX = Math.max(8, (availableWidth - cols * avgWidth) / Math.max(1, cols - 1))
+        const maxGapY = Math.max(8, (availableHeight - rows * avgHeight) / Math.max(1, rows - 1))
+        gap = Math.min(maxGapX, maxGapY, 360) // Use smaller gap, capped at 360
+      }
+
       const positions = fastGridLayout(fastNodes, {
         centerX,
         centerY,
-        gap: 360,
+        gap,
       })
 
       // Push nodes out of frames OR constrain to frame boundaries
@@ -628,6 +685,9 @@ export function useLayout(options: UseLayoutOptions) {
 
       // Batch update positions to avoid blocking UI
       await batchUpdatePositions(finalPositions, store.updateNodePosition, 200)
+
+      // After layout, ensure all framed nodes are inside their assigned frames
+      await constrainFramedNodesToTheirFrames()
       return
     }
 
@@ -655,7 +715,8 @@ export function useLayout(options: UseLayoutOptions) {
       // Fallback: spatial check for nodes without frame_id (newly placed nodes)
 
       for (const node of nodes) {
-        // Primary check: explicit frame_id is authoritative
+        // frame_id is the ONLY source of truth for frame membership
+        // NO spatial fallback - that creates non-deterministic behavior
         if (node.frame_id) {
           if (frameMap.has(node.frame_id)) {
             if (!frameNodes.has(node.frame_id)) {
@@ -663,38 +724,76 @@ export function useLayout(options: UseLayoutOptions) {
             }
             frameNodes.get(node.frame_id)!.push(node)
           }
-          // Even if frame doesn't exist, node with frame_id is considered "framed"
+          // Node with frame_id is always considered "framed" - skip layout
           continue
         }
 
-        // Fallback: spatial check for nodes without frame_id
-        // Only use this for unassigned nodes (e.g., during import)
-        let inFrame = false
-        const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-        const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-
-        for (const frame of allFrames) {
-          // Use 50% overlap to determine if spatially inside
-          if (isNodeInFrame(node.canvas_x, node.canvas_y, nodeWidth, nodeHeight, frame)) {
-            if (!frameNodes.has(frame.id)) {
-              frameNodes.set(frame.id, [])
-            }
-            frameNodes.get(frame.id)!.push(node)
-            inFrame = true
-            break
-          }
-        }
-
-        if (!inFrame) {
-          unframedNodes.push(node)
-        }
+        // No frame_id = unframed node = participates in layout
+        unframedNodes.push(node)
       }
       // Only layout unframed nodes - nodes with frame_id stay fixed
       virtualNodes = [...unframedNodes]
     }
 
-    // Skip frames entirely - they don't participate in layout
-    // (Previously we created virtual nodes for frames and moved them as units)
+    // When no unframed nodes exist, lay out the FRAMES instead
+    if (virtualNodes.length === 0 && frameNodes.size > 0) {
+      // Create virtual nodes representing frames
+      const frameVirtualNodes: Node[] = []
+      for (const [fid] of frameNodes) {
+        const frame = frameMap.get(fid)
+        if (frame) {
+          frameVirtualNodes.push({
+            id: fid,
+            canvas_x: frame.canvas_x,
+            canvas_y: frame.canvas_y,
+            width: frame.width,
+            height: frame.height,
+          })
+        }
+      }
+
+      if (frameVirtualNodes.length > 0) {
+        // Calculate center of frames
+        let sumX = 0, sumY = 0
+        for (const vn of frameVirtualNodes) {
+          sumX += vn.canvas_x + (vn.width || 400) / 2
+          sumY += vn.canvas_y + (vn.height || 300) / 2
+        }
+        const frameCenterX = sumX / frameVirtualNodes.length
+        const frameCenterY = sumY / frameVirtualNodes.length
+
+        // Apply grid layout to frames
+        const frameGap = 40
+        const edges = store.getFilteredEdges()
+        const frameTargets = tetrisGridLayout(frameVirtualNodes, edges, 0, 0, frameGap)
+
+        // Center the layout
+        if (frameTargets.size > 0) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+          for (const vn of frameVirtualNodes) {
+            const pos = frameTargets.get(vn.id)
+            if (!pos) continue
+            minX = Math.min(minX, pos.x)
+            minY = Math.min(minY, pos.y)
+            maxX = Math.max(maxX, pos.x + (vn.width || 400))
+            maxY = Math.max(maxY, pos.y + (vn.height || 300))
+          }
+          const layoutCenterX = (minX + maxX) / 2
+          const layoutCenterY = (minY + maxY) / 2
+          const offsetX = frameCenterX - layoutCenterX
+          const offsetY = frameCenterY - layoutCenterY
+
+          // Move frames to new positions
+          for (const [fid, pos] of frameTargets) {
+            store.updateFramePosition(fid, pos.x + offsetX, pos.y + offsetY)
+          }
+
+          // Constrain nodes inside their frames after frames move
+          await constrainFramedNodesToTheirFrames()
+        }
+      }
+      return
+    }
 
     if (virtualNodes.length === 0) {
       return
@@ -781,8 +880,12 @@ export function useLayout(options: UseLayoutOptions) {
       const animationDuration = layout === 'force' ? 800 : 600
       if (finalTargets.size > 500) {
         await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
+        // After layout, ensure all framed nodes are inside their assigned frames
+        await constrainFramedNodesToTheirFrames()
       } else {
         animateToPositions(finalTargets, animationDuration)
+        // After layout, ensure all framed nodes are inside their assigned frames
+        setTimeout(() => constrainFramedNodesToTheirFrames(), animationDuration + 100)
       }
       return
     }
@@ -791,7 +894,9 @@ export function useLayout(options: UseLayoutOptions) {
 
     if (layout === 'grid') {
       const edges = store.getFilteredEdges()
-      const trialTargets = tetrisGridLayout(virtualNodes, edges, 0, 0, gridGap)
+      // Pass frame width constraint for frame-scoped layouts
+      const containerWidth = targetFrame ? targetFrame.width - 60 : undefined // 60 = 2 * padding
+      const trialTargets = tetrisGridLayout(virtualNodes, edges, 0, 0, gridGap, containerWidth)
 
       if (trialTargets.size === 0) {
         console.warn('Grid layout: no positions generated')
@@ -846,6 +951,10 @@ export function useLayout(options: UseLayoutOptions) {
     const finalTargets = applyFrameConstraints(targets, nodes, targetFrame)
 
     animateToPositions(finalTargets, 500)
+
+    // After layout, ensure all framed nodes are inside their assigned frames
+    // Use setTimeout to let animation complete first
+    setTimeout(() => constrainFramedNodesToTheirFrames(), 600)
   }
 
   function fitToContent() {
@@ -908,27 +1017,9 @@ export function useLayout(options: UseLayoutOptions) {
 
     const selectedIds = store.getSelectedNodeIds()
     const allNodes = store.getFilteredNodes()
-    const allFrames = store.getFilteredFrames()
 
-    // Helper to check if a node is inside any frame (50%+ overlap)
-    const isNodeInAnyFrame = (node: Node): boolean => {
-      if (node.frame_id) return true
-
-      const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-      const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-      const nodeArea = nodeWidth * nodeHeight
-
-      for (const frame of allFrames) {
-        const overlapX = Math.max(0,
-          Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
-          Math.max(node.canvas_x, frame.canvas_x))
-        const overlapY = Math.max(0,
-          Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
-          Math.max(node.canvas_y, frame.canvas_y))
-        if (overlapX * overlapY > nodeArea * 0.5) return true
-      }
-      return false
-    }
+    // frame_id is the ONLY source of truth
+    const isNodeInAnyFrame = (node: Node): boolean => !!node.frame_id
 
     // Filter nodes: selected ones, excluding those in frames
     const candidateNodes = selectedIds.length > 0
