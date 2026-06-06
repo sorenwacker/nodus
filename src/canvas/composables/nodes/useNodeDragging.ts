@@ -52,6 +52,7 @@ export interface UseNodeDraggingContext {
   layoutNeighborhood: (focusId: string) => void
   pushOverlappingNodesAway: (sourceId: string) => void
   pushUndo: () => void
+  pushFrameAssignmentUndo: (assignments: Map<string, string | null>) => void
   screenToCanvas: (clientX: number, clientY: number) => { x: number; y: number }
   zoomToNode: (nodeId: string) => void
   onFullscreenOpen?: (nodeId: string) => void
@@ -381,6 +382,11 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
         // Update frame assignment if changed
         if (node.frame_id !== assignedFrameId) {
+          // Push undo before changing frame assignment
+          const oldAssignments = new Map<string, string | null>()
+          oldAssignments.set(nodeId, node.frame_id ?? null)
+          ctx.pushFrameAssignmentUndo(oldAssignments)
+
           store.assignNodesToFrame([nodeId], assignedFrameId)
 
           // Move file to frame's folder if:

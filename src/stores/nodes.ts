@@ -680,8 +680,12 @@ export const useNodesStore = defineStore('nodes', () => {
       framesStore.createFrameAsync(x, y, width, height, title, wsId, folderPath, parentFrameId),
     assignNodesToFrame: (nodeIds, frameId) => {
       for (const node of nodes.value) {
-        if (nodeIds.includes(node.id)) {
+        if (nodeIds.includes(node.id) && node.frame_id !== frameId) {
           node.frame_id = frameId
+          // Persist to backend
+          invoke('assign_node_to_frame', { nodeId: node.id, frameId }).catch((e) =>
+            storeLogger.error('Failed to assign node to frame:', e)
+          )
         }
       }
     },
@@ -898,8 +902,12 @@ export const useNodesStore = defineStore('nodes', () => {
 
   function assignNodesToFrame(nodeIds: string[], frameId: string | null) {
     for (const node of nodes.value) {
-      if (nodeIds.includes(node.id)) {
+      if (nodeIds.includes(node.id) && node.frame_id !== frameId) {
         node.frame_id = frameId
+        // Persist to backend
+        invoke('assign_node_to_frame', { nodeId: node.id, frameId }).catch((e) =>
+          storeLogger.error('Failed to assign node to frame:', e)
+        )
       }
     }
   }

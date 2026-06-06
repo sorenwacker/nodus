@@ -40,7 +40,12 @@ interface FramePositionSnapshot {
   frames: Map<string, { x: number; y: number }>
 }
 
-export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot
+interface FrameAssignmentSnapshot {
+  type: 'frame-assignment'
+  assignments: Map<string, string | null> // nodeId -> frame_id
+}
+
+export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot | FrameAssignmentSnapshot
 
 export interface UndoRedoStore {
   getNode: (id: string) => Node | undefined
@@ -56,6 +61,7 @@ export interface UndoRedoStore {
   // Frame operations
   getFilteredFrames?: () => Array<{ id: string; canvas_x: number; canvas_y: number }>
   updateFramePosition?: (id: string, x: number, y: number) => void
+  assignNodesToFrame?: (nodeIds: string[], frameId: string | null) => void
 }
 
 export interface UseUndoRedoOptions {
@@ -182,6 +188,18 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     redoStack.value = []
   }
 
+  function pushFrameAssignmentUndo(assignments: Map<string, string | null>) {
+    if (assignments.size === 0) return
+    undoStack.value.push({
+      type: 'frame-assignment',
+      assignments: new Map(assignments),
+    })
+    if (undoStack.value.length > maxUndo) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
   async function undo() {
     if (undoStack.value.length === 0) {
       showToast('Nothing to undo', 'info')
@@ -276,6 +294,31 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         }
       }
       showToast('Undo frame position', 'info')
+    } else if (snapshot.type === 'frame-assignment') {
+      // Save current frame assignments for redo
+      const currentAssignments = new Map<string, string | null>()
+      for (const [nodeId] of snapshot.assignments) {
+        const node = store.getNode(nodeId)
+        if (node) {
+          currentAssignments.set(nodeId, node.frame_id ?? null)
+        }
+      }
+      redoStack.value.push({ type: 'frame-assignment', assignments: currentAssignments })
+      // Restore old frame assignments
+      if (store.assignNodesToFrame) {
+        // Group by frame_id for batch assignment
+        const byFrame = new Map<string | null, string[]>()
+        for (const [nodeId, frameId] of snapshot.assignments) {
+          if (!byFrame.has(frameId)) {
+            byFrame.set(frameId, [])
+          }
+          byFrame.get(frameId)!.push(nodeId)
+        }
+        for (const [frameId, nodeIds] of byFrame) {
+          store.assignNodesToFrame(nodeIds, frameId)
+        }
+      }
+      showToast('Undo frame assignment', 'info')
     }
   }
 
@@ -355,6 +398,30 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         }
       }
       showToast('Redo frame position', 'info')
+    } else if (snapshot.type === 'frame-assignment') {
+      // Save current frame assignments for undo
+      const currentAssignments = new Map<string, string | null>()
+      for (const [nodeId] of snapshot.assignments) {
+        const node = store.getNode(nodeId)
+        if (node) {
+          currentAssignments.set(nodeId, node.frame_id ?? null)
+        }
+      }
+      undoStack.value.push({ type: 'frame-assignment', assignments: currentAssignments })
+      // Apply redo frame assignments
+      if (store.assignNodesToFrame) {
+        const byFrame = new Map<string | null, string[]>()
+        for (const [nodeId, frameId] of snapshot.assignments) {
+          if (!byFrame.has(frameId)) {
+            byFrame.set(frameId, [])
+          }
+          byFrame.get(frameId)!.push(nodeId)
+        }
+        for (const [frameId, nodeIds] of byFrame) {
+          store.assignNodesToFrame(nodeIds, frameId)
+        }
+      }
+      showToast('Redo frame assignment', 'info')
     }
   }
 
@@ -382,6 +449,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     pushColorUndo,
     pushSizeUndo,
     pushFramePositionUndo,
+    pushFrameAssignmentUndo,
     undo,
     redo,
     canUndo,
