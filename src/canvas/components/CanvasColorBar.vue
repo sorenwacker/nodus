@@ -14,6 +14,7 @@ interface ColorOption {
 
 const props = defineProps<{
   colors: ColorOption[]
+  colorsInUse: string[]
   selectedNodeIds: string[]
   selectedFrameId: string | null
   isCollapsed: boolean
@@ -79,6 +80,21 @@ function isRecentColorActive(color: string): boolean {
   return props.selectedNodeIds.every(id => props.getNodeColor(id) === color)
 }
 
+function isInUseColorActive(color: string): boolean {
+  if (props.selectedFrameId) {
+    return props.getFrameColor() === color
+  }
+  return props.selectedNodeIds.every(id => props.getNodeColor(id) === color)
+}
+
+function onInUseColorClick(color: string) {
+  if (props.selectedFrameId) {
+    emit('update-frame-color', color)
+  } else {
+    emit('update-node-color', color)
+  }
+}
+
 function onColorClick(color: ColorOption) {
   if (props.selectedFrameId) {
     emit('update-frame-color', color.display)
@@ -113,6 +129,20 @@ function onColorPickerChange(event: Event) {
 
 <template>
   <div class="collapsed-color-bar" @pointerdown.stop @click.stop>
+    <!-- Colors in use (from current nodes and frames) -->
+    <template v-if="colorsInUse.length > 0">
+      <button
+        v-for="color in colorsInUse"
+        :key="'inuse-' + color"
+        class="color-dot in-use-color"
+        :class="{ active: isInUseColorActive(color) }"
+        :style="{ background: color }"
+        :title="'In use: ' + color"
+        @click.stop="onInUseColorClick(color)"
+      ></button>
+      <span class="color-bar-sep"></span>
+    </template>
+
     <!-- Preset colors -->
     <button
       v-for="color in colors"
@@ -264,5 +294,10 @@ function onColorPickerChange(event: Event) {
 .recent-color {
   width: 16px;
   height: 16px;
+}
+
+/* Colors in use - show with a subtle ring */
+.in-use-color {
+  box-shadow: 0 0 0 1px var(--border-default);
 }
 </style>

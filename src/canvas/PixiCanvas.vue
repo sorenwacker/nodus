@@ -547,6 +547,27 @@ const previewConnectedNodes = computed(() => {
     .map(({ title, content }) => ({ title, content }))
 })
 
+// Colors currently in use in nodes and frames (for color bar)
+const colorsInUse = computed(() => {
+  const colors = new Set<string>()
+
+  // Collect colors from nodes
+  for (const node of store.filteredNodes) {
+    if (node.color_theme) {
+      colors.add(node.color_theme)
+    }
+  }
+
+  // Collect colors from frames
+  for (const frame of store.filteredFrames) {
+    if (frame.color) {
+      colors.add(frame.color)
+    }
+  }
+
+  return Array.from(colors)
+})
+
 // Node editor composable - handles inline editing with autosave
 const nodeEditor = useNodeEditor({
   store: {
@@ -2187,6 +2208,7 @@ useCanvasKeyboardShortcuts({
       <CanvasColorBar
         v-if="store.selectedNodeIds.length > 0 || store.selectedFrameId"
         :colors="nodeColors"
+        :colors-in-use="colorsInUse"
         :selected-node-ids="store.selectedNodeIds"
         :selected-frame-id="store.selectedFrameId"
         :is-collapsed="isSemanticZoomCollapsed"
