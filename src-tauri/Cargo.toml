@@ -1,6 +1,6 @@
 [package]
 name = "nodus"
-version = "0.6.0"
+version = "0.6.1-rc.1"
 description = "Visual knowledge graph for thinking and research"
 authors = ["Nodus Team"]
 edition = "2021"
@@ -36,6 +36,10 @@ rio_api = "0.8"
 rio_turtle = "0.8"
 rio_xml = "0.8"
 oxiri = "0.2"
+
+# WebSocket server for MCP
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
 
 # Utilities
 dirs = "5.0"
