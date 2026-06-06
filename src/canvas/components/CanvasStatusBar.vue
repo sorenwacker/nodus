@@ -59,10 +59,12 @@ const emit = defineEmits<{
     <span>{{ visibleNodeCount }}/{{ totalNodeCount }} {{ t('canvas.status.nodes') }}</span>
     <span class="sep">|</span>
     <span>{{ visibleEdgeCount }}/{{ totalEdgeCount }} {{ t('canvas.status.edges') }}</span>
-    <span class="sep">|</span>
-    <span class="mcp-status" :class="{ active: mcpIsRunning, connected: mcpConnectionCount > 0 }">
-      MCP: {{ mcpIsRunning ? 'on' : 'off' }}
-    </span>
+    <template v-if="mcpIsRunning">
+      <span class="sep">|</span>
+      <span class="mcp-status" :class="{ connected: mcpConnectionCount > 0 }">
+        MCP
+      </span>
+    </template>
     <button
       v-if="agentLog.length > 0"
       class="agent-log-toggle"
@@ -161,16 +163,12 @@ const emit = defineEmits<{
 }
 
 .mcp-status {
-  background: var(--text-muted);
+  background: #3b82f6;
   color: white;
   padding: 2px 6px;
   border-radius: 3px;
   font-weight: 600;
   font-size: 10px;
-}
-
-.mcp-status.active {
-  background: #3b82f6;
 }
 
 .mcp-status.connected {

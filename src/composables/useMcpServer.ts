@@ -144,7 +144,7 @@ export function useMcpServer(options: UseMcpServerOptions) {
    * Set up event listeners
    */
   async function setupListeners(): Promise<void> {
-    // Connection request
+    // Connection request (non-localhost)
     const unlistenConnectionRequest = await listen<McpConnectionRequestEvent>(
       'mcp-connection-request',
       (event) => {
