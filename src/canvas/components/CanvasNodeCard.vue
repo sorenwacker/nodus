@@ -179,7 +179,7 @@ const displayTitle = computed(() => {
       v-else-if="node.title || isEditing || isEditingTitle || isCollapsed"
       class="node-header"
       tabindex="-1"
-      @dblclick.stop="emit('start-editing-title')"
+      @dblclick.stop="!isCollapsed && emit('start-editing-title')"
       @click.stop="isEditing && !isEditingTitle && emit('start-editing-title')"
     >
       <input

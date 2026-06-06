@@ -4,17 +4,22 @@
  * Shown when nodes or frames are selected
  * Includes preset colors + color picker with recent colors
  */
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 interface ColorOption {
   value: string | null
+  display: string | null
+}
+
+interface ColorInUse {
+  value: string
   display: string
 }
 
 const props = defineProps<{
   colors: ColorOption[]
-  colorsInUse: string[]
+  colorsInUse: ColorInUse[]
   selectedNodeIds: string[]
   selectedFrameId: string | null
   isCollapsed: boolean
@@ -30,41 +35,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const RECENT_COLORS_KEY = 'nodus-recent-colors'
-const MAX_RECENT_COLORS = 5
-
-const recentColors = ref<string[]>([])
 const colorPickerRef = ref<HTMLInputElement | null>(null)
-
-onMounted(() => {
-  loadRecentColors()
-})
-
-function loadRecentColors() {
-  try {
-    const stored = localStorage.getItem(RECENT_COLORS_KEY)
-    if (stored) {
-      recentColors.value = JSON.parse(stored)
-    }
-  } catch {
-    recentColors.value = []
-  }
-}
-
-function saveRecentColor(color: string) {
-  // Don't save preset colors or null
-  if (!color || props.colors.some(c => c.display === color)) return
-
-  // Add to front, remove duplicates, limit to max
-  const filtered = recentColors.value.filter(c => c !== color)
-  recentColors.value = [color, ...filtered].slice(0, MAX_RECENT_COLORS)
-
-  try {
-    localStorage.setItem(RECENT_COLORS_KEY, JSON.stringify(recentColors.value))
-  } catch {
-    // Ignore storage errors
-  }
-}
 
 function isColorActive(color: ColorOption): boolean {
   if (props.selectedFrameId) {
@@ -73,25 +44,18 @@ function isColorActive(color: ColorOption): boolean {
   return props.selectedNodeIds.every(id => props.getNodeColor(id) === color.value)
 }
 
-function isRecentColorActive(color: string): boolean {
+function isInUseColorActive(color: ColorInUse): boolean {
   if (props.selectedFrameId) {
-    return props.getFrameColor() === color
+    return props.getFrameColor() === color.value
   }
-  return props.selectedNodeIds.every(id => props.getNodeColor(id) === color)
+  return props.selectedNodeIds.every(id => props.getNodeColor(id) === color.value)
 }
 
-function isInUseColorActive(color: string): boolean {
+function onInUseColorClick(color: ColorInUse) {
   if (props.selectedFrameId) {
-    return props.getFrameColor() === color
-  }
-  return props.selectedNodeIds.every(id => props.getNodeColor(id) === color)
-}
-
-function onInUseColorClick(color: string) {
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color)
+    emit('update-frame-color', color.value)
   } else {
-    emit('update-node-color', color)
+    emit('update-node-color', color.value)
   }
 }
 
@@ -103,14 +67,6 @@ function onColorClick(color: ColorOption) {
   }
 }
 
-function onRecentColorClick(color: string) {
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color)
-  } else {
-    emit('update-node-color', color)
-  }
-}
-
 function openColorPicker() {
   colorPickerRef.value?.click()
 }
@@ -118,7 +74,6 @@ function openColorPicker() {
 function onColorPickerChange(event: Event) {
   const input = event.target as HTMLInputElement
   const color = input.value
-  saveRecentColor(color)
   if (props.selectedFrameId) {
     emit('update-frame-color', color)
   } else {
@@ -133,11 +88,11 @@ function onColorPickerChange(event: Event) {
     <template v-if="colorsInUse.length > 0">
       <button
         v-for="color in colorsInUse"
-        :key="'inuse-' + color"
+        :key="'inuse-' + color.value"
         class="color-dot in-use-color"
         :class="{ active: isInUseColorActive(color) }"
-        :style="{ background: color }"
-        :title="'In use: ' + color"
+        :style="{ background: color.display }"
+        :title="'In use'"
         @click.stop="onInUseColorClick(color)"
       ></button>
       <span class="color-bar-sep"></span>
@@ -168,20 +123,6 @@ function onColorPickerChange(event: Event) {
       class="hidden-color-input"
       @input="onColorPickerChange"
     />
-
-    <!-- Recent colors (if any) -->
-    <template v-if="recentColors.length > 0">
-      <span class="color-bar-sep"></span>
-      <button
-        v-for="color in recentColors"
-        :key="'recent-' + color"
-        class="color-dot recent-color"
-        :class="{ active: isRecentColorActive(color) }"
-        :style="{ background: color }"
-        :title="'Recent: ' + color"
-        @click.stop="onRecentColorClick(color)"
-      ></button>
-    </template>
 
     <span v-if="selectedNodeIds.length > 0 && !selectedFrameId" class="color-bar-sep"></span>
     <button
@@ -290,11 +231,6 @@ function onColorPickerChange(event: Event) {
   pointer-events: none;
 }
 
-/* Recent colors - slightly smaller */
-.recent-color {
-  width: 16px;
-  height: 16px;
-}
 
 /* Colors in use - show with a subtle ring */
 .in-use-color {

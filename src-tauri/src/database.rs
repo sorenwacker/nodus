@@ -627,6 +627,19 @@ pub mod edges {
         Ok(())
     }
 
+    pub async fn update_label(
+        pool: &DbPool,
+        id: &str,
+        label: Option<&str>,
+    ) -> Result<(), DatabaseError> {
+        sqlx::query("UPDATE edges SET label = ? WHERE id = ?")
+            .bind(label)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn update_storyline_and_color(
         pool: &DbPool,
         id: &str,

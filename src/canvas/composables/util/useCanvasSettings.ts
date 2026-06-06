@@ -13,6 +13,7 @@ export function useCanvasSettings(workspaceId?: string) {
   // Edge display settings
   const highlightAllEdges = ref(false)
   const edgeHideThreshold = ref(canvasStorage.getEdgeHideThreshold(workspaceId))
+  const edgeLabelSize = ref(canvasStorage.getEdgeLabelSize(workspaceId))
 
   // Help modal visibility
   const showHelpModal = ref(false)
@@ -44,12 +45,20 @@ export function useCanvasSettings(workspaceId?: string) {
     edgeHideThreshold.value = customEvent.detail
   }
 
+  // Listen for edge label size changes from settings panel
+  function onEdgeLabelSizeChange(e: Event) {
+    const customEvent = e as CustomEvent<number>
+    edgeLabelSize.value = customEvent.detail
+  }
+
   onMounted(() => {
     window.addEventListener('nodus-edge-hide-threshold-change', onEdgeHideThresholdChange)
+    window.addEventListener('nodus-edge-label-size-change', onEdgeLabelSizeChange)
   })
 
   onUnmounted(() => {
     window.removeEventListener('nodus-edge-hide-threshold-change', onEdgeHideThresholdChange)
+    window.removeEventListener('nodus-edge-label-size-change', onEdgeLabelSizeChange)
   })
 
   return {
@@ -58,6 +67,7 @@ export function useCanvasSettings(workspaceId?: string) {
     gridSize,
     highlightAllEdges,
     edgeHideThreshold,
+    edgeLabelSize,
     showHelpModal,
 
     // Toggles

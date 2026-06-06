@@ -78,8 +78,9 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   /* Prevent mid-word breaks - only break at spaces */
-  word-break: normal;
-  overflow-wrap: break-word;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
   hyphens: none;
   /* Ensure header can expand to fit content */
   flex-shrink: 0;

@@ -13,6 +13,7 @@ export function useUndoHandlers() {
   const injectedPushColorUndo = inject<((colors: Map<string, string | null>) => void) | undefined>('pushColorUndo')
   const injectedPushSizeUndo = inject<((sizes: Map<string, { width: number; height: number; x: number; y: number }>) => void) | undefined>('pushSizeUndo')
   const injectedPushFramePositionUndo = inject<(() => void) | undefined>('pushFramePositionUndo')
+  const injectedPushFrameAssignmentUndo = inject<((assignments: Map<string, string | null>) => void) | undefined>('pushFrameAssignmentUndo')
 
   const pushUndo = () => {
     if (injectedPushUndo) {
@@ -70,6 +71,14 @@ export function useUndoHandlers() {
     }
   }
 
+  const pushFrameAssignmentUndo = (assignments: Map<string, string | null>) => {
+    if (injectedPushFrameAssignmentUndo) {
+      injectedPushFrameAssignmentUndo(assignments)
+    } else {
+      console.warn('pushFrameAssignmentUndo not provided - frame assignment undo will not work')
+    }
+  }
+
   return {
     pushUndo,
     pushContentUndo,
@@ -78,5 +87,6 @@ export function useUndoHandlers() {
     pushColorUndo,
     pushSizeUndo,
     pushFramePositionUndo,
+    pushFrameAssignmentUndo,
   }
 }

@@ -77,23 +77,6 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
     const filteredFrames = deps.getFilteredFrames()
     const filteredEdges = deps.getFilteredEdges()
 
-    // Helper to check if a node is inside a specific frame (50%+ overlap)
-    const isNodeInSpecificFrame = (node: Node, frame: Frame): boolean => {
-      if (node.frame_id === frame.id) return true
-
-      const nodeWidth = node.width || 200
-      const nodeHeight = node.height || 120
-      const nodeArea = nodeWidth * nodeHeight
-
-      const overlapX = Math.max(0,
-        Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
-        Math.max(node.canvas_x, frame.canvas_x))
-      const overlapY = Math.max(0,
-        Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
-        Math.max(node.canvas_y, frame.canvas_y))
-      return overlapX * overlapY > nodeArea * 0.5
-    }
-
     // Helper to check if a node is inside any frame
     // frame_id is the single source of truth - no visual overlap fallback
     const isNodeInAnyFrame = (node: Node): boolean => {
@@ -104,13 +87,14 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
     let targetFrame: Frame | undefined
 
     if (frameId) {
-      // Frame-scoped layout: only nodes inside the selected frame
+      // Frame-scoped layout: only nodes explicitly assigned to this frame via frame_id
+      // Do NOT use visual overlap - that creates inconsistent state
       targetFrame = filteredFrames.find(f => f.id === frameId)
       if (!targetFrame) {
         return
       }
 
-      targetNodes = filteredNodes.filter(n => isNodeInSpecificFrame(n, targetFrame!))
+      targetNodes = filteredNodes.filter(n => n.frame_id === frameId)
     } else {
       // Canvas layout: exclude nodes inside frames
       const allTargetNodes = nodeIds

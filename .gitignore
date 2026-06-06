@@ -56,3 +56,7 @@ temp/
 # Claude
 .claude/
 CLAUDE.md
+
+# MCP Server package build
+packages/nodus-mcp-server/dist/
+packages/nodus-mcp-server/node_modules/

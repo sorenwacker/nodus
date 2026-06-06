@@ -875,6 +875,14 @@ pub async fn update_edge_color(id: String, color: Option<String>) -> Result<(), 
 }
 
 #[tauri::command]
+pub async fn update_edge_label(id: String, label: Option<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::edges::update_label(pool, &id, label.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn update_edge_storyline(
     id: String,
     storyline_id: Option<String>,

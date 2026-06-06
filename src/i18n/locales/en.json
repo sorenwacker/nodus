@@ -49,7 +49,8 @@
       "insertNode": "Insert Node",
       "insertNodeTooltip": "Insert a node on this edge",
       "deleteEdge": "Delete Edge",
-      "deleteEdgeTooltip": "Delete this edge"
+      "deleteEdgeTooltip": "Delete this edge",
+      "labelSaved": "Edge label saved"
     },
     "frame": {
       "delete": "Delete frame",
@@ -519,6 +520,8 @@
     },
     "edgeHideThreshold": "Hide Edges Above",
     "edgeHideThresholdHint": "Hide all edges when count exceeds this value (0 = always show)",
+    "edgeLabelSize": "Edge Label Size",
+    "edgeLabelSizeHint": "Font size for edge labels (8-24 pixels)",
     "radialStyle": "Radial Layout Style",
     "radialStyleHint": "Spacing style for radial/circular layout",
     "radialStyles": {
@@ -576,5 +579,22 @@
       "replace": "Replace",
       "replaceDesc": "Overwrite the existing file (cannot be undone)"
     }
+  },
+  "mcp": {
+    "connectionRequest": "MCP Connection Request",
+    "connectionRequestMessage": "An AI tool is requesting access to your workspace. This will allow it to read and modify your nodes.",
+    "connectionId": "Connection ID",
+    "warningMessage": "Only approve connections from tools you trust. The connected tool will be able to read, create, update, and delete nodes.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "server": "MCP Server",
+    "serverHint": "Allow AI tools like Claude Desktop to connect to Nodus via MCP protocol.",
+    "enableServer": "Enable MCP Server",
+    "port": "Port",
+    "status": "Status",
+    "running": "Running",
+    "stopped": "Stopped",
+    "connections": "connections",
+    "configHint": "Add this to your Claude Desktop config:"
   }
 }

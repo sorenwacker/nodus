@@ -13,9 +13,10 @@ const props = defineProps<{
   isEdgeDirected: (edgeId: string) => boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void
   (e: 'change-label', value: string): void
+  (e: 'save-label'): void
   (e: 'change-color', value: string): void
   (e: 'reverse'): void
   (e: 'make-non-directional'): void
@@ -23,6 +24,13 @@ defineEmits<{
   (e: 'insert-node'): void
   (e: 'delete'): void
 }>()
+
+function onLabelKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    emit('save-label')
+  }
+}
 
 const selectedEdgeData = computed(() => {
   if (!props.selectedEdge) return null
@@ -56,6 +64,7 @@ const isDirected = computed(() => {
         :placeholder="t('canvas.edge.labelPlaceholder')"
         class="edge-label-input"
         @input="$emit('change-label', ($event.target as HTMLInputElement).value)"
+        @keydown="onLabelKeydown"
       />
       <label>{{ t('canvas.edge.color') }}</label>
       <div class="edge-color-picker">

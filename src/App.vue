@@ -85,11 +85,12 @@ const undoRedo = useUndoRedo({
     // Frame operations for undo
     getFilteredFrames: () => store.filteredFrames,
     updateFramePosition: store.updateFramePosition,
+    assignNodesToFrame: store.assignNodesToFrame,
   },
   showToast,
 })
 
-const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, undo, redo } = undoRedo
+const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, pushFrameAssignmentUndo, undo, redo } = undoRedo
 
 // MCP Server setup (with undo integration)
 const edgesStore = useEdgesStore()
@@ -109,6 +110,7 @@ const mcpServer = useMcpServer({
     createEdge: store.createEdge,
     deleteEdge: store.deleteEdge,
     updateEdgeDirected: edgesStore.updateEdgeDirected,
+    updateEdgeLabel: edgesStore.updateEdgeLabel,
     // Frame operations
     getFilteredFrames: () => store.filteredFrames,
     getFrame: (id: string) => store.filteredFrames.find(f => f.id === id),
@@ -164,6 +166,7 @@ provide('pushCreationUndo', pushCreationUndo)
 provide('pushColorUndo', pushColorUndo)
 provide('pushSizeUndo', pushSizeUndo)
 provide('pushFramePositionUndo', pushFramePositionUndo)
+provide('pushFrameAssignmentUndo', pushFrameAssignmentUndo)
 
 // Expose MCP status and controls to child components
 provide('mcpRunning', mcpServer.isRunning)
@@ -171,6 +174,7 @@ provide('mcpConnections', mcpServer.approvedConnections)
 provide('mcpPort', mcpServer.port)
 provide('mcpStartServer', mcpServer.startServer)
 provide('mcpStopServer', mcpServer.stopServer)
+provide('mcpGetStatus', mcpServer.getStatus)
 
 // Reset all nodes to default size
 async function resetAllNodeSizes() {
@@ -402,7 +406,6 @@ onMounted(async () => {
   if (mcpEnabled) {
     try {
       await mcpServer.startServer()
-      console.log('[App] MCP server auto-started')
     } catch (e) {
       console.error('[App] Failed to auto-start MCP server:', e)
     }

@@ -6,6 +6,7 @@ const props = defineProps<{
   edges: VisibleEdgeLine[]
   isLargeGraph: boolean
   edgeStrokeWidth: number
+  edgeLabelSize: number
   lassoPoints: Array<{ x: number; y: number }>
   isLassoSelecting: boolean
   currentTheme: string
@@ -115,6 +116,7 @@ function getArrowMarkerId(color: string): string {
           :x="edge.labelX || (edge.x1 + edge.x2) / 2"
           :y="(edge.labelY || (edge.y1 + edge.y2) / 2) - 2"
           class="edge-label"
+          :style="{ fontSize: edgeLabelSize + 'px' }"
         >{{ edge.label }}</text>
       </g>
     </template>
@@ -174,7 +176,6 @@ function getArrowMarkerId(color: string): string {
 }
 
 .edge-label {
-  font-size: 11px;
   font-weight: 500;
   fill: var(--text-main);
   text-anchor: middle;

@@ -783,13 +783,25 @@ export function useLayout(options: UseLayoutOptions) {
           const offsetX = frameCenterX - layoutCenterX
           const offsetY = frameCenterY - layoutCenterY
 
-          // Move frames to new positions
+          // Move frames AND their nodes together (preserve relative positions)
           for (const [fid, pos] of frameTargets) {
-            store.updateFramePosition(fid, pos.x + offsetX, pos.y + offsetY)
-          }
+            const frame = frameMap.get(fid)
+            if (!frame) continue
 
-          // Constrain nodes inside their frames after frames move
-          await constrainFramedNodesToTheirFrames()
+            const newX = pos.x + offsetX
+            const newY = pos.y + offsetY
+            const deltaX = newX - frame.canvas_x
+            const deltaY = newY - frame.canvas_y
+
+            // Move the frame
+            store.updateFramePosition(fid, newX, newY)
+
+            // Move all nodes inside this frame by the same delta
+            const nodesInThisFrame = frameNodes.get(fid) || []
+            for (const node of nodesInThisFrame) {
+              store.updateNodePosition(node.id, node.canvas_x + deltaX, node.canvas_y + deltaY)
+            }
+          }
         }
       }
       return

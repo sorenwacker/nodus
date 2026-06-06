@@ -26,6 +26,7 @@ const emit = defineEmits<{
   (e: 'node-dblclick', nodeId: string): void
   (e: 'node-contextmenu', event: MouseEvent, nodeId: string): void
   (e: 'canvas-contextmenu', event: MouseEvent): void
+  (e: 'canvas-dblclick', event: MouseEvent): void
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -197,6 +198,8 @@ function onDblClick(e: MouseEvent) {
   const nodeId = hitTest(e as PointerEvent)
   if (nodeId) {
     emit('node-dblclick', nodeId)
+  } else {
+    emit('canvas-dblclick', e)
   }
 }
 

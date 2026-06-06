@@ -5,13 +5,14 @@ mod commands;
 mod database;
 mod import_helpers;
 mod layout_config;
+mod mcp_websocket;
 mod ontology;
 mod pdf;
 mod themes;
 mod typst_render;
 mod watcher;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 #[cfg(target_os = "macos")]
 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
 use tauri::Manager;
@@ -19,6 +20,53 @@ use tauri::Manager;
 #[tauri::command]
 fn render_typst_math(math: String, display_mode: bool) -> Result<String, String> {
     typst_render::render_math_to_svg(&math, display_mode)
+}
+
+// MCP Server state wrapper
+pub struct McpState(pub Arc<mcp_websocket::McpServerState>);
+
+#[tauri::command]
+async fn start_mcp_server(
+    state: tauri::State<'_, McpState>,
+    app_handle: tauri::AppHandle,
+) -> Result<u16, String> {
+    mcp_websocket::start_server(Arc::clone(&state.0), app_handle).await
+}
+
+#[tauri::command]
+async fn stop_mcp_server(state: tauri::State<'_, McpState>) -> Result<(), String> {
+    mcp_websocket::stop_server(Arc::clone(&state.0)).await
+}
+
+#[tauri::command]
+async fn approve_mcp_connection(
+    state: tauri::State<'_, McpState>,
+    connection_id: String,
+    approved: bool,
+) -> Result<(), String> {
+    mcp_websocket::approve_connection(Arc::clone(&state.0), &connection_id, approved).await
+}
+
+#[tauri::command]
+async fn send_mcp_response(
+    state: tauri::State<'_, McpState>,
+    connection_id: String,
+    response: String,
+) -> Result<(), String> {
+    mcp_websocket::send_response(Arc::clone(&state.0), &connection_id, &response).await
+}
+
+#[tauri::command]
+async fn get_mcp_status(state: tauri::State<'_, McpState>) -> Result<serde_json::Value, String> {
+    let running = state.0.is_running().await;
+    let port = state.0.get_port().await;
+    let pending = mcp_websocket::get_pending_connections(Arc::clone(&state.0)).await;
+
+    Ok(serde_json::json!({
+        "running": running,
+        "port": port,
+        "pending_connections": pending.len()
+    }))
 }
 
 fn main() {
@@ -31,6 +79,7 @@ fn main() {
         .manage(commands::LocksState(Mutex::new(
             std::collections::HashMap::new(),
         )))
+        .manage(McpState(Arc::new(mcp_websocket::McpServerState::new())))
         .setup(|app| {
             // Initialize database - must complete before app starts
             let app_handle = app.handle().clone();
@@ -158,6 +207,7 @@ fn main() {
             commands::create_edge,
             commands::delete_edge,
             commands::update_edge_color,
+            commands::update_edge_label,
             commands::update_edge_storyline,
             commands::update_edge_directed,
             commands::restore_edge,
@@ -222,6 +272,11 @@ fn main() {
             commands::assign_node_to_frame,
             commands::import_ontology,
             render_typst_math,
+            start_mcp_server,
+            stop_mcp_server,
+            approve_mcp_connection,
+            send_mcp_response,
+            get_mcp_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

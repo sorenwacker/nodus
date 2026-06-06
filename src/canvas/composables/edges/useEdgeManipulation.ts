@@ -14,6 +14,7 @@ export interface EdgeManipulationStore {
   createEdge: (data: CreateEdgeInput) => Promise<Edge>
   deleteEdge: (id: string) => Promise<void>
   updateEdgeDirected: (id: string, directed: boolean) => Promise<void>
+  updateEdgeLabel: (id: string, label: string | null) => Promise<void>
   selectNode: (id: string | null) => void
 }
 
@@ -89,11 +90,13 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     }
   }
 
-  function changeEdgeLabel(label: string) {
+  async function changeEdgeLabel(label: string) {
     if (selectedEdge.value) {
       const edge = store.getFilteredEdges().find((e) => e.id === selectedEdge.value)
       if (edge) {
         edge.label = label || null
+        // Persist to database
+        await store.updateEdgeLabel(selectedEdge.value, label || null)
       }
     }
   }

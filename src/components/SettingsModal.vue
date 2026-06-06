@@ -13,6 +13,7 @@ import AppearanceSettingsPanel from './settings/AppearanceSettingsPanel.vue'
 import CanvasSettingsPanel from './settings/CanvasSettingsPanel.vue'
 import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
 import ZoteroSettingsPanel from './settings/ZoteroSettingsPanel.vue'
+import McpSettingsPanel from './settings/McpSettingsPanel.vue'
 import WorkspaceDiagnosticsSection from './settings/WorkspaceDiagnosticsSection.vue'
 
 const { t } = useI18n()
@@ -23,7 +24,7 @@ const emit = defineEmits<{
 }>()
 
 // Active tab - broken into separate integration tabs
-const activeTab = ref<'general' | 'appearance' | 'canvas' | 'ai' | 'zotero' | 'citations'>('general')
+const activeTab = ref<'general' | 'appearance' | 'canvas' | 'ai' | 'zotero' | 'citations' | 'integrations'>('general')
 
 // App version
 const appVersion = ref('')
@@ -106,6 +107,12 @@ function handleClose() {
           @click="activeTab = 'citations'"
         >
           {{ t('settings.tabs.citations') }}
+        </button>
+        <button
+          :class="{ active: activeTab === 'integrations' }"
+          @click="activeTab = 'integrations'"
+        >
+          {{ t('settings.tabs.integrations') }}
         </button>
       </nav>
 
@@ -191,6 +198,16 @@ function handleClose() {
         <div v-if="activeTab === 'citations'" class="settings-section">
           <p class="section-description">{{ t('settings.citations.description') }}</p>
           <p class="hint">{{ t('settings.citations.hint') }}</p>
+        </div>
+
+        <!-- Integrations (MCP) -->
+        <div v-if="activeTab === 'integrations'" class="settings-section">
+          <div class="integration-section">
+            <div class="integration-header">
+              <span class="integration-title">{{ t('mcp.server') }}</span>
+            </div>
+            <McpSettingsPanel />
+          </div>
         </div>
       </div>
     </div>
@@ -502,5 +519,15 @@ function handleClose() {
 
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .section-divider {
   border-color: #3f3f46;
+}
+
+.section-description {
+  font-size: 13px;
+  color: var(--text-main, #18181b);
+  margin: 0 0 8px;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .section-description {
+  color: #f4f4f5;
 }
 </style>
