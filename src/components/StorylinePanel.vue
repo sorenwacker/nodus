@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, watch, inject, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, inject, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
 import StorylineNodeList from './StorylineNodeList.vue'
-import type { Node, Storyline, EntityNodeType } from '../types'
+import StorylineEntitySummary from './StorylineEntitySummary.vue'
+import type { Node, Storyline } from '../types'
 import type { ComponentPublicInstance } from 'vue'
-import { ENTITY_NODE_TYPES } from '../types'
 import type { StorylineService } from '../services/storylineService'
+import { useStorylineOperations } from '../composables/useStorylineOperations'
+import { useStorylineDropTarget } from '../canvas/composables/util/useStorylineDropTarget'
 
 const { t } = useI18n()
 
@@ -27,9 +29,8 @@ const nodeListRef = ref<ComponentPublicInstance | null>(null)
 const isCreating = ref(false)
 const editingStorylineId = ref<string | null>(null)
 const editTitle = ref('')
-const isDropTarget = ref(false)
-const dropPreviewIndex = ref<number | null>(null)
 const expandedNodeIds = ref<Set<string>>(new Set())
+const panelRef = ref<HTMLElement | null>(null)
 
 const storylines = computed(() => store.filteredStorylines)
 
@@ -128,83 +129,19 @@ async function deleteStoryline(id: string) {
   }
 }
 
-// Node list event handlers
-async function handleNodeAdd(index: number, nodeId: string) {
-  if (!selectedStorylineId.value) return
-  try {
-    if (storylineService) {
-      await storylineService.addNode(selectedStorylineId.value, nodeId, index)
-    } else {
-      await store.addNodeToStoryline(selectedStorylineId.value, nodeId, index)
-    }
-    showToast?.('Node added to storyline', 'success')
-  } catch (e) {
-    console.error('Failed to add node:', e)
-    showToast?.(`Failed to add node: ${e}`, 'error')
-  }
-}
-
-async function handleNodeCreate(index: number, title: string) {
-  if (!selectedStorylineId.value) return
-  try {
-    const node = await store.createNode({ title, markdown_content: '' })
-    if (storylineService) {
-      await storylineService.addNode(selectedStorylineId.value, node.id, index)
-    } else {
-      await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
-    }
-    showToast?.(`Created "${title}"`, 'success')
-  } catch (e) {
-    console.error('Failed to create node:', e)
-    showToast?.(`Failed to create node: ${e}`, 'error')
-  }
-}
-
-async function handleCommentCreate(index: number, text: string) {
-  if (!selectedStorylineId.value) return
-  try {
-    const node = await store.createNode({
-      title: 'Comment',
-      node_type: 'comment',
-      markdown_content: text,
-    })
-    if (storylineService) {
-      await storylineService.addNode(selectedStorylineId.value, node.id, index)
-    } else {
-      await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
-    }
-    showToast?.('Added comment', 'success')
-  } catch (e) {
-    console.error('Failed to create comment:', e)
-    showToast?.(`Failed to create comment: ${e}`, 'error')
-  }
-}
-
-async function handleNodeRemove(nodeId: string) {
-  if (!selectedStorylineId.value) return
-  try {
-    if (storylineService) {
-      await storylineService.removeNode(selectedStorylineId.value, nodeId)
-    } else {
-      await store.removeNodeFromStoryline(selectedStorylineId.value, nodeId)
-    }
-  } catch (e) {
-    console.error('Failed to remove node:', e)
-  }
-}
-
-async function handleNodeReorder(nodeIds: string[]) {
-  if (!selectedStorylineId.value) return
-  try {
-    if (storylineService) {
-      await storylineService.reorderNodes(selectedStorylineId.value, nodeIds)
-    } else {
-      await store.reorderStorylineNodes(selectedStorylineId.value, nodeIds)
-    }
-  } catch (e) {
-    console.error('Failed to reorder nodes:', e)
-  }
-}
+// Use extracted operations composable
+const {
+  handleNodeAdd,
+  handleNodeCreate,
+  handleCommentCreate,
+  handleNodeRemove,
+  handleNodeReorder,
+} = useStorylineOperations({
+  store,
+  storylineService,
+  selectedStorylineId,
+  showToast,
+})
 
 function handleNodeClick(index: number) {
   const node = selectedStorylineNodes.value[index]
@@ -248,210 +185,28 @@ async function updateStorylineColor(event: Event) {
   }
 }
 
-// Calculate insertion position from Y coordinate
-function calculateDropPosition(clientY: number): number {
-  // Use template ref to access DOM, fallback to querySelector for robustness
-  const nodeListEl = nodeListRef.value?.$el ?? document.querySelector('.storyline-nodes-list .node-list')
-  if (!nodeListEl) return selectedStorylineNodes.value.length
+// Use extracted drop target composable
+const { isDropTarget, dropPreviewIndex } = useStorylineDropTarget(panelRef, {
+  store,
+  storylineService,
+  selectedStorylineId,
+  selectedStorylineNodes,
+  nodeListRef,
+  showToast,
+  selectStoryline,
+  storylines,
+})
 
-  const nodeItems = nodeListEl.querySelectorAll('.node-item')
-  if (nodeItems.length === 0) return 0
-
-  // Find which position based on Y coordinate
-  for (let i = 0; i < nodeItems.length; i++) {
-    const rect = nodeItems[i].getBoundingClientRect()
-    const midpoint = rect.top + rect.height / 2
-    if (clientY < midpoint) {
-      return i
-    }
-  }
-  // If below all items, insert at end
-  return nodeItems.length
-}
-
-// Handle nodes dropped from canvas
-async function handleNodeDrop(event: Event) {
-  const e = event as CustomEvent<{ nodeIds: string[], x: number, y: number }>
-  const { nodeIds, y } = e.detail
-
-  // If we're in a storyline view, add to that storyline
-  if (selectedStorylineId.value) {
-    try {
-      // Calculate insertion position from Y coordinate
-      let position = calculateDropPosition(y)
-      for (const nodeId of nodeIds) {
-        if (storylineService) {
-          await storylineService.addNode(selectedStorylineId.value, nodeId, position)
-        } else {
-          await store.addNodeToStoryline(selectedStorylineId.value, nodeId, position)
-        }
-        position++ // Increment for next node to maintain order
-      }
-      showToast?.(`Added ${nodeIds.length} node(s) to storyline`, 'success')
-    } catch (err) {
-      showToast?.(`Failed to add nodes: ${err}`, 'error')
-    }
-  } else if (storylines.value.length > 0) {
-    // If not in a storyline view but storylines exist, add to first one
-    const firstStoryline = storylines.value[0]
-    try {
-      for (const nodeId of nodeIds) {
-        if (storylineService) {
-          await storylineService.addNode(firstStoryline.id, nodeId)
-        } else {
-          await store.addNodeToStoryline(firstStoryline.id, nodeId)
-        }
-      }
-      showToast?.(`Added ${nodeIds.length} node(s) to "${firstStoryline.title}"`, 'success')
-      // Auto-select the storyline
-      selectStoryline(firstStoryline.id)
-    } catch (err) {
-      showToast?.(`Failed to add nodes: ${err}`, 'error')
-    }
-  } else {
-    showToast?.('Create a storyline first', 'info')
-  }
-}
-
-// Track when nodes are being dragged over the panel
-// Use pointermove for reliable detection during pointer capture
-// Expose state globally so drag handler can check it
-const panelRef = ref<HTMLElement | null>(null)
-
-declare global {
-  interface Window {
-    __storylinePanelDropTarget?: boolean
-  }
-}
-
-function checkIfOverPanel(clientX: number, clientY: number): boolean {
-  if (!panelRef.value) return false
-  const rect = panelRef.value.getBoundingClientRect()
-  return (
-    clientX >= rect.left &&
-    clientX <= rect.right &&
-    clientY >= rect.top &&
-    clientY <= rect.bottom
-  )
-}
-
-function onGlobalPointerMove(e: PointerEvent) {
-  if (document.body.classList.contains('node-dragging')) {
-    const over = checkIfOverPanel(e.clientX, e.clientY)
-    isDropTarget.value = over
-    window.__storylinePanelDropTarget = over
-    // Calculate and show drop position preview when over panel
-    if (over && selectedStorylineId.value) {
-      dropPreviewIndex.value = calculateDropPosition(e.clientY)
-    } else {
-      dropPreviewIndex.value = null
-    }
-  }
-}
-
-function onDragEnd() {
-  // Reset visual state
-  isDropTarget.value = false
-  dropPreviewIndex.value = null
-  // Use setTimeout to ensure stopNodeDrag reads the value before we reset it
-  // This is needed because event handler order isn't guaranteed
-  setTimeout(() => {
-    window.__storylinePanelDropTarget = false
-  }, 0)
-}
+// Get storyline node IDs for entity summary
+const selectedStorylineNodeIds = computed(() => {
+  if (!selectedStorylineId.value) return []
+  return storylineNodes.value.get(selectedStorylineId.value) || []
+})
 
 // Load storylines when panel mounts
 onMounted(() => {
   store.loadStorylines()
-  window.addEventListener('node-dropped-on-storyline', handleNodeDrop)
-  document.addEventListener('pointermove', onGlobalPointerMove)
-  document.addEventListener('pointerup', onDragEnd)
 })
-
-onUnmounted(() => {
-  window.removeEventListener('node-dropped-on-storyline', handleNodeDrop)
-  document.removeEventListener('pointermove', onGlobalPointerMove)
-  document.removeEventListener('pointerup', onDragEnd)
-})
-
-// Get entities referenced in the selected storyline
-const storylineEntities = computed((): Record<EntityNodeType, { entity: Node; count: number }[]> => {
-  const emptyResult: Record<EntityNodeType, { entity: Node; count: number }[]> = {
-    character: [],
-    location: [],
-    citation: [],
-    term: [],
-    item: [],
-  }
-  if (!selectedStorylineId.value) return emptyResult
-
-  // Get all nodes in the storyline
-  const nodeIds = storylineNodes.value.get(selectedStorylineId.value) || []
-
-  // Collect all linked entities from storyline nodes
-  const entitiesByType: Record<EntityNodeType, { entity: Node; count: number }[]> = {
-    character: [],
-    location: [],
-    citation: [],
-    term: [],
-    item: [],
-  }
-
-  const entityCounts = new Map<string, number>()
-
-  for (const nodeId of nodeIds) {
-    const linkedEntities = store.getLinkedEntities(nodeId)
-    for (const entity of linkedEntities) {
-      const type = entity.node_type as EntityNodeType
-      if (ENTITY_NODE_TYPES.includes(type)) {
-        const count = (entityCounts.get(entity.id) || 0) + 1
-        entityCounts.set(entity.id, count)
-      }
-    }
-  }
-
-  // Group by type with counts
-  for (const [entityId, count] of entityCounts) {
-    const entity = store.getNode(entityId)
-    if (entity) {
-      const type = entity.node_type as EntityNodeType
-      if (ENTITY_NODE_TYPES.includes(type)) {
-        entitiesByType[type].push({ entity, count })
-      }
-    }
-  }
-
-  // Sort each type by count (descending)
-  for (const type of ENTITY_NODE_TYPES) {
-    entitiesByType[type].sort((a, b) => b.count - a.count)
-  }
-
-  return entitiesByType
-})
-
-const hasEntities = computed(() => {
-  return ENTITY_NODE_TYPES.some(type => storylineEntities.value[type]?.length > 0)
-})
-
-const showEntitySummary = ref(false)
-
-function toggleEntitySummary() {
-  showEntitySummary.value = !showEntitySummary.value
-}
-
-function panToEntity(entityId: string) {
-  store.selectNode(entityId)
-  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entityId } }))
-}
-
-// Entity type labels
-const entityTypeLabels: Record<EntityNodeType, string> = {
-  character: 'Characters',
-  location: 'Locations',
-  citation: 'Citations',
-  term: 'Terms',
-  item: 'Items',
-}
 
 // Reload storylines when workspace changes
 watch(() => store.currentWorkspaceId, () => {
@@ -513,31 +268,10 @@ watch(() => store.currentWorkspaceId, () => {
       </div>
 
       <!-- Entity Summary Section -->
-      <div v-if="hasEntities" class="entity-summary-section">
-        <button class="entity-summary-toggle" @click="toggleEntitySummary">
-          <Icon :name="showEntitySummary ? 'chevron-down' : 'forward'" :size="12" />
-          <span>Entities in this storyline</span>
-        </button>
-
-        <div v-if="showEntitySummary" class="entity-summary-content">
-          <template v-for="type in ENTITY_NODE_TYPES" :key="type">
-            <div v-if="storylineEntities[type]?.length > 0" class="entity-type-group">
-              <div class="entity-type-label">{{ entityTypeLabels[type] }}</div>
-              <div class="entity-list">
-                <button
-                  v-for="{ entity, count } in storylineEntities[type]"
-                  :key="entity.id"
-                  class="entity-chip"
-                  @click="panToEntity(entity.id)"
-                >
-                  {{ entity.title }}
-                  <span class="entity-count">({{ count }})</span>
-                </button>
-              </div>
-            </div>
-          </template>
-        </div>
-      </div>
+      <StorylineEntitySummary
+        :storyline-id="selectedStorylineId!"
+        :node-ids="selectedStorylineNodeIds"
+      />
     </template>
 
     <!-- Storyline List (default view) -->
@@ -990,83 +724,5 @@ watch(() => store.currentWorkspaceId, () => {
 .create-first-btn:hover {
   background: var(--bg-elevated);
   border-color: var(--text-muted);
-}
-
-/* Entity summary section */
-.entity-summary-section {
-  border-top: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  flex-shrink: 0;
-}
-
-.entity-summary-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.1s, color 0.1s;
-}
-
-.entity-summary-toggle:hover {
-  background: var(--bg-elevated);
-  color: var(--text-main);
-}
-
-.entity-summary-content {
-  padding: 8px 16px 12px;
-  border-top: 1px solid var(--border-default);
-}
-
-.entity-type-group {
-  margin-bottom: 10px;
-}
-
-.entity-type-group:last-child {
-  margin-bottom: 0;
-}
-
-.entity-type-label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.entity-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.entity-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border: none;
-  border-radius: 12px;
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.entity-chip:hover {
-  background: var(--primary-bg, rgba(59, 130, 246, 0.1));
-  color: var(--primary-color);
-}
-
-.entity-count {
-  font-size: 10px;
-  color: var(--text-muted);
 }
 </style>

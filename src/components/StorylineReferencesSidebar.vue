@@ -60,11 +60,21 @@ interface LinkedReference {
   isMissing: boolean
 }
 
-// Extract wikilinks from ALL nodes in the storyline
+// Lazy loading: only process sections near the active index
+const SECTION_BUFFER = 2
+
+const visibleSections = computed(() => {
+  const start = Math.max(0, props.activeIndex - SECTION_BUFFER)
+  const end = Math.min(props.nodes.length - 1, props.activeIndex + SECTION_BUFFER)
+  return { start, end }
+})
+
+// Extract wikilinks only from visible sections for performance
 const references = computed<LinkedReference[]>(() => {
   const refs: LinkedReference[] = []
+  const { start, end } = visibleSections.value
 
-  for (let nodeIdx = 0; nodeIdx < props.nodes.length; nodeIdx++) {
+  for (let nodeIdx = start; nodeIdx <= end; nodeIdx++) {
     const node = props.nodes[nodeIdx]
     if (!node?.markdown_content) continue
     // Skip comment nodes - they don't typically have substantive references
