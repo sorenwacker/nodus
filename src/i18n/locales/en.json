@@ -373,7 +373,10 @@
     "newStoryline": "New Storyline",
     "rename": "Rename",
     "contents": "Contents",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "expandNode": "Expand content",
+    "collapseNode": "Collapse content",
+    "noContent": "No content"
   },
   "nodePicker": {
     "newNode": "New node",
