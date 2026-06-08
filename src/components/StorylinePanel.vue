@@ -465,7 +465,7 @@ watch(() => store.currentWorkspaceId, () => {
         <span>Drop to add</span>
       </div>
 
-      <div class="storyline-nodes-list">
+      <div class="storyline-nodes-list" :class="{ 'external-dragging': isDropTarget }">
         <StorylineNodeList
           ref="nodeListRef"
           v-model:expanded-node-ids="expandedNodeIds"
@@ -872,6 +872,11 @@ watch(() => store.currentWorkspaceId, () => {
   overflow-y: auto;
   padding: 8px;
   padding-bottom: 320px; /* Space for dropdown to be visible when at bottom */
+  transition: background 0.15s ease;
+}
+
+.storyline-nodes-list.external-dragging {
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .empty-panel {
