@@ -45,7 +45,13 @@ interface FrameAssignmentSnapshot {
   assignments: Map<string, string | null> // nodeId -> frame_id
 }
 
-export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot | FrameAssignmentSnapshot
+interface StorylineNodesSnapshot {
+  type: 'storyline-nodes'
+  storylineId: string
+  nodeIds: string[] // previous order of node IDs
+}
+
+export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot | FrameAssignmentSnapshot | StorylineNodesSnapshot
 
 export interface UndoRedoStore {
   getNode: (id: string) => Node | undefined
@@ -62,6 +68,9 @@ export interface UndoRedoStore {
   getFilteredFrames?: () => Array<{ id: string; canvas_x: number; canvas_y: number }>
   updateFramePosition?: (id: string, x: number, y: number) => void
   assignNodesToFrame?: (nodeIds: string[], frameId: string | null) => void
+  // Storyline operations
+  getStorylineNodeIds?: (storylineId: string) => string[]
+  reorderStorylineNodes?: (storylineId: string, nodeIds: string[]) => Promise<void>
 }
 
 export interface UseUndoRedoOptions {
@@ -200,6 +209,18 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     redoStack.value = []
   }
 
+  function pushStorylineNodesUndo(storylineId: string, nodeIds: string[]) {
+    undoStack.value.push({
+      type: 'storyline-nodes',
+      storylineId,
+      nodeIds: [...nodeIds],
+    })
+    if (undoStack.value.length > maxUndo) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
   async function undo() {
     if (undoStack.value.length === 0) {
       showToast('Nothing to undo', 'info')
@@ -319,6 +340,19 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         }
       }
       showToast('Undo frame assignment', 'info')
+    } else if (snapshot.type === 'storyline-nodes') {
+      // Save current order for redo
+      if (store.getStorylineNodeIds && store.reorderStorylineNodes) {
+        const currentNodeIds = store.getStorylineNodeIds(snapshot.storylineId)
+        redoStack.value.push({
+          type: 'storyline-nodes',
+          storylineId: snapshot.storylineId,
+          nodeIds: currentNodeIds,
+        })
+        // Restore old order
+        await store.reorderStorylineNodes(snapshot.storylineId, snapshot.nodeIds)
+        showToast('Undo storyline reorder', 'info')
+      }
     }
   }
 
@@ -422,6 +456,19 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         }
       }
       showToast('Redo frame assignment', 'info')
+    } else if (snapshot.type === 'storyline-nodes') {
+      // Save current order for undo
+      if (store.getStorylineNodeIds && store.reorderStorylineNodes) {
+        const currentNodeIds = store.getStorylineNodeIds(snapshot.storylineId)
+        undoStack.value.push({
+          type: 'storyline-nodes',
+          storylineId: snapshot.storylineId,
+          nodeIds: currentNodeIds,
+        })
+        // Apply redo order
+        await store.reorderStorylineNodes(snapshot.storylineId, snapshot.nodeIds)
+        showToast('Redo storyline reorder', 'info')
+      }
     }
   }
 
@@ -450,6 +497,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     pushSizeUndo,
     pushFramePositionUndo,
     pushFrameAssignmentUndo,
+    pushStorylineNodesUndo,
     undo,
     redo,
     canUndo,

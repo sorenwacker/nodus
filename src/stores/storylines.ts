@@ -293,6 +293,10 @@ export const useStorylinesStore = defineStore('storylines', () => {
     })
   }
 
+  function getStorylineNodeIds(storylineId: string): string[] {
+    return storylineNodes.value.get(storylineId) || []
+  }
+
   async function repairStorylineEdges(storylineId: string): Promise<void> {
     if (!deps) return
     try {
@@ -369,6 +373,7 @@ export const useStorylinesStore = defineStore('storylines', () => {
     removeNodeFromStoryline,
     reorderStorylineNodes,
     getStorylineNodes,
+    getStorylineNodeIds,
     getStorylinesForNode,
     repairStorylineEdges,
     updateStorylineEdgeColors,

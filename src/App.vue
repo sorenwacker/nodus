@@ -82,6 +82,12 @@ import { useUndoRedo } from './composables/useUndoRedo'
 import { NodeService } from './services/nodeService'
 import { NODE_SERVICE_KEY } from './composables/useNodeService'
 
+// StorylineService for guaranteed undo on storyline operations
+import { StorylineService } from './services/storylineService'
+
+// Initialize stores needed for undo
+const storylinesStore = useStorylinesStore()
+
 const undoRedo = useUndoRedo({
   store: {
     getNode: store.getNode,
@@ -98,11 +104,14 @@ const undoRedo = useUndoRedo({
     getFilteredFrames: () => store.filteredFrames,
     updateFramePosition: store.updateFramePosition,
     assignNodesToFrame: store.assignNodesToFrame,
+    // Storyline operations for undo
+    getStorylineNodeIds: storylinesStore.getStorylineNodeIds,
+    reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
   },
   showToast,
 })
 
-const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, pushFrameAssignmentUndo, undo, redo } = undoRedo
+const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, pushFrameAssignmentUndo, pushStorylineNodesUndo, undo, redo } = undoRedo
 
 // NodeService for guaranteed undo on deletions and moves
 const nodeService = new NodeService({
@@ -122,9 +131,24 @@ const nodeService = new NodeService({
 // Provide NodeService to child components
 provide(NODE_SERVICE_KEY, nodeService)
 
+// StorylineService for guaranteed undo on storyline operations
+const storylineService = new StorylineService({
+  store: {
+    getStorylineNodeIds: storylinesStore.getStorylineNodeIds,
+    reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
+    addNodeToStoryline: storylinesStore.addNodeToStoryline,
+    removeNodeFromStoryline: storylinesStore.removeNodeFromStoryline,
+  },
+  undo: {
+    pushStorylineNodesUndo,
+  },
+})
+
+// Provide StorylineService to child components
+provide('storylineService', storylineService)
+
 // MCP Server setup (with undo integration)
 const edgesStore = useEdgesStore()
-const storylinesStore = useStorylinesStore()
 const mcpServer = useMcpServer({
   store: {
     getFilteredNodes: () => store.filteredNodes,
