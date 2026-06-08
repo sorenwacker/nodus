@@ -370,7 +370,7 @@ function panToEntity(entityId: string) {
     ></div>
 
     <!-- Skip link for accessibility -->
-    <a href="#main-content" class="skip-link">Skip to content</a>
+    <a href="#reader-main-content" class="skip-link">Skip to content</a>
 
     <!-- Reading progress bar -->
     <div class="reading-progress" :style="{ width: `${readingProgress}%` }"></div>
@@ -415,12 +415,12 @@ function panToEntity(entityId: string) {
         </aside>
 
         <!-- Main Content -->
-        <main
-          id="main-content"
+        <div
+          id="reader-main-content"
           ref="contentRef"
           class="reader-content"
           :class="{ 'full-width': !showToc }"
-          role="main"
+          role="region"
           aria-label="Storyline content"
           @scroll="handleScroll"
         >
@@ -508,7 +508,7 @@ function panToEntity(entityId: string) {
               </article>
             </template>
           </template>
-        </main>
+        </div>
 
         <!-- Entity Sidebar -->
         <aside
@@ -529,6 +529,7 @@ function panToEntity(entityId: string) {
           v-if="showReferencesSidebar"
           :nodes="nodes"
           :active-index="activeNodeIndex"
+          :content-ref="contentRef"
           @navigate-to-node="(nodeId) => {
             const idx = nodes.findIndex(n => n.id === nodeId)
             if (idx >= 0) goToNode(idx)
@@ -560,6 +561,8 @@ function panToEntity(entityId: string) {
   overflow: hidden;
   flex-shrink: 0;
   border-left: 1px solid var(--border-default);
+  height: 100%;
+  overscroll-behavior: contain;
 }
 
 @keyframes slideInFromRight {
@@ -633,12 +636,15 @@ function panToEntity(entityId: string) {
   height: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .reader-body {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .toc-sidebar {
@@ -648,6 +654,7 @@ function panToEntity(entityId: string) {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  min-height: 0;
 }
 
 .toc-title {
@@ -664,6 +671,8 @@ function panToEntity(entityId: string) {
   flex: 1;
   overflow-y: auto;
   padding: 0 8px 16px;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .reader-content {
@@ -672,6 +681,8 @@ function panToEntity(entityId: string) {
   padding: 40px 60px;
   max-width: 800px;
   margin: 0 auto;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .reader-content.full-width {

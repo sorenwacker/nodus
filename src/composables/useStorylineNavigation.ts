@@ -38,6 +38,12 @@ export function useStorylineNavigation(options: UseStorylineNavigationOptions) {
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    // Don't capture keyboard events when user is typing in an input/textarea
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return
+    }
+
     switch (e.key) {
       case 'Escape':
         onClose()

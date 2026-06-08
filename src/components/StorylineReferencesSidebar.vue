@@ -3,9 +3,10 @@
  * Storyline References Sidebar
  * Shows linked documents at the position where they appear in the text
  */
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
+import { marked } from '../lib/markdown'
 import Icon from './Icon.vue'
 import type { Node } from '../types'
 
@@ -35,6 +36,7 @@ function extractWikilinksWithPosition(content: string, nodeIndex: number): Wikil
 const props = defineProps<{
   nodes: Node[]
   activeIndex: number
+  contentRef?: HTMLElement | null
 }>()
 
 const emit = defineEmits<{
@@ -109,172 +111,173 @@ const references = computed<LinkedReference[]>(() => {
   return refs
 })
 
-// Filter to show only references from the active section
-const activeReferences = computed(() => {
-  return references.value.filter(r => r.sectionIndex === props.activeIndex)
-})
+// Track scroll position and wikilink positions
+const scrollTop = ref(0)
+const wikilinkPositions = ref<Map<string, number>>(new Map())
+let scrollRaf: number | null = null
 
-// Sync sidebar scroll with content scroll
-watch(() => props.activeIndex, () => {
-  nextTick(() => {
-    // Scroll sidebar to show references for active section
-    if (sidebarRef.value) {
-      const firstRef = sidebarRef.value.querySelector(`[data-section="${props.activeIndex}"]`)
-      if (firstRef) {
-        firstRef.scrollIntoView({ behavior: 'smooth', block: 'start' })
+// Calculate wikilink positions from the rendered content
+function updateWikilinkPositions() {
+  if (!props.contentRef) return
+
+  const positions = new Map<string, number>()
+  const wikilinks = props.contentRef.querySelectorAll('a.wikilink')
+  const containerRect = props.contentRef.getBoundingClientRect()
+
+  wikilinks.forEach((link) => {
+    const target = (link as HTMLElement).dataset.target
+    if (target) {
+      const rect = link.getBoundingClientRect()
+      // Position relative to container + scroll offset
+      const position = rect.top - containerRect.top + props.contentRef!.scrollTop
+      // Store position keyed by target (may have multiple links to same target)
+      if (!positions.has(target)) {
+        positions.set(target, position)
       }
     }
   })
+
+  wikilinkPositions.value = positions
+}
+
+// Listen to content scroll with RAF for smooth updates
+function syncScroll() {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    if (props.contentRef) {
+      scrollTop.value = props.contentRef.scrollTop
+    }
+    scrollRaf = null
+  })
+}
+
+// Set up scroll listener and calculate positions
+watch(() => props.contentRef, (el) => {
+  if (el) {
+    el.addEventListener('scroll', syncScroll)
+    syncScroll()
+    // Delay to ensure content is rendered
+    setTimeout(updateWikilinkPositions, 100)
+  }
+}, { immediate: true })
+
+// Recalculate positions when nodes change
+watch(() => props.nodes, () => {
+  setTimeout(updateWikilinkPositions, 100)
+}, { deep: true })
+
+// Recalculate on scroll (links may have moved due to lazy loading etc)
+watch(scrollTop, () => {
+  updateWikilinkPositions()
 })
 
-function handleRefClick(ref: LinkedReference) {
-  if (ref.isMissing) return
-
-  if (ref.isInStoryline && ref.storylineIndex !== undefined) {
-    emit('navigate-to-node', ref.id!)
-  } else if (ref.id) {
-    emit('pan-to-canvas', ref.id)
+onMounted(() => {
+  if (props.contentRef) {
+    props.contentRef.addEventListener('scroll', syncScroll)
+    setTimeout(updateWikilinkPositions, 100)
   }
+})
+
+// Get position for a reference based on its target
+function getRefTop(target: string): number {
+  return wikilinkPositions.value.get(target) || 0
+}
+
+// Render markdown preview
+function renderPreview(markdown: string): string {
+  if (!markdown) return ''
+  // Take first 200 chars and render
+  const truncated = markdown.slice(0, 200)
+  return marked.parse(truncated) as string
+}
+
+function handleRefClick(refItem: LinkedReference) {
+  if (refItem.isMissing) return
+
+  if (refItem.isInStoryline && refItem.storylineIndex !== undefined) {
+    // Navigate within the storyline - don't close reader
+    emit('navigate-to-node', refItem.id!)
+  }
+  // For canvas references, don't do anything to avoid closing reader
+  // User can use the link in the text to navigate if needed
 }
 </script>
 
 <template>
   <aside ref="sidebarRef" class="references-sidebar">
-    <div class="sidebar-header">
-      <h3 class="sidebar-title">References</h3>
-      <span class="ref-count">{{ activeReferences.length }}</span>
-    </div>
-
-    <div class="references-container">
-      <div v-if="activeReferences.length === 0" class="empty-state">
-        <Icon name="link" :size="20" />
-        <p>No linked documents in this section</p>
-      </div>
-
+    <div class="references-viewport">
+      <!-- Position each reference at the exact height of its wikilink -->
       <div
-        v-for="ref in activeReferences"
-        :key="ref.key"
-        :data-section="ref.sectionIndex"
+        v-for="refItem in references"
+        :key="refItem.key"
         class="reference-card"
         :class="{
-          'in-storyline': ref.isInStoryline,
-          'is-missing': ref.isMissing
+          'in-storyline': refItem.isInStoryline,
+          'is-missing': refItem.isMissing
         }"
-        @click="handleRefClick(ref)"
+        :style="{ top: (getRefTop(refItem.target) - scrollTop) + 'px' }"
+        @click="handleRefClick(refItem)"
       >
         <div class="ref-header">
-          <Icon v-if="ref.isMissing" name="alert-circle" :size="12" class="ref-icon missing" />
-          <Icon v-else-if="ref.isInStoryline" name="book-open" :size="12" class="ref-icon storyline" />
+          <Icon v-if="refItem.isMissing" name="alert-circle" :size="12" class="ref-icon missing" />
+          <Icon v-else-if="refItem.isInStoryline" name="book-open" :size="12" class="ref-icon storyline" />
           <Icon v-else name="external-link" :size="12" class="ref-icon external" />
-          <span class="ref-title">{{ ref.title }}</span>
+          <span class="ref-title">{{ refItem.title }}</span>
         </div>
-        <p v-if="ref.preview && !ref.isMissing" class="ref-preview">
-          {{ ref.preview.slice(0, 100) }}{{ ref.preview.length > 100 ? '...' : '' }}
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div v-if="refItem.preview && !refItem.isMissing" class="ref-preview" v-html="renderPreview(refItem.preview)"></div>
+        <p v-else-if="refItem.isMissing" class="ref-preview missing-hint">
+          [[{{ refItem.target }}]]
         </p>
-        <p v-else-if="ref.isMissing" class="ref-preview missing-hint">
-          Node not found: [[{{ ref.target }}]]
-        </p>
-        <div class="ref-footer">
-          <span v-if="ref.isMissing" class="ref-location missing">
-            Missing
-          </span>
-          <span v-else-if="ref.isInStoryline" class="ref-location">
-            Section {{ (ref.storylineIndex || 0) + 1 }}
-          </span>
-          <span v-else class="ref-location">
-            On canvas
-          </span>
-        </div>
       </div>
-    </div>
-
-    <!-- Show total reference count across all sections -->
-    <div v-if="references.length > 0" class="sidebar-footer">
-      <span class="total-refs">{{ references.length }} total references</span>
     </div>
   </aside>
 </template>
 
 <style scoped>
 .references-sidebar {
-  width: 280px;
-  background: var(--bg-surface);
-  border-left: 1px solid var(--border-default);
-  display: flex;
-  flex-direction: column;
+  width: 220px;
+  position: relative;
+  flex-shrink: 0;
   overflow: hidden;
 }
 
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-default);
-}
-
-.sidebar-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.ref-count {
-  font-size: 12px;
-  color: var(--text-muted);
-  background: var(--bg-elevated);
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.references-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  position: relative;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  color: var(--text-muted);
-  text-align: center;
-  gap: 12px;
-}
-
-.empty-state p {
-  margin: 0;
-  font-size: 13px;
+.references-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
 }
 
 .reference-card {
-  background: var(--bg-elevated);
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  background: var(--bg-surface);
   border: 1px solid var(--border-default);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
+  border-radius: 6px;
+  padding: 8px 10px;
   cursor: pointer;
-  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  will-change: top;
 }
 
 .reference-card:hover {
   border-color: var(--primary-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: var(--bg-elevated);
 }
 
 .reference-card.in-storyline {
-  border-left: 3px solid var(--primary-color);
+  border-left: 2px solid var(--primary-color);
 }
 
 .ref-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 
 .ref-icon {
@@ -291,7 +294,7 @@ function handleRefClick(ref: LinkedReference) {
 }
 
 .ref-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
@@ -300,24 +303,41 @@ function handleRefClick(ref: LinkedReference) {
 }
 
 .ref-preview {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--text-secondary);
-  margin: 0 0 8px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  margin: 0 0 6px;
+  max-height: 80px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ref-preview :deep(p) {
+  margin: 0;
+}
+
+.ref-preview :deep(p + p) {
+  margin-top: 4px;
+}
+
+.ref-preview :deep(code) {
+  font-size: 10px;
+  background: var(--bg-elevated);
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
+.ref-preview :deep(a) {
+  color: var(--primary-color);
 }
 
 .ref-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
 }
 
 .ref-location {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
 }
 
@@ -333,7 +353,7 @@ function handleRefClick(ref: LinkedReference) {
 
 .reference-card.is-missing:hover {
   border-color: var(--danger-color, #dc2626);
-  box-shadow: none;
+  background: var(--bg-surface);
 }
 
 .ref-icon.missing {
@@ -343,16 +363,6 @@ function handleRefClick(ref: LinkedReference) {
 .missing-hint {
   font-style: italic;
   color: var(--text-muted);
-}
-
-.sidebar-footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-default);
-  background: var(--bg-surface);
-}
-
-.total-refs {
   font-size: 11px;
-  color: var(--text-muted);
 }
 </style>

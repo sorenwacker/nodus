@@ -229,10 +229,20 @@ function onContentInput() {
     nextTick(() => {
       if (editorRef.value) {
         const rect = editorRef.value.getBoundingClientRect()
-        linkPickerPosition.value = {
-          top: rect.top + 100,
-          left: rect.left + 50
-        }
+        const pickerWidth = 260 // NodePicker width + padding
+        const pickerHeight = 300 // Approximate height
+
+        // Calculate position, ensuring it stays within viewport
+        let top = rect.top + 80
+        let left = rect.left + rect.width / 2 - pickerWidth / 2
+
+        // Clamp to viewport bounds
+        const maxTop = window.innerHeight - pickerHeight - 20
+        const maxLeft = window.innerWidth - pickerWidth - 20
+        top = Math.max(20, Math.min(top, maxTop))
+        left = Math.max(20, Math.min(left, maxLeft))
+
+        linkPickerPosition.value = { top, left }
       }
     })
   } else if (showLinkPicker.value) {
@@ -593,6 +603,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .editor-pane {
@@ -623,6 +634,7 @@ onUnmounted(() => {
   resize: none;
   overflow-y: auto;
   overscroll-behavior: contain;
+  min-height: 0;
 }
 
 .fullscreen-editor:focus {
@@ -639,6 +651,7 @@ onUnmounted(() => {
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
+  min-height: 0;
 }
 
 /* Mermaid diagram text visibility */

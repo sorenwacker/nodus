@@ -316,18 +316,19 @@ function onDropEnd(e: DragEvent) {
             <span v-else class="node-order">{{ index + 1 }}</span>
             <span class="node-title">{{ node.node_type === 'comment' ? getCommentDisplayText(node) : node.title }}</span>
             <button
+              v-if="!compact"
               class="expand-btn"
               :aria-label="isExpanded(node.id) ? t('storyline.collapseNode') : t('storyline.expandNode')"
               @click="toggleExpand($event, node.id)"
             >
-              <Icon :name="isExpanded(node.id) ? 'chevron-up' : 'chevron-down'" :size="compact ? 10 : 12" />
+              <Icon :name="isExpanded(node.id) ? 'chevron-up' : 'chevron-down'" :size="12" />
             </button>
             <button class="remove-btn" :aria-label="t('storyline.removeFromStoryline')" @click.stop="handleRemove(node.id)">
               <Icon name="close" :size="compact ? 8 : 10" />
             </button>
           </div>
-          <!-- Expanded content (shows when clicked to expand) -->
-          <div v-if="isExpanded(node.id)" class="node-content-preview">
+          <!-- Expanded content (shows when clicked to expand) - not in compact mode -->
+          <div v-if="!compact && isExpanded(node.id)" class="node-content-preview">
             <div class="content-text">{{ node.markdown_content || t('storyline.noContent') }}</div>
           </div>
         </div>

@@ -293,7 +293,8 @@
   flex: 1;
   display: flex;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* Reader mode: canvas shrinks, reader slides in */
