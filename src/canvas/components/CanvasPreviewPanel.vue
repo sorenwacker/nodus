@@ -116,11 +116,17 @@ function onEditorInput(e: Event) {
     nextTick(() => {
       if (editorRef.value) {
         const rect = editorRef.value.getBoundingClientRect()
-        // Approximate position based on cursor
-        linkPickerPosition.value = {
-          top: rect.top + 60,
-          left: rect.left + 20
-        }
+        // Approximate picker dimensions
+        const pickerWidth = 320
+        const pickerHeight = 300
+        // Calculate position, clamped to viewport
+        let top = rect.top + 60
+        let left = rect.left + 20
+        const maxTop = window.innerHeight - pickerHeight - 20
+        const maxLeft = window.innerWidth - pickerWidth - 20
+        top = Math.max(20, Math.min(top, maxTop))
+        left = Math.max(20, Math.min(left, maxLeft))
+        linkPickerPosition.value = { top, left }
       }
     })
   } else if (showLinkPicker.value) {
