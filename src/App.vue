@@ -656,17 +656,17 @@ async function openFolderDialog() {
     </div>
 
     <main class="main-content">
-      <!-- Storyline panel on the left -->
-      <StorylinePanel
-        v-if="showStorylinePanel"
-        @open-reader="(id) => readerStorylineId = id"
-      />
       <!-- Canvas or Reader - reader replaces canvas when active -->
       <PixiCanvas v-if="!readerStorylineId" />
       <StorylineReader
         v-else
         :storyline-id="readerStorylineId"
         @close="readerStorylineId = null"
+      />
+      <!-- Storyline panel on the right -->
+      <StorylinePanel
+        v-if="showStorylinePanel"
+        @open-reader="(id) => readerStorylineId = id"
       />
     </main>
 
