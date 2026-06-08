@@ -661,6 +661,8 @@ watch(() => store.currentWorkspaceId, () => {
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
+  height: 48px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-surface);
 }

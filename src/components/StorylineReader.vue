@@ -36,7 +36,31 @@ const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
 const showToc = ref(false) // TOC hidden - storyline panel serves this purpose
 const showEntitySidebar = ref(false)
-const showReferencesSidebar = ref(true) // Show by default
+const showReferencesSidebar = ref(false) // Hidden by default - optional
+
+// Resizable width
+const readerWidth = ref(600)
+const isResizing = ref(false)
+
+function startResize(e: PointerEvent) {
+  isResizing.value = true
+  const startX = e.clientX
+  const startWidth = readerWidth.value
+
+  const onMove = (e: PointerEvent) => {
+    const delta = startX - e.clientX
+    readerWidth.value = Math.max(400, Math.min(1200, startWidth + delta))
+  }
+
+  const onUp = () => {
+    isResizing.value = false
+    document.removeEventListener('pointermove', onMove)
+    document.removeEventListener('pointerup', onUp)
+  }
+
+  document.addEventListener('pointermove', onMove)
+  document.addEventListener('pointerup', onUp)
+}
 const collapsedComments = ref<Set<string>>(new Set())
 
 // Navigation composable
@@ -310,7 +334,13 @@ function panToEntity(entityId: string) {
 </script>
 
 <template>
-  <div class="reader-overlay">
+  <div class="reader-overlay" :style="{ width: readerWidth + 'px' }">
+    <!-- Resize handle on left edge -->
+    <div
+      class="resize-handle"
+      @pointerdown="startResize"
+    ></div>
+
     <!-- Skip link for accessibility -->
     <a href="#main-content" class="skip-link">Skip to content</a>
 
@@ -469,12 +499,14 @@ function panToEntity(entityId: string) {
 
 <style scoped>
 .reader-overlay {
-  flex: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--bg-canvas);
   animation: slideInFromRight 0.25s ease-out;
   overflow: hidden;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-default);
 }
 
 @keyframes slideInFromRight {
@@ -486,6 +518,24 @@ function panToEntity(entityId: string) {
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+/* Resize handle */
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: var(--primary-color);
 }
 
 /* Skip link for accessibility */
