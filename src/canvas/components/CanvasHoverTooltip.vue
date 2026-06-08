@@ -85,8 +85,8 @@ const displayTitle = computed(() => {
 <style scoped>
 .hover-tooltip {
   position: fixed;
-  top: 16px;
-  left: 16px;
+  top: 8px;
+  right: 16px;
   z-index: 9999;
   width: 280px;
   max-height: 396px; /* A4 aspect ratio: 280 × 1.414 */
