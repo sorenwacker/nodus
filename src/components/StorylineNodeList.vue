@@ -49,12 +49,25 @@ function getNodeBackground(colorTheme: string | null | undefined): string | unde
 
 const emit = defineEmits<{
   (e: 'node-click', index: number): void
+  (e: 'toggle-expand', nodeId: string): void
   (e: 'reorder', nodeIds: string[]): void
   (e: 'remove', nodeId: string): void
   (e: 'add', index: number, nodeId: string): void
   (e: 'create', index: number, title: string): void
   (e: 'create-comment', index: number, text: string, commentType: CommentType): void
 }>()
+
+// Track which nodes are expanded
+const expandedNodeIds = defineModel<Set<string>>('expandedNodeIds', { default: () => new Set() })
+
+function isExpanded(nodeId: string) {
+  return expandedNodeIds.value?.has(nodeId) ?? false
+}
+
+function toggleExpand(e: Event, nodeId: string) {
+  e.stopPropagation()
+  emit('toggle-expand', nodeId)
+}
 
 function getCommentMeta(node: Node) {
   return parseCommentMeta(node.markdown_content)
@@ -254,37 +267,54 @@ function onDropEnd(e: DragEvent) {
 
         <!-- Node item -->
         <div
-          class="node-item"
-          :class="{
-            active: activeIndex === index,
-            dragging: draggingNodeIndex === index,
-            'drag-over': dragOverIndex === index,
-            'is-comment': node.node_type === 'comment',
-            'is-resolved': node.node_type === 'comment' && getCommentMeta(node).meta.resolved
-          }"
-          :style="[
-            node.color_theme ? { background: getNodeBackground(node.color_theme) } : {},
-            node.node_type === 'comment' ? { '--comment-color': getCommentStyle(node).color } : {}
-          ]"
-          draggable="true"
-          @click="handleNodeClick(index)"
-          @dragstart="onDragStart($event, index)"
-          @dragover="onDragOver($event, index)"
-          @dragleave="onDragLeave"
-          @drop="onDrop($event, index)"
-          @dragend="onDragEnd"
+          class="node-item-wrapper"
+          :class="{ expanded: isExpanded(node.id) }"
         >
-          <div class="drag-handle">
-            <Icon name="drag" :size="compact ? 10 : 12" />
+          <div
+            class="node-item"
+            :class="{
+              active: activeIndex === index,
+              dragging: draggingNodeIndex === index,
+              'drag-over': dragOverIndex === index,
+              'is-comment': node.node_type === 'comment',
+              'is-resolved': node.node_type === 'comment' && getCommentMeta(node).meta.resolved
+            }"
+            :style="[
+              node.color_theme ? { background: getNodeBackground(node.color_theme) } : {},
+              node.node_type === 'comment' ? { '--comment-color': getCommentStyle(node).color } : {}
+            ]"
+            draggable="true"
+            @click="handleNodeClick(index)"
+            @dragstart="onDragStart($event, index)"
+            @dragover="onDragOver($event, index)"
+            @dragleave="onDragLeave"
+            @drop="onDrop($event, index)"
+            @dragend="onDragEnd"
+          >
+            <div class="drag-handle">
+              <Icon name="drag" :size="compact ? 10 : 12" />
+            </div>
+            <span v-if="node.node_type === 'comment'" class="node-order comment-icon" :style="{ background: getCommentStyle(node).color }">
+              <Icon :name="getCommentStyle(node).icon" :size="compact ? 10 : 12" />
+            </span>
+            <span v-else class="node-order">{{ index + 1 }}</span>
+            <span class="node-title">{{ node.node_type === 'comment' ? getCommentDisplayText(node) : node.title }}</span>
+            <button
+              class="expand-btn"
+              :aria-label="isExpanded(node.id) ? t('storyline.collapseNode') : t('storyline.expandNode')"
+              :data-tooltip="isExpanded(node.id) ? t('storyline.collapseNode') : t('storyline.expandNode')"
+              @click="toggleExpand($event, node.id)"
+            >
+              <Icon :name="isExpanded(node.id) ? 'chevron-up' : 'chevron-down'" :size="compact ? 10 : 12" />
+            </button>
+            <button class="remove-btn" :aria-label="t('storyline.removeFromStoryline')" @click.stop="handleRemove(node.id)">
+              <Icon name="close" :size="compact ? 8 : 10" />
+            </button>
           </div>
-          <span v-if="node.node_type === 'comment'" class="node-order comment-icon" :style="{ background: getCommentStyle(node).color }">
-            <Icon :name="getCommentStyle(node).icon" :size="compact ? 10 : 12" />
-          </span>
-          <span v-else class="node-order">{{ index + 1 }}</span>
-          <span class="node-title">{{ node.node_type === 'comment' ? getCommentDisplayText(node) : node.title }}</span>
-          <button class="remove-btn" :aria-label="t('storyline.removeFromStoryline')" @click.stop="handleRemove(node.id)">
-            <Icon name="close" :size="compact ? 8 : 10" />
-          </button>
+          <!-- Expanded content -->
+          <div v-if="isExpanded(node.id)" class="node-content-preview">
+            <div class="content-text">{{ node.markdown_content || t('storyline.noContent') }}</div>
+          </div>
         </div>
       </template>
 
@@ -588,5 +618,91 @@ function onDropEnd(e: DragEvent) {
 .node-item.active .remove-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   color: white;
+}
+
+/* Expand button */
+.expand-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.compact .expand-btn {
+  width: 16px;
+  height: 16px;
+}
+
+.node-item:hover .expand-btn {
+  opacity: 1;
+}
+
+.node-item-wrapper.expanded .expand-btn {
+  opacity: 1;
+  color: var(--primary-color);
+}
+
+.node-item.active .expand-btn {
+  opacity: 0.8;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.expand-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--primary-color);
+}
+
+.node-item.active .expand-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Node wrapper for expand animation */
+.node-item-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-item-wrapper.expanded {
+  margin-bottom: 4px;
+}
+
+/* Expanded content preview */
+.node-content-preview {
+  padding: 8px 12px 12px 44px;
+  background: var(--bg-elevated);
+  border-radius: 0 0 6px 6px;
+  margin-top: -4px;
+  border-left: 2px solid var(--primary-color);
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.compact .node-content-preview {
+  padding: 6px 10px 10px 36px;
+}
+
+.content-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.compact .content-text {
+  font-size: 11px;
+  max-height: 100px;
 }
 </style>

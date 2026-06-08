@@ -26,6 +26,7 @@ const isCreating = ref(false)
 const editingStorylineId = ref<string | null>(null)
 const editTitle = ref('')
 const isDropTarget = ref(false)
+const expandedNodeIds = ref<Set<string>>(new Set())
 
 const storylines = computed(() => store.filteredStorylines)
 
@@ -188,6 +189,16 @@ function handleNodeClick(index: number) {
     store.selectNode(node.id)
     window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: node.id } }))
   }
+}
+
+function toggleExpandNode(nodeId: string) {
+  const newSet = new Set(expandedNodeIds.value)
+  if (newSet.has(nodeId)) {
+    newSet.delete(nodeId)
+  } else {
+    newSet.add(nodeId)
+  }
+  expandedNodeIds.value = newSet
 }
 
 function openReader() {
@@ -418,9 +429,11 @@ watch(() => store.currentWorkspaceId, () => {
       <div class="storyline-nodes-list">
         <StorylineNodeList
           ref="nodeListRef"
+          v-model:expanded-node-ids="expandedNodeIds"
           :nodes="selectedStorylineNodes"
           :storyline-id="selectedStorylineId!"
           @node-click="handleNodeClick"
+          @toggle-expand="toggleExpandNode"
           @reorder="handleNodeReorder"
           @remove="handleNodeRemove"
           @add="handleNodeAdd"
