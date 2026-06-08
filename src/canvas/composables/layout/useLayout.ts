@@ -452,11 +452,11 @@ export function useLayout(options: UseLayoutOptions) {
     const targets = new Map<string, { x: number; y: number }>()
     // Adjust ring distance based on style - compact has tighter rings with overlap allowed
     // Both baseRadius and minNodeSpacing scale with style to make difference visible even with many nodes
-    const firstRingRadius = isCompact ? 300 : 400 // Minimum distance from center to first ring
-    const baseRadius = isCompact ? 150 : 300 // Distance between subsequent rings
-    const minNodeSpacing = isCompact ? 60 : 150 // Spacing between nodes on a ring (tighter packing)
+    const firstRingRadius = isCompact ? 300 : 500 // Minimum distance from center to first ring
+    const baseRadius = isCompact ? 150 : 400 // Distance between subsequent rings
+    const minNodeSpacing = isCompact ? 80 : 280 // Spacing between nodes on a ring (must exceed node width ~200px for spacious)
     const maxRadius = 50000 // Cap radius for reasonable layout size
-    const ringSpacing = isCompact ? 180 : 300 // Spacing between sub-rings when splitting large levels
+    const ringSpacing = isCompact ? 180 : 400 // Spacing between sub-rings when splitting large levels
 
     let lastUsedRadius = 0 // Track the actual radius used by the previous ring
 
