@@ -489,7 +489,7 @@ function onDropEnd(e: DragEvent) {
   background: var(--bg-surface);
   margin-bottom: 2px;
   cursor: grab;
-  transition: all 0.1s;
+  transition: transform 0.15s ease, background 0.1s, box-shadow 0.15s;
   user-select: none;
   -webkit-user-drag: element;
 }
@@ -511,11 +511,15 @@ function onDropEnd(e: DragEvent) {
 .node-item.dragging {
   opacity: 0.5;
   cursor: grabbing;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .node-item.drag-over {
-  border-top: 2px solid var(--primary-color);
-  margin-top: -2px;
+  transform: translateY(4px);
+  border-top: 3px solid var(--primary-color);
+  margin-top: -3px;
+  background: rgba(59, 130, 246, 0.08);
 }
 
 .insert-zone.drag-over,

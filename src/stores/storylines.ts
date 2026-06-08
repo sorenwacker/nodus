@@ -226,33 +226,48 @@ export const useStorylinesStore = defineStore('storylines', () => {
 
   async function reorderStorylineNodes(storylineId: string, nodeIds: string[]): Promise<void> {
     if (!deps) throw new Error('Storylines store not initialized')
+
+    // Update local state first (optimistic update)
+    const newMap = new Map(storylineNodes.value)
+    newMap.set(storylineId, [...nodeIds])
+    storylineNodes.value = newMap
+    storylineNodesVersion.value++
+
     try {
-      // Update local state first
-      const newMap = new Map(storylineNodes.value)
-      newMap.set(storylineId, [...nodeIds])
-      storylineNodes.value = newMap
-      storylineNodesVersion.value++
-
       await invoke('reorder_storyline_nodes', { storylineId, nodeIds })
+    } catch (e) {
+      storeLogger.error('Failed to persist storyline reorder:', e)
+      // Don't revert - keep the local state change
+    }
 
+    // Update edges separately - don't let edge failures affect the reorder
+    try {
       const storyline = storylines.value.find(s => s.id === storylineId)
       const edgeColor = storyline?.color || undefined
 
       // Delete all old edges belonging to this storyline
       const oldStorylineEdges = deps.getEdges().filter(e => e.storyline_id === storylineId)
       for (const edge of oldStorylineEdges) {
-        await deps.deleteEdge(edge.id)
+        try {
+          await deps.deleteEdge(edge.id)
+        } catch {
+          // Ignore individual edge deletion failures
+        }
       }
 
       // Create edges between consecutive nodes
       for (let i = 0; i < nodeIds.length - 1; i++) {
-        await deps.createEdge({ source_node_id: nodeIds[i], target_node_id: nodeIds[i + 1], link_type: 'related', color: edgeColor, storyline_id: storylineId })
+        try {
+          await deps.createEdge({ source_node_id: nodeIds[i], target_node_id: nodeIds[i + 1], link_type: 'related', color: edgeColor, storyline_id: storylineId })
+        } catch {
+          // Ignore individual edge creation failures
+        }
       }
 
       storeLogger.debug(`Reordered nodes in storyline ${storylineId}`)
     } catch (e) {
-      storeLogger.error('Failed to reorder storyline nodes:', e)
-      throw e
+      storeLogger.error('Failed to update storyline edges:', e)
+      // Don't throw - the reorder itself succeeded
     }
   }
 
