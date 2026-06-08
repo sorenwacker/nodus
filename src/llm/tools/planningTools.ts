@@ -120,16 +120,18 @@ export function registerPlanningTools(): void {
       }
       const disconnected = nodes.filter(n => !connectedIds.has(n.id))
 
-      // BLOCK completion if graph has many nodes but few edges
-      if (nodes.length >= 5 && edgeRatio < 0.3) {
-        ctx.log(`> BLOCKED: Cannot complete - graph needs edges (${nodes.length} nodes, ${edges.length} edges)`)
+      // Skip edge checks if force=true (user explicitly requested action like deleting edges)
+      if (!args.force) {
+        // BLOCK completion if graph has many nodes but few edges
+        if (nodes.length >= 5 && edgeRatio < 0.3) {
+          ctx.log(`> BLOCKED: Cannot complete - graph needs edges (${nodes.length} nodes, ${edges.length} edges)`)
 
-        // List disconnected nodes
-        const disconnectedList = disconnected.length > 0
-          ? `\n\nDISCONNECTED NODES (${disconnected.length}):\n${disconnected.slice(0, 20).map(n => `- "${n.title}"`).join('\n')}${disconnected.length > 20 ? `\n... and ${disconnected.length - 20} more` : ''}`
-          : ''
+          // List disconnected nodes
+          const disconnectedList = disconnected.length > 0
+            ? `\n\nDISCONNECTED NODES (${disconnected.length}):\n${disconnected.slice(0, 20).map(n => `- "${n.title}"`).join('\n')}${disconnected.length > 20 ? `\n... and ${disconnected.length - 20} more` : ''}`
+            : ''
 
-        return `ERROR: Cannot complete. You created ${nodes.length} nodes but only ${edges.length} edges.
+          return `ERROR: Cannot complete. You created ${nodes.length} nodes but only ${edges.length} edges.
 ${disconnectedList}
 
 Connect these nodes using create_edges_batch:
@@ -144,22 +146,17 @@ create_edges_batch({edges: [
   ...
 ]})
 
-Create at least ${Math.ceil(nodes.length * 0.5)} edges, then call done() again.`
-      }
+Create at least ${Math.ceil(nodes.length * 0.5)} edges, then call done() again. Use force=true ONLY if user explicitly requested deletion.`
+        }
 
-      // Warn about low edge ratio
-      if (nodes.length >= 3 && edgeRatio < 0.5) {
-        ctx.log(`> Warning: Low edge ratio (${edgeRatio.toFixed(2)})`)
-        const disconnectedList = disconnected.length > 0
-          ? ` Disconnected: ${disconnected.slice(0, 10).map(n => `"${n.title}"`).join(', ')}${disconnected.length > 10 ? ` (+${disconnected.length - 10} more)` : ''}`
-          : ''
-        return `WARNING: Graph has ${nodes.length} nodes but only ${edges.length} edges.${disconnectedList} Add connections with create_edges_batch.`
-      }
-
-      // Block force on research tasks
-      if (args.force && nodes.length >= 10) {
-        ctx.log(`> BLOCKED: force=true rejected for research task`)
-        return `ERROR: Cannot use force=true on a knowledge graph with ${nodes.length} nodes. Create edges first.`
+        // Warn about low edge ratio
+        if (nodes.length >= 3 && edgeRatio < 0.5) {
+          ctx.log(`> Warning: Low edge ratio (${edgeRatio.toFixed(2)})`)
+          const disconnectedList = disconnected.length > 0
+            ? ` Disconnected: ${disconnected.slice(0, 10).map(n => `"${n.title}"`).join(', ')}${disconnected.length > 10 ? ` (+${disconnected.length - 10} more)` : ''}`
+            : ''
+          return `WARNING: Graph has ${nodes.length} nodes but only ${edges.length} edges.${disconnectedList} Add connections with create_edges_batch.`
+        }
       }
 
       ctx.log(`> Completed: ${nodes.length} nodes, ${edges.length} edges`)
