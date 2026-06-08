@@ -296,6 +296,18 @@
   overflow: visible;
 }
 
+/* Reader mode: canvas shrinks, reader slides in */
+.main-content .with-reader {
+  flex: 1;
+  min-width: 300px;
+  transition: flex 0.25s ease;
+}
+
+/* Reader mode: storyline panel stays in middle */
+.main-content .reader-mode-panel {
+  border-left: 1px solid var(--border-default);
+}
+
 /* Dialog styles */
 .dialog-overlay {
   position: fixed;

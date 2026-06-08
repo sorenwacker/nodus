@@ -473,8 +473,19 @@ function panToEntity(entityId: string) {
   display: flex;
   flex-direction: column;
   background: var(--bg-canvas);
-  animation: fadeIn 0.2s ease;
+  animation: slideInFromRight 0.25s ease-out;
   overflow: hidden;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Skip link for accessibility */
