@@ -428,7 +428,7 @@ function onDropEnd(e: DragEvent) {
   align-items: center;
   margin: 0 8px;
   overflow: visible;
-  transition: height 0.15s ease-out;
+  transition: height 0.12s ease-out, background 0.12s ease-out;
 }
 
 .insert-zone:hover,
@@ -519,21 +519,39 @@ function onDropEnd(e: DragEvent) {
 }
 
 .insert-zone.drag-over,
-.insert-zone-end.drag-over,
-.insert-zone.external-drop-target,
-.insert-zone-end.external-drop-target {
+.insert-zone-end.drag-over {
   height: 28px;
   border-top: 2px solid var(--primary-color);
   background: rgba(59, 130, 246, 0.1);
   border-radius: 4px;
 }
 
-/* External drop shows a more prominent indicator */
+/* External drop from canvas - smooth animated indicator */
 .insert-zone.external-drop-target,
 .insert-zone-end.external-drop-target {
-  height: 32px;
-  border: 2px dashed var(--primary-color);
-  border-top: 2px dashed var(--primary-color);
+  height: 36px;
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 6px;
+  position: relative;
+}
+
+.insert-zone.external-drop-target::before,
+.insert-zone-end.external-drop-target::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 50%;
+  height: 3px;
+  background: var(--primary-color);
+  border-radius: 2px;
+  transform: translateY(-50%);
+  animation: drop-indicator-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes drop-indicator-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .drag-handle {

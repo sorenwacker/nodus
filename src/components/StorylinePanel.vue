@@ -459,8 +459,8 @@ watch(() => store.currentWorkspaceId, () => {
         </button>
       </header>
 
-      <!-- Drop hint overlay - only show when not in specific position -->
-      <div v-if="isDropTarget && dropPreviewIndex === null" class="drop-hint">
+      <!-- Drop hint only shows when empty or no specific position calculated -->
+      <div v-if="isDropTarget && dropPreviewIndex === null && selectedStorylineNodes.length === 0" class="drop-hint">
         <Icon name="plus" :size="24" />
         <span>Drop to add</span>
       </div>
@@ -618,12 +618,12 @@ watch(() => store.currentWorkspaceId, () => {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .storyline-panel.drop-target {
   border-color: var(--primary-color);
-  box-shadow: inset 0 0 0 2px var(--primary-color);
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
 .drop-hint {
