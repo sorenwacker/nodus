@@ -26,6 +26,7 @@ const isCreating = ref(false)
 const editingStorylineId = ref<string | null>(null)
 const editTitle = ref('')
 const isDropTarget = ref(false)
+const dropPreviewIndex = ref<number | null>(null)
 const expandedNodeIds = ref<Set<string>>(new Set())
 
 const storylines = computed(() => store.filteredStorylines)
@@ -309,11 +310,18 @@ function onGlobalPointerMove(e: PointerEvent) {
     const over = checkIfOverPanel(e.clientX, e.clientY)
     isDropTarget.value = over
     window.__storylinePanelDropTarget = over
+    // Calculate and show drop position preview when over panel
+    if (over && selectedStorylineId.value) {
+      dropPreviewIndex.value = calculateDropPosition(e.clientY)
+    } else {
+      dropPreviewIndex.value = null
+    }
   }
 }
 
 function onDragEnd() {
   isDropTarget.value = false
+  dropPreviewIndex.value = null
   window.__storylinePanelDropTarget = false
 }
 
@@ -446,8 +454,8 @@ watch(() => store.currentWorkspaceId, () => {
         </button>
       </header>
 
-      <!-- Drop hint overlay -->
-      <div v-if="isDropTarget" class="drop-hint">
+      <!-- Drop hint overlay - only show when not in specific position -->
+      <div v-if="isDropTarget && dropPreviewIndex === null" class="drop-hint">
         <Icon name="plus" :size="24" />
         <span>Drop to add</span>
       </div>
@@ -458,6 +466,7 @@ watch(() => store.currentWorkspaceId, () => {
           v-model:expanded-node-ids="expandedNodeIds"
           :nodes="selectedStorylineNodes"
           :storyline-id="selectedStorylineId!"
+          :external-drop-index="dropPreviewIndex"
           @node-click="handleNodeClick"
           @toggle-expand="toggleExpandNode"
           @reorder="handleNodeReorder"

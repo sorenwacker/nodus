@@ -14,6 +14,7 @@ const props = defineProps<{
   storylineId: string
   activeIndex?: number
   compact?: boolean
+  externalDropIndex?: number | null
 }>()
 
 // Map legacy color values to current colors
@@ -119,6 +120,17 @@ function handleNodeClick(index: number) {
   emit('node-click', index)
 }
 
+// Hover tooltip - dispatch events for canvas hover tooltip
+function showNodeHover(node: Node) {
+  window.dispatchEvent(new CustomEvent('storyline-node-hover', {
+    detail: { node }
+  }))
+}
+
+function hideNodeHover() {
+  window.dispatchEvent(new CustomEvent('storyline-node-hover-end'))
+}
+
 // Drag and drop
 function onDragStart(e: DragEvent, index: number) {
   draggingNodeIndex.value = index
@@ -219,9 +231,10 @@ function onDropEnd(e: DragEvent) {
 <template>
   <div class="node-list" :class="{ compact }">
     <!-- Empty state -->
-    <div v-if="nodes.length === 0" class="empty-state">
-      <p>No nodes yet</p>
-      <div class="add-first-wrapper">
+    <div v-if="nodes.length === 0" class="empty-state" :class="{ 'external-drop-target': externalDropIndex === 0 }">
+      <p v-if="externalDropIndex !== 0">No nodes yet</p>
+      <p v-else class="drop-text">Drop here to add</p>
+      <div v-if="externalDropIndex !== 0" class="add-first-wrapper">
         <button class="add-first-btn" @click="toggleInsertPicker(0)">
           <Icon name="plus" :size="14" />
           <span>Add first node</span>
@@ -244,7 +257,8 @@ function onDropEnd(e: DragEvent) {
           class="insert-zone"
           :class="{
             active: hoveringInsertIndex === index || showingInsertPicker === index,
-            'drag-over': dragOverIndex === index && draggingNodeIndex !== index && draggingNodeIndex !== index - 1
+            'drag-over': dragOverIndex === index && draggingNodeIndex !== index && draggingNodeIndex !== index - 1,
+            'external-drop-target': externalDropIndex === index
           }"
           @mouseenter="hoveringInsertIndex = index"
           @mouseleave="hoveringInsertIndex = null"
@@ -290,6 +304,8 @@ function onDropEnd(e: DragEvent) {
             @dragleave="onDragLeave"
             @drop="onDrop($event, index)"
             @dragend="onDragEnd"
+            @mouseenter="showNodeHover(node)"
+            @mouseleave="hideNodeHover"
           >
             <div class="drag-handle">
               <Icon name="drag" :size="compact ? 10 : 12" />
@@ -310,10 +326,6 @@ function onDropEnd(e: DragEvent) {
               <Icon name="close" :size="compact ? 8 : 10" />
             </button>
           </div>
-          <!-- Hover preview (shows on hover when not expanded) -->
-          <div v-if="!isExpanded(node.id) && node.markdown_content" class="node-hover-preview">
-            <div class="content-text">{{ node.markdown_content }}</div>
-          </div>
           <!-- Expanded content (shows when clicked to expand) -->
           <div v-if="isExpanded(node.id)" class="node-content-preview">
             <div class="content-text">{{ node.markdown_content || t('storyline.noContent') }}</div>
@@ -326,7 +338,8 @@ function onDropEnd(e: DragEvent) {
         class="insert-zone insert-zone-end"
         :class="{
           active: hoveringInsertIndex === nodes.length || showingInsertPicker === nodes.length,
-          'drag-over': dragOverIndex === nodes.length
+          'drag-over': dragOverIndex === nodes.length,
+          'external-drop-target': externalDropIndex === nodes.length
         }"
         @mouseenter="hoveringInsertIndex = nodes.length"
         @mouseleave="hoveringInsertIndex = null"
@@ -369,6 +382,17 @@ function onDropEnd(e: DragEvent) {
 
 .empty-state p {
   margin: 0;
+}
+
+.empty-state.external-drop-target {
+  border: 2px dashed var(--primary-color);
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.empty-state .drop-text {
+  color: var(--primary-color);
+  font-weight: 500;
 }
 
 .add-first-wrapper {
@@ -495,11 +519,21 @@ function onDropEnd(e: DragEvent) {
 }
 
 .insert-zone.drag-over,
-.insert-zone-end.drag-over {
+.insert-zone-end.drag-over,
+.insert-zone.external-drop-target,
+.insert-zone-end.external-drop-target {
   height: 28px;
   border-top: 2px solid var(--primary-color);
   background: rgba(59, 130, 246, 0.1);
   border-radius: 4px;
+}
+
+/* External drop shows a more prominent indicator */
+.insert-zone.external-drop-target,
+.insert-zone-end.external-drop-target {
+  height: 32px;
+  border: 2px dashed var(--primary-color);
+  border-top: 2px dashed var(--primary-color);
 }
 
 .drag-handle {

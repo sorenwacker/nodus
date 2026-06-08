@@ -246,6 +246,17 @@ onMounted(() => {
   }
   window.addEventListener('nodus-radial-z-order', handleRadialZOrder)
 
+  // Listen for storyline panel hover events
+  const handleStorylineNodeHover = (e: Event) => {
+    const node = (e as CustomEvent<{ node: Node }>).detail?.node
+    if (node) setExternalHover(node)
+  }
+  const handleStorylineNodeHoverEnd = () => {
+    setExternalHover(null)
+  }
+  window.addEventListener('storyline-node-hover', handleStorylineNodeHover)
+  window.addEventListener('storyline-node-hover-end', handleStorylineNodeHoverEnd)
+
   // Setup PDF drop listener
   pdfDrop.setup()
 
@@ -256,6 +267,8 @@ onMounted(() => {
     window.removeEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
     window.removeEventListener('nodus-llm-config-change', handleLLMConfigChange)
     window.removeEventListener('nodus-radial-z-order', handleRadialZOrder)
+    window.removeEventListener('storyline-node-hover', handleStorylineNodeHover)
+    window.removeEventListener('storyline-node-hover-end', handleStorylineNodeHoverEnd)
     pdfDrop.cleanup()
     displayStore.cleanupListener()
   })
@@ -768,6 +781,7 @@ const {
   onNodePointerEnter,
   onNodePointerMove,
   onNodePointerLeave,
+  setExternalHover,
 } = nodeHover
 
 // Context menu composable

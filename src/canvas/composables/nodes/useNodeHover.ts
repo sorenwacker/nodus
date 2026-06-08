@@ -36,6 +36,7 @@ export interface UseNodeHoverReturn {
   onNodePointerEnter: (e: PointerEvent, nodeId: string) => void
   onNodePointerMove: (e: PointerEvent) => void
   onNodePointerLeave: () => void
+  setExternalHover: (node: Node | null) => void
 }
 
 export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
@@ -44,14 +45,22 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
   const hoveredNodeId = ref<string | null>(null)
   const hoverMousePos = ref({ x: 0, y: 0 })
 
+  // External hover state (from storyline panel, etc.)
+  const externalHoveredNode = ref<Node | null>(null)
+
   // Tooltip for zoomed-out hover - shows node info when scale is low or in LOD mode
+  // Also shows when triggered externally (e.g., from storyline panel)
   // Can be disabled via settings
   const showHoverTooltip = computed(() => {
     if (hoverTooltipEnabled && !hoverTooltipEnabled.value) return false
+    // Show for external hover regardless of scale
+    if (externalHoveredNode.value) return true
     return !!hoveredNodeId.value && (scale.value < 0.5 || isLODMode.value)
   })
 
   const hoveredNode = computed(() => {
+    // External hover takes precedence
+    if (externalHoveredNode.value) return externalHoveredNode.value
     if (!hoveredNodeId.value) return null
     return getNode(hoveredNodeId.value) || null
   })
@@ -163,6 +172,11 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
     hoveredNodeId.value = null
   }
 
+  // Set hover from external source (e.g., storyline panel)
+  function setExternalHover(node: Node | null) {
+    externalHoveredNode.value = node
+  }
+
   return {
     hoveredNodeId,
     hoverMousePos,
@@ -176,5 +190,6 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
     onNodePointerEnter,
     onNodePointerMove,
     onNodePointerLeave,
+    setExternalHover,
   }
 }
