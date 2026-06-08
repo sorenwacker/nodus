@@ -351,7 +351,7 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
   padding: 8px 10px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: top 0.15s ease-out, padding 0.15s ease-out, box-shadow 0.15s ease-out;
+  transition: padding 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
 .reference-card:hover {
