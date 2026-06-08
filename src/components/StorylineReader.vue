@@ -34,7 +34,7 @@ const storyline = ref<Storyline | null>(null)
 const nodes = ref<Node[]>([])
 const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
-const showToc = ref(false) // TOC hidden - storyline panel serves this purpose
+const showToc = ref(true) // Show contents sidebar
 const showEntitySidebar = ref(false)
 const showReferencesSidebar = ref(false) // Hidden by default - optional
 

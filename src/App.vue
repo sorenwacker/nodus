@@ -658,13 +658,12 @@ async function openFolderDialog() {
     <main class="main-content">
       <!-- Canvas always visible -->
       <PixiCanvas :class="{ 'with-reader': readerStorylineId }" />
-      <!-- Storyline panel in middle when reader is open -->
+      <!-- Storyline panel - hidden when reader is open -->
       <StorylinePanel
-        v-if="showStorylinePanel"
-        :class="{ 'reader-mode-panel': readerStorylineId }"
+        v-if="showStorylinePanel && !readerStorylineId"
         @open-reader="(id) => readerStorylineId = id"
       />
-      <!-- Reader slides in from right -->
+      <!-- Reader slides in from right with its own contents -->
       <StorylineReader
         v-if="readerStorylineId"
         :storyline-id="readerStorylineId"

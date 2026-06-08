@@ -303,11 +303,6 @@
   transition: flex 0.25s ease;
 }
 
-/* Reader mode: storyline panel stays in middle */
-.main-content .reader-mode-panel {
-  border-left: 1px solid var(--border-default);
-}
-
 /* Dialog styles */
 .dialog-overlay {
   position: fixed;
