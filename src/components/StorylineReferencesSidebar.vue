@@ -7,6 +7,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
 import { marked } from '../lib/markdown'
+import { sanitizeHtml } from '../lib/sanitize'
 import Icon from './Icon.vue'
 import type { Node } from '../types'
 
@@ -45,7 +46,6 @@ const emit = defineEmits<{
 }>()
 
 const store = useNodesStore()
-const sidebarRef = ref<HTMLElement | null>(null)
 
 interface LinkedReference {
   key: string // unique key for each occurrence
@@ -252,12 +252,12 @@ function getRefTop(key: string): number {
   return adjustedPositions.value.get(key) || 0
 }
 
-// Render markdown preview
+// Render markdown preview (sanitized for XSS protection)
 function renderPreview(markdown: string): string {
   if (!markdown) return ''
   // Take first 200 chars and render
   const truncated = markdown.slice(0, 200)
-  return marked.parse(truncated) as string
+  return sanitizeHtml(marked.parse(truncated) as string)
 }
 
 function handleRefClick(refItem: LinkedReference) {
@@ -278,7 +278,7 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
 </script>
 
 <template>
-  <aside ref="sidebarRef" class="references-sidebar">
+  <aside class="references-sidebar">
     <div class="references-viewport">
       <!-- Position each reference at the exact height of its wikilink -->
       <div
