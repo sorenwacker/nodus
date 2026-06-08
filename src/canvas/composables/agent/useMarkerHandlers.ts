@@ -8,6 +8,7 @@
 import type { Ref } from 'vue'
 import type { Node } from '../../../types'
 import type { AgentPlan } from '../../../llm/types'
+import type { NodeService } from '../../../services/nodeService'
 import { stripHtmlTags } from '../../../lib/sanitize'
 import {
   quickResearch,
@@ -47,13 +48,14 @@ export interface MarkerHandlerContext {
   nodes: Ref<Node[]>
   log: (msg: string) => void
   store?: MarkerStoreInterface
+  nodeService?: NodeService | null
 }
 
 /**
  * Marker handler composable
  */
 export function useMarkerHandlers(ctx: MarkerHandlerContext) {
-  const { planState, nodes, log, store } = ctx
+  const { planState, nodes, log, store, nodeService } = ctx
 
   /**
    * Handle markers in tool results
@@ -324,13 +326,18 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
     }
 
     // Selection delete marker
-    if (result.startsWith('__SELECTION_DELETE__:') && store?.deleteNode) {
+    if (result.startsWith('__SELECTION_DELETE__:') && (nodeService || store?.deleteNode)) {
       try {
         const data = JSON.parse(result.replace('__SELECTION_DELETE__:', ''))
         const nodeIds: string[] = data.nodeIds || []
 
-        for (const nodeId of nodeIds) {
-          await store.deleteNode(nodeId)
+        // Use NodeService for guaranteed undo, fall back to store
+        if (nodeService) {
+          await nodeService.deleteNodes(nodeIds)
+        } else if (store?.deleteNode) {
+          for (const nodeId of nodeIds) {
+            await store.deleteNode(nodeId)
+          }
         }
         log(`> Deleted ${nodeIds.length} node(s)`)
 

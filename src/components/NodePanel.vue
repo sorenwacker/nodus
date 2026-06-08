@@ -4,11 +4,13 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
+import { useNodeService } from '../composables/useNodeService'
 
 const { t } = useI18n()
 const store = useNodesStore()
 const displayStore = useDisplayStore()
 const { spellcheckEnabled } = storeToRefs(displayStore)
+const nodeService = useNodeService()
 
 const selectedNode = computed(() => store.selectedNode)
 const editContent = ref('')
@@ -64,7 +66,12 @@ function closePanel() {
 
 async function deleteNode() {
   if (selectedNode.value && confirm('Delete this node?')) {
-    await store.deleteNode(selectedNode.value.id)
+    // Use NodeService for guaranteed undo, fall back to store
+    if (nodeService) {
+      await nodeService.deleteNode(selectedNode.value.id)
+    } else {
+      await store.deleteNode(selectedNode.value.id)
+    }
   }
 }
 </script>

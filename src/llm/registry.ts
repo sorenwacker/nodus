@@ -8,6 +8,7 @@
  */
 
 import type { Node, Edge } from '../types'
+import type { NodeService } from '../services/nodeService'
 
 // Tool parameter schema (JSON Schema subset)
 export interface ToolParameterSchema {
@@ -39,6 +40,8 @@ export interface ToolContext {
   ollamaContextLength: number
   // Undo support for content changes
   pushContentUndo?: (nodeId: string, oldContent: string | null, oldTitle: string) => void
+  // NodeService for guaranteed undo on deletions and moves
+  service?: NodeService
   // Selection state for selection-aware tools
   selectedNodeIds?: string[]
   editingNodeId?: string | null

@@ -70,6 +70,10 @@ provide('showToast', showToast)
 // Undo/Redo composable (initialized before MCP for undo integration)
 import { useUndoRedo } from './composables/useUndoRedo'
 
+// NodeService for guaranteed undo on deletions and moves
+import { NodeService } from './services/nodeService'
+import { NODE_SERVICE_KEY } from './composables/useNodeService'
+
 const undoRedo = useUndoRedo({
   store: {
     getNode: store.getNode,
@@ -91,6 +95,24 @@ const undoRedo = useUndoRedo({
 })
 
 const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, pushFrameAssignmentUndo, undo, redo } = undoRedo
+
+// NodeService for guaranteed undo on deletions and moves
+const nodeService = new NodeService({
+  store: {
+    getNode: store.getNode,
+    deleteNode: store.deleteNode,
+    deleteNodes: store.deleteNodes,
+    updateNodePosition: store.updateNodePosition,
+  },
+  undo: {
+    pushDeletionUndo,
+    pushPositionUndo,
+  },
+  getEdges: () => store.filteredEdges,
+})
+
+// Provide NodeService to child components
+provide(NODE_SERVICE_KEY, nodeService)
 
 // MCP Server setup (with undo integration)
 const edgesStore = useEdgesStore()

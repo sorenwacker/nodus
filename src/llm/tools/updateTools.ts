@@ -48,7 +48,12 @@ export function registerUpdateTools(): void {
       const x = Number(args.x)
       const y = Number(args.y)
       if (isNaN(x) || isNaN(y)) return `Error: Invalid position (${args.x}, ${args.y})`
-      await ctx.store.updateNodePosition(node.id, x, y)
+      // Use NodeService for guaranteed undo, fall back to store
+      if (ctx.service) {
+        await ctx.service.moveNode(node.id, x, y)
+      } else {
+        await ctx.store.updateNodePosition(node.id, x, y)
+      }
       return `Moved "${args.title}" to (${x}, ${y})`
     },
     { category: 'update' }
@@ -70,6 +75,9 @@ export function registerUpdateTools(): void {
       if (!Array.isArray(updates) || updates.length === 0) {
         return 'No updates provided'
       }
+
+      // Collect position updates for batch undo
+      const positionMoves: Array<{ id: string; x: number; y: number }> = []
 
       const results: string[] = []
       for (const upd of updates) {
@@ -95,8 +103,19 @@ export function registerUpdateTools(): void {
         if (newX !== undefined || newY !== undefined) {
           const x = newX !== undefined ? Number(newX) : node.canvas_x
           const y = newY !== undefined ? Number(newY) : node.canvas_y
-          await ctx.store.updateNodePosition(node.id, x, y)
+          positionMoves.push({ id: node.id, x, y })
           results.push(`${upd.title} → (${x},${y})`)
+        }
+      }
+
+      // Use NodeService for position updates with guaranteed undo
+      if (positionMoves.length > 0) {
+        if (ctx.service) {
+          await ctx.service.moveNodes(positionMoves)
+        } else {
+          for (const move of positionMoves) {
+            await ctx.store.updateNodePosition(move.id, move.x, move.y)
+          }
         }
       }
 

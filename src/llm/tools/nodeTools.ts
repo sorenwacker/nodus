@@ -163,7 +163,12 @@ export function registerNodeTools(): void {
     async (args, ctx) => {
       const node = ctx.store.filteredNodes.find(n => n.title === args.title)
       if (!node) return `Error: Node "${args.title}" not found`
-      await ctx.store.deleteNode(node.id)
+      // Use NodeService for guaranteed undo, fall back to store
+      if (ctx.service) {
+        await ctx.service.deleteNode(node.id)
+      } else {
+        await ctx.store.deleteNode(node.id)
+      }
       return `Deleted node "${args.title}"`
     },
     { category: 'crud' }
@@ -284,8 +289,13 @@ export function registerNodeTools(): void {
       if (nodes.length === 0) return `No nodes match filter "${filter}"`
 
       ctx.log(`> Deleting ${nodes.length} nodes...`)
-      for (const node of nodes) {
-        await ctx.store.deleteNode(node.id)
+      // Use NodeService for guaranteed undo, fall back to store
+      if (ctx.service) {
+        await ctx.service.deleteNodes(nodes.map(n => n.id))
+      } else {
+        for (const node of nodes) {
+          await ctx.store.deleteNode(node.id)
+        }
       }
       return `Deleted ${nodes.length} nodes (${filter})`
     },

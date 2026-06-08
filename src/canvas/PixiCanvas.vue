@@ -86,6 +86,7 @@ import FileMoveCollisionDialog from '../components/FileMoveCollisionDialog.vue'
 import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 import { useZotero } from '../composables/useZotero'
+import { useNodeService } from '../composables/useNodeService'
 import { notifications$ } from '../composables/useNotifications'
 
 // Undo handlers
@@ -107,6 +108,7 @@ const themesStore = useThemesStore()
 const agentTasksStore = useAgentTasksStore()
 const displayStore = useDisplayStore()
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info' | 'warning') => void>('showToast')
+const nodeService = useNodeService()
 
 // MCP status is now injected directly in CanvasStatusBar
 
@@ -229,6 +231,12 @@ onMounted(() => {
   }
   window.addEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
 
+  // Listen for LLM config changes (provider or API key)
+  const handleLLMConfigChange = () => {
+    refreshLLMConfigured()
+  }
+  window.addEventListener('nodus-llm-config-change', handleLLMConfigChange)
+
   // Listen for radial layout z-order updates (angle-based stacking)
   const handleRadialZOrder = (e: Event) => {
     const order = (e as CustomEvent<string[]>).detail
@@ -246,6 +254,7 @@ onMounted(() => {
     window.removeEventListener('resize', updateViewportSize)
     window.removeEventListener('zoom-to-node', handleZoomToNode)
     window.removeEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
+    window.removeEventListener('nodus-llm-config-change', handleLLMConfigChange)
     window.removeEventListener('nodus-radial-z-order', handleRadialZOrder)
     pdfDrop.cleanup()
     displayStore.cleanupListener()
@@ -1182,6 +1191,8 @@ const {
   isGraphLLMLoading,
   showAgentLogPanel,
   llmEnabled,
+  showLLMBar,
+  refreshLLMConfigured,
 } = llmState
 
 // Auto-open log panel on error (only on error, not on regular log messages)
@@ -1257,6 +1268,7 @@ const markerHandlers = useMarkerHandlers({
     deleteNode: store.deleteNode,
     getNode: store.getNode,
   },
+  nodeService,
 })
 
 // LLM tools composable for handling LLM-dependent tools
@@ -1306,6 +1318,8 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     ollamaContextLength: ollamaContextLength.value,
     // Enable undo for AI content changes
     pushContentUndo,
+    // NodeService for guaranteed undo on deletions and moves
+    service: nodeService ?? undefined,
     // Selection state for selection-aware tools
     selectedNodeIds: store.selectedNodeIds,
     editingNodeId: editingNodeId.value,
@@ -2219,7 +2233,7 @@ useCanvasKeyboardShortcuts({
   <div class="canvas-wrapper">
     <!-- Graph-level LLM prompt bar -->
     <CanvasLLMBar
-      v-if="llmEnabled"
+      v-if="showLLMBar"
       :graph-prompt="graphPrompt"
       :is-loading="isGraphLLMLoading"
       :is-running="agentRunning"
@@ -2238,7 +2252,7 @@ useCanvasKeyboardShortcuts({
 
     <!-- Standalone agent log panel (when LLM bar is hidden) -->
     <CanvasAgentLogPanel
-      v-if="!llmEnabled && showAgentLogPanel && agentLog.length > 0"
+      v-if="!showLLMBar && showAgentLogPanel && agentLog.length > 0"
       :log="agentLog"
       @clear="agentLog.length = 0"
       @close="showAgentLogPanel = false"
