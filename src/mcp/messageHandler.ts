@@ -485,6 +485,7 @@ export function createMcpMessageHandler(
     edge_count: number
     node_types: Record<string, number>
     top_connected: Array<{ id: string; title: string; connections: number }>
+    content_format: string
   } {
     const nodes = store.getFilteredNodes()
     const edges = store.getFilteredEdges()
@@ -516,6 +517,7 @@ export function createMcpMessageHandler(
       edge_count: edges.length,
       node_types: nodeTypes,
       top_connected: topConnected,
+      content_format: 'markdown',
     }
   }
 
@@ -541,7 +543,8 @@ export function createMcpMessageHandler(
 
   function handleGetNodeNeighbors(params: { id: string; depth?: number }): {
     node: McpNode
-    neighbors: Array<{ node: McpNode; edge: McpEdge; direction: 'incoming' | 'outgoing' }>
+    neighbors: McpNode[]
+    edges: McpEdge[]
   } {
     const node = store.getNode(params.id)
     if (!node) {
@@ -551,26 +554,49 @@ export function createMcpMessageHandler(
       )
     }
 
-    const edges = store.getFilteredEdges()
-    const connectedEdges = edges.filter(
-      (e) => e.source_node_id === params.id || e.target_node_id === params.id
-    )
+    const depth = Math.min(params.depth ?? 1, 3) // Cap at 3 hops
+    const allEdges = store.getFilteredEdges()
 
-    const neighbors = connectedEdges.map((edge) => {
-      const isOutgoing = edge.source_node_id === params.id
-      const neighborId = isOutgoing ? edge.target_node_id : edge.source_node_id
-      const neighborNode = store.getNode(neighborId)
+    // BFS to find all nodes within depth
+    const visitedNodes = new Set<string>([params.id])
+    const subgraphEdges = new Set<string>()
+    let frontier = [params.id]
 
-      return {
-        node: neighborNode ? nodeToMcp(neighborNode, false) : { id: neighborId, title: 'Unknown', node_type: 'note', canvas_x: 0, canvas_y: 0, width: 0, height: 0, created_at: 0, updated_at: 0 },
-        edge: edgeToMcp(edge),
-        direction: isOutgoing ? 'outgoing' as const : 'incoming' as const,
+    for (let d = 0; d < depth && frontier.length > 0; d++) {
+      const nextFrontier: string[] = []
+      for (const nodeId of frontier) {
+        for (const edge of allEdges) {
+          if (edge.source_node_id === nodeId || edge.target_node_id === nodeId) {
+            subgraphEdges.add(edge.id)
+            const neighborId = edge.source_node_id === nodeId ? edge.target_node_id : edge.source_node_id
+            if (!visitedNodes.has(neighborId)) {
+              visitedNodes.add(neighborId)
+              nextFrontier.push(neighborId)
+            }
+          }
+        }
       }
-    })
+      frontier = nextFrontier
+    }
+
+    // Collect neighbor nodes (excluding the root)
+    const neighbors: McpNode[] = []
+    for (const nodeId of visitedNodes) {
+      if (nodeId !== params.id) {
+        const n = store.getNode(nodeId)
+        if (n) neighbors.push(nodeToMcp(n, true))
+      }
+    }
+
+    // Collect edges within subgraph
+    const edges: McpEdge[] = allEdges
+      .filter(e => subgraphEdges.has(e.id))
+      .map(edgeToMcp)
 
     return {
-      node: nodeToMcp(node, false),
+      node: nodeToMcp(node, true),
       neighbors,
+      edges,
     }
   }
 
