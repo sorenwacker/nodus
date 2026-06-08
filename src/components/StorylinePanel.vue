@@ -559,7 +559,9 @@ watch(() => store.currentWorkspaceId, () => {
           class="storyline-list-item"
           @click="selectStoryline(storyline.id)"
         >
-          <Icon name="book" :size="12" class="storyline-icon" />
+          <span class="storyline-icon" :style="{ backgroundColor: storyline.color || 'var(--primary-color)' }">
+            <Icon name="book" :size="12" />
+          </span>
 
           <template v-if="editingStorylineId === storyline.id">
             <input
@@ -808,8 +810,8 @@ watch(() => store.currentWorkspaceId, () => {
 }
 
 .storyline-icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -817,6 +819,11 @@ watch(() => store.currentWorkspaceId, () => {
   background: var(--primary-color);
   border-radius: 50%;
   flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.storyline-list-item:hover .storyline-icon {
+  transform: scale(1.1);
 }
 
 .storyline-title {
