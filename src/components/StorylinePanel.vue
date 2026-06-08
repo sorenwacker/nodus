@@ -284,7 +284,14 @@ async function handleNodeDrop(event: Event) {
 
 // Track when nodes are being dragged over the panel
 // Use pointermove for reliable detection during pointer capture
+// Expose state globally so drag handler can check it
 const panelRef = ref<HTMLElement | null>(null)
+
+declare global {
+  interface Window {
+    __storylinePanelDropTarget?: boolean
+  }
+}
 
 function checkIfOverPanel(clientX: number, clientY: number): boolean {
   if (!panelRef.value) return false
@@ -299,12 +306,15 @@ function checkIfOverPanel(clientX: number, clientY: number): boolean {
 
 function onGlobalPointerMove(e: PointerEvent) {
   if (document.body.classList.contains('node-dragging')) {
-    isDropTarget.value = checkIfOverPanel(e.clientX, e.clientY)
+    const over = checkIfOverPanel(e.clientX, e.clientY)
+    isDropTarget.value = over
+    window.__storylinePanelDropTarget = over
   }
 }
 
 function onDragEnd() {
   isDropTarget.value = false
+  window.__storylinePanelDropTarget = false
 }
 
 // Load storylines when panel mounts

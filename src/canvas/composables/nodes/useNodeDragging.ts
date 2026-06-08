@@ -283,31 +283,23 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
           ? [draggedNodeId]
           : []
 
-    // Check if drag ended over storyline panel
-    const storylinePanel = document.querySelector('.storyline-panel')
-    if (storylinePanel && draggedNodeIds.length > 0) {
-      const rect = storylinePanel.getBoundingClientRect()
-      if (
-        e.clientX >= rect.left &&
-        e.clientX <= rect.right &&
-        e.clientY >= rect.top &&
-        e.clientY <= rect.bottom
-      ) {
-        // Reset nodes to original positions (don't move them on canvas)
-        if (multiDragInitial.value.size > 0) {
-          for (const [id, initial] of multiDragInitial.value) {
-            store.updateNodePosition(id, initial.x, initial.y)
-          }
-        } else if (draggedNodeId) {
-          store.updateNodePosition(draggedNodeId, dragStart.value.nodeX, dragStart.value.nodeY)
+    // Check if drag ended over storyline panel (using global state set by StorylinePanel)
+    const isOverStorylinePanel = (window as { __storylinePanelDropTarget?: boolean }).__storylinePanelDropTarget
+    if (isOverStorylinePanel && draggedNodeIds.length > 0) {
+      // Reset nodes to original positions (don't move them on canvas)
+      if (multiDragInitial.value.size > 0) {
+        for (const [id, initial] of multiDragInitial.value) {
+          store.updateNodePosition(id, initial.x, initial.y)
         }
-        // Emit event for storyline panel to handle
-        window.dispatchEvent(
-          new CustomEvent('node-dropped-on-storyline', {
-            detail: { nodeIds: draggedNodeIds, x: e.clientX, y: e.clientY },
-          })
-        )
+      } else if (draggedNodeId) {
+        store.updateNodePosition(draggedNodeId, dragStart.value.nodeX, dragStart.value.nodeY)
       }
+      // Emit event for storyline panel to handle
+      window.dispatchEvent(
+        new CustomEvent('node-dropped-on-storyline', {
+          detail: { nodeIds: draggedNodeIds, x: e.clientX, y: e.clientY },
+        })
+      )
     }
 
     // Collision pushing disabled - was causing layout chaos by pushing nodes across frame boundaries
