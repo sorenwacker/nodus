@@ -320,9 +320,14 @@ function onGlobalPointerMove(e: PointerEvent) {
 }
 
 function onDragEnd() {
+  // Reset visual state
   isDropTarget.value = false
   dropPreviewIndex.value = null
-  window.__storylinePanelDropTarget = false
+  // Use setTimeout to ensure stopNodeDrag reads the value before we reset it
+  // This is needed because event handler order isn't guaranteed
+  setTimeout(() => {
+    window.__storylinePanelDropTarget = false
+  }, 0)
 }
 
 // Load storylines when panel mounts
