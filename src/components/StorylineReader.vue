@@ -46,7 +46,7 @@ function startResize(e: PointerEvent) {
   isResizing.value = true
   const startX = e.clientX
   const startWidth = readerWidth.value
-  const maxWidth = window.innerWidth - 350 // Leave room for canvas
+  const maxWidth = window.innerWidth // Allow full width
 
   const onMove = (e: PointerEvent) => {
     const delta = startX - e.clientX

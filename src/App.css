@@ -299,8 +299,9 @@
 /* Reader mode: canvas shrinks, reader slides in */
 .main-content .with-reader {
   flex: 1;
-  min-width: 300px;
+  min-width: 0;
   transition: flex 0.25s ease;
+  overflow: hidden;
 }
 
 /* Dialog styles */
