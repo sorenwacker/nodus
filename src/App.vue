@@ -656,19 +656,19 @@ async function openFolderDialog() {
     </div>
 
     <main class="main-content">
-      <PixiCanvas />
+      <!-- Storyline panel on the left -->
       <StorylinePanel
         v-if="showStorylinePanel"
         @open-reader="(id) => readerStorylineId = id"
       />
+      <!-- Canvas or Reader - reader replaces canvas when active -->
+      <PixiCanvas v-if="!readerStorylineId" />
+      <StorylineReader
+        v-else
+        :storyline-id="readerStorylineId"
+        @close="readerStorylineId = null"
+      />
     </main>
-
-    <!-- Storyline Reader (fullscreen) -->
-    <StorylineReader
-      v-if="readerStorylineId"
-      :storyline-id="readerStorylineId"
-      @close="readerStorylineId = null"
-    />
 
     <!-- Import Dialog -->
     <div v-if="showImportDialog" class="dialog-overlay" @click.self="showImportDialog = false">

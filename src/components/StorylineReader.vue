@@ -469,14 +469,12 @@ function panToEntity(entityId: string) {
 
 <style scoped>
 .reader-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-canvas);
-  z-index: 500;
   animation: fadeIn 0.2s ease;
+  overflow: hidden;
 }
 
 /* Skip link for accessibility */
@@ -503,12 +501,12 @@ function panToEntity(entityId: string) {
 
 /* Reading progress bar */
 .reading-progress {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   height: 3px;
   background: var(--primary-color);
-  z-index: 600;
+  z-index: 10;
   transition: width 0.15s ease-out;
 }
 
