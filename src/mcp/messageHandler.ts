@@ -386,6 +386,12 @@ export function createMcpMessageHandler(
       case 'delete_edges_for_node':
         return handleDeleteEdgesForNode(params as { node_id: string; direction?: 'incoming' | 'outgoing' | 'both' })
 
+      case 'get_duplicate_edges':
+        return handleGetDuplicateEdges()
+
+      case 'cleanup_duplicate_edges':
+        return handleCleanupDuplicateEdges()
+
       case 'arrange_radial':
         return handleArrangeRadial(params as { center_node_id: string; node_ids?: string[]; radius?: number })
 
@@ -1039,6 +1045,93 @@ export function createMcpMessageHandler(
     }
 
     return { success: true, count: edges.length }
+  }
+
+  function handleGetDuplicateEdges(): {
+    duplicates_found: number
+    duplicate_groups: Array<{
+      source_node_id: string
+      target_node_id: string
+      edge_ids: string[]
+      count: number
+    }>
+  } {
+    const edges = store.getFilteredEdges()
+
+    // Group edges by source+target pair
+    const edgeGroups = new Map<string, Edge[]>()
+    for (const edge of edges) {
+      // Create a normalized key (sorted to treat A->B and B->A as same for undirected)
+      const key = `${edge.source_node_id}|${edge.target_node_id}`
+      const existing = edgeGroups.get(key) || []
+      existing.push(edge)
+      edgeGroups.set(key, existing)
+    }
+
+    // Find groups with more than one edge
+    const duplicateGroups: Array<{
+      source_node_id: string
+      target_node_id: string
+      edge_ids: string[]
+      count: number
+    }> = []
+
+    for (const [, group] of edgeGroups) {
+      if (group.length > 1) {
+        duplicateGroups.push({
+          source_node_id: group[0].source_node_id,
+          target_node_id: group[0].target_node_id,
+          edge_ids: group.map((e) => e.id),
+          count: group.length,
+        })
+      }
+    }
+
+    return {
+      duplicates_found: duplicateGroups.reduce((sum, g) => sum + g.count - 1, 0),
+      duplicate_groups: duplicateGroups,
+    }
+  }
+
+  async function handleCleanupDuplicateEdges(): Promise<{
+    success: boolean
+    duplicates_found: number
+    duplicates_removed: number
+    edges_kept: string[]
+  }> {
+    const edges = store.getFilteredEdges()
+
+    // Group edges by source+target pair
+    const edgeGroups = new Map<string, Edge[]>()
+    for (const edge of edges) {
+      const key = `${edge.source_node_id}|${edge.target_node_id}`
+      const existing = edgeGroups.get(key) || []
+      existing.push(edge)
+      edgeGroups.set(key, existing)
+    }
+
+    const edgesKept: string[] = []
+    let duplicatesRemoved = 0
+    let duplicatesFound = 0
+
+    for (const [, group] of edgeGroups) {
+      if (group.length > 1) {
+        duplicatesFound += group.length - 1
+        // Keep the first edge (oldest), delete the rest
+        edgesKept.push(group[0].id)
+        for (let i = 1; i < group.length; i++) {
+          await store.deleteEdge(group[i].id)
+          duplicatesRemoved++
+        }
+      }
+    }
+
+    return {
+      success: true,
+      duplicates_found: duplicatesFound,
+      duplicates_removed: duplicatesRemoved,
+      edges_kept: edgesKept,
+    }
   }
 
   async function handleArrangeRadial(params: { center_node_id: string; node_ids?: string[]; radius?: number }): Promise<{ success: boolean; count: number }> {
