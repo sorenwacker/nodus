@@ -302,7 +302,6 @@ function onDropEnd(e: DragEvent) {
             <button
               class="expand-btn"
               :aria-label="isExpanded(node.id) ? t('storyline.collapseNode') : t('storyline.expandNode')"
-              :data-tooltip="isExpanded(node.id) ? t('storyline.collapseNode') : t('storyline.expandNode')"
               @click="toggleExpand($event, node.id)"
             >
               <Icon :name="isExpanded(node.id) ? 'chevron-up' : 'chevron-down'" :size="compact ? 10 : 12" />
@@ -311,7 +310,11 @@ function onDropEnd(e: DragEvent) {
               <Icon name="close" :size="compact ? 8 : 10" />
             </button>
           </div>
-          <!-- Expanded content -->
+          <!-- Hover preview (shows on hover when not expanded) -->
+          <div v-if="!isExpanded(node.id) && node.markdown_content" class="node-hover-preview">
+            <div class="content-text">{{ node.markdown_content }}</div>
+          </div>
+          <!-- Expanded content (shows when clicked to expand) -->
           <div v-if="isExpanded(node.id)" class="node-content-preview">
             <div class="content-text">{{ node.markdown_content || t('storyline.noContent') }}</div>
           </div>
@@ -674,6 +677,36 @@ function onDropEnd(e: DragEvent) {
 
 .node-item-wrapper.expanded {
   margin-bottom: 4px;
+}
+
+/* Hover preview (hidden by default, shows on hover) */
+.node-hover-preview {
+  display: none;
+  padding: 8px 12px 12px 44px;
+  background: var(--bg-elevated);
+  border-radius: 0 0 6px 6px;
+  margin-top: -4px;
+  border-left: 2px solid var(--border-default);
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.node-item-wrapper:hover .node-hover-preview {
+  display: block;
+}
+
+/* Don't show hover preview when expanded or dragging */
+.node-item-wrapper.expanded .node-hover-preview,
+.node-item-wrapper:has(.node-item.dragging) .node-hover-preview {
+  display: none;
+}
+
+.compact .node-hover-preview {
+  padding: 6px 10px 10px 36px;
+}
+
+.node-hover-preview .content-text {
+  max-height: 80px;
 }
 
 /* Expanded content preview */
