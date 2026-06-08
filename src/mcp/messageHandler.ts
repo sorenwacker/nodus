@@ -335,6 +335,19 @@ export function createMcpMessageHandler(
           }
         )
 
+      case 'batch_update_nodes':
+        return handleBatchUpdateNodes(
+          params as {
+            updates: Array<{
+              id: string
+              title?: string
+              content?: string
+              x?: number
+              y?: number
+            }>
+          }
+        )
+
       case 'delete_node':
         return handleDeleteNode(params as { id: string })
 
@@ -820,6 +833,77 @@ export function createMcpMessageHandler(
     }
 
     return { success: true }
+  }
+
+  async function handleBatchUpdateNodes(params: {
+    updates: Array<{
+      id: string
+      title?: string
+      content?: string
+      x?: number
+      y?: number
+    }>
+  }): Promise<{ success: boolean; updated: number; failed: number; errors?: Array<{ id: string; error: string }> }> {
+    let updated = 0
+    let failed = 0
+    const errors: Array<{ id: string; error: string }> = []
+
+    // Capture positions for undo before any changes
+    if (undo) {
+      const positions = new Map<string, { x: number; y: number }>()
+      for (const update of params.updates) {
+        if (update.x !== undefined && update.y !== undefined) {
+          const node = store.getNode(update.id)
+          if (node) {
+            positions.set(node.id, { x: node.canvas_x, y: node.canvas_y })
+          }
+        }
+      }
+      if (positions.size > 0) {
+        undo.pushPositionUndo(positions)
+      }
+    }
+
+    for (const update of params.updates) {
+      const node = store.getNode(update.id)
+      if (!node) {
+        failed++
+        errors.push({ id: update.id, error: 'Node not found' })
+        continue
+      }
+
+      try {
+        if (update.title !== undefined) {
+          await store.updateNodeTitle(update.id, update.title)
+        }
+
+        if (update.content !== undefined) {
+          await store.updateNodeContent(update.id, update.content)
+        }
+
+        if (update.x !== undefined && update.y !== undefined) {
+          const clamped = clampToFrame(node, update.x, update.y, store.getFrame)
+          await store.updateNodePosition(update.id, clamped.x, clamped.y)
+        }
+
+        updated++
+      } catch (e) {
+        failed++
+        errors.push({ id: update.id, error: e instanceof Error ? e.message : String(e) })
+      }
+    }
+
+    const result: { success: boolean; updated: number; failed: number; errors?: Array<{ id: string; error: string }> } = {
+      success: failed === 0,
+      updated,
+      failed,
+    }
+
+    if (errors.length > 0) {
+      result.errors = errors
+    }
+
+    return result
   }
 
   async function handleDeleteNode(params: { id: string }): Promise<{ success: boolean }> {
