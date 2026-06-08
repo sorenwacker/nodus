@@ -50,13 +50,17 @@ function startResize(e: PointerEvent) {
 
   const onMove = (e: PointerEvent) => {
     const delta = startX - e.clientX
-    readerWidth.value = Math.max(300, Math.min(maxWidth, startWidth + delta))
+    readerWidth.value = Math.max(0, Math.min(maxWidth, startWidth + delta))
   }
 
   const onUp = () => {
     isResizing.value = false
     document.removeEventListener('pointermove', onMove)
     document.removeEventListener('pointerup', onUp)
+    // Close reader if dragged too small
+    if (readerWidth.value < 100) {
+      emit('close')
+    }
   }
 
   document.addEventListener('pointermove', onMove)
