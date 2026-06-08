@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
+import type { StorylineService } from '../services/storylineService'
 import { openExternal } from '../lib/tauri'
 import { resolveWikilink } from '../lib/wikilink'
 import StorylineNodeList from './StorylineNodeList.vue'
@@ -29,6 +30,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useNodesStore()
+const storylineService = inject<StorylineService>('storylineService')
 
 const storyline = ref<Storyline | null>(null)
 const nodes = ref<Node[]>([])
@@ -199,9 +201,9 @@ watch(nodes, async (newNodes) => {
 
 // Node list event handlers
 async function handleNodeAdd(index: number, nodeId: string) {
-  if (!storyline.value) return
+  if (!storyline.value || !storylineService) return
   try {
-    await store.addNodeToStoryline(storyline.value.id, nodeId, index)
+    await storylineService.addNode(storyline.value.id, nodeId, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
   } catch (e) {
     console.error('Failed to add node:', e)
@@ -209,10 +211,10 @@ async function handleNodeAdd(index: number, nodeId: string) {
 }
 
 async function handleNodeCreate(index: number, title: string) {
-  if (!storyline.value) return
+  if (!storyline.value || !storylineService) return
   try {
     const node = await store.createNode({ title, markdown_content: '' })
-    await store.addNodeToStoryline(storyline.value.id, node.id, index)
+    await storylineService.addNode(storyline.value.id, node.id, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
   } catch (e) {
     console.error('Failed to create node:', e)
@@ -220,7 +222,7 @@ async function handleNodeCreate(index: number, title: string) {
 }
 
 async function handleCommentCreate(index: number, text: string, commentType: CommentType = 'note') {
-  if (!storyline.value) return
+  if (!storyline.value || !storylineService) return
   try {
     const content = createCommentContent(text, commentType)
     const node = await store.createNode({
@@ -228,7 +230,7 @@ async function handleCommentCreate(index: number, text: string, commentType: Com
       node_type: 'comment',
       markdown_content: content,
     })
-    await store.addNodeToStoryline(storyline.value.id, node.id, index)
+    await storylineService.addNode(storyline.value.id, node.id, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
     await renderNodeContent(node)
   } catch (e) {
@@ -237,9 +239,9 @@ async function handleCommentCreate(index: number, text: string, commentType: Com
 }
 
 async function handleNodeRemove(nodeId: string) {
-  if (!storyline.value) return
+  if (!storyline.value || !storylineService) return
   try {
-    await store.removeNodeFromStoryline(storyline.value.id, nodeId)
+    await storylineService.removeNode(storyline.value.id, nodeId)
     nodes.value = await store.getStorylineNodes(props.storylineId)
   } catch (e) {
     console.error('Failed to remove node:', e)
@@ -247,14 +249,14 @@ async function handleNodeRemove(nodeId: string) {
 }
 
 async function handleNodeReorder(nodeIds: string[]) {
-  if (!storyline.value) return
+  if (!storyline.value || !storylineService) return
   try {
     // Reorder local nodes array to match new order (trust optimistic update)
     const nodeMap = new Map(nodes.value.map(n => [n.id, n]))
     const reorderedNodes = nodeIds.map(id => nodeMap.get(id)).filter((n): n is Node => !!n)
     nodes.value = reorderedNodes
-    // Persist to backend (don't wait for response to avoid flicker)
-    store.reorderStorylineNodes(storyline.value.id, nodeIds)
+    // Persist with undo support
+    await storylineService.reorderNodes(storyline.value.id, nodeIds)
   } catch (e) {
     console.error('Failed to reorder nodes:', e)
   }
