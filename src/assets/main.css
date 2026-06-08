@@ -327,9 +327,4 @@ html, body, #app {
 /* Global node dragging state - dragged nodes appear above everything */
 body.node-dragging .node-card.selected {
   z-index: 100000 !important;
-  pointer-events: none;
-}
-
-body.node-dragging .nodes-layer {
-  z-index: 99999 !important;
 }
