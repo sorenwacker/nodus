@@ -283,14 +283,27 @@ async function handleNodeDrop(event: Event) {
 }
 
 // Track when nodes are being dragged over the panel
-function onPanelMouseEnter() {
-  // Check if there's an active canvas drag by looking for body class
+// Use pointermove for reliable detection during pointer capture
+const panelRef = ref<HTMLElement | null>(null)
+
+function checkIfOverPanel(clientX: number, clientY: number): boolean {
+  if (!panelRef.value) return false
+  const rect = panelRef.value.getBoundingClientRect()
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  )
+}
+
+function onGlobalPointerMove(e: PointerEvent) {
   if (document.body.classList.contains('node-dragging')) {
-    isDropTarget.value = true
+    isDropTarget.value = checkIfOverPanel(e.clientX, e.clientY)
   }
 }
 
-function onPanelMouseLeave() {
+function onDragEnd() {
   isDropTarget.value = false
 }
 
@@ -298,10 +311,14 @@ function onPanelMouseLeave() {
 onMounted(() => {
   store.loadStorylines()
   window.addEventListener('node-dropped-on-storyline', handleNodeDrop)
+  document.addEventListener('pointermove', onGlobalPointerMove)
+  document.addEventListener('pointerup', onDragEnd)
 })
 
 onUnmounted(() => {
   window.removeEventListener('node-dropped-on-storyline', handleNodeDrop)
+  document.removeEventListener('pointermove', onGlobalPointerMove)
+  document.removeEventListener('pointerup', onDragEnd)
 })
 
 // Get entities referenced in the selected storyline
@@ -392,10 +409,9 @@ watch(() => store.currentWorkspaceId, () => {
 
 <template>
   <aside
+    ref="panelRef"
     class="storyline-panel"
     :class="{ 'drop-target': isDropTarget }"
-    @mouseenter="onPanelMouseEnter"
-    @mouseleave="onPanelMouseLeave"
   >
     <!-- Storyline View (when a storyline is selected) -->
     <template v-if="selectedStoryline">
