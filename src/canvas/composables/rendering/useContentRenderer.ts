@@ -1,17 +1,17 @@
 /**
- * Content renderer composable
- * Manages markdown, Typst math, and Mermaid diagram rendering with caching
- * Uses Tauri backend when available, falls back to WASM in browser mode
+ * Content renderer composable for canvas nodes
+ *
+ * Delegates to MarkdownRenderService for consistent rendering across all views.
+ * Manages node-specific caching and watchers for the canvas.
  */
 import { ref, watch, nextTick } from 'vue'
-import { marked } from '../../../lib/markdown'
-import { invoke, isTauri } from '../../../lib/tauri'
 import {
-  renderMath as renderMathWasm,
-  initTypst as initTypstWasm,
-  isTypstReady,
-} from '../../../lib/typst'
-import { sanitizeSvg, sanitizeHtml, escapeText, sanitizeMermaidSvg, decodeHtmlEntities } from '../../../lib/sanitize'
+  renderMarkdown as serviceRenderMarkdown,
+  renderPendingMath,
+  renderPendingMermaid,
+  reinitializeMermaid,
+  type RenderOptions,
+} from '../../../services/MarkdownRenderService'
 import type { Node, Frame } from '../../../types'
 
 export interface UseContentRendererOptions {
@@ -23,221 +23,66 @@ export interface UseContentRendererOptions {
 export function useContentRenderer(options: UseContentRendererOptions) {
   const { getFilteredNodes, getFilteredFrames, debounceMs = 50 } = options
 
-  // Caches
+  // Local markdown cache (content hash -> rendered HTML)
   const markdownCache = new Map<string, string>()
-  const mathCache = new Map<string, string>()
-  const mermaidCache = new Map<string, string>()
-
-  // Counters for unique IDs
-  let mermaidCounter = 0
 
   // Pre-rendered HTML cache for each node
   const nodeRenderedContent = ref<Record<string, string>>({})
   const nodeContentHashes = new Map<string, string>()
 
-  // Mermaid state
-  let mermaidLoaded = false
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mermaidApi: any = null
-  let mermaidRenderPending = false
-  let mermaidRenderQueued = false
-  let lastMermaidCode = ''
-
   // Debounce timer
   let markdownRenderTimer: ReturnType<typeof setTimeout> | null = null
 
-  async function renderTypstMath() {
-    const elements = document.querySelectorAll('.typst-pending')
-    if (elements.length === 0) return
+  // Track nodes that contain mermaid blocks
+  const nodesWithMermaid = new Set<string>()
+  let lastMermaidCode = ''
 
-    // Initialize WASM renderer if needed (for browser mode)
-    if (!isTauri() && !isTypstReady()) {
-      try {
-        await initTypstWasm()
-      } catch (e) {
-        console.warn('WASM Typst init failed:', e)
-      }
-    }
-
-    for (const el of elements) {
-      const math = el.getAttribute('data-math')
-      const isDisplay = el.classList.contains('typst-display')
-      if (!math) continue
-
-      // Check cache
-      const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
-      if (mathCache.has(cacheKey)) {
-        el.innerHTML = mathCache.get(cacheKey)!
-        el.classList.remove('typst-pending')
-        continue
-      }
-
-      try {
-        let svg: string | null = null
-
-        if (isTauri()) {
-          // Use Tauri backend for native performance
-          svg = await invoke<string>('render_typst_math', {
-            math,
-            displayMode: isDisplay,
-          })
-        } else if (isTypstReady()) {
-          // Use WASM renderer in browser mode
-          svg = await renderMathWasm(math, isDisplay)
-        }
-
-        if (svg) {
-          const sanitized = sanitizeSvg(svg)
-          mathCache.set(cacheKey, sanitized)
-          el.innerHTML = sanitized
-          el.classList.remove('typst-pending')
-        } else {
-          // No renderer available - show raw math
-          el.classList.remove('typst-pending')
-          el.classList.add('typst-fallback')
-        }
-      } catch (e) {
-        console.warn('Math render error:', e)
-        el.textContent = math // Fallback to raw math
-        el.classList.remove('typst-pending')
-        el.classList.add('typst-error')
-      }
-    }
-  }
-
+  /**
+   * Render markdown to HTML using the unified service
+   */
   function renderMarkdown(content: string | null): string {
     if (!content) return ''
 
-    // Don't cache content with math - render inline instead
-    const hasMath = /\$[^$]+\$/.test(content)
-
-    // Check cache first (only for non-math content)
-    if (!hasMath && markdownCache.has(content)) {
+    // Check local cache first
+    if (markdownCache.has(content)) {
       return markdownCache.get(content)!
     }
 
-    // Extract math blocks BEFORE markdown processing to preserve backslashes
-    const mathPlaceholders: Map<string, string> = new Map()
-    let processedContent = content
-
-    // Extract display math first ($$...$$)
-    processedContent = processedContent.replace(/\$\$([^$]+)\$\$/g, (_match, math) => {
-      const id = `MATH_DISPLAY_${mathPlaceholders.size}`
-      mathPlaceholders.set(id, math.trim())
-      return id
-    })
-
-    // Extract inline math ($...$)
-    processedContent = processedContent.replace(
-      /(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g,
-      (_match, math) => {
-        const id = `MATH_INLINE_${mathPlaceholders.size}`
-        mathPlaceholders.set(id, math.trim())
-        return id
-      }
-    )
-
-    // Render markdown (without math blocks)
-    let html = marked.parse(processedContent) as string
-
-    // Restore math blocks - use cached SVG or create pending placeholders
-    for (const [id, math] of mathPlaceholders) {
-      const isDisplay = id.startsWith('MATH_DISPLAY_')
-      const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
-
-      let wrapper: string
-      if (mathCache.has(cacheKey)) {
-        // Use cached SVG
-        const rendered = mathCache.get(cacheKey)!
-        wrapper = isDisplay
-          ? `<div class="typst-display">${rendered}</div>`
-          : `<span class="typst-inline">${rendered}</span>`
-      } else {
-        // Create placeholder for async rendering
-        const escapedMath = math.replace(/"/g, '&quot;')
-        wrapper = isDisplay
-          ? `<div class="typst-display typst-pending" data-math="${escapedMath}">${math}</div>`
-          : `<span class="typst-inline typst-pending" data-math="${escapedMath}">${math}</span>`
-      }
-      html = html.replace(id, wrapper)
-    }
-
-    // Post-process to handle mermaid code blocks
-    const mermaidRegex = /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g
-
-    let needsMermaidRender = false
-    html = html.replace(mermaidRegex, (_match, code) => {
-      const id = `mermaid-${mermaidCounter++}`
-      // Decode HTML entities from marked output to get original mermaid code
-      // Uses browser's built-in HTML parsing for correct entity decoding
-      const decoded = decodeHtmlEntities(code)
-
-      // If we have cached SVG for this mermaid code, use it directly
-      if (mermaidCache.has(decoded)) {
-        return `<div class="mermaid-wrapper">${mermaidCache.get(decoded)}</div>`
-      }
-      // Only trigger mermaid render if we have uncached diagrams
-      needsMermaidRender = true
-      // Escape the decoded content for safe HTML insertion, mermaid will read from textContent
-      return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${escapeText(decoded)}</pre></div>`
-    })
-
-    // Only schedule mermaid render if there are uncached diagrams
-    if (needsMermaidRender) {
-      setTimeout(() => renderMermaidDiagrams(), 50)
-    }
-
-    // Convert [[link]] and [[link|display]] wikilinks to clickable elements
-    const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-    html = html.replace(wikilinkRegex, (_match, target, display) => {
-      const displayText = display || target
-      const targetTrimmed = target.trim()
-      // Extract path parts for frame-based resolution (e.g., "folder/note" -> ["folder", "note"])
-      const pathParts = targetTrimmed.split('/')
-      const targetWithoutPath = pathParts[pathParts.length - 1]
-
-      // Check if target node exists for styling
-      let targetExists = false
+    // Build wikilink checker from current nodes/frames
+    const wikilinkExists = (target: string): boolean => {
       const nodes = getFilteredNodes()
       const frames = getFilteredFrames?.() || []
+      const targetLower = target.toLowerCase()
+      const pathParts = target.split('/')
+      const targetWithoutPath = pathParts[pathParts.length - 1]
 
-      // 1. Try exact title match
-      targetExists = nodes.some(n => n.title.toLowerCase() === targetTrimmed.toLowerCase())
+      // 1. Exact title match
+      if (nodes.some(n => n.title.toLowerCase() === targetLower)) return true
 
-      // 2. Try file path match
-      if (!targetExists) {
-        targetExists = nodes.some(n => n.file_path?.toLowerCase().includes(targetTrimmed.toLowerCase()))
-      }
+      // 2. File path match
+      if (nodes.some(n => n.file_path?.toLowerCase().includes(targetLower))) return true
 
-      // 3. Try frame + node title match (e.g., "folder/note" -> frame "folder" + node "note")
-      if (!targetExists && pathParts.length >= 2) {
+      // 3. Frame + node title match
+      if (pathParts.length >= 2) {
         const framePath = pathParts.slice(0, -1).join('/')
         const frame = frames.find(f =>
           f.title.toLowerCase() === framePath.toLowerCase() ||
           f.folder_path?.toLowerCase().includes(framePath.toLowerCase())
         )
-        if (frame) {
-          // Find node with matching title inside this frame
-          targetExists = nodes.some(n =>
-            n.title.toLowerCase() === targetWithoutPath.toLowerCase() &&
-            n.frame_id === frame.id
-          )
-        }
+        if (frame && nodes.some(n =>
+          n.title.toLowerCase() === targetWithoutPath.toLowerCase() &&
+          n.frame_id === frame.id
+        )) return true
       }
 
-      // 4. Fallback: filename-only match
-      if (!targetExists) {
-        targetExists = nodes.some(n => n.title.toLowerCase() === targetWithoutPath.toLowerCase())
-      }
+      // 4. Filename-only match
+      return nodes.some(n => n.title.toLowerCase() === targetWithoutPath.toLowerCase())
+    }
 
-      const missingClass = targetExists ? '' : ' missing'
-      return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
-    })
+    const renderOptions: RenderOptions = { wikilinkExists }
+    const html = serviceRenderMarkdown(content, renderOptions)
 
-    // Sanitize HTML to prevent XSS
-    html = sanitizeHtml(html)
-
-    // Cache the result (limit cache size - increased for large graphs)
+    // Cache the result (limit size)
     if (markdownCache.size > 2000) {
       const firstKey = markdownCache.keys().next().value
       if (firstKey) markdownCache.delete(firstKey)
@@ -247,6 +92,23 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     return html
   }
 
+  /**
+   * Render pending math expressions in the DOM
+   */
+  async function renderTypstMath() {
+    await renderPendingMath()
+  }
+
+  /**
+   * Render pending mermaid diagrams in the DOM
+   */
+  async function renderMermaidDiagrams() {
+    await renderPendingMermaid()
+  }
+
+  /**
+   * Update rendered content for all visible nodes
+   */
   function updateRenderedContent() {
     if (markdownRenderTimer) clearTimeout(markdownRenderTimer)
     markdownRenderTimer = setTimeout(() => {
@@ -285,153 +147,42 @@ export function useContentRenderer(options: UseContentRendererOptions) {
 
       if (changed) {
         nodeRenderedContent.value = result
-        // Render Typst math after DOM updates
-        nextTick(() => renderTypstMath())
+        // Render pending content after DOM updates
+        nextTick(async () => {
+          await renderTypstMath()
+          await renderMermaidDiagrams()
+        })
       }
     }, debounceMs)
   }
 
-  async function renderMermaidDiagrams() {
-    // If already rendering, queue another render for when it's done
-    if (mermaidRenderPending) {
-      mermaidRenderQueued = true
-      return
-    }
-    mermaidRenderPending = true
-    mermaidRenderQueued = false
-
-    await nextTick()
-
-    const elements = document.querySelectorAll('.mermaid')
-    if (elements.length === 0) {
-      mermaidRenderPending = false
-      // Check if another render was queued
-      if (mermaidRenderQueued) {
-        mermaidRenderQueued = false
-        setTimeout(renderMermaidDiagrams, 50)
-      }
-      return
-    }
-
-    // Lazy load mermaid only when needed
-    // Lazy load mermaid module
-    if (!mermaidLoaded) {
-      try {
-        const mod = await import('mermaid')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let api: any = mod.default || mod
-        if (api.default) api = api.default
-        mermaidApi = api
-        mermaidLoaded = true
-      } catch (e) {
-        console.error('[Mermaid] Load error:', e)
-        mermaidRenderPending = false
-        return
-      }
-    }
-
-    // Initialize Mermaid with appropriate built-in theme
-    // Read theme directly from DOM to avoid race conditions with reactive state
-    if (typeof mermaidApi.initialize === 'function') {
-      const theme = document.documentElement.getAttribute('data-theme') || 'light'
-      const isDark = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
-      mermaidApi.initialize({
-        startOnLoad: false,
-        theme: isDark ? 'dark' : 'default',
-        securityLevel: 'loose',
-      })
-    }
-
-    // Skip if no elements to render
-    if (elements.length === 0) {
-      mermaidRenderPending = false
-      if (mermaidRenderQueued) {
-        mermaidRenderQueued = false
-        setTimeout(renderMermaidDiagrams, 50)
-      }
-      return
-    }
-
-    let didRenderNew = false
-    for (const el of elements) {
-      // Skip if already contains SVG (already rendered in DOM)
-      if (el.querySelector('svg')) {
-        continue
-      }
-
-      const code = el.textContent?.trim() || ''
-      if (!code) {
-        continue
-      }
-
-      // Store original code as data attribute for theme change reinit
-      el.setAttribute('data-mermaid-code', code)
-
-      // Include theme in cache key so theme changes re-render
-      // Read directly from DOM to match initialization
-      const theme = document.documentElement.getAttribute('data-theme') || 'light'
-      const dark = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
-      const cacheKey = `${dark ? 'dark' : 'light'}:${code}`
-
-      // Check cache first
-      if (mermaidCache.has(cacheKey)) {
-        el.innerHTML = mermaidCache.get(cacheKey)!
-        didRenderNew = true
-        continue
-      }
-
-      try {
-        const id = `m${Date.now()}${Math.random().toString(36).substr(2, 5)}`
-        const { svg } = await mermaidApi.render(id, code)
-        // Use Mermaid-specific sanitization that preserves foreignObject content
-        const sanitized = sanitizeMermaidSvg(svg)
-        mermaidCache.set(cacheKey, sanitized)
-        el.innerHTML = sanitized
-        didRenderNew = true
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (e: any) {
-        const msg = e.message || String(e)
-        // Escape error message to prevent XSS
-        const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${escapeText(msg.substring(0, 100))}</div>`
-        mermaidCache.set(cacheKey, errorHtml)
-        el.innerHTML = errorHtml
-        didRenderNew = true
-      }
-    }
-
-    // Only clear markdown cache if we actually rendered something new
-    if (didRenderNew) {
-      markdownCache.clear()
-    }
-
-    mermaidRenderPending = false
-
-    // Check if another render was queued while we were rendering
-    if (mermaidRenderQueued) {
-      mermaidRenderQueued = false
-      setTimeout(renderMermaidDiagrams, 50)
-    }
-  }
-
+  /**
+   * Clear all caches
+   */
   function clearCaches() {
     markdownCache.clear()
-    mathCache.clear()
-    mermaidCache.clear()
     nodeContentHashes.clear()
     nodeRenderedContent.value = {}
   }
 
+  /**
+   * Render a single node's content
+   */
   function renderSingleNode(nodeId: string, content: string | null) {
     nodeRenderedContent.value = {
       ...nodeRenderedContent.value,
       [nodeId]: renderMarkdown(content),
     }
+    // Render pending content after DOM updates
+    nextTick(async () => {
+      await renderTypstMath()
+      await renderMermaidDiagrams()
+    })
   }
 
-  // Track nodes that contain mermaid blocks (incremental tracking)
-  const nodesWithMermaid = new Set<string>()
-
-  // Setup watchers
+  /**
+   * Setup watchers for node changes
+   */
   function setupWatchers() {
     // Watch for node changes with shallow comparison
     watch(
@@ -442,31 +193,28 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       { immediate: true }
     )
 
-    // Watch for mermaid content changes - optimized to only check nodes with mermaid
+    // Watch for mermaid content changes
     watch(
       () => {
         const nodes = getFilteredNodes()
         const mermaidBlocks: string[] = []
 
-        // First pass: check previously known mermaid nodes + scan for new ones
         for (const node of nodes) {
           const content = node.markdown_content || ''
           const hasMermaid = content.includes('```mermaid')
 
           if (hasMermaid) {
             nodesWithMermaid.add(node.id)
-            // Only extract blocks from nodes that have mermaid
             const matches = content.match(/```mermaid[\s\S]*?```/g)
             if (matches) {
               mermaidBlocks.push(...matches)
             }
           } else if (nodesWithMermaid.has(node.id)) {
-            // Node no longer has mermaid - remove from tracking
             nodesWithMermaid.delete(node.id)
           }
         }
 
-        // Clean up deleted nodes from tracking
+        // Clean up deleted nodes
         const nodeIds = new Set(nodes.map(n => n.id))
         for (const id of nodesWithMermaid) {
           if (!nodeIds.has(id)) {
@@ -483,26 +231,6 @@ export function useContentRenderer(options: UseContentRendererOptions) {
         }
       }
     )
-  }
-
-  // Reinitialize Mermaid with current theme (call when theme changes)
-  function reinitializeMermaid() {
-    mermaidCache.clear()
-    mermaidLoaded = false
-    mermaidApi = null
-    // Clear rendered mermaid from DOM and re-render
-    const elements = document.querySelectorAll('.node-content .mermaid, .preview-content .mermaid')
-    for (const el of elements) {
-      if (el.querySelector('svg')) {
-        // Restore the original code so it can be re-rendered
-        const code = el.getAttribute('data-mermaid-code') || ''
-        if (code) {
-          el.innerHTML = code
-        }
-      }
-    }
-    // Trigger re-render
-    setTimeout(renderMermaidDiagrams, 50)
   }
 
   return {

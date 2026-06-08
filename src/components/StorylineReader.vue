@@ -111,8 +111,8 @@ const readingProgress = computed(() => {
 })
 
 // Handle scroll with position saving
-function handleScroll(e: Event) {
-  baseHandleScroll(e)
+function handleScroll() {
+  baseHandleScroll()
   schedulePositionSave()
 }
 
@@ -171,7 +171,7 @@ function handleContentClick(e: MouseEvent) {
 
 // Markdown rendering composable
 const markdownRendering = useStorylineMarkdownRendering()
-const { renderedContent, renderNodeContent, getRenderedContent } = markdownRendering
+const { renderNodeContent, renderAllNodes, processPendingContent, getRenderedContent } = markdownRendering
 
 async function loadStoryline() {
   loading.value = true
@@ -192,11 +192,19 @@ async function loadStoryline() {
 
 // Render all node content when nodes change
 watch(nodes, async (newNodes) => {
-  for (const node of newNodes) {
-    if (!renderedContent.value.has(node.id)) {
-      await renderNodeContent(node)
+  // Phase 1: Render markdown with placeholders (sync)
+  renderAllNodes(newNodes)
+  // Phase 2: After DOM update, inject math/mermaid SVGs
+  await nextTick()
+  // Delay to ensure DOM is fully rendered and contentRef is available
+  setTimeout(async () => {
+    if (contentRef.value) {
+      await processPendingContent(contentRef.value)
+    } else {
+      // Fallback to document-wide search if container not ready
+      await processPendingContent()
     }
-  }
+  }, 100)
 }, { immediate: true })
 
 // Node list event handlers
@@ -213,7 +221,7 @@ async function handleNodeAdd(index: number, nodeId: string) {
 async function handleNodeCreate(index: number, title: string) {
   if (!storyline.value || !storylineService) return
   try {
-    const node = await store.createNode({ title, markdown_content: '' })
+    const node = await store.createNode({ title, markdown_content: '', canvas_x: 0, canvas_y: 0 })
     await storylineService.addNode(storyline.value.id, node.id, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
   } catch (e) {
@@ -229,10 +237,16 @@ async function handleCommentCreate(index: number, text: string, commentType: Com
       title: 'Comment',
       node_type: 'comment',
       markdown_content: content,
+      canvas_x: 0,
+      canvas_y: 0,
     })
     await storylineService.addNode(storyline.value.id, node.id, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
-    await renderNodeContent(node)
+    renderNodeContent(node)
+    await nextTick()
+    setTimeout(async () => {
+      await processPendingContent(contentRef.value || undefined)
+    }, 100)
   } catch (e) {
     console.error('Failed to create comment:', e)
   }
@@ -930,12 +944,33 @@ function panToEntity(entityId: string) {
 
 .section-content :deep(.typst-inline) {
   display: inline;
+  vertical-align: middle;
+}
+
+.section-content :deep(.typst-math svg) {
+  vertical-align: middle;
 }
 
 .section-content :deep(.typst-pending) {
   color: var(--text-muted);
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
+}
+
+/* Mermaid diagram styles */
+.section-content :deep(.mermaid-wrapper) {
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+.section-content :deep(.mermaid) {
+  display: flex;
+  justify-content: center;
+}
+
+.section-content :deep(.mermaid svg) {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Blockquote styles */

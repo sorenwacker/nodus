@@ -6,8 +6,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
-import { marked } from '../lib/markdown'
-import { sanitizeHtml } from '../lib/sanitize'
+import { renderMarkdown } from '../services/MarkdownRenderService'
 import Icon from './Icon.vue'
 import type { Node } from '../types'
 
@@ -262,12 +261,12 @@ function getRefTop(key: string): number {
   return adjustedPositions.value.get(key) || 0
 }
 
-// Render markdown preview (sanitized for XSS protection)
+// Render markdown preview using unified service
 function renderPreview(markdown: string): string {
   if (!markdown) return ''
   // Take first 200 chars and render
   const truncated = markdown.slice(0, 200)
-  return sanitizeHtml(marked.parse(truncated) as string)
+  return renderMarkdown(truncated)
 }
 
 function handleRefClick(refItem: LinkedReference) {

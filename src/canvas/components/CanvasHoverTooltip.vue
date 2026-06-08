@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { renderPendingContent } from '../../services/MarkdownRenderService'
 import type { Node } from '../../types'
 
 const { t } = useI18n()
+
+const tooltipRef = ref<HTMLElement | null>(null)
 
 interface EdgeStats {
   incoming: number
@@ -25,6 +28,20 @@ const props = defineProps<{
  * Derive a display title from the node
  * Falls back to first line of content if no title is set
  */
+// Trigger rendering when tooltip becomes visible with content
+watch(
+  () => props.visible && props.renderedContent,
+  async (shouldRender) => {
+    if (shouldRender) {
+      await nextTick()
+      if (tooltipRef.value) {
+        await renderPendingContent(tooltipRef.value)
+      }
+    }
+  },
+  { immediate: true }
+)
+
 const displayTitle = computed(() => {
   if (props.node?.title) return props.node.title
 
@@ -48,6 +65,7 @@ const displayTitle = computed(() => {
 <template>
   <div
     v-if="visible && node"
+    ref="tooltipRef"
     class="hover-tooltip"
   >
     <div class="hover-tooltip-title">{{ displayTitle }}</div>
@@ -241,6 +259,48 @@ const displayTitle = computed(() => {
   height: auto;
   border-radius: 4px;
 }
+
+/* Math rendering */
+.hover-tooltip-content :deep(.typst-display) {
+  display: block;
+  text-align: center;
+  margin: 4px 0;
+}
+
+.hover-tooltip-content :deep(.typst-inline) {
+  display: inline;
+  vertical-align: middle;
+}
+
+.hover-tooltip-content :deep(.typst-math svg) {
+  vertical-align: middle;
+  max-width: 100%;
+  height: auto;
+}
+
+.hover-tooltip-content :deep(.typst-pending) {
+  color: var(--text-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+}
+
+/* Mermaid diagrams */
+.hover-tooltip-content :deep(.mermaid-wrapper) {
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.hover-tooltip-content :deep(.mermaid) {
+  display: flex;
+  justify-content: center;
+}
+
+.hover-tooltip-content :deep(.mermaid svg) {
+  max-width: 100%;
+  height: auto;
+  max-height: 150px;
+}
+
 
 /* Cyber theme tooltip glow */
 :global([data-theme='cyber']) .hover-tooltip {

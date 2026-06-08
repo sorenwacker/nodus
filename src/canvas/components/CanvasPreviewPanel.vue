@@ -9,6 +9,7 @@ import { openExternal } from '../../lib/tauri'
 import { notifications$ } from '../../composables/useNotifications'
 import { resolveWikilink } from '../../lib/wikilink'
 import { useNodeAgent, type NodeAgentContext } from '../composables/agent/useNodeAgent'
+import MarkdownContent from '../../components/MarkdownContent.vue'
 
 const { t } = useI18n()
 const store = useNodesStore()
@@ -60,26 +61,6 @@ watch(() => props.visible, (visible) => {
 watch(() => props.nodeId, () => {
   isEditing.value = false
 })
-
-// Request mermaid rendering when content with diagrams is displayed
-watch(
-  () => props.content,
-  (content) => {
-    if (content && content.includes('class="mermaid"') && props.visible && !isEditing.value) {
-      emit('renderMermaid')
-    }
-  },
-  { immediate: true }
-)
-
-watch(
-  () => props.visible,
-  (visible) => {
-    if (visible && props.content?.includes('class="mermaid"') && !isEditing.value) {
-      emit('renderMermaid')
-    }
-  }
-)
 
 function startEditing() {
   editContent.value = props.rawContent
@@ -167,35 +148,19 @@ function handleLinkPickerSelect(nodeId: string) {
   if (node) onLinkSelect(nodeId, node.title)
 }
 
-// Handle clicks in preview content (for external links and wikilinks)
-function handleContentClick(e: MouseEvent) {
-  const target = e.target as HTMLElement
-  const link = target.closest('a')
-  if (link) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (link.classList.contains('wikilink')) {
-      // Wikilink - navigate to linked node
-      const linkTarget = link.dataset.target
-      if (linkTarget) {
-        const linkedNode = resolveWikilink(linkTarget, {
-          nodes: store.nodes,
-          frames: store.filteredFrames,
-        })
-        if (linkedNode) {
-          emit('navigateToNode', linkedNode.id)
-        } else {
-          // Node doesn't exist - show notification
-          notifications$.next({
-            type: 'warning',
-            message: `Node "${linkTarget}" not found`,
-          })
-        }
-      }
-    } else if (link.href) {
-      // External link - open in system browser
-      openExternal(link.href)
-    }
+// Handle wikilink click from MarkdownContent component
+function handleWikilinkClick(target: string) {
+  const linkedNode = resolveWikilink(target, {
+    nodes: store.nodes,
+    frames: store.filteredFrames,
+  })
+  if (linkedNode) {
+    emit('navigateToNode', linkedNode.id)
+  } else {
+    notifications$.next({
+      type: 'warning',
+      message: `Node "${target}" not found`,
+    })
   }
 }
 
@@ -334,8 +299,14 @@ function stopNodeAgent() {
       </div>
 
       <!-- View mode -->
-      <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-else class="preview-content" @click="handleContentClick" @dblclick="startEditing" v-html="content"></div>
+      <MarkdownContent
+        v-else
+        :content="rawContent"
+        content-class="preview-content"
+        @wikilink-click="handleWikilinkClick"
+        @link-click="openExternal"
+        @dblclick="startEditing"
+      />
 
       <div class="preview-actions">
         <template v-if="isEditing">

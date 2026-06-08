@@ -328,8 +328,8 @@
 }
 
 /* Make Typst SVG adapt to dark theme */
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) :is(.node-content, .preview-content) .typst-display svg,
-:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) :is(.node-content, .preview-content) .typst-inline svg {
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) :is(.node-content, .preview-content, .section-content, .hover-tooltip-content, .fullscreen-preview, .ref-preview) .typst-display svg,
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) :is(.node-content, .preview-content, .section-content, .hover-tooltip-content, .fullscreen-preview, .ref-preview) .typst-inline svg {
   filter: invert(1);
 }
 

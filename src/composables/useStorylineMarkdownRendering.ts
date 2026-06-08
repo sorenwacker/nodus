@@ -1,117 +1,91 @@
 import { ref } from 'vue'
-import { marked } from '../lib/markdown'
-import { invoke } from '@tauri-apps/api/core'
-import { sanitizeHtml, sanitizeSvg } from '../lib/sanitize'
+import {
+  renderMarkdown,
+  renderPendingContent,
+} from '../services/MarkdownRenderService'
 import { useNodesStore } from '../stores/nodes'
 import type { Node } from '../types'
 
-// Math cache for rendered SVGs
-const mathSvgCache = new Map<string, string>()
-
 /**
  * Handles markdown and math rendering for the storyline reader.
- * Provides caching for rendered content and math expressions.
+ * Uses the unified MarkdownRenderService for consistent rendering.
+ *
+ * Two-phase rendering:
+ * 1. renderNodeContent/renderAllNodes - sync, creates HTML with placeholders
+ * 2. processPendingContent - async, injects SVG into DOM
+ *
+ * Usage:
+ *   await renderAllNodes(nodes)
+ *   await nextTick()  // wait for DOM update
+ *   await processPendingContent()  // inject math/mermaid SVGs
  */
 export function useStorylineMarkdownRendering() {
   const renderedContent = ref<Map<string, string>>(new Map())
 
-  async function renderMathToSvg(math: string, displayMode: boolean): Promise<string> {
-    const cacheKey = `${displayMode ? 'd' : 'i'}:${math}`
-    if (mathSvgCache.has(cacheKey)) {
-      return mathSvgCache.get(cacheKey)!
-    }
-
-    try {
-      const svg = await invoke<string>('render_typst_math', { math, displayMode })
-      mathSvgCache.set(cacheKey, svg)
-      return svg
-    } catch (e) {
-      console.error('[Math] Render error:', e)
-      return `<span class="math-error">${math}</span>`
-    }
-  }
-
-  async function parseMarkdownAsync(content: string): Promise<string> {
-    if (!content) return ''
-
-    // Extract math blocks before markdown processing
-    const mathPlaceholders: Map<string, { math: string; isDisplay: boolean }> = new Map()
-    let processedContent = content
-
-    // Extract display math first ($$...$$)
-    processedContent = processedContent.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
-      const id = `MATH_DISPLAY_${mathPlaceholders.size}`
-      mathPlaceholders.set(id, { math: math.trim(), isDisplay: true })
-      return id
-    })
-
-    // Extract inline math ($...$)
-    processedContent = processedContent.replace(/(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g, (_, math) => {
-      const id = `MATH_INLINE_${mathPlaceholders.size}`
-      mathPlaceholders.set(id, { math: math.trim(), isDisplay: false })
-      return id
-    })
-
-    // Render markdown
-    let html = marked.parse(processedContent) as string
-
-    // Convert [[link]] and [[link|display]] wikilinks to clickable elements
+  function getWikilinkExists(target: string): boolean {
     const store = useNodesStore()
-    const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-    html = html.replace(wikilinkRegex, (_match, target, display) => {
-      const displayText = display || target
-      const targetTrimmed = target.trim()
-      const targetExists = store.filteredNodes.some(
-        n => n.title.toLowerCase() === targetTrimmed.toLowerCase()
-      )
-      const missingClass = targetExists ? '' : ' missing'
-      return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
-    })
-
-    // Render math to SVG and restore
-    for (const [id, { math, isDisplay }] of mathPlaceholders) {
-      const svg = sanitizeSvg(await renderMathToSvg(math, isDisplay))
-      const wrapper = isDisplay
-        ? `<div class="typst-display typst-math">${svg}</div>`
-        : `<span class="typst-inline typst-math">${svg}</span>`
-      html = html.replace(new RegExp(id, 'g'), wrapper)
-    }
-
-    // Sanitize final HTML output
-    return sanitizeHtml(html)
+    return store.filteredNodes.some(
+      n => n.title.toLowerCase() === target.toLowerCase()
+    )
   }
 
-  async function renderNodeContent(node: Node) {
+  /**
+   * Phase 1: Render markdown to HTML with placeholders (sync)
+   */
+  function renderNodeContent(node: Node): void {
     if (!node.markdown_content) {
-      renderedContent.value.set(node.id, '')
+      renderedContent.value = new Map(renderedContent.value).set(node.id, '')
       return
     }
-    const html = await parseMarkdownAsync(node.markdown_content)
+
+    const html = renderMarkdown(node.markdown_content, {
+      wikilinkExists: getWikilinkExists,
+    })
+
     renderedContent.value = new Map(renderedContent.value).set(node.id, html)
   }
 
-  async function renderAllNodes(nodes: Node[]) {
+  /**
+   * Phase 1: Render all nodes to HTML with placeholders (sync)
+   */
+  function renderAllNodes(nodes: Node[]): void {
+    const newContent = new Map(renderedContent.value)
+
     for (const node of nodes) {
-      if (!renderedContent.value.has(node.id)) {
-        await renderNodeContent(node)
+      if (!newContent.has(node.id)) {
+        const html = node.markdown_content
+          ? renderMarkdown(node.markdown_content, {
+              wikilinkExists: getWikilinkExists,
+            })
+          : ''
+        newContent.set(node.id, html)
       }
     }
+
+    renderedContent.value = newContent
+  }
+
+  /**
+   * Phase 2: Process pending math/mermaid in DOM (async)
+   * Call this after DOM has updated with the rendered HTML
+   */
+  async function processPendingContent(container?: Element): Promise<void> {
+    await renderPendingContent(container)
   }
 
   function getRenderedContent(nodeId: string): string {
     return renderedContent.value.get(nodeId) || ''
   }
 
-  function clearCache() {
+  function clearCache(): void {
     renderedContent.value = new Map()
   }
 
   return {
     renderedContent,
-    renderMathToSvg,
-    parseMarkdownAsync,
     renderNodeContent,
     renderAllNodes,
+    processPendingContent,
     getRenderedContent,
     clearCache,
   }

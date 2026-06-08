@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
-import { marked } from '../lib/markdown'
-import mermaid from 'mermaid'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
 import { openExternal } from '../lib/tauri'
-import { sanitizeMermaidSvg, escapeText, decodeHtmlEntities } from '../lib/sanitize'
+import {
+  renderMarkdown,
+  renderPendingContent,
+} from '../services/MarkdownRenderService'
 import NodePicker from './NodePicker.vue'
 
 const props = defineProps<{
@@ -49,11 +50,6 @@ const readingMode = ref(true)
 // Auto-save timer
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
-// Mermaid state
-let mermaidInitialized = false
-const mermaidCache = new Map<string, string>()
-let mermaidCounter = 0
-
 // Load node data when nodeId changes
 const node = computed(() => props.nodeId ? store.getNode(props.nodeId) : null)
 
@@ -66,7 +62,7 @@ watch(() => props.nodeId, (id) => {
 }, { immediate: true })
 
 // Reset state when modal closes
-watch(() => props.visible, (visible) => {
+watch(() => props.visible, async (visible) => {
   if (!visible) {
     // Save any pending changes
     if (hasUnsavedChanges.value) {
@@ -80,107 +76,31 @@ watch(() => props.visible, (visible) => {
     showLinkPicker.value = false
   } else {
     // Focus editor when modal opens
-    nextTick(() => {
-      editorRef.value?.focus()
-    })
-    // Render mermaid diagrams when modal opens with content
-    if (editContent.value?.includes('```mermaid')) {
-      nextTick(() => renderMermaidInModal())
-    }
+    await nextTick()
+    editorRef.value?.focus()
+    // Render pending math and mermaid
+    await renderPendingContent(previewRef.value || undefined)
   }
 })
 
-// Live preview - render markdown with mermaid support
-const renderedContent = computed(() => {
-  if (!editContent.value) return ''
-
-  let html = marked.parse(editContent.value) as string
-
-  // Process mermaid code blocks - convert to .mermaid class for rendering
-  const mermaidRegex = /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g
-
-  html = html.replace(mermaidRegex, (_match, code) => {
-    const id = `mermaid-fs-${mermaidCounter++}`
-    // Decode HTML entities from marked output
-    const decoded = decodeHtmlEntities(code)
-
-    // If we have cached SVG, use it directly
-    if (mermaidCache.has(decoded)) {
-      return `<div class="mermaid-wrapper">${mermaidCache.get(decoded)}</div>`
-    }
-    return `<div class="mermaid-wrapper"><pre class="mermaid" id="${id}">${escapeText(decoded)}</pre></div>`
-  })
-
-  // Convert [[link]] and [[link|display]] wikilinks to clickable elements
-  const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-  html = html.replace(wikilinkRegex, (_match, target, display) => {
-    const displayText = display || target
-    const targetTrimmed = target.trim()
-    const targetExists = store.filteredNodes.some(
-      n => n.title.toLowerCase() === targetTrimmed.toLowerCase()
-    )
-    const missingClass = targetExists ? '' : ' missing'
-    return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`
-  })
-
-  return html
-})
-
-// Render mermaid diagrams within the fullscreen modal
-async function renderMermaidInModal() {
-  await nextTick()
-
-  const container = previewRef.value
-  if (!container) return
-
-  const elements = container.querySelectorAll('.mermaid')
-  if (elements.length === 0) return
-
-  // Initialize mermaid if needed
-  if (!mermaidInitialized) {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
-                   document.documentElement.getAttribute('data-theme') === 'pitch-black' ||
-                   document.documentElement.getAttribute('data-theme') === 'cyber'
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: isDark ? 'dark' : 'default',
-      securityLevel: 'loose',
-    })
-    mermaidInitialized = true
-  }
-
-  for (const el of elements) {
-    // Skip if already rendered
-    if (el.querySelector('svg')) continue
-
-    const code = el.textContent?.trim() || ''
-    if (!code) continue
-
-    // Check cache
-    if (mermaidCache.has(code)) {
-      el.innerHTML = mermaidCache.get(code)!
-      continue
-    }
-
-    try {
-      const id = `m${Date.now()}${Math.random().toString(36).substr(2, 5)}`
-      const { svg } = await mermaid.render(id, code)
-      const sanitized = sanitizeMermaidSvg(svg)
-      mermaidCache.set(code, sanitized)
-      el.innerHTML = sanitized
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      const errorHtml = `<div style="color:var(--danger-color);font-size:11px;padding:8px;user-select:text;">Diagram error: ${escapeText(msg.substring(0, 100))}</div>`
-      mermaidCache.set(code, errorHtml)
-      el.innerHTML = errorHtml
-    }
-  }
+// Helper to check if wikilink target exists
+function wikilinkExists(target: string): boolean {
+  return store.filteredNodes.some(
+    n => n.title.toLowerCase() === target.toLowerCase()
+  )
 }
 
-// Watch for mermaid content changes and trigger rendering
-watch(renderedContent, (content) => {
-  if (content && content.includes('class="mermaid"') && props.visible) {
-    nextTick(() => renderMermaidInModal())
+// Live preview - render markdown using unified service
+const renderedContent = computed(() => {
+  if (!editContent.value) return ''
+  return renderMarkdown(editContent.value, { wikilinkExists })
+})
+
+// Watch for content changes and trigger async rendering
+watch(renderedContent, async () => {
+  if (props.visible) {
+    await nextTick()
+    await renderPendingContent(previewRef.value || undefined)
   }
 })
 
