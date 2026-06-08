@@ -706,7 +706,7 @@ function onDropEnd(e: DragEvent) {
 }
 
 .node-hover-preview .content-text {
-  max-height: 80px;
+  max-height: 150px;
 }
 
 /* Expanded content preview */
