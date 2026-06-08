@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
+import { generateShortId } from '../lib/ids'
 import type { Edge, CreateEdgeInput, EntityLinkType } from '../types'
 import { ENTITY_LINK_TYPES } from '../types'
 
@@ -106,7 +107,7 @@ export const useEdgesStore = defineStore('edges', () => {
       storeLogger.error('Failed to create edge:', e)
       // Fallback for development
       const edge: Edge = {
-        id: crypto.randomUUID(),
+        id: generateShortId(),
         source_node_id: data.source_node_id,
         target_node_id: data.target_node_id,
         label: data.label || null,

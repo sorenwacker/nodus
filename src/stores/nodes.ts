@@ -4,6 +4,7 @@ import { invoke, getWorkspace } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
 import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs, getEdgeLabel } from '../lib/templates'
 import { canvasStorage, tagStorage } from '../lib/storage'
+import { generateShortId } from '../lib/ids'
 import { extractHashtags, extractWikilinks } from '../lib/contentParser'
 import { notifications$ } from '../composables/useNotifications'
 import { useStorylinesStore } from './storylines'
@@ -559,7 +560,7 @@ export const useNodesStore = defineStore('nodes', () => {
       console.error('Failed to create node:', e)
       // Fallback for development
       const node: Node = {
-        id: crypto.randomUUID(),
+        id: generateShortId(),
         title: data.title.trim(),
         file_path: data.file_path || null,
         markdown_content: data.markdown_content?.trim() || null,
