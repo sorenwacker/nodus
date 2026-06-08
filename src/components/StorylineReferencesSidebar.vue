@@ -192,14 +192,19 @@ function renderPreview(markdown: string): string {
 }
 
 function handleRefClick(refItem: LinkedReference) {
+  if (refItem.isMissing || !refItem.id) return
+  // Open detail modal for this node via global event
+  window.dispatchEvent(new CustomEvent('open-node-detail', { detail: { nodeId: refItem.id } }))
+}
+
+function handleRefNavigate(e: Event, refItem: LinkedReference) {
+  e.stopPropagation()
   if (refItem.isMissing) return
 
   if (refItem.isInStoryline && refItem.storylineIndex !== undefined) {
     // Navigate within the storyline - don't close reader
     emit('navigate-to-node', refItem.id!)
   }
-  // For canvas references, don't do anything to avoid closing reader
-  // User can use the link in the text to navigate if needed
 }
 </script>
 
@@ -223,6 +228,14 @@ function handleRefClick(refItem: LinkedReference) {
           <Icon v-else-if="refItem.isInStoryline" name="book-open" :size="12" class="ref-icon storyline" />
           <Icon v-else name="external-link" :size="12" class="ref-icon external" />
           <span class="ref-title">{{ refItem.title }}</span>
+          <button
+            v-if="refItem.isInStoryline && !refItem.isMissing"
+            class="ref-goto-btn"
+            title="Go to section"
+            @click="handleRefNavigate($event, refItem)"
+          >
+            <Icon name="arrow-right" :size="10" />
+          </button>
         </div>
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div v-if="refItem.preview && !refItem.isMissing" class="ref-preview" v-html="renderPreview(refItem.preview)"></div>
@@ -294,12 +307,38 @@ function handleRefClick(refItem: LinkedReference) {
 }
 
 .ref-title {
+  flex: 1;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ref-goto-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.reference-card:hover .ref-goto-btn {
+  opacity: 1;
+}
+
+.ref-goto-btn:hover {
+  background: var(--primary-color);
+  color: white;
 }
 
 .ref-preview {

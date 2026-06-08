@@ -257,6 +257,13 @@ onMounted(() => {
   window.addEventListener('storyline-node-hover', handleStorylineNodeHover)
   window.addEventListener('storyline-node-hover-end', handleStorylineNodeHoverEnd)
 
+  // Listen for open-node-detail events (from references sidebar)
+  const handleOpenNodeDetail = (e: Event) => {
+    const nodeId = (e as CustomEvent<{ nodeId: string }>).detail?.nodeId
+    if (nodeId) openFullscreenNode(nodeId)
+  }
+  window.addEventListener('open-node-detail', handleOpenNodeDetail)
+
   // Setup PDF drop listener
   pdfDrop.setup()
 
@@ -269,6 +276,7 @@ onMounted(() => {
     window.removeEventListener('nodus-radial-z-order', handleRadialZOrder)
     window.removeEventListener('storyline-node-hover', handleStorylineNodeHover)
     window.removeEventListener('storyline-node-hover-end', handleStorylineNodeHoverEnd)
+    window.removeEventListener('open-node-detail', handleOpenNodeDetail)
     pdfDrop.cleanup()
     displayStore.cleanupListener()
   })

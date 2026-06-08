@@ -475,20 +475,21 @@ function panToEntity(entityId: string) {
                 :id="`node-${index}`"
                 :data-node-index="index"
                 class="node-section"
-                :class="{ 'is-editing': isEditMode && editingNodeId === node.id }"
+                :class="{ 'is-editing': editingNodeId === node.id }"
               >
                 <header class="section-header">
-                  <span class="section-number">{{ index + 1 }}</span>
+                  <span
+                    class="section-number"
+                    :class="{ clickable: editingNodeId !== node.id }"
+                    :title="editingNodeId !== node.id ? 'Click to edit' : ''"
+                    @click="editingNodeId !== node.id && startEditing(node)"
+                  >
+                    <span class="section-num-text">{{ index + 1 }}</span>
+                    <Icon v-if="editingNodeId !== node.id" name="edit" :size="12" class="edit-hint" />
+                  </span>
                   <h2 class="section-title">{{ node.title }}</h2>
                   <button
-                    v-if="isEditMode && editingNodeId !== node.id"
-                    class="edit-section-btn"
-                    @click="startEditing(node)"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    v-if="isEditMode && editingNodeId === node.id"
+                    v-if="editingNodeId === node.id"
                     class="save-section-btn"
                     @click="saveEditContent"
                   >
@@ -816,6 +817,7 @@ function panToEntity(entityId: string) {
 }
 
 .section-number {
+  position: relative;
   width: 32px;
   height: 32px;
   display: flex;
@@ -827,6 +829,34 @@ function panToEntity(entityId: string) {
   background: var(--primary-color);
   border-radius: 8px;
   flex-shrink: 0;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.section-number.clickable {
+  cursor: pointer;
+}
+
+.section-number.clickable:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.section-num-text {
+  transition: opacity 0.15s;
+}
+
+.edit-hint {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.section-number.clickable:hover .section-num-text {
+  opacity: 0;
+}
+
+.section-number.clickable:hover .edit-hint {
+  opacity: 1;
 }
 
 .section-title {
