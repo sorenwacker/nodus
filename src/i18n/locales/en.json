@@ -536,6 +536,10 @@
       "scroll": "Scroll to Zoom",
       "pinch": "Pinch to Zoom"
     },
+    "hideWikilinkEdges": "Hide [[wikilink]] Edges",
+    "hideWikilinkEdgesHint": "Hide edges auto-generated from [[links]] in node content",
+    "hideStorylineEdges": "Hide Storyline Edges",
+    "hideStorylineEdgesHint": "Hide edges that connect nodes in storylines",
     "showTagNodes": "Show Tags as Nodes",
     "showTagNodesHint": "Display #hashtags as connected tag nodes on canvas",
     "workspaceDiagnostics": "Workspace Diagnostics",

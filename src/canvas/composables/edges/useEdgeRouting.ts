@@ -41,6 +41,7 @@ export interface EdgeLine {
   link_type: string | null
   color?: string | null
   label: string | null
+  storyline_id?: string | null
   isBidirectional: boolean
   isShortEdge: boolean
   debugInfo?: unknown
@@ -182,6 +183,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
             link_type: edge.link_type,
             color: edge.color,
             label: edge.label,
+            storyline_id: edge.storyline_id,
             isBidirectional: false,
             isShortEdge: Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) < 50,
             debugInfo: undefined,
@@ -575,6 +577,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
           link_type: edge.link_type,
           color: edge.color,
           label: edge.label,
+          storyline_id: edge.storyline_id,
           isBidirectional: !showArrow, // Hide arrow if non-directional or bidirectional
           isShortEdge,
           debugInfo: routed?.debugInfo,

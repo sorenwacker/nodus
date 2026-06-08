@@ -30,6 +30,8 @@ export interface UseEdgeVisibilityContext {
   highlightedEdgeIds: ComputedRef<Set<string>>
   highlightAllEdges?: Ref<boolean>
   edgeHideThreshold?: Ref<number> // User setting: hide all edges when total count > this (0 = disabled)
+  hideWikilinkEdges?: Ref<boolean> // User setting: hide edges auto-generated from [[links]]
+  hideStorylineEdges?: Ref<boolean> // User setting: hide edges that connect storyline nodes
   edgeStrokeWidth: ComputedRef<number>
   highlightColor: ComputedRef<string>
   selectedColor: ComputedRef<string>
@@ -56,6 +58,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     highlightedEdgeIds,
     highlightAllEdges = ref(false), // Default to false if not provided
     edgeHideThreshold = ref(0), // User setting: 0 = disabled (show all)
+    hideWikilinkEdges = ref(false), // User setting: hide [[wikilink]] edges
+    hideStorylineEdges = ref(false), // User setting: hide storyline edges
     edgeStrokeWidth,
     highlightColor,
     selectedColor,
@@ -83,6 +87,16 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     const visIds = visibleNodeIds.value
     const hovered = hoveredNodeId.value
     const selectedNodes = Array.isArray(selectedNodeIds.value) ? selectedNodeIds.value : selectedNodeIds.value
+
+    // Filter out wikilink edges if user setting is enabled
+    if (hideWikilinkEdges.value) {
+      edges = edges.filter(e => e.link_type !== 'wikilink')
+    }
+
+    // Filter out storyline edges if user setting is enabled
+    if (hideStorylineEdges.value) {
+      edges = edges.filter(e => !e.storyline_id)
+    }
 
     // For small graphs, show all edges regardless of viewport visibility
     // Only filter by viewport for larger graphs to improve performance

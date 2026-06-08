@@ -21,6 +21,8 @@ const gridSize = ref(canvasStorage.getGridSize(workspaceId.value))
 const edgeStyle = ref<'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight'>(canvasStorage.getEdgeStyle(workspaceId.value))
 const edgeHideThreshold = ref(canvasStorage.getEdgeHideThreshold(workspaceId.value))
 const edgeLabelSize = ref(canvasStorage.getEdgeLabelSize(workspaceId.value))
+const hideWikilinkEdges = ref(canvasStorage.getHideWikilinkEdges(workspaceId.value))
+const hideStorylineEdges = ref(canvasStorage.getHideStorylineEdges(workspaceId.value))
 // Global settings (not workspace-specific)
 const radialStyle = ref<'compact' | 'spacious'>(canvasStorage.getRadialStyle())
 const zoomMode = ref<'scroll' | 'pinch'>(canvasStorage.getZoomMode())
@@ -35,12 +37,16 @@ function saveCanvasSettings() {
   canvasStorage.setEdgeStyle(edgeStyle.value, workspaceId.value)
   canvasStorage.setEdgeHideThreshold(edgeHideThreshold.value, workspaceId.value)
   canvasStorage.setEdgeLabelSize(edgeLabelSize.value, workspaceId.value)
+  canvasStorage.setHideWikilinkEdges(hideWikilinkEdges.value, workspaceId.value)
+  canvasStorage.setHideStorylineEdges(hideStorylineEdges.value, workspaceId.value)
   canvasStorage.setRadialStyle(radialStyle.value) // Global setting
   canvasStorage.setZoomMode(zoomMode.value) // Global setting
   // Notify canvas of edge style change
   window.dispatchEvent(new CustomEvent('nodus-edge-style-change', { detail: edgeStyle.value }))
   window.dispatchEvent(new CustomEvent('nodus-edge-hide-threshold-change', { detail: edgeHideThreshold.value }))
   window.dispatchEvent(new CustomEvent('nodus-edge-label-size-change', { detail: edgeLabelSize.value }))
+  window.dispatchEvent(new CustomEvent('nodus-hide-wikilink-edges-change', { detail: hideWikilinkEdges.value }))
+  window.dispatchEvent(new CustomEvent('nodus-hide-storyline-edges-change', { detail: hideStorylineEdges.value }))
 }
 
 // Save Tag settings
@@ -50,7 +56,7 @@ function saveTagSettings() {
 }
 
 // Auto-save on changes
-watch([gridSnap, gridSize, edgeStyle, edgeHideThreshold, edgeLabelSize, radialStyle, zoomMode], saveCanvasSettings)
+watch([gridSnap, gridSize, edgeStyle, edgeHideThreshold, edgeLabelSize, hideWikilinkEdges, hideStorylineEdges, radialStyle, zoomMode], saveCanvasSettings)
 watch(showTagNodes, saveTagSettings)
 
 // Reload settings when workspace changes (radialStyle is global, not reloaded)
@@ -60,6 +66,8 @@ watch(workspaceId, (newId) => {
   edgeStyle.value = canvasStorage.getEdgeStyle(newId)
   edgeHideThreshold.value = canvasStorage.getEdgeHideThreshold(newId)
   edgeLabelSize.value = canvasStorage.getEdgeLabelSize(newId)
+  hideWikilinkEdges.value = canvasStorage.getHideWikilinkEdges(newId)
+  hideStorylineEdges.value = canvasStorage.getHideStorylineEdges(newId)
 })
 </script>
 
@@ -146,6 +154,22 @@ watch(workspaceId, (newId) => {
         step="1"
       />
       <span class="hint">{{ t('settings.edgeLabelSizeHint') }}</span>
+    </div>
+
+    <div class="setting-group">
+      <label class="checkbox-label">
+        <input v-model="hideWikilinkEdges" type="checkbox" />
+        {{ t('settings.hideWikilinkEdges') }}
+      </label>
+      <span class="hint">{{ t('settings.hideWikilinkEdgesHint') }}</span>
+    </div>
+
+    <div class="setting-group">
+      <label class="checkbox-label">
+        <input v-model="hideStorylineEdges" type="checkbox" />
+        {{ t('settings.hideStorylineEdges') }}
+      </label>
+      <span class="hint">{{ t('settings.hideStorylineEdgesHint') }}</span>
     </div>
 
     <div class="setting-group">

@@ -894,6 +894,8 @@ const {
   highlightAllEdges,
   edgeHideThreshold,
   edgeLabelSize,
+  hideWikilinkEdges,
+  hideStorylineEdges,
   showHelpModal,
   snapToGrid,
 } = canvasSettings
@@ -1905,6 +1907,8 @@ const { visibleEdgeLines } = useEdgeVisibility({
   highlightedEdgeIds,
   highlightAllEdges,
   edgeHideThreshold,
+  hideWikilinkEdges,
+  hideStorylineEdges,
   edgeStrokeWidth,
   highlightColor,
   selectedColor,

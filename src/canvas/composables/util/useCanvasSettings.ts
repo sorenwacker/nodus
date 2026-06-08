@@ -14,6 +14,8 @@ export function useCanvasSettings(workspaceId?: string) {
   const highlightAllEdges = ref(false)
   const edgeHideThreshold = ref(canvasStorage.getEdgeHideThreshold(workspaceId))
   const edgeLabelSize = ref(canvasStorage.getEdgeLabelSize(workspaceId))
+  const hideWikilinkEdges = ref(canvasStorage.getHideWikilinkEdges(workspaceId))
+  const hideStorylineEdges = ref(canvasStorage.getHideStorylineEdges(workspaceId))
 
   // Help modal visibility
   const showHelpModal = ref(false)
@@ -51,14 +53,30 @@ export function useCanvasSettings(workspaceId?: string) {
     edgeLabelSize.value = customEvent.detail
   }
 
+  // Listen for hide wikilink edges changes from settings panel
+  function onHideWikilinkEdgesChange(e: Event) {
+    const customEvent = e as CustomEvent<boolean>
+    hideWikilinkEdges.value = customEvent.detail
+  }
+
+  // Listen for hide storyline edges changes from settings panel
+  function onHideStorylineEdgesChange(e: Event) {
+    const customEvent = e as CustomEvent<boolean>
+    hideStorylineEdges.value = customEvent.detail
+  }
+
   onMounted(() => {
     window.addEventListener('nodus-edge-hide-threshold-change', onEdgeHideThresholdChange)
     window.addEventListener('nodus-edge-label-size-change', onEdgeLabelSizeChange)
+    window.addEventListener('nodus-hide-wikilink-edges-change', onHideWikilinkEdgesChange)
+    window.addEventListener('nodus-hide-storyline-edges-change', onHideStorylineEdgesChange)
   })
 
   onUnmounted(() => {
     window.removeEventListener('nodus-edge-hide-threshold-change', onEdgeHideThresholdChange)
     window.removeEventListener('nodus-edge-label-size-change', onEdgeLabelSizeChange)
+    window.removeEventListener('nodus-hide-wikilink-edges-change', onHideWikilinkEdgesChange)
+    window.removeEventListener('nodus-hide-storyline-edges-change', onHideStorylineEdgesChange)
   })
 
   return {
@@ -68,6 +86,8 @@ export function useCanvasSettings(workspaceId?: string) {
     highlightAllEdges,
     edgeHideThreshold,
     edgeLabelSize,
+    hideWikilinkEdges,
+    hideStorylineEdges,
     showHelpModal,
 
     // Toggles

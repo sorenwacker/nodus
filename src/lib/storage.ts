@@ -33,6 +33,8 @@ const KEYS = {
   canvasBubbleMode: 'nodus_canvas_bubble_mode',
   canvasEdgeHideThreshold: 'nodus_canvas_edge_hide_threshold',
   canvasEdgeLabelSize: 'nodus_canvas_edge_label_size',
+  canvasHideWikilinkEdges: 'nodus_canvas_hide_wikilink_edges',
+  canvasHideStorylineEdges: 'nodus_canvas_hide_storyline_edges',
   canvasZoomMode: 'nodus_canvas_zoom_mode',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
@@ -323,6 +325,20 @@ export const canvasStorage = {
   },
   setEdgeLabelSize(value: number, workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasEdgeLabelSize, workspaceId), String(value))
+  },
+  // Hide wikilink edges - auto-generated from [[links]] in content
+  getHideWikilinkEdges(workspaceId?: string): boolean {
+    return localStorage.getItem(this._key(KEYS.canvasHideWikilinkEdges, workspaceId)) === 'true'
+  },
+  setHideWikilinkEdges(value: boolean, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasHideWikilinkEdges, workspaceId), String(value))
+  },
+  // Hide storyline edges - edges that connect nodes in a storyline
+  getHideStorylineEdges(workspaceId?: string): boolean {
+    return localStorage.getItem(this._key(KEYS.canvasHideStorylineEdges, workspaceId)) === 'true'
+  },
+  setHideStorylineEdges(value: boolean, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasHideStorylineEdges, workspaceId), String(value))
   },
   // Zoom mode: 'scroll' (default) = two-finger scroll zooms, 'pinch' = only pinch zooms
   getZoomMode(): 'scroll' | 'pinch' {
