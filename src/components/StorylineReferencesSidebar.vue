@@ -121,20 +121,26 @@ function updateWikilinkPositions() {
   if (!props.contentRef) return
 
   const positions = new Map<string, number>()
-  const wikilinks = props.contentRef.querySelectorAll('a.wikilink')
   const containerRect = props.contentRef.getBoundingClientRect()
 
-  wikilinks.forEach((link) => {
-    const target = (link as HTMLElement).dataset.target
-    if (target) {
-      const rect = link.getBoundingClientRect()
-      // Position relative to container + scroll offset
-      const position = rect.top - containerRect.top + props.contentRef!.scrollTop
-      // Store position keyed by target (may have multiple links to same target)
-      if (!positions.has(target)) {
-        positions.set(target, position)
+  // Process each section to match how references are built
+  const sections = props.contentRef.querySelectorAll('[data-node-index]')
+
+  sections.forEach((section) => {
+    const nodeIdx = parseInt(section.getAttribute('data-node-index') || '0', 10)
+    const wikilinks = section.querySelectorAll('a.wikilink')
+
+    wikilinks.forEach((link, linkIdx) => {
+      const target = (link as HTMLElement).dataset.target
+      if (target) {
+        const rect = link.getBoundingClientRect()
+        // Position relative to container + scroll offset
+        const position = rect.top - containerRect.top + props.contentRef!.scrollTop
+        // Key format matches references: nodeIdx-linkIdx-target
+        const key = `${nodeIdx}-${linkIdx}-${target}`
+        positions.set(key, position)
       }
-    }
+    })
   })
 
   wikilinkPositions.value = positions
@@ -178,9 +184,72 @@ onMounted(() => {
   }
 })
 
-// Get position for a reference based on its target
-function getRefTop(target: string): number {
-  return wikilinkPositions.value.get(target) || 0
+// Card heights
+const CARD_HEIGHT_FULL = 90
+const CARD_HEIGHT_COLLAPSED = 28
+const CARD_GAP = 4
+const COLLAPSE_THRESHOLD = 100 // Collapse if natural positions are within this distance
+
+// Track which card is hovered for expansion
+const hoveredKey = ref<string | null>(null)
+
+// Determine which cards should be collapsed based on proximity
+const collapsedCards = computed(() => {
+  const collapsed = new Set<string>()
+
+  const sortedRefs = [...references.value].sort((a, b) => {
+    const posA = wikilinkPositions.value.get(a.key) || 0
+    const posB = wikilinkPositions.value.get(b.key) || 0
+    return posA - posB
+  })
+
+  for (let i = 1; i < sortedRefs.length; i++) {
+    const prevPos = wikilinkPositions.value.get(sortedRefs[i - 1].key) || 0
+    const currPos = wikilinkPositions.value.get(sortedRefs[i].key) || 0
+
+    // If too close to previous, collapse both
+    if (currPos - prevPos < COLLAPSE_THRESHOLD) {
+      collapsed.add(sortedRefs[i - 1].key)
+      collapsed.add(sortedRefs[i].key)
+    }
+  }
+
+  return collapsed
+})
+
+// Calculate positions with collision avoidance
+const adjustedPositions = computed(() => {
+  const positions = new Map<string, number>()
+
+  const sortedRefs = [...references.value].sort((a, b) => {
+    const posA = wikilinkPositions.value.get(a.key) || 0
+    const posB = wikilinkPositions.value.get(b.key) || 0
+    return posA - posB
+  })
+
+  let lastBottom = -Infinity
+
+  for (const ref of sortedRefs) {
+    const naturalTop = wikilinkPositions.value.get(ref.key) || 0
+    const isCollapsed = collapsedCards.value.has(ref.key) && hoveredKey.value !== ref.key
+    const cardHeight = isCollapsed ? CARD_HEIGHT_COLLAPSED : CARD_HEIGHT_FULL
+
+    // Push down if would overlap
+    const adjustedTop = Math.max(naturalTop, lastBottom + CARD_GAP)
+    positions.set(ref.key, adjustedTop)
+    lastBottom = adjustedTop + cardHeight
+  }
+
+  return positions
+})
+
+function isCollapsed(key: string): boolean {
+  return collapsedCards.value.has(key) && hoveredKey.value !== key
+}
+
+// Get position for a reference based on its unique key
+function getRefTop(key: string): number {
+  return adjustedPositions.value.get(key) || 0
 }
 
 // Render markdown preview
@@ -218,12 +287,17 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
         class="reference-card"
         :class="{
           'in-storyline': refItem.isInStoryline,
-          'is-missing': refItem.isMissing
+          'is-missing': refItem.isMissing,
+          'is-collapsed': isCollapsed(refItem.key)
         }"
-        :style="{ top: (getRefTop(refItem.target) - scrollTop) + 'px' }"
+        :style="{ top: (getRefTop(refItem.key) - scrollTop) + 'px' }"
         @click="handleRefClick(refItem)"
       >
-        <div class="ref-header">
+        <div
+          class="ref-header"
+          @mouseenter="hoveredKey = refItem.key"
+          @mouseleave="hoveredKey = null"
+        >
           <Icon v-if="refItem.isMissing" name="alert-circle" :size="12" class="ref-icon missing" />
           <Icon v-else-if="refItem.isInStoryline" name="book-open" :size="12" class="ref-icon storyline" />
           <Icon v-else name="external-link" :size="12" class="ref-icon external" />
@@ -237,11 +311,14 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
             <Icon name="arrow-right" :size="10" />
           </button>
         </div>
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div v-if="refItem.preview && !refItem.isMissing" class="ref-preview" v-html="renderPreview(refItem.preview)"></div>
-        <p v-else-if="refItem.isMissing" class="ref-preview missing-hint">
-          [[{{ refItem.target }}]]
-        </p>
+        <!-- Only show preview when not collapsed -->
+        <template v-if="!isCollapsed(refItem.key)">
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div v-if="refItem.preview && !refItem.isMissing" class="ref-preview" v-html="renderPreview(refItem.preview)"></div>
+          <p v-else-if="refItem.isMissing" class="ref-preview missing-hint">
+            [[{{ refItem.target }}]]
+          </p>
+        </template>
       </div>
     </div>
   </aside>
@@ -274,7 +351,7 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
   padding: 8px 10px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  will-change: top;
+  transition: top 0.15s ease-out, padding 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
 .reference-card:hover {
@@ -403,5 +480,20 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
   font-style: italic;
   color: var(--text-muted);
   font-size: 11px;
+}
+
+/* Collapsed state */
+.reference-card.is-collapsed {
+  padding: 4px 10px;
+}
+
+.reference-card.is-collapsed .ref-header {
+  margin-bottom: 0;
+}
+
+/* Expand on hover with higher z-index */
+.reference-card:has(.ref-header:hover) {
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 </style>

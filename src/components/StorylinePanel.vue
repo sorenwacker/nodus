@@ -8,6 +8,7 @@ import StorylineNodeList from './StorylineNodeList.vue'
 import type { Node, Storyline, EntityNodeType } from '../types'
 import type { ComponentPublicInstance } from 'vue'
 import { ENTITY_NODE_TYPES } from '../types'
+import type { StorylineService } from '../services/storylineService'
 
 const { t } = useI18n()
 
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 const store = useNodesStore()
 const { storylineNodes, storylineNodesVersion } = storeToRefs(store)
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info') => void>('showToast')
+const storylineService = inject<StorylineService>('storylineService')
 
 const selectedStorylineId = ref<string | null>(null)
 const newStorylineTitle = ref('')
@@ -130,7 +132,11 @@ async function deleteStoryline(id: string) {
 async function handleNodeAdd(index: number, nodeId: string) {
   if (!selectedStorylineId.value) return
   try {
-    await store.addNodeToStoryline(selectedStorylineId.value, nodeId, index)
+    if (storylineService) {
+      await storylineService.addNode(selectedStorylineId.value, nodeId, index)
+    } else {
+      await store.addNodeToStoryline(selectedStorylineId.value, nodeId, index)
+    }
     showToast?.('Node added to storyline', 'success')
   } catch (e) {
     console.error('Failed to add node:', e)
@@ -142,7 +148,11 @@ async function handleNodeCreate(index: number, title: string) {
   if (!selectedStorylineId.value) return
   try {
     const node = await store.createNode({ title, markdown_content: '' })
-    await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
+    if (storylineService) {
+      await storylineService.addNode(selectedStorylineId.value, node.id, index)
+    } else {
+      await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
+    }
     showToast?.(`Created "${title}"`, 'success')
   } catch (e) {
     console.error('Failed to create node:', e)
@@ -158,7 +168,11 @@ async function handleCommentCreate(index: number, text: string) {
       node_type: 'comment',
       markdown_content: text,
     })
-    await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
+    if (storylineService) {
+      await storylineService.addNode(selectedStorylineId.value, node.id, index)
+    } else {
+      await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
+    }
     showToast?.('Added comment', 'success')
   } catch (e) {
     console.error('Failed to create comment:', e)
@@ -169,7 +183,11 @@ async function handleCommentCreate(index: number, text: string) {
 async function handleNodeRemove(nodeId: string) {
   if (!selectedStorylineId.value) return
   try {
-    await store.removeNodeFromStoryline(selectedStorylineId.value, nodeId)
+    if (storylineService) {
+      await storylineService.removeNode(selectedStorylineId.value, nodeId)
+    } else {
+      await store.removeNodeFromStoryline(selectedStorylineId.value, nodeId)
+    }
   } catch (e) {
     console.error('Failed to remove node:', e)
   }
@@ -178,7 +196,11 @@ async function handleNodeRemove(nodeId: string) {
 async function handleNodeReorder(nodeIds: string[]) {
   if (!selectedStorylineId.value) return
   try {
-    await store.reorderStorylineNodes(selectedStorylineId.value, nodeIds)
+    if (storylineService) {
+      await storylineService.reorderNodes(selectedStorylineId.value, nodeIds)
+    } else {
+      await store.reorderStorylineNodes(selectedStorylineId.value, nodeIds)
+    }
   } catch (e) {
     console.error('Failed to reorder nodes:', e)
   }
@@ -258,7 +280,11 @@ async function handleNodeDrop(event: Event) {
       // Calculate insertion position from Y coordinate
       let position = calculateDropPosition(y)
       for (const nodeId of nodeIds) {
-        await store.addNodeToStoryline(selectedStorylineId.value, nodeId, position)
+        if (storylineService) {
+          await storylineService.addNode(selectedStorylineId.value, nodeId, position)
+        } else {
+          await store.addNodeToStoryline(selectedStorylineId.value, nodeId, position)
+        }
         position++ // Increment for next node to maintain order
       }
       showToast?.(`Added ${nodeIds.length} node(s) to storyline`, 'success')
@@ -270,7 +296,11 @@ async function handleNodeDrop(event: Event) {
     const firstStoryline = storylines.value[0]
     try {
       for (const nodeId of nodeIds) {
-        await store.addNodeToStoryline(firstStoryline.id, nodeId)
+        if (storylineService) {
+          await storylineService.addNode(firstStoryline.id, nodeId)
+        } else {
+          await store.addNodeToStoryline(firstStoryline.id, nodeId)
+        }
       }
       showToast?.(`Added ${nodeIds.length} node(s) to "${firstStoryline.title}"`, 'success')
       // Auto-select the storyline
