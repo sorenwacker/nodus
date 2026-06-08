@@ -6,8 +6,8 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
-import { renderMarkdown } from '../services/MarkdownRenderService'
 import Icon from './Icon.vue'
+import MarkdownContent from './MarkdownContent.vue'
 import type { Node } from '../types'
 
 interface WikilinkMatch {
@@ -261,12 +261,10 @@ function getRefTop(key: string): number {
   return adjustedPositions.value.get(key) || 0
 }
 
-// Render markdown preview using unified service
-function renderPreview(markdown: string): string {
+// Truncate markdown for preview (MarkdownContent handles rendering)
+function truncatePreview(markdown: string): string {
   if (!markdown) return ''
-  // Take first 200 chars and render
-  const truncated = markdown.slice(0, 200)
-  return renderMarkdown(truncated)
+  return markdown.slice(0, 200)
 }
 
 function handleRefClick(refItem: LinkedReference) {
@@ -322,8 +320,11 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
         </div>
         <!-- Only show preview when not collapsed -->
         <template v-if="!isCollapsed(refItem.key)">
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div v-if="refItem.preview && !refItem.isMissing" class="ref-preview" v-html="renderPreview(refItem.preview)"></div>
+          <MarkdownContent
+            v-if="refItem.preview && !refItem.isMissing"
+            :content="truncatePreview(refItem.preview)"
+            content-class="ref-preview"
+          />
           <p v-else-if="refItem.isMissing" class="ref-preview missing-hint">
             [[{{ refItem.target }}]]
           </p>
