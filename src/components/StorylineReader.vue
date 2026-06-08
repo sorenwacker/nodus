@@ -46,10 +46,11 @@ function startResize(e: PointerEvent) {
   isResizing.value = true
   const startX = e.clientX
   const startWidth = readerWidth.value
+  const maxWidth = window.innerWidth - 350 // Leave room for canvas
 
   const onMove = (e: PointerEvent) => {
     const delta = startX - e.clientX
-    readerWidth.value = Math.max(400, Math.min(1200, startWidth + delta))
+    readerWidth.value = Math.max(300, Math.min(maxWidth, startWidth + delta))
   }
 
   const onUp = () => {
