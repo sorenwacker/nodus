@@ -459,10 +459,10 @@ watch(() => store.currentWorkspaceId, () => {
         </button>
       </header>
 
-      <!-- Drop hint only shows when empty or no specific position calculated -->
-      <div v-if="isDropTarget && dropPreviewIndex === null && selectedStorylineNodes.length === 0" class="drop-hint">
-        <Icon name="plus" :size="24" />
-        <span>Drop to add</span>
+      <!-- Drop hint shows when dragging over - always visible during drag -->
+      <div v-if="isDropTarget" class="drop-hint">
+        <Icon name="plus" :size="28" />
+        <span>Drop here to add</span>
       </div>
 
       <div class="storyline-nodes-list" :class="{ 'external-dragging': isDropTarget }">
@@ -544,10 +544,11 @@ watch(() => store.currentWorkspaceId, () => {
         </div>
       </div>
 
-      <!-- Drop hint for list view -->
-      <div v-if="isDropTarget && storylines.length > 0" class="drop-hint">
+      <!-- Drop hint for list view - show which storyline will receive the drop -->
+      <div v-if="isDropTarget" class="drop-hint">
         <Icon name="plus" :size="24" />
-        <span>Drop to add to "{{ storylines[0].title }}"</span>
+        <span v-if="storylines.length > 0">Drop to add to "{{ storylines[0].title }}"</span>
+        <span v-else>Create a storyline first</span>
       </div>
 
       <!-- Storylines list -->
@@ -618,12 +619,13 @@ watch(() => store.currentWorkspaceId, () => {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .storyline-panel.drop-target {
+  background: rgba(59, 130, 246, 0.08);
   border-color: var(--primary-color);
-  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.3);
+  box-shadow: inset 0 0 0 3px var(--primary-color);
 }
 
 .drop-hint {
@@ -631,15 +633,27 @@ watch(() => store.currentWorkspaceId, () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 24px;
-  margin: 8px;
-  border: 2px dashed var(--primary-color);
-  border-radius: 8px;
-  background: rgba(59, 130, 246, 0.1);
+  gap: 12px;
+  padding: 32px 24px;
+  margin: 12px;
+  border: 3px dashed var(--primary-color);
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.15);
   color: var(--primary-color);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
+  animation: drop-hint-pulse 0.6s ease-in-out infinite;
+}
+
+@keyframes drop-hint-pulse {
+  0%, 100% {
+    transform: scale(1);
+    border-color: var(--primary-color);
+  }
+  50% {
+    transform: scale(1.02);
+    border-color: rgba(59, 130, 246, 0.6);
+  }
 }
 
 .panel-header {
