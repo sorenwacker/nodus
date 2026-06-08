@@ -9,6 +9,7 @@ import { llmStorage } from '../../lib/storage'
 import { providerRegistry } from '../../llm/providers'
 import type { ProviderModel } from '../../llm/providers'
 import { DEFAULT_SYSTEM_PROMPT, DEFAULT_AGENT_PROMPT } from '../../llm/prompts'
+import { notifications$ } from '../../composables/useNotifications'
 
 const { t } = useI18n()
 
@@ -194,6 +195,9 @@ function saveProviderConfig() {
   if (provider) {
     provider.configure(config)
   }
+
+  // Notify canvas of config change
+  window.dispatchEvent(new CustomEvent('nodus-llm-config-change'))
 }
 
 // Save active provider
@@ -202,6 +206,8 @@ function saveActiveProvider() {
   providerRegistry.setActiveProvider(selectedProvider.value)
   apiKeyStatus.value = 'idle'
   fetchModels()
+  // Notify canvas of provider change
+  window.dispatchEvent(new CustomEvent('nodus-llm-config-change'))
 }
 
 // Validate API key
@@ -241,9 +247,13 @@ async function validateApiKey() {
       providerStatus.value = 'online'
       const models = await provider.listModels()
       availableModels.value = models
+      notifications$.success(t('llm.connected', { provider: provider.name }))
+    } else {
+      notifications$.error(t('llm.connectionFailed'))
     }
   } catch {
     apiKeyStatus.value = 'invalid'
+    notifications$.error(t('llm.connectionFailed'))
   }
 }
 

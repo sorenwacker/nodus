@@ -102,6 +102,8 @@
       "notConnected": "Non connesso",
       "checking": "Verifica..."
     },
+    "connected": "Connesso a {provider}",
+    "connectionFailed": "Connessione al provider fallita",
     "streaming": {
       "label": "Abilita streaming",
       "hint": "Trasmetti le risposte token per token (richiede supporto del provider)"

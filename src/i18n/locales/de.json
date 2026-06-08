@@ -102,6 +102,8 @@
       "notConnected": "Nicht verbunden",
       "checking": "Prüfe..."
     },
+    "connected": "Verbunden mit {provider}",
+    "connectionFailed": "Verbindung zum Anbieter fehlgeschlagen",
     "streaming": {
       "label": "Streaming aktivieren",
       "hint": "Antworten Token für Token streamen (erfordert Anbieterunterstützung)"

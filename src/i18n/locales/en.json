@@ -103,6 +103,8 @@
       "notConnected": "Not connected",
       "checking": "Checking..."
     },
+    "connected": "Connected to {provider}",
+    "connectionFailed": "Failed to connect to provider",
     "streaming": {
       "label": "Enable Streaming",
       "hint": "Stream responses token-by-token (requires provider support)"

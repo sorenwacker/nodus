@@ -229,6 +229,22 @@ export const llmStorage = {
   setLLMStreaming(value: boolean): void {
     localStorage.setItem(KEYS.llmStreaming, String(value))
   },
+  /**
+   * Check if LLM is configured based on provider requirements.
+   * - Ollama: always configured (no API key required)
+   * - OpenAI-compatible: always configured (API key optional)
+   * - OpenAI/Anthropic: configured only if API key is set
+   */
+  isLLMConfigured(): boolean {
+    const provider = this.getProvider()
+    // Providers that don't require API keys
+    if (provider === 'ollama' || provider === 'openai-compatible') {
+      return true
+    }
+    // Check if API key is set for providers that require it
+    const config = this.getProviderConfig(provider)
+    return Boolean(config.apiKey)
+  },
 }
 
 /**

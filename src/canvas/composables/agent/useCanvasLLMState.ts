@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { llmStorage } from '../../../lib/storage'
 
 /**
@@ -18,8 +18,18 @@ export function useCanvasLLMState() {
   // LLM feature toggle (persisted)
   const llmEnabled = ref(llmStorage.getLLMEnabled())
 
+  // LLM configuration status (reactive to storage changes)
+  const llmConfigured = ref(llmStorage.isLLMConfigured())
+
+  // Combined: show AI bar only if enabled AND configured
+  const showLLMBar = computed(() => llmEnabled.value && llmConfigured.value)
+
   function clearGraphPrompt() {
     graphPrompt.value = ''
+  }
+
+  function refreshLLMConfigured() {
+    llmConfigured.value = llmStorage.isLLMConfigured()
   }
 
   return {
@@ -32,8 +42,11 @@ export function useCanvasLLMState() {
     // Panel visibility
     showAgentLogPanel,
     llmEnabled,
+    llmConfigured,
+    showLLMBar,
 
     // Helpers
     clearGraphPrompt,
+    refreshLLMConfigured,
   }
 }
