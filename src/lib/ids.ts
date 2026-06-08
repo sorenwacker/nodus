@@ -1,13 +1,14 @@
 /**
  * Short ID Generator
  *
- * Generates 10-character alphanumeric IDs using crypto.getRandomValues.
- * With 62^10 possibilities (~839 quadrillion), collision probability
- * is negligible even for 1M+ nodes per workspace.
+ * Generates 8-character alphanumeric IDs using crypto.getRandomValues.
+ * IDs are workspace-scoped (unique within a workspace, not globally).
+ * With 62^8 possibilities (~218 trillion), collision probability
+ * is negligible for typical workspace sizes.
  */
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-const ID_LENGTH = 10
+const ID_LENGTH = 8 // Workspace-scoped: only needs uniqueness within workspace
 
 /**
  * Generate a short random ID (10 alphanumeric characters)
@@ -27,10 +28,10 @@ export function generateShortId(): string {
 }
 
 /**
- * Check if a string looks like a short ID (10 alphanumeric chars)
+ * Check if a string looks like a short ID (8 alphanumeric chars)
  */
 export function isShortId(id: string): boolean {
-  return /^[A-Za-z0-9]{10}$/.test(id)
+  return /^[A-Za-z0-9]{8}$/.test(id)
 }
 
 /**
