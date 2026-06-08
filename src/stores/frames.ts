@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '../lib/tauri'
 import { storeLogger } from '../lib/logger'
+import { generateShortId } from '../lib/ids'
 import type { Frame } from '../types'
 import { clampCoord, clampFrameSize } from '../lib/geometry'
 
@@ -67,7 +68,7 @@ export const useFramesStore = defineStore('frames', () => {
     parentFrameId: string | null = null
   ): Frame {
     const frame: Frame = {
-      id: crypto.randomUUID(),
+      id: generateShortId(),
       title,
       parent_frame_id: parentFrameId,
       canvas_x: x,
@@ -120,7 +121,7 @@ export const useFramesStore = defineStore('frames', () => {
     parentFrameId: string | null = null
   ): Promise<Frame> {
     const frame: Frame = {
-      id: crypto.randomUUID(),
+      id: generateShortId(),
       title,
       parent_frame_id: parentFrameId,
       canvas_x: x,
