@@ -295,6 +295,9 @@ export function createMcpMessageHandler(
       case 'get_orphan_nodes':
         return handleGetOrphanNodes()
 
+      case 'get_connected_components':
+        return handleGetConnectedComponents()
+
       case 'get_leaf_nodes':
         return handleGetLeafNodes()
 
@@ -685,6 +688,83 @@ export function createMcpMessageHandler(
     return store.getFilteredNodes()
       .filter((node) => !connectedIds.has(node.id))
       .map((node) => ({ id: node.id, title: node.title }))
+  }
+
+  function handleGetConnectedComponents(): {
+    component_count: number
+    components: Array<{
+      size: number
+      nodes?: Array<{ id: string; title: string }>
+      sample_nodes?: Array<{ id: string; title: string }>
+    }>
+  } {
+    const nodes = store.getFilteredNodes()
+    const edges = store.getFilteredEdges()
+
+    // Build adjacency list (treat all edges as undirected for connectivity)
+    const adjacency = new Map<string, Set<string>>()
+    for (const node of nodes) {
+      adjacency.set(node.id, new Set())
+    }
+    for (const edge of edges) {
+      adjacency.get(edge.source_node_id)?.add(edge.target_node_id)
+      adjacency.get(edge.target_node_id)?.add(edge.source_node_id)
+    }
+
+    // Find connected components using BFS
+    const visited = new Set<string>()
+    const components: Array<string[]> = []
+
+    for (const node of nodes) {
+      if (visited.has(node.id)) continue
+
+      // BFS to find all nodes in this component
+      const component: string[] = []
+      const queue = [node.id]
+      visited.add(node.id)
+
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        component.push(current)
+
+        const neighbors = adjacency.get(current) || new Set()
+        for (const neighbor of neighbors) {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor)
+            queue.push(neighbor)
+          }
+        }
+      }
+
+      components.push(component)
+    }
+
+    // Sort components by size (largest first)
+    components.sort((a, b) => b.length - a.length)
+
+    // Format response
+    const formattedComponents = components.map((component) => {
+      const nodeInfos = component.map((id) => {
+        const n = store.getNode(id)
+        return { id, title: n?.title || 'Unknown' }
+      })
+
+      // For small components (<=10 nodes), include all nodes
+      // For larger components, include only sample nodes
+      if (component.length <= 10) {
+        return { size: component.length, nodes: nodeInfos }
+      } else {
+        return {
+          size: component.length,
+          sample_nodes: nodeInfos.slice(0, 5),
+        }
+      }
+    })
+
+    return {
+      component_count: components.length,
+      components: formattedComponents,
+    }
   }
 
   function handleGetLeafNodes(): Array<{ id: string; title: string }> {
