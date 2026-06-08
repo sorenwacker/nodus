@@ -37,28 +37,9 @@ const contentRef = ref<HTMLElement | null>(null)
 const showToc = ref(true) // Show contents sidebar
 const showEntitySidebar = ref(false)
 const showReferencesSidebar = ref(false) // Hidden by default - optional
-const isEditMode = ref(false)
-const editingNodeId = ref<string | null>(null)
-const editContent = ref('')
-
-function toggleEditMode() {
-  isEditMode.value = !isEditMode.value
-  if (!isEditMode.value && editingNodeId.value) {
-    // Save on exit
-    saveEditContent()
-  }
-}
-
-function startEditing(node: Node) {
-  editingNodeId.value = node.id
-  editContent.value = node.markdown_content || ''
-}
-
-async function saveEditContent() {
-  if (editingNodeId.value && editContent.value !== undefined) {
-    await store.updateNodeContent(editingNodeId.value, editContent.value)
-    editingNodeId.value = null
-  }
+// Open detail modal for editing a node
+function openNodeDetail(nodeId: string) {
+  window.dispatchEvent(new CustomEvent('open-node-detail', { detail: { nodeId } }))
 }
 
 // Resizable width
@@ -268,8 +249,12 @@ async function handleNodeRemove(nodeId: string) {
 async function handleNodeReorder(nodeIds: string[]) {
   if (!storyline.value) return
   try {
-    await store.reorderStorylineNodes(storyline.value.id, nodeIds)
-    nodes.value = await store.getStorylineNodes(props.storylineId)
+    // Reorder local nodes array to match new order (trust optimistic update)
+    const nodeMap = new Map(nodes.value.map(n => [n.id, n]))
+    const reorderedNodes = nodeIds.map(id => nodeMap.get(id)).filter((n): n is Node => !!n)
+    nodes.value = reorderedNodes
+    // Persist to backend (don't wait for response to avoid flicker)
+    store.reorderStorylineNodes(storyline.value.id, nodeIds)
   } catch (e) {
     console.error('Failed to reorder nodes:', e)
   }
@@ -384,12 +369,10 @@ function panToEntity(entityId: string) {
         :has-entities="hasEntities"
         :show-entity-sidebar="showEntitySidebar"
         :show-references-sidebar="showReferencesSidebar"
-        :is-edit-mode="isEditMode"
         @close="$emit('close')"
         @toggle-toc="showToc = !showToc"
         @toggle-entities="showEntitySidebar = !showEntitySidebar"
         @toggle-references="showReferencesSidebar = !showReferencesSidebar"
-        @toggle-edit="toggleEditMode"
       />
 
       <div class="reader-body">
@@ -475,37 +458,20 @@ function panToEntity(entityId: string) {
                 :id="`node-${index}`"
                 :data-node-index="index"
                 class="node-section"
-                :class="{ 'is-editing': editingNodeId === node.id }"
               >
                 <header class="section-header">
                   <span
-                    class="section-number"
-                    :class="{ clickable: editingNodeId !== node.id }"
-                    :title="editingNodeId !== node.id ? 'Click to edit' : ''"
-                    @click="editingNodeId !== node.id && startEditing(node)"
+                    class="section-number clickable"
+                    title="Click to edit"
+                    @click="openNodeDetail(node.id)"
                   >
                     <span class="section-num-text">{{ index + 1 }}</span>
-                    <Icon v-if="editingNodeId !== node.id" name="edit" :size="12" class="edit-hint" />
+                    <Icon name="edit" :size="12" class="edit-hint" />
                   </span>
                   <h2 class="section-title">{{ node.title }}</h2>
-                  <button
-                    v-if="editingNodeId === node.id"
-                    class="save-section-btn"
-                    @click="saveEditContent"
-                  >
-                    Save
-                  </button>
                 </header>
-                <!-- Edit mode: textarea -->
-                <textarea
-                  v-if="isEditMode && editingNodeId === node.id"
-                  v-model="editContent"
-                  class="section-editor"
-                  @blur="saveEditContent"
-                ></textarea>
-                <!-- View mode: rendered content -->
                 <!-- eslint-disable-next-line vue/no-v-html -->
-                <div v-else class="section-content" @click="handleContentClick" v-html="getRenderedContent(node.id) || ''"></div>
+                <div class="section-content" @click="handleContentClick" v-html="getRenderedContent(node.id) || ''"></div>
               </article>
             </template>
           </template>
@@ -1019,63 +985,6 @@ function panToEntity(entityId: string) {
   height: auto;
   border-radius: 8px;
   margin: 1em 0;
-}
-
-/* Edit mode styles */
-.node-section.is-editing {
-  background: rgba(59, 130, 246, 0.05);
-  border-radius: 8px;
-  padding: 16px;
-  margin: -16px;
-  margin-bottom: 48px;
-}
-
-.edit-section-btn,
-.save-section-btn {
-  margin-left: auto;
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-}
-
-.edit-section-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-main);
-}
-
-.save-section-btn {
-  background: var(--success-color, #22c55e);
-  border-color: var(--success-color, #22c55e);
-  color: white;
-}
-
-.save-section-btn:hover {
-  opacity: 0.9;
-}
-
-.section-editor {
-  width: 100%;
-  min-height: 300px;
-  padding: 16px;
-  font-family: inherit;
-  font-size: 16px;
-  line-height: 1.7;
-  color: var(--text-main);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  resize: vertical;
-}
-
-.section-editor:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* Reduced motion preference */
