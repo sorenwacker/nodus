@@ -11,9 +11,10 @@
   flex-direction: column;
   min-height: calc(60px * var(--zoom-scale, 1));
   z-index: 1;
-  /* Crisp text - nodes rendered at native resolution */
-  -webkit-font-smoothing: subpixel-antialiased;
-  -moz-osx-font-smoothing: auto;
+  /* Cross-platform text rendering - use grayscale antialiasing to avoid
+     RGB subpixel fringing on Linux and ensure consistent appearance */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   /* Re-enable pointer events (parent has none) */
   pointer-events: auto;
@@ -75,6 +76,7 @@
   /* Allow wrapping to 3 lines max */
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   /* Prevent mid-word breaks - only break at spaces */
@@ -275,7 +277,7 @@
   border: none;
   background: transparent;
   color: var(--text-main);
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-family: ui-monospace, 'SF Mono', Menlo, 'DejaVu Sans Mono', 'Ubuntu Mono', 'Liberation Mono', 'Consolas', monospace;
   font-size: calc(13px * var(--font-scale, 1) * var(--zoom-scale, 1));
   line-height: 1.5;
   resize: none;

@@ -344,7 +344,7 @@
   border-radius: 6px;
   font-size: calc(12px * var(--font-scale, 1));
   line-height: 1.5;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-family: ui-monospace, 'SF Mono', Menlo, 'DejaVu Sans Mono', 'Ubuntu Mono', 'Liberation Mono', 'Consolas', monospace;
   background: var(--bg-surface-alt);
   color: var(--text-main);
   resize: vertical;
@@ -413,7 +413,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 8px 12px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-family: ui-monospace, 'SF Mono', Menlo, 'DejaVu Sans Mono', 'Ubuntu Mono', 'Liberation Mono', 'Consolas', monospace;
   font-size: calc(11px * var(--font-scale, 1));
   line-height: 1.5;
   color: var(--text-main);

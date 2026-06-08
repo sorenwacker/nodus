@@ -181,6 +181,10 @@ function getArrowMarkerId(color: string): string {
   text-anchor: middle;
   pointer-events: none;
   user-select: none;
+  /* Disable subpixel anti-aliasing to prevent RGB fringing on Linux */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
 }
 
 .edge-glow {
