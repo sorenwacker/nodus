@@ -684,8 +684,8 @@ function onDropEnd(e: DragEvent) {
   display: none;
   padding: 8px 12px 12px 44px;
   background: var(--bg-elevated);
-  border-radius: 0 0 6px 6px;
-  margin-top: -4px;
+  border-radius: 6px;
+  margin-top: 4px;
   border-left: 2px solid var(--border-default);
   margin-left: 8px;
   margin-right: 8px;
@@ -713,8 +713,8 @@ function onDropEnd(e: DragEvent) {
 .node-content-preview {
   padding: 8px 12px 12px 44px;
   background: var(--bg-elevated);
-  border-radius: 0 0 6px 6px;
-  margin-top: -4px;
+  border-radius: 6px;
+  margin-top: 4px;
   border-left: 2px solid var(--primary-color);
   margin-left: 8px;
   margin-right: 8px;

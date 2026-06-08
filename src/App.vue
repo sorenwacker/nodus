@@ -656,11 +656,11 @@ async function openFolderDialog() {
     </div>
 
     <main class="main-content">
+      <PixiCanvas />
       <StorylinePanel
         v-if="showStorylinePanel"
         @open-reader="(id) => readerStorylineId = id"
       />
-      <PixiCanvas />
     </main>
 
     <!-- Storyline Reader (fullscreen) -->
