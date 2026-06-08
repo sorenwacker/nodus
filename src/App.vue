@@ -37,6 +37,14 @@ const { searchQuery, showSearch, searchResults, toggleSearch, closeSearch, selec
 const currentTheme = computed(() => themesStore.currentThemeName)
 const showStorylinePanel = ref(false)
 const readerStorylineId = ref<string | null>(null)
+
+function toggleStorylinePanel() {
+  showStorylinePanel.value = !showStorylinePanel.value
+  // Close reader when hiding the panel
+  if (!showStorylinePanel.value) {
+    readerStorylineId.value = null
+  }
+}
 const mcpPendingConnectionId = ref<string | null>(null)
 const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
@@ -596,9 +604,9 @@ async function openFolderDialog() {
       <div class="toolbar-actions">
         <button
           class="icon-btn"
-          :class="{ active: showStorylinePanel }"
+          :class="{ active: showStorylinePanel || readerStorylineId }"
           :data-tooltip="t('toolbar.storylines')"
-          @click="showStorylinePanel = !showStorylinePanel"
+          @click="toggleStorylinePanel"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>

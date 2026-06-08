@@ -559,7 +559,7 @@ watch(() => store.currentWorkspaceId, () => {
           class="storyline-list-item"
           @click="selectStoryline(storyline.id)"
         >
-          <Icon name="book" :size="16" class="storyline-icon" />
+          <Icon name="book" :size="12" class="storyline-icon" />
 
           <template v-if="editingStorylineId === storyline.id">
             <input
@@ -660,15 +660,14 @@ watch(() => store.currentWorkspaceId, () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 16px 16px 8px;
+  padding: 12px 16px;
+  height: 52px;
   box-sizing: border-box;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .storyline-view-header {
-  padding: 8px 16px;
-  height: 52px;
-  border-bottom: 1px solid var(--border-default);
-  background: var(--bg-surface);
+  /* Same as base, just reaffirming height */
 }
 
 .back-btn {
@@ -809,8 +808,15 @@ watch(() => store.currentWorkspaceId, () => {
 }
 
 .storyline-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background: var(--primary-color);
+  border-radius: 50%;
   flex-shrink: 0;
-  color: var(--text-muted);
 }
 
 .storyline-title {
@@ -834,9 +840,10 @@ watch(() => store.currentWorkspaceId, () => {
 
 .node-count {
   font-size: 11px;
+  font-weight: 500;
   color: var(--text-muted);
-  background: var(--bg-surface);
-  padding: 2px 6px;
+  background: var(--bg-elevated);
+  padding: 2px 8px;
   border-radius: 10px;
 }
 
