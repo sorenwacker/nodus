@@ -136,27 +136,31 @@ export const useStorylinesStore = defineStore('storylines', () => {
         }
       }
 
-      // Create edge from previous node
+      // Create edge from previous node (skip if same node to prevent self-loop)
       if (insertPosition > 0) {
         const prevNodeId = nodeIds[insertPosition - 1]
-        const edgeExists = deps.getEdges().some(
-          e => (e.source_node_id === prevNodeId && e.target_node_id === nodeId) ||
-               (e.source_node_id === nodeId && e.target_node_id === prevNodeId)
-        )
-        if (!edgeExists) {
-          await deps.createEdge({ source_node_id: prevNodeId, target_node_id: nodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+        if (prevNodeId !== nodeId) {
+          const edgeExists = deps.getEdges().some(
+            e => (e.source_node_id === prevNodeId && e.target_node_id === nodeId) ||
+                 (e.source_node_id === nodeId && e.target_node_id === prevNodeId)
+          )
+          if (!edgeExists) {
+            await deps.createEdge({ source_node_id: prevNodeId, target_node_id: nodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+          }
         }
       }
 
-      // If inserting in middle, create edge to next node
+      // If inserting in middle, create edge to next node (skip if same node)
       if (position !== undefined && position < nodeIds.length) {
         const nextNodeId = nodeIds[position]
-        const edgeExists = deps.getEdges().some(
-          e => (e.source_node_id === nodeId && e.target_node_id === nextNodeId) ||
-               (e.source_node_id === nextNodeId && e.target_node_id === nodeId)
-        )
-        if (!edgeExists) {
-          await deps.createEdge({ source_node_id: nodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+        if (nextNodeId !== nodeId) {
+          const edgeExists = deps.getEdges().some(
+            e => (e.source_node_id === nodeId && e.target_node_id === nextNodeId) ||
+                 (e.source_node_id === nextNodeId && e.target_node_id === nodeId)
+          )
+          if (!edgeExists) {
+            await deps.createEdge({ source_node_id: nodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
+          }
         }
       }
 
