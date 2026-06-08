@@ -612,9 +612,9 @@ watch(() => store.currentWorkspaceId, () => {
 
 <style scoped>
 .storyline-panel {
-  width: 280px;
+  width: 260px;
   height: 100%;
-  background: var(--bg-surface-alt);
+  background: var(--bg-surface);
   border-right: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
@@ -660,28 +660,29 @@ watch(() => store.currentWorkspaceId, () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 14px;
-  height: 48px;
+  padding: 16px 16px 8px;
   box-sizing: border-box;
+}
+
+.storyline-view-header {
+  padding: 8px 16px;
+  height: 52px;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-surface);
 }
 
-.storyline-view-header {
-  gap: 10px;
-}
-
 .back-btn {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  background: var(--bg-surface-alt);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.1s, color 0.1s;
 }
 
 .back-btn:hover {
@@ -691,35 +692,45 @@ watch(() => store.currentWorkspaceId, () => {
 
 .panel-title {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.storyline-view-header .panel-title {
+  font-size: 14px;
+  color: var(--text-main);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .add-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-surface);
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
 }
 
 .add-btn:hover {
   background: var(--bg-elevated);
-  color: var(--text-main);
+  color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .new-storyline {
-  padding: 12px;
-  border-bottom: 1px solid var(--border-default);
+  padding: 12px 16px;
   background: var(--bg-surface);
 }
 
@@ -772,7 +783,9 @@ watch(() => store.currentWorkspaceId, () => {
 .storylines-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 0 8px 16px;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .storyline-list-item {
@@ -780,14 +793,19 @@ watch(() => store.currentWorkspaceId, () => {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  margin-bottom: 4px;
-  transition: background 0.1s;
+  margin-bottom: 2px;
+  background: var(--bg-surface);
+  transition: background 0.1s, transform 0.15s;
 }
 
 .storyline-list-item:hover {
   background: var(--bg-elevated);
+}
+
+.storyline-list-item:active {
+  transform: scale(0.98);
 }
 
 .storyline-icon {
@@ -834,26 +852,29 @@ watch(() => store.currentWorkspaceId, () => {
 }
 
 .icon-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
 }
 
 .icon-btn:hover {
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
   color: var(--text-main);
 }
 
 .icon-btn.danger:hover {
-  background: var(--danger-bg);
-  color: var(--danger-color);
+  background: var(--danger-bg, rgba(239, 68, 68, 0.1));
+  border-color: var(--danger-color, #ef4444);
+  color: var(--danger-color, #ef4444);
 }
 
 /* Color picker */
@@ -886,8 +907,10 @@ watch(() => store.currentWorkspaceId, () => {
 .storyline-nodes-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 0 8px 16px;
   padding-bottom: 320px; /* Space for dropdown to be visible when at bottom */
+  min-height: 0;
+  overscroll-behavior: contain;
   transition: background 0.15s ease;
 }
 
@@ -937,13 +960,14 @@ watch(() => store.currentWorkspaceId, () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
   text-align: left;
+  transition: background 0.1s, color 0.1s;
 }
 
 .entity-summary-toggle:hover {
@@ -952,7 +976,7 @@ watch(() => store.currentWorkspaceId, () => {
 }
 
 .entity-summary-content {
-  padding: 8px 14px;
+  padding: 8px 16px 12px;
   border-top: 1px solid var(--border-default);
 }
 
