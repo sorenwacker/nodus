@@ -97,7 +97,9 @@ async function copyLog(log: string[]) {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 12px 16px;
+  padding: 8px 16px;
+  height: 52px;
+  box-sizing: border-box;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
   flex-shrink: 0;
