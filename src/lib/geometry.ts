@@ -3,8 +3,9 @@
  * Shared functions for coordinate and size validation/clamping
  */
 
-// Canvas bounds
-export const MAX_CANVAS_COORD = 100_000
+// Canvas bounds - large enough for hierarchical layouts with many levels
+// (e.g., 1000 levels * 360px spacing = 360,000px)
+export const MAX_CANVAS_COORD = 1_000_000
 export const MIN_NODE_SIZE = 50
 export const MAX_NODE_SIZE = 5_000
 export const MIN_FRAME_SIZE = 50

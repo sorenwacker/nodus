@@ -91,6 +91,7 @@ export function isNodeCenterInFrame(
  * Push nodes fully out of frame boundaries after layout calculation.
  * Ensures no part of a node overlaps with frames.
  * Iterates until no more overlaps occur (handles adjacent frames).
+ * Spreads out nodes that end up at the same position to avoid stacking.
  */
 export function pushNodesOutOfFrames(
   positions: Map<string, { x: number; y: number }>,
@@ -103,18 +104,23 @@ export function pushNodesOutOfFrames(
   const framePadding = 30 // Gap between node edge and frame edge
   const maxIterations = 10 // Prevent infinite loops
 
+  // Track nodes pushed to each edge for spreading
+  const edgePushes = new Map<string, string[]>() // "frameId-direction" -> nodeIds
+
   for (const [nodeId, pos] of positions) {
     const nodeInfo = nodeMap.get(nodeId)
     const nodeWidth = nodeInfo?.width || NODE_DEFAULTS.WIDTH
     const nodeHeight = nodeInfo?.height || NODE_DEFAULTS.HEIGHT
     let newX = pos.x
     let newY = pos.y
+    let pushEdgeKey: string | null = null
 
     // Iterate until no overlaps or max iterations reached
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       let hasOverlap = false
 
-      for (const frame of frames) {
+      for (let frameIdx = 0; frameIdx < frames.length; frameIdx++) {
+        const frame = frames[frameIdx]
         const nodeRight = newX + nodeWidth
         const nodeBottom = newY + nodeHeight
         const frameRight = frame.canvas_x + frame.width
@@ -137,12 +143,16 @@ export function pushNodesOutOfFrames(
           const minPush = Math.min(pushLeft, pushRight, pushUp, pushDown)
           if (minPush === pushLeft) {
             newX = frame.canvas_x - nodeWidth - framePadding
+            pushEdgeKey = `${frameIdx}-left`
           } else if (minPush === pushRight) {
             newX = frameRight + framePadding
+            pushEdgeKey = `${frameIdx}-right`
           } else if (minPush === pushUp) {
             newY = frame.canvas_y - nodeHeight - framePadding
+            pushEdgeKey = `${frameIdx}-up`
           } else {
             newY = frameBottom + framePadding
+            pushEdgeKey = `${frameIdx}-down`
           }
         }
       }
@@ -152,6 +162,50 @@ export function pushNodesOutOfFrames(
     }
 
     result.set(nodeId, { x: newX, y: newY })
+
+    // Track which edge this node was pushed to
+    if (pushEdgeKey) {
+      if (!edgePushes.has(pushEdgeKey)) {
+        edgePushes.set(pushEdgeKey, [])
+      }
+      edgePushes.get(pushEdgeKey)!.push(nodeId)
+    }
+  }
+
+  // Spread out nodes pushed to the same edge
+  const nodeSpacing = 40
+  for (const [edgeKey, nodeIds] of edgePushes) {
+    if (nodeIds.length <= 1) continue
+
+    const direction = edgeKey.split('-')[1]
+    const isHorizontalEdge = direction === 'left' || direction === 'right'
+
+    // Sort nodes by their perpendicular position to maintain relative order
+    nodeIds.sort((a, b) => {
+      const posA = result.get(a)!
+      const posB = result.get(b)!
+      return isHorizontalEdge ? posA.y - posB.y : posA.x - posB.x
+    })
+
+    // Spread nodes along the perpendicular axis
+    for (let i = 0; i < nodeIds.length; i++) {
+      const nodeId = nodeIds[i]
+      const pos = result.get(nodeId)!
+      const nodeInfo = nodeMap.get(nodeId)
+      const nodeSize = isHorizontalEdge
+        ? (nodeInfo?.height || NODE_DEFAULTS.HEIGHT)
+        : (nodeInfo?.width || NODE_DEFAULTS.WIDTH)
+
+      // Calculate offset from center of the group
+      const centerIdx = (nodeIds.length - 1) / 2
+      const offset = (i - centerIdx) * (nodeSize + nodeSpacing)
+
+      if (isHorizontalEdge) {
+        result.set(nodeId, { x: pos.x, y: pos.y + offset })
+      } else {
+        result.set(nodeId, { x: pos.x + offset, y: pos.y })
+      }
+    }
   }
 
   return result
