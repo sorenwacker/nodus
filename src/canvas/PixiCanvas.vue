@@ -1072,6 +1072,7 @@ const layout = useLayout({
     getNode: store.getNode,
     updateNodePosition: store.updateNodePosition,
     updateFramePosition: store.updateFramePosition,
+    updateFrameSize: store.updateFrameSize,
     layoutNodes: store.layoutNodes,
   },
   viewState: {

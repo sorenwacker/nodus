@@ -53,6 +53,7 @@ interface Store {
   getNode: (id: string) => Node | undefined
   updateNodePosition: (id: string, x: number, y: number) => void
   updateFramePosition: (id: string, x: number, y: number) => void
+  updateFrameSize: (id: string, width: number, height: number) => void
   layoutNodes: (nodeIds?: string[], options?: { centerX: number; centerY: number }) => Promise<void>
 }
 
@@ -167,7 +168,8 @@ function processFrameAwareLayoutResults(
   positions: Map<string, { x: number; y: number }>,
   frameSnapshot: Map<string, { x: number; y: number }>,
   updateFramePosition: (id: string, x: number, y: number) => void,
-  pushOutOfFrames: (targets: Map<string, { x: number; y: number }>, nodeSizes: Map<string, NodeSize>) => Map<string, { x: number; y: number }>
+  pushOutOfFrames: (targets: Map<string, { x: number; y: number }>, nodeSizes: Map<string, NodeSize>) => Map<string, { x: number; y: number }>,
+  updateFrameSize?: (id: string, width: number, height: number) => void
 ): Map<string, { x: number; y: number }> {
   const { virtualNodes, allFrames, frameNodes, frameId, nodes, targetFrame } = ctx
 
@@ -208,9 +210,78 @@ function processFrameAwareLayoutResults(
     }
   }
 
-  // Apply frame constraints
-  if (frameId) {
-    // Frame-scoped: constrain nodes to stay inside the frame
+  // Handle frame-scoped layout
+  if (frameId && targetFrame && updateFrameSize) {
+    // Instead of constraining nodes, expand the frame to fit the layout
+    const padding = 30
+    const nodeSizes = new Map(nodes.map(n => [n.id, { width: n.width || NODE_DEFAULTS.WIDTH, height: n.height || NODE_DEFAULTS.HEIGHT }]))
+
+    // Calculate bounding box of all node positions
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const [nodeId, pos] of nodeTargets) {
+      const size = nodeSizes.get(nodeId)
+      if (!size) continue
+      minX = Math.min(minX, pos.x)
+      minY = Math.min(minY, pos.y)
+      maxX = Math.max(maxX, pos.x + size.width)
+      maxY = Math.max(maxY, pos.y + size.height)
+    }
+
+    if (Number.isFinite(minX) && Number.isFinite(minY)) {
+      // Calculate required frame bounds with padding
+      const requiredLeft = minX - padding
+      const requiredTop = minY - padding
+      const requiredRight = maxX + padding
+      const requiredBottom = maxY + padding
+
+      // Expand frame if needed (never shrink)
+      let newFrameX = targetFrame.canvas_x
+      let newFrameY = targetFrame.canvas_y
+      let newFrameWidth = targetFrame.width
+      let newFrameHeight = targetFrame.height
+
+      // Expand left
+      if (requiredLeft < targetFrame.canvas_x) {
+        const expandBy = targetFrame.canvas_x - requiredLeft
+        newFrameX = requiredLeft
+        newFrameWidth += expandBy
+      }
+
+      // Expand top
+      if (requiredTop < targetFrame.canvas_y) {
+        const expandBy = targetFrame.canvas_y - requiredTop
+        newFrameY = requiredTop
+        newFrameHeight += expandBy
+      }
+
+      // Expand right
+      const currentRight = newFrameX + newFrameWidth
+      if (requiredRight > currentRight) {
+        newFrameWidth = requiredRight - newFrameX
+      }
+
+      // Expand bottom
+      const currentBottom = newFrameY + newFrameHeight
+      if (requiredBottom > currentBottom) {
+        newFrameHeight = requiredBottom - newFrameY
+      }
+
+      // Apply frame changes
+      const posChanged = newFrameX !== targetFrame.canvas_x || newFrameY !== targetFrame.canvas_y
+      const sizeChanged = newFrameWidth !== targetFrame.width || newFrameHeight !== targetFrame.height
+
+      if (posChanged) {
+        updateFramePosition(frameId, newFrameX, newFrameY)
+      }
+      if (sizeChanged) {
+        updateFrameSize(frameId, newFrameWidth, newFrameHeight)
+      }
+    }
+
+    // Return positions as-is (frame expanded to fit, no node constraint needed)
+    return nodeTargets
+  } else if (frameId) {
+    // Frame-scoped but no updateFrameSize available - fall back to constraint
     return targetFrame
       ? constrainNodesToFrame(nodeTargets, new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }])), targetFrame)
       : nodeTargets
@@ -291,10 +362,11 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   /**
-   * Constrain all nodes with frame_id to be positioned inside their assigned frames.
-   * Called after layout to ensure framed nodes stay in bounds.
+   * Expand frames to fit their assigned nodes after layout.
+   * Called after layout to ensure frames contain all their nodes.
+   * Previously this constrained nodes to frames, but that created barriers.
    */
-  async function constrainFramedNodesToTheirFrames(): Promise<void> {
+  async function expandFramesToFitNodes(): Promise<void> {
     const allNodes = store.getFilteredNodes()
     const allFrames = store.getFilteredFrames()
     const frameMap = new Map(allFrames.map(f => [f.id, f]))
@@ -310,28 +382,73 @@ export function useLayout(options: UseLayoutOptions) {
       }
     }
 
-    // For each frame, constrain its assigned nodes
-    const allUpdates = new Map<string, { x: number; y: number }>()
+    const padding = 30
 
+    // For each frame, expand it to fit all its nodes
     for (const [frameId, nodes] of nodesByFrame) {
       const frame = frameMap.get(frameId)!
-      const positions = new Map(nodes.map(n => [n.id, { x: n.canvas_x, y: n.canvas_y }]))
-      const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
 
-      const constrained = constrainNodesToFrame(positions, nodeMap, frame)
-
-      // Only include nodes that actually moved
-      for (const [nodeId, pos] of constrained) {
-        const node = nodes.find(n => n.id === nodeId)
-        if (node && (Math.abs(node.canvas_x - pos.x) > 1 || Math.abs(node.canvas_y - pos.y) > 1)) {
-          allUpdates.set(nodeId, pos)
-        }
+      // Calculate bounding box of all nodes in this frame
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (const node of nodes) {
+        const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+        const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+        minX = Math.min(minX, node.canvas_x)
+        minY = Math.min(minY, node.canvas_y)
+        maxX = Math.max(maxX, node.canvas_x + nodeWidth)
+        maxY = Math.max(maxY, node.canvas_y + nodeHeight)
       }
-    }
 
-    // Apply all updates
-    if (allUpdates.size > 0) {
-      await batchUpdatePositions(allUpdates, store.updateNodePosition, 50)
+      if (!Number.isFinite(minX)) continue
+
+      // Calculate required frame bounds with padding
+      const requiredLeft = minX - padding
+      const requiredTop = minY - padding
+      const requiredRight = maxX + padding
+      const requiredBottom = maxY + padding
+
+      // Expand frame if needed (never shrink)
+      let newFrameX = frame.canvas_x
+      let newFrameY = frame.canvas_y
+      let newFrameWidth = frame.width
+      let newFrameHeight = frame.height
+
+      // Expand left
+      if (requiredLeft < frame.canvas_x) {
+        const expandBy = frame.canvas_x - requiredLeft
+        newFrameX = requiredLeft
+        newFrameWidth += expandBy
+      }
+
+      // Expand top
+      if (requiredTop < frame.canvas_y) {
+        const expandBy = frame.canvas_y - requiredTop
+        newFrameY = requiredTop
+        newFrameHeight += expandBy
+      }
+
+      // Expand right
+      const currentRight = newFrameX + newFrameWidth
+      if (requiredRight > currentRight) {
+        newFrameWidth = requiredRight - newFrameX
+      }
+
+      // Expand bottom
+      const currentBottom = newFrameY + newFrameHeight
+      if (requiredBottom > currentBottom) {
+        newFrameHeight = requiredBottom - newFrameY
+      }
+
+      // Apply frame changes
+      const posChanged = newFrameX !== frame.canvas_x || newFrameY !== frame.canvas_y
+      const sizeChanged = newFrameWidth !== frame.width || newFrameHeight !== frame.height
+
+      if (posChanged) {
+        store.updateFramePosition(frameId, newFrameX, newFrameY)
+      }
+      if (sizeChanged) {
+        store.updateFrameSize(frameId, newFrameWidth, newFrameHeight)
+      }
     }
   }
 
@@ -687,7 +804,7 @@ export function useLayout(options: UseLayoutOptions) {
       await batchUpdatePositions(finalPositions, store.updateNodePosition, 200)
 
       // After layout, ensure all framed nodes are inside their assigned frames
-      await constrainFramedNodesToTheirFrames()
+      await expandFramesToFitNodes()
       return
     }
 
@@ -879,25 +996,32 @@ export function useLayout(options: UseLayoutOptions) {
         })
       }
 
-      // Use shared helper to process results (frame movement + constraints)
+      // Use shared helper to process results (frame movement + frame expansion for frame-scoped layouts)
       const finalTargets = processFrameAwareLayoutResults(
         ctx,
         positions,
         frameSnapshot,
         store.updateFramePosition,
-        pushOutOfFrames
+        pushOutOfFrames,
+        store.updateFrameSize
       )
 
       // Apply positions with animation or batch update
       const animationDuration = layout === 'force' ? 800 : 600
       if (finalTargets.size > 500) {
         await batchUpdatePositions(finalTargets, store.updateNodePosition, 200)
-        // After layout, ensure all framed nodes are inside their assigned frames
-        await constrainFramedNodesToTheirFrames()
+        // After global layout, ensure all framed nodes are inside their assigned frames
+        // Skip for frame-scoped layout since we expanded the frame to fit
+        if (!frameId) {
+          await expandFramesToFitNodes()
+        }
       } else {
         animateToPositions(finalTargets, animationDuration)
-        // After layout, ensure all framed nodes are inside their assigned frames
-        setTimeout(() => constrainFramedNodesToTheirFrames(), animationDuration + 100)
+        // After global layout, ensure all framed nodes are inside their assigned frames
+        // Skip for frame-scoped layout since we expanded the frame to fit
+        if (!frameId) {
+          setTimeout(() => expandFramesToFitNodes(), animationDuration + 100)
+        }
       }
       return
     }
@@ -966,7 +1090,7 @@ export function useLayout(options: UseLayoutOptions) {
 
     // After layout, ensure all framed nodes are inside their assigned frames
     // Use setTimeout to let animation complete first
-    setTimeout(() => constrainFramedNodesToTheirFrames(), 600)
+    setTimeout(() => expandFramesToFitNodes(), 600)
   }
 
   function fitToContent() {
