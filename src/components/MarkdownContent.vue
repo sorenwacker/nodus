@@ -56,6 +56,8 @@ async function triggerRender() {
   await nextTick()
   // Wait a frame to ensure Transition animations have settled
   await new Promise(resolve => requestAnimationFrame(resolve))
+  // Additional delay for complex transitions
+  await new Promise(resolve => setTimeout(resolve, 50))
   if (containerRef.value) {
     await renderPendingContent(containerRef.value)
   }

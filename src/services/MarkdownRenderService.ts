@@ -86,25 +86,14 @@ export function renderMarkdown(content: string | null, options: RenderOptions = 
   // Render markdown (without math blocks)
   let html = marked.parse(processedContent) as string
 
-  // Restore math blocks - use cached SVG or create pending placeholders
+  // Restore math blocks - always use pending placeholders
+  // (Cache is checked in renderPendingMath, not here, because sanitizeHtml strips SVG)
   for (const [id, math] of mathPlaceholders) {
     const isDisplay = id.includes('MATH_DISPLAY')
-    const cacheKey = `${isDisplay ? 'd' : 'i'}:${math}`
-
-    let wrapper: string
-    if (mathCache.has(cacheKey)) {
-      // Use cached SVG - insert directly
-      const rendered = mathCache.get(cacheKey)!
-      wrapper = isDisplay
-        ? `<div class="typst-display typst-math">${rendered}</div>`
-        : `<span class="typst-inline typst-math">${rendered}</span>`
-    } else {
-      // Create placeholder for async rendering
-      const escapedMath = math.replace(/"/g, '&quot;')
-      wrapper = isDisplay
-        ? `<div class="typst-display typst-pending" data-math="${escapedMath}">${escapeText(math)}</div>`
-        : `<span class="typst-inline typst-pending" data-math="${escapedMath}">${escapeText(math)}</span>`
-    }
+    const escapedMath = math.replace(/"/g, '&quot;')
+    const wrapper = isDisplay
+      ? `<div class="typst-display typst-pending" data-math="${escapedMath}">${escapeText(math)}</div>`
+      : `<span class="typst-inline typst-pending" data-math="${escapedMath}">${escapeText(math)}</span>`
     html = html.replace(new RegExp(id, 'g'), wrapper)
   }
 
