@@ -52,18 +52,25 @@ const renderedHtml = computed(() => {
 })
 
 // Trigger async rendering after HTML is in DOM
-watch(renderedHtml, async () => {
+async function triggerRender() {
   await nextTick()
+  // Wait a frame to ensure Transition animations have settled
+  await new Promise(resolve => requestAnimationFrame(resolve))
   if (containerRef.value) {
     await renderPendingContent(containerRef.value)
   }
-}, { immediate: true })
+}
 
-// Also render on mount
-onMounted(async () => {
-  await nextTick()
-  if (containerRef.value) {
-    await renderPendingContent(containerRef.value)
+// Watch for content changes
+watch(renderedHtml, triggerRender)
+
+// Also render on mount (with delay for Transition)
+onMounted(triggerRender)
+
+// Watch for when the container ref becomes available (handles Transition timing)
+watch(containerRef, (el) => {
+  if (el && props.content) {
+    triggerRender()
   }
 })
 
