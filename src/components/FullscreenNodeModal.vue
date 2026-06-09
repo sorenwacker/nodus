@@ -78,8 +78,8 @@ watch(() => props.visible, async (visible) => {
     // Focus editor when modal opens
     await nextTick()
     editorRef.value?.focus()
-    // Render pending math and mermaid
-    await renderPendingContent(previewRef.value || undefined)
+    // Render pending math and mermaid (with proper timing)
+    await triggerRender()
   }
 })
 
@@ -96,11 +96,24 @@ const renderedContent = computed(() => {
   return renderMarkdown(editContent.value, { wikilinkExists })
 })
 
+// Trigger async rendering with proper timing
+async function triggerRender() {
+  if (!props.visible) return
+  await nextTick()
+  // Wait for transition/DOM to settle
+  await new Promise(resolve => requestAnimationFrame(resolve))
+  if (previewRef.value) {
+    await renderPendingContent(previewRef.value)
+  }
+}
+
 // Watch for content changes and trigger async rendering
-watch(renderedContent, async () => {
-  if (props.visible) {
-    await nextTick()
-    await renderPendingContent(previewRef.value || undefined)
+watch(renderedContent, triggerRender)
+
+// Also watch for when previewRef becomes available
+watch(() => previewRef.value, (el) => {
+  if (el && props.visible) {
+    triggerRender()
   }
 })
 
