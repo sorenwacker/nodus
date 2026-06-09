@@ -1,7 +1,7 @@
 # Nodus Makefile
 # Development workflow automation
 
-.PHONY: help install dev build test clean docker-dev docker-build lint fmt audit kill docs docs-build docs-rust
+.PHONY: help install dev build test clean docker-dev docker-build lint fmt audit kill docs docs-build docs-rust install-mac
 
 # Default target
 help:
@@ -20,6 +20,7 @@ help:
 	@echo ""
 	@echo "Build:"
 	@echo "  make build        Production build"
+	@echo "  make install-mac  Build and install to /Applications (macOS)"
 	@echo "  make clean        Clean build artifacts"
 	@echo ""
 	@echo "Release:"
@@ -119,6 +120,16 @@ build:
 
 build-debug:
 	npm run tauri build -- --debug
+
+# =============================================================================
+# Install (macOS)
+# =============================================================================
+
+install-mac: build
+	@echo "Installing Nodus to /Applications..."
+	@rm -rf /Applications/Nodus.app
+	@cp -r src-tauri/target/release/bundle/macos/Nodus.app /Applications/
+	@echo "Nodus installed to /Applications/Nodus.app"
 
 # =============================================================================
 # Database
