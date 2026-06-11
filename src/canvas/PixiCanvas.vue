@@ -2254,6 +2254,42 @@ useCanvasKeyboardShortcuts({
     showHelpModal.value = true
   },
 })
+
+// MCP Viewport interface methods
+function focusNode(nodeId: string) {
+  const node = store.getNode(nodeId)
+  if (!node) return
+
+  const rect = canvasRef.value?.getBoundingClientRect()
+  if (!rect) return
+
+  // Calculate center of viewport in canvas coordinates
+  const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
+  const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
+  const nodeCenterX = node.canvas_x + nodeWidth / 2
+  const nodeCenterY = node.canvas_y + nodeHeight / 2
+
+  // Set offset to center the node in the viewport
+  offsetX.value = rect.width / 2 - nodeCenterX * scale.value
+  offsetY.value = rect.height / 2 - nodeCenterY * scale.value
+
+  // Select the node
+  store.selectNode(nodeId)
+}
+
+function getViewport() {
+  return {
+    x: -offsetX.value / scale.value,
+    y: -offsetY.value / scale.value,
+    zoom: scale.value,
+  }
+}
+
+// Expose methods for parent component (MCP integration)
+defineExpose({
+  focusNode,
+  getViewport,
+})
 </script>
 
 <template>

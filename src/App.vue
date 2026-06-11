@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, provide } from 'vue'
+import { onMounted, ref, computed, provide, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from './stores/nodes'
 import { useThemesStore } from './stores/themes'
@@ -56,6 +56,9 @@ import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles
 import { useMcpServer } from './composables/useMcpServer'
 import { useEdgesStore } from './stores/edges'
 import { useStorylinesStore } from './stores/storylines'
+
+// PixiCanvas ref for MCP viewport integration
+const pixiCanvasRef = ref<ComponentPublicInstance<{ focusNode: (id: string) => void; getViewport: () => { x: number; y: number; zoom: number } }> | null>(null)
 
 const syncingFiles = ref(false)
 
@@ -147,7 +150,7 @@ const storylineService = new StorylineService({
 // Provide StorylineService to child components
 provide('storylineService', storylineService)
 
-// MCP Server setup (with undo integration)
+// MCP Server setup (with undo and viewport integration)
 const edgesStore = useEdgesStore()
 const mcpServer = useMcpServer({
   store: {
@@ -185,6 +188,10 @@ const mcpServer = useMcpServer({
     addNodeToStoryline: storylinesStore.addNodeToStoryline,
     removeNodeFromStoryline: storylinesStore.removeNodeFromStoryline,
     reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
+  },
+  viewport: {
+    getViewport: () => pixiCanvasRef.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
+    focusNode: (id: string) => pixiCanvasRef.value?.focusNode(id),
   },
   undo: {
     pushPositionUndo,
@@ -689,7 +696,7 @@ async function openFolderDialog() {
 
     <main class="main-content">
       <!-- Canvas always visible -->
-      <PixiCanvas :class="{ 'with-reader': readerStorylineId }" />
+      <PixiCanvas ref="pixiCanvasRef" :class="{ 'with-reader': readerStorylineId }" />
       <!-- Storyline panel - hidden when reader is open -->
       <StorylinePanel
         v-if="showStorylinePanel && !readerStorylineId"
