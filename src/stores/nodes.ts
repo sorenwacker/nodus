@@ -1,22 +1,108 @@
+/**
+ * Nodes store - orchestrator that combines all node store modules
+ *
+ * This file maintains the original useNodesStore API while delegating
+ * to submodules in src/stores/nodes/ for implementation.
+ */
+
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { invoke, getWorkspace } from '../lib/tauri'
-import { storeLogger } from '../lib/logger'
-import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs, getEdgeLabel } from '../lib/templates'
-import { canvasStorage, tagStorage } from '../lib/storage'
-import { generateShortId } from '../lib/ids'
-import { extractHashtags, extractWikilinks } from '../lib/contentParser'
-import { notifications$ } from '../composables/useNotifications'
-import { useStorylinesStore } from './storylines'
-import { useEdgesStore } from './edges'
-import { useFramesStore } from './frames'
-import { useWorkspaceStore } from './workspaces'
+import { invoke } from '../lib/tauri'
+import { extractHashtags } from '../lib/contentParser'
 import { useFileSync } from '../composables/useFileSync'
 import { useImport } from '../composables/useImport'
 import { useTagNodes } from '../composables/useTagNodes'
 import { useNodeEditLocking } from '../composables/useNodeEditLocking'
 import { useNodeLayout } from '../composables/useNodeLayout'
 import { useEntityOperations } from '../composables/useEntityOperations'
+import { storeLogger } from '../lib/logger'
+
+// Import from submodules
+import {
+  createState,
+  createStoreInstances,
+  createComputedProperties,
+  createDependencies,
+  initializeStore,
+  getNode as getNodeFn,
+  getNeighborIds as getNeighborIdsFn,
+  findNodeByTitle as findNodeByTitleFn,
+  selectNode as selectNodeFn,
+} from './nodes/state'
+
+import {
+  updateNodePosition as updateNodePositionFn,
+  triggerLayoutUpdate as triggerLayoutUpdateFn,
+  updateNodeSize as updateNodeSizeFn,
+  refreshNodeFromFile as refreshNodeFromFileFn,
+  updateNodeContent as updateNodeContentFn,
+  updateNodeTitle as updateNodeTitleFn,
+  updateNodeColor as updateNodeColorFn,
+  moveNodesToWorkspace as moveNodesToWorkspaceFn,
+  createNode as createNodeFn,
+  deleteNode as deleteNodeFn,
+  deleteNodes as deleteNodesFn,
+  restoreNode as restoreNodeFn,
+} from './nodes/crud'
+
+import {
+  createEdge as createEdgeFn,
+  deleteEdge as deleteEdgeFn,
+  restoreEdge as restoreEdgeFn,
+  updateEdgeLinkType as updateEdgeLinkTypeFn,
+  updateEdgeColor as updateEdgeColorFn,
+  updateEdgeDirected as updateEdgeDirectedFn,
+  cleanupOrphanEdges as cleanupOrphanEdgesFn,
+  deduplicateEdges as deduplicateEdgesFn,
+} from './nodes/edges'
+
+import {
+  checkFileCollision as checkFileCollisionFn,
+  moveNodeFile as moveNodeFileFn,
+  updateNodeFilePath as updateNodeFilePathFn,
+  getVaultPath as getVaultPathFn,
+} from './nodes/files'
+
+import {
+  createFrame as createFrameFn,
+  updateFramePosition as updateFramePositionFn,
+  updateFrameSize as updateFrameSizeFn,
+  updateFrameTitle as updateFrameTitleFn,
+  updateFrameColor as updateFrameColorFn,
+  deleteFrame as deleteFrameFn,
+  selectFrame as selectFrameFn,
+  assignNodesToFrame as assignNodesToFrameFn,
+} from './nodes/frames'
+
+import {
+  createWorkspace as createWorkspaceFn,
+  switchWorkspace as switchWorkspaceFn,
+  deleteWorkspace as deleteWorkspaceFn,
+  recoverWorkspace as recoverWorkspaceFn,
+  getOrphanedWorkspaceIds as getOrphanedWorkspaceIdsFn,
+  renameWorkspace as renameWorkspaceFn,
+  clearCanvas as clearCanvasFn,
+  resetDefaultWorkspace as resetDefaultWorkspaceFn,
+  loadStorylines as loadStorylinesFn,
+  createStoryline as createStorylineFn,
+  updateStoryline as updateStorylineFn,
+  deleteStoryline as deleteStorylineFn,
+  addNodeToStoryline as addNodeToStorylineFn,
+  removeNodeFromStoryline as removeNodeFromStorylineFn,
+  reorderStorylineNodes as reorderStorylineNodesFn,
+  getStorylineNodes as getStorylineNodesFn,
+  getStorylinesForNode as getStorylinesForNodeFn,
+  repairStorylineEdges as repairStorylineEdgesFn,
+  updateStorylineEdgeColors as updateStorylineEdgeColorsFn,
+  syncAllTagNodes as syncAllTagNodesFn,
+  removeAllTagNodes as removeAllTagNodesFn,
+  getEntities as getEntitiesFn,
+  getEntitiesByType as getEntitiesByTypeFn,
+  getLinkedEntities as getLinkedEntitiesFn,
+  getNodesReferencingEntity as getNodesReferencingEntityFn,
+  createEntityNode as createEntityNodeFn,
+  linkToEntity as linkToEntityFn,
+} from './nodes/advanced'
+
 import type {
   Node,
   Edge,
@@ -29,31 +115,29 @@ import type {
   StorylineNode,
   EntityNodeType,
 } from '../types'
-import { clampCoord, clampNodeSize } from '../lib/geometry'
-import { createMockNodes } from '../lib/mockData'
 
 // Re-export types for consumers
 export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
 
 export const useNodesStore = defineStore('nodes', () => {
-  // Node-specific state
-  const nodes = ref<Node[]>([])
-  const selectedNodeIds = ref<string[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-  // Version counter to trigger edge re-routing when node positions/sizes change
-  const nodeLayoutVersion = ref(0)
+  // Create core state
+  const state = createState()
+  const { nodes, selectedNodeIds, loading, error, nodeLayoutVersion, showLinkedNodes, showNodusNodes, showCommentNodes } = state
 
-  // Node type visibility filters
-  const showLinkedNodes = ref(true)  // Nodes with file_path (from vault)
-  const showNodusNodes = ref(true)   // Nodes without file_path (created in app)
-  const showCommentNodes = ref(true) // Comment nodes
+  // Create store instances
+  const stores = createStoreInstances()
+  const { storylinesStore, edgesStore, framesStore, workspaceStore } = stores
 
-  // Separate stores with their own state
-  const storylinesStore = useStorylinesStore()
-  const edgesStore = useEdgesStore()
-  const framesStore = useFramesStore()
-  const workspaceStore = useWorkspaceStore()
+  // Create computed properties
+  const computed = createComputedProperties(state, stores)
+  const {
+    edges, frames, selectedFrameId, workspaces, currentWorkspaceId,
+    selectedNodeId, selectedNode, filteredNodes, filteredEdges, filteredFrames,
+    storylines, storylineNodes, storylineNodesVersion, filteredStorylines,
+  } = computed
+
+  // Create dependencies for submodules
+  const deps = createDependencies(state, computed, stores)
 
   // File sync composable
   const fileSync = useFileSync({
@@ -115,150 +199,34 @@ export const useNodesStore = defineStore('nodes', () => {
     },
   })
 
-  // Import composable (initialized after createNode is defined)
+  // Forward declarations for composables (initialized after createNode is defined)
   let importComposable: ReturnType<typeof useImport> = undefined!
-
-  // Tag nodes composable (initialized after dependencies are available)
   let tagNodesComposable: ReturnType<typeof useTagNodes> = undefined!
+  let layoutComposable: ReturnType<typeof useNodeLayout> = undefined!
+  let entityOpsComposable: ReturnType<typeof useEntityOperations> = undefined!
 
-  // Expose edges and frames from their stores for backwards compatibility
-  const edges = computed(() => edgesStore.edges)
-  const frames = computed(() => framesStore.frames)
-  const selectedFrameId = computed(() => framesStore.selectedFrameId)
-  const workspaces = computed(() => workspaceStore.workspaces)
-  const currentWorkspaceId = computed(() => workspaceStore.currentWorkspaceId)
-
-  // For backwards compatibility
-  const selectedNodeId = computed(() => selectedNodeIds.value[0] || null)
-  const selectedNode = computed(() =>
-    nodes.value.find(n => n.id === selectedNodeId.value)
-  )
-
-  // Filtered nodes/edges for current workspace
-  const filteredNodes = computed(() => {
-    const wsId = workspaceStore.currentWorkspaceId
-    // Treat null, undefined, and "default" as the default workspace
-    // Default workspace shows nodes with no workspace_id (null)
-    let result: Node[]
-    if (!wsId || wsId === 'default') {
-      result = nodes.value.filter(n => !n.workspace_id)
-    } else {
-      result = nodes.value.filter(n => n.workspace_id === wsId)
-    }
-
-    // Apply node type visibility filters
-    return result.filter(node => {
-      // Comment nodes
-      if (node.node_type === 'comment') {
-        return showCommentNodes.value
-      }
-      // Linked nodes (from vault) - have file_path
-      if (node.file_path) {
-        return showLinkedNodes.value
-      }
-      // Nodus nodes (created in app) - no file_path
-      return showNodusNodes.value
-    })
-  })
-
-  const filteredFrames = computed(() => {
-    const wsId = workspaceStore.currentWorkspaceId
-    // Filter frames by workspace, treating null/undefined/"default" as the default workspace
-    if (!wsId || wsId === 'default') {
-      return framesStore.frames.filter(f => !f.workspace_id || f.workspace_id === 'default')
-    }
-    return framesStore.frames.filter(f => f.workspace_id === wsId)
-  })
-
-  const filteredEdges = computed(() => {
-    const nodeIds = new Set(filteredNodes.value.map(n => n.id))
-    // Filter edges to only include those connecting nodes in the current workspace
-    return edgesStore.edges.filter(
-      e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
-    )
-  })
-
-  // Storylines are managed by separate store - expose computed for compatibility
-  const storylines = computed(() => storylinesStore.storylines)
-  const storylineNodes = computed(() => storylinesStore.storylineNodes)
-  const storylineNodesVersion = computed(() => storylinesStore.storylineNodesVersion)
-  const filteredStorylines = computed(() => storylinesStore.filteredStorylines)
+  // ============================================================================
+  // Bound functions (wrapping submodule functions with dependencies)
+  // ============================================================================
 
   async function initialize() {
-    loading.value = true
-    error.value = null
-    try {
-      // Initialize workspace store (syncs localStorage with database)
-      await workspaceStore.initialize()
-
-      // Initialize edges and frames stores with current workspace
-      // Convert "default" to null for backend compatibility
-      const currentWorkspace = workspaceStore.currentWorkspaceId
-      const workspaceForBackend = currentWorkspace === 'default' ? null : currentWorkspace
-      storeLogger.debug(`[Nodes] Current workspace after init: ${currentWorkspace} (backend: ${workspaceForBackend})`)
-
-      await Promise.all([
-        edgesStore.initialize(workspaceForBackend),
-        framesStore.initialize(),
-      ])
-
-      // Load nodes
-      const fetchedNodes = await invoke<Node[]>('get_nodes')
-      nodes.value = fetchedNodes
-
-      // Debug: log node sizes from database
-      console.log('[Nodes] Node sizes from DB:', fetchedNodes.slice(0, 5).map(n => ({ id: n.id.slice(0, 8), title: n.title, width: n.width, height: n.height })))
-
-      storeLogger.debug(`[Nodes] Loaded ${fetchedNodes.length} total nodes`)
-      const workspaceIds = [...new Set(fetchedNodes.map(n => n.workspace_id))]
-      storeLogger.debug(`[Nodes] Workspace IDs in nodes: ${JSON.stringify(workspaceIds)}`)
-      storeLogger.debug(`[Nodes] Filtered nodes count: ${filteredNodes.value.length}`)
-
-      // Set up node existence callback for edge validation
-      edgesStore.setNodeExistsCallback((id) => nodes.value.some(n => n.id === id))
-
-      // Initialize storylines store with dependencies
-      storylinesStore.setDependencies({
-        getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
-        getEdges: () => edgesStore.edges,
-        getNodes: () => nodes.value,
-        createEdge: (data) => edgesStore.createEdge(data),
-        deleteEdge: (id) => edgesStore.deleteEdge(id),
-      })
-
-      // Load storylines separately (may fail if migration hasn't run)
-      try {
-        await storylinesStore.loadStorylines()
-      } catch (e) {
-        storeLogger.warn('Failed to load storylines (migration may not have run yet):', e)
-      }
-    } catch (e) {
-      error.value = String(e)
-      storeLogger.error('Failed to load nodes:', e)
-      notifications$.error('Failed to load data', 'Using offline mode with sample data')
-      nodes.value = createMockNodes()
-    } finally {
-      loading.value = false
-    }
+    await initializeStore(deps, createNode)
   }
 
   function getNode(id: string): Node | undefined {
-    return nodes.value.find(n => n.id === id)
+    return getNodeFn(nodes.value, id)
   }
 
-  /**
-   * Get IDs of all nodes directly connected to the given node
-   */
   function getNeighborIds(nodeId: string): string[] {
-    const neighbors: string[] = []
-    for (const edge of edgesStore.edges) {
-      if (edge.source_node_id === nodeId) {
-        neighbors.push(edge.target_node_id)
-      } else if (edge.target_node_id === nodeId) {
-        neighbors.push(edge.source_node_id)
-      }
-    }
-    return neighbors
+    return getNeighborIdsFn(edgesStore.edges, nodeId)
+  }
+
+  function findNodeByTitle(title: string): Node | undefined {
+    return findNodeByTitleFn(nodes.value, title)
+  }
+
+  function selectNode(id: string | null, addToSelection = false) {
+    selectNodeFn(selectedNodeIds, id, addToSelection)
   }
 
   async function updateNodePosition(
@@ -267,423 +235,153 @@ export const useNodesStore = defineStore('nodes', () => {
     y: number,
     options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean }
   ) {
-    const node = nodes.value.find(n => n.id === id)
-    if (node) {
-      let finalX = clampCoord(x)
-      let finalY = clampCoord(y)
-
-      // Enforce frame containment if requested and node is in a frame
-      if (options?.enforceFrame && node.frame_id) {
-        const frame = framesStore.frames.find(f => f.id === node.frame_id)
-        if (frame) {
-          const padding = 20
-          const titleHeight = 50
-          const nodeWidth = node.width || 200
-          const nodeHeight = node.height || 120
-          // Clamp to frame bounds
-          finalX = Math.max(
-            frame.canvas_x + padding,
-            Math.min(frame.canvas_x + frame.width - nodeWidth - padding, finalX)
-          )
-          finalY = Math.max(
-            frame.canvas_y + padding + titleHeight,
-            Math.min(frame.canvas_y + frame.height - nodeHeight - padding, finalY)
-          )
-        }
-      }
-
-      node.canvas_x = finalX
-      node.canvas_y = finalY
-      node.updated_at = Date.now()
-      // Skip layout trigger during drag for performance - caller should trigger once at drag end
-      if (!options?.skipLayoutTrigger) {
-        nodeLayoutVersion.value++
-      }
-      try {
-        await invoke('update_node_position', { id, x: finalX, y: finalY })
-      } catch (e) {
-        console.error('Failed to update position:', e)
-      }
-    }
+    await updateNodePositionFn(deps, id, x, y, options)
   }
 
-  /**
-   * Manually trigger layout version update (call after drag ends)
-   */
   function triggerLayoutUpdate() {
-    nodeLayoutVersion.value++
+    triggerLayoutUpdateFn(nodeLayoutVersion)
   }
 
   async function updateNodeSize(id: string, width: number, height: number, pushOthers = false) {
-    const node = nodes.value.find(n => n.id === id)
-    if (node) {
-      const clampedWidth = clampNodeSize(width)
-      const clampedHeight = clampNodeSize(height)
-      node.width = clampedWidth
-      node.height = clampedHeight
-      node.updated_at = Date.now()
-      nodeLayoutVersion.value++ // Trigger edge re-routing
-
-      // Push overlapping nodes away using layout composable
-      if (pushOthers && layoutComposable) {
-        layoutComposable.pushOverlappingNodes(node)
-      }
-
-      try {
-        console.log(`[Nodes] Saving size for ${id}: ${clampedWidth}x${clampedHeight}`)
-        await invoke('update_node_size', { id, width: clampedWidth, height: clampedHeight })
-        console.log(`[Nodes] Size saved successfully for ${id}`)
-      } catch (e) {
-        console.error('Failed to update size:', e)
-      }
-    }
+    await updateNodeSizeFn(deps, id, width, height, pushOthers, layoutComposable)
   }
 
-  // Layout composable (initialized after dependencies are available)
-  let layoutComposable: ReturnType<typeof useNodeLayout> = undefined!
-  // Entity operations composable
-  let entityOpsComposable: ReturnType<typeof useEntityOperations> = undefined!
-
-  function selectNode(id: string | null, addToSelection = false) {
-    if (id === null) {
-      selectedNodeIds.value = []
-    } else if (addToSelection) {
-      // Toggle selection
-      const idx = selectedNodeIds.value.indexOf(id)
-      if (idx >= 0) {
-        selectedNodeIds.value.splice(idx, 1)
-      } else {
-        selectedNodeIds.value.push(id)
-      }
-    } else {
-      selectedNodeIds.value = [id]
-    }
-  }
-
-  // Find a node by title (case-insensitive)
-  function findNodeByTitle(title: string): Node | undefined {
-    const lowerTitle = title.toLowerCase()
-    return nodes.value.find(n => n.title.toLowerCase() === lowerTitle)
-  }
-
-  // Check if node's file has changed and refresh content if needed
   async function refreshNodeFromFile(id: string): Promise<boolean> {
-    const node = nodes.value.find(n => n.id === id)
-    if (!node || !node.file_path) return false
-
-    try {
-      const content = await invoke<string>('read_file_content', { path: node.file_path })
-      if (content !== node.markdown_content) {
-        node.markdown_content = content
-        node.updated_at = Date.now()
-        const newChecksum = await invoke<string | null>('update_node_content', { id, content })
-        if (newChecksum) node.checksum = newChecksum
-        return true
-      }
-    } catch (e) {
-      const errorMsg = String(e)
-      if (errorMsg.includes('No such file') || errorMsg.includes('not found')) {
-        node.file_path = null
-        node.checksum = null
-        node.updated_at = Date.now()
-        try { await invoke('update_node_file_path', { id, filePath: '' }) } catch { /* ignore */ }
-      } else {
-        storeLogger.error('Failed to read file:', e)
-      }
-    }
-    return false
+    return refreshNodeFromFileFn(nodes, id)
   }
 
   async function updateNodeContent(id: string, content: string) {
-    // Remove trailing whitespace from each line, then trim the whole content
-    const trimmedContent = content
-      .split('\n')
-      .map(line => line.trimEnd())
-      .join('\n')
-      .trim()
-    const node = nodes.value.find(n => n.id === id)
-    if (node) {
-      node.markdown_content = trimmedContent
-      node.updated_at = Date.now()
-      try {
-        const newChecksum = await invoke<string | null>('update_node_content', { id, content: trimmedContent })
-        // Update checksum if file was written (prevents watcher reload loop)
-        if (newChecksum) {
-          node.checksum = newChecksum
-        }
-      } catch (e) {
-        console.error('Failed to update content:', e)
-      }
-
-      // Extract hashtags and update tags
-      const extractedTags = extractHashtags(trimmedContent)
-      if (extractedTags.length > 0) {
-        // Merge with existing tags (deduplicate)
-        let existingTags: string[] = []
-        if (node.tags) {
-          try {
-            const parsed = JSON.parse(node.tags)
-            existingTags = Array.isArray(parsed) ? parsed : []
-          } catch {
-            // Malformed JSON in tags field - reset to empty array
-            storeLogger.warn(`Invalid JSON in tags for node ${id}, resetting`)
-            existingTags = []
-          }
-        }
-        const mergedTags = Array.from(new Set([...existingTags, ...extractedTags]))
-        node.tags = JSON.stringify(mergedTags)
-        try {
-          await invoke('update_node_tags', { id, tags: mergedTags })
-        } catch (e) {
-          console.error('Failed to update tags:', e)
-        }
-
-        // Create tag nodes if setting is enabled
-        if (tagStorage.getShowTagNodes() && tagNodesComposable) {
-          try {
-            await tagNodesComposable.createTagEdges(id, extractedTags)
-          } catch (e) {
-            console.error('Failed to create tag edges:', e)
-          }
-        }
-      }
-
-      // Extract wikilinks and sync edges
-      const links = extractWikilinks(trimmedContent)
-
-      // Build set of target node IDs from current wikilinks
-      const currentTargetIds = new Set<string>()
-      for (const linkTitle of links) {
-        const targetNode = findNodeByTitle(linkTitle)
-        if (targetNode && targetNode.id !== id) {
-          currentTargetIds.add(targetNode.id)
-        }
-      }
-
-      // Find existing wikilink edges from this node
-      const existingWikilinkEdges = edges.value.filter(e =>
-        e.source_node_id === id && e.link_type === 'wikilink'
-      )
-
-      // Delete edges that no longer have corresponding wikilinks
-      for (const edge of existingWikilinkEdges) {
-        if (!currentTargetIds.has(edge.target_node_id)) {
-          await edgesStore.deleteEdge(edge.id)
-        }
-      }
-
-      // Create edges for new wikilinks (or make existing reverse edges non-directional)
-      for (const targetId of currentTargetIds) {
-        // Check if edge already exists in this direction
-        const existsForward = edges.value.some(e =>
-          e.source_node_id === id &&
-          e.target_node_id === targetId &&
-          e.link_type === 'wikilink'
-        )
-        if (existsForward) continue
-
-        // Check if reverse edge exists (target→source)
-        const reverseEdge = edges.value.find(e =>
-          e.source_node_id === targetId &&
-          e.target_node_id === id &&
-          e.link_type === 'wikilink'
-        )
-
-        if (reverseEdge) {
-          // Reverse edge exists - make it non-directional instead of creating duplicate
-          if (reverseEdge.directed !== false) {
-            await edgesStore.updateEdgeDirected(reverseEdge.id, false)
-          }
-        } else {
-          // No edge in either direction - create new one
-          await createEdge({
-            source_node_id: id,
-            target_node_id: targetId,
-            link_type: 'wikilink',
-          })
-        }
-      }
-    }
+    await updateNodeContentFn(deps, id, content, tagNodesComposable, createEdge)
   }
 
   async function updateNodeTitle(id: string, title: string) {
-    const trimmedTitle = title.trim()
-    const node = nodes.value.find(n => n.id === id)
-    if (node) {
-      node.title = trimmedTitle
-      node.updated_at = Date.now()
-      try {
-        await invoke('update_node_title', { id, title: trimmedTitle })
-      } catch (e) {
-        console.error('Failed to update title:', e)
-      }
-    }
+    await updateNodeTitleFn(nodes, id, title)
   }
 
   async function updateNodeColor(id: string, color: string | null) {
-    const node = nodes.value.find(n => n.id === id)
-    if (node) {
-      node.color_theme = color
-      node.updated_at = Date.now()
-      try {
-        await invoke('update_node_color', { id, color })
-      } catch (e) {
-        console.error('Failed to update color:', e)
-      }
-    }
+    await updateNodeColorFn(nodes, id, color)
   }
 
   async function moveNodesToWorkspace(nodeIds: string[], workspaceId: string | null) {
-    for (const id of nodeIds) {
-      const node = nodes.value.find(n => n.id === id)
-      if (node) {
-        node.workspace_id = workspaceId
-        node.updated_at = Date.now()
-        try {
-          await invoke('update_node_workspace', { id, workspaceId })
-        } catch (e) {
-          console.error('Failed to move node to workspace:', e)
-        }
-      }
-    }
+    await moveNodesToWorkspaceFn(nodes, nodeIds, workspaceId)
   }
 
   async function createNode(data: CreateNodeInput): Promise<Node> {
-    // Determine workspace_id for the new node
-    // "default" maps to null (the default workspace uses null in the database)
-    let validWorkspaceId: string | null = data.workspace_id ?? null
-    if (data.workspace_id === undefined) {
-      // Use current workspace, but convert "default" to null
-      if (currentWorkspaceId.value === 'default') {
-        validWorkspaceId = null
-      } else if (currentWorkspaceId.value && workspaces.value.some(w => w.id === currentWorkspaceId.value)) {
-        validWorkspaceId = currentWorkspaceId.value
-      } else {
-        validWorkspaceId = null
-      }
-    } else if (data.workspace_id === 'default') {
-      validWorkspaceId = null
-    }
-
-    const inputWithWorkspace = {
-      ...data,
-      title: data.title.trim(),
-      markdown_content: data.markdown_content?.trim() || null,
-      workspace_id: validWorkspaceId,
-    }
-
-    try {
-      const node = await invoke<Node>('create_node', { input: inputWithWorkspace })
-      nodes.value.push(node)
-      nodeLayoutVersion.value++ // Trigger reactivity for displayNodes/visibleNodes
-      return node
-    } catch (e) {
-      console.error('Failed to create node:', e)
-      // Fallback for development
-      const node: Node = {
-        id: generateShortId(),
-        title: data.title.trim(),
-        file_path: data.file_path || null,
-        markdown_content: data.markdown_content?.trim() || null,
-        node_type: data.node_type || 'note',
-        canvas_x: data.canvas_x,
-        canvas_y: data.canvas_y,
-        width: data.width || 200,
-        height: data.height || 120,
-        z_index: 0,
-        frame_id: null,
-        color_theme: data.color_theme ?? null,
-        is_collapsed: false,
-        tags: data.tags ? JSON.stringify(data.tags) : null,
-        workspace_id: validWorkspaceId,
-        checksum: null,
-        created_at: Date.now(),
-        updated_at: Date.now(),
-        deleted_at: null,
-      }
-      nodes.value.push(node)
-      nodeLayoutVersion.value++ // Trigger reactivity for displayNodes/visibleNodes
-      return node
-    }
+    return createNodeFn(deps, data)
   }
 
   async function deleteNode(id: string) {
-    try {
-      await invoke('delete_node', { id })
-    } catch (e) {
-      console.error('Failed to delete node:', e)
-    }
-    nodes.value = nodes.value.filter(n => n.id !== id)
-    // Clear selection if deleted node was selected
-    selectedNodeIds.value = selectedNodeIds.value.filter(nid => nid !== id)
-    // Remove edges connected to deleted node
-    edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
+    await deleteNodeFn(deps, id)
   }
 
   async function deleteNodes(ids: string[]) {
-    if (ids.length === 0) return
-    try {
-      await invoke('delete_nodes', { ids })
-    } catch (e) {
-      console.error('Failed to delete nodes:', e)
-    }
-    const idSet = new Set(ids)
-    nodes.value = nodes.value.filter(n => !idSet.has(n.id))
-    // Clear selection for deleted nodes
-    selectedNodeIds.value = selectedNodeIds.value.filter(nid => !idSet.has(nid))
-    // Remove edges connected to deleted nodes
-    edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
+    await deleteNodesFn(deps, ids)
   }
 
-  // Edge functions - forwarded to edges store
-  const createEdge = (data: CreateEdgeInput) => edgesStore.createEdge(data)
+  async function restoreNode(node: Node) {
+    await restoreNodeFn(nodes, node)
+  }
 
-  /**
-   * Delete an edge. If it's a wikilink edge, convert the [[...]] to plain text in the source node.
-   */
+  // Edge operations
+  const createEdge = (data: CreateEdgeInput) => createEdgeFn(edgesStore, data)
+
   async function deleteEdge(id: string): Promise<void> {
-    const edge = edgesStore.getEdge(id)
-
-    // If it's a wikilink edge, convert the wikilink to plain text in source node
-    if (edge && edge.link_type === 'wikilink') {
-      const sourceNode = nodes.value.find(n => n.id === edge.source_node_id)
-      const targetNode = nodes.value.find(n => n.id === edge.target_node_id)
-
-      if (sourceNode && targetNode && sourceNode.markdown_content) {
-        // Replace [[Target Title]] or [[Target Title|display]] with just the display text
-        const targetTitle = targetNode.title
-        const wikilinkRegex = new RegExp(
-          `\\[\\[${escapeRegex(targetTitle)}(?:\\|([^\\]]+))?\\]\\]`,
-          'gi'
-        )
-        const newContent = sourceNode.markdown_content.replace(wikilinkRegex, (_match, display) => {
-          return display || targetTitle
-        })
-
-        if (newContent !== sourceNode.markdown_content) {
-          // Update content without triggering edge sync (would cause infinite loop)
-          sourceNode.markdown_content = newContent
-          sourceNode.updated_at = Date.now()
-          try {
-            await invoke<string | null>('update_node_content', { id: sourceNode.id, content: newContent })
-          } catch (e) {
-            console.error('Failed to update content after wikilink removal:', e)
-          }
-        }
-      }
-    }
-
-    await edgesStore.deleteEdge(id)
+    await deleteEdgeFn(deps, id)
   }
 
-  /** Escape special regex characters in a string */
-  function escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const restoreEdge = (edge: Edge) => restoreEdgeFn(edgesStore, edge)
+  const updateEdgeLinkType = (id: string, linkType: string) => updateEdgeLinkTypeFn(edgesStore, id, linkType)
+  const updateEdgeColor = (id: string, color: string | null) => updateEdgeColorFn(edgesStore, id, color)
+  const updateEdgeDirected = (id: string, directed: boolean) => updateEdgeDirectedFn(edgesStore, id, directed)
+  const cleanupOrphanEdges = () => cleanupOrphanEdgesFn(edgesStore, nodes.value)
+  const deduplicateEdges = () => deduplicateEdgesFn(edgesStore)
+
+  // File operations
+  const checkFileCollision = (nodeId: string, targetFolder: string) =>
+    checkFileCollisionFn(nodeId, targetFolder)
+
+  async function moveNodeFile(nodeId: string, targetFolder: string, collisionResolution?: string): Promise<string> {
+    return moveNodeFileFn(deps, nodeId, targetFolder, collisionResolution, updateNodeContent)
   }
-  const restoreEdge = (edge: Edge) => edgesStore.restoreEdge(edge)
-  const updateEdgeLinkType = (id: string, linkType: string) => edgesStore.updateEdgeLinkType(id, linkType)
-  const updateEdgeColor = (id: string, color: string | null) => edgesStore.updateEdgeColor(id, color)
-  const updateEdgeDirected = (id: string, directed: boolean) => edgesStore.updateEdgeDirected(id, directed)
+
+  function updateNodeFilePath(nodeId: string, filePath: string) {
+    updateNodeFilePathFn(nodes.value, nodeId, filePath)
+  }
+
+  function getVaultPath(): string | null {
+    return getVaultPathFn(workspaceStore)
+  }
+
+  // Frame operations
+  function createFrame(x: number, y: number, width = 400, height = 300, title = 'Frame') {
+    return createFrameFn(deps, x, y, width, height, title)
+  }
+
+  const updateFramePosition = (id: string, x: number, y: number) => updateFramePositionFn(framesStore, id, x, y)
+  const updateFrameSize = (id: string, width: number, height: number) => updateFrameSizeFn(framesStore, id, width, height)
+  const updateFrameTitle = (id: string, title: string) => updateFrameTitleFn(framesStore, id, title)
+  const updateFrameColor = (id: string, color: string | null) => updateFrameColorFn(framesStore, id, color)
+
+  function deleteFrame(id: string) {
+    deleteFrameFn(deps, id)
+  }
+
+  function selectFrame(id: string | null) {
+    selectFrameFn(deps, id)
+  }
+
+  function assignNodesToFrame(nodeIds: string[], frameId: string | null) {
+    assignNodesToFrameFn(nodes.value, nodeIds, frameId)
+  }
+
+  // Workspace operations
+  const createWorkspace = (name: string) => createWorkspaceFn(workspaceStore, name)
+
+  async function switchWorkspace(workspaceId: string | null) {
+    await switchWorkspaceFn(deps, fileSync, workspaceId)
+  }
+
+  const deleteWorkspace = (id: string, deleteFiles?: boolean) => deleteWorkspaceFn(workspaceStore, id, deleteFiles)
+  const recoverWorkspace = (id: string) => recoverWorkspaceFn(workspaceStore, id)
+  const getOrphanedWorkspaceIds = () => getOrphanedWorkspaceIdsFn(workspaceStore, nodes.value)
+  const renameWorkspace = (id: string, newName: string) => renameWorkspaceFn(workspaceStore, id, newName)
+
+  function clearCanvas() {
+    clearCanvasFn(deps)
+  }
+
+  async function resetDefaultWorkspace(): Promise<void> {
+    await resetDefaultWorkspaceFn(deps, createNode, createEdge)
+  }
+
+  // Storyline operations
+  const loadStorylines = () => loadStorylinesFn(storylinesStore)
+  const createStoryline = (title: string, description?: string, color?: string) =>
+    createStorylineFn(storylinesStore, title, description, color)
+  const updateStoryline = (id: string, title: string, description?: string, color?: string) =>
+    updateStorylineFn(storylinesStore, id, title, description, color)
+  const deleteStoryline = (id: string) => deleteStorylineFn(storylinesStore, id)
+  const addNodeToStoryline = (storylineId: string, nodeId: string, position?: number) =>
+    addNodeToStorylineFn(storylinesStore, storylineId, nodeId, position)
+  const removeNodeFromStoryline = (storylineId: string, nodeId: string) =>
+    removeNodeFromStorylineFn(storylinesStore, storylineId, nodeId)
+  const reorderStorylineNodes = (storylineId: string, nodeIds: string[]) =>
+    reorderStorylineNodesFn(storylinesStore, storylineId, nodeIds)
+  const getStorylineNodes = (storylineId: string) => getStorylineNodesFn(storylinesStore, storylineId)
+  const getStorylinesForNode = (nodeId: string) => getStorylinesForNodeFn(storylinesStore, nodeId)
+  const repairStorylineEdges = (storylineId: string) => repairStorylineEdgesFn(storylinesStore, storylineId)
+  const updateStorylineEdgeColors = (storylineId: string, color: string | null) =>
+    updateStorylineEdgeColorsFn(storylinesStore, storylineId, color)
+
+  // Tag operations
+  async function syncAllTagNodes() {
+    if (!tagNodesComposable) return
+    await syncAllTagNodesFn(nodes.value, tagNodesComposable)
+  }
+
+  async function removeAllTagNodes() {
+    await removeAllTagNodesFn(deps, deleteNode)
+  }
 
   // Initialize composables that depend on functions defined above
   importComposable = useImport({
@@ -743,7 +441,7 @@ export const useNodesStore = defineStore('nodes', () => {
     updateNodePosition,
     updateNodeSize: async (id, width, height) => {
       // Update without push to avoid infinite recursion
-      await updateNodeSize(id, width, height, false)
+      await updateNodeSizeFn(deps, id, width, height, false, undefined)
     },
     incrementLayoutVersion: () => { nodeLayoutVersion.value++ },
   })
@@ -758,336 +456,53 @@ export const useNodesStore = defineStore('nodes', () => {
     getEntityEdgesForNode: (nodeId, direction) => edgesStore.getEntityEdgesForNode(nodeId, direction),
   })
 
-  // Restore a deleted node (for undo)
-  async function restoreNode(node: Node) {
-    try {
-      await invoke('restore_node', { node })
-    } catch (e) {
-      console.error('Failed to restore node:', e)
-    }
-    // Add back to local state if not already present
-    if (!nodes.value.find(n => n.id === node.id)) {
-      nodes.value.push(node)
+  // Tag node forwarding
+  const getOrCreateTagNode = (tagName: string, nearNodeId?: string) =>
+    tagNodesComposable.getOrCreateTagNode(tagName, nearNodeId)
+  const createTagEdges = (nodeId: string, tagNames: string[]) =>
+    tagNodesComposable.createTagEdges(nodeId, tagNames)
+  const getTagNodes = () => tagNodesComposable.getTagNodes()
+
+  // Listen for tag nodes setting change
+  const handleTagNodesChange = async (e: Event) => {
+    const enabled = (e as CustomEvent).detail
+    if (enabled) {
+      await syncAllTagNodes()
+    } else {
+      await removeAllTagNodes()
     }
   }
+  window.addEventListener('nodus-tag-nodes-change', handleTagNodesChange)
 
-  /**
-   * Update colors of all edges belonging to a storyline - forwarded to storylines store
-   */
-  const updateStorylineEdgeColors = (storylineId: string, color: string | null) => storylinesStore.updateStorylineEdgeColors(storylineId, color)
+  // Entity forwarding
+  const getEntities = () => getEntitiesFn(entityOpsComposable)
+  const getEntitiesByType = (entityType: EntityNodeType) => getEntitiesByTypeFn(entityOpsComposable, entityType)
+  const getLinkedEntities = (nodeId: string) => getLinkedEntitiesFn(entityOpsComposable, nodeId)
+  const getNodesReferencingEntity = (entityId: string) => getNodesReferencingEntityFn(entityOpsComposable, entityId)
+  const createEntityNode = (
+    entityType: EntityNodeType,
+    title: string,
+    options?: { canvas_x?: number; canvas_y?: number; markdown_content?: string; color_theme?: string | null }
+  ) => createEntityNodeFn(entityOpsComposable, entityType, title, options)
+  const linkToEntity = (sourceNodeId: string, entityNodeId: string, linkType?: string) =>
+    linkToEntityFn(entityOpsComposable, sourceNodeId, entityNodeId, linkType)
 
-  // Import functions - forwarded to import composable
-  const importVault = (path: string, deleteOriginals?: boolean, targetWorkspaceId?: string) => importComposable.importVault(path, deleteOriginals, targetWorkspaceId)
+  // Import forwarding
+  const importVault = (path: string, deleteOriginals?: boolean, targetWorkspaceId?: string) =>
+    importComposable.importVault(path, deleteOriginals, targetWorkspaceId)
   const importCitations = (filePath: string) => importComposable.importCitations(filePath)
-  const importOntology = (filePath: string, options?: { createClassNodes?: boolean; createIndividualNodes?: boolean; workspaceId?: string; layout?: 'grid' | 'hierarchical' }) =>
-    importComposable.importOntology(filePath, options)
+  const importOntology = (
+    filePath: string,
+    options?: { createClassNodes?: boolean; createIndividualNodes?: boolean; workspaceId?: string; layout?: 'grid' | 'hierarchical' }
+  ) => importComposable.importOntology(filePath, options)
   const refreshWorkspace = () => importComposable.refreshWorkspace()
   const syncFramesFromFolders = () => importComposable.syncFramesFromFolders()
 
-  // File sync functions - forwarded to composable
+  // File sync forwarding
   const watchVault = (path: string) => fileSync.watchVault(path)
   const stopWatching = () => fileSync.stopWatching()
 
-  // Workspace functions - forwarded to workspace store
-  const createWorkspace = (name: string) => workspaceStore.createWorkspace(name)
-  const switchWorkspace = async (workspaceId: string | null) => {
-    // Stop any existing file watcher
-    await fileSync.stopWatching()
-
-    workspaceStore.switchWorkspace(workspaceId)
-    // Reload edges and frames for the new workspace
-    await Promise.all([
-      edgesStore.initialize(workspaceId),
-      framesStore.initialize(),
-    ])
-
-    // Start file watcher if workspace has sync enabled and vault path
-    if (workspaceId) {
-      try {
-        const workspace = await getWorkspace(workspaceId)
-        if (workspace?.sync_enabled && workspace?.vault_path) {
-          await fileSync.watchVault(workspace.vault_path)
-          storeLogger.info(`Started watching vault: ${workspace.vault_path}`)
-        }
-      } catch (e) {
-        storeLogger.error('Failed to start file watcher:', e)
-      }
-    }
-  }
-  const deleteWorkspace = (id: string, deleteFiles?: boolean) => workspaceStore.deleteWorkspace(id, deleteFiles)
-  const recoverWorkspace = (id: string) => workspaceStore.recoverWorkspace(id)
-  const getOrphanedWorkspaceIds = () => workspaceStore.getOrphanedWorkspaceIds(nodes.value)
-  const renameWorkspace = (id: string, newName: string) => workspaceStore.renameWorkspace(id, newName)
-
-  function clearCanvas() {
-    nodes.value = []
-    edgesStore.edges.splice(0, edgesStore.edges.length)
-    selectedNodeIds.value = []
-  }
-
-  /**
-   * Reset the default workspace to initial state with starter nodes
-   * Deletes all nodes in the default workspace and creates welcome content
-   */
-  async function resetDefaultWorkspace(): Promise<void> {
-    storeLogger.info('Resetting default workspace to initial state')
-
-    // Delete all nodes in the default workspace (workspace_id = null)
-    const defaultNodes = nodes.value.filter(n => n.workspace_id === null)
-    for (const node of defaultNodes) {
-      try {
-        await invoke('delete_node', { id: node.id })
-      } catch (e) {
-        storeLogger.error(`Failed to delete node ${node.id}:`, e)
-      }
-    }
-
-    // Clear local state for default workspace
-    nodes.value = nodes.value.filter(n => n.workspace_id !== null)
-    selectedNodeIds.value = []
-
-    // Get localized content and node configurations
-    const locale = localStorage.getItem('nodus-locale') || 'en'
-    const templates = getStarterTemplates(locale)
-    const titles = getStarterTitles(locale)
-    const nodeConfigs = getStarterNodeConfigs()
-    const edgeConfigs = getStarterEdgeConfigs()
-
-    // Create starter nodes from configurations
-    const createdNodes = new Map<string, Node>()
-    for (const config of nodeConfigs) {
-      const node = await createNode({
-        title: titles[config.key],
-        markdown_content: templates[config.key],
-        canvas_x: config.canvas_x,
-        canvas_y: config.canvas_y,
-        width: config.width,
-        height: config.height,
-        color_theme: config.color_theme,
-      })
-      createdNodes.set(config.key, node)
-    }
-
-    // Create demo edges from configurations
-    for (const config of edgeConfigs) {
-      const source = createdNodes.get(config.sourceKey)
-      const target = createdNodes.get(config.targetKey)
-      if (source && target) {
-        await createEdge({
-          source_node_id: source.id,
-          target_node_id: target.id,
-          link_type: config.linkType,
-          label: getEdgeLabel(config.labelKey, locale),
-          directed: config.directed,
-        })
-      }
-    }
-
-    // Set hyperbolic edge style for starter content
-    canvasStorage.setEdgeStyle('hyperbolic')
-
-    storeLogger.info('Default workspace reset complete')
-  }
-
-  // Edge cleanup functions - forwarded to edges store
-  const cleanupOrphanEdges = () => edgesStore.cleanupOrphanEdges(new Set(nodes.value.map(n => n.id)))
-  const deduplicateEdges = () => edgesStore.deduplicateEdges()
-
-  // Frame functions - forwarded to frames store (with node cleanup for delete)
-  // Convert "default" to null for backend compatibility
-  const createFrame = (x: number, y: number, width = 400, height = 300, title = 'Frame') => {
-    const wsId = workspaceStore.currentWorkspaceId
-    const workspaceForBackend = wsId === 'default' ? null : wsId
-    return framesStore.createFrame(x, y, width, height, title, workspaceForBackend)
-  }
-  const updateFramePosition = (id: string, x: number, y: number) => framesStore.updateFramePosition(id, x, y)
-  const updateFrameSize = (id: string, width: number, height: number) => framesStore.updateFrameSize(id, width, height)
-  const updateFrameTitle = (id: string, title: string) => framesStore.updateFrameTitle(id, title)
-  const updateFrameColor = (id: string, color: string | null) => framesStore.updateFrameColor(id, color)
-
-  function deleteFrame(id: string) {
-    // Unassign nodes from this frame first
-    for (const node of nodes.value) {
-      if (node.frame_id === id) {
-        node.frame_id = null
-      }
-    }
-    framesStore.deleteFrame(id)
-  }
-
-  function selectFrame(id: string | null) {
-    framesStore.selectFrame(id)
-    if (id) {
-      selectedNodeIds.value = []
-    }
-  }
-
-  function assignNodesToFrame(nodeIds: string[], frameId: string | null) {
-    for (const node of nodes.value) {
-      if (nodeIds.includes(node.id) && node.frame_id !== frameId) {
-        node.frame_id = frameId
-        // Persist to backend
-        invoke('assign_node_to_frame', { nodeId: node.id, frameId }).catch((e) =>
-          storeLogger.error('Failed to assign node to frame:', e)
-        )
-      }
-    }
-  }
-
-  /**
-   * Check if moving a node's file would cause a collision
-   * Returns the conflicting filename if collision exists, null otherwise
-   */
-  async function checkFileCollision(nodeId: string, targetFolder: string): Promise<string | null> {
-    const result = await invoke<string | null>('check_file_collision', { nodeId, targetFolder })
-    return result
-  }
-
-  /**
-   * Move a node's file to a different folder
-   * Used for folder-frame sync when nodes are dragged between frames
-   * @param collisionResolution - 'auto' (auto-rename), 'replace' (overwrite), or a custom filename
-   */
-  async function moveNodeFile(
-    nodeId: string,
-    targetFolder: string,
-    collisionResolution?: string
-  ): Promise<string> {
-    const node = nodes.value.find((n) => n.id === nodeId)
-    const oldPath = node?.file_path
-
-    const newPath = await invoke<string>('move_node_file', {
-      nodeId,
-      targetFolder,
-      collisionResolution: collisionResolution ?? 'auto',
-    })
-
-    // Update local node state
-    if (node) {
-      node.file_path = newPath
-    }
-
-    // Update backlinks in other nodes that reference this node
-    if (oldPath && newPath !== oldPath) {
-      const vaultPath = workspaceStore.currentVaultPath
-      await updateBacklinksForMovedNode(nodeId, oldPath, newPath, vaultPath)
-    }
-
-    return newPath
-  }
-
-  /**
-   * Update wikilinks in other nodes when a node moves
-   */
-  async function updateBacklinksForMovedNode(
-    nodeId: string,
-    oldPath: string,
-    newPath: string,
-    vaultPath: string | null
-  ): Promise<void> {
-    const movedNode = nodes.value.find((n) => n.id === nodeId)
-    if (!movedNode) return
-
-    // Calculate new wikilink target
-    let newTarget = movedNode.title
-    if (newPath && vaultPath) {
-      const normalizedNewPath = newPath.replace(/\\/g, '/')
-      const normalizedVault = vaultPath.replace(/\\/g, '/').replace(/\/$/, '')
-      if (normalizedNewPath.startsWith(normalizedVault)) {
-        const relativePath = normalizedNewPath.slice(normalizedVault.length + 1)
-        newTarget = relativePath.replace(/\.md$/, '')
-      }
-    }
-
-    // Find and update nodes with wikilinks to the moved node
-    for (const node of nodes.value) {
-      if (node.id === nodeId || !node.markdown_content) continue
-
-      // Check if this node has wikilinks that might reference the moved node
-      const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-      let match
-      let updatedContent = node.markdown_content
-      let hasChanges = false
-
-      // Collect all matches first to avoid issues with index shifting
-      const matches: Array<{ target: string; display: string | null; fullMatch: string; index: number }> = []
-      while ((match = wikilinkRegex.exec(node.markdown_content)) !== null) {
-        matches.push({
-          target: match[1],
-          display: match[2] || null,
-          fullMatch: match[0],
-          index: match.index,
-        })
-      }
-
-      // Process matches in reverse order to preserve indices
-      for (let i = matches.length - 1; i >= 0; i--) {
-        const m = matches[i]
-        const targetLower = m.target.toLowerCase()
-
-        // Check if this wikilink matches the moved node
-        let isMatch = false
-
-        // Match by title
-        if (movedNode.title.toLowerCase() === targetLower) {
-          isMatch = true
-        }
-
-        // Match by old path
-        if (!isMatch && oldPath) {
-          const pathParts = oldPath.replace(/\\/g, '/').split('/')
-          const filename = pathParts[pathParts.length - 1].replace(/\.md$/, '')
-          if (targetLower === filename.toLowerCase()) {
-            isMatch = true
-          }
-          // Check folder/filename pattern
-          if (!isMatch && pathParts.length >= 2) {
-            const folderAndFile = pathParts.slice(-2).join('/').replace(/\.md$/, '')
-            if (targetLower === folderAndFile.toLowerCase()) {
-              isMatch = true
-            }
-          }
-        }
-
-        if (isMatch && m.target !== newTarget) {
-          const newWikilink = m.display ? `[[${newTarget}|${m.display}]]` : `[[${newTarget}]]`
-          updatedContent =
-            updatedContent.slice(0, m.index) +
-            newWikilink +
-            updatedContent.slice(m.index + m.fullMatch.length)
-          hasChanges = true
-        }
-      }
-
-      if (hasChanges) {
-        try {
-          await updateNodeContent(node.id, updatedContent)
-          storeLogger.info(`Updated backlinks in node: ${node.title}`)
-        } catch (e) {
-          storeLogger.error(`Failed to update backlinks in node ${node.id}:`, e)
-        }
-      }
-    }
-  }
-
-  /**
-   * Update a node's file path in local state (for use by node dragging)
-   */
-  function updateNodeFilePath(nodeId: string, filePath: string) {
-    const node = nodes.value.find((n) => n.id === nodeId)
-    if (node) {
-      node.file_path = filePath
-    }
-  }
-
-  /**
-   * Get the current workspace vault path
-   */
-  function getVaultPath(): string | null {
-    return workspaceStore.currentVaultPath
-  }
-
-  // Layout nodes - forwarded to layout composable
+  // Layout forwarding
   const layoutNodes = (
     nodeIds?: string[],
     options?: {
@@ -1106,73 +521,8 @@ export const useNodesStore = defineStore('nodes', () => {
   })
   const { isNodeEditable, startEditing, stopEditing, hasEditLock } = editLocking
 
-  // Storyline functions - forwarded to storylines store
-  const loadStorylines = () => storylinesStore.loadStorylines()
-  const createStoryline = (title: string, description?: string, color?: string) => storylinesStore.createStoryline(title, description, color)
-  const updateStoryline = (id: string, title: string, description?: string, color?: string) => storylinesStore.updateStoryline(id, title, description, color)
-  const deleteStoryline = (id: string) => storylinesStore.deleteStoryline(id)
-  const addNodeToStoryline = (storylineId: string, nodeId: string, position?: number) => storylinesStore.addNodeToStoryline(storylineId, nodeId, position)
-  const removeNodeFromStoryline = (storylineId: string, nodeId: string) => storylinesStore.removeNodeFromStoryline(storylineId, nodeId)
-  const reorderStorylineNodes = (storylineId: string, nodeIds: string[]) => storylinesStore.reorderStorylineNodes(storylineId, nodeIds)
-  const getStorylineNodes = (storylineId: string) => storylinesStore.getStorylineNodes(storylineId)
-  const getStorylinesForNode = (nodeId: string) => storylinesStore.getStorylinesForNode(nodeId)
-  const repairStorylineEdges = (storylineId: string) => storylinesStore.repairStorylineEdges(storylineId)
-
-  // Tag node functions - forwarded to tag nodes composable
-  const getOrCreateTagNode = (tagName: string, nearNodeId?: string) => tagNodesComposable.getOrCreateTagNode(tagName, nearNodeId)
-  const createTagEdges = (nodeId: string, tagNames: string[]) => tagNodesComposable.createTagEdges(nodeId, tagNames)
-  const getTagNodes = () => tagNodesComposable.getTagNodes()
-
-  // Sync all existing hashtags to tag nodes
-  async function syncAllTagNodes() {
-    if (!tagNodesComposable) return
-    for (const node of nodes.value) {
-      if (node.node_type === 'tag') continue // Skip tag nodes themselves
-      if (!node.tags) continue
-      try {
-        const tags = JSON.parse(node.tags)
-        if (Array.isArray(tags) && tags.length > 0) {
-          await tagNodesComposable.createTagEdges(node.id, tags)
-        }
-      } catch {
-        // Invalid JSON in tags
-      }
-    }
-  }
-
-  // Remove all tag nodes
-  async function removeAllTagNodes() {
-    const tagNodes = nodes.value.filter(n => n.node_type === 'tag')
-    for (const tagNode of tagNodes) {
-      await deleteNode(tagNode.id)
-    }
-  }
-
-  // Listen for tag nodes setting change
-  const handleTagNodesChange = async (e: Event) => {
-    const enabled = (e as CustomEvent).detail
-    if (enabled) {
-      await syncAllTagNodes()
-    } else {
-      await removeAllTagNodes()
-    }
-  }
-  window.addEventListener('nodus-tag-nodes-change', handleTagNodesChange)
-
-  // Entity functions - forwarded to entity operations composable
-  const getEntities = () => entityOpsComposable.getEntities()
-  const getEntitiesByType = (entityType: EntityNodeType) => entityOpsComposable.getEntitiesByType(entityType)
-  const getLinkedEntities = (nodeId: string) => entityOpsComposable.getLinkedEntities(nodeId)
-  const getNodesReferencingEntity = (entityId: string) => entityOpsComposable.getNodesReferencingEntity(entityId)
-  const createEntityNode = (
-    entityType: EntityNodeType,
-    title: string,
-    options?: { canvas_x?: number; canvas_y?: number; markdown_content?: string; color_theme?: string | null }
-  ) => entityOpsComposable.createEntityNode(entityType, title, options)
-  const linkToEntity = (sourceNodeId: string, entityNodeId: string, linkType?: string) =>
-    entityOpsComposable.linkToEntity(sourceNodeId, entityNodeId, linkType)
-
   return {
+    // State
     nodes,
     edges,
     frames,
@@ -1196,7 +546,9 @@ export const useNodesStore = defineStore('nodes', () => {
     filteredStorylines,
     storylineNodes,
     storylineNodesVersion,
+    // Initialization
     initialize,
+    // Node operations
     getNode,
     getNeighborIds,
     findNodeByTitle,
@@ -1213,6 +565,7 @@ export const useNodesStore = defineStore('nodes', () => {
     deleteNode,
     deleteNodes,
     restoreNode,
+    // Edge operations
     createEdge,
     deleteEdge,
     restoreEdge,
@@ -1220,6 +573,7 @@ export const useNodesStore = defineStore('nodes', () => {
     updateEdgeColor,
     updateEdgeDirected,
     updateStorylineEdgeColors,
+    // Frame operations
     createFrame,
     updateFramePosition,
     updateFrameSize,
@@ -1228,6 +582,7 @@ export const useNodesStore = defineStore('nodes', () => {
     deleteFrame,
     selectFrame,
     assignNodesToFrame,
+    // Import operations
     importVault,
     importCitations,
     importOntology,
@@ -1235,6 +590,7 @@ export const useNodesStore = defineStore('nodes', () => {
     syncFramesFromFolders,
     watchVault,
     stopWatching,
+    // Workspace operations
     createWorkspace,
     switchWorkspace,
     deleteWorkspace,
@@ -1243,6 +599,7 @@ export const useNodesStore = defineStore('nodes', () => {
     renameWorkspace,
     clearCanvas,
     resetDefaultWorkspace,
+    // Edge cleanup
     cleanupOrphanEdges,
     deduplicateEdges,
     loadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
@@ -1250,11 +607,14 @@ export const useNodesStore = defineStore('nodes', () => {
       const fetchedNodes = await invoke<Node[]>('get_nodes')
       nodes.value = fetchedNodes
     },
+    // Layout
     layoutNodes,
+    // Edit locking
     isNodeEditable,
     startEditing,
     stopEditing,
     hasEditLock,
+    // Storylines
     loadStorylines,
     createStoryline,
     updateStoryline,
