@@ -36,3 +36,31 @@ export {
   type UseCanvasEventHandlersContext,
   type UseCanvasEventHandlersReturn,
 } from './useCanvasEventHandlers'
+export {
+  useCanvasTheme,
+  type UseCanvasThemeReturn,
+  type UseCanvasThemeContext,
+} from './useCanvasTheme'
+export {
+  useCanvasInit,
+  useWorkspaceWatchers,
+  type UseCanvasInitContext,
+  type UseCanvasInitReturn,
+  type UseWorkspaceWatchContext,
+} from './useCanvasInit'
+export {
+  useCanvasNodeSizing,
+  type UseCanvasNodeSizingContext,
+  type UseCanvasNodeSizingReturn,
+  type NodeLike as NodeLikeForSizing,
+} from './useCanvasNodeSizing'
+export {
+  useCanvasZotero,
+  type UseCanvasZoteroContext,
+  type UseCanvasZoteroReturn,
+} from './useCanvasZotero'
+export {
+  useFullscreenModal,
+  type UseFullscreenModalContext,
+  type UseFullscreenModalReturn,
+} from './useFullscreenModal'

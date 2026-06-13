@@ -58,3 +58,8 @@ export {
   type UseCanvasNodeStyleContext,
   type UseCanvasNodeStyleReturn,
 } from './useCanvasNodeStyle'
+export {
+  useColorOperations,
+  type UseColorOperationsContext,
+  type UseColorOperationsReturn,
+} from './useColorOperations'

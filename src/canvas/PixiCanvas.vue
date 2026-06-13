@@ -4,10 +4,9 @@ import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 import { useDisplayStore } from '../stores/display'
-import type { Node, Edge } from '../types'
+import type { Node } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
-import { resolveWikilink } from '../lib/wikilink'
 import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
 import { memoryStorage, agentMemoryStorage } from '../lib/storage'
@@ -30,6 +29,7 @@ import {
   useNodeNavigation,
   useEntityOperations,
   useCanvasNodeStyle,
+  useColorOperations,
 } from './composables/nodes'
 import {
   useEdgeManipulation,
@@ -37,7 +37,7 @@ import {
   useEdgeStyling,
   useEdgeVisibility,
 } from './composables/edges'
-import { useLasso, useContextMenu } from './composables/selection'
+import { useLasso, useContextMenu, useSelectionActions } from './composables/selection'
 import {
   useAgentRunner,
   useLLMTools,
@@ -48,8 +48,7 @@ import {
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
 import { useLayout, useNeighborhoodMode } from './composables/layout'
-import { resolveFrameOverlaps, organizeFrameNodes, type FrameWithId, type FrameForOrganize, type NodeForOrganize } from './composables/layout/useFrameCollision'
-import { useFrames } from './composables/frames'
+import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
 import {
   useCanvasKeyboardShortcuts,
   usePdfDrop,
@@ -59,6 +58,9 @@ import {
   useCitationFetch,
   useCanvasSettings,
   useCanvasEventHandlers,
+  useCanvasTheme,
+  useCanvasZotero,
+  useFullscreenModal,
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
 import { findConnectedNodes } from './utils/graphTraversal'
@@ -79,14 +81,16 @@ import CanvasLODCanvas from './components/CanvasLODCanvas.vue'
 import CanvasAgentLogPanel from './components/CanvasAgentLogPanel.vue'
 import CanvasColorBar from './components/CanvasColorBar.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
-import NodePicker from '../components/NodePicker.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
+import CanvasCitationProgress from './components/CanvasCitationProgress.vue'
+import CanvasZoteroProgress from './components/CanvasZoteroProgress.vue'
+import CanvasLinkPickerModal from './components/CanvasLinkPickerModal.vue'
+import CanvasEmptyState from './components/CanvasEmptyState.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
 import FullscreenNodeModal from '../components/FullscreenNodeModal.vue'
 import FileMoveCollisionDialog from '../components/FileMoveCollisionDialog.vue'
 import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
-import { useZotero } from '../composables/useZotero'
 import { useNodeService } from '../composables/useNodeService'
 import { notifications$ } from '../composables/useNotifications'
 
@@ -151,15 +155,6 @@ async function showFileMoveCollisionDialog(
   })
 }
 
-// Reactive theme tracking
-const isDarkMode = ref(false)
-
-function updateTheme() {
-  const theme = document.documentElement.getAttribute('data-theme') || 'light'
-  currentTheme.value = theme
-  isDarkMode.value = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
-}
-
 // Track if we've centered the view initially
 let hasInitiallyCentered = false
 
@@ -185,11 +180,6 @@ const {
   startZooming,
 } = viewState
 
-// Watch for theme changes to reinitialize Mermaid with correct theme
-watch(isDarkMode, () => {
-  reinitializeMermaid()
-})
-
 onMounted(() => {
   // Setup display settings listener for reactive updates
   displayStore.setupListener()
@@ -199,14 +189,6 @@ onMounted(() => {
 
   // Initialize font scale CSS variable
   document.documentElement.style.setProperty('--font-scale', String(fontScale.value))
-
-  updateTheme()
-  // Watch for theme changes
-  const observer = new MutationObserver(updateTheme)
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['data-theme'],
-  })
 
   // Track viewport size for node culling
   const updateViewportSize = () => {
@@ -269,7 +251,6 @@ onMounted(() => {
   pdfDrop.setup()
 
   onUnmounted(() => {
-    observer.disconnect()
     window.removeEventListener('resize', updateViewportSize)
     window.removeEventListener('zoom-to-node', handleZoomToNode)
     window.removeEventListener('nodus-llm-enabled-change', handleLLMEnabledChange)
@@ -564,6 +545,11 @@ const {
   reinitializeMermaid,
 } = contentRenderer
 
+// Theme composable - tracks dark mode and theme changes
+const { currentTheme } = useCanvasTheme({
+  onThemeChange: () => reinitializeMermaid(),
+})
+
 // Preview content computed - renders on-demand if not cached
 const previewContent = computed(() => {
   const node = previewNode.value
@@ -839,42 +825,14 @@ const {
   handleFetchBoth,
 } = citationFetch
 
-// Zotero integration
-const zotero = useZotero()
-
-async function handleAddToZotero() {
-  const affectedIds = contextMenu.affectedNodeIds.value
-  if (affectedIds.length === 0) return
-
-  const nodes = affectedIds
-    .map(id => store.getNode(id))
-    .filter((n): n is Node => n !== undefined)
-
-  if (nodes.length === 0) return
-
-  const result = await zotero.addNodesToZotero(nodes)
-
-  if (result.cancelled) {
-    if (result.added > 0) {
-      showToast(`Stopped - added ${result.added} item(s) to Zotero`, 'warning')
-    } else {
-      showToast('Cancelled', 'info')
-    }
-  } else if (result.added > 0) {
-    const parts: string[] = []
-    if (result.duplicates > 0) parts.push(`${result.duplicates} duplicates`)
-    if (result.skipped > 0) parts.push(`${result.skipped} no content`)
-    const extraMsg = parts.length > 0 ? ` (${parts.join(', ')})` : ''
-    showToast(`Added ${result.added} item(s) to Zotero${extraMsg}`, 'success')
-  } else if (result.duplicates > 0) {
-    showToast(`No items added - ${result.duplicates} already in Zotero`, 'info')
-  } else if (result.skipped > 0) {
-    showToast(`No items added - ${result.skipped} node(s) had no content`, 'warning')
-  }
-  if (result.errors.length > 0) {
-    showToast(result.errors[0], 'error')
-  }
-}
+// Zotero integration composable
+const { zotero, handleAddToZotero } = useCanvasZotero({
+  store: {
+    getNode: store.getNode,
+  },
+  getAffectedNodeIds: () => contextMenu.affectedNodeIds.value,
+  showToast,
+})
 
 // Link picker composable
 const linkPicker = useLinkPicker({
@@ -921,90 +879,16 @@ const {
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
 
-// Resolve frame-to-frame collisions after drag or resize
-function resolveFrameCollisions() {
-  const allFrames = store.filteredFrames
-  if (allFrames.length < 2) return
-
-  // Build frames with ID for collision detection
-  const framesForCollision: FrameWithId[] = allFrames.map(f => ({
-    id: f.id,
-    canvas_x: f.canvas_x,
-    canvas_y: f.canvas_y,
-    width: f.width,
-    height: f.height,
-    parent_frame_id: f.parent_frame_id,
-  }))
-
-  // Resolve overlaps (40px gap, max 10 iterations)
-  const resolvedPositions = resolveFrameOverlaps(framesForCollision, 40, 10)
-
-  // Apply resolved positions and move contained nodes
-  for (const frame of allFrames) {
-    const resolvedPos = resolvedPositions.get(frame.id)
-    if (!resolvedPos) continue
-
-    const deltaX = resolvedPos.x - frame.canvas_x
-    const deltaY = resolvedPos.y - frame.canvas_y
-
-    // Skip if no movement needed
-    if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
-
-    // Update frame position
-    store.updateFramePosition(frame.id, resolvedPos.x, resolvedPos.y)
-
-    // Move contained nodes with the frame (use frame_id from database)
-    const nodesInFrame = store.filteredNodes.filter(n => n.frame_id === frame.id)
-    for (const node of nodesInFrame) {
-      store.updateNodePosition(node.id, node.canvas_x + deltaX, node.canvas_y + deltaY)
-    }
-  }
-}
-
-/**
- * Organize nodes for a specific frame:
- * - Nodes 50%+ inside get pulled fully inside
- * - Nodes just overlapping (<50%) get pushed out
- */
-async function organizeFrame(frameId: string) {
-  const frame = store.filteredFrames.find(f => f.id === frameId)
-  if (!frame) return
-
-  const allNodes = store.filteredNodes
-
-  // Build node data
-  const nodesForOrganize: NodeForOrganize[] = allNodes.map(n => ({
-    id: n.id,
-    canvas_x: n.canvas_x,
-    canvas_y: n.canvas_y,
-    width: n.width,
-    height: n.height,
-  }))
-
-  // Build frame data
-  const frameForOrganize: FrameForOrganize = {
-    id: frame.id,
-    canvas_x: frame.canvas_x,
-    canvas_y: frame.canvas_y,
-    width: frame.width,
-    height: frame.height,
-  }
-
-  // Run organization
-  const newPositions = organizeFrameNodes(nodesForOrganize, frameForOrganize, 20)
-
-  // Apply new positions
-  for (const [nodeId, pos] of newPositions) {
-    const node = store.getNode(nodeId)
-    if (!node) continue
-
-    const dx = Math.abs(pos.x - node.canvas_x)
-    const dy = Math.abs(pos.y - node.canvas_y)
-    if (dx > 1 || dy > 1) {
-      await store.updateNodePosition(nodeId, pos.x, pos.y)
-    }
-  }
-}
+// Frame operations composable - collision resolution and node organization
+const { resolveFrameCollisions, organizeFrame } = useFrameOperations({
+  store: {
+    get filteredFrames() { return store.filteredFrames },
+    get filteredNodes() { return store.filteredNodes },
+    getNode: store.getNode,
+    updateFramePosition: store.updateFramePosition,
+    updateNodePosition: store.updateNodePosition,
+  },
+})
 
 // Frame operations composable
 const frames = useFrames({
@@ -1097,42 +981,16 @@ function fitToContent() {
   layout.fitToContent()
 }
 
-// Fit selected frame to snugly wrap its contents
-function fitSelectedFrameToContents() {
-  const frameId = store.selectedFrameId
-  if (!frameId) return
-
-  const frame = store.frames.find(f => f.id === frameId)
-  if (!frame) return
-
-  // Get nodes assigned to this frame
-  const nodesInFrame = store.filteredNodes.filter(n => n.frame_id === frameId)
-  if (nodesInFrame.length === 0) return
-
-  // Calculate bounding box of nodes
-  const padding = 30
-  const titleHeight = 40
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const node of nodesInFrame) {
-    const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-    const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + nodeWidth)
-    maxY = Math.max(maxY, node.canvas_y + nodeHeight)
-  }
-
-  // Calculate new frame dimensions
-  const newX = minX - padding
-  const newY = minY - padding - titleHeight
-  const newWidth = maxX - minX + padding * 2
-  const newHeight = maxY - minY + padding * 2 + titleHeight
-
-  // Update frame position and size
-  store.updateFramePosition(frameId, newX, newY)
-  store.updateFrameSize(frameId, newWidth, newHeight)
-}
+// Frame fitting composable
+const { fitSelectedFrameToContents } = useFrameFitting({
+  store: {
+    get frames() { return store.frames },
+    get filteredNodes() { return store.filteredNodes },
+    get selectedFrameId() { return store.selectedFrameId },
+    updateFramePosition: store.updateFramePosition,
+    updateFrameSize: store.updateFrameSize,
+  },
+})
 
 // Auto-fit is per-node (stored on node.auto_fit)
 
@@ -1666,30 +1524,17 @@ const nodeResizing = useNodeResizing({
 })
 const { resizingNode, resizePreview, onResizePointerDown } = nodeResizing
 
-// Fullscreen node modal state
-const showFullscreenModal = ref(false)
-const fullscreenNodeId = ref<string | null>(null)
-
-function openFullscreenNode(nodeId: string) {
-  fullscreenNodeId.value = nodeId
-  showFullscreenModal.value = true
-}
-
-function closeFullscreenNode() {
-  showFullscreenModal.value = false
-  fullscreenNodeId.value = null
-}
-
-function handleNavigateToNode(title: string) {
-  const linkedNode = resolveWikilink(title, {
-    nodes: store.filteredNodes,
-    frames: store.filteredFrames,
-  })
-  if (linkedNode) {
-    // Open the linked node in fullscreen
-    fullscreenNodeId.value = linkedNode.id
-  }
-}
+// Fullscreen node modal composable
+const {
+  showFullscreenModal,
+  fullscreenNodeId,
+  openFullscreenNode,
+  closeFullscreenNode,
+  handleNavigateToNode,
+} = useFullscreenModal({
+  getFilteredNodes: () => store.filteredNodes,
+  getFilteredFrames: () => store.filteredFrames,
+})
 
 // Node dragging composable
 const nodeDragging = useNodeDragging({
@@ -1757,9 +1602,6 @@ const nodeDragging = useNodeDragging({
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
-// Track current theme name for reactive palette switching
-const currentTheme = ref(document.documentElement.getAttribute('data-theme') || 'light')
-
 // Edge styling composable - handles colors, styles, stroke width, and theme-aware highlighting
 const edgeStyling = useEdgeStyling({
   store: {
@@ -1825,28 +1667,17 @@ const { visibleEdgeLines } = useEdgeVisibility({
   getNode: store.getNode,
 })
 
-function updateSelectedNodesColor(color: string | null) {
-  // Capture old colors for undo
-  const oldColors = new Map<string, string | null>()
-  for (const nodeId of store.selectedNodeIds) {
-    const node = store.getNode(nodeId)
-    if (node) {
-      oldColors.set(nodeId, node.color_theme ?? null)
-    }
-  }
-  pushColorUndo(oldColors)
-
-  // Apply color to all selected nodes
-  for (const nodeId of store.selectedNodeIds) {
-    store.updateNodeColor(nodeId, color)
-  }
-}
-
-function updateSelectedFrameColor(color: string | null) {
-  if (store.selectedFrameId) {
-    store.updateFrameColor(store.selectedFrameId, color)
-  }
-}
+// Color operations composable - node and frame color updates
+const { updateSelectedNodesColor, updateSelectedFrameColor } = useColorOperations({
+  store: {
+    getNode: store.getNode,
+    get selectedNodeIds() { return store.selectedNodeIds },
+    get selectedFrameId() { return store.selectedFrameId },
+    updateNodeColor: store.updateNodeColor,
+    updateFrameColor: store.updateFrameColor,
+  },
+  pushColorUndo,
+})
 
 async function fitSelectedNodes() {
   // Selected nodes are always included in visibleNodes via viewport culling,
@@ -1933,36 +1764,18 @@ async function fitNodeNow(nodeId: string): Promise<void> {
   })
 }
 
-function selectAllNodes() {
-  // Select all visible nodes (respects neighborhood mode)
-  const nodeIds = displayNodes.value.map(n => n.id)
-  store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...nodeIds)
-}
-
-async function deleteSelectedNodes(nodeIds?: string[]) {
-  const ids = nodeIds ?? [...store.selectedNodeIds]
-  if (ids.length === 0) return
-
-  // Collect all nodes and edges for undo before deletion
-  const undoData: Array<{ node: Node; edges: Edge[] }> = []
-  for (const id of ids) {
-    const node = store.getNode(id)
-    if (node) {
-      const connectedEdges = store.filteredEdges.filter(
-        e => e.source_node_id === id || e.target_node_id === id
-      )
-      undoData.push({ node, edges: connectedEdges })
-    }
-  }
-
-  // Push all to undo stack
-  for (const { node, edges } of undoData) {
-    pushDeletionUndo(node, edges)
-  }
-
-  // Batch delete all nodes at once
-  await store.deleteNodes(ids)
-}
+// Selection actions composable - select all and delete
+const { selectAllNodes, deleteSelectedNodes } = useSelectionActions({
+  store: {
+    getNode: store.getNode,
+    get selectedNodeIds() { return store.selectedNodeIds },
+    set selectedNodeIds(ids) { store.selectedNodeIds.splice(0, store.selectedNodeIds.length, ...ids) },
+    get filteredEdges() { return store.filteredEdges },
+    deleteNodes: store.deleteNodes,
+  },
+  displayNodes,
+  pushDeletionUndo,
+})
 
 // Node styling composable - handles node background and style computation
 const nodeStyle = useCanvasNodeStyle({
@@ -2454,88 +2267,31 @@ defineExpose({
       />
 
       <!-- Citation fetch progress indicator -->
-      <div v-if="isFetchingCitations" class="citation-fetch-progress">
-        <div class="citation-fetch-content">
-          <div class="citation-fetch-header">
-            <span class="citation-fetch-title">Fetching Citations</span>
-            <span v-if="queueSize > 0" class="citation-fetch-queue">({{ queueSize }} queued)</span>
-            <button class="citation-fetch-cancel" @click="citationFetch.cancelFetch()">
-              Cancel
-            </button>
-          </div>
-          <div v-if="fetchProgress" class="citation-fetch-info">
-            <div v-if="fetchProgress.paperCount && fetchProgress.paperCount > 1" class="citation-fetch-papers">
-              Paper {{ fetchProgress.paperIndex }} / {{ fetchProgress.paperCount }}
-            </div>
-            <div class="citation-fetch-count">
-              Citation {{ fetchProgress.current }} / {{ fetchProgress.total }}
-            </div>
-            <div class="citation-fetch-paper">{{ fetchProgress.paperTitle }}</div>
-            <div class="citation-fetch-bar">
-              <div
-                class="citation-fetch-bar-fill"
-                :style="{ width: `${(fetchProgress.current / Math.max(fetchProgress.total, 1)) * 100}%` }"
-              ></div>
-            </div>
-          </div>
-          <!-- Wait countdown display -->
-          <div v-if="waitStatus?.isWaiting" class="citation-fetch-wait">
-            <span class="citation-fetch-wait-icon">&#8987;</span>
-            <span class="citation-fetch-wait-text">
-              {{ waitStatus.reason === 'backoff' ? 'Rate limited, retrying in' : 'Next request in' }}
-              {{ waitStatus.remainingSeconds }}s
-            </span>
-          </div>
-        </div>
-      </div>
+      <CanvasCitationProgress
+        :visible="isFetchingCitations"
+        :fetch-progress="fetchProgress"
+        :queue-size="queueSize"
+        :wait-status="waitStatus"
+        @cancel="citationFetch.cancelFetch()"
+      />
 
       <!-- Zotero add progress indicator -->
-      <div v-if="zotero.addToZoteroProgress.value" class="citation-fetch-progress">
-        <div class="citation-fetch-content">
-          <div class="citation-fetch-header">
-            <span class="citation-fetch-title">Adding to Zotero</span>
-            <button class="citation-fetch-cancel" @click="zotero.cancelAddToZotero()">
-              Stop
-            </button>
-          </div>
-          <div class="citation-fetch-info">
-            <div class="citation-fetch-count">
-              {{ zotero.addToZoteroProgress.value.current }} / {{ zotero.addToZoteroProgress.value.total }}
-            </div>
-            <div class="citation-fetch-paper">{{ zotero.addToZoteroProgress.value.currentItem }}</div>
-            <div class="citation-fetch-bar">
-              <div
-                class="citation-fetch-bar-fill"
-                :style="{ width: `${(zotero.addToZoteroProgress.value.current / Math.max(zotero.addToZoteroProgress.value.total, 1)) * 100}%` }"
-              ></div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CanvasZoteroProgress
+        :visible="!!zotero.addToZoteroProgress.value"
+        :progress="zotero.addToZoteroProgress.value"
+        @cancel="zotero.cancelAddToZotero()"
+      />
 
       <!-- Link to picker modal -->
-      <Teleport to="body">
-        <div v-if="showLinkPicker" class="link-picker-overlay" @click="closeLinkPicker">
-          <div class="link-picker-modal" @click.stop>
-            <NodePicker
-              :exclude-node-ids="linkPickerSourceNodeId ? [linkPickerSourceNodeId] : []"
-              :show-search="true"
-              :allow-create="false"
-              :max-items="20"
-              @select="linkToNode"
-              @close="closeLinkPicker"
-            />
-          </div>
-        </div>
-      </Teleport>
+      <CanvasLinkPickerModal
+        :visible="showLinkPicker"
+        :exclude-node-ids="linkPickerSourceNodeId ? [linkPickerSourceNodeId] : []"
+        @select="linkToNode"
+        @close="closeLinkPicker"
+      />
 
       <!-- Empty state overlay -->
-      <div v-if="store.filteredNodes.length === 0" class="empty-state-overlay">
-        <div class="empty-state-box">
-          <h3>No nodes yet</h3>
-          <p>Double-click anywhere to create a node</p>
-        </div>
-      </div>
+      <CanvasEmptyState :visible="store.filteredNodes.length === 0" />
 
       <!-- Import options modal for Zotero/BibTeX files -->
       <ImportOptionsModal
