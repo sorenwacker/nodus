@@ -624,6 +624,32 @@ async function openFolderDialog() {
         <button class="icon-btn" :disabled="redoStack.length === 0" :data-tooltip="`${t('toolbar.redo')} (Cmd+Shift+Z)`" @click="redo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
+        <div class="toolbar-divider"></div>
+        <!-- Node type filters -->
+        <button
+          class="icon-btn filter-btn"
+          :class="{ active: store.showLinkedNodes }"
+          data-tooltip="Toggle linked nodes (from vault)"
+          @click="store.showLinkedNodes = !store.showLinkedNodes"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
+        <button
+          class="icon-btn filter-btn"
+          :class="{ active: store.showNodusNodes }"
+          data-tooltip="Toggle Nodus nodes (created in app)"
+          @click="store.showNodusNodes = !store.showNodusNodes"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        </button>
+        <button
+          class="icon-btn filter-btn"
+          :class="{ active: store.showCommentNodes }"
+          data-tooltip="Toggle comment nodes"
+          @click="store.showCommentNodes = !store.showCommentNodes"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
       </div>
       <div class="toolbar-center">
         <button class="search-trigger" @click="showSearch = true">

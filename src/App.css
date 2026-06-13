@@ -96,6 +96,15 @@
   color: white;
 }
 
+/* Filter buttons - dimmed when filter is OFF (nodes hidden) */
+.icon-btn.filter-btn:not(.active) {
+  opacity: 0.4;
+}
+
+.icon-btn.filter-btn:not(.active):hover {
+  opacity: 0.7;
+}
+
 .icon-btn svg {
   flex-shrink: 0;
   width: 16px;
