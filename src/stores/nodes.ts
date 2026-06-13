@@ -44,6 +44,11 @@ export const useNodesStore = defineStore('nodes', () => {
   // Version counter to trigger edge re-routing when node positions/sizes change
   const nodeLayoutVersion = ref(0)
 
+  // Node type visibility filters
+  const showLinkedNodes = ref(true)  // Nodes with file_path (from vault)
+  const showNodusNodes = ref(true)   // Nodes without file_path (created in app)
+  const showCommentNodes = ref(true) // Comment nodes
+
   // Separate stores with their own state
   const storylinesStore = useStorylinesStore()
   const edgesStore = useEdgesStore()
@@ -134,10 +139,26 @@ export const useNodesStore = defineStore('nodes', () => {
     const wsId = workspaceStore.currentWorkspaceId
     // Treat null, undefined, and "default" as the default workspace
     // Default workspace shows nodes with no workspace_id (null)
+    let result: Node[]
     if (!wsId || wsId === 'default') {
-      return nodes.value.filter(n => !n.workspace_id)
+      result = nodes.value.filter(n => !n.workspace_id)
+    } else {
+      result = nodes.value.filter(n => n.workspace_id === wsId)
     }
-    return nodes.value.filter(n => n.workspace_id === wsId)
+
+    // Apply node type visibility filters
+    return result.filter(node => {
+      // Comment nodes
+      if (node.node_type === 'comment') {
+        return showCommentNodes.value
+      }
+      // Linked nodes (from vault) - have file_path
+      if (node.file_path) {
+        return showLinkedNodes.value
+      }
+      // Nodus nodes (created in app) - no file_path
+      return showNodusNodes.value
+    })
   })
 
   const filteredFrames = computed(() => {
@@ -1165,6 +1186,10 @@ export const useNodesStore = defineStore('nodes', () => {
     selectedFrameId,
     loading,
     error,
+    // Node type visibility filters
+    showLinkedNodes,
+    showNodusNodes,
+    showCommentNodes,
     workspaces,
     currentWorkspaceId,
     storylines,

@@ -14,8 +14,10 @@
  * - citation: Reference (academic writing)
  * - term: Glossary/definition (both)
  * - item: Object, figure, dataset
+ * - tag: Tag node (auto-generated from #tags)
+ * - citation-stub: Placeholder for unresolved citation
  */
-export type NodeType = 'note' | 'comment' | 'character' | 'location' | 'citation' | 'term' | 'item'
+export type NodeType = 'note' | 'comment' | 'character' | 'location' | 'citation' | 'term' | 'item' | 'tag' | 'citation-stub'
 
 /** Entity node types (subset of NodeType used for cross-linking) */
 export type EntityNodeType = 'character' | 'location' | 'citation' | 'term' | 'item'
