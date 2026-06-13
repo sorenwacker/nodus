@@ -29,6 +29,7 @@ import {
   useNodeCollision,
   useNodeNavigation,
   useEntityOperations,
+  useCanvasNodeStyle,
 } from './composables/nodes'
 import {
   useEdgeManipulation,
@@ -57,9 +58,9 @@ import {
   useGraphExport,
   useCitationFetch,
   useCanvasSettings,
+  useCanvasEventHandlers,
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
-import { getNodeBackground as getNodeBackgroundUtil } from './utils/nodeColors'
 import { findConnectedNodes } from './utils/graphTraversal'
 import ImportOptionsModal from '../components/ImportOptionsModal.vue'
 import { NODE_DEFAULTS } from './constants'
@@ -1756,117 +1757,6 @@ const nodeDragging = useNodeDragging({
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
-// Handle clicks in node content (for external links and wikilinks)
-function handleContentClick(e: MouseEvent) {
-  const target = e.target as HTMLElement
-  const link = target.closest('a')
-  if (link) {
-    e.preventDefault()
-    e.stopPropagation()
-    // Check if it's a wikilink
-    if (link.classList.contains('wikilink')) {
-      const linkTarget = link.dataset.target
-      if (linkTarget) {
-        navigateToNode(linkTarget)
-      }
-    } else if (link.href) {
-      // External link
-      openExternal(link.href)
-    }
-  }
-}
-
-// Custom saveEditing with mermaid render and auto-fit
-function saveEditing(e?: FocusEvent) {
-  // If this is a blur event (e defined) and search is active, don't close
-  // (focus is moving within the node, e.g., to search bar)
-  // Direct calls without event (e.g., from canvas click or Cmd+Enter) should still close
-  if (e && showNodeSearch.value) {
-    return
-  }
-  // Don't close if focus moved to LLM inputs, buttons, color bar, search bar, or title header
-  if (e?.relatedTarget) {
-    const related = e.relatedTarget as HTMLElement
-    if (
-      related.closest('.collapsed-color-bar') ||
-      related.closest('.graph-llm-bar') ||
-      related.closest('.node-search-bar') ||
-      related.closest('.node-header')
-    ) {
-      return
-    }
-  }
-  // Close search if it was open
-  if (showNodeSearch.value) {
-    closeNodeSearch()
-  }
-
-  const nodeId = editingNodeId.value
-  if (nodeId) {
-    store.updateNodeContent(nodeId, editContent.value)
-    // Trigger mermaid rendering after content update
-    setTimeout(renderMermaidDiagrams, 100)
-    // Auto-fit node to content after saving (if enabled for this node)
-    // Delay to ensure content is rendered (including mermaid)
-    const node = store.getNode(nodeId)
-    if (node?.auto_fit) {
-      setTimeout(() => fitNodeToContent(nodeId), 500)
-    }
-  }
-  editingNodeId.value = null
-  editContent.value = ''
-}
-
-function onEditorKeydown(e: KeyboardEvent) {
-  // Cmd/Ctrl+F opens in-node search
-  if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {
-    e.preventDefault()
-    openNodeSearch()
-    return
-  }
-  if (e.key === 'Escape') {
-    if (showNodeSearch.value) {
-      closeNodeSearch()
-    } else {
-      saveEditing()
-    }
-    return
-  }
-  // Cmd/Ctrl+Enter to save and exit
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-    saveEditing()
-  }
-  // Don't propagate to prevent canvas shortcuts
-  e.stopPropagation()
-}
-
-// Double click to create node
-async function onCanvasDoubleClick(e: MouseEvent) {
-  const target = e.target as HTMLElement
-
-  // Don't create if clicking on interactive elements
-  if (
-    target.closest('.node-card') ||
-    target.closest('.edge-panel') ||
-    target.closest('.zoom-controls') ||
-    target.closest('.status-bar')
-  ) {
-    return
-  }
-
-  // Don't create if we just finished dragging (within 200ms)
-  if (Date.now() - lastDragEndTime < 200) return
-
-  const pos = screenToCanvas(e.clientX, e.clientY)
-  await store.createNode({
-    title: '',
-    node_type: 'note',
-    markdown_content: '',
-    canvas_x: snapToGrid(pos.x),
-    canvas_y: snapToGrid(pos.y),
-  })
-}
-
 // Track current theme name for reactive palette switching
 const currentTheme = ref(document.documentElement.getAttribute('data-theme') || 'light')
 
@@ -2074,111 +1964,56 @@ async function deleteSelectedNodes(nodeIds?: string[]) {
   await store.deleteNodes(ids)
 }
 
-// Get node background - wrapper for utility function with current theme
-function getNodeBackground(colorTheme: string | null): string | undefined {
-  return getNodeBackgroundUtil(colorTheme, currentTheme.value)
-}
+// Node styling composable - handles node background and style computation
+const nodeStyle = useCanvasNodeStyle({
+  scale,
+  offsetX,
+  offsetY,
+  resizingNode,
+  resizePreview,
+  nodeZOrder,
+  nodeBorderWidth,
+  isSemanticZoomCollapsed,
+  selectedNodeIds: computed(() => store.selectedNodeIds),
+  currentTheme,
+})
+const { getNodeStyle } = nodeStyle
 
-// Get computed style for a node card (simplifies template binding)
-function getNodeStyle(node: {
-  id: string
-  canvas_x: number
-  canvas_y: number
-  width?: number
-  height?: number
-  color_theme?: string | null
-  node_type?: string
-}) {
-  const isResizing = resizingNode.value === node.id
-  const isTagNode = node.node_type === 'tag'
-  const x = isResizing ? resizePreview.value.x : node.canvas_x
-  const y = isResizing ? resizePreview.value.y : node.canvas_y
-  const width = isResizing ? resizePreview.value.width : node.width || NODE_DEFAULTS.WIDTH
-  const height = isResizing ? resizePreview.value.height : node.height || NODE_DEFAULTS.HEIGHT
-
-  // Calculate screen position (node layer is outside canvas-content scale transform)
-  const screenX = x * scale.value + offsetX.value
-  const screenY = y * scale.value + offsetY.value
-
-  // Tag nodes fit content, regular nodes use stored dimensions
-  const screenWidth = isTagNode ? 'fit-content' : (width * scale.value) + 'px'
-  const screenHeight = isTagNode ? 'fit-content' : (height * scale.value) + 'px'
-
-  const style: Record<string, string> = {
-    '--zoom-scale': String(scale.value),
-    transform: `translate(${screenX}px, ${screenY}px)`,
-    width: screenWidth,
-    height: screenHeight,
-    borderWidth: (nodeBorderWidth.value * scale.value) + 'px',
-  }
-
-  // Apply z-index from radial layout angle order (if set)
-  const zIndex = nodeZOrder.value.get(node.id)
-  if (zIndex !== undefined) {
-    style.zIndex = String(zIndex)
-  }
-
-  // Apply color theme background if set
-  if (node.color_theme) {
-    const bg = getNodeBackground(node.color_theme)
-    if (bg) {
-      style.background = bg
-      // Tag nodes use background color for border too
-      if (isTagNode) {
-        style.borderColor = bg
-      }
-    }
-  } else if (!isTagNode && isSemanticZoomCollapsed.value && !store.selectedNodeIds.includes(node.id)) {
-    // Collapsed non-selected nodes get canvas background
-    style.background = 'var(--bg-canvas)'
-    style.borderColor = 'var(--text-muted)'
-  }
-
-  return style
-}
-
-// Context menu handler
-function onContextMenu(e: MouseEvent) {
-  e.preventDefault()
-
-  // Check if clicking on a node
-  const target = e.target as HTMLElement
-  const nodeCard = target.closest('.node-card') as HTMLElement | null
-
-  if (nodeCard) {
-    const nodeId = nodeCard.dataset.nodeId
-    if (nodeId) {
-      suppressPreviewPanel()
-      contextMenu.open(e, nodeId)
-
-      // Select the node if not already selected
-      if (!store.selectedNodeIds.includes(nodeId)) {
-        store.selectNode(nodeId)
-      }
-      return
-    }
-  }
-
-  // Hide context menu if clicking elsewhere
-  contextMenu.close()
-}
-
-function closeContextMenu() {
-  contextMenu.close()
-}
-
-// LOD canvas context menu handlers
-function onLODNodeContextMenu(e: MouseEvent, nodeId: string) {
-  suppressPreviewPanel()
-  contextMenu.open(e, nodeId)
-  if (!store.selectedNodeIds.includes(nodeId)) {
-    store.selectNode(nodeId)
-  }
-}
-
-function onLODCanvasContextMenu(_e: MouseEvent) {
-  contextMenu.close()
-}
+// Canvas event handlers composable - handles content clicks, editing, context menus
+const eventHandlers = useCanvasEventHandlers({
+  editingNodeId,
+  editContent,
+  showNodeSearch,
+  closeNodeSearch,
+  openNodeSearch,
+  updateNodeContent: store.updateNodeContent,
+  getNode: store.getNode,
+  renderMermaidDiagrams,
+  fitNodeToContent,
+  navigateToNode,
+  openExternal,
+  screenToCanvas,
+  snapToGrid,
+  createNode: store.createNode,
+  lastDragEndTime: () => lastDragEndTime,
+  contextMenu: {
+    open: contextMenu.open,
+    close: contextMenu.close,
+  },
+  suppressPreviewPanel,
+  getSelectedNodeIds: () => store.selectedNodeIds,
+  selectNode: store.selectNode,
+})
+const {
+  handleContentClick,
+  saveEditing,
+  onEditorKeydown,
+  onCanvasDoubleClick,
+  onContextMenu,
+  closeContextMenu,
+  onLODNodeContextMenu,
+  onLODCanvasContextMenu,
+} = eventHandlers
 
 // Storylines composable for storyline and workspace operations
 const storylines = useStorylines({

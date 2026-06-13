@@ -30,3 +30,9 @@ export {
   type UseCitationFetchOptions,
 } from './useCitationFetch'
 export { useCanvasSettings } from './useCanvasSettings'
+export {
+  useCanvasEventHandlers,
+  type ContextMenuInterface,
+  type UseCanvasEventHandlersContext,
+  type UseCanvasEventHandlersReturn,
+} from './useCanvasEventHandlers'

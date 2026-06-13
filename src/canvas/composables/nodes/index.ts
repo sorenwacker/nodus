@@ -51,3 +51,10 @@ export {
   useEntityOperations,
   type UseEntityOperationsOptions,
 } from './useEntityOperations'
+export {
+  useCanvasNodeStyle,
+  type NodeForStyle,
+  type ResizePreview,
+  type UseCanvasNodeStyleContext,
+  type UseCanvasNodeStyleReturn,
+} from './useCanvasNodeStyle'
