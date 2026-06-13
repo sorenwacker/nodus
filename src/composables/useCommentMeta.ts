@@ -51,22 +51,6 @@ export function serializeCommentMeta(meta: CommentMeta, text: string): string {
 }
 
 /**
- * Toggle the resolved state of a comment
- */
-export function toggleResolved(content: string | null): string {
-  const { meta, text } = parseCommentMeta(content)
-  return serializeCommentMeta({ ...meta, resolved: !meta.resolved }, text)
-}
-
-/**
- * Update the comment type
- */
-export function updateCommentType(content: string | null, type: CommentType): string {
-  const { meta, text } = parseCommentMeta(content)
-  return serializeCommentMeta({ ...meta, type }, text)
-}
-
-/**
  * Create initial comment content with metadata
  */
 export function createCommentContent(text: string, type: CommentType = 'note'): string {
@@ -77,8 +61,6 @@ export function useCommentMeta() {
   return {
     parseCommentMeta,
     serializeCommentMeta,
-    toggleResolved,
-    updateCommentType,
     createCommentContent,
   }
 }

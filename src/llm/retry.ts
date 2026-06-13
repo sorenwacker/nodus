@@ -115,32 +115,3 @@ export async function withRetry<T>(
 
   throw lastError
 }
-
-/**
- * Create a retry wrapper for a class of operations
- */
-export function createRetryWrapper(defaultOptions: Partial<RetryOptions> = {}) {
-  return function retry<T>(
-    fn: () => Promise<T>,
-    overrideOptions: Partial<RetryOptions> = {}
-  ): Promise<T> {
-    return withRetry(fn, { ...defaultOptions, ...overrideOptions })
-  }
-}
-
-/**
- * Retry wrapper specifically for LLM calls
- */
-export const llmRetry = createRetryWrapper({
-  maxRetries: 2,
-  initialDelayMs: 1000,
-  maxDelayMs: 10000,
-  retryableErrors: [
-    'rate_limit',
-    'overloaded',
-    '429',
-    '503',
-    'timeout',
-    'ECONNRESET',
-  ],
-})
