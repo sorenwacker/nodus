@@ -37,7 +37,9 @@ export interface NodeStoreState {
   loading: Ref<boolean>
   error: Ref<string | null>
   nodeLayoutVersion: Ref<number>
-  hiddenLinkTypes: Ref<Set<string>>
+  showManualEdges: Ref<boolean>
+  showStorylineEdges: Ref<boolean>
+  showWikilinkEdges: Ref<boolean>
 }
 
 /**

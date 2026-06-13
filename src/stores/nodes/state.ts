@@ -23,7 +23,9 @@ export function createState(): NodeStoreState {
     loading: ref(false),
     error: ref<string | null>(null),
     nodeLayoutVersion: ref(0),
-    hiddenLinkTypes: ref(new Set<string>()),
+    showManualEdges: ref(true),
+    showStorylineEdges: ref(true),
+    showWikilinkEdges: ref(true),
   }
 }
 
@@ -46,7 +48,7 @@ export function createComputedProperties(
   state: NodeStoreState,
   stores: ReturnType<typeof createStoreInstances>
 ): NodeStoreComputed {
-  const { nodes, hiddenLinkTypes } = state
+  const { nodes, showManualEdges, showStorylineEdges, showWikilinkEdges } = state
   const { edgesStore, framesStore, workspaceStore, storylinesStore } = stores
 
   // Expose edges and frames from their stores for backwards compatibility
@@ -85,12 +87,22 @@ export function createComputedProperties(
   const filteredEdges = computed(() => {
     const nodeIds = new Set(filteredNodes.value.map(n => n.id))
     // Filter edges to only include those connecting nodes in the current workspace
-    // and exclude edges with hidden link types
-    return edgesStore.edges.filter(
-      e => nodeIds.has(e.source_node_id) &&
-           nodeIds.has(e.target_node_id) &&
-           !hiddenLinkTypes.value.has(e.link_type)
-    )
+    // and apply edge category visibility filters
+    return edgesStore.edges.filter(e => {
+      // Must connect nodes in current workspace
+      if (!nodeIds.has(e.source_node_id) || !nodeIds.has(e.target_node_id)) {
+        return false
+      }
+      // Apply category filters
+      if (e.storyline_id) {
+        return showStorylineEdges.value
+      }
+      if (e.link_type === 'wikilink') {
+        return showWikilinkEdges.value
+      }
+      // Manual edges (everything else)
+      return showManualEdges.value
+    })
   })
 
   // Storylines are managed by separate store - expose computed for compatibility

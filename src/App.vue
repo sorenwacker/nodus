@@ -625,46 +625,30 @@ async function openFolderDialog() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
         <div class="toolbar-divider"></div>
-        <!-- Edge type filters -->
+        <!-- Edge category filters -->
         <button
           class="icon-btn filter-btn"
-          :class="{ active: store.isLinkTypeVisible('related') }"
-          data-tooltip="Toggle 'related' edges"
-          @click="store.toggleLinkTypeVisibility('related')"
+          :class="{ active: store.showManualEdges }"
+          data-tooltip="Toggle manual edges"
+          @click="store.showManualEdges = !store.showManualEdges"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><circle cx="5" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
         </button>
         <button
           class="icon-btn filter-btn"
-          :class="{ active: store.isLinkTypeVisible('wikilink') }"
+          :class="{ active: store.showStorylineEdges }"
+          data-tooltip="Toggle storyline edges"
+          @click="store.showStorylineEdges = !store.showStorylineEdges"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </button>
+        <button
+          class="icon-btn filter-btn"
+          :class="{ active: store.showWikilinkEdges }"
           data-tooltip="Toggle wikilink edges"
-          @click="store.toggleLinkTypeVisibility('wikilink')"
+          @click="store.showWikilinkEdges = !store.showWikilinkEdges"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        </button>
-        <button
-          class="icon-btn filter-btn"
-          :class="{ active: store.isLinkTypeVisible('supports') }"
-          data-tooltip="Toggle 'supports' edges"
-          @click="store.toggleLinkTypeVisibility('supports')"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-        <button
-          class="icon-btn filter-btn"
-          :class="{ active: store.isLinkTypeVisible('contradicts') }"
-          data-tooltip="Toggle 'contradicts' edges"
-          @click="store.toggleLinkTypeVisibility('contradicts')"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <button
-          class="icon-btn filter-btn"
-          :class="{ active: store.isLinkTypeVisible('cites') }"
-          data-tooltip="Toggle 'cites' edges"
-          @click="store.toggleLinkTypeVisibility('cites')"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 7 7 7s0-3 2.5-3a2.5 2.5 0 0 1 0 5H6v6a2 2 0 0 1-2 2H3"/><path d="M17 9h1.5a2.5 2.5 0 0 0 0-5C16 4 16 7 16 7s0-3-2.5-3a2.5 2.5 0 0 0 0 5H17v6a2 2 0 0 0 2 2h1"/></svg>
         </button>
       </div>
       <div class="toolbar-center">
