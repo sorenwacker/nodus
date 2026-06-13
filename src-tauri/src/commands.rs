@@ -42,6 +42,33 @@ fn should_exclude_file(path: &std::path::Path) -> bool {
     false
 }
 
+/// Validate that a file path is within a workspace vault
+/// Returns an error if the path is outside all workspace vaults (security check)
+async fn validate_path_in_workspace(path: &std::path::Path) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let workspaces = database::workspaces::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Canonicalize the requested path
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|e| format!("Invalid path: {}", e))?;
+
+    // Check if path is within any workspace vault
+    for workspace in &workspaces {
+        if let Some(vault_path) = &workspace.vault_path {
+            if let Ok(canonical_vault) = std::path::Path::new(vault_path).canonicalize() {
+                if canonical_path.starts_with(&canonical_vault) {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    Err("Access denied: path is not within any workspace vault".to_string())
+}
+
 // ============================================================================
 // Node Commands
 // ============================================================================
@@ -1953,8 +1980,11 @@ pub async fn delete_workspace(id: String, delete_files: Option<bool>) -> Result<
 }
 
 /// Read file content from disk (for on-demand sync)
+/// Only allows reading files within workspace vaults (security)
 #[tauri::command]
 pub async fn read_file_content(path: String) -> Result<String, String> {
+    let path_ref = std::path::Path::new(&path);
+    validate_path_in_workspace(path_ref).await?;
     std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
 }
 
@@ -2078,20 +2108,27 @@ pub async fn http_request(input: HttpRequestInput) -> Result<HttpResponse, Strin
 // PDF Commands
 // ============================================================================
 
+/// Extract text from PDF file
+/// Only allows reading PDFs within workspace vaults (security)
 #[tauri::command]
 pub async fn extract_pdf_text(path: String) -> Result<String, String> {
+    let path_ref = std::path::Path::new(&path);
+    validate_path_in_workspace(path_ref).await?;
     let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read PDF: {}", e))?;
     let text = pdf_extract::extract_text_from_mem(&bytes)
         .map_err(|e| format!("PDF extraction failed: {}", e))?;
     Ok(text)
 }
 
+/// Extract annotations from PDF file
+/// Only allows reading PDFs within workspace vaults (security)
 #[tauri::command]
 pub async fn extract_pdf_annotations(
     path: String,
 ) -> Result<Vec<crate::pdf::PdfAnnotation>, String> {
-    let path = std::path::Path::new(&path);
-    crate::pdf::extract_annotations(path)
+    let path_ref = std::path::Path::new(&path);
+    validate_path_in_workspace(path_ref).await?;
+    crate::pdf::extract_annotations(path_ref)
 }
 
 // ============================================================================
@@ -2763,41 +2800,15 @@ pub async fn import_ontology(
     };
 
     let total_entities = ontology_data.classes.len() + ontology_data.individuals.len();
-    println!(
-        "Parsed ontology: {} individuals, {} object properties, {} classes, {} subclass relations, {} property defs ({} total)",
-        ontology_data.individuals.len(),
-        ontology_data.object_properties.len(),
-        ontology_data.classes.len(),
-        ontology_data.subclass_relations.len(),
-        ontology_data.property_definitions.len(),
-        total_entities
-    );
-    // Debug: print property definitions with their domains
-    for prop in &ontology_data.property_definitions {
-        if !prop.domains.is_empty() {
-            println!("  Property: {} -> domains: {:?}", prop.iri, prop.domains);
-        }
-    }
-    use std::io::Write;
-    let _ = std::io::stdout().flush();
-    println!("DEBUG: About to check layout...");
-    let _ = std::io::stdout().flush();
 
     // Force grid layout for large ontologies (hierarchical is too slow)
     let layout = if total_entities > 500 {
-        println!(
-            "Large ontology detected ({} entities), forcing grid layout",
-            total_entities
-        );
         crate::ontology::OntologyLayout::Grid
     } else {
         input.layout
     };
 
     // Transform to nodes and edges
-    println!("DEBUG: Creating TransformOptions with layout={:?}", layout);
-    let _ = std::io::stdout().flush();
-
     let options = TransformOptions {
         create_class_nodes: input.create_class_nodes,
         create_individual_nodes: input.create_individual_nodes,
@@ -2806,24 +2817,7 @@ pub async fn import_ontology(
         ..Default::default()
     };
 
-    println!("DEBUG: Calling transform_to_nodus...");
-    let _ = std::io::stdout().flush();
-
     let result = transform_to_nodus(&ontology_data, &options);
-
-    println!("DEBUG: transform_to_nodus returned");
-    let _ = std::io::stdout().flush();
-
-    println!(
-        "Transform result: {} nodes, {} edges, {} class nodes",
-        result.nodes.len(),
-        result.edges.len(),
-        result.class_nodes_created
-    );
-    println!(
-        "Options: create_class_nodes={}, create_individual_nodes={}, workspace_id={:?}",
-        options.create_class_nodes, options.create_individual_nodes, options.workspace_id
-    );
 
     // Save nodes to database
     let pool = database::get_pool().map_err(|e| e.to_string())?;
