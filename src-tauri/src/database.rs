@@ -850,6 +850,9 @@ pub mod workspaces {
     }
 
     pub async fn delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
+        // Use transaction to ensure atomic deletion
+        let mut tx = pool.begin().await?;
+
         // Delete edges connected to nodes in this workspace
         sqlx::query(
             "DELETE FROM edges WHERE source_node_id IN (SELECT id FROM nodes WHERE workspace_id = ?)
@@ -857,32 +860,34 @@ pub mod workspaces {
         )
             .bind(id)
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
 
         // Delete all nodes in this workspace (cuts link to Obsidian vault)
         sqlx::query("DELETE FROM nodes WHERE workspace_id = ?")
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
 
         // Delete storylines in this workspace
         sqlx::query("DELETE FROM storylines WHERE workspace_id = ?")
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
 
         // Delete frames in this workspace
         sqlx::query("DELETE FROM frames WHERE workspace_id = ?")
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
 
         // Finally delete the workspace
         sqlx::query("DELETE FROM workspaces WHERE id = ?")
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
+
+        tx.commit().await?;
         Ok(())
     }
 }
@@ -1097,7 +1102,23 @@ pub mod storylines {
         storyline_id: &str,
         node_ids: &[String],
     ) -> Result<(), DatabaseError> {
-        // Update sequence_order for each node based on its position in the array
+        // Use transaction to ensure atomic reordering
+        let mut tx = pool.begin().await?;
+
+        // First, set all sequence_orders to negative values to avoid unique constraint conflicts
+        // We use -(index + 1000) to ensure they're all unique and negative
+        for (order, node_id) in node_ids.iter().enumerate() {
+            sqlx::query(
+                "UPDATE storyline_nodes SET sequence_order = ? WHERE storyline_id = ? AND node_id = ?"
+            )
+            .bind(-(order as i32 + 1000))
+            .bind(storyline_id)
+            .bind(node_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // Then set the final positive values
         for (order, node_id) in node_ids.iter().enumerate() {
             sqlx::query(
                 "UPDATE storyline_nodes SET sequence_order = ? WHERE storyline_id = ? AND node_id = ?"
@@ -1105,9 +1126,11 @@ pub mod storylines {
             .bind(order as i32)
             .bind(storyline_id)
             .bind(node_id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
         }
+
+        tx.commit().await?;
         Ok(())
     }
 
