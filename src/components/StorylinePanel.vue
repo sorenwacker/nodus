@@ -32,20 +32,24 @@ const editTitle = ref('')
 const expandedNodeIds = ref<Set<string>>(new Set())
 const panelRef = ref<HTMLElement | null>(null)
 
+
 const storylines = computed(() => store.filteredStorylines)
 
 const selectedStoryline = computed(() =>
   storylines.value.find(s => s.id === selectedStorylineId.value)
 )
 
-// Get nodes for selected storyline - reactive to store changes
-const selectedStorylineNodes = computed(() => {
+// Get all nodes for selected storyline - reactive to store changes
+const allStorylineNodes = computed(() => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _version = storylineNodesVersion.value // Force reactivity on Map changes
   if (!selectedStorylineId.value) return []
   const nodeIds = storylineNodes.value.get(selectedStorylineId.value) || []
   return nodeIds.map(id => store.getNode(id)).filter((n): n is Node => n !== undefined)
 })
+
+// Alias for compatibility with composables
+const selectedStorylineNodes = computed(() => allStorylineNodes.value)
 
 // Get node counts for all storylines - reactive to Map changes
 const storylineNodeCounts = computed(() => {

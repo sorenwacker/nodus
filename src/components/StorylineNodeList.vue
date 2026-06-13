@@ -131,22 +131,90 @@ function hideNodeHover() {
   window.dispatchEvent(new CustomEvent('storyline-node-hover-end'))
 }
 
-// Drag and drop
-function onDragStart(e: DragEvent, index: number) {
+// Pointer-based drag and drop (more reliable than HTML5 drag-drop in WebKit)
+let pointerStartY = 0
+let pointerCurrentY = 0
+let isDragging = false
+
+function onPointerDown(e: PointerEvent, index: number) {
+  // Only handle primary button (left click)
+  if (e.button !== 0) return
+  // Don't start drag on buttons
+  if ((e.target as HTMLElement).closest('button')) return
+
+  // Prevent text selection
+  e.preventDefault()
+
   draggingNodeIndex.value = index
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', String(index))
+  pointerStartY = e.clientY
+  pointerCurrentY = e.clientY
+  isDragging = false
+
+  // Add dragging class to body to prevent text selection globally
+  document.body.classList.add('storyline-dragging')
+
+  // Capture pointer for tracking
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+
+  document.addEventListener('pointermove', onPointerMove)
+  document.addEventListener('pointerup', onPointerUp)
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (draggingNodeIndex.value === null) return
+
+  pointerCurrentY = e.clientY
+  const dragDistance = Math.abs(pointerCurrentY - pointerStartY)
+
+  // Start dragging after moving 5px
+  if (dragDistance > 5) {
+    isDragging = true
+  }
+
+  if (!isDragging) return
+
+  // Find which node we're hovering over
+  const elements = document.elementsFromPoint(e.clientX, e.clientY)
+  const nodeItem = elements.find(el => el.classList.contains('node-item'))
+
+  if (nodeItem) {
+    const allItems = Array.from(document.querySelectorAll('.node-list .node-item'))
+    const hoverIndex = allItems.indexOf(nodeItem)
+    if (hoverIndex !== -1 && hoverIndex !== draggingNodeIndex.value) {
+      dragOverIndex.value = hoverIndex
+    }
+  } else {
+    // Check insert zones
+    const insertZone = elements.find(el => el.classList.contains('insert-zone'))
+    if (insertZone) {
+      const allZones = Array.from(document.querySelectorAll('.node-list .insert-zone'))
+      const zoneIndex = allZones.indexOf(insertZone)
+      if (zoneIndex !== -1) {
+        dragOverIndex.value = zoneIndex
+      }
+    }
   }
 }
 
-function onDragOver(e: DragEvent, index: number) {
-  e.preventDefault()
-  dragOverIndex.value = index
-}
+function onPointerUp(_e: PointerEvent) {
+  document.removeEventListener('pointermove', onPointerMove)
+  document.removeEventListener('pointerup', onPointerUp)
 
-function onDragLeave() {
+  // Remove dragging class
+  document.body.classList.remove('storyline-dragging')
+
+  if (draggingNodeIndex.value === null) return
+
+  const fromIndex = draggingNodeIndex.value
+  const toIndex = dragOverIndex.value
+
+  if (isDragging && toIndex !== null && toIndex !== fromIndex) {
+    reorderNodes(fromIndex, toIndex)
+  }
+
+  draggingNodeIndex.value = null
   dragOverIndex.value = null
+  isDragging = false
 }
 
 // Reorder nodes by moving from one index to another
@@ -157,25 +225,6 @@ function reorderNodes(fromIndex: number, toIndex: number) {
   const adjustedTarget = toIndex > fromIndex ? toIndex - 1 : toIndex
   nodesCopy.splice(adjustedTarget, 0, removed)
   emit('reorder', nodesCopy.map(n => n.id))
-}
-
-function onDrop(e: DragEvent, targetIndex: number) {
-  e.preventDefault()
-  dragOverIndex.value = null
-
-  if (draggingNodeIndex.value === null) return
-  if (draggingNodeIndex.value === targetIndex) {
-    draggingNodeIndex.value = null
-    return
-  }
-
-  reorderNodes(draggingNodeIndex.value, targetIndex)
-  draggingNodeIndex.value = null
-}
-
-function onDragEnd() {
-  draggingNodeIndex.value = null
-  dragOverIndex.value = null
 }
 
 // Handle drag over insert zones between nodes
@@ -225,6 +274,11 @@ function onDropEnd(e: DragEvent) {
 
   reorderNodes(draggingNodeIndex.value, props.nodes.length)
   draggingNodeIndex.value = null
+}
+
+// Handle drag leave on drop zones
+function onDragLeave() {
+  dragOverIndex.value = null
 }
 </script>
 
@@ -297,13 +351,8 @@ function onDropEnd(e: DragEvent) {
               node.color_theme ? { background: getNodeBackground(node.color_theme) } : {},
               node.node_type === 'comment' ? { '--comment-color': getCommentStyle(node).color } : {}
             ]"
-            draggable="true"
+            @pointerdown="onPointerDown($event, index)"
             @click="handleNodeClick(index)"
-            @dragstart="onDragStart($event, index)"
-            @dragover="onDragOver($event, index)"
-            @dragleave="onDragLeave"
-            @drop="onDrop($event, index)"
-            @dragend="onDragEnd"
             @mouseenter="showNodeHover(node)"
             @mouseleave="hideNodeHover"
           >
@@ -492,7 +541,6 @@ function onDropEnd(e: DragEvent) {
   cursor: grab;
   transition: transform 0.15s ease, background 0.1s, box-shadow 0.15s;
   user-select: none;
-  -webkit-user-drag: element;
 }
 
 .compact .node-item {
