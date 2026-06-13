@@ -78,13 +78,11 @@ function submitNewStep() {
 
 // Actions
 function handleApprove() {
-  console.log('[PlanModal] Approve clicked')
   if (editingStepId.value) saveEdit()
   emit('approve')
 }
 
 function handleReject() {
-  console.log('[PlanModal] Reject clicked')
   emit('reject')
 }
 

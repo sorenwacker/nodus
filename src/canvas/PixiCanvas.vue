@@ -842,21 +842,16 @@ const {
 const zotero = useZotero()
 
 async function handleAddToZotero() {
-  console.log('[Zotero] handleAddToZotero called')
   const affectedIds = contextMenu.affectedNodeIds.value
-  console.log('[Zotero] affectedIds:', affectedIds.length)
   if (affectedIds.length === 0) return
 
   const nodes = affectedIds
     .map(id => store.getNode(id))
     .filter((n): n is Node => n !== undefined)
 
-  console.log('[Zotero] nodes to add:', nodes.length)
   if (nodes.length === 0) return
 
-  console.log('[Zotero] calling addNodesToZotero...')
   const result = await zotero.addNodesToZotero(nodes)
-  console.log('[Zotero] result:', result)
 
   if (result.cancelled) {
     if (result.added > 0) {
@@ -2214,10 +2209,6 @@ const graphExport = useGraphExport({
   showToast,
 })
 const { exportGraphAsYaml } = graphExport
-
-// Expose export function globally for debugging
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(window as any).exportGraphAsYaml = exportGraphAsYaml
 
 // Helper to open search on a node (works in both view and edit modes)
 function startEditingAndSearch(nodeId: string) {
