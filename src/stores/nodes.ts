@@ -122,7 +122,7 @@ export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, Fi
 export const useNodesStore = defineStore('nodes', () => {
   // Create core state
   const state = createState()
-  const { nodes, selectedNodeIds, loading, error, nodeLayoutVersion, showLinkedNodes, showNodusNodes, showCommentNodes } = state
+  const { nodes, selectedNodeIds, loading, error, nodeLayoutVersion, hiddenLinkTypes } = state
 
   // Create store instances
   const stores = createStoreInstances()
@@ -536,10 +536,18 @@ export const useNodesStore = defineStore('nodes', () => {
     selectedFrameId,
     loading,
     error,
-    // Node type visibility filters
-    showLinkedNodes,
-    showNodusNodes,
-    showCommentNodes,
+    // Edge type visibility filter
+    hiddenLinkTypes,
+    toggleLinkTypeVisibility: (linkType: string) => {
+      if (hiddenLinkTypes.value.has(linkType)) {
+        hiddenLinkTypes.value.delete(linkType)
+      } else {
+        hiddenLinkTypes.value.add(linkType)
+      }
+      // Trigger reactivity by creating a new Set
+      hiddenLinkTypes.value = new Set(hiddenLinkTypes.value)
+    },
+    isLinkTypeVisible: (linkType: string) => !hiddenLinkTypes.value.has(linkType),
     workspaces,
     currentWorkspaceId,
     storylines,

@@ -23,9 +23,7 @@ export function createState(): NodeStoreState {
     loading: ref(false),
     error: ref<string | null>(null),
     nodeLayoutVersion: ref(0),
-    showLinkedNodes: ref(true),
-    showNodusNodes: ref(true),
-    showCommentNodes: ref(true),
+    hiddenLinkTypes: ref(new Set<string>()),
   }
 }
 
@@ -48,7 +46,7 @@ export function createComputedProperties(
   state: NodeStoreState,
   stores: ReturnType<typeof createStoreInstances>
 ): NodeStoreComputed {
-  const { nodes, showLinkedNodes, showNodusNodes, showCommentNodes } = state
+  const { nodes, hiddenLinkTypes } = state
   const { edgesStore, framesStore, workspaceStore, storylinesStore } = stores
 
   // Expose edges and frames from their stores for backwards compatibility
@@ -69,26 +67,10 @@ export function createComputedProperties(
     const wsId = workspaceStore.currentWorkspaceId
     // Treat null, undefined, and "default" as the default workspace
     // Default workspace shows nodes with no workspace_id (null)
-    let result: Node[]
     if (!wsId || wsId === 'default') {
-      result = nodes.value.filter(n => !n.workspace_id)
-    } else {
-      result = nodes.value.filter(n => n.workspace_id === wsId)
+      return nodes.value.filter(n => !n.workspace_id)
     }
-
-    // Apply node type visibility filters
-    return result.filter(node => {
-      // Comment nodes
-      if (node.node_type === 'comment') {
-        return showCommentNodes.value
-      }
-      // Linked nodes (from vault) - have file_path
-      if (node.file_path) {
-        return showLinkedNodes.value
-      }
-      // Nodus nodes (created in app) - no file_path
-      return showNodusNodes.value
-    })
+    return nodes.value.filter(n => n.workspace_id === wsId)
   })
 
   const filteredFrames = computed(() => {
@@ -103,8 +85,11 @@ export function createComputedProperties(
   const filteredEdges = computed(() => {
     const nodeIds = new Set(filteredNodes.value.map(n => n.id))
     // Filter edges to only include those connecting nodes in the current workspace
+    // and exclude edges with hidden link types
     return edgesStore.edges.filter(
-      e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
+      e => nodeIds.has(e.source_node_id) &&
+           nodeIds.has(e.target_node_id) &&
+           !hiddenLinkTypes.value.has(e.link_type)
     )
   })
 

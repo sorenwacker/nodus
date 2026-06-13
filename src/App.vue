@@ -625,30 +625,46 @@ async function openFolderDialog() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
         <div class="toolbar-divider"></div>
-        <!-- Node type filters -->
+        <!-- Edge type filters -->
         <button
           class="icon-btn filter-btn"
-          :class="{ active: store.showLinkedNodes }"
-          data-tooltip="Toggle linked nodes (from vault)"
-          @click="store.showLinkedNodes = !store.showLinkedNodes"
+          :class="{ active: store.isLinkTypeVisible('related') }"
+          data-tooltip="Toggle 'related' edges"
+          @click="store.toggleLinkTypeVisibility('related')"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button
+          class="icon-btn filter-btn"
+          :class="{ active: store.isLinkTypeVisible('wikilink') }"
+          data-tooltip="Toggle wikilink edges"
+          @click="store.toggleLinkTypeVisibility('wikilink')"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
         <button
           class="icon-btn filter-btn"
-          :class="{ active: store.showNodusNodes }"
-          data-tooltip="Toggle Nodus nodes (created in app)"
-          @click="store.showNodusNodes = !store.showNodusNodes"
+          :class="{ active: store.isLinkTypeVisible('supports') }"
+          data-tooltip="Toggle 'supports' edges"
+          @click="store.toggleLinkTypeVisibility('supports')"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button
           class="icon-btn filter-btn"
-          :class="{ active: store.showCommentNodes }"
-          data-tooltip="Toggle comment nodes"
-          @click="store.showCommentNodes = !store.showCommentNodes"
+          :class="{ active: store.isLinkTypeVisible('contradicts') }"
+          data-tooltip="Toggle 'contradicts' edges"
+          @click="store.toggleLinkTypeVisibility('contradicts')"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <button
+          class="icon-btn filter-btn"
+          :class="{ active: store.isLinkTypeVisible('cites') }"
+          data-tooltip="Toggle 'cites' edges"
+          @click="store.toggleLinkTypeVisibility('cites')"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 7 7 7s0-3 2.5-3a2.5 2.5 0 0 1 0 5H6v6a2 2 0 0 1-2 2H3"/><path d="M17 9h1.5a2.5 2.5 0 0 0 0-5C16 4 16 7 16 7s0-3-2.5-3a2.5 2.5 0 0 0 0 5H17v6a2 2 0 0 0 2 2h1"/></svg>
         </button>
       </div>
       <div class="toolbar-center">

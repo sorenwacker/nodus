@@ -37,9 +37,7 @@ export interface NodeStoreState {
   loading: Ref<boolean>
   error: Ref<string | null>
   nodeLayoutVersion: Ref<number>
-  showLinkedNodes: Ref<boolean>
-  showNodusNodes: Ref<boolean>
-  showCommentNodes: Ref<boolean>
+  hiddenLinkTypes: Ref<Set<string>>
 }
 
 /**
