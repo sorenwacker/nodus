@@ -3,8 +3,6 @@ import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick, inject }
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import type { StorylineService } from '../services/storylineService'
-import { openExternal } from '../lib/tauri'
-import { resolveWikilink } from '../lib/wikilink'
 import StorylineNodeList from './StorylineNodeList.vue'
 import StorylineReaderHeader from './StorylineReaderHeader.vue'
 import StorylineEntitySidebar from './StorylineEntitySidebar.vue'
@@ -15,9 +13,12 @@ import { useStorylineNavigation } from '../composables/useStorylineNavigation'
 import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdownRendering'
 import { useScrollPositionMemory } from '../composables/useScrollPositionMemory'
 import { useScrollObserver } from '../composables/useScrollObserver'
-import { parseCommentMeta, createCommentContent } from '../composables/useCommentMeta'
-import type { Node, Storyline, EntityNodeType, CommentType } from '../types'
-import { ENTITY_NODE_TYPES, COMMENT_STYLES } from '../types'
+import { createCommentContent } from '../composables/useCommentMeta'
+import { useStorylineReaderContent } from '../composables/useStorylineReaderContent'
+import { useStorylineReaderComments } from '../composables/useStorylineReaderComments'
+import { useStorylineReaderEntities } from '../composables/useStorylineReaderEntities'
+import type { Node, Storyline, CommentType } from '../types'
+import { COMMENT_STYLES } from '../types'
 
 const { t } = useI18n()
 
@@ -39,6 +40,7 @@ const contentRef = ref<HTMLElement | null>(null)
 const showToc = ref(true) // Show contents sidebar
 const showEntitySidebar = ref(false)
 const showReferencesSidebar = ref(false) // Hidden by default - optional
+
 // Open detail modal for editing a node
 function openNodeDetail(nodeId: string) {
   window.dispatchEvent(new CustomEvent('open-node-detail', { detail: { nodeId } }))
@@ -72,7 +74,6 @@ function startResize(e: PointerEvent) {
   document.addEventListener('pointermove', onMove)
   document.addEventListener('pointerup', onUp)
 }
-const collapsedComments = ref<Set<string>>(new Set())
 
 // Navigation composable
 const navigation = useStorylineNavigation({
@@ -81,6 +82,10 @@ const navigation = useStorylineNavigation({
   onClose: () => emit('close'),
 })
 const { activeNodeIndex, goToNode, goToPrevious, goToNext, handleScroll: baseHandleScroll, setupKeyboardListeners, cleanupKeyboardListeners } = navigation
+
+// Comment state composable
+const comments = useStorylineReaderComments()
+const { getCommentMeta, isCommentCollapsed, toggleCommentCollapsed } = comments
 
 // Scroll position memory
 const storylineIdRef = toRef(props, 'storylineId')
@@ -116,62 +121,29 @@ function handleScroll() {
   schedulePositionSave()
 }
 
-// Comment helpers
-function getCommentMeta(node: Node) {
-  return parseCommentMeta(node.markdown_content)
-}
-
-function isCommentCollapsed(nodeId: string): boolean {
-  return collapsedComments.value.has(nodeId)
-}
-
-function toggleCommentCollapsed(nodeId: string) {
-  if (collapsedComments.value.has(nodeId)) {
-    collapsedComments.value.delete(nodeId)
-  } else {
-    collapsedComments.value.add(nodeId)
-  }
-}
-
-// Handle clicks in rendered content (for external links and wikilinks)
-function handleContentClick(e: MouseEvent) {
-  const target = e.target as HTMLElement
-  const link = target.closest('a')
-  if (link) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (link.classList.contains('wikilink')) {
-      // Wikilink - navigate to linked node
-      const linkTarget = link.dataset.target
-      if (linkTarget) {
-        const linkedNode = resolveWikilink(linkTarget, {
-          nodes: store.filteredNodes,
-          frames: store.filteredFrames,
-        })
-        if (linkedNode) {
-          // Check if the linked node is in this storyline
-          const nodeIndex = nodes.value.findIndex(n => n.id === linkedNode.id)
-          if (nodeIndex >= 0) {
-            // Navigate within storyline
-            goToNode(nodeIndex)
-          } else {
-            // Navigate to node on canvas
-            store.selectNode(linkedNode.id)
-            emit('close')
-            window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: linkedNode.id } }))
-          }
-        }
-      }
-    } else if (link.href) {
-      // External link - open in system browser
-      openExternal(link.href)
-    }
-  }
-}
-
 // Markdown rendering composable
 const markdownRendering = useStorylineMarkdownRendering()
 const { renderNodeContent, renderAllNodes, processPendingContent, getRenderedContent } = markdownRendering
+
+// Content interaction composable
+const contentInteraction = useStorylineReaderContent({
+  nodes,
+  contentRef,
+  goToNode,
+  onClose: () => emit('close'),
+  renderAllNodes,
+  processPendingContent,
+})
+const { handleContentClick, setupContentRendering } = contentInteraction
+
+// Entity sidebar composable
+const entities = useStorylineReaderEntities({
+  nodes,
+  activeNodeIndex,
+  goToNode,
+  onClose: () => emit('close'),
+})
+const { entitiesByType, hasEntities, navigateToEntityNode, panToEntity } = entities
 
 async function loadStoryline() {
   loading.value = true
@@ -190,22 +162,8 @@ async function loadStoryline() {
   }
 }
 
-// Render all node content when nodes change
-watch(nodes, async (newNodes) => {
-  // Phase 1: Render markdown with placeholders (sync)
-  renderAllNodes(newNodes)
-  // Phase 2: After DOM update, inject math/mermaid SVGs
-  await nextTick()
-  // Delay to ensure DOM is fully rendered and contentRef is available
-  setTimeout(async () => {
-    if (contentRef.value) {
-      await processPendingContent(contentRef.value)
-    } else {
-      // Fallback to document-wide search if container not ready
-      await processPendingContent()
-    }
-  }, 100)
-}, { immediate: true })
+// Set up content rendering watcher
+setupContentRendering()
 
 // Node list event handlers
 async function handleNodeAdd(index: number, nodeId: string) {
@@ -301,65 +259,6 @@ watch(nodes, () => {
 })
 
 watch(() => props.storylineId, loadStoryline)
-
-// Get entities for the current active node
-const currentNodeEntities = computed(() => {
-  const node = nodes.value[activeNodeIndex.value]
-  if (!node) return []
-  return store.getLinkedEntities(node.id)
-})
-
-// Group entities by type for display
-const entitiesByType = computed(() => {
-  const grouped: Record<EntityNodeType, Node[]> = {
-    character: [],
-    location: [],
-    citation: [],
-    term: [],
-    item: [],
-  }
-
-  for (const entity of currentNodeEntities.value) {
-    const type = entity.node_type as EntityNodeType
-    if (ENTITY_NODE_TYPES.includes(type)) {
-      grouped[type].push(entity)
-    }
-  }
-
-  return grouped
-})
-
-const hasEntities = computed(() => currentNodeEntities.value.length > 0)
-
-// Navigate to the previous/next node containing a specific entity
-function navigateToEntityNode(entityId: string, direction: 'prev' | 'next') {
-  const currentIndex = activeNodeIndex.value
-  const startIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1
-
-  if (direction === 'next') {
-    for (let i = startIndex; i < nodes.value.length; i++) {
-      const nodeEntities = store.getLinkedEntities(nodes.value[i].id)
-      if (nodeEntities.some(e => e.id === entityId)) {
-        goToNode(i)
-        return
-      }
-    }
-  } else {
-    for (let i = startIndex; i >= 0; i--) {
-      const nodeEntities = store.getLinkedEntities(nodes.value[i].id)
-      if (nodeEntities.some(e => e.id === entityId)) {
-        goToNode(i)
-        return
-      }
-    }
-  }
-}
-
-function panToEntity(entityId: string) {
-  store.selectNode(entityId)
-  emit('close')
-  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId: entityId } }))
-}
 </script>
 
 <template>
