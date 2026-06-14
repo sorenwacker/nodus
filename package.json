@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "0.6.4",
+  "version": "0.6.5-rc.1",
   "description": "Visual knowledge graph for thinking and research",
   "type": "module",
   "scripts": {
