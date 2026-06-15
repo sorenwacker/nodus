@@ -96,13 +96,18 @@
   color: white;
 }
 
-/* Filter buttons - dimmed when filter is OFF (nodes hidden) */
+/* Filter buttons - subtle styling */
+.icon-btn.filter-btn.active {
+  background: var(--bg-surface-alt);
+  color: var(--text-main);
+}
+
 .icon-btn.filter-btn:not(.active) {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .icon-btn.filter-btn:not(.active):hover {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .icon-btn svg {
