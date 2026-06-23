@@ -38,10 +38,22 @@ export async function switchWorkspace(
   fileSync: FileSyncInterface,
   workspaceId: string | null
 ): Promise<void> {
-  const { edgesStore, framesStore, workspaceStore } = deps
+  const { state, edgesStore, framesStore, workspaceStore } = deps
 
   // Stop any existing file watcher
   await fileSync.stopWatching()
+
+  // Reload the global node cache before changing the workspace. Nodes are loaded
+  // once and filtered client-side by workspace, but clearCanvas() (e.g. after
+  // creating a workspace) empties that cache. Without reloading here, switching
+  // to another workspace would render blank. Done before the id change so the new
+  // workspace's nodes are present the moment filteredNodes recomputes. A failed
+  // reload keeps the existing cache rather than aborting the switch.
+  try {
+    state.nodes.value = await invoke<Node[]>('get_nodes')
+  } catch (e) {
+    storeLogger.error('Failed to reload nodes on workspace switch:', e)
+  }
 
   workspaceStore.switchWorkspace(workspaceId)
   // Reload edges and frames for the new workspace
