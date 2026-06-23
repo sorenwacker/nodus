@@ -89,13 +89,13 @@ When done, the graph should represent your research visually.`,
  */
 const planMode: AgentModeConfig = {
   name: 'plan',
-  description: 'Research, build graph, then create plan for approval',
+  description: 'Research and read only, then propose a plan for approval',
   maxIterations: 200,
   toolWhitelist: [
     // Reading
     'read_graph',
     'query_nodes',
-    // Research
+    // Research (read-only)
     'web_search',
     'research',
     'deep_research',
@@ -103,24 +103,6 @@ const planMode: AgentModeConfig = {
     'wikipedia_search',
     'validate_claim',
     'check_completeness',
-    // Creating (build as you research)
-    'create_node',
-    'create_nodes_batch',
-    'create_edge',
-    'create_edges_batch',
-    'update_node',
-    'auto_layout',
-    // Deleting (for corrections)
-    'delete_node',
-    'delete_edges',
-    'delete_matching',
-    // Coloring
-    'smart_color',
-    'color_matching',
-    'reset_edge_colors',
-    // Batch operations
-    'for_each_node',
-    'batch_update',
     // Planning
     'think',
     'create_plan',
@@ -128,29 +110,24 @@ const planMode: AgentModeConfig = {
     'done',
   ],
   systemPromptAddition: `
-MODE: PLAN (Research, Build, Plan)
-Research thoroughly, BUILD THE GRAPH as you go, then create a plan.
+MODE: PLAN (Research, then propose)
+Research and read ONLY. Do NOT modify the graph in this phase: you have no tools
+to create, edit, delete, connect, or lay out nodes. Nothing happens to the user's
+graph until they approve your plan.
 
-METHODOLOGY - RESEARCH AND CREATE SIMULTANEOUSLY:
-1. wikipedia_search() for the main topic
-2. fetch_wikipedia() for each article
-3. CREATE NODES immediately for key concepts you discover
-4. CREATE EDGES to show relationships
-5. Keep researching - more searches, more articles
-6. Keep creating nodes and edges as you learn
-7. validate_claim() on important facts
-8. check_completeness() - if < 90%, KEEP GOING
-9. auto_layout() to organize the graph
+METHODOLOGY:
+1. read_graph() / query_nodes() to see what already exists
+2. wikipedia_search(), fetch_wikipedia(), research() to gather information
+3. validate_claim() / check_completeness() as needed
+4. think() to synthesize
+5. create_plan() - list concrete steps. For EVERY step set "action":
+   - "create" for new nodes (put the node titles in "targets")
+   - "edit" for changes to existing nodes (put their titles in "targets")
+   - "connect" for edges, "delete" for removals, "other" for layout/color
+6. request_approval()
 
-BUILD THE GRAPH WHILE RESEARCHING.
-Don't wait - create nodes as soon as you discover information.
-
-After thorough research with graph built:
-1. think() to synthesize
-2. create_plan() for any remaining work
-3. request_approval()
-
-EXPECT 50-200 TOOL CALLS mixing research and node creation.`,
+The plan must let the user see exactly what will be created versus edited before
+they approve. Do not over-research: propose a plan once you know enough to act.`,
 }
 
 /**

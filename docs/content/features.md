@@ -178,6 +178,29 @@ Connect AI assistants for research help:
 - Smart node connections
 - Task automation
 
+### Ask AI on the canvas vs. on a node
+
+Two scopes keep AI actions predictable:
+
+- **Canvas "Ask AI" bar** runs the graph agent, which can create and edit nodes,
+  add edges, and lay out the graph.
+- **Node "Ask" bar** (in the node preview) runs the node agent, which only edits
+  the current note. It never creates new nodes.
+
+### Plan-first approval
+
+The graph agent always works in two phases:
+
+1. **Plan.** It researches and reads the graph only; it cannot create, edit,
+   delete, or connect nodes in this phase. It then proposes a plan.
+2. **Execute.** The plan opens in an approval dialog that states, up front, what
+   it will create versus edit (for example, "create 7 new nodes, edit 2"). Each
+   step is labeled with its action and lists the affected node titles. Nothing is
+   written to the graph until you approve.
+
+This makes node creation predictable: the agent never adds a node you did not see
+listed and approve.
+
 ---
 
 ## Layout Algorithms

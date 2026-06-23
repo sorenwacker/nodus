@@ -8,9 +8,12 @@
 import { defineTool } from '../registry'
 
 export function registerAgentTools(): void {
-  defineTool<{ title: string; steps: Array<{ description: string; details?: string }> }>(
+  defineTool<{
+    title: string
+    steps: Array<{ description: string; action: string; targets?: string[]; details?: string }>
+  }>(
     'create_plan',
-    'Create a detailed plan with steps for user approval. IMPORTANT: Plans for graphs MUST include separate steps for: 1) Creating nodes, 2) Creating edges with labels, 3) Applying layout.',
+    'Create a detailed plan with steps for user approval. Every step MUST declare its "action" so the user can see what will be created vs edited before approving. IMPORTANT: Plans for graphs MUST include separate steps for: 1) Creating nodes, 2) Creating edges with labels, 3) Applying layout.',
     {
       type: 'object',
       properties: {
@@ -21,10 +24,21 @@ export function registerAgentTools(): void {
             type: 'object',
             properties: {
               description: { type: 'string', description: 'Specific action (e.g., "Create 7 nodes for brain regions")' },
+              action: {
+                type: 'string',
+                enum: ['create', 'edit', 'delete', 'connect', 'research', 'other'],
+                description: 'Effect on the graph: "create" = new nodes, "edit" = change existing nodes, "delete" = remove, "connect" = edges, "research" = read-only, "other" = layout/color/etc.',
+              },
+              targets: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Titles of the nodes this step creates or edits, when known (e.g., ["Cerebrum", "Cerebellum"])',
+              },
               details: { type: 'string', description: 'Specific details (e.g., "Nodes: Cerebrum, Cerebellum, Brainstem, ...")' },
             },
+            required: ['description', 'action'],
           },
-          description: 'REQUIRED STEPS FOR GRAPHS: 1) Create nodes (list specific nodes), 2) Create edges with labels (specify connections), 3) Apply layout, 4) Done',
+          description: 'REQUIRED STEPS FOR GRAPHS: 1) Create nodes (action="create", list node titles in targets), 2) Create edges with labels (action="connect"), 3) Apply layout (action="other"), 4) Done',
         },
       },
       required: ['title', 'steps'],

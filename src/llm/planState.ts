@@ -61,7 +61,10 @@ export function usePlanState() {
   /**
    * Create a new plan
    */
-  function createPlan(title: string, steps: Array<{ description: string; details?: string }>): AgentPlan {
+  function createPlan(
+    title: string,
+    steps: Array<{ description: string; action?: PlanStep['action']; targets?: string[]; details?: string }>
+  ): AgentPlan {
     const plan: AgentPlan = {
       id: generateId(),
       title,
@@ -69,6 +72,8 @@ export function usePlanState() {
         id: generateId(),
         description: s.description,
         details: s.details,
+        action: s.action,
+        targets: s.targets,
         status: 'pending',
       })),
       status: 'draft',

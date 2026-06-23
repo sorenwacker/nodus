@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { AgentPlan, PlanStep } from '../llm/types'
+import type { AgentPlan, PlanStep, PlanStepAction } from '../llm/types'
+import { summarizePlanIntent, classifyStepAction } from '../llm/planIntent'
 
 const { t } = useI18n()
 
@@ -89,6 +90,34 @@ function handleReject() {
 // Step count
 const stepCount = computed(() => props.plan?.steps?.length ?? 0)
 
+// What the plan will do to the graph, shown up front so node creation is predictable.
+const intent = computed(() => summarizePlanIntent(props.plan))
+
+const intentSummary = computed<string[]>(() => {
+  const c = intent.value
+  const parts: string[] = []
+  const created = c.createTargets.length || c.counts.create
+  const edited = c.editTargets.length || c.counts.edit
+  if (created) parts.push(`create ${created} new node${created === 1 ? '' : 's'}`)
+  if (edited) parts.push(`edit ${edited} existing node${edited === 1 ? '' : 's'}`)
+  if (c.counts.delete) parts.push(`delete ${c.counts.delete} node${c.counts.delete === 1 ? '' : 's'}`)
+  if (c.counts.connect) parts.push('add connections')
+  return parts
+})
+
+const ACTION_LABEL: Record<PlanStepAction, string> = {
+  create: 'New',
+  edit: 'Edit',
+  delete: 'Delete',
+  connect: 'Connect',
+  research: 'Research',
+  other: 'Other',
+}
+
+function stepAction(step: PlanStep): PlanStepAction {
+  return classifyStepAction(step)
+}
+
 // Watch visibility to reset state
 watch(() => props.visible, (visible) => {
   if (!visible) {
@@ -119,6 +148,20 @@ watch(() => props.visible, (visible) => {
         <div class="plan-modal-content">
           <h3 class="plan-title">{{ plan?.title || 'Plan' }}</h3>
 
+          <!-- Create vs edit intent, so node creation is visible before approving -->
+          <div v-if="intentSummary.length" class="plan-intent">
+            <span class="plan-intent-lead">This plan will</span>
+            <span
+              v-for="(part, i) in intentSummary"
+              :key="i"
+              class="plan-intent-chip"
+            >{{ part }}</span>
+          </div>
+          <div v-if="intent.createTargets.length" class="plan-intent-targets">
+            <span class="plan-intent-targets-label">New nodes:</span>
+            <span v-for="title in intent.createTargets" :key="title" class="plan-intent-target">{{ title }}</span>
+          </div>
+
           <div class="steps-list">
             <div
               v-for="(step, index) in (plan?.steps || [])"
@@ -141,6 +184,7 @@ watch(() => props.visible, (visible) => {
               </div>
 
               <div v-else class="step-content">
+                <span class="step-action" :class="'step-action-' + stepAction(step)">{{ ACTION_LABEL[stepAction(step)] }}</span>
                 <span class="step-description">{{ step.description }}</span>
                 <div class="step-actions">
                   <button
@@ -269,6 +313,67 @@ watch(() => props.visible, (visible) => {
   font-weight: 600;
   color: var(--text-main, #111);
 }
+
+.plan-intent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-secondary, #444);
+}
+
+.plan-intent-lead {
+  font-weight: 500;
+}
+
+.plan-intent-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primary-color-alpha, rgba(59, 130, 246, 0.12));
+  color: var(--primary-color, #3b82f6);
+  font-weight: 600;
+}
+
+.plan-intent-targets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: var(--text-muted, #666);
+}
+
+.plan-intent-targets-label {
+  font-weight: 600;
+}
+
+.plan-intent-target {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-surface-alt, #f1f1f1);
+  border: 1px solid var(--border-subtle, #eee);
+}
+
+.step-action {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: var(--bg-surface-alt, #eee);
+  color: var(--text-secondary, #555);
+}
+
+.step-action-create { background: rgba(34, 197, 94, 0.15); color: #16a34a; }
+.step-action-edit { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+.step-action-delete { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+.step-action-connect { background: rgba(168, 85, 247, 0.15); color: #9333ea; }
 
 .steps-list {
   display: flex;

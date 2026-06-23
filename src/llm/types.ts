@@ -53,6 +53,12 @@ export interface ChatMessage {
 export type AgentMode = 'explore' | 'plan' | 'execute'
 
 /**
+ * What a plan step does to the graph. Lets the approval UI tell the user, up
+ * front, whether the agent will create new nodes or only change existing ones.
+ */
+export type PlanStepAction = 'create' | 'edit' | 'delete' | 'connect' | 'research' | 'other'
+
+/**
  * A single step in an agent plan
  */
 export interface PlanStep {
@@ -60,6 +66,10 @@ export interface PlanStep {
   description: string
   status: 'pending' | 'approved' | 'rejected' | 'in_progress' | 'done' | 'error'
   details?: string
+  /** Effect on the graph, declared by the agent when it builds the plan. */
+  action?: PlanStepAction
+  /** Node titles this step creates or edits, when known. */
+  targets?: string[]
   toolCalls?: string[]
 }
 
