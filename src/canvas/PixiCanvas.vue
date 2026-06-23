@@ -79,6 +79,7 @@ import CanvasNodeCard from './components/CanvasNodeCard.vue'
 import CanvasPreviewPanel from './components/CanvasPreviewPanel.vue'
 import CanvasLODCanvas from './components/CanvasLODCanvas.vue'
 import CanvasAgentLogPanel from './components/CanvasAgentLogPanel.vue'
+import { isErrorLog } from '../llm/agentLog'
 import CanvasColorBar from './components/CanvasColorBar.vue'
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue'
 import PlanApprovalModal from '../components/PlanApprovalModal.vue'
@@ -1079,9 +1080,10 @@ watch(
   () => agentLog.value.length,
   (newLen, oldLen) => {
     if (newLen > oldLen) {
-      // Check if the new message is an error
+      // Auto-open only on genuine failures, not tool results that merely
+      // contain the word "Error" (see llm/agentLog.ts).
       const lastMessage = agentLog.value[newLen - 1]
-      if (lastMessage && lastMessage.includes('ERROR')) {
+      if (lastMessage && isErrorLog(lastMessage)) {
         showAgentLogPanel.value = true
       }
     }

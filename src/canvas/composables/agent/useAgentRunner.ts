@@ -11,6 +11,7 @@
 import { ref, type Ref } from 'vue'
 import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } from '../../../llm/types'
 import { llmQueue } from '../../../llm/queue'
+import { errorLog } from '../../../llm/agentLog'
 import {
   filterToolsForMode,
   getModeMaxIterations,
@@ -519,14 +520,14 @@ export function useAgentRunner(ctx: AgentContext) {
           errorMsg.includes('decoder prompt')
 
         if (isTokenLimitError) {
-          ctx.log.value.push(`> ERROR: Context too large - ${errorMsg}`)
+          ctx.log.value.push(errorLog(`Context too large - ${errorMsg}`))
           ctx.log.value.push('> Tip: Select fewer nodes or reduce node content')
           ctx.isRunning.value = false
           return { status: 'error', message: 'Context exceeds model limit. Select fewer nodes or reduce content.' }
         }
 
         console.error('Agent error:', e)
-        ctx.log.value.push(`> ERROR: ${errorMsg}`)
+        ctx.log.value.push(errorLog(errorMsg))
         ctx.isRunning.value = false
         return { status: 'error', message: errorMsg }
       }

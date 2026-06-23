@@ -9,6 +9,7 @@
 
 import type { Node, Edge } from '../types'
 import type { NodeService } from '../services/nodeService'
+import { errorLog } from './agentLog'
 
 // Tool parameter schema (JSON Schema subset)
 export interface ToolParameterSchema {
@@ -17,6 +18,7 @@ export interface ToolParameterSchema {
   items?: ToolParameterSchema
   properties?: Record<string, ToolParameterSchema>
   required?: string[]
+  enum?: string[]
 }
 
 // Tool definition for LLM function calling
@@ -217,7 +219,7 @@ class ToolRegistry {
       return result
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      ctx.log(`  → ERROR: ${msg}`)
+      ctx.log(errorLog(`${name}: ${msg}`))
       return `Error executing ${name}: ${msg}`
     }
   }
