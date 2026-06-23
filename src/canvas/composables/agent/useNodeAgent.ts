@@ -12,9 +12,10 @@ import { ref, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import type { ChatMessage } from '../../../llm/types'
 import { llmQueue } from '../../../llm/queue'
+import { errorLog } from '../../../llm/agentLog'
 import { notifications$ } from '../../../composables/useNotifications'
 import { llmStorage } from '../../../lib/storage'
-import { convertLatexDocument } from '../../../lib/latex-to-typst'
+import { formatMathToTypst } from '../../../llm/typstFormat'
 import { toolRegistry } from '../../../llm/registry'
 import { registerCoreTools } from '../../../llm/tools'
 
@@ -229,8 +230,15 @@ TOOLS:
 - update_content(content): Replace note content - THIS SAVES YOUR WORK
 - append_content(text): Add text to end of note
 - update_title(title): Change note title
-- format_math(): Convert LaTeX math to Typst format in the note
+- format_math(): Reformat the note's math to Typst syntax (uses the model)
 - node_done(summary): Signal completion
+
+MATH FORMAT:
+- Notes render math with Typst, NOT LaTeX. Write math in Typst syntax inside
+  $...$ (inline) or $$...$$ (display). Examples: $a/b$, $sqrt(x)$, $x_(i+1)$,
+  $sum_(i=0)^n i$, $alpha$, $mat(1, 2; 3, 4)$.
+- If you write LaTeX (\\frac, \\alpha, \\sqrt, ...), call format_math() afterward
+  to convert it to Typst.
 
 CRITICAL RULES:
 1. You can answer from your own knowledge OR use search tools - searching is OPTIONAL
@@ -310,7 +318,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                   log.value.push(`  Found results`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Search failed'
-                  log.value.push(`  ERROR: ${errorMsg}`)
+                  log.value.push(errorLog(errorMsg))
                   notifications$.error('Web search failed', errorMsg)
                   result = `Error: ${errorMsg}`
                 }
@@ -322,7 +330,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                 // Validate URL before fetching
                 if (!isValidFetchUrl(urlToFetch)) {
                   const errorMsg = 'Invalid URL: only http/https URLs to public hosts are allowed'
-                  log.value.push(`  ERROR: ${errorMsg}`)
+                  log.value.push(errorLog(errorMsg))
                   result = `Error: ${errorMsg}`
                   break
                 }
@@ -333,7 +341,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                   log.value.push(`  Got content (${result.length} chars)`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Fetch failed'
-                  log.value.push(`  ERROR: ${errorMsg}`)
+                  log.value.push(errorLog(errorMsg))
                   notifications$.error('URL fetch failed', errorMsg)
                   result = `Error: ${errorMsg}`
                 }
@@ -347,30 +355,25 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                   log.value.push(`  Found results`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Search failed'
-                  log.value.push(`  ERROR: ${errorMsg}`)
+                  log.value.push(errorLog(errorMsg))
                   notifications$.error('Wikipedia search failed', errorMsg)
                   result = `Error: ${errorMsg}`
                 }
                 break
 
               case 'update_content': {
-                // Convert LaTeX math to Typst format
                 const rawContent = args.content as string
-                const convertedContent = convertLatexDocument(rawContent)
-                currentContent.value = convertedContent
-                await ctx.updateContent(convertedContent)
+                currentContent.value = rawContent
+                await ctx.updateContent(rawContent)
                 contentWasUpdated = true
                 result = 'Content updated and saved'
-                const mathConverted = rawContent !== convertedContent ? ' (math converted to Typst)' : ''
-                log.value.push(`  Updated content (${convertedContent.length} chars)${mathConverted}`)
+                log.value.push(`  Updated content (${rawContent.length} chars)`)
                 break
               }
 
               case 'append_content': {
-                // Convert LaTeX math to Typst format
                 const rawText = args.text as string
-                const convertedText = convertLatexDocument(rawText)
-                currentContent.value += '\n' + convertedText
+                currentContent.value += '\n' + rawText
                 await ctx.updateContent(currentContent.value)
                 contentWasUpdated = true
                 result = 'Text appended and saved'
@@ -385,18 +388,21 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                 break
 
               case 'format_math': {
-                // Convert LaTeX math expressions to Typst format in current content
+                // Reformat math to Typst syntax via the model (see llm/typstFormat.ts)
                 const originalContent = currentContent.value
-                const convertedContent = convertLatexDocument(originalContent)
-                if (originalContent !== convertedContent) {
-                  currentContent.value = convertedContent
-                  await ctx.updateContent(convertedContent)
+                log.value.push(`  Formatting math to Typst...`)
+                const formatted = await formatMathToTypst(originalContent, (p, s) =>
+                  llmQueue.generate(p, s)
+                )
+                if (formatted !== originalContent) {
+                  currentContent.value = formatted
+                  await ctx.updateContent(formatted)
                   contentWasUpdated = true
-                  result = 'Math expressions converted from LaTeX to Typst format and saved'
-                  log.value.push(`  Converted math to Typst (${convertedContent.length} chars)`)
+                  result = 'Math reformatted to Typst and saved'
+                  log.value.push(`  Formatted math to Typst (${formatted.length} chars)`)
                 } else {
-                  result = 'No LaTeX math found to convert (content unchanged)'
-                  log.value.push(`  No LaTeX math found`)
+                  result = 'Math already in Typst format (content unchanged)'
+                  log.value.push(`  Math already in Typst format`)
                 }
                 break
               }
@@ -444,7 +450,7 @@ After update_content succeeds, then you may call node_done().`
         }
 
         // Show specific error to user
-        log.value.push(`> ERROR: ${errorMsg}`)
+        log.value.push(errorLog(errorMsg))
 
         if (errorMsg.includes('400')) {
           notifications$.error('LLM does not support tools', 'This model may not support function calling. Try a different model (e.g., GPT-4, Claude, or a local model with tool support).')

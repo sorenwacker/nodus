@@ -64,7 +64,7 @@ export function registerNodeEditTools(): void {
 
   defineTool<Record<string, never>>(
     'format_math',
-    'Convert LaTeX math expressions in the note to Typst format. Use this when the note contains LaTeX math syntax (like $x^2$ or \\frac{a}{b}) that should be rendered as Typst math.',
+    'Reformat the math in the note to Typst syntax using the model. Use this when the note contains LaTeX (like \\frac{a}{b} or \\alpha) or other non-Typst math that should render correctly.',
     {
       type: 'object',
       properties: {},
