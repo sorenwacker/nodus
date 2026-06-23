@@ -119,20 +119,27 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     const width = isResizing ? resizePreview.value.width : node.width || NODE_DEFAULTS.WIDTH
     const height = isResizing ? resizePreview.value.height : node.height || NODE_DEFAULTS.HEIGHT
 
-    // Calculate screen position (node layer is outside canvas-content scale transform)
+    // Calculate screen position of the card's top-left corner (node layer is
+    // outside the canvas-content scale transform, so apply pan/zoom here).
     const screenX = x * scale.value + offsetX.value
     const screenY = y * scale.value + offsetY.value
 
-    // Tag nodes fit content, regular nodes use stored dimensions
-    const screenWidth = isTagNode ? 'fit-content' : width * scale.value + 'px'
-    const screenHeight = isTagNode ? 'fit-content' : height * scale.value + 'px'
+    // Render the card at its logical (unscaled) size and apply zoom as a single
+    // transform. Scaling each CSS dimension independently (the old --zoom-scale
+    // approach) rounded box and text separately, so text drifted against the box
+    // during zoom ("wiggle"). One transform scales box, text, and chrome as a
+    // single unit, eliminating the drift. --zoom-scale is pinned to 1 so the
+    // existing calc(... * var(--zoom-scale)) rules resolve to their base sizes.
+    const logicalWidth = isTagNode ? 'fit-content' : width + 'px'
+    const logicalHeight = isTagNode ? 'fit-content' : height + 'px'
 
     const style: Record<string, string> = {
-      '--zoom-scale': String(scale.value),
-      transform: `translate(${screenX}px, ${screenY}px)`,
-      width: screenWidth,
-      height: screenHeight,
-      borderWidth: nodeBorderWidth.value * scale.value + 'px',
+      '--zoom-scale': '1',
+      transform: `translate(${screenX}px, ${screenY}px) scale(${scale.value})`,
+      transformOrigin: '0 0',
+      width: logicalWidth,
+      height: logicalHeight,
+      borderWidth: nodeBorderWidth.value + 'px',
     }
 
     // Apply z-index from radial layout angle order (if set)
