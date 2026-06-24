@@ -8,6 +8,7 @@ import { useI18n } from 'vue-i18n'
 import EntityBadge from '../../components/EntityBadge.vue'
 import type { Node as EntityNode, EntityNodeType } from '../../types'
 import { ENTITY_NODE_TYPES } from '../../types'
+import { nodeDisplayTitle } from '../utils/nodeDisplayTitle'
 
 interface Node {
   id: string
@@ -124,31 +125,8 @@ const moreEntitiesCount = computed(() =>
   (props.linkedEntities?.length || 0) - 3
 )
 
-// Display title: use title, or first line of content, or fallback to "Untitled"
-const displayTitle = computed(() => {
-  if (props.node.title) return props.node.title
-
-  // Extract first meaningful line from markdown content
-  const content = props.node.markdown_content?.trim()
-  if (content) {
-    // Remove markdown formatting and get first line
-    const firstLine = content
-      .split('\n')[0]
-      .replace(/^#+\s*/, '') // Remove heading markers
-      .replace(/\*\*/g, '')  // Remove bold
-      .replace(/\*/g, '')    // Remove italic
-      .replace(/`/g, '')     // Remove code
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Extract link text
-      .trim()
-
-    if (firstLine) {
-      // Truncate if too long
-      return firstLine.length > 50 ? firstLine.slice(0, 47) + '...' : firstLine
-    }
-  }
-
-  return t('canvas.node.untitled')
-})
+// Display title: explicit title, ad-hoc title from content, or "Untitled"
+const displayTitle = computed(() => nodeDisplayTitle(props.node, t('canvas.node.untitled')))
 </script>
 
 <template>

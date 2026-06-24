@@ -3,6 +3,7 @@ import { computed, ref, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { renderPendingContent } from '../../services/MarkdownRenderService'
 import type { Node } from '../../types'
+import { nodeDisplayTitle } from '../utils/nodeDisplayTitle'
 
 const { t } = useI18n()
 
@@ -42,24 +43,12 @@ watch(
   { immediate: true }
 )
 
-const displayTitle = computed(() => {
-  if (props.node?.title) return props.node.title
-
-  // Try to extract title from content
-  const content = props.node?.markdown_content || props.content
-  if (!content) return t('canvas.node.untitled')
-
-  // Get first non-empty line, strip markdown headers
-  const firstLine = content.split('\n').find(line => line.trim())
-  if (!firstLine) return t('canvas.node.untitled')
-
-  // Remove markdown header prefix
-  const stripped = firstLine.replace(/^#+\s*/, '').trim()
-  if (!stripped) return t('canvas.node.untitled')
-
-  // Truncate if too long
-  return stripped.length > 50 ? stripped.slice(0, 50) + '...' : stripped
-})
+const displayTitle = computed(() =>
+  nodeDisplayTitle(
+    { title: props.node?.title, markdown_content: props.node?.markdown_content || props.content },
+    t('canvas.node.untitled')
+  )
+)
 </script>
 
 <template>
