@@ -374,6 +374,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
 
     // In-node search state
     showNodeSearch,
+    searchNodeId,
     nodeSearchQuery,
     nodeSearchIndex,
     nodeSearchMatches,

@@ -618,6 +618,7 @@ const {
   cancelTitleEditing,
   // In-node search
   showNodeSearch,
+  searchNodeId,
   nodeSearchQuery,
   nodeSearchMatches,
   nodeSearchIndex,
@@ -2080,7 +2081,7 @@ defineExpose({
           :edit-title="editTitle"
           :edit-content="editContent"
           :scale="scale"
-          :show-node-search="showNodeSearch && editingNodeId === node.id"
+          :show-node-search="showNodeSearch && searchNodeId === node.id"
           :node-search-query="nodeSearchQuery"
           :node-search-match-count="nodeSearchMatches.length"
           :node-search-index="nodeSearchIndex"
