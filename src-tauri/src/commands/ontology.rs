@@ -104,23 +104,17 @@ pub async fn import_ontology(
 
     let result = transform_to_nodus(&ontology_data, &options);
 
-    // Save nodes to database
+    // Save nodes and edges transactionally so a failed import leaves no partial graph
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    let mut node_ids = Vec::with_capacity(result.nodes.len());
 
-    for node in &result.nodes {
-        database::nodes::create(pool, node)
-            .await
-            .map_err(|e| format!("Failed to create node: {}", e))?;
-        node_ids.push(node.id.clone());
-    }
+    database::nodes::create_many(pool, &result.nodes)
+        .await
+        .map_err(|e| format!("Failed to create nodes: {}", e))?;
+    database::edges::create_many(pool, &result.edges)
+        .await
+        .map_err(|e| format!("Failed to create edges: {}", e))?;
 
-    // Save edges to database
-    for edge in &result.edges {
-        database::edges::create(pool, edge)
-            .await
-            .map_err(|e| format!("Failed to create edge: {}", e))?;
-    }
+    let node_ids: Vec<String> = result.nodes.iter().map(|n| n.id.clone()).collect();
 
     println!(
         "Import complete: {} nodes created, {} edges created, {} class nodes",

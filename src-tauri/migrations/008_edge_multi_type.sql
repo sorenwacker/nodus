@@ -2,17 +2,13 @@
 -- This is needed for ontology imports where classes can have multiple relationships
 --
 -- SQLite doesn't support dropping constraints directly, so we need to recreate the table.
--- This migration is wrapped in checks to be idempotent and safe.
-
--- Check if migration is needed (edges table lacks the new constraint)
--- If edges_new already exists, migration was interrupted - skip
-SELECT CASE
-    WHEN EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='edges_new')
-    THEN RAISE(IGNORE)
-END;
+-- Idempotency lives in Rust (database/mod.rs): this file only runs when the edges
+-- table still has the old 2-column unique constraint, inside a transaction, after
+-- any leftover edges_new from an interrupted run has been dropped. The directed
+-- column is guaranteed to exist because its ALTER migration runs first.
 
 -- Step 1: Create new table with updated constraint
-CREATE TABLE IF NOT EXISTS edges_new (
+CREATE TABLE edges_new (
     id TEXT PRIMARY KEY,
     source_node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     target_node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
@@ -28,13 +24,13 @@ CREATE TABLE IF NOT EXISTS edges_new (
     UNIQUE(source_node_id, target_node_id, link_type)
 );
 
--- Step 2: Copy data from old table (directed defaults to 1 if column doesn't exist)
-INSERT OR IGNORE INTO edges_new (id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at, directed)
-SELECT id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at, 1
+-- Step 2: Copy data from old table
+INSERT INTO edges_new (id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at, directed)
+SELECT id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at, directed
 FROM edges;
 
 -- Step 3: Drop old table
-DROP TABLE IF EXISTS edges;
+DROP TABLE edges;
 
 -- Step 4: Rename new table
 ALTER TABLE edges_new RENAME TO edges;

@@ -62,24 +62,33 @@ pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Edge>, Database
 }
 
 pub async fn create(pool: &DbPool, edge: &Edge) -> Result<(), DatabaseError> {
-    sqlx::query(
-        r#"
-        INSERT INTO edges (id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at, directed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        "#
-    )
-    .bind(&edge.id)
-    .bind(&edge.source_node_id)
-    .bind(&edge.target_node_id)
-    .bind(&edge.label)
-    .bind(&edge.link_type)
-    .bind(edge.weight)
-    .bind(&edge.color)
-    .bind(&edge.storyline_id)
-    .bind(edge.created_at)
-    .bind(edge.directed)
-    .execute(pool)
-    .await?;
+    create_many(pool, std::slice::from_ref(edge)).await
+}
+
+/// Insert a batch of edges in a single transaction; on any failure nothing is inserted
+pub async fn create_many(pool: &DbPool, edges: &[Edge]) -> Result<(), DatabaseError> {
+    let mut tx = pool.begin().await?;
+    for edge in edges {
+        sqlx::query(
+            r#"
+            INSERT INTO edges (id, source_node_id, target_node_id, label, link_type, weight, color, storyline_id, created_at, directed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#
+        )
+        .bind(&edge.id)
+        .bind(&edge.source_node_id)
+        .bind(&edge.target_node_id)
+        .bind(&edge.label)
+        .bind(&edge.link_type)
+        .bind(edge.weight)
+        .bind(&edge.color)
+        .bind(&edge.storyline_id)
+        .bind(edge.created_at)
+        .bind(edge.directed)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -149,15 +158,23 @@ pub async fn get_edges_from_node(pool: &DbPool, node_id: &str) -> Result<Vec<Edg
     Ok(edges)
 }
 
-/// Remove duplicate edges, keeping only the first one for each source-target pair
+/// Remove duplicate edges, keeping the oldest edge for each
+/// (source, target, link_type) group. Edges of different link_types between
+/// the same node pair are legitimate (the schema allows them for ontology
+/// imports) and are never removed.
 pub async fn deduplicate(pool: &DbPool) -> Result<u64, DatabaseError> {
     let result = sqlx::query(
         r#"
         DELETE FROM edges
         WHERE id NOT IN (
-            SELECT MIN(id)
-            FROM edges
-            GROUP BY source_node_id, target_node_id
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (
+                    PARTITION BY source_node_id, target_node_id, link_type
+                    ORDER BY created_at, id
+                ) AS row_num
+                FROM edges
+            )
+            WHERE row_num = 1
         )
         "#,
     )

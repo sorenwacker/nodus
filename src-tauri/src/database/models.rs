@@ -250,39 +250,61 @@ pub mod storylines {
         node_id: &str,
         position: Option<i32>,
     ) -> Result<StorylineNode, DatabaseError> {
-        // Get the current max sequence_order
+        let mut tx = pool.begin().await?;
+
+        // If the node is already in the storyline, return the existing
+        // membership before any reordering happens
+        let existing = sqlx::query_as::<_, StorylineNode>(
+            "SELECT * FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?",
+        )
+        .bind(storyline_id)
+        .bind(node_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(existing) = existing {
+            return Ok(existing);
+        }
+
         let max_order: Option<i32> = sqlx::query_scalar(
             "SELECT MAX(sequence_order) FROM storyline_nodes WHERE storyline_id = ?",
         )
         .bind(storyline_id)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
 
-        let sequence_order = position.unwrap_or_else(|| max_order.unwrap_or(-1) + 1);
+        let next_order = max_order.unwrap_or(-1) + 1;
+        let sequence_order = position.unwrap_or(next_order).clamp(0, next_order);
 
-        // If inserting at a specific position, shift existing nodes
-        if position.is_some() {
+        // Shift trailing nodes up by one. A direct += 1 violates
+        // UNIQUE(storyline_id, sequence_order) row-by-row, so go through
+        // disjoint negative values first (same technique as reorder_nodes):
+        // s -> -(s + 2) -> s + 1
+        if sequence_order < next_order {
             sqlx::query(
-                "UPDATE storyline_nodes SET sequence_order = sequence_order + 1 WHERE storyline_id = ? AND sequence_order >= ?",
+                "UPDATE storyline_nodes SET sequence_order = -(sequence_order + 2) WHERE storyline_id = ? AND sequence_order >= ?",
             )
             .bind(storyline_id)
             .bind(sequence_order)
-            .execute(pool)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query(
+                "UPDATE storyline_nodes SET sequence_order = -sequence_order - 1 WHERE storyline_id = ? AND sequence_order < 0",
+            )
+            .bind(storyline_id)
+            .execute(&mut *tx)
             .await?;
         }
 
-        let id = uuid::Uuid::new_v4().to_string();
         let storyline_node = StorylineNode {
-            id: id.clone(),
+            id: uuid::Uuid::new_v4().to_string(),
             storyline_id: storyline_id.to_string(),
             node_id: node_id.to_string(),
             sequence_order,
         };
 
-        // Use INSERT OR IGNORE to skip if node already exists in storyline
-        let result = sqlx::query(
+        sqlx::query(
             r#"
-            INSERT OR IGNORE INTO storyline_nodes (id, storyline_id, node_id, sequence_order)
+            INSERT INTO storyline_nodes (id, storyline_id, node_id, sequence_order)
             VALUES (?, ?, ?, ?)
             "#,
         )
@@ -290,21 +312,10 @@ pub mod storylines {
         .bind(&storyline_node.storyline_id)
         .bind(&storyline_node.node_id)
         .bind(storyline_node.sequence_order)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
-        // If no rows were inserted, the node already exists - fetch and return existing
-        if result.rows_affected() == 0 {
-            let existing = sqlx::query_as::<_, StorylineNode>(
-                "SELECT * FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?",
-            )
-            .bind(storyline_id)
-            .bind(node_id)
-            .fetch_one(pool)
-            .await?;
-            return Ok(existing);
-        }
-
+        tx.commit().await?;
         Ok(storyline_node)
     }
 

@@ -103,35 +103,44 @@ pub async fn hard_delete(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
 }
 
 pub async fn create(pool: &DbPool, node: &Node) -> Result<(), DatabaseError> {
-    sqlx::query(
-        r#"
-        INSERT INTO nodes (id, title, file_path, markdown_content, node_type,
-            canvas_x, canvas_y, width, height, z_index, frame_id,
-            color_theme, is_collapsed, tags, workspace_id, checksum,
-            created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        "#,
-    )
-    .bind(&node.id)
-    .bind(&node.title)
-    .bind(&node.file_path)
-    .bind(&node.markdown_content)
-    .bind(&node.node_type)
-    .bind(node.canvas_x)
-    .bind(node.canvas_y)
-    .bind(node.width)
-    .bind(node.height)
-    .bind(node.z_index)
-    .bind(&node.frame_id)
-    .bind(&node.color_theme)
-    .bind(node.is_collapsed)
-    .bind(&node.tags)
-    .bind(&node.workspace_id)
-    .bind(&node.checksum)
-    .bind(node.created_at)
-    .bind(node.updated_at)
-    .execute(pool)
-    .await?;
+    create_many(pool, std::slice::from_ref(node)).await
+}
+
+/// Insert a batch of nodes in a single transaction; on any failure nothing is inserted
+pub async fn create_many(pool: &DbPool, nodes: &[Node]) -> Result<(), DatabaseError> {
+    let mut tx = pool.begin().await?;
+    for node in nodes {
+        sqlx::query(
+            r#"
+            INSERT INTO nodes (id, title, file_path, markdown_content, node_type,
+                canvas_x, canvas_y, width, height, z_index, frame_id,
+                color_theme, is_collapsed, tags, workspace_id, checksum,
+                created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(&node.id)
+        .bind(&node.title)
+        .bind(&node.file_path)
+        .bind(&node.markdown_content)
+        .bind(&node.node_type)
+        .bind(node.canvas_x)
+        .bind(node.canvas_y)
+        .bind(node.width)
+        .bind(node.height)
+        .bind(node.z_index)
+        .bind(&node.frame_id)
+        .bind(&node.color_theme)
+        .bind(node.is_collapsed)
+        .bind(&node.tags)
+        .bind(&node.workspace_id)
+        .bind(&node.checksum)
+        .bind(node.created_at)
+        .bind(node.updated_at)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
     Ok(())
 }
 
