@@ -91,7 +91,10 @@ pub async fn create_node_from_file(
         return Err("Invalid file path".to_string());
     }
 
-    // Verify file exists and is within a valid workspace vault
+    // Verify the file is within the target workspace's vault; when no
+    // workspace (or one without a vault) is given, it must still be inside
+    // one of the configured vaults - the check must not be bypassable
+    let mut checked_against_own_vault = false;
     if let Some(ref ws_id) = workspace_id {
         if let Ok(Some(workspace)) = database::workspaces::get_by_id(pool, ws_id).await {
             if let Some(vault_path) = &workspace.vault_path {
@@ -104,8 +107,12 @@ pub async fn create_node_from_file(
                 if !canonical_file.starts_with(&canonical_vault) {
                     return Err("File must be within workspace vault".to_string());
                 }
+                checked_against_own_vault = true;
             }
         }
+    }
+    if !checked_against_own_vault {
+        super::validate_path_in_workspace(path).await?;
     }
 
     // Check if node already exists for this file
@@ -822,8 +829,9 @@ pub async fn check_file_collision(
         None => return Err("Invalid file path".to_string()),
     };
 
-    // Calculate new path
+    // The target folder comes from the webview; never probe paths outside the vaults
     let target_dir = Path::new(&target_folder);
+    super::validate_target_dir_in_workspace(target_dir).await?;
     let new_path = target_dir.join(filename);
 
     // Check for collision (different path but file exists)
@@ -870,8 +878,10 @@ pub async fn move_node_file(
         .file_name()
         .ok_or_else(|| "Invalid file path".to_string())?;
 
-    // Calculate new path
+    // The target folder comes from the webview; validate it before any
+    // filesystem operation (create_dir_all, remove_file, rename)
     let target_dir = Path::new(&target_folder);
+    super::validate_target_dir_in_workspace(target_dir).await?;
     let mut new_path = target_dir.join(filename);
 
     // Handle filename conflicts based on collision_resolution parameter
@@ -911,7 +921,16 @@ pub async fn move_node_file(
                 }
             }
             custom_name => {
-                // Use custom filename provided by the user
+                // Use custom filename provided by the user; it must be a plain
+                // filename, not a path that could escape the validated folder
+                let custom_path = Path::new(custom_name);
+                if custom_path.components().count() != 1
+                    || custom_path
+                        .components()
+                        .any(|c| !matches!(c, std::path::Component::Normal(_)))
+                {
+                    return Err("Custom filename must not contain path separators".to_string());
+                }
                 new_path = target_dir.join(custom_name);
                 // Check if this custom name also conflicts
                 if new_path.exists() && new_path != old_path {

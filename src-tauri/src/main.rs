@@ -18,8 +18,14 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuild
 use tauri::Manager;
 
 #[tauri::command]
-fn render_typst_math(math: String, display_mode: bool) -> Result<String, String> {
-    typst_render::render_math_to_svg(&math, display_mode)
+async fn render_typst_math(math: String, display_mode: bool) -> Result<String, String> {
+    // Typst compilation is CPU-heavy; a synchronous command would block the
+    // main thread and freeze the UI
+    tauri::async_runtime::spawn_blocking(move || {
+        typst_render::render_math_to_svg(&math, display_mode)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // MCP Server state wrapper
@@ -72,6 +78,7 @@ async fn get_mcp_status(state: tauri::State<'_, McpState>) -> Result<serde_json:
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -81,13 +88,12 @@ fn main() {
         )))
         .manage(McpState(Arc::new(mcp_websocket::McpServerState::new())))
         .setup(|app| {
-            // Initialize database - must complete before app starts
+            // Initialize database - must complete before app starts. A failure
+            // here must abort startup: without a database every command fails
+            // and the app would launch in a silently broken state.
             let app_handle = app.handle().clone();
-            tauri::async_runtime::block_on(async move {
-                if let Err(e) = database::initialize(&app_handle).await {
-                    eprintln!("Failed to initialize database: {}", e);
-                }
-            });
+            tauri::async_runtime::block_on(async move { database::initialize(&app_handle).await })
+                .map_err(|e| format!("Failed to initialize database: {}", e))?;
 
             // Build macOS menu
             #[cfg(target_os = "macos")]
@@ -177,10 +183,16 @@ fn main() {
                     let _ = window.eval("window.__NODUS_ZOOM_RESET?.()");
                 }
                 "website" => {
-                    let _ = window.eval("window.open('https://nodus.app', '_blank')");
+                    // window.open inside the webview does not reach the system
+                    // browser under wry; use the opener plugin instead
+                    use tauri_plugin_opener::OpenerExt;
+                    let _ = app.opener().open_url("https://nodus.app", None::<&str>);
                 }
                 "docs" => {
-                    let _ = window.eval("window.open('https://nodus.app/docs', '_blank')");
+                    use tauri_plugin_opener::OpenerExt;
+                    let _ = app
+                        .opener()
+                        .open_url("https://nodus.app/docs", None::<&str>);
                 }
                 _ => {}
             }

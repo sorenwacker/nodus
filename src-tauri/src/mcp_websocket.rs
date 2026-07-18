@@ -27,7 +27,13 @@ pub enum ConnectionState {
 pub struct McpConnection {
     pub id: String,
     pub state: ConnectionState,
-    pub sender: mpsc::UnboundedSender<String>,
+    pub sender: mpsc::UnboundedSender<Message>,
+}
+
+impl McpConnection {
+    fn send_text(&self, text: String) {
+        let _ = self.sender.send(Message::Text(text));
+    }
 }
 
 /// Shared state for the MCP server
@@ -133,6 +139,8 @@ pub const NOT_APPROVED: i32 = -32001;
 #[derive(Debug, Serialize, Clone)]
 pub struct ConnectionRequestEvent {
     pub connection_id: String,
+    /// Peer address so the user can identify who is asking for access
+    pub peer_addr: Option<String>,
 }
 
 /// Event emitted when a message is received from an approved client
@@ -207,10 +215,16 @@ pub async fn start_server(
             }
         }
 
-        // Cleanup
+        // Cleanup: close every client connection, then drop them
+        {
+            let mut connections = state_clone.connections.write().await;
+            for conn in connections.values() {
+                let _ = conn.sender.send(Message::Close(None));
+            }
+            connections.clear();
+        }
         *state_clone.running.write().await = false;
         *state_clone.port.write().await = None;
-        state_clone.connections.write().await.clear();
         println!("[MCP] Server stopped");
     });
 
@@ -253,13 +267,14 @@ pub async fn approve_connection(
             None,
             serde_json::json!({"status": "approved", "message": "Connection approved by user"}),
         );
-        let _ = conn.sender.send(serde_json::to_string(&response).unwrap());
+        conn.send_text(serde_json::to_string(&response).unwrap());
         println!("[MCP] Connection {} approved", connection_id);
     } else {
         conn.state = ConnectionState::Rejected;
-        // Send rejection and close
+        // Send rejection, then actually close the socket
         let response = JsonRpcResponse::error(None, NOT_APPROVED, "Connection rejected by user");
-        let _ = conn.sender.send(serde_json::to_string(&response).unwrap());
+        conn.send_text(serde_json::to_string(&response).unwrap());
+        let _ = conn.sender.send(Message::Close(None));
         println!("[MCP] Connection {} rejected", connection_id);
     }
 
@@ -283,7 +298,7 @@ pub async fn send_response(
     }
 
     conn.sender
-        .send(response.to_string())
+        .send(Message::Text(response.to_string()))
         .map_err(|e| e.to_string())
 }
 
@@ -316,14 +331,32 @@ async fn handle_connection(
     state: Arc<McpServerState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Get peer address for logging
-    let _peer_addr = stream.peer_addr().ok();
+    let peer_addr = stream.peer_addr().ok();
 
-    let ws_stream = tokio_tungstenite::accept_async(stream).await?;
+    // Reject handshakes carrying an Origin header: those come from browsers,
+    // and a malicious web page must not be able to reach the local MCP server.
+    // Native MCP clients do not send Origin.
+    let ws_stream = tokio_tungstenite::accept_hdr_async(
+        stream,
+        |request: &tokio_tungstenite::tungstenite::handshake::server::Request,
+         response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+            if request.headers().contains_key("origin") {
+                let mut forbidden =
+                    tokio_tungstenite::tungstenite::handshake::server::ErrorResponse::new(Some(
+                        "Browser connections are not allowed".to_string(),
+                    ));
+                *forbidden.status_mut() =
+                    tokio_tungstenite::tungstenite::http::StatusCode::FORBIDDEN;
+                return Err(forbidden);
+            }
+            Ok(response)
+        },
+    )
+    .await?;
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
     // Create channel for sending messages to this connection
-    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
     // All connections require approval (user preference)
     let initial_state = ConnectionState::PendingApproval;
@@ -348,6 +381,7 @@ async fn handle_connection(
         "mcp-connection-request",
         ConnectionRequestEvent {
             connection_id: connection_id.clone(),
+            peer_addr: peer_addr.map(|a| a.to_string()),
         },
     );
 
@@ -355,7 +389,8 @@ async fn handle_connection(
     let conn_id_out = connection_id.clone();
     let outgoing = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            if ws_sender.send(Message::Text(msg)).await.is_err() {
+            let closing = matches!(msg, Message::Close(_));
+            if ws_sender.send(msg).await.is_err() || closing {
                 break;
             }
         }
@@ -381,25 +416,20 @@ async fn handle_connection(
 
                         if !is_approved {
                             // Only allow status check before approval
-                            if request.method == "get_status" {
-                                let response = JsonRpcResponse::success(
+                            let response = if request.method == "get_status" {
+                                JsonRpcResponse::success(
                                     request.id.clone(),
                                     serde_json::json!({"status": "pending_approval"}),
-                                );
-                                let _ =
-                                    state.connections.read().await.get(&connection_id).map(|c| {
-                                        c.sender.send(serde_json::to_string(&response).unwrap())
-                                    });
+                                )
                             } else {
-                                let response = JsonRpcResponse::error(
+                                JsonRpcResponse::error(
                                     request.id.clone(),
                                     NOT_APPROVED,
                                     "Connection pending approval",
-                                );
-                                let _ =
-                                    state.connections.read().await.get(&connection_id).map(|c| {
-                                        c.sender.send(serde_json::to_string(&response).unwrap())
-                                    });
+                                )
+                            };
+                            if let Some(c) = state.connections.read().await.get(&connection_id) {
+                                c.send_text(serde_json::to_string(&response).unwrap());
                             }
                             continue;
                         }
@@ -420,12 +450,9 @@ async fn handle_connection(
                             PARSE_ERROR,
                             &format!("Parse error: {}", e),
                         );
-                        let _ = state
-                            .connections
-                            .read()
-                            .await
-                            .get(&connection_id)
-                            .map(|c| c.sender.send(serde_json::to_string(&response).unwrap()));
+                        if let Some(c) = state.connections.read().await.get(&connection_id) {
+                            c.send_text(serde_json::to_string(&response).unwrap());
+                        }
                     }
                 }
             }
@@ -434,11 +461,11 @@ async fn handle_connection(
                 break;
             }
             Ok(Message::Ping(data)) => {
-                // Respond to ping with pong
-                let _ = state.connections.read().await.get(&connection_id).map(|c| {
-                    let pong_data: Vec<u8> = data;
-                    c.sender.send(format!("PONG:{}", hex::encode(&pong_data)))
-                });
+                // Respond with a Pong control frame; a text frame here would
+                // corrupt the JSON-RPC stream
+                if let Some(c) = state.connections.read().await.get(&connection_id) {
+                    let _ = c.sender.send(Message::Pong(data));
+                }
             }
             Err(e) => {
                 eprintln!("[MCP] WebSocket error for {}: {}", connection_id, e);

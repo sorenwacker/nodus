@@ -96,18 +96,26 @@ pub async fn web_search(
     Ok(results)
 }
 
-/// Fetch and extract content from a URL (handles JavaScript via Jina Reader)
+/// Fetch and extract content from a URL.
+///
+/// By default the URL is fetched directly so it is never shared with a third
+/// party. Passing `use_reader = true` opts in to the Jina Reader proxy
+/// (r.jina.ai), which renders JavaScript and returns clean markdown but sees
+/// every fetched URL.
 #[tauri::command]
-pub async fn fetch_url(url: String) -> Result<String, String> {
+pub async fn fetch_url(url: String, use_reader: Option<bool>) -> Result<String, String> {
+    super::http::validate_outbound_url(&url)?;
+
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
 
-    // Use Jina Reader to fetch and extract content (handles JS rendering)
-    // This service renders the page and returns clean markdown
-    let jina_url = format!("https://r.jina.ai/{}", url);
+    if use_reader != Some(true) {
+        return fetch_url_direct(&client, &url).await;
+    }
 
+    let jina_url = format!("https://r.jina.ai/{}", url);
     let response = client
         .get(&jina_url)
         .header(

@@ -61,15 +61,15 @@ impl FileLock {
 }
 
 /// Write content to a file with exclusive locking
-/// Returns the new checksum of the file
+/// Returns the checksum of the written content
 pub fn write_file_locked(path: &Path, content: &str) -> Result<String, WatcherError> {
     let mut lock = FileLock::exclusive(path)?;
     lock.write_content(content)?;
-    // Lock is released on drop
+    // Checksum the content we wrote, not the file: re-reading the file after
+    // releasing the lock races with concurrent writers (e.g. Obsidian)
+    let checksum = crate::checksum::compute_string(content);
     drop(lock);
-    // Compute new checksum
-    crate::checksum::compute_file(path)
-        .map_err(|e| WatcherError::Io(std::io::Error::other(e.to_string())))
+    Ok(checksum)
 }
 
 impl Drop for FileLock {
