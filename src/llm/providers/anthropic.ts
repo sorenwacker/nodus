@@ -155,13 +155,50 @@ export class AnthropicProvider implements ILLMProvider {
     }
 
     let systemPrompt: string | undefined
-    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
+    type ContentBlock =
+      | { type: 'text'; text: string }
+      | { type: 'tool_use'; id: string; name: string; input: unknown }
+      | { type: 'tool_result'; tool_use_id: string; content: string }
+    const messages: Array<{ role: 'user' | 'assistant'; content: string | ContentBlock[] }> = []
 
     for (const msg of options.messages) {
       if (msg.role === 'system') {
         systemPrompt = msg.content
-      } else if (msg.role === 'user' || msg.role === 'assistant') {
-        messages.push({ role: msg.role, content: msg.content })
+      } else if (msg.role === 'assistant') {
+        // Tool calls must become tool_use blocks; dropping them (or sending
+        // empty text blocks) makes the API reject or ignore the tool loop
+        const blocks: ContentBlock[] = []
+        if (msg.content) blocks.push({ type: 'text', text: msg.content })
+        for (const tc of msg.tool_calls || []) {
+          let input: unknown = {}
+          try {
+            input = JSON.parse(tc.function.arguments)
+          } catch {
+            input = {}
+          }
+          blocks.push({ type: 'tool_use', id: tc.id || '', name: tc.function.name, input })
+        }
+        if (msg.tool_calls?.length) {
+          messages.push({ role: 'assistant', content: blocks })
+        } else if (msg.content) {
+          messages.push({ role: 'assistant', content: msg.content })
+        }
+      } else if (msg.role === 'tool') {
+        // Tool results are user-turn tool_result blocks; consecutive results
+        // for one assistant turn belong in a single user message
+        const block: ContentBlock = {
+          type: 'tool_result',
+          tool_use_id: msg.tool_call_id || '',
+          content: msg.content,
+        }
+        const last = messages[messages.length - 1]
+        if (last && last.role === 'user' && Array.isArray(last.content)) {
+          last.content.push(block)
+        } else {
+          messages.push({ role: 'user', content: [block] })
+        }
+      } else {
+        messages.push({ role: 'user', content: msg.content })
       }
     }
 

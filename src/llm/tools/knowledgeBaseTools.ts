@@ -62,60 +62,53 @@ const HISTORICAL_PHASES: PhaseConfig[] = [
 /** Supervisor evaluation result */
 interface SupervisorEvaluation {
   phase: string
-  nodesCreated: number
-  edgesCreated: number
+  findingsCount: number
   coverageScore: number
   isComplete: boolean
   missingAspects: string[]
-  recommendation: 'continue' | 'expand' | 'connect' | 'complete'
+  recommendation: 'continue' | 'expand'
   message: string
 }
 
 /**
- * Evaluate phase completion
+ * Evaluate phase completion.
+ *
+ * deepResearch only gathers findings; node creation happens later when the
+ * agent processes the returned markers. The phase must therefore be judged on
+ * the research output itself - a store-delta check would always read zero and
+ * loop the first phase forever.
  */
 function evaluatePhase(
   phase: PhaseConfig,
-  nodesBefore: number,
-  nodesAfter: number,
-  edgesBefore: number,
-  edgesAfter: number,
   researchResult?: DeepResearchResult
 ): SupervisorEvaluation {
-  const nodesCreated = nodesAfter - nodesBefore
-  const edgesCreated = edgesAfter - edgesBefore
+  const findingsCount = researchResult?.findings?.length ?? 0
   const coverageScore = researchResult?.completenessScore ?? 0
 
-  // Check if phase met minimum requirements
-  const hasEnoughNodes = nodesCreated >= phase.minNodes
-  const hasEnoughEdges = edgesCreated >= nodesCreated * 0.5
+  const hasEnoughFindings = findingsCount >= phase.minNodes
   const hasGoodCoverage = coverageScore >= 0.6
 
   const missingAspects = researchResult?.suggestedFollowUps?.slice(0, 3) ?? []
 
-  let recommendation: SupervisorEvaluation['recommendation'] = 'complete'
+  let recommendation: SupervisorEvaluation['recommendation'] = 'continue'
   let message = ''
 
-  if (!hasEnoughNodes) {
+  if (!hasEnoughFindings) {
     recommendation = 'expand'
-    message = `Phase "${phase.name}" incomplete: only ${nodesCreated}/${phase.minNodes} nodes. Need more research.`
-  } else if (!hasEnoughEdges) {
-    recommendation = 'connect'
-    message = `Phase "${phase.name}" has nodes but few connections (${edgesCreated} edges for ${nodesCreated} nodes). Connect them.`
+    message = `Phase "${phase.name}" incomplete: only ${findingsCount}/${phase.minNodes} findings. Need more research.`
   } else if (!hasGoodCoverage && missingAspects.length > 0) {
     recommendation = 'expand'
     message = `Phase "${phase.name}" coverage is ${Math.round(coverageScore * 100)}%. Missing: ${missingAspects.join(', ')}`
   } else {
     recommendation = 'continue'
-    message = `Phase "${phase.name}" complete: ${nodesCreated} nodes, ${edgesCreated} edges, ${Math.round(coverageScore * 100)}% coverage.`
+    message = `Phase "${phase.name}" complete: ${findingsCount} findings, ${Math.round(coverageScore * 100)}% coverage.`
   }
 
   return {
     phase: phase.name,
-    nodesCreated,
-    edgesCreated,
+    findingsCount,
     coverageScore,
-    isComplete: recommendation === 'continue' || recommendation === 'complete',
+    isComplete: recommendation === 'continue',
     missingAspects,
     recommendation,
     message,
@@ -184,8 +177,6 @@ export function registerKnowledgeBaseTools(): void {
       // Run each phase
       for (let i = 0; i < phases.length; i++) {
         const phase = phases[i]
-        const nodesBefore = ctx.store.filteredNodes.length
-        const edgesBefore = ctx.store.filteredEdges.length
 
         ctx.log(`\n[Phase ${i + 1}/${phases.length}] ${phase.name.toUpperCase()}: ${phase.description}`)
 
@@ -203,19 +194,14 @@ export function registerKnowledgeBaseTools(): void {
 
           totalResearchResult = result
 
-          // Evaluate phase completion
-          const nodesAfter = ctx.store.filteredNodes.length
-          const edgesAfter = ctx.store.filteredEdges.length
-          const evaluation = evaluatePhase(phase, nodesBefore, nodesAfter, edgesBefore, edgesAfter, result)
+          const evaluation = evaluatePhase(phase, result)
           phaseResults.push(evaluation)
 
           ctx.log(`[Supervisor] ${evaluation.message}`)
 
           // If phase incomplete, return marker for agent to continue
           if (!evaluation.isComplete) {
-            const instruction = evaluation.recommendation === 'connect'
-              ? `Use create_edges_batch to connect the ${phase.name} nodes before continuing.`
-              : `Research more about: ${evaluation.missingAspects.join(', ')}`
+            const instruction = `Research more about: ${evaluation.missingAspects.join(', ')}`
 
             return `__KB_PHASE_INCOMPLETE__:${JSON.stringify({
               phase: phase.name,

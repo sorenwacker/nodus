@@ -17,9 +17,10 @@ export function registerSmartTools(): void {
       },
       required: ['instruction'],
     },
-    async (args, _ctx) => {
-      // This tool requires external LLM calls - handled by agent runner
-      return `__SMART_MOVE__:${args.instruction}`
+    async (_args, _ctx) => {
+      // This tool requires external LLM calls - the canvas dispatcher only
+      // falls through to the real implementation on __UNHANDLED__
+      return `__UNHANDLED__:smart_move`
     },
     { category: 'smart' }
   )
@@ -34,8 +35,8 @@ export function registerSmartTools(): void {
       },
       required: ['groups'],
     },
-    async (args, _ctx) => {
-      return `__SMART_CONNECT__:${args.groups}`
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:smart_connect`
     },
     { category: 'smart' }
   )

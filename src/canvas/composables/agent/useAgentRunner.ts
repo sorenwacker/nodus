@@ -77,9 +77,9 @@ export interface AgentContext {
   // Selection state for selection-aware tools
   selectedNodeIds?: () => string[]
 
-  // LLM settings
-  model: Ref<string>
-  contextLength: Ref<number>
+  // LLM settings (read-only refs; useLLM provides computeds)
+  model: Readonly<Ref<string>>
+  contextLength: Readonly<Ref<number>>
   getProviderId?: () => string
 
   // Agent state (shared with useLLM)
@@ -117,6 +117,14 @@ export function useAgentRunner(ctx: AgentContext) {
   let savedMessages: ChatMessage[] = []
   let savedIteration = 0
 
+  // Incremented on every run/stop so a restarted agent invalidates the
+  // previous loop even after isRunning flips back to true
+  let runGeneration = 0
+
+  // Leading messages (system prompt + restored history + user request) that
+  // pruning must never drop; set by run() which knows the message layout
+  let pinnedMessageCount = 2
+
   // Current plan (for execute mode)
   const currentPlan = ref<AgentPlan | null>(null)
 
@@ -124,6 +132,7 @@ export function useAgentRunner(ctx: AgentContext) {
    * Stop the running agent
    */
   function stop() {
+    runGeneration++
     llmQueue.cancelCurrent()
     ctx.isRunning.value = false
     isPaused.value = false
@@ -235,6 +244,7 @@ export function useAgentRunner(ctx: AgentContext) {
       ...recentHistory,
       { role: 'user', content: enhancedRequest },
     ]
+    pinnedMessageCount = messages.length
 
     // Add current request to conversation history
     ctx.conversationHistory.value.push({ role: 'user', content: userRequest })
@@ -242,7 +252,7 @@ export function useAgentRunner(ctx: AgentContext) {
     const maxIterations = getModeMaxIterations(mode.value)
     const pruneEvery = 10
 
-    return await runLoop(messages, 0, maxIterations, pruneEvery)
+    return await runLoop(messages, 0, maxIterations, pruneEvery, ++runGeneration)
   }
 
   /**
@@ -276,7 +286,7 @@ export function useAgentRunner(ctx: AgentContext) {
     }
 
     const maxIterations = getModeMaxIterations(mode.value)
-    return await runLoop(savedMessages, savedIteration, maxIterations, 10)
+    return await runLoop(savedMessages, savedIteration, maxIterations, 10, ++runGeneration)
   }
 
   /**
@@ -286,19 +296,22 @@ export function useAgentRunner(ctx: AgentContext) {
     messages: ChatMessage[],
     startIteration: number,
     maxIterations: number,
-    pruneEvery: number
+    pruneEvery: number,
+    generation: number
   ): Promise<AgentRunResult> {
     for (let i = startIteration; i < maxIterations; i++) {
       // Get tools for current mode (refresh each iteration in case mode changed)
       const tools = getFilteredTools()
-      // Check if we should stop
-      if (!ctx.isRunning.value) {
+      // Stop when the user stopped the agent, or when a newer run superseded
+      // this loop (isRunning alone is not enough: a restart sets it back to
+      // true before the old loop observes the stop)
+      if (!ctx.isRunning.value || generation !== runGeneration) {
         return { status: 'stopped', message: 'Agent stopped by user' }
       }
 
       // Prune context periodically
       if (i > 0 && i % pruneEvery === 0) {
-        messages = pruneMessages(messages)
+        messages = pruneMessages(messages, 6, pinnedMessageCount)
         ctx.log.value.push(`> Pruned context (${messages.length} messages)`)
       }
 
@@ -309,25 +322,29 @@ export function useAgentRunner(ctx: AgentContext) {
 
         messages.push(msg)
 
-        // Check if content has embedded tool calls that should be processed BEFORE native tool calls
-        // Some models output both text with tool JSON AND a native done() call
-        if (msg.content && msg.tool_calls?.length) {
-          const hasEmbeddedTools = /<\|channel\|>.*?to=\w+/.test(msg.content) ||
-                                   /<\|constrain\|>json<\|message\|>\{/.test(msg.content) ||
-                                   /```json[\s\S]*?"name"\s*:/.test(msg.content)
+        // Some models output both text with embedded tool JSON AND native tool
+        // calls (e.g. a spurious done()). When that happens, process the
+        // content-based tools and skip the native calls this iteration.
+        const hasEmbeddedToolsInContent = Boolean(
+          msg.content &&
+            msg.tool_calls?.length &&
+            (/<\|channel\|>.*?to=\w+/.test(msg.content) ||
+              /<\|constrain\|>json<\|message\|>\{/.test(msg.content) ||
+              /```json[\s\S]*?"name"\s*:/.test(msg.content))
+        )
 
-          if (hasEmbeddedTools) {
-            // Process content-based tools first, skip native calls this iteration
-            ctx.log.value.push('> Processing embedded tool calls from content...')
-            // Fall through to content processing below
+        if (hasEmbeddedToolsInContent) {
+          ctx.log.value.push('> Processing embedded tool calls from content...')
+          // The assistant message carrying the skipped native tool_calls is
+          // already in history; answer each so no tool call is left dangling
+          for (const tc of msg.tool_calls || []) {
+            messages.push({
+              role: 'tool',
+              content: 'Skipped: superseded by the tool call embedded in the message content.',
+              tool_call_id: tc.id,
+            })
           }
         }
-
-        // Handle native tool calls (skip if we detected embedded tools above)
-        const hasEmbeddedToolsInContent = msg.content && (
-          /<\|channel\|>.*?to=\w+/.test(msg.content) ||
-          /<\|constrain\|>json<\|message\|>\{/.test(msg.content)
-        )
 
         if (msg.tool_calls && msg.tool_calls.length > 0 && !hasEmbeddedToolsInContent) {
           // Get allowed tools for current mode
@@ -358,12 +375,19 @@ export function useAgentRunner(ctx: AgentContext) {
                 ? JSON.parse(tc.function.arguments)
                 : (tc.function.arguments || {})
             } catch (e) {
-              // Invalid JSON - log the error and malformed args for debugging
+              // Invalid JSON - report the failure back to the model instead of
+              // executing the tool with empty arguments
               const argsPreview = typeof tc.function.arguments === 'string'
                 ? tc.function.arguments.slice(0, 100)
                 : JSON.stringify(tc.function.arguments).slice(0, 100)
               console.error(`Failed to parse tool arguments for ${tc.function.name}:`, e)
               ctx.log.value.push(`> Warning: Malformed args for ${tc.function.name}: ${argsPreview}...`)
+              messages.push({
+                role: 'tool',
+                content: `Error: arguments for ${tc.function.name} were not valid JSON. Repeat the call with valid JSON arguments.`,
+                tool_call_id: tc.id,
+              })
+              continue
             }
             const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
@@ -432,13 +456,11 @@ export function useAgentRunner(ctx: AgentContext) {
         } else if (msg.content) {
           ctx.log.value.push(`LLM: ${msg.content.slice(0, 80)}...`)
 
-          // If LLM asks a question or says it's done, stop
-          if (msg.content.includes('?') || /done|complete|finished|empty/i.test(msg.content)) {
-            ctx.isRunning.value = false
-            return { status: 'done', message: msg.content.slice(0, 200) }
-          }
-
-          // Try to parse tool calls from text (fallback for models without native tool calling)
+          // Try to parse tool calls from text FIRST (fallback for models
+          // without native tool calling). The done/question heuristics below
+          // must not fire on messages that contain tool JSON: words like
+          // "complete" inside tool arguments would otherwise end the run
+          // without executing the tool.
           let toolJson: string | null = null
 
           const jsonMatch = msg.content.match(/```json\s*([\s\S]*?)\s*```/)
@@ -491,11 +513,15 @@ export function useAgentRunner(ctx: AgentContext) {
             } catch { /* Not valid tool JSON */ }
           }
 
-          // Check if LLM thinks it's done
-          const looksComplete = /now shows|complete|finished|created|done|successfully/i.test(msg.content)
-          if (looksComplete) {
+          // No tool JSON found: apply the done/question heuristics. A question
+          // only counts when the whole message is short - a '?' buried in a
+          // longer answer is not a question to the user.
+          const asksQuestion = msg.content.includes('?') && msg.content.length < 200
+          const looksComplete =
+            /now shows|complete|finished|created|done|successfully|empty/i.test(msg.content)
+          if (asksQuestion || looksComplete) {
             ctx.isRunning.value = false
-            return { status: 'done', message: 'Done' }
+            return { status: 'done', message: msg.content.slice(0, 200) }
           }
 
           // Prompt to continue

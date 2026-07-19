@@ -14,6 +14,8 @@ export interface LLMMessage {
       arguments: string
     }
   }>
+  /** Set on role:'tool' messages to link the result to its tool call */
+  tool_call_id?: string
 }
 
 export interface LLMTool {

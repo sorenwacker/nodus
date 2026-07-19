@@ -4,7 +4,7 @@
  * Handles: update_node, move_node, batch_update
  */
 
-import { defineTool } from '../registry'
+import { defineTool, findNodeByTitle } from '../registry'
 import { cleanContent } from '../utils'
 
 export function registerUpdateTools(): void {
@@ -20,7 +20,7 @@ export function registerUpdateTools(): void {
       required: ['title', 'new_content'],
     },
     async (args, ctx) => {
-      const node = ctx.store.filteredNodes.find(n => n.title === args.title)
+      const node = findNodeByTitle(ctx.store.filteredNodes, args.title)
       if (!node) return `Error: Node "${args.title}" not found`
       // Push to undo stack before modifying
       ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)
@@ -43,7 +43,7 @@ export function registerUpdateTools(): void {
       required: ['title', 'x', 'y'],
     },
     async (args, ctx) => {
-      const node = ctx.store.filteredNodes.find(n => n.title === args.title)
+      const node = findNodeByTitle(ctx.store.filteredNodes, args.title)
       if (!node) return `Error: Node "${args.title}" not found`
       const x = Number(args.x)
       const y = Number(args.y)
@@ -81,7 +81,7 @@ export function registerUpdateTools(): void {
 
       const results: string[] = []
       for (const upd of updates) {
-        const node = ctx.store.filteredNodes.find(n => n.title === upd.title)
+        const node = findNodeByTitle(ctx.store.filteredNodes, upd.title)
         if (!node) {
           results.push(`${upd.title}: not found`)
           continue

@@ -202,8 +202,8 @@ export function registerBatchTools(): void {
 
       // LLM action - use LLM to generate/transform content
       if (action === 'llm') {
-        const { providerRegistry } = await import('../providers')
-        const provider = providerRegistry.getActiveProvider()
+        // All LLM calls go through the queue for retry/cancellation
+        const { llmQueue } = await import('../queue')
         let processed = 0
 
         for (let i = 0; i < nodes.length; i++) {
@@ -235,13 +235,13 @@ export function registerBatchTools(): void {
               prompt = `Write about "${node.title}". ${instruction}`
             }
 
-            const result = await provider.generate({
+            const content = await llmQueue.generate(
               prompt,
-              system: `Write about "${node.title}" only. No preamble.`,
-            })
+              `Write about "${node.title}" only. No preamble.`
+            )
 
-            if (result.content?.trim()) {
-              await ctx.store.updateNodeContent(node.id, cleanContent(result.content))
+            if (content?.trim()) {
+              await ctx.store.updateNodeContent(node.id, cleanContent(content))
               processed++
             }
           } catch (err) {
@@ -292,8 +292,8 @@ export function registerBatchTools(): void {
       required: ['topic', 'target_count'],
     },
     async (args, ctx) => {
-      const { providerRegistry } = await import('../providers')
-      const provider = providerRegistry.getActiveProvider()
+      // All LLM calls go through the queue for retry/cancellation
+      const { llmQueue } = await import('../queue')
 
       const topic = args.topic
       const targetCount = Math.min(args.target_count || 100, 2000)
@@ -319,21 +319,21 @@ export function registerBatchTools(): void {
           : ''
 
         try {
-          const result = await provider.generate({
-            prompt: `List exactly ${thisCount} specific subtopics about "${topic}".
+          const responseText = await llmQueue.generate(
+            `List exactly ${thisCount} specific subtopics about "${topic}".
 Return ONLY a JSON array of objects with "title" and "content" keys.
 Each content should be 2-3 sentences.
 Be specific and diverse - cover different aspects.${avoidClause}
 
 Example format:
 [{"title": "Subtopic Name", "content": "Brief description..."}]`,
-            system: 'You are a research assistant. Return only valid JSON, no markdown.',
-          })
+            'You are a research assistant. Return only valid JSON, no markdown.'
+          )
 
           // Parse the response
           let nodes: Array<{ title: string; content: string }> = []
           try {
-            const jsonMatch = result.content.match(/\[[\s\S]*\]/)
+            const jsonMatch = responseText.match(/\[[\s\S]*\]/)
             if (jsonMatch) {
               nodes = JSON.parse(jsonMatch[0])
             }

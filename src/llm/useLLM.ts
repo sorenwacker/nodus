@@ -3,7 +3,7 @@
  * Manages LLM settings, state, and provides API access
  * ALL LLM calls go through the queue
  */
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
 import { providerRegistry } from './providers'
 import type { ProviderConfig } from './providers/types'
@@ -42,8 +42,10 @@ export function useLLM() {
     return provider.getConfig()
   }
 
-  const model = ref((getProviderConfig().model as string) || 'llama3.2')
-  const contextLength = ref((getProviderConfig().contextLength as number) || 4096)
+  // Read the provider config live: a one-shot snapshot would go stale when
+  // the user changes model or provider in settings mid-session
+  const model = computed(() => (getProviderConfig().model as string) || 'llama3.2')
+  const contextLength = computed(() => (getProviderConfig().contextLength as number) || 4096)
 
   // Agent state
   const isRunning = ref(false)

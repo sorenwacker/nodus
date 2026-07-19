@@ -3,17 +3,28 @@
  */
 
 /**
- * Clean LLM-generated content: fix escape sequences
+ * LaTeX commands that start with the same characters as the \n and \t escape
+ * sequences. Their presence means a literal backslash-n/-t is math notation,
+ * not a mangled newline.
+ */
+const LATEX_ESCAPE_LOOKALIKES =
+  /\\(?:nabla|natural|ncong|nearrow|neg|neq|nexists|ni|nmid|not|notin|nparallel|nsim|nsubseteq|nsupseteq|nu|nwarrow|tan|tanh|tau|tbinom|text|textbf|textit|textrm|textsf|texttt|tfrac|theta|therefore|thicksim|tilde|times|to|top|triangle|triangledown|triangleleft|triangleright)\b/
+
+/**
+ * Clean LLM-generated content: fix escape sequences without corrupting LaTeX
  */
 export function cleanContent(text: string | undefined | null): string {
-  return (text || '')
+  let result = (text || '')
     .replace(/\\\\n/g, '\n')
-    .replace(/\\n/g, '\n')
     .replace(/\\\\t/g, '\t')
-    .replace(/\\t/g, '\t')
     .replace(/direct\s*\.end/gi, '')
-    .replace(/;\s*$/gm, '')
-    .trim()
+  // A single-escaped \n or \t is only unescaped when the text has no real
+  // newlines (the signature of JSON-escaped output) and contains no LaTeX
+  // commands like \nabla or \theta that the replacement would destroy
+  if (!result.includes('\n') && !LATEX_ESCAPE_LOOKALIKES.test(result)) {
+    result = result.replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+  }
+  return result.trim()
 }
 
 /**

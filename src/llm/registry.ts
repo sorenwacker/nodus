@@ -257,6 +257,21 @@ class ToolRegistry {
 // Singleton instance
 export const toolRegistry = new ToolRegistry()
 
+/**
+ * Find a node by title: exact match first, then case-insensitive.
+ * All tools must resolve titles through this helper so the same title string
+ * behaves identically in every tool (LLMs frequently vary capitalization).
+ */
+export function findNodeByTitle<T extends { title: string }>(
+  nodes: T[],
+  title: string
+): T | undefined {
+  const exact = nodes.find(n => n.title === title)
+  if (exact) return exact
+  const lower = title.toLowerCase()
+  return nodes.find(n => n.title.toLowerCase() === lower)
+}
+
 // Helper to create tool definitions with type safety
 export function defineTool<T extends Record<string, unknown>>(
   name: string,

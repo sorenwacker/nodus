@@ -14,8 +14,8 @@ export function registerLayoutTools(): void {
     {
       type: 'object',
       properties: {
-        layout: { type: 'string', description: '"grid", "horizontal", "vertical", "circle", "clock", "star", "force" (force-directed based on edges)' },
-        sort: { type: 'string', description: '"alphabetical", "numeric", "reverse" (optional)' },
+        layout: { type: 'string', description: '"grid", "horizontal", "vertical", "circle", "star", "force" (force-directed based on edges)' },
+        sort: { type: 'string', description: '"alphabetical", "numeric", "reverse" (reverse alphabetical); prefix with "-" for descending (optional)' },
       },
       required: ['layout'],
     },
@@ -25,7 +25,8 @@ export function registerLayoutTools(): void {
 
       // Sort if requested
       if (args.sort) {
-        const sortKey = args.sort
+        // The schema documents "reverse"; honor it as descending alphabetical
+        const sortKey = args.sort === 'reverse' ? '-alphabetical' : args.sort
         const desc = sortKey.startsWith('-')
         const key = desc ? sortKey.slice(1) : sortKey
 

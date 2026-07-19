@@ -90,8 +90,8 @@ export function registerPlanningTools(): void {
       },
       required: ['query'],
     },
-    async (args, _ctx) => {
-      return `__WEB_SEARCH__:${args.query}`
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:web_search`
     },
     { category: 'utility' }
   )

@@ -296,20 +296,32 @@ ${customRules}`,
 }
 
 /**
- * Prune messages to manage context size
+ * Prune messages to manage context size.
+ *
+ * `pinned` is the number of leading messages to preserve verbatim: the system
+ * prompt plus any restored conversation history plus the user request. The
+ * caller must pass it because the request is NOT always at index 1.
  */
-export function pruneMessages(messages: ChatMessage[], keepRecent: number = 6): ChatMessage[] {
-  if (messages.length <= keepRecent + 2) return messages
+export function pruneMessages(
+  messages: ChatMessage[],
+  keepRecent: number = 6,
+  pinned: number = 2
+): ChatMessage[] {
+  if (messages.length <= keepRecent + pinned) return messages
 
-  const systemPrompt = messages[0]
-  const userRequest = messages[1]
+  const head = messages.slice(0, pinned)
   const recentMessages = messages.slice(-keepRecent)
+  // Drop leading tool results whose assistant tool_calls were pruned away;
+  // dangling results are rejected by tool-calling APIs
+  while (recentMessages.length > 0 && recentMessages[0].role === 'tool') {
+    recentMessages.shift()
+  }
 
-  const prunedCount = messages.length - keepRecent - 2
+  const prunedCount = messages.length - recentMessages.length - pinned
   const summary: ChatMessage = {
     role: 'assistant',
     content: `[Completed ${prunedCount} previous actions successfully. Continue with remaining work.]`
   }
 
-  return [systemPrompt, userRequest, summary, ...recentMessages]
+  return [...head, summary, ...recentMessages]
 }

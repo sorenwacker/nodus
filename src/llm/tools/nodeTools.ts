@@ -4,7 +4,7 @@
  * Handles: create_node, create_edge, create_edges_batch, delete_node, delete_edges, update_edge, delete_matching
  */
 
-import { defineTool } from '../registry'
+import { defineTool, findNodeByTitle } from '../registry'
 import { cleanContent } from '../utils'
 
 // Position counter for new nodes (module-level state)
@@ -66,8 +66,8 @@ export function registerNodeTools(): void {
       required: ['from_title', 'to_title'],
     },
     async (args, ctx) => {
-      const fromNode = ctx.store.filteredNodes.find(n => n.title === args.from_title)
-      const toNode = ctx.store.filteredNodes.find(n => n.title === args.to_title)
+      const fromNode = findNodeByTitle(ctx.store.filteredNodes, args.from_title)
+      const toNode = findNodeByTitle(ctx.store.filteredNodes, args.to_title)
       if (!fromNode) return `Error: Node "${args.from_title}" not found`
       if (!toNode) return `Error: Node "${args.to_title}" not found`
 
@@ -113,8 +113,8 @@ export function registerNodeTools(): void {
       ctx.log(`> Creating ${args.edges.length} edges...`)
 
       for (const edge of args.edges) {
-        const fromNode = ctx.store.filteredNodes.find(n => n.title === edge.from_title)
-        const toNode = ctx.store.filteredNodes.find(n => n.title === edge.to_title)
+        const fromNode = findNodeByTitle(ctx.store.filteredNodes, edge.from_title)
+        const toNode = findNodeByTitle(ctx.store.filteredNodes, edge.to_title)
 
         if (!fromNode) {
           results.push(`Skip: "${edge.from_title}" not found`)
@@ -161,7 +161,7 @@ export function registerNodeTools(): void {
       required: ['title'],
     },
     async (args, ctx) => {
-      const node = ctx.store.filteredNodes.find(n => n.title === args.title)
+      const node = findNodeByTitle(ctx.store.filteredNodes, args.title)
       if (!node) return `Error: Node "${args.title}" not found`
       // Use NodeService for guaranteed undo, fall back to store
       if (ctx.service) {
@@ -189,7 +189,7 @@ export function registerNodeTools(): void {
       let edges = [...ctx.store.filteredEdges]
 
       if (filter !== 'all') {
-        const node = ctx.store.filteredNodes.find(n => n.title.toLowerCase() === filter.toLowerCase())
+        const node = findNodeByTitle(ctx.store.filteredNodes, filter)
         if (node) {
           edges = edges.filter(e => e.source_node_id === node.id || e.target_node_id === node.id)
         } else {
@@ -222,8 +222,8 @@ export function registerNodeTools(): void {
       required: ['from_title', 'to_title'],
     },
     async (args, ctx) => {
-      const fromNode = ctx.store.filteredNodes.find(n => n.title === args.from_title)
-      const toNode = ctx.store.filteredNodes.find(n => n.title === args.to_title)
+      const fromNode = findNodeByTitle(ctx.store.filteredNodes, args.from_title)
+      const toNode = findNodeByTitle(ctx.store.filteredNodes, args.to_title)
       if (!fromNode) return `Error: Node "${args.from_title}" not found`
       if (!toNode) return `Error: Node "${args.to_title}" not found`
 
