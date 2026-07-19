@@ -2040,6 +2040,7 @@ defineExpose({
           :is-large-graph="isLargeGraph"
           :edge-stroke-width="edgeStrokeWidth"
           :edge-label-size="edgeLabelSize"
+          :zoom="scale"
           :lasso-points="lassoPoints"
           :is-lasso-selecting="isLassoSelecting"
           :current-theme="currentTheme"

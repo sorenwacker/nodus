@@ -7,6 +7,8 @@ const props = defineProps<{
   isLargeGraph: boolean
   edgeStrokeWidth: number
   edgeLabelSize: number
+  /** Current viewport zoom, used to keep labels a constant on-screen size */
+  zoom: number
   lassoPoints: Array<{ x: number; y: number }>
   isLassoSelecting: boolean
   currentTheme: string
@@ -15,6 +17,15 @@ const props = defineProps<{
   edgePreviewStart: { x: number; y: number } | null
   edgePreviewEnd: { x: number; y: number }
 }>()
+
+// Labels live in canvas coordinates inside the zoom-scaled layer, so a fixed
+// canvas font shrinks as you zoom out. Counter-scale by 1/zoom so the label
+// holds a roughly constant on-screen size. Clamp the divisor so labels do not
+// grow unboundedly when zoomed far out or collapse when zoomed far in.
+const renderedLabelSize = computed(() => {
+  const z = Math.min(Math.max(props.zoom, 0.2), 3)
+  return props.edgeLabelSize / z
+})
 
 defineEmits<{
   (e: 'edge-click', event: MouseEvent, edgeId: string): void
@@ -116,7 +127,7 @@ function getArrowMarkerId(color: string): string {
           :x="edge.labelX || (edge.x1 + edge.x2) / 2"
           :y="(edge.labelY || (edge.y1 + edge.y2) / 2) - 2"
           class="edge-label"
-          :style="{ fontSize: edgeLabelSize + 'px' }"
+          :style="{ fontSize: renderedLabelSize + 'px' }"
         >{{ edge.label }}</text>
       </g>
     </template>
