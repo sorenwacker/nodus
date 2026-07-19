@@ -237,6 +237,36 @@ describe('routing module', () => {
       expect(result.finalCrossings).toBeLessThanOrEqual(result.initialCrossings)
     })
 
+    it('orders a hub side monotonically so up/down-quadrant edges do not cross', () => {
+      // A hub with four neighbours on its right side spanning up to down. After
+      // crossing reduction the ports must run monotonically top-to-bottom in the
+      // same order as the targets; a reversed up-quadrant sort (the old bug) put
+      // the least-up target at the top port and crossed the up edges.
+      const nodes: NodeRect[] = [
+        { id: 'hub', canvas_x: 0, canvas_y: 300, width: 200, height: 120 },
+        { id: 'up-far', canvas_x: 600, canvas_y: 0, width: 100, height: 60 },
+        { id: 'up-near', canvas_x: 600, canvas_y: 250, width: 100, height: 60 },
+        { id: 'down-near', canvas_x: 600, canvas_y: 400, width: 100, height: 60 },
+        { id: 'down-far', canvas_x: 600, canvas_y: 700, width: 100, height: 60 },
+      ]
+      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
+      const edges: EdgeDef[] = [
+        { id: 'e-up-far', source_node_id: 'hub', target_node_id: 'up-far' },
+        { id: 'e-up-near', source_node_id: 'hub', target_node_id: 'up-near' },
+        { id: 'e-down-near', source_node_id: 'hub', target_node_id: 'down-near' },
+        { id: 'e-down-far', source_node_id: 'hub', target_node_id: 'down-far' },
+      ]
+
+      optimizeNodeEntrypoints('hub', edges, nodeMap)
+      const routed = routeAllEdges(edges, nodes, nodeMap)
+
+      // Port Y must increase in the same order as the targets (top-to-bottom)
+      const portY = (id: string) => routed.get(id)!.path[0].y
+      expect(portY('e-up-far')).toBeLessThan(portY('e-up-near'))
+      expect(portY('e-up-near')).toBeLessThan(portY('e-down-near'))
+      expect(portY('e-down-near')).toBeLessThan(portY('e-down-far'))
+    })
+
     it('returns early for nodes with fewer than 2 edges', () => {
       const nodes: NodeRect[] = [
         { id: 'a', canvas_x: 0, canvas_y: 0, width: 100, height: 60 },

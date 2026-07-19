@@ -161,51 +161,15 @@ export class BarycentricReduction implements CrossingReductionStrategy {
 
     let swapsPerformed = 0
 
-    // Sort each group by barycenter (position of connected node)
-    // For orthogonal routing: separate by approach direction, reverse within each
-    for (const [key, entries] of groups) {
+    // Order each group by the connected node's position along the side. otherPos
+    // is already the per-side projection (Y for left/right, X for top/bottom),
+    // so a single ascending sort yields the monotonic, non-crossing fan: the
+    // up/down (or left/right) quadrant split falls out of the ordering. This is
+    // the same convention as portOrderKey in portAssignment.
+    for (const [, entries] of groups) {
       if (entries.length < 2) continue
 
-      // Determine the node+side this group represents
-      const [nodeId, side] = key.split(':') as [string, Side]
-      const isHorizontalSide = side === 'left' || side === 'right'
-
-      // Find the node's center position
-      const nodeInfo = edgeInfos.find(e =>
-        e.edge.source_node_id === nodeId || e.edge.target_node_id === nodeId
-      )
-      if (!nodeInfo) continue
-
-      const nodeRect = nodeInfo.edge.source_node_id === nodeId ? nodeInfo.source : nodeInfo.target
-      const nodeCenterPos = isHorizontalSide
-        ? nodeRect.canvas_y + (nodeRect.height || 120) / 2
-        : nodeRect.canvas_x + (nodeRect.width || 200) / 2
-
-      // Separate entries by approach direction
-      const negative: typeof entries = []  // left of center (for top/bottom) or above center (for left/right)
-      const positive: typeof entries = []  // right of center or below center
-
-      for (const entry of entries) {
-        if (entry.otherPos < nodeCenterPos) {
-          negative.push(entry)
-        } else {
-          positive.push(entry)
-        }
-      }
-
-      // Sort BOTH quadrants ascending by the connected node's position so the
-      // combined order runs monotonically across the whole side (most-negative
-      // at the first/top port, most-positive at the last/bottom port). Sorting
-      // the negative quadrant in reverse put the least-negative target at the
-      // extreme port, which made the up-quadrant edges cross before attaching.
-      negative.sort((a, b) => a.otherPos - b.otherPos)
-      positive.sort((a, b) => a.otherPos - b.otherPos)
-
-      // Combine: negative quadrant gets the lower indices (top/left ports),
-      // positive quadrant the higher indices (bottom/right ports)
-      const combined = [...negative, ...positive]
-      entries.length = 0
-      entries.push(...combined)
+      entries.sort((a, b) => a.otherPos - b.otherPos)
 
       // Reassign indices based on sorted order
       entries.forEach((entry, idx) => {

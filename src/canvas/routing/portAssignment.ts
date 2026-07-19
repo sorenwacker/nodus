@@ -10,6 +10,25 @@ import { getSide, getNodeCenter } from './geometry'
 export const PORT_SPACING = 25
 
 /**
+ * Ordering key for a port on a given side, based on the position of the node at
+ * the other end of the edge.
+ *
+ * Ports are laid out top-to-bottom (left/right sides) or left-to-right
+ * (top/bottom sides) with index 0 at the top/left. Ordering every entry on a
+ * side by this key ascending puts the edge whose far node is highest/leftmost
+ * at the first port and the lowest/rightmost at the last port, which is the
+ * monotonic, non-crossing fan. The up-vs-down (or left-vs-right) quadrant split
+ * is implicit: ascending order already groups the two quadrants correctly.
+ *
+ * This is the single source of truth for port ordering; assignPorts,
+ * optimizePortAssignments and the crossing-reduction pass all use it so their
+ * conventions cannot drift apart.
+ */
+export function portOrderKey(side: Side, otherX: number, otherY: number): number {
+  return side === 'left' || side === 'right' ? otherY : otherX
+}
+
+/**
  * Cache for optimized port indices
  * Key: "edgeId:source" or "edgeId:target"
  * Value: { index, total }
@@ -143,29 +162,12 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
     const [, sideStr] = key.split(':')
     const side = sideStr as Side
 
-    // Sort edges by position relative to the side
-    // This ensures edges fan out in order, minimizing immediate crossings
-    entries.sort((a, b) => {
-      // Sort by position relative to the side:
-      // LEFT/RIGHT: sort by Y (vertical position)
-      // TOP/BOTTOM: sort by X (horizontal position)
-      if (side === 'left') {
-        // For left side, edges going up should be at top, edges going down at bottom
-        // Angle to up-left is around -3π/4, angle to down-left is around 3π/4
-        // We want up (-Y) to get smaller index, so sort by Y component
-        return a.otherNodeY - b.otherNodeY
-      } else if (side === 'right') {
-        // For right side, edges going up should be at top
-        // Angle to up-right is around -π/4, angle to down-right is around π/4
-        return a.otherNodeY - b.otherNodeY
-      } else if (side === 'top') {
-        // For top side, edges going left should be at left
-        return a.otherNodeX - b.otherNodeX
-      } else {
-        // For bottom side, edges going left should be at left
-        return a.otherNodeX - b.otherNodeX
-      }
-    })
+    // Order edges so the fan is monotonic across the side (see portOrderKey)
+    entries.sort(
+      (a, b) =>
+        portOrderKey(side, a.otherNodeX, a.otherNodeY) -
+        portOrderKey(side, b.otherNodeX, b.otherNodeY)
+    )
 
 
     // Assign indices from the unified pool
@@ -414,38 +416,11 @@ export function optimizePortAssignments(
     const [, sideStr] = key.split(':')
     const side = sideStr as Side
 
-    // Get node center
-    const firstEdge = edges[0]
-    const node = firstEdge.assignment.node
-    const nodeCx = node.canvas_x + (node.width || 200) / 2
-    const nodeCy = node.canvas_y + (node.height || 120) / 2
-
-    // Sort by angle from node center to other node
-    edges.sort((a, b) => {
-      const angleA = Math.atan2(a.otherY - nodeCy, a.otherX - nodeCx)
-      const angleB = Math.atan2(b.otherY - nodeCy, b.otherX - nodeCx)
-
-      // Map angles to port order based on side
-      // For right side: angles from -π/2 (up) to π/2 (down), map to top-to-bottom ports
-      // For left side: angles from π/2 (down) to -π/2 (up), but edges point left so reverse
-      // For top side: angles from -π (left) to 0 (right), map to left-to-right ports
-      // For bottom side: angles from 0 (right) to π (left), map to left-to-right ports
-
-      if (side === 'right') {
-        // Right side: -π/2 to π/2, ascending angle = top to bottom
-        return angleA - angleB
-      } else if (side === 'left') {
-        // Left side: π to π/2 (up) and -π to -π/2 (down)
-        // We want up (small Y) at top port, down (large Y) at bottom port
-        return a.otherY - b.otherY
-      } else if (side === 'top') {
-        // Top side: left (small X) to right (large X)
-        return a.otherX - b.otherX
-      } else {
-        // Bottom side: left (small X) to right (large X)
-        return a.otherX - b.otherX
-      }
-    })
+    // Order by the shared per-side key so this pass matches assignPorts
+    edges.sort(
+      (a, b) =>
+        portOrderKey(side, a.otherX, a.otherY) - portOrderKey(side, b.otherX, b.otherY)
+    )
 
     // Reassign indices based on sorted order
     edges.forEach((edge, idx) => {
