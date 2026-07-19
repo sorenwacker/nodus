@@ -5,7 +5,6 @@
  * Allows exporting citations created in Nodus to Zotero.
  */
 import { zoteroStorage } from './storage'
-import { parseFrontmatterRaw, extractCitationMetadata } from './extraction'
 
 // Zotero API types
 export interface ZoteroApiCollection {
@@ -259,66 +258,6 @@ export class ZoteroWebApi {
     })
   }
 
-  /**
-   * Create item from node content
-   * Uses shared extraction utilities for frontmatter parsing
-   */
-  createItemFromNode(
-    title: string,
-    content: string | null
-  ): ZoteroApiItem {
-    const item: ZoteroApiItem = {
-      itemType: 'journalArticle', // Default type
-      title,
-    }
-
-    if (!content) return item
-
-    // Use shared extraction utilities
-    const frontmatter = parseFrontmatterRaw(content)
-    const metadata = extractCitationMetadata(content)
-
-    // Apply frontmatter values
-    if (frontmatter) {
-      if (frontmatter.doi) {
-        item.DOI = frontmatter.doi
-      }
-
-      // Map item type
-      if (frontmatter.type) {
-        const type = frontmatter.type.toLowerCase()
-        if (type === 'book') item.itemType = 'book'
-        else if (type === 'thesis' || type === 'dissertation') item.itemType = 'thesis'
-        else if (type === 'conference' || type === 'inproceedings') item.itemType = 'conferencePaper'
-        else if (type === 'webpage' || type === 'website') item.itemType = 'webpage'
-      }
-
-      if (frontmatter.journal) {
-        item.publicationTitle = frontmatter.journal
-      }
-
-      if (frontmatter.date) {
-        item.date = frontmatter.date
-      }
-    }
-
-    // Apply extracted metadata
-    if (metadata.creators.length > 0) {
-      item.creators = metadata.creators.map(c => ({
-        creatorType: c.creatorType,
-        firstName: c.firstName,
-        lastName: c.lastName,
-      }))
-    }
-
-    // Extract abstract (not covered by shared utility)
-    const abstractMatch = content.match(/## Abstract\s*\n\s*\n([\s\S]*?)(?=\n##|\n---|\n*$)/)
-    if (abstractMatch) {
-      item.abstractNote = abstractMatch[1].trim()
-    }
-
-    return item
-  }
 }
 
 /**

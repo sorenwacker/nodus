@@ -141,21 +141,6 @@ export function useAgentRunner(ctx: AgentContext) {
   }
 
   /**
-   * Set agent mode
-   */
-  function setMode(newMode: AgentMode) {
-    mode.value = newMode
-    ctx.log.value.push(`> Mode: ${newMode}`)
-  }
-
-  /**
-   * Set plan for execution
-   */
-  function setPlan(plan: AgentPlan) {
-    currentPlan.value = plan
-  }
-
-  /**
    * Get tools filtered for current mode
    */
   function getFilteredTools(): ToolDefinition[] {
@@ -574,8 +559,6 @@ export function useAgentRunner(ctx: AgentContext) {
     run,
     resume,
     stop,
-    setMode,
-    setPlan,
     getFilteredTools,
   }
 }
