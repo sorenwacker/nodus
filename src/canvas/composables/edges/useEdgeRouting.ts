@@ -4,7 +4,7 @@
  * Computes edge paths with routing, port assignments, and optimization for large graphs
  */
 
-import { computed, watch, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, watch, type Ref, type ComputedRef } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import {
   routeAllEdges,
@@ -95,11 +95,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
   // Combined flag for deferring expensive routing
   const isDeferringRouting = () => isDragging?.value || isZooming?.value
 
-  // Cache for routed edges - only recalculate when not dragging.
-  // Plain (non-reactive) variables on purpose: the edgeLines computed both
-  // reads and writes these, so making them refs would invalidate the computed
-  // as a side effect of its own evaluation and cause double evaluation.
-  type RoutedEdgeMap = Map<
+  // Cache for routed edges - only recalculate when not dragging
+  const cachedRoutedEdges = ref<Map<
     string,
     {
       svgPath: string
@@ -107,9 +104,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       path?: Array<{ x: number; y: number }>
       debugInfo?: unknown
     }
-  >
-  let cachedRoutedEdges: RoutedEdgeMap | null = null
-  let lastRoutingKey = ''
+  > | null>(null)
+  const lastRoutingKey = ref('')
 
   // Recalculate routing when drag ends
   watch(
@@ -117,7 +113,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     (dragging, wasDragging) => {
       if (wasDragging && !dragging) {
         // Drag ended - invalidate cache to trigger re-routing
-        lastRoutingKey = ''
+        lastRoutingKey.value = ''
       }
     }
   )
@@ -297,37 +293,38 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     // Build spatial index and route edges
     // Skip complex routing during drag for performance - use cached or simple lines
     const effectiveStyle: EdgeStyle = style as EdgeStyle
-    let routedEdges: RoutedEdgeMap | null = null
+    let routedEdges: Map<
+      string,
+      {
+        svgPath: string
+        strokeWidth?: number
+        path?: Array<{ x: number; y: number }>
+        debugInfo?: unknown
+      }
+    > | null = null
 
     // Create a key to detect when routing needs recalculation
     // Include edge IDs and directions so reversing an edge triggers recalculation
     const edgeKey = edges.map(e => `${e.id}:${e.source_node_id}>${e.target_node_id}`).join(',')
     const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}-${edgeKey}`
 
-    // Recompute the expensive orthogonal routing only when the routing key
-    // changed and we are NOT deferring. During drag/zoom the cached routing is
-    // reused (or simple fallback paths are drawn downstream); recomputing every
-    // deferred frame is exactly what deferral exists to avoid. Compute once
-    // when there is no cache yet so the first render has paths.
-    const deferring = isDeferringRouting()
-    if ((routingKey !== lastRoutingKey && !deferring) || !cachedRoutedEdges) {
+    // Always recalculate routing for live updates during drag
+    if (routingKey !== lastRoutingKey.value || isDeferringRouting()) {
       const spatialIndex = new SpatialIndex()
       spatialIndex.build(nodeMap)
       setRoutingSpatialIndex(spatialIndex)
 
       try {
         routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
-        cachedRoutedEdges = routedEdges
-        // Only commit the key when not deferring, so routing is recomputed
-        // with final positions once the drag/zoom ends
-        if (!deferring) {
-          lastRoutingKey = routingKey
+        cachedRoutedEdges.value = routedEdges
+        if (!isDeferringRouting()) {
+          lastRoutingKey.value = routingKey
         }
       } finally {
         setRoutingSpatialIndex(null)
       }
     } else {
-      routedEdges = cachedRoutedEdges
+      routedEdges = cachedRoutedEdges.value
     }
 
     // Sort edges to minimize crossings
