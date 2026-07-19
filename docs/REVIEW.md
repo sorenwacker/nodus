@@ -18,7 +18,7 @@ and validated against `cargo test`/`clippy` (Rust) or `vitest` (frontend). Test 
 | LLM agent pipeline (unreachable smart tools, completion heuristic, Anthropic tool messages, cleanContent LaTeX, restart race, stale model) | Done | `3e05ec2` |
 | Library/UI correctness (Zotero pagination, markdown escaping, task panel, HiDPI drop, frame revert, undo-on-click, edge attrs, MCP stdout) | Done | `2156fc7` |
 | More correctness/security (NodePicker field, redo shortcut, edge dedup link_type, wikilink anchoring, BibTeX @, mermaid sanitizer, SSRF blocklist) | Done | `1de8df5` |
-| Canvas performance (culling map memo, edge-visibility Set, edge-routing deferral, deferred position persistence) | Done | `98e6ae7` |
+| Canvas performance (culling map memo, edge-visibility Set, deferred position persistence) | Done | `98e6ae7` |
 | Dead code (useCanvasNodeSizing, useCanvasInit, setMode/setPlan, createItemFromNode) | Done | `9e1a49d` |
 
 ### Deferred (need their own focused work)
@@ -33,6 +33,10 @@ and validated against `cargo test`/`clippy` (Rust) or `vitest` (frontend). Test 
   proper fix is OS-keychain integration, a feature-level change.
 - **Layout-strategy "dead code" finding was refuted on re-grep:** `useLayoutStrategies.ts` and
   `useLayout.ts` do reference `layoutRegistry`/`executeStrategy`, so it was NOT removed.
+- **Edge-routing deferral finding was reverted:** the "re-routes every frame during drag/zoom"
+  finding was a real code/comment mismatch, but that per-frame recompute is what makes edges follow
+  the dragged node live and keep their routed style. Deferring it froze edges mid-drag (and a
+  simplified-path fallback made the style pop), so the original behavior was restored.
 - Remaining medium design/consistency/typing items (settings-panel theming duplication, EntityBadge
   config duplication, `useUndoRedo` boilerplate, several `vue-tsc` type-signature mismatches) — see
   the per-file findings below.

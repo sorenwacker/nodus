@@ -521,6 +521,25 @@ Edges are routed using a motherboard/PCB-inspired lane system:
 - `curved`: Smooth Bezier curve
 - `hyperbolic`: S-curve that exits/enters nodes orthogonally
 
+**Live routing during drag and zoom (required behavior):**
+
+While a node is being dragged or the canvas is being zoomed, edges must
+re-route on every animation frame so they follow the moving node and keep
+their configured style. This is intentional, not a performance oversight:
+freezing the routing (reusing the pre-drag cached paths) leaves edges
+stationary until the drag ends, and substituting cheap straight/orthogonal
+fallback paths makes the edge style visibly "pop" during the drag. Both were
+tried and rejected as regressions.
+
+Implementation note: `useEdgeRouting` recomputes `routeAllEdges` when the
+routing key changes **or** while `isDragging`/`isZooming` is true, and commits
+the routing key only when not deferring, so the final positions are routed once
+more when the interaction ends. Do not "optimize" this by skipping the
+per-frame recompute during drag/zoom without preserving both the live-follow
+and the styled appearance. If per-frame routing ever becomes a measured
+bottleneck on very large graphs, gate any simplification behind a node-count
+threshold rather than applying it to all graphs.
+
 ### Themes
 
 YAML-based theme system with SQLite storage. Four built-in themes, plus LLM-generated custom themes.
