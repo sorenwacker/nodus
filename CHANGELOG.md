@@ -2,6 +2,34 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [0.7.0-rc.1] - 2026-07-19
+
+### Fixed
+- Edge port ordering now sorts by angle, so hub edges fan correctly when
+  neighbours are in a row (not only a column); left and right sides wind
+  consistently and no longer cross before attaching
+- Edges follow the node live during drag/zoom while keeping their routed style
+- Edge labels stay legible when zoomed out (counter-scaled, capped at 12px)
+- MCP approval prompts no longer storm: rejected connections are no longer
+  force-closed into a client reconnect loop
+- Database integrity: migration that never ran now applies; edge de-duplication
+  keeps distinct link types; positional storyline insert no longer violates the
+  unique constraint; ontology import is transactional
+- Backend security: workspace-vault containment on file moves, SSRF guards on
+  HTTP/fetch, MCP WebSocket origin check, fail-fast database initialisation
+- LLM agent pipeline: unreachable smart tools, premature completion, dropped
+  Anthropic tool messages, and LaTeX-corrupting content cleaning
+- Zotero import pagination, markdown code escaping, HiDPI drop position, and
+  other library/UI correctness fixes
+
+### Changed
+- Unified edge port ordering into a single shared function across assignment,
+  optimisation, and crossing reduction
+- Deferred node/frame position writes to drag end; memoised viewport culling
+
+### Removed
+- Dead code: unused canvas composables and agent/Zotero helpers
+
 ## [0.5.0] - 2026-05-14
 
 ### Added
