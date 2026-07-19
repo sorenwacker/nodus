@@ -10,22 +10,43 @@ import { getSide, getNodeCenter } from './geometry'
 export const PORT_SPACING = 25
 
 /**
- * Ordering key for a port on a given side, based on the position of the node at
- * the other end of the edge.
+ * Ordering key for a port on a given side, based on the angle from the node
+ * centre to the node at the other end of the edge.
  *
- * Ports are laid out top-to-bottom (left/right sides) or left-to-right
- * (top/bottom sides) with index 0 at the top/left. Ordering every entry on a
- * side by this key ascending puts the edge whose far node is highest/leftmost
- * at the first port and the lowest/rightmost at the last port, which is the
- * monotonic, non-crossing fan. The up-vs-down (or left-vs-right) quadrant split
- * is implicit: ascending order already groups the two quadrants correctly.
+ * The key is the angle of the far node measured relative to the side's outward
+ * normal, so it always falls in (-π/2, π/2): the most counter-normal (up on
+ * left/right, left on top/bottom) direction sorts first and gets the first port
+ * (top or left), sweeping to the last port. Sorting every entry on a side by
+ * this key ascending produces the monotonic, non-crossing fan.
+ *
+ * Using the angle rather than a single coordinate is what makes a hub work when
+ * its neighbours are spread horizontally (a row) as well as vertically: a raw
+ * Y sort cannot order same-Y neighbours on the left/right sides, which left one
+ * side winding the wrong way.
  *
  * This is the single source of truth for port ordering; assignPorts,
  * optimizePortAssignments and the crossing-reduction pass all use it so their
  * conventions cannot drift apart.
  */
-export function portOrderKey(side: Side, otherX: number, otherY: number): number {
-  return side === 'left' || side === 'right' ? otherY : otherX
+export function portOrderKey(
+  side: Side,
+  nodeCx: number,
+  nodeCy: number,
+  otherX: number,
+  otherY: number
+): number {
+  const dx = otherX - nodeCx
+  const dy = otherY - nodeCy
+  switch (side) {
+    case 'right':
+      return Math.atan2(dy, dx)
+    case 'left':
+      return Math.atan2(dy, -dx)
+    case 'bottom':
+      return Math.atan2(dx, dy)
+    case 'top':
+      return Math.atan2(dx, -dy)
+  }
 }
 
 /**
@@ -162,11 +183,17 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
     const [, sideStr] = key.split(':')
     const side = sideStr as Side
 
+    // All entries in a group belong to the same node (this node+side); use its
+    // centre as the angle origin for ordering
+    const owner = entries[0].isSource ? entries[0].info.source : entries[0].info.target
+    const nodeCx = owner.canvas_x + (owner.width || 200) / 2
+    const nodeCy = owner.canvas_y + (owner.height || 120) / 2
+
     // Order edges so the fan is monotonic across the side (see portOrderKey)
     entries.sort(
       (a, b) =>
-        portOrderKey(side, a.otherNodeX, a.otherNodeY) -
-        portOrderKey(side, b.otherNodeX, b.otherNodeY)
+        portOrderKey(side, nodeCx, nodeCy, a.otherNodeX, a.otherNodeY) -
+        portOrderKey(side, nodeCx, nodeCy, b.otherNodeX, b.otherNodeY)
     )
 
 
@@ -416,10 +443,16 @@ export function optimizePortAssignments(
     const [, sideStr] = key.split(':')
     const side = sideStr as Side
 
+    // Angle origin: the node this side belongs to
+    const node = edges[0].assignment.node
+    const nodeCx = node.canvas_x + (node.width || 200) / 2
+    const nodeCy = node.canvas_y + (node.height || 120) / 2
+
     // Order by the shared per-side key so this pass matches assignPorts
     edges.sort(
       (a, b) =>
-        portOrderKey(side, a.otherX, a.otherY) - portOrderKey(side, b.otherX, b.otherY)
+        portOrderKey(side, nodeCx, nodeCy, a.otherX, a.otherY) -
+        portOrderKey(side, nodeCx, nodeCy, b.otherX, b.otherY)
     )
 
     // Reassign indices based on sorted order

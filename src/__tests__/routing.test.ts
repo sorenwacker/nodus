@@ -267,6 +267,39 @@ describe('routing module', () => {
       expect(portY('e-down-near')).toBeLessThan(portY('e-down-far'))
     })
 
+    it('orders left and right sides consistently for a hub above a row of targets', () => {
+      // The failing real-world case: a hub with its neighbours spread in a
+      // horizontal ROW below it (same Y, different X). A Y-only sort cannot
+      // order same-Y neighbours, so one side wound the wrong way. Both the left
+      // and right sides must place the farthest-out target at the outer (top)
+      // port, sweeping inward toward the bottom port.
+      const hub: NodeRect = { id: 'hub', canvas_x: -100, canvas_y: -60, width: 200, height: 120 }
+      const nodes: NodeRect[] = [
+        hub,
+        // Right side of the hub, below and to the right (a row)
+        { id: 'r-near', canvas_x: 600, canvas_y: 200, width: 200, height: 120 },
+        { id: 'r-far', canvas_x: 1500, canvas_y: 200, width: 200, height: 120 },
+        // Left side of the hub, below and to the left (a row)
+        { id: 'l-near', canvas_x: -800, canvas_y: 200, width: 200, height: 120 },
+        { id: 'l-far', canvas_x: -1700, canvas_y: 200, width: 200, height: 120 },
+      ]
+      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
+      const edges: EdgeDef[] = [
+        { id: 'e-r-near', source_node_id: 'hub', target_node_id: 'r-near' },
+        { id: 'e-r-far', source_node_id: 'hub', target_node_id: 'r-far' },
+        { id: 'e-l-near', source_node_id: 'hub', target_node_id: 'l-near' },
+        { id: 'e-l-far', source_node_id: 'hub', target_node_id: 'l-far' },
+      ]
+
+      optimizeNodeEntrypoints('hub', edges, nodeMap)
+      const routed = routeAllEdges(edges, nodes, nodeMap)
+      const portY = (id: string) => routed.get(id)!.path[0].y
+
+      // Both sides: the farther-out target attaches at the higher (top) port
+      expect(portY('e-r-far')).toBeLessThan(portY('e-r-near'))
+      expect(portY('e-l-far')).toBeLessThan(portY('e-l-near'))
+    })
+
     it('returns early for nodes with fewer than 2 edges', () => {
       const nodes: NodeRect[] = [
         { id: 'a', canvas_x: 0, canvas_y: 0, width: 100, height: 60 },

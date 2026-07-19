@@ -4,6 +4,7 @@
  */
 
 import type { Side, NodeRect, EdgeDef, PortAssignment } from './types'
+import { portOrderKey } from './portAssignment'
 
 interface EdgeInfo {
   edge: EdgeDef
@@ -133,43 +134,64 @@ export class BarycentricReduction implements CrossingReductionStrategy {
       return { improved: false, initialCrossings: 0, finalCrossings: 0, swapsPerformed: 0 }
     }
 
-    // Group edges by node+side
-    const groups = new Map<string, Array<{ edgeId: string; isSource: boolean; otherPos: number }>>()
+    // Group edges by node+side, keeping the connected node's centre and the
+    // side's own node centre so we can order by angle (see portOrderKey)
+    type BaryEntry = {
+      edgeId: string
+      isSource: boolean
+      side: Side
+      nodeCx: number
+      nodeCy: number
+      otherX: number
+      otherY: number
+    }
+    const groups = new Map<string, BaryEntry[]>()
+    const center = (n: NodeRect) => ({
+      x: n.canvas_x + (n.width || 200) / 2,
+      y: n.canvas_y + (n.height || 120) / 2,
+    })
 
     for (const info of edgeInfos) {
       const srcKey = `${info.edge.source_node_id}:${info.sourceSide}`
       const tgtKey = `${info.edge.target_node_id}:${info.targetSide}`
-
-      // For source side, "other" is the target position
-      const isHorizSrc = info.sourceSide === 'left' || info.sourceSide === 'right'
-      const targetPos = isHorizSrc
-        ? info.target.canvas_y + (info.target.height || 120) / 2
-        : info.target.canvas_x + (info.target.width || 200) / 2
+      const src = center(info.source)
+      const tgt = center(info.target)
 
       if (!groups.has(srcKey)) groups.set(srcKey, [])
-      groups.get(srcKey)!.push({ edgeId: info.edge.id, isSource: true, otherPos: targetPos })
-
-      // For target side, "other" is the source position
-      const isHorizTgt = info.targetSide === 'left' || info.targetSide === 'right'
-      const sourcePos = isHorizTgt
-        ? info.source.canvas_y + (info.source.height || 120) / 2
-        : info.source.canvas_x + (info.source.width || 200) / 2
+      groups.get(srcKey)!.push({
+        edgeId: info.edge.id,
+        isSource: true,
+        side: info.sourceSide,
+        nodeCx: src.x,
+        nodeCy: src.y,
+        otherX: tgt.x,
+        otherY: tgt.y,
+      })
 
       if (!groups.has(tgtKey)) groups.set(tgtKey, [])
-      groups.get(tgtKey)!.push({ edgeId: info.edge.id, isSource: false, otherPos: sourcePos })
+      groups.get(tgtKey)!.push({
+        edgeId: info.edge.id,
+        isSource: false,
+        side: info.targetSide,
+        nodeCx: tgt.x,
+        nodeCy: tgt.y,
+        otherX: src.x,
+        otherY: src.y,
+      })
     }
 
     let swapsPerformed = 0
 
-    // Order each group by the connected node's position along the side. otherPos
-    // is already the per-side projection (Y for left/right, X for top/bottom),
-    // so a single ascending sort yields the monotonic, non-crossing fan: the
-    // up/down (or left/right) quadrant split falls out of the ordering. This is
-    // the same convention as portOrderKey in portAssignment.
+    // Order each group by the shared angle key so the crossing reducer uses the
+    // exact same convention as assignPorts (single source of truth).
     for (const [, entries] of groups) {
       if (entries.length < 2) continue
 
-      entries.sort((a, b) => a.otherPos - b.otherPos)
+      entries.sort(
+        (a, b) =>
+          portOrderKey(a.side, a.nodeCx, a.nodeCy, a.otherX, a.otherY) -
+          portOrderKey(b.side, b.nodeCx, b.nodeCy, b.otherX, b.otherY)
+      )
 
       // Reassign indices based on sorted order
       entries.forEach((entry, idx) => {
