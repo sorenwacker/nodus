@@ -321,7 +321,10 @@ export const canvasStorage = {
   // Edge label font size in pixels
   getEdgeLabelSize(workspaceId?: string): number {
     const val = localStorage.getItem(this._key(KEYS.canvasEdgeLabelSize, workspaceId))
-    return val ? parseInt(val, 10) : 14 // default 14px
+    // Clamp to the supported 8-12px range so values stored under an older,
+    // wider range do not sit outside the current control's bounds
+    const size = val ? parseInt(val, 10) : 12 // default 12px
+    return Math.min(Math.max(size, 8), 12)
   },
   setEdgeLabelSize(value: number, workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasEdgeLabelSize, workspaceId), String(value))

@@ -150,7 +150,7 @@ watch(workspaceId, (newId) => {
         v-model.number="edgeLabelSize"
         type="number"
         min="8"
-        max="24"
+        max="12"
         step="1"
       />
       <span class="hint">{{ t('settings.edgeLabelSizeHint') }}</span>

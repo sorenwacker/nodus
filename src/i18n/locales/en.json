@@ -526,7 +526,7 @@
     "edgeHideThreshold": "Hide Edges Above",
     "edgeHideThresholdHint": "Hide all edges when count exceeds this value (0 = always show)",
     "edgeLabelSize": "Edge Label Size",
-    "edgeLabelSizeHint": "Font size for edge labels (8-24 pixels)",
+    "edgeLabelSizeHint": "Font size for edge labels (8-12 pixels)",
     "radialStyle": "Radial Layout Style",
     "radialStyleHint": "Spacing style for radial/circular layout",
     "radialStyles": {
