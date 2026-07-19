@@ -361,6 +361,14 @@ Users want the node on the canvas to be the "source of truth." They dislike clic
 - Zoom out: Nodes aggregate into clusters, show only titles
 - Zoom in: Content reveals, full editing mode
 
+**Edge label sizing (required behavior):** Edge labels are rendered in canvas
+coordinates inside the zoom-scaled layer, so a fixed canvas font shrinks as the
+user zooms out and grows as they zoom in. To keep labels legible, the rendered
+font is counter-scaled by `1/zoom` so labels hold a roughly constant on-screen
+size. The divisor is clamped to a 0.2–3× zoom window so labels neither balloon
+when zoomed far out nor collapse when zoomed far in; the base size still comes
+from the user's `edgeLabelSize` canvas setting.
+
 ### Canvas Features
 
 - Infinite pan/zoom
