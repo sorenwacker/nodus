@@ -30,9 +30,20 @@ export function updateFramePosition(
   framesStore: NodeStoreDependencies['framesStore'],
   id: string,
   x: number,
-  y: number
+  y: number,
+  options?: { skipPersist?: boolean }
 ): void {
-  framesStore.updateFramePosition(id, x, y)
+  framesStore.updateFramePosition(id, x, y, options)
+}
+
+/**
+ * Persist a frame's current position - forwarded to frames store
+ */
+export function persistFramePosition(
+  framesStore: NodeStoreDependencies['framesStore'],
+  id: string
+): void {
+  framesStore.persistFramePosition(id)
 }
 
 /**

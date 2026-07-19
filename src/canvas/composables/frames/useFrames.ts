@@ -36,10 +36,12 @@ interface Store {
   selectNode: (id: string | null) => void
   createFrame: (x: number, y: number, w: number, h: number, title: string) => Frame
   deleteFrame: (id: string) => void
-  updateFramePosition: (id: string, x: number, y: number) => void
+  updateFramePosition: (id: string, x: number, y: number, options?: { skipPersist?: boolean }) => void
+  persistFramePosition: (id: string) => void
   updateFrameSize: (id: string, w: number, h: number) => void
   updateFrameTitle: (id: string, title: string) => void
-  updateNodePosition: (id: string, x: number, y: number) => void
+  updateNodePosition: (id: string, x: number, y: number, options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }) => void
+  persistNodePosition: (id: string) => void
 }
 
 interface ViewState {
@@ -126,17 +128,28 @@ export function useFrames(options: UseFramesOptions) {
     const dy = pos.y - frameDragStart.value.y
     const newX = snapToGrid(frameDragStart.value.frameX + dx)
     const newY = snapToGrid(frameDragStart.value.frameY + dy)
-    store.updateFramePosition(draggingFrame.value, newX, newY)
+    // Update in memory only during the drag; the backend writes (one IPC per
+    // frame and per contained node per pointermove otherwise) are flushed once
+    // on pointerup in stopDrag.
+    store.updateFramePosition(draggingFrame.value, newX, newY, { skipPersist: true })
 
     // Move contained nodes with the frame
     for (const [nodeId, initialPos] of frameContainedNodes.value) {
       const newNodeX = snapToGrid(initialPos.x + dx)
       const newNodeY = snapToGrid(initialPos.y + dy)
-      store.updateNodePosition(nodeId, newNodeX, newNodeY)
+      store.updateNodePosition(nodeId, newNodeX, newNodeY, { skipLayoutTrigger: true, skipPersist: true })
     }
   }
 
   function stopDrag() {
+    const frameId = draggingFrame.value
+    // Persist final positions of the frame and every node it carried
+    if (frameId) {
+      store.persistFramePosition(frameId)
+      for (const nodeId of frameContainedNodes.value.keys()) {
+        store.persistNodePosition(nodeId)
+      }
+    }
     draggingFrame.value = null
     frameContainedNodes.value.clear()
     document.removeEventListener('pointermove', onDrag)

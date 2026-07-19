@@ -87,6 +87,9 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     const visIds = visibleNodeIds.value
     const hovered = hoveredNodeId.value
     const selectedNodes = Array.isArray(selectedNodeIds.value) ? selectedNodeIds.value : selectedNodeIds.value
+    // O(1) membership for the per-edge loops below (this computed is hover-hot,
+    // so an Array.includes scan per edge is O(edges x selected))
+    const selectedSet = new Set(selectedNodes)
 
     // Filter out wikilink edges if user setting is enabled
     if (hideWikilinkEdges.value) {
@@ -115,10 +118,10 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     const neighborIds = new Set<string>()
     if (hovered || selectedNodes.length > 0) {
       for (const e of edges) {
-        if (e.source_node_id === hovered || selectedNodes.includes(e.source_node_id)) {
+        if (e.source_node_id === hovered || selectedSet.has(e.source_node_id)) {
           neighborIds.add(e.target_node_id)
         }
-        if (e.target_node_id === hovered || selectedNodes.includes(e.target_node_id)) {
+        if (e.target_node_id === hovered || selectedSet.has(e.target_node_id)) {
           neighborIds.add(e.source_node_id)
         }
       }
@@ -133,7 +136,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         edges = edges.filter(e => {
           // Direct edges to hovered/selected nodes
           const isDirect = e.source_node_id === hovered || e.target_node_id === hovered ||
-            selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
+            selectedSet.has(e.source_node_id) || selectedSet.has(e.target_node_id)
           if (isDirect) return true
           // 2nd hop: edges where at least one endpoint is a neighbor
           return neighborIds.has(e.source_node_id) || neighborIds.has(e.target_node_id)
@@ -155,7 +158,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
       // Determine if this is a direct edge or a 2nd-hop neighbor edge
       const isDirect = e.source_node_id === hovered || e.target_node_id === hovered ||
-        selectedNodes.includes(e.source_node_id) || selectedNodes.includes(e.target_node_id)
+        selectedSet.has(e.source_node_id) || selectedSet.has(e.target_node_id)
       const isNeighborEdge = !isDirect && (neighborIds.has(e.source_node_id) || neighborIds.has(e.target_node_id))
 
       // Opacity: highlighted edges are full, others are dimmed by default
@@ -174,8 +177,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       if (isHighlighted && !allHighlighted) {
         // Only change color when highlighting due to hover/selection, not "highlight all"
         const isConnectedToSelected =
-          selectedNodes.includes(e.source_node_id) ||
-          selectedNodes.includes(e.target_node_id)
+          selectedSet.has(e.source_node_id) ||
+          selectedSet.has(e.target_node_id)
 
         if (isConnectedToSelected) {
           // Use selected color (matches selected node border)

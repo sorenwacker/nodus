@@ -31,6 +31,7 @@ import {
 
 import {
   updateNodePosition as updateNodePositionFn,
+  persistNodePosition as persistNodePositionFn,
   triggerLayoutUpdate as triggerLayoutUpdateFn,
   updateNodeSize as updateNodeSizeFn,
   refreshNodeFromFile as refreshNodeFromFileFn,
@@ -65,6 +66,7 @@ import {
 import {
   createFrame as createFrameFn,
   updateFramePosition as updateFramePositionFn,
+  persistFramePosition as persistFramePositionFn,
   updateFrameSize as updateFrameSizeFn,
   updateFrameTitle as updateFrameTitleFn,
   updateFrameColor as updateFrameColorFn,
@@ -233,9 +235,13 @@ export const useNodesStore = defineStore('nodes', () => {
     id: string,
     x: number,
     y: number,
-    options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean }
+    options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean; skipPersist?: boolean }
   ) {
     await updateNodePositionFn(deps, id, x, y, options)
+  }
+
+  async function persistNodePosition(id: string) {
+    await persistNodePositionFn(deps, id)
   }
 
   function triggerLayoutUpdate() {
@@ -317,7 +323,8 @@ export const useNodesStore = defineStore('nodes', () => {
     return createFrameFn(deps, x, y, width, height, title)
   }
 
-  const updateFramePosition = (id: string, x: number, y: number) => updateFramePositionFn(framesStore, id, x, y)
+  const updateFramePosition = (id: string, x: number, y: number, options?: { skipPersist?: boolean }) => updateFramePositionFn(framesStore, id, x, y, options)
+  const persistFramePosition = (id: string) => persistFramePositionFn(framesStore, id)
   const updateFrameSize = (id: string, width: number, height: number) => updateFrameSizeFn(framesStore, id, width, height)
   const updateFrameTitle = (id: string, title: string) => updateFrameTitleFn(framesStore, id, title)
   const updateFrameColor = (id: string, color: string | null) => updateFrameColorFn(framesStore, id, color)
@@ -553,6 +560,7 @@ export const useNodesStore = defineStore('nodes', () => {
     getNeighborIds,
     findNodeByTitle,
     updateNodePosition,
+    persistNodePosition,
     triggerLayoutUpdate,
     updateNodeSize,
     updateNodeContent,
@@ -576,6 +584,7 @@ export const useNodesStore = defineStore('nodes', () => {
     // Frame operations
     createFrame,
     updateFramePosition,
+    persistFramePosition,
     updateFrameSize,
     updateFrameTitle,
     updateFrameColor,

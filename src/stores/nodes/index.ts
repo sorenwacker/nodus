@@ -35,6 +35,7 @@ export {
 // Re-export CRUD functions
 export {
   updateNodePosition,
+  persistNodePosition,
   triggerLayoutUpdate,
   updateNodeSize,
   refreshNodeFromFile,

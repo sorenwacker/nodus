@@ -143,17 +143,35 @@ export const useFramesStore = defineStore('frames', () => {
   /**
    * Update frame position
    */
-  function updateFramePosition(id: string, x: number, y: number): void {
+  function updateFramePosition(
+    id: string,
+    x: number,
+    y: number,
+    options?: { skipPersist?: boolean }
+  ): void {
     const frame = frames.value.find((f) => f.id === id)
     if (frame) {
       const clampedX = clampCoord(x)
       const clampedY = clampCoord(y)
       frame.canvas_x = clampedX
       frame.canvas_y = clampedY
+      // Skip the backend write during a live drag; flush once on pointerup
+      if (options?.skipPersist) return
       invoke('update_frame_position', { id, x: clampedX, y: clampedY }).catch((e) =>
         storeLogger.error('Failed to update frame position:', e)
       )
     }
+  }
+
+  /** Persist a frame's current in-memory position to the backend */
+  function persistFramePosition(id: string): void {
+    const frame = frames.value.find((f) => f.id === id)
+    if (!frame) return
+    invoke('update_frame_position', {
+      id,
+      x: frame.canvas_x,
+      y: frame.canvas_y,
+    }).catch((e) => storeLogger.error('Failed to persist frame position:', e))
   }
 
   /**
@@ -307,6 +325,7 @@ export const useFramesStore = defineStore('frames', () => {
     createFrame,
     createFrameAsync,
     updateFramePosition,
+    persistFramePosition,
     updateFrameSize,
     updateFrameTitle,
     updateFrameColor,

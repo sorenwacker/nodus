@@ -62,6 +62,13 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     { immediate: true }
   )
 
+  // Node id -> node lookup, memoized so it is not rebuilt on every pan/zoom
+  // frame. Depends only on the node set and layout version, not the viewport.
+  const nodeMap = computed(() => {
+    void nodeLayoutVersion?.value
+    return new Map(displayNodes.value.map(n => [n.id, n]))
+  })
+
   // Handle window resize
   function onResize() {
     viewportWidth.value = window.innerWidth
@@ -124,13 +131,13 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
       candidateIds.add(id)
     }
 
-    // Build node map for efficient lookup
-    const nodeMap = new Map(nodes.map(n => [n.id, n]))
+    // Memoized node lookup (rebuilt only when the node set changes)
+    const lookup = nodeMap.value
 
     // Filter candidates with precise AABB check (grid may have false positives at cell boundaries)
     const result: Node[] = []
     for (const id of candidateIds) {
-      const node = nodeMap.get(id)
+      const node = lookup.get(id)
       if (!node) continue
 
       // Selected nodes always included

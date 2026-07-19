@@ -912,9 +912,11 @@ const frames = useFrames({
     createFrame: store.createFrame,
     deleteFrame: store.deleteFrame,
     updateFramePosition: store.updateFramePosition,
+    persistFramePosition: store.persistFramePosition,
     updateFrameSize: store.updateFrameSize,
     updateFrameTitle: store.updateFrameTitle,
     updateNodePosition: store.updateNodePosition,
+    persistNodePosition: store.persistNodePosition,
     assignNodesToFrame: store.assignNodesToFrame,
   },
   viewState: {
@@ -1544,6 +1546,7 @@ const nodeDragging = useNodeDragging({
   store: {
     getNode: store.getNode,
     updateNodePosition: store.updateNodePosition,
+    persistNodePosition: store.persistNodePosition,
     triggerLayoutUpdate: store.triggerLayoutUpdate,
     selectNode: store.selectNode,
     get selectedNodeIds() {

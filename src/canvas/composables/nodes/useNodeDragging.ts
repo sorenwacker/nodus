@@ -11,7 +11,8 @@ import type { Node, Frame } from '../../../types'
 export interface UseNodeDraggingContext {
   store: {
     getNode: (id: string) => Node | undefined
-    updateNodePosition: (id: string, x: number, y: number, options?: { skipLayoutTrigger?: boolean }) => void
+    updateNodePosition: (id: string, x: number, y: number, options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }) => void
+    persistNodePosition: (id: string) => void
     triggerLayoutUpdate: () => void
     selectNode: (id: string, multi: boolean) => void
     selectedNodeIds: string[]
@@ -263,12 +264,12 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       for (const [id, initial] of multiDragInitial.value) {
         const newX = snapToGrid(initial.x + dx)
         const newY = snapToGrid(initial.y + dy)
-        store.updateNodePosition(id, newX, newY, { skipLayoutTrigger: true })
+        store.updateNodePosition(id, newX, newY, { skipLayoutTrigger: true, skipPersist: true })
       }
     } else {
       const newX = snapToGrid(dragStart.value.nodeX + dx)
       const newY = snapToGrid(dragStart.value.nodeY + dy)
-      store.updateNodePosition(draggingNode.value, newX, newY, { skipLayoutTrigger: true })
+      store.updateNodePosition(draggingNode.value, newX, newY, { skipLayoutTrigger: true, skipPersist: true })
     }
   }
 
@@ -454,6 +455,12 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
             }
           }
         }
+    }
+
+    // Persist final positions once, now that the live drag (which ran with
+    // skipPersist) has ended
+    for (const nodeId of draggedNodeIds) {
+      store.persistNodePosition(nodeId)
     }
 
     // Trigger layout update once at drag end (was skipped during drag for performance)

@@ -26,7 +26,7 @@ export async function updateNodePosition(
   id: string,
   x: number,
   y: number,
-  options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean }
+  options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean; skipPersist?: boolean }
 ): Promise<void> {
   const { state, framesStore } = deps
   const node = state.nodes.value.find(n => n.id === id)
@@ -61,11 +61,33 @@ export async function updateNodePosition(
     if (!options?.skipLayoutTrigger) {
       state.nodeLayoutVersion.value++
     }
+    // Skip the backend write during a live drag (one IPC + DB write per
+    // pointermove per node otherwise). The caller flushes final positions with
+    // persistNodePosition on pointerup.
+    if (options?.skipPersist) return
     try {
       await invoke('update_node_position', { id, x: finalX, y: finalY })
     } catch (e) {
       console.error('Failed to update position:', e)
     }
+  }
+}
+
+/**
+ * Persist a node's current in-memory position to the backend. Used to flush
+ * positions after a drag that ran with skipPersist.
+ */
+export async function persistNodePosition(
+  deps: NodeStoreDependencies,
+  id: string
+): Promise<void> {
+  const { state } = deps
+  const node = state.nodes.value.find(n => n.id === id)
+  if (!node) return
+  try {
+    await invoke('update_node_position', { id, x: node.canvas_x, y: node.canvas_y })
+  } catch (e) {
+    console.error('Failed to persist position:', e)
   }
 }
 
