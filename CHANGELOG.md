@@ -8,6 +8,9 @@ All notable changes to Nodus are documented in this file.
 - Edge port ordering now sorts by angle, so hub edges fan correctly when
   neighbours are in a row (not only a column); left and right sides wind
   consistently and no longer cross before attaching
+- Orthogonal edge routing no longer inverts fan nesting: the left/right hub
+  fans that crossed before attaching are now clean (curved and direct routing
+  are fully crossing-free; some orthogonal/diagonal fan cases remain)
 - Edges follow the node live during drag/zoom while keeping their routed style
 - Edge labels stay legible when zoomed out (counter-scaled, capped at 12px)
 - MCP approval prompts no longer storm: rejected connections are no longer
