@@ -300,6 +300,62 @@ describe('routing module', () => {
       expect(portY('e-l-far')).toBeLessThan(portY('e-l-near'))
     })
 
+    it('routes orthogonal-style hub edges without the paths crossing', () => {
+      // Same row-hub layout, but check the actual orthogonal L-shaped paths do
+      // not intersect each other (port order alone is not enough for the L
+      // paths to be crossing-free).
+      const hub: NodeRect = { id: 'hub', canvas_x: -100, canvas_y: -60, width: 200, height: 120 }
+      const nodes: NodeRect[] = [
+        hub,
+        { id: 'r1', canvas_x: 600, canvas_y: 200, width: 200, height: 120 },
+        { id: 'r2', canvas_x: 1100, canvas_y: 200, width: 200, height: 120 },
+        { id: 'r3', canvas_x: 1600, canvas_y: 200, width: 200, height: 120 },
+        { id: 'l1', canvas_x: -800, canvas_y: 200, width: 200, height: 120 },
+        { id: 'l2', canvas_x: -1300, canvas_y: 200, width: 200, height: 120 },
+        { id: 'l3', canvas_x: -1800, canvas_y: 200, width: 200, height: 120 },
+      ]
+      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
+      const edges: EdgeDef[] = ['r1', 'r2', 'r3', 'l1', 'l2', 'l3'].map(t => ({
+        id: `e-${t}`,
+        source_node_id: 'hub',
+        target_node_id: t,
+      }))
+
+      optimizeNodeEntrypoints('hub', edges, nodeMap)
+      const routed = routeAllEdges(edges, nodes, nodeMap, 'orthogonal')
+
+      // Proper (interior) segment intersection
+      const cross = (
+        a: { x: number; y: number },
+        b: { x: number; y: number },
+        c: { x: number; y: number },
+        d: { x: number; y: number }
+      ): boolean => {
+        const dax = b.x - a.x, day = b.y - a.y
+        const dcx = d.x - c.x, dcy = d.y - c.y
+        const den = dax * dcy - day * dcx
+        if (Math.abs(den) < 1e-9) return false
+        const t = ((c.x - a.x) * dcy - (c.y - a.y) * dcx) / den
+        const u = ((c.x - a.x) * day - (c.y - a.y) * dax) / den
+        return t > 0.02 && t < 0.98 && u > 0.02 && u < 0.98
+      }
+
+      const paths = edges.map(e => routed.get(e.id)!.path)
+      let crossings = 0
+      for (let i = 0; i < paths.length; i++) {
+        for (let j = i + 1; j < paths.length; j++) {
+          for (let p = 0; p < paths[i].length - 1; p++) {
+            for (let q = 0; q < paths[j].length - 1; q++) {
+              if (cross(paths[i][p], paths[i][p + 1], paths[j][q], paths[j][q + 1])) {
+                crossings++
+              }
+            }
+          }
+        }
+      }
+      expect(crossings).toBe(0)
+    })
+
     it('returns early for nodes with fewer than 2 edges', () => {
       const nodes: NodeRect[] = [
         { id: 'a', canvas_x: 0, canvas_y: 0, width: 100, height: 60 },
