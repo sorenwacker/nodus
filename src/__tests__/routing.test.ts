@@ -300,22 +300,22 @@ describe('routing module', () => {
       expect(portY('e-l-far')).toBeLessThan(portY('e-l-near'))
     })
 
-    it('routes orthogonal-style hub edges without the paths crossing', () => {
-      // Same row-hub layout, but check the actual orthogonal L-shaped paths do
-      // not intersect each other (port order alone is not enough for the L
-      // paths to be crossing-free).
-      const hub: NodeRect = { id: 'hub', canvas_x: -100, canvas_y: -60, width: 200, height: 120 }
+    it('routes an orthogonal hub side-fan (row of targets) without the paths crossing', () => {
+      // Real-world left-side fan (hub above a tight row of targets to the
+      // lower-left). With the old channel offset, the outer edges' turn
+      // channels were shoved back toward the hub, so their row-level segments
+      // crossed the inner edges. All five must fan without crossing.
+      const W = 331.84, H = 236.25
       const nodes: NodeRect[] = [
-        hub,
-        { id: 'r1', canvas_x: 600, canvas_y: 200, width: 200, height: 120 },
-        { id: 'r2', canvas_x: 1100, canvas_y: 200, width: 200, height: 120 },
-        { id: 'r3', canvas_x: 1600, canvas_y: 200, width: 200, height: 120 },
-        { id: 'l1', canvas_x: -800, canvas_y: 200, width: 200, height: 120 },
-        { id: 'l2', canvas_x: -1300, canvas_y: 200, width: 200, height: 120 },
-        { id: 'l3', canvas_x: -1800, canvas_y: 200, width: 200, height: 120 },
+        { id: 'hub', canvas_x: -35899, canvas_y: -13937, width: W, height: H },
+        { id: 't1', canvas_x: -39030, canvas_y: -13400, width: W, height: H },
+        { id: 't2', canvas_x: -38549, canvas_y: -13400, width: W, height: H },
+        { id: 't3', canvas_x: -38067, canvas_y: -13400, width: W, height: H },
+        { id: 't4', canvas_x: -37585, canvas_y: -13400, width: W, height: H },
+        { id: 't5', canvas_x: -37103, canvas_y: -13400, width: W, height: H },
       ]
       const nodeMap = new Map(nodes.map(n => [n.id!, n]))
-      const edges: EdgeDef[] = ['r1', 'r2', 'r3', 'l1', 'l2', 'l3'].map(t => ({
+      const edges: EdgeDef[] = ['t1', 't2', 't3', 't4', 't5'].map(t => ({
         id: `e-${t}`,
         source_node_id: 'hub',
         target_node_id: t,

@@ -549,7 +549,12 @@ export function routeAllEdges(
               })
     } else {
       // orthogonal (default)
-      const channelOffset = -(srcOffset + tgtOffset) * 3
+      // No channel offset: the raw midpoint already nests a fan correctly
+      // (an edge to a farther target has a farther midpoint, so it turns
+      // further out). The previous offset `-(srcOffset + tgtOffset) * 3` shifted
+      // the outer edges back toward the node, inverting the nesting and making
+      // the fan's L-paths cross. Collisions are resolved by the grid tracker.
+      const channelOffset = 0
 
       routeResult = routeOrthogonal({
         startPort: sourcePort,
