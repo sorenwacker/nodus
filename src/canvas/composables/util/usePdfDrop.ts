@@ -5,6 +5,7 @@
 import { ref } from 'vue'
 import { extractPdfText, readTextFile } from '../../../lib/tauri'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { parseReferences, citationToMarkdown, type BibEntry } from '../../../lib/bibtex'
 import {
   splitIntoChunks,
@@ -448,11 +449,18 @@ ${preprocessed}`
     getCurrentWebview().onDragDropEvent(async (event) => {
       if (event.payload.type === 'drop') {
         const paths = event.payload.paths
-        // Get drop position from event, fallback to viewport center
+        // Get drop position from event, fallback to viewport center.
+        // The payload position is in physical pixels, but screenToCanvas works
+        // in logical (CSS) pixels; convert with the window scale factor so
+        // drops land at the cursor on HiDPI displays instead of at 2x offset.
         const position = event.payload.position
         let canvasPos: { x: number; y: number }
         if (position) {
-          canvasPos = viewState.screenToCanvas(position.x, position.y)
+          const scaleFactor = await getCurrentWindow().scaleFactor()
+          canvasPos = viewState.screenToCanvas(
+            position.x / scaleFactor,
+            position.y / scaleFactor
+          )
         } else {
           canvasPos = viewState.getViewportCenter()
         }

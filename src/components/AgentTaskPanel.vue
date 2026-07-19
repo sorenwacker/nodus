@@ -2,9 +2,15 @@
 import { computed } from 'vue'
 import { useAgentTasksStore, type AgentTaskItem } from '../stores/agentTasks'
 
-const props = defineProps<{
-  visible?: boolean
-}>()
+// A Boolean prop with no default resolves to `false` when the parent omits it
+// (the only caller renders <AgentTaskPanel /> with no binding), which would
+// keep the panel permanently hidden. Default it to visible.
+const props = withDefaults(
+  defineProps<{
+    visible?: boolean
+  }>(),
+  { visible: true }
+)
 
 const tasksStore = useAgentTasksStore()
 
@@ -35,7 +41,7 @@ const progressWidth = computed(() => `${tasksStore.progress}%`)
 
 // Show panel only if there are tasks
 const shouldShow = computed(() =>
-  (props.visible !== false) && tasksStore.totalTasks > 0
+  props.visible && tasksStore.totalTasks > 0
 )
 </script>
 

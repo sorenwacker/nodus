@@ -110,11 +110,16 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     const oldId = edge.id
     await store.deleteEdge(oldId)
 
+    // Preserve all edge attributes, not just link_type/label, so reversing
+    // does not silently reset color, direction, or storyline membership
     const newEdge = await store.createEdge({
       source_node_id: edge.target_node_id,
       target_node_id: edge.source_node_id,
       link_type: edge.link_type,
       label: edge.label || undefined,
+      color: edge.color || undefined,
+      directed: edge.directed,
+      storyline_id: edge.storyline_id || undefined,
     })
 
     // Select the new edge
@@ -164,16 +169,22 @@ export function useEdgeManipulation(options: UseEdgeManipulationOptions) {
     // Delete old edge
     await store.deleteEdge(edge.id)
 
-    // Create two new edges
+    // Create two new edges, preserving the original edge's styling/direction
+    const inherited = {
+      link_type: edge.link_type,
+      color: edge.color || undefined,
+      directed: edge.directed,
+      storyline_id: edge.storyline_id || undefined,
+    }
     await store.createEdge({
       source_node_id: edge.source_node_id,
       target_node_id: newNode.id,
-      link_type: edge.link_type,
+      ...inherited,
     })
     await store.createEdge({
       source_node_id: newNode.id,
       target_node_id: edge.target_node_id,
-      link_type: edge.link_type,
+      ...inherited,
     })
 
     selectedEdge.value = null

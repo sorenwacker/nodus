@@ -63,12 +63,12 @@ export class NodusWebSocketClient {
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       const url = `ws://${this.host}:${this.port}`
-      console.log(`[MCP Client] Connecting to ${url}...`)
+      console.error(`[MCP Client] Connecting to ${url}...`)
 
       this.ws = new WebSocket(url)
 
       this.ws.on('open', () => {
-        console.log('[MCP Client] Connected')
+        console.error('[MCP Client] Connected')
         this.reconnectAttempts = 0
         this.options.onConnected?.()
         resolve()
@@ -79,7 +79,7 @@ export class NodusWebSocketClient {
       })
 
       this.ws.on('close', () => {
-        console.log('[MCP Client] Disconnected')
+        console.error('[MCP Client] Disconnected')
         this.isApproved = false
         this.options.onDisconnected?.()
         this.attemptReconnect()
@@ -155,20 +155,20 @@ export class NodusWebSocketClient {
       if (message.result && typeof message.result === 'object') {
         const result = message.result as Record<string, unknown>
         if (result.status === 'approved') {
-          console.log('[MCP Client] Connection approved by user')
+          console.error('[MCP Client] Connection approved by user')
           this.isApproved = true
           this.options.onApproved?.()
           return
         }
         if (result.status === 'pending_approval') {
-          console.log('[MCP Client] Waiting for user approval...')
+          console.error('[MCP Client] Waiting for user approval...')
           return
         }
       }
 
       // Handle error response for pending approval
       if (message.error?.code === -32001) {
-        console.log('[MCP Client] Waiting for user approval...')
+        console.error('[MCP Client] Waiting for user approval...')
         return
       }
 
@@ -199,7 +199,7 @@ export class NodusWebSocketClient {
     }
 
     this.reconnectAttempts++
-    console.log(`[MCP Client] Reconnecting in ${RECONNECT_DELAY / 1000}s (attempt ${this.reconnectAttempts})...`)
+    console.error(`[MCP Client] Reconnecting in ${RECONNECT_DELAY / 1000}s (attempt ${this.reconnectAttempts})...`)
 
     setTimeout(() => {
       this.connect().catch((error) => {

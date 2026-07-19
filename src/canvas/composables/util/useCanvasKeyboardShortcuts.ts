@@ -156,8 +156,9 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       toggleNeighborhoodMode(selectedNodeIds.value[0])
     }
 
-    // Shift+R resets all node sizes to default
-    if ((e.key === 'R' || e.key === 'r') && e.shiftKey) {
+    // Shift+R (without Ctrl/Cmd) resets all node sizes to default.
+    // Exclude Ctrl/Cmd so Ctrl+Shift+R triggers only refreshFromFiles below.
+    if ((e.key === 'R' || e.key === 'r') && e.shiftKey && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       resetAllNodeSizes()
     }

@@ -141,12 +141,16 @@ describe('Edge Manipulation', () => {
       // Should delete old edge
       expect(mockStore.deleteEdge).toHaveBeenCalledWith('edge-1')
 
-      // Should create new edge with swapped source/target
+      // Should create new edge with swapped source/target, preserving
+      // link_type, label, color, direction, and storyline membership
       expect(mockStore.createEdge).toHaveBeenCalledWith({
         source_node_id: 'node-2',
         target_node_id: 'node-1',
         link_type: 'related',
         label: 'depends on',
+        color: undefined,
+        directed: true,
+        storyline_id: undefined,
       })
 
       // Should select the new edge

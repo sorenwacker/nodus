@@ -151,9 +151,9 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     // Note: File sync is handled by the file watcher composable, not on click.
     // Removed refreshNodeFromFile(nodeId) call to avoid file I/O blocking UI.
 
-    // Capture undo state before dragging
-    pushUndo()
-
+    // Undo state is captured only once movement promotes this to a real drag
+    // (see onPointerMove). Pushing here would clear the redo stack on every
+    // plain click.
     pendingDragNode.value = nodeId
 
     // If node is already selected, don't change selection (allows multi-drag)
@@ -245,6 +245,9 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     if (pendingDragNode.value && !draggingNode.value) {
       const distance = Math.sqrt(dx * dx + dy * dy)
       if (distance < DRAG_THRESHOLD) return // Not enough movement yet
+
+      // Capture undo state now that this is a real drag, not a plain click
+      pushUndo()
 
       // Start actual drag
       draggingNode.value = pendingDragNode.value
@@ -374,9 +377,14 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
         // Update frame assignment if changed
         if (node.frame_id !== assignedFrameId) {
+          // Capture the previous frame id BEFORE assigning: assignNodesToFrame
+          // mutates node.frame_id in place, so reading it later (to revert on
+          // cancel/failure) would just read back the new value - a no-op revert.
+          const previousFrameId = node.frame_id ?? null
+
           // Push undo before changing frame assignment
           const oldAssignments = new Map<string, string | null>()
-          oldAssignments.set(nodeId, node.frame_id ?? null)
+          oldAssignments.set(nodeId, previousFrameId)
           ctx.pushFrameAssignmentUndo(oldAssignments)
 
           store.assignNodesToFrame([nodeId], assignedFrameId)
@@ -414,8 +422,8 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
                     )
 
                     if (dialogResult.resolution === 'cancel') {
-                      // User cancelled - revert frame assignment
-                      store.assignNodesToFrame([nodeId], node.frame_id)
+                      // User cancelled - revert to the captured previous frame
+                      store.assignNodesToFrame([nodeId], previousFrameId)
                       return
                     }
 
@@ -436,8 +444,8 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
                   store.updateNodeFilePath?.(nodeId, newPath)
                 } catch (err) {
                   console.error(`Failed to move file for node ${nodeId}:`, err)
-                  // Revert frame assignment on failure
-                  store.assignNodesToFrame([nodeId], node.frame_id)
+                  // Revert to the captured previous frame on failure
+                  store.assignNodesToFrame([nodeId], previousFrameId)
                 }
               }
 

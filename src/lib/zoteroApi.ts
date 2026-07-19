@@ -147,11 +147,36 @@ export class ZoteroWebApi {
   }
 
   /**
+   * Fetch every page of a paginated list endpoint.
+   *
+   * The Zotero Web API returns at most 25 items per request unless a `limit`
+   * is given (max 100), so a single request silently truncates any library or
+   * collection with more than 25 items. `endpoint` must already contain a
+   * query string (this appends `&limit=&start=`).
+   */
+  private async requestAllPages<T>(endpoint: string): Promise<T[]> {
+    const all: T[] = []
+    let start = 0
+    const limit = 100
+
+    for (;;) {
+      const page = await this.request<T[]>(
+        'GET',
+        `${endpoint}&limit=${limit}&start=${start}`
+      )
+      all.push(...page)
+      if (page.length < limit) break
+      start += limit
+    }
+
+    return all
+  }
+
+  /**
    * Get items in a collection
    */
   async getCollectionItems(collectionKey: string): Promise<ZoteroApiItem[]> {
-    const response = await this.request<Array<{ key: string; data: ZoteroApiItem }>>(
-      'GET',
+    const response = await this.requestAllPages<{ key: string; data: ZoteroApiItem }>(
       `/collections/${collectionKey}/items?itemType=-attachment&format=json`
     )
     return transformApiItems(response)
@@ -161,8 +186,7 @@ export class ZoteroWebApi {
    * Get all library items (top-level, no attachments)
    */
   async getItems(): Promise<ZoteroApiItem[]> {
-    const response = await this.request<Array<{ key: string; data: ZoteroApiItem }>>(
-      'GET',
+    const response = await this.requestAllPages<{ key: string; data: ZoteroApiItem }>(
       '/items/top?itemType=-attachment&format=json'
     )
     return transformApiItems(response)
@@ -175,35 +199,14 @@ export class ZoteroWebApi {
   async getAllDOIs(): Promise<Set<string>> {
     try {
       const dois = new Set<string>()
-      let start = 0
-      const limit = 100
-      let hasMore = true
-
-      // Paginate through all items
-      while (hasMore) {
-        const response = await this.request<Array<{ data: ZoteroApiItem }>>(
-          'GET',
-          `/items/top?itemType=-attachment&format=json&limit=${limit}&start=${start}`
-        )
-
-        if (response.length === 0) {
-          hasMore = false
-          continue
-        }
-
-        for (const item of response) {
-          if (item.data?.DOI) {
-            dois.add(item.data.DOI)
-          }
-        }
-
-        if (response.length < limit) {
-          hasMore = false
-        } else {
-          start += limit
+      const items = await this.requestAllPages<{ data: ZoteroApiItem }>(
+        '/items/top?itemType=-attachment&format=json'
+      )
+      for (const item of items) {
+        if (item.data?.DOI) {
+          dois.add(item.data.DOI)
         }
       }
-
       console.log(`[Zotero API] Loaded ${dois.size} DOIs from library`)
       return dois
     } catch (e) {
