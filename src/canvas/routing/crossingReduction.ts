@@ -193,14 +193,16 @@ export class BarycentricReduction implements CrossingReductionStrategy {
         }
       }
 
-      // Sort each group: REVERSE order within each approach direction
-      // This ensures: leftmost source → rightmost port (among left-approachers)
-      // And: rightmost source → leftmost port (among right-approachers)
-      negative.sort((a, b) => b.otherPos - a.otherPos)  // reverse: more negative → higher index
-      positive.sort((a, b) => a.otherPos - b.otherPos)  // reverse: more positive → higher index
+      // Sort BOTH quadrants ascending by the connected node's position so the
+      // combined order runs monotonically across the whole side (most-negative
+      // at the first/top port, most-positive at the last/bottom port). Sorting
+      // the negative quadrant in reverse put the least-negative target at the
+      // extreme port, which made the up-quadrant edges cross before attaching.
+      negative.sort((a, b) => a.otherPos - b.otherPos)
+      positive.sort((a, b) => a.otherPos - b.otherPos)
 
-      // Combine: negative side gets lower indices (left/top ports), positive gets higher (right/bottom)
-      // But WITHIN each group, inner sources get outer positions
+      // Combine: negative quadrant gets the lower indices (top/left ports),
+      // positive quadrant the higher indices (bottom/right ports)
       const combined = [...negative, ...positive]
       entries.length = 0
       entries.push(...combined)
