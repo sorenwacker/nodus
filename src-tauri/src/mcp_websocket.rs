@@ -271,10 +271,13 @@ pub async fn approve_connection(
         println!("[MCP] Connection {} approved", connection_id);
     } else {
         conn.state = ConnectionState::Rejected;
-        // Send rejection, then actually close the socket
+        // Send the rejection but keep the socket OPEN. Closing it makes the
+        // client's auto-reconnect fire (every few seconds), which re-triggers
+        // the approval prompt in a loop. Leaving it open in the Rejected state
+        // is harmless - send_response refuses anything that is not Approved -
+        // and the client gets a single rejection instead of a storm.
         let response = JsonRpcResponse::error(None, NOT_APPROVED, "Connection rejected by user");
         conn.send_text(serde_json::to_string(&response).unwrap());
-        let _ = conn.sender.send(Message::Close(None));
         println!("[MCP] Connection {} rejected", connection_id);
     }
 
