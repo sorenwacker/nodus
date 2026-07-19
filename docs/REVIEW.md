@@ -5,6 +5,38 @@ Method: 22 module-group review agents read all 296 source files; every high/medi
 then checked by an independent adversarial verification agent instructed to refute it. Only
 confirmed findings appear in the main sections; verifier-corrected severities are used.
 
+## Remediation status (as of 260719)
+
+Fixes were applied theme by theme, each with regression tests where the defect is unit-testable
+and validated against `cargo test`/`clippy` (Rust) or `vitest` (frontend). Test count grew from
+444 to 468.
+
+| Theme | Status | Commit summary |
+|-------|--------|----------------|
+| Database integrity (migration 008, dedup, storyline insert, ontology txn) | Done | `2e40d54` |
+| Backend security (vault containment, SSRF guards, MCP origin/close/pong, DB-init, TOCTOU, off-thread typst) | Done | `21b35bf` |
+| LLM agent pipeline (unreachable smart tools, completion heuristic, Anthropic tool messages, cleanContent LaTeX, restart race, stale model) | Done | `3e05ec2` |
+| Library/UI correctness (Zotero pagination, markdown escaping, task panel, HiDPI drop, frame revert, undo-on-click, edge attrs, MCP stdout) | Done | `2156fc7` |
+| More correctness/security (NodePicker field, redo shortcut, edge dedup link_type, wikilink anchoring, BibTeX @, mermaid sanitizer, SSRF blocklist) | Done | `1de8df5` |
+| Canvas performance (culling map memo, edge-visibility Set, edge-routing deferral, deferred position persistence) | Done | `98e6ae7` |
+| Dead code (useCanvasNodeSizing, useCanvasInit, setMode/setPlan, createItemFromNode) | Done | `9e1a49d` |
+
+### Deferred (need their own focused work)
+
+- **`PixiCanvas.vue` split (2332 LOC vs 1000 rule).** A behavior-preserving extraction that must be
+  verified with the app running; not safe to do mechanically. Split plan is in the finding below.
+- **`useTetrisLayout` O(n^3).** Algorithmic rewrite that must keep layout output identical to the
+  existing layout tests; deferred to avoid changing placement behavior.
+- **`typst-export.ts` escaping.** Needs a tokenizer to escape literal text without breaking the
+  markdown→Typst transforms.
+- **API keys in plaintext localStorage** (`storage.ts`, `LLMSettingsPanel.vue`). Design finding;
+  proper fix is OS-keychain integration, a feature-level change.
+- **Layout-strategy "dead code" finding was refuted on re-grep:** `useLayoutStrategies.ts` and
+  `useLayout.ts` do reference `layoutRegistry`/`executeStrategy`, so it was NOT removed.
+- Remaining medium design/consistency/typing items (settings-panel theming duplication, EntityBadge
+  config duplication, `useUndoRedo` boilerplate, several `vue-tsc` type-signature mismatches) — see
+  the per-file findings below.
+
 ## Baseline gates
 
 | Gate | Command | Result |
