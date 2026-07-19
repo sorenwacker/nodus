@@ -39,10 +39,20 @@ export function resolveWikilink(
   )
   if (node) return node
 
-  // 2. File path match
-  node = nodes.find(
-    n => n.file_path?.toLowerCase().includes(decodedTarget.toLowerCase())
-  )
+  // 2. File path match, anchored to the filename. A loose substring match
+  // here would resolve "note" to "another-note.md" and shadow the more
+  // precise frame+title resolution below.
+  const targetLower = decodedTarget.toLowerCase()
+  node = nodes.find(n => {
+    const path = n.file_path?.toLowerCase()
+    if (!path) return false
+    return (
+      path === targetLower ||
+      path === `${targetLower}.md` ||
+      path.endsWith(`/${targetLower}`) ||
+      path.endsWith(`/${targetLower}.md`)
+    )
+  })
   if (node) return node
 
   // 3. Frame + node title match

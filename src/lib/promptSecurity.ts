@@ -20,29 +20,47 @@ export function escapeForPrompt(text: string): string {
 }
 
 /**
- * Check if hostname is in private IP range (RFC 1918)
+ * Check if a hostname resolves to a private, loopback, link-local, or otherwise
+ * non-routable address that must not be reachable via SSRF.
  */
 function isPrivateHostname(hostname: string): boolean {
-  // Localhost variations
-  if (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '0.0.0.0' ||
-    hostname === '[::1]' ||
-    hostname.endsWith('.local')
-  ) {
+  // Strip IPv6 brackets that URL.hostname keeps
+  const host = hostname.replace(/^\[/, '').replace(/\]$/, '')
+
+  // Named localhost and mDNS/internal names
+  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) {
     return true
   }
-  // Private IP ranges
-  if (hostname.startsWith('192.168.') || hostname.startsWith('10.')) {
+  // Cloud metadata endpoints commonly targeted by SSRF
+  if (host === 'metadata.google.internal') {
     return true
   }
-  // 172.16.0.0 - 172.31.255.255 range
-  for (let i = 16; i <= 31; i++) {
-    if (hostname.startsWith(`172.${i}.`)) {
-      return true
-    }
+
+  // IPv4 (dotted quad)
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])]
+    if (a === 127) return true // loopback 127.0.0.0/8
+    if (a === 10) return true // private 10.0.0.0/8
+    if (a === 0) return true // "this" network 0.0.0.0/8
+    if (a === 169 && b === 254) return true // link-local 169.254.0.0/16 (metadata)
+    if (a === 192 && b === 168) return true // private 192.168.0.0/16
+    if (a === 172 && b >= 16 && b <= 31) return true // private 172.16.0.0/12
+    return false
   }
+
+  // IPv6
+  if (host.includes(':')) {
+    const lower = host.toLowerCase()
+    if (lower === '::1' || lower === '::') return true // loopback / unspecified
+    if (lower.startsWith('fe80:')) return true // link-local fe80::/10
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true // unique-local fc00::/7
+    // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1)
+    const mapped = lower.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+    if (mapped) return isPrivateHostname(mapped[1])
+    return false
+  }
+
   return false
 }
 

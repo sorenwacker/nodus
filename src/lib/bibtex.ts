@@ -91,8 +91,10 @@ function parseFields(body: string, entry: BibEntry): void {
 export function parseBibTeX(content: string): BibEntry[] {
   const entries: BibEntry[] = []
 
-  // Match @type{key, ... }
-  const entryRegex = /@(\w+)\s*\{\s*([^,\s]+)\s*,([^@]*?)(?=\n\s*@|\s*$)/gs
+  // Match @type{key, ... }. The body uses [\s\S] (not [^@]) so field values
+  // containing '@' (emails, URLs) are not truncated; the lookahead stops the
+  // body at the start of the next entry (a '@' at the beginning of a line).
+  const entryRegex = /@(\w+)\s*\{\s*([^,\s]+)\s*,([\s\S]*?)(?=\n\s*@|\s*$)/gs
 
   let match
   while ((match = entryRegex.exec(content)) !== null) {

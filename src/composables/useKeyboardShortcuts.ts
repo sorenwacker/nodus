@@ -19,15 +19,18 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
     const target = e.target as HTMLElement
     const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
 
+    // e.key is uppercase when Shift is held, so compare case-insensitively
+    const key = e.key.toLowerCase()
+
     // Cmd/Ctrl + Z: Undo (not in input)
-    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !isInput) {
+    if ((e.metaKey || e.ctrlKey) && key === 'z' && !e.shiftKey && !isInput) {
       e.preventDefault()
       handlers.onUndo?.()
       return
     }
 
     // Cmd/Ctrl + Shift + Z or Cmd/Ctrl + Y: Redo (not in input)
-    if ((e.metaKey || e.ctrlKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y') && !isInput) {
+    if ((e.metaKey || e.ctrlKey) && ((key === 'z' && e.shiftKey) || key === 'y') && !isInput) {
       e.preventDefault()
       handlers.onRedo?.()
       return

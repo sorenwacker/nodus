@@ -51,7 +51,7 @@ const availableNodes = computed(() => {
     const q = searchQuery.value.toLowerCase()
     nodes = nodes.filter(n =>
       n.title.toLowerCase().includes(q) ||
-      (n.content && n.content.toLowerCase().includes(q))
+      (n.markdown_content && n.markdown_content.toLowerCase().includes(q))
     )
   }
 

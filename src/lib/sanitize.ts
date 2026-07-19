@@ -84,20 +84,17 @@ export function sanitizeSvg(svg: string): string {
 }
 
 /**
- * Sanitize Mermaid SVG output
- * Mermaid generates SVG from its own DSL - not from untrusted user HTML.
- * DOMPurify aggressively strips foreignObject HTML content which breaks text rendering.
- * We do minimal sanitization: remove script tags and event handlers only.
+ * Sanitize Mermaid SVG output.
+ *
+ * Runs the SVG through DOMPurify with the SVG profile (which permits
+ * foreignObject and the HTML tags Mermaid renders inside it) rather than a
+ * hand-rolled regex blacklist. A regex blacklist is trivially bypassable
+ * (`<script >`, entity-encoded handlers, `xlink:href="javascript:..."`),
+ * whereas DOMPurify parses the DOM and strips scripts, event handlers, and
+ * dangerous protocols structurally.
  */
 export function sanitizeMermaidSvg(svg: string): string {
-  // Remove script tags
-  let clean = svg.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-  // Remove event handlers (onclick, onerror, etc.)
-  clean = clean.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
-  clean = clean.replace(/\s+on\w+\s*=\s*[^\s>]+/gi, '')
-  // Remove javascript: URLs
-  clean = clean.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
-  return clean
+  return DOMPurify.sanitize(svg, svgConfig as Parameters<typeof DOMPurify.sanitize>[1])
 }
 
 /**

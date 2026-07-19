@@ -90,6 +90,21 @@ describe('BibTeX Parser', () => {
       expect(entries[0].doi).toBe('10.1234/example')
       expect(entries[0].url).toBe('https://example.com/paper')
     })
+
+    it('does not truncate a field value containing @', () => {
+      const bib = `
+@article{test2024,
+  title = {A paper},
+  note = {Contact author@example.com for data},
+  year = {2024}
+}
+      `
+      const entries = parseBibTeX(bib)
+
+      expect(entries).toHaveLength(1)
+      expect(entries[0].note).toBe('Contact author@example.com for data')
+      expect(entries[0].year).toBe('2024')
+    })
   })
 
   describe('formatAuthors', () => {

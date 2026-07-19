@@ -78,12 +78,21 @@ export const useEdgesStore = defineStore('edges', () => {
       throw new Error('Cannot create self-referencing edge')
     }
 
-    // Check for existing edge with same source and target
+    // Check for an existing edge with the same source, target AND link_type.
+    // The schema's UNIQUE constraint includes link_type, so two nodes may be
+    // connected by several edges of different types; ignoring link_type here
+    // would silently swallow legitimate new edges.
+    const linkType = data.link_type ?? 'related'
     const existingEdge = edges.value.find(
-      e => e.source_node_id === data.source_node_id && e.target_node_id === data.target_node_id
+      e =>
+        e.source_node_id === data.source_node_id &&
+        e.target_node_id === data.target_node_id &&
+        (e.link_type ?? 'related') === linkType
     )
     if (existingEdge) {
-      storeLogger.debug(`Edge already exists: ${data.source_node_id} -> ${data.target_node_id}`)
+      storeLogger.debug(
+        `Edge already exists: ${data.source_node_id} -> ${data.target_node_id} (${linkType})`
+      )
       return existingEdge
     }
 
