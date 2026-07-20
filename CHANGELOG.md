@@ -2,7 +2,11 @@
 
 All notable changes to Nodus are documented in this file.
 
-## [Unreleased]
+## [1.0.0] - 2026-07-20
+
+First stable release. Consolidates the 0.7.0-rc.1 review remediation (backend
+hardening, database integrity, LLM agent pipeline, edge port ordering) with the
+port-cache fix below; edge routing is crossing-free across all styles.
 
 ### Fixed
 - Edge ports are now assigned purely from the current layout on every render.
