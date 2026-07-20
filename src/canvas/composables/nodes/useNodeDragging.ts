@@ -5,7 +5,6 @@
  */
 
 import { ref, type Ref } from 'vue'
-import { NODE_DEFAULTS } from '../../constants'
 import type { Node, Frame } from '../../../types'
 
 export interface UseNodeDraggingContext {
@@ -57,14 +56,6 @@ export interface UseNodeDraggingContext {
   screenToCanvas: (clientX: number, clientY: number) => { x: number; y: number }
   zoomToNode: (nodeId: string) => void
   onFullscreenOpen?: (nodeId: string) => void
-  optimizeNodeEntrypoints: (
-    nodeId: string,
-    edges: Array<{ id: string; source_node_id: string; target_node_id: string }>,
-    nodeMap: Map<
-      string,
-      { id: string; canvas_x: number; canvas_y: number; width: number; height: number }
-    >
-  ) => void
   onEdgePreviewMove: (e: PointerEvent) => void
   onEdgeCreate: (e: PointerEvent) => void
   setLastDragEndTime: (time: number) => void
@@ -95,7 +86,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     pushUndo,
     screenToCanvas,
     zoomToNode,
-    optimizeNodeEntrypoints,
     onEdgePreviewMove,
     onEdgeCreate,
     setLastDragEndTime,
@@ -163,31 +153,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
       store.selectNode(nodeId, e.shiftKey || e.metaKey)
     }
     selectedEdge.value = null
-
-    // Optimize entry points for this node (wrapped in try-catch to not break click handling)
-    try {
-      const optNodeMap = new Map<
-        string,
-        { id: string; canvas_x: number; canvas_y: number; width: number; height: number }
-      >()
-      for (const n of store.filteredNodes) {
-        optNodeMap.set(n.id, {
-          id: n.id,
-          canvas_x: n.canvas_x,
-          canvas_y: n.canvas_y,
-          width: n.width || NODE_DEFAULTS.WIDTH,
-          height: n.height || NODE_DEFAULTS.HEIGHT,
-        })
-      }
-      const edgeDefs = store.filteredEdges.map(edge => ({
-        id: edge.id,
-        source_node_id: edge.source_node_id,
-        target_node_id: edge.target_node_id,
-      }))
-      optimizeNodeEntrypoints(nodeId, edgeDefs, optNodeMap)
-    } catch (err) {
-      console.error('[optimizeNodeEntrypoints] Error:', err)
-    }
 
     const pos = screenToCanvas(e.clientX, e.clientY)
     dragStart.value = {

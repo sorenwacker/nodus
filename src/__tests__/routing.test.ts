@@ -2,11 +2,9 @@
  * Tests for edge routing module
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   routeAllEdges,
-  optimizeNodeEntrypoints,
-  clearPortCache,
   getSide,
   getPortPoint,
   calculatePortOffset,
@@ -144,26 +142,10 @@ describe('routing module', () => {
     })
   })
 
-  describe('optimizeNodeEntrypoints', () => {
-    beforeEach(() => {
-      clearPortCache()
-    })
-
-    it('reduces crossings for edges connected to a central node', () => {
-      /**
-       * Test scenario: Star topology with central node and 4 surrounding nodes
-       * arranged in a pattern that creates crossings with default port ordering.
-       *
-       *       top1 (x=250)
-       *          |
-       *   left1 --- center --- right1
-       *          |
-       *       bottom1 (x=250)
-       *
-       * Plus additional edges that would cross without optimization:
-       * - Edge from center to a node at top-right that should use top-right port
-       * - Edge from center to a node at bottom-left that should use bottom-left port
-       */
+  describe('hub side-fan ordering', () => {
+    it('orders a top-side fan left-to-right by target position', () => {
+      // A central node with two neighbours off its top side. The port order
+      // must follow the targets' x order so the edges do not cross.
       const nodes: NodeRect[] = [
         { id: 'center', canvas_x: 200, canvas_y: 200, width: 200, height: 120 },
         // Top nodes - edges from center should spread across top side
@@ -186,14 +168,6 @@ describe('routing module', () => {
         { id: 'e-right-bottom', source_node_id: 'center', target_node_id: 'right-bottom' },
       ]
 
-      // Run optimization for the central node
-      const result = optimizeNodeEntrypoints('center', edges, nodeMap)
-
-      // The optimization should report improvement or no crossings
-      // (barycentric should order edges correctly)
-      expect(result.finalCrossings).toBeLessThanOrEqual(result.initialCrossings)
-
-      // Now route edges using the cached optimized indices
       const routed = routeAllEdges(edges, nodes, nodeMap)
 
       // Verify all edges got routed
@@ -207,34 +181,6 @@ describe('routing module', () => {
       // Optimized order should have top-left edge to the left of top-right edge
       // (lower x coordinate for the port)
       expect(topLeftPort.x).toBeLessThan(topRightPort.x)
-    })
-
-    it('handles nodes with many edges without increasing crossings', () => {
-      // Hub node with 6 edges going to nodes arranged in a semicircle on the right
-      const nodes: NodeRect[] = [
-        { id: 'hub', canvas_x: 0, canvas_y: 200, width: 200, height: 120 },
-        // Nodes arranged from top to bottom on the right
-        { id: 'r1', canvas_x: 400, canvas_y: 50, width: 100, height: 60 },
-        { id: 'r2', canvas_x: 450, canvas_y: 120, width: 100, height: 60 },
-        { id: 'r3', canvas_x: 480, canvas_y: 200, width: 100, height: 60 },
-        { id: 'r4', canvas_x: 450, canvas_y: 280, width: 100, height: 60 },
-        { id: 'r5', canvas_x: 400, canvas_y: 350, width: 100, height: 60 },
-      ]
-
-      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
-
-      const edges: EdgeDef[] = [
-        { id: 'e1', source_node_id: 'hub', target_node_id: 'r1' },
-        { id: 'e2', source_node_id: 'hub', target_node_id: 'r2' },
-        { id: 'e3', source_node_id: 'hub', target_node_id: 'r3' },
-        { id: 'e4', source_node_id: 'hub', target_node_id: 'r4' },
-        { id: 'e5', source_node_id: 'hub', target_node_id: 'r5' },
-      ]
-
-      const result = optimizeNodeEntrypoints('hub', edges, nodeMap)
-
-      // Should not make things worse
-      expect(result.finalCrossings).toBeLessThanOrEqual(result.initialCrossings)
     })
 
     it('orders a hub side monotonically so up/down-quadrant edges do not cross', () => {
@@ -257,7 +203,6 @@ describe('routing module', () => {
         { id: 'e-down-far', source_node_id: 'hub', target_node_id: 'down-far' },
       ]
 
-      optimizeNodeEntrypoints('hub', edges, nodeMap)
       const routed = routeAllEdges(edges, nodes, nodeMap)
 
       // Port Y must increase in the same order as the targets (top-to-bottom)
@@ -291,7 +236,6 @@ describe('routing module', () => {
         { id: 'e-l-far', source_node_id: 'hub', target_node_id: 'l-far' },
       ]
 
-      optimizeNodeEntrypoints('hub', edges, nodeMap)
       const routed = routeAllEdges(edges, nodes, nodeMap)
       const portY = (id: string) => routed.get(id)!.path[0].y
 
@@ -321,7 +265,6 @@ describe('routing module', () => {
         target_node_id: t,
       }))
 
-      optimizeNodeEntrypoints('hub', edges, nodeMap)
       const routed = routeAllEdges(edges, nodes, nodeMap, 'orthogonal')
 
       // Proper (interior) segment intersection
@@ -354,25 +297,6 @@ describe('routing module', () => {
         }
       }
       expect(crossings).toBe(0)
-    })
-
-    it('returns early for nodes with fewer than 2 edges', () => {
-      const nodes: NodeRect[] = [
-        { id: 'a', canvas_x: 0, canvas_y: 0, width: 100, height: 60 },
-        { id: 'b', canvas_x: 200, canvas_y: 0, width: 100, height: 60 },
-      ]
-
-      const nodeMap = new Map(nodes.map(n => [n.id!, n]))
-
-      const edges: EdgeDef[] = [
-        { id: 'e1', source_node_id: 'a', target_node_id: 'b' },
-      ]
-
-      const result = optimizeNodeEntrypoints('a', edges, nodeMap)
-
-      // Single edge - nothing to optimize
-      expect(result.improved).toBe(false)
-      expect(result.swapsPerformed).toBe(0)
     })
   })
 
@@ -471,10 +395,6 @@ describe('routing module', () => {
   })
 
   describe('routeAllEdges arrow visibility', () => {
-    beforeEach(() => {
-      clearPortCache()
-    })
-
     it('applies arrow offset when routing edge A->B', () => {
       const nodes: NodeRect[] = [
         { id: 'a', canvas_x: 0, canvas_y: 0, width: 200, height: 120 },
@@ -531,8 +451,6 @@ describe('routing module', () => {
       ]
       const resultAB = routeAllEdges(edgesAB, nodes, nodeMap)
       const routedAB = resultAB.get('e1')!
-
-      clearPortCache()
 
       // Route B->A
       const edgesBA: EdgeDef[] = [

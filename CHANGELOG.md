@@ -2,6 +2,20 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Edge ports are now assigned purely from the current layout on every render.
+  A port-order cache populated on node click was never invalidated, so once a
+  node was touched its edges' port order was pinned to that moment's layout and
+  drifted back into crossings as the graph changed. Removing the cache makes the
+  angle-based fan ordering the single source of truth.
+
+### Removed
+- Unused crossing-reduction subsystem (barycentric/greedy port reordering) that
+  was reachable only through the removed port cache; the angle-based fan
+  ordering supersedes it.
+
 ## [0.7.0-rc.1] - 2026-07-19
 
 ### Fixed

@@ -7,7 +7,6 @@ import { useDisplayStore } from '../stores/display'
 import type { Node } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
-import { optimizeNodeEntrypoints } from './routing'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
 import { memoryStorage, agentMemoryStorage } from '../lib/storage'
 import {
@@ -1592,7 +1591,6 @@ const nodeDragging = useNodeDragging({
   pushFrameAssignmentUndo,
   screenToCanvas,
   zoomToNode,
-  optimizeNodeEntrypoints,
   onEdgePreviewMove,
   onEdgeCreate,
   setLastDragEndTime: (time: number) => {

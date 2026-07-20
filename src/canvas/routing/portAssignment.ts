@@ -49,36 +49,6 @@ export function portOrderKey(
   }
 }
 
-/**
- * Cache for optimized port indices
- * Key: "edgeId:source" or "edgeId:target"
- * Value: { index, total }
- */
-const optimizedPortCache = new Map<string, { index: number; total: number }>()
-
-/**
- * Store optimized port index in cache
- */
-export function cachePortIndex(edgeId: string, isSource: boolean, index: number, total: number): void {
-  const key = `${edgeId}:${isSource ? 'source' : 'target'}`
-  optimizedPortCache.set(key, { index, total })
-}
-
-/**
- * Get cached port index if available
- */
-export function getCachedPortIndex(edgeId: string, isSource: boolean): { index: number; total: number } | null {
-  const key = `${edgeId}:${isSource ? 'source' : 'target'}`
-  return optimizedPortCache.get(key) || null
-}
-
-/**
- * Clear the port cache (call after routing completes)
- */
-export function clearPortCache(): void {
-  optimizedPortCache.clear()
-}
-
 interface EdgeInfo {
   edge: EdgeDef
   source: NodeRect
@@ -197,23 +167,19 @@ export function assignPorts(edgeInfos: EdgeInfo[]): {
     )
 
 
-    // Assign indices from the unified pool
-    // Check cache for optimized indices first
+    // Assign indices from the unified pool in the angle-sorted order computed
+    // above. This is the single source of truth for port order: it depends only
+    // on the current layout, so ports always reflect where the nodes are now.
     const total = entries.length
     entries.forEach((entry, idx) => {
       const node = entry.isSource ? entry.info.source : entry.info.target
-
-      // Check if we have a cached optimized index for this edge
-      const cached = getCachedPortIndex(entry.edgeId, entry.isSource)
-      const finalIndex = cached ? cached.index : idx
-      const finalTotal = cached ? cached.total : total
 
       const assignment: PortAssignment = {
         edgeId: entry.edgeId,
         node,
         side,
-        index: finalIndex,
-        total: finalTotal,
+        index: idx,
+        total,
       }
 
       if (entry.isSource) {

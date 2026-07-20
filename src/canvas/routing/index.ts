@@ -9,7 +9,7 @@ export * from './types'
 // Re-export utilities
 export { pathToSvg } from './svgPath'
 export { getSide, getPortPoint, getStandoff, getAngledStandoff, getNodeCenter, CORNER_MARGIN } from './geometry'
-export { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, optimizePortAssignments, detectCrossings, clearPortCache, type CrossingReport } from './portAssignment'
+export { analyzeEdges, assignPorts, calculatePortOffset, PORT_SPACING, optimizePortAssignments, detectCrossings, type CrossingReport } from './portAssignment'
 export { createOrthogonalPath, cleanPath, findOrthogonalPath } from './pathBuilder'
 
 // Export new routing modules
@@ -30,27 +30,14 @@ export { SpatialIndex, getSpatialIndex, invalidateSpatialIndex } from './spatial
 export { routeDiagonal, validateDiagonalPath, type DiagonalRouteParams, type DiagonalRouteResult } from './diagonalRouter'
 export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, type OrthogonalRouteResult } from './orthogonalRouter'
 
-// Export crossing reduction module
-export {
-  reduceCrossings,
-  setStrategy as setCrossingStrategy,
-  getStrategy as getCrossingStrategy,
-  BarycentricReduction,
-  GreedySwapReduction,
-  CombinedReduction,
-  type CrossingReductionStrategy,
-  type CrossingReductionResult,
-} from './crossingReduction'
-
 // Internal imports
 import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
 import { getPortPoint, getStandoff } from './geometry'
-import { analyzeEdges, assignPorts, calculatePortOffset, cachePortIndex } from './portAssignment'
+import { analyzeEdges, assignPorts, calculatePortOffset } from './portAssignment'
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
 import { findObstacles, getObstacleBounds, OBSTACLE_MARGIN } from './obstacleAvoider'
-import { reduceCrossings as runCrossingReduction } from './crossingReduction'
 
 // Minimum orthogonal standoff distance from node edge
 // Larger standoff = more room for edge routing lanes
@@ -579,46 +566,6 @@ export function routeAllEdges(
       svgPath: adjusted.svgPath,
       debugInfo: { srcOffset, tgtOffset, srcSide: sourceSide, tgtSide: targetSide },
     })
-  }
-
-  return result
-}
-
-/**
- * Optimize entry points (port assignments) for edges connected to a specific node.
- * Reduces edge crossings by reordering ports on the clicked node's sides.
- * Call this when clicking on a node to improve edge layout.
- * Stores optimized indices in cache for next routing pass.
- */
-export function optimizeNodeEntrypoints(
-  nodeId: string,
-  edges: EdgeDef[],
-  nodeMap: Map<string, NodeRect>
-): { improved: boolean; initialCrossings: number; finalCrossings: number; swapsPerformed: number } {
-  // Filter to edges connected to this node
-  const nodeEdges = edges.filter(e => e.source_node_id === nodeId || e.target_node_id === nodeId)
-
-  if (nodeEdges.length < 2) {
-    return { improved: false, initialCrossings: 0, finalCrossings: 0, swapsPerformed: 0 }
-  }
-
-  // Analyze edges and determine sides
-  const edgeInfos = analyzeEdges(nodeEdges, nodeMap)
-
-  // Assign port indices for spreading
-  const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
-
-  // Run crossing reduction (modifies assignments in place)
-  const result = runCrossingReduction(edgeInfos, sourceAssignments, targetAssignments)
-
-  // Cache the optimized indices for the next routing pass
-  if (result.swapsPerformed > 0) {
-    for (const [edgeId, assign] of sourceAssignments) {
-      cachePortIndex(edgeId, true, assign.index, assign.total)
-    }
-    for (const [edgeId, assign] of targetAssignments) {
-      cachePortIndex(edgeId, false, assign.index, assign.total)
-    }
   }
 
   return result
