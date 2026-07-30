@@ -48,7 +48,10 @@ export function usePointerReorder(options: PointerReorderOptions) {
     if (e.button !== 0) return
     if ((e.target as HTMLElement).closest(ignoreSelector)) return
 
-    // Prevent text selection while possibly dragging
+    // Prevent text selection while possibly dragging. No pointer capture:
+    // capturing retargets the derived click to the captured element, which
+    // silently kills click handlers on the item's children (e.g. a row
+    // opening the reader). The document listeners track the drag instead.
     e.preventDefault()
 
     draggingIndex.value = index
@@ -56,7 +59,6 @@ export function usePointerReorder(options: PointerReorderOptions) {
     isDragging = false
 
     document.body.classList.add('storyline-dragging')
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
     document.addEventListener('pointermove', onPointerMove)
     document.addEventListener('pointerup', onPointerUp)
