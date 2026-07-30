@@ -373,7 +373,9 @@
     "contents": "Sommaire",
     "loading": "Chargement...",
     "expandItems": "Afficher les éléments",
-    "collapseItems": "Masquer les éléments"
+    "collapseItems": "Masquer les éléments",
+    "timelines": "Chronologies",
+    "noStorylines": "Aucune storyline pour le moment"
   },
   "nodePicker": {
     "newNode": "Nouveau nœud",

@@ -377,7 +377,9 @@
     "collapseNode": "Collapse content",
     "noContent": "No content",
     "expandItems": "Show items",
-    "collapseItems": "Hide items"
+    "collapseItems": "Hide items",
+    "timelines": "Timelines",
+    "noStorylines": "No storylines yet"
   },
   "nodePicker": {
     "newNode": "New node",

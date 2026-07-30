@@ -5,11 +5,12 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Timelines view: all storylines side by side as horizontal lanes in their colors, nodes as beads in sequence order, dashed connectors joining nodes shared between storylines; clicking a lane opens its reader. It is the third edge-push step, between the overview and the reader
 - Node cards show their tags as chips, and YAML frontmatter (OKF/Obsidian metadata) is hidden from rendered content instead of appearing as raw text
 - Open Knowledge Format (OKF v0.2) support: export any workspace as an OKF bundle (frontmatter documents grouped by node type, root index.md, wikilinks rewritten as Markdown links) from the workspace editor; files Nodus creates in a vault carry OKF frontmatter, and content write-backs preserve existing frontmatter blocks
 
 ### Changed
-- Storylines are navigated in steps along the screen edges: right-edge pushes go deeper (overview, half-screen reader with the graph visible, full-screen reader) and left-edge pushes step back down to the graph. The overview keeps its expanded sections across these steps, the reader's contents sidebar sits on the right, and every step transition is animated (panel slide, reader half/full width, reader slide-out). Returning to the canvas also closes an unpinned overview; the toolbar book button pins it. The separator between panel and canvas is a visible drag handle and the chosen width persists across sessions
+- Storylines are navigated in steps along the screen edges: right-edge pushes go deeper (overview, timelines at half screen with the graph visible, full-screen reader) and left-edge pushes step back down to the graph. The overview keeps its expanded sections across these steps, the reader's contents sidebar sits on the right, and every step transition is animated (panel slide, reader half/full width, reader slide-out). Returning to the canvas also closes an unpinned overview; the toolbar book button pins it. The separator between panel and canvas is a visible drag handle and the chosen width persists across sessions
 - Storyline panel is now an accordion: every storyline is a collapsible section, several can be open at once, and titles wrap to two lines instead of truncating; dropping a node onto a section adds it to that storyline
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 

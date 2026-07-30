@@ -311,6 +311,24 @@
   min-height: 0;
 }
 
+/* Timelines step: half window beside the graph */
+.timelines-overlay {
+  width: 50%;
+  height: 100%;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-default);
+  overflow: hidden;
+}
+
+.reader-slide-enter-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.reader-slide-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
 /* Reader close: slide back out to the right (opening animates in-component) */
 .reader-slide-leave-active {
   transition: transform 0.25s ease, opacity 0.25s ease;

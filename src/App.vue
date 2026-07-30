@@ -14,6 +14,7 @@ import NotificationToast from './components/NotificationToast.vue'
 import OnboardingFlow from './components/OnboardingFlow.vue'
 import StorylinePanel from './components/StorylinePanel.vue'
 import StorylineReader from './components/StorylineReader.vue'
+import StorylineTimelines from './components/StorylineTimelines.vue'
 import McpApprovalModal from './components/McpApprovalModal.vue'
 
 const { t } = useI18n()
@@ -68,13 +69,15 @@ const storylinePanel = usePanelReveal({
 // edge steps back. Detected via a capture-phase pointer listener because a
 // hot-zone div can be covered by canvas overlays and never see the pointer.
 const lastReadStorylineId = ref<string | null>(null)
-const readerFullWidth = ref(false)
-const panelVisible = computed(() => storylinePanel.isOpen.value && !readerStorylineId.value)
+const showTimelines = ref(false)
+const panelVisible = computed(
+  () => storylinePanel.isOpen.value && !readerStorylineId.value && !showTimelines.value
+)
 
 function openReader(id: string) {
   readerStorylineId.value = id
   lastReadStorylineId.value = id
-  readerFullWidth.value = false
+  showTimelines.value = false
 }
 
 function openReaderFromEdge() {
@@ -84,26 +87,28 @@ function openReaderFromEdge() {
   openReader(remembered ? remembered.id : candidates[0].id)
 }
 
-// Steps: graph -> overview -> half-screen reader -> full-screen reader
+// Steps: graph -> overview -> timelines (all storylines) -> reader (full)
 const edgeStepper = createEdgeStepper({
   threshold: 12,
   stepRight: () => {
-    if (readerStorylineId.value) {
-      readerFullWidth.value = true
-    } else if (!storylinePanel.isOpen.value) {
-      storylinePanel.onEdgeEnter()
-    } else {
+    if (readerStorylineId.value) return
+    if (showTimelines.value) {
       openReaderFromEdge()
+    } else if (storylinePanel.isOpen.value) {
+      showTimelines.value = true
+    } else {
+      storylinePanel.onEdgeEnter()
     }
   },
   stepLeft: () => {
     if (readerStorylineId.value) {
-      if (readerFullWidth.value) {
-        readerFullWidth.value = false
-      } else {
-        readerStorylineId.value = null
-        storylinePanel.onEdgeEnter()
-      }
+      readerStorylineId.value = null
+      showTimelines.value = true
+      return
+    }
+    if (showTimelines.value) {
+      showTimelines.value = false
+      storylinePanel.onEdgeEnter()
       return
     }
     if (storylinePanel.isOpen.value) {
@@ -845,12 +850,18 @@ async function openFolderDialog() {
           <StorylinePanel @open-reader="openReader" />
         </div>
       </div>
+      <!-- Timelines: all storylines as lanes, half screen -->
+      <Transition name="reader-slide">
+        <div v-if="showTimelines && !readerStorylineId" class="timelines-overlay">
+          <StorylineTimelines @open-reader="openReader" />
+        </div>
+      </Transition>
       <!-- Reader slides in from the right and back out on close -->
       <Transition name="reader-slide">
         <StorylineReader
           v-if="readerStorylineId"
           :storyline-id="readerStorylineId"
-          :full-width="readerFullWidth"
+          :full-width="true"
           @close="readerStorylineId = null"
         />
       </Transition>

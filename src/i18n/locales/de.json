@@ -373,7 +373,9 @@
     "contents": "Inhalt",
     "loading": "Laden...",
     "expandItems": "Einträge anzeigen",
-    "collapseItems": "Einträge ausblenden"
+    "collapseItems": "Einträge ausblenden",
+    "timelines": "Zeitleisten",
+    "noStorylines": "Noch keine Storylines"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",

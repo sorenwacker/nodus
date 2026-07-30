@@ -373,7 +373,9 @@
     "contents": "Contenido",
     "loading": "Cargando...",
     "expandItems": "Mostrar elementos",
-    "collapseItems": "Ocultar elementos"
+    "collapseItems": "Ocultar elementos",
+    "timelines": "Cronologías",
+    "noStorylines": "Aún no hay storylines"
   },
   "nodePicker": {
     "newNode": "Nuevo nodo",

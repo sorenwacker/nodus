@@ -373,7 +373,9 @@
     "contents": "Indice",
     "loading": "Caricamento...",
     "expandItems": "Mostra elementi",
-    "collapseItems": "Nascondi elementi"
+    "collapseItems": "Nascondi elementi",
+    "timelines": "Cronologie",
+    "noStorylines": "Ancora nessuna storyline"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",
