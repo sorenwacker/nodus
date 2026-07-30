@@ -81,6 +81,22 @@ describe('StorylineSection', () => {
     expect(wrapper.emitted('toggle')).toBeTruthy()
   })
 
+  it('emits open-reader from the always-visible read-mode button', async () => {
+    const wrapper = mountSection()
+    const readerBtn = wrapper.find('.reader-btn')
+    expect(readerBtn.exists()).toBe(true)
+    expect(readerBtn.attributes('data-tooltip')).toBe(en.storyline.readMode)
+    await readerBtn.trigger('click')
+    expect(wrapper.emitted('open-reader')).toEqual([['s1']])
+    expect(wrapper.emitted('toggle')).toBeUndefined()
+  })
+
+  it('emits open-reader on header double-click', async () => {
+    const wrapper = mountSection()
+    await wrapper.find('.section-header').trigger('dblclick')
+    expect(wrapper.emitted('open-reader')).toEqual([['s1']])
+  })
+
   it('shows the node list only while expanded', async () => {
     const wrapper = mountSection({ expanded: false })
     expect(wrapper.find('.node-list-stub').exists()).toBe(false)

@@ -14,6 +14,8 @@ All notable changes to Nodus are documented in this file.
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 
 ### Fixed
+- Storyline read mode is reachable again at a glance: the book button on each storyline row is always visible and a double-click on the row opens the reader; previously the button only appeared on hover
+- The storyline panel closes again after clicking inside it; a focus guard meant for text inputs was keeping it open after any click
 - Nodes created with content (e.g. via MCP create_node or the LLM agent) now get wikilink edges for their `[[links]]` immediately; previously edges only appeared after a later content edit (#45)
 - Hashtags in initial node content are now extracted into tags on creation, matching the behavior of content edits
 - Node content updates no longer rewrite vault files while folder sync is off. Write-back now requires a sync-enabled workspace whose vault contains the file; otherwise only the database changes (#43)

@@ -39,16 +39,27 @@ const currentTheme = computed(() => themesStore.currentThemeName)
 const readerStorylineId = ref<string | null>(null)
 const storylineRevealRef = ref<HTMLElement | null>(null)
 
-// Storyline panel: opens when the pointer reaches the left edge, closes when
+// Storyline panel: opens when the pointer reaches the right edge, closes when
 // it returns to the canvas, and can be pinned via the toolbar button. Kept
-// open during node drags, drop handling, and while an input inside has focus.
+// open during node drags, drop handling, and while typing in a panel input.
+// The guard must only match editable elements: any click focuses a button,
+// and guarding on that would keep the panel open forever.
+function panelHasTypingFocus(): boolean {
+  const el = document.activeElement
+  if (!el || !storylineRevealRef.value?.contains(el)) return false
+  return (
+    el.tagName === 'INPUT' ||
+    el.tagName === 'TEXTAREA' ||
+    (el as HTMLElement).isContentEditable
+  )
+}
 const storylinePanel = usePanelReveal({
   side: 'right',
   storageKey: 'nodus-storyline-panel-width',
   closeGuard: () =>
     document.body.classList.contains('node-dragging') ||
     window.__storylinePanelDropTarget === true ||
-    (storylineRevealRef.value?.contains(document.activeElement) ?? false),
+    panelHasTypingFocus(),
 })
 
 function toggleStorylinePanel() {

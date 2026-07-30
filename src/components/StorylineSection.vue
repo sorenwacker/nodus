@@ -115,7 +115,11 @@ function toggleExpandNode(nodeId: string) {
 
 <template>
   <section class="storyline-section" :data-storyline-id="storyline.id">
-    <header class="section-header" @click="emit('toggle')">
+    <header
+      class="section-header"
+      @click="emit('toggle')"
+      @dblclick="emit('open-reader', storyline.id)"
+    >
       <Icon
         name="chevron-right"
         :size="14"
@@ -147,7 +151,17 @@ function toggleExpandNode(nodeId: string) {
         <span class="node-count">{{ nodeCount }}</span>
       </template>
 
-      <div class="storyline-actions" @click.stop>
+      <!-- Read mode is the primary action: always visible -->
+      <button
+        class="icon-btn reader-btn"
+        :data-tooltip="t('storyline.readMode')"
+        @click.stop="emit('open-reader', storyline.id)"
+        @dblclick.stop
+      >
+        <Icon name="book" :size="12" />
+      </button>
+
+      <div class="storyline-actions" @click.stop @dblclick.stop>
         <label class="color-picker" :data-tooltip="t('storyline.edgeColor')">
           <span
             class="color-swatch"
@@ -159,13 +173,6 @@ function toggleExpandNode(nodeId: string) {
             @input="updateColor($event)"
           />
         </label>
-        <button
-          class="icon-btn"
-          :data-tooltip="t('storyline.readMode')"
-          @click="emit('open-reader', storyline.id)"
-        >
-          <Icon name="book" :size="12" />
-        </button>
         <button class="icon-btn" :data-tooltip="t('storyline.rename')" @click="startEditing">
           <Icon name="edit" :size="12" />
         </button>
@@ -266,6 +273,11 @@ function toggleExpandNode(nodeId: string) {
   padding: 2px 8px;
   border-radius: 10px;
   flex-shrink: 0;
+}
+
+.reader-btn {
+  flex-shrink: 0;
+  color: var(--primary-color);
 }
 
 .storyline-actions {
