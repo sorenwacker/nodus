@@ -93,6 +93,9 @@ const classes = computed(() => ({
   'neighborhood-mode': props.isNeighborhoodMode,
   'neighborhood-focus': props.isNeighborhoodFocus,
   'neighbor-highlighted': props.isNeighborHighlighted,
+  // Shared hover bus: lights up when this node is hovered anywhere
+  // (timelines, storyline panel, canvas)
+  'hover-highlighted': nodesStore.hoverHighlightNodeId === props.node.id,
   'tag-node': isTagNode.value,
 }))
 
@@ -404,6 +407,10 @@ async function removeTag(tag: string) {
 </template>
 
 <style scoped>
+.node-card.hover-highlighted {
+  box-shadow: 0 0 0 2px var(--primary-color), 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
 .node-tag-footer {
   display: flex;
   flex-wrap: wrap;
