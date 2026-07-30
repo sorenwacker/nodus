@@ -254,6 +254,11 @@ export async function renderPendingMermaid(container?: Element): Promise<void> {
       startOnLoad: false,
       theme: isDark ? 'dark' : 'default',
       securityLevel: 'loose',
+      // Native SVG text labels: DOMPurify strips foreignObject content
+      // (mXSS hardening), which blanked all HTML-label text
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      class: { htmlLabels: false },
     })
   }
 

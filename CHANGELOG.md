@@ -20,6 +20,7 @@ All notable changes to Nodus are documented in this file.
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 
 ### Fixed
+- Mermaid diagram labels render again: DOMPurify 3.4.12 empties foreignObject content (mXSS hardening), which blanked mermaid's HTML labels, so mermaid now renders native SVG text labels instead
 - Storyline layers stay open while the pointer is inside them: auto-close on mouse-leave is gone (left-edge push or the book button steps back), and stepping deeper while a layer is open requires pressing against the very window edge so panel interaction near the border no longer skips ahead
 - Canvas overlays (minimap, zoom controls, hover preview) shift left in sync with the storyline layers instead of being covered by or floating above them
 - Clicking a storyline row opens the reader directly; expanding the item list moved to the row's chevron. Previously the reader was only reachable via a button that appeared on hover
