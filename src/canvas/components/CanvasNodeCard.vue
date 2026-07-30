@@ -20,6 +20,7 @@ interface Node {
   width?: number
   height?: number
   color_theme?: string | null
+  tags?: string | null
 }
 
 const props = defineProps<{
@@ -127,6 +128,20 @@ const moreEntitiesCount = computed(() =>
 
 // Display title: explicit title, ad-hoc title from content, or "Untitled"
 const displayTitle = computed(() => nodeDisplayTitle(props.node, t('canvas.node.untitled')))
+
+// Tags from the node's metadata (JSON column), shown as chips
+const nodeTags = computed<string[]>(() => {
+  if (!props.node.tags) return []
+  try {
+    const parsed = JSON.parse(props.node.tags)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+})
+const showTagChips = computed(() =>
+  !isTagNode.value && !props.isCollapsed && !props.isEditing && nodeTags.value.length > 0
+)
 </script>
 
 <template>
@@ -223,6 +238,11 @@ const displayTitle = computed(() => nodeDisplayTitle(props.node, t('canvas.node.
     ></div>
     <!-- eslint-enable vue/no-v-html -->
 
+    <!-- Tag chips footer -->
+    <div v-if="showTagChips" class="node-tag-footer">
+      <span v-for="tag in nodeTags" :key="tag" class="node-tag-chip">#{{ tag }}</span>
+    </div>
+
     <!-- Entity badges footer -->
     <div v-if="showEntityBadges" class="node-entity-footer">
       <EntityBadge
@@ -260,6 +280,26 @@ const displayTitle = computed(() => nodeDisplayTitle(props.node, t('canvas.node.
 </template>
 
 <style scoped>
+.node-tag-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-surface-alt, rgba(0, 0, 0, 0.02));
+}
+
+.node-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--primary-color);
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 .node-entity-footer {
   display: flex;
   flex-wrap: wrap;

@@ -13,6 +13,7 @@
  */
 import { nextTick } from 'vue'
 import { marked } from '../lib/markdown'
+import { stripFrontmatter } from '../lib/contentParser'
 import { invoke, isTauri } from '../lib/tauri'
 import {
   renderMath as renderMathWasm,
@@ -64,7 +65,8 @@ export function renderMarkdown(content: string | null, options: RenderOptions = 
 
   // Extract math blocks BEFORE markdown processing to preserve backslashes
   const mathPlaceholders: Map<string, string> = new Map()
-  let processedContent = content
+  // Frontmatter is metadata (OKF/Obsidian), not display content
+  let processedContent = stripFrontmatter(content)
 
   // Extract display math first ($$...$$)
   processedContent = processedContent.replace(/\$\$([^$]+)\$\$/g, (_match, math) => {

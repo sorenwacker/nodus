@@ -32,6 +32,18 @@ export function extractHashtags(content: string): string[] {
  * Matches: [[link]], [[link|display text]]
  * Returns lowercased, trimmed link targets
  */
+/**
+ * Remove a leading YAML frontmatter block (OKF/Obsidian metadata) so it is
+ * not rendered as visible text. Content without a terminated block at the
+ * very start is returned unchanged.
+ */
+export function stripFrontmatter(content: string): string {
+  if (!content.startsWith('---\n')) return content
+  const end = content.indexOf('\n---', 4)
+  if (end === -1) return content
+  return content.slice(end + 4).replace(/^\r?\n/, '')
+}
+
 export function extractWikilinks(content: string): Set<string> {
   const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
   const links = new Set<string>()

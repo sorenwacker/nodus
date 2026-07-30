@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Node cards show their tags as chips, and YAML frontmatter (OKF/Obsidian metadata) is hidden from rendered content instead of appearing as raw text
 - Open Knowledge Format (OKF v0.2) support: export any workspace as an OKF bundle (frontmatter documents grouped by node type, root index.md, wikilinks rewritten as Markdown links) from the workspace editor; files Nodus creates in a vault carry OKF frontmatter, and content write-backs preserve existing frontmatter blocks
 
 ### Changed
