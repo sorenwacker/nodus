@@ -25,7 +25,10 @@ Hashtags in node content become node tags:
 
 - `#tag` tokens are extracted whenever content is set: on node creation and on every content edit, from any interface (canvas editor, MCP tools, LLM agent)
 - Extracted tags merge with the node's existing tags
+- A node's tags appear as chips at the bottom of its card
 - With tag nodes enabled in settings, each tag becomes a tag node connected to the notes that use it
+
+YAML frontmatter at the top of a note (OKF or Obsidian metadata) is treated as metadata: its title and tags feed the node, and the block is hidden from the rendered card instead of appearing as raw text.
 
 ### Frames
 Group related nodes visually. Frames act as containers that can be moved together with all contained nodes.
