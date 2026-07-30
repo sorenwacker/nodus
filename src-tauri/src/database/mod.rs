@@ -445,4 +445,51 @@ mod tests {
             "failed batch insert must not leave partial data"
         );
     }
+
+    #[tokio::test]
+    async fn get_by_workspace_excludes_edges_of_trashed_nodes() {
+        let pool = memory_pool().await;
+        run_migrations(&pool).await.unwrap();
+        insert_node(&pool, "a").await;
+        insert_node(&pool, "b").await;
+        edges::create(&pool, &edge("e1", "a", "b", "wikilink", 1))
+            .await
+            .unwrap();
+
+        assert_eq!(edges::get_by_workspace(&pool, None).await.unwrap().len(), 1);
+
+        nodes::soft_delete(&pool, "b").await.unwrap();
+
+        assert!(
+            edges::get_by_workspace(&pool, None)
+                .await
+                .unwrap()
+                .is_empty(),
+            "edges of soft-deleted nodes must not be returned"
+        );
+    }
+
+    #[tokio::test]
+    async fn cleanup_orphans_removes_edges_of_trashed_nodes() {
+        let pool = memory_pool().await;
+        run_migrations(&pool).await.unwrap();
+        insert_node(&pool, "a").await;
+        insert_node(&pool, "b").await;
+        insert_node(&pool, "c").await;
+        edges::create(&pool, &edge("e1", "a", "b", "wikilink", 1))
+            .await
+            .unwrap();
+        edges::create(&pool, &edge("e2", "a", "c", "related", 2))
+            .await
+            .unwrap();
+
+        nodes::soft_delete(&pool, "b").await.unwrap();
+
+        let removed = edges::cleanup_orphans(&pool).await.unwrap();
+        assert_eq!(removed, 1, "only the edge to the trashed node is removed");
+
+        let remaining = edges::get_all(&pool).await.unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, "e2");
+    }
 }

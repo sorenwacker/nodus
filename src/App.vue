@@ -155,7 +155,7 @@ const edgesStore = useEdgesStore()
 const mcpServer = useMcpServer({
   store: {
     getFilteredNodes: () => store.filteredNodes,
-    getFilteredEdges: () => edgesStore.edges,
+    getFilteredEdges: () => store.graphEdges,
     getNode: store.getNode,
     createNode: store.createNode,
     updateNodeContent: store.updateNodeContent,

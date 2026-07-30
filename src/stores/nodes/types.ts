@@ -55,6 +55,7 @@ export interface NodeStoreComputed {
   selectedNode: ComputedRef<Node | undefined>
   filteredNodes: ComputedRef<Node[]>
   filteredEdges: ComputedRef<Edge[]>
+  graphEdges: ComputedRef<Edge[]>
   filteredFrames: ComputedRef<Frame[]>
   storylines: ComputedRef<Storyline[]>
   storylineNodes: ComputedRef<Map<string, StorylineNode[]>>

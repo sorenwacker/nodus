@@ -17,7 +17,8 @@ pub struct Edge {
     pub directed: bool,
 }
 
-/// Get edges filtered by workspace (both source and target nodes must be in workspace)
+/// Get edges filtered by workspace (both source and target nodes must be
+/// live, non-deleted members of the workspace)
 pub async fn get_by_workspace(
     pool: &DbPool,
     workspace_id: Option<&str>,
@@ -30,6 +31,7 @@ pub async fn get_by_workspace(
                 INNER JOIN nodes n1 ON e.source_node_id = n1.id
                 INNER JOIN nodes n2 ON e.target_node_id = n2.id
                 WHERE n1.workspace_id = ? AND n2.workspace_id = ?
+                AND n1.deleted_at IS NULL AND n2.deleted_at IS NULL
                 "#,
             )
             .bind(ws_id)
@@ -44,6 +46,7 @@ pub async fn get_by_workspace(
                 INNER JOIN nodes n1 ON e.source_node_id = n1.id
                 INNER JOIN nodes n2 ON e.target_node_id = n2.id
                 WHERE n1.workspace_id IS NULL AND n2.workspace_id IS NULL
+                AND n1.deleted_at IS NULL AND n2.deleted_at IS NULL
                 "#,
             )
             .fetch_all(pool)
@@ -238,13 +241,13 @@ pub async fn merge_bidirectional_wikilinks(pool: &DbPool) -> Result<u64, Databas
     Ok(delete_result.rows_affected())
 }
 
-/// Remove orphan edges (edges pointing to non-existent nodes)
+/// Remove orphan edges (edges pointing to non-existent or trashed nodes)
 pub async fn cleanup_orphans(pool: &DbPool) -> Result<u64, DatabaseError> {
     let result = sqlx::query(
         r#"
         DELETE FROM edges
-        WHERE source_node_id NOT IN (SELECT id FROM nodes)
-           OR target_node_id NOT IN (SELECT id FROM nodes)
+        WHERE source_node_id NOT IN (SELECT id FROM nodes WHERE deleted_at IS NULL)
+           OR target_node_id NOT IN (SELECT id FROM nodes WHERE deleted_at IS NULL)
         "#,
     )
     .execute(pool)

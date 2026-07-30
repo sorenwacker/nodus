@@ -105,6 +105,16 @@ export function createComputedProperties(
     })
   })
 
+  // Edges whose endpoints both exist in the current workspace, ignoring the
+  // category visibility toggles: the graph as data (MCP, analytics), as
+  // opposed to filteredEdges, the graph as displayed on the canvas
+  const graphEdges = computed(() => {
+    const nodeIds = new Set(filteredNodes.value.map(n => n.id))
+    return edgesStore.edges.filter(
+      e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
+    )
+  })
+
   // Storylines are managed by separate store - expose computed for compatibility
   const storylines = computed(() => storylinesStore.storylines)
   const storylineNodes = computed(() => storylinesStore.storylineNodes)
@@ -121,6 +131,7 @@ export function createComputedProperties(
     selectedNode,
     filteredNodes,
     filteredEdges,
+    graphEdges,
     filteredFrames,
     storylines,
     storylineNodes,
