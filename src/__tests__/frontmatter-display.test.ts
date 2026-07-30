@@ -1,8 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import en from '../i18n/locales/en.json'
-import { stripFrontmatter, splitFrontmatter, joinFrontmatter } from '../lib/contentParser'
+import {
+  stripFrontmatter,
+  splitFrontmatter,
+  joinFrontmatter,
+  upsertFrontmatterField,
+} from '../lib/contentParser'
 import { renderMarkdown } from '../services/MarkdownRenderService'
 import { useNodeEditor } from '../canvas/composables/nodes/useNodeEditor'
 import CanvasNodeCard from '../canvas/components/CanvasNodeCard.vue'
@@ -19,6 +25,23 @@ describe('stripFrontmatter', () => {
 
   it('leaves an unterminated block untouched', () => {
     expect(stripFrontmatter('---\nbroken yaml')).toBe('---\nbroken yaml')
+  })
+
+  it('upserts, replaces, and removes frontmatter fields', () => {
+    // Creates the block on plain content
+    expect(upsertFrontmatterField('Body text', 'date', '20 BC')).toBe(
+      '---\ndate: 20 BC\n---\nBody text'
+    )
+    // Replaces an existing value, keeping other fields
+    expect(
+      upsertFrontmatterField('---\ndate: 100\ntags:\n  - a\n---\nBody', 'date', '200')
+    ).toBe('---\ntags:\n  - a\ndate: 200\n---\nBody')
+    // Adds a second field
+    expect(upsertFrontmatterField('---\ndate: 100\n---\nBody', 'date_end', '900')).toBe(
+      '---\ndate: 100\ndate_end: 900\n---\nBody'
+    )
+    // Removing the last field drops the block entirely
+    expect(upsertFrontmatterField('---\ndate: 100\n---\nBody', 'date', null)).toBe('Body')
   })
 
   it('split and join round-trip content exactly', () => {
@@ -139,7 +162,7 @@ describe('CanvasNodeCard tag chips', () => {
         nodeSearchMatchCount: 0,
         nodeSearchIndex: 0,
       },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, createPinia()] },
     })
   }
 
@@ -186,7 +209,7 @@ describe('CanvasNodeCard tag chips', () => {
         nodeSearchMatchCount: 0,
         nodeSearchIndex: 0,
       },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, createPinia()] },
     })
     expect(wrapper.find('.node-date-chip').text()).toBe('800 – 1800')
     expect(wrapper.find('.node-status-chip').text()).toBe('draft')

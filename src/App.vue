@@ -66,9 +66,17 @@ const canvasRightInset = computed(() => {
   return '0px'
 })
 
+// The timelines sheet is only as tall as its lanes need, capped at 45%
+const timelinesSheetHeight = computed(() => {
+  const laneCount = Math.max(1, storylinesStore.filteredStorylines.length)
+  // header + axis + lanes + padding and scrollbar allowance
+  const contentPx = 52 + 34 + 8 + 14 + laneCount * 52
+  return `min(${contentPx}px, 45vh)`
+})
+
 // Bottom overlays (zoom controls) shift up over the timelines sheet
 const canvasBottomInset = computed(() =>
-  showTimelines.value && !readerStorylineId.value ? '45%' : '0px'
+  showTimelines.value && !readerStorylineId.value ? timelinesSheetHeight.value : '0px'
 )
 
 function openReader(id: string) {
@@ -876,7 +884,11 @@ async function openFolderDialog() {
       </div>
       <!-- Timelines: all storylines as lanes, sliding up from the bottom -->
       <Transition name="sheet-slide">
-        <div v-if="showTimelines && !readerStorylineId" class="timelines-overlay">
+        <div
+          v-if="showTimelines && !readerStorylineId"
+          class="timelines-overlay"
+          :style="{ height: timelinesSheetHeight }"
+        >
           <StorylineTimelines
             @open-reader="openReader"
             @close="showTimelines = false"

@@ -3,9 +3,11 @@
  * CanvasNodeCard - Individual node card component
  * Handles rendering of node content, title editing, and resize handles
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EntityBadge from '../../components/EntityBadge.vue'
+import { useNodesStore } from '../../stores/nodes'
+import { upsertFrontmatterField } from '../../lib/contentParser'
 import type { Node as EntityNode, EntityNodeType } from '../../types'
 import { ENTITY_NODE_TYPES } from '../../types'
 import { nodeDisplayTitle } from '../utils/nodeDisplayTitle'
@@ -156,12 +158,37 @@ const nodeStatus = computed<string | null>(() => {
   return status && status !== 'stable' ? status : null
 })
 
-const showMetaChips = computed(() =>
-  !isTagNode.value &&
-  !props.isCollapsed &&
-  !props.isEditing &&
-  (nodeTags.value.length > 0 || nodeDate.value !== null || nodeStatus.value !== null)
+const showMetaChips = computed(
+  () =>
+    !isTagNode.value &&
+    !props.isCollapsed &&
+    !props.isEditing &&
+    (nodeTags.value.length > 0 ||
+      nodeDate.value !== null ||
+      nodeStatus.value !== null ||
+      props.isSelected)
 )
+
+// Inline date editor: writes date/date_end into the metadata header
+const nodesStore = useNodesStore()
+const showDateEditor = ref(false)
+const dateInput = ref('')
+const dateEndInput = ref('')
+
+function openDateEditor() {
+  const content = props.node.markdown_content || ''
+  dateInput.value = extractFrontmatterField(content, 'date') || ''
+  dateEndInput.value = extractFrontmatterField(content, 'date_end') || ''
+  showDateEditor.value = true
+}
+
+async function saveDate() {
+  let content = props.node.markdown_content || ''
+  content = upsertFrontmatterField(content, 'date', dateInput.value || null)
+  content = upsertFrontmatterField(content, 'date_end', dateEndInput.value || null)
+  showDateEditor.value = false
+  await nodesStore.updateNodeContent(props.node.id, content)
+}
 </script>
 
 <template>
@@ -259,10 +286,39 @@ const showMetaChips = computed(() =>
     <!-- eslint-enable vue/no-v-html -->
 
     <!-- Metadata chips footer (OKF frontmatter surfaces here, not as text) -->
-    <div v-if="showMetaChips" class="node-tag-footer">
+    <div v-if="showMetaChips" class="node-tag-footer" @pointerdown.stop @dblclick.stop>
       <span v-if="nodeStatus" class="node-status-chip" :data-status="nodeStatus">{{ nodeStatus }}</span>
-      <span v-if="nodeDate" class="node-date-chip">{{ nodeDate }}</span>
+      <button
+        v-if="nodeDate || isSelected"
+        class="node-date-chip"
+        :class="{ ghost: !nodeDate }"
+        :data-tooltip="t('canvas.node.setDate')"
+        @click.stop="openDateEditor"
+      >
+        {{ nodeDate || `+ ${t('canvas.node.setDate')}` }}
+      </button>
       <span v-for="tag in nodeTags" :key="tag" class="node-tag-chip">#{{ tag }}</span>
+    </div>
+
+    <!-- Inline date editor -->
+    <div v-if="showDateEditor" class="date-editor" @pointerdown.stop @dblclick.stop>
+      <input
+        v-model.trim="dateInput"
+        type="text"
+        class="date-editor-input"
+        :placeholder="t('canvas.node.datePlaceholder')"
+        @keydown.enter="saveDate"
+        @keydown.escape="showDateEditor = false"
+      />
+      <input
+        v-model.trim="dateEndInput"
+        type="text"
+        class="date-editor-input"
+        :placeholder="t('canvas.node.dateEndPlaceholder')"
+        @keydown.enter="saveDate"
+        @keydown.escape="showDateEditor = false"
+      />
+      <button class="date-editor-save" @click.stop="saveDate">{{ t('common.save') }}</button>
     </div>
 
     <!-- Entity badges footer -->
@@ -333,6 +389,51 @@ const showMetaChips = computed(() =>
   border-radius: 8px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.node-date-chip:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.node-date-chip.ghost {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.date-editor {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+}
+
+.date-editor-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.date-editor-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.date-editor-save {
+  padding: 3px 8px;
+  font-size: 11px;
+  border: none;
+  border-radius: 4px;
+  background: var(--primary-color);
+  color: white;
+  cursor: pointer;
 }
 
 .node-status-chip {

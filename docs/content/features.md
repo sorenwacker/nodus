@@ -32,6 +32,7 @@ YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treate
 
 - The block is hidden from rendered cards, and all editors (inline, fullscreen, preview panel) show only the body — the metadata header survives every edit untouched
 - Its fields surface as chips on the node card: tags, the date (or date range), and the OKF lifecycle `status` when it is `draft` or `deprecated` (`stable` is the silent default)
+- Click the date chip (or the "+ Set date" chip on a selected node) to set or change the node's `date` and `date_end` in place — no YAML editing needed
 - Title and tags from frontmatter also feed the node record during vault sync
 
 ### Frames

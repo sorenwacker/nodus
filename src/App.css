@@ -324,7 +324,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 45%;
+  /* Height set inline: fits the lanes, capped at 45% of the window */
   z-index: 61;
   border-top: 1px solid var(--border-default);
   overflow: hidden;

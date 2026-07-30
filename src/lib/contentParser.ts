@@ -62,6 +62,30 @@ export function stripFrontmatter(content: string): string {
   return splitFrontmatter(content).body
 }
 
+/**
+ * Set, replace, or remove (value null) a scalar field in the frontmatter
+ * block, creating or dropping the block as needed. Returns the new content.
+ */
+export function upsertFrontmatterField(
+  content: string,
+  field: string,
+  value: string | null
+): string {
+  const { frontmatter, body } = splitFrontmatter(content)
+  const fieldRe = new RegExp(`^${field}:.*$`)
+
+  const lines = frontmatter
+    ? frontmatter.split('\n').slice(1, -2) // strip delimiters and trailing newline
+    : []
+  const kept = lines.filter(line => !fieldRe.test(line))
+  if (value !== null && value.trim() !== '') {
+    kept.push(`${field}: ${value.trim()}`)
+  }
+
+  if (kept.length === 0) return body
+  return `---\n${kept.join('\n')}\n---\n${body}`
+}
+
 export function extractWikilinks(content: string): Set<string> {
   const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
   const links = new Set<string>()
