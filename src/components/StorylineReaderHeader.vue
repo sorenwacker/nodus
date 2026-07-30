@@ -24,6 +24,11 @@ defineEmits<{
 <template>
   <header class="reader-header">
     <div class="header-left">
+      <h1 class="reader-title">{{ title || t('storyline.loading') }}</h1>
+    </div>
+    <div class="header-right">
+      <span class="page-indicator" aria-live="polite">{{ activeIndex + 1 }} / {{ nodeCount }}</span>
+      <!-- Contents toggle sits on the right, matching the sidebar it toggles -->
       <button
         class="toc-toggle"
         :title="t('storyline.toggleContents')"
@@ -32,10 +37,6 @@ defineEmits<{
       >
         <Icon name="menu" :size="18" />
       </button>
-      <h1 class="reader-title">{{ title || t('storyline.loading') }}</h1>
-    </div>
-    <div class="header-right">
-      <span class="page-indicator" aria-live="polite">{{ activeIndex + 1 }} / {{ nodeCount }}</span>
       <button
         v-if="hasEntities"
         class="entity-toggle"
