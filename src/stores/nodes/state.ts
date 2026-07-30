@@ -27,6 +27,8 @@ export function createState(): NodeStoreState {
     showStorylineEdges: ref(true),
     showWikilinkEdges: ref(true),
     showTagEdges: ref(true),
+    // Shared hover bus: canvas and timelines highlight each other's hovered node
+    hoverHighlightNodeId: ref<string | null>(null),
   }
 }
 

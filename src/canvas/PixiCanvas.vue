@@ -781,6 +781,11 @@ const {
   setExternalHover,
 } = nodeHover
 
+// Mirror canvas hover onto the shared bus so the timelines highlight it too
+watch(hoveredNode, (n) => {
+  store.hoverHighlightNodeId = n?.id ?? null
+})
+
 // Context menu composable
 const contextMenu = useContextMenu({
   getSelectedNodeIds: () => store.selectedNodeIds,

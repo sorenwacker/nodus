@@ -2,9 +2,10 @@
 
 All notable changes to Nodus are documented in this file.
 
-## [Unreleased]
+## [1.1.0-rc.1] - 2026-07-30
 
 ### Added
+- Canvas and timelines are cross-linked: hovering a node highlights its timeline mark and vice versa, and clicking a timeline mark selects the node (opening the preview at low zoom, like a canvas click) and zooms to it. Tags are also editable in the preview panel, which works at any zoom level
 - Tags are editable on the card: a selected node's chips gain remove buttons and a "+ #" chip adds tags; tag nodes and tagged edges are a toggleable canvas layer, and all edge-filter toggles moved from the toolbar to a cluster on the canvas beside the content they filter
 - MCP node tools understand metadata: create_node and update_node accept `date`, `date_end` (written as frontmatter, empty string clears), and `tags`; node reads expose the date fields directly so agents can build timelines without parsing YAML
 - Storylines can be reordered by dragging their rows in the overview, with the same pointer-drag mechanism as node reordering (extracted into one shared composable); the order persists and the timelines lanes follow it. The overview also shortens above an open timelines sheet instead of overlapping it

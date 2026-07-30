@@ -95,6 +95,36 @@ function saveDate() {
   }
 }
 
+// Tag editor (same store method as the card chips and MCP)
+const showTagInput = ref(false)
+const tagInput = ref('')
+
+const nodeTags = computed<string[]>(() => {
+  const raw = store.getNode(props.nodeId)?.tags
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+})
+
+async function addTag() {
+  const tag = tagInput.value.replace(/^#/, '').trim()
+  tagInput.value = ''
+  showTagInput.value = false
+  if (!tag || nodeTags.value.includes(tag)) return
+  await store.updateNodeTags(props.nodeId, [...nodeTags.value, tag])
+}
+
+async function removeTag(tag: string) {
+  await store.updateNodeTags(
+    props.nodeId,
+    nodeTags.value.filter(existing => existing !== tag)
+  )
+}
+
 function startEditing() {
   const { frontmatter, body } = splitFrontmatter(props.rawContent)
   editingFrontmatter = frontmatter
@@ -309,6 +339,30 @@ function stopNodeAgent() {
           />
           <button class="preview-date-save" @click="saveDate">{{ t('common.save') }}</button>
         </template>
+
+        <!-- Tags: chips with remove, plus add input -->
+        <span v-for="tag in nodeTags" :key="tag" class="preview-tag-chip">
+          #{{ tag }}
+          <button class="preview-tag-remove" @click="removeTag(tag)">&times;</button>
+        </span>
+        <input
+          v-if="showTagInput"
+          v-model.trim="tagInput"
+          type="text"
+          class="preview-date-input preview-tag-input"
+          :placeholder="t('canvas.node.addTagPlaceholder')"
+          @keydown.enter="addTag"
+          @keydown.escape="showTagInput = false"
+          @blur="addTag"
+        />
+        <button
+          v-else
+          class="preview-date-chip ghost"
+          :data-tooltip="t('canvas.node.addTag')"
+          @click="showTagInput = true"
+        >
+          + #
+        </button>
       </div>
 
       <!-- AI toolbar -->

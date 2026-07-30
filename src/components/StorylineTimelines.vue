@@ -201,19 +201,29 @@ const lanes = computed<Lane[]>(() => {
 })
 
 // One tool: bead hovers drive the canvas's own hover tooltip via the same
-// events the storyline panel uses
+// events the storyline panel uses; the shared bus highlights the node both
+// on the canvas and here
 function hoverNode(nodeId: string) {
   const node = store.getNode(nodeId)
   if (node) {
     window.dispatchEvent(new CustomEvent('storyline-node-hover', { detail: { node } }))
+    store.hoverHighlightNodeId = nodeId
   }
 }
 
 function hoverEnd() {
   window.dispatchEvent(new CustomEvent('storyline-node-hover-end'))
+  store.hoverHighlightNodeId = null
 }
 
 onUnmounted(hoverEnd)
+
+// Clicking a mark behaves like clicking the node on the canvas: it is
+// selected, which opens the preview panel at low zoom
+function openNode(nodeId: string) {
+  store.selectNode(nodeId)
+  window.dispatchEvent(new CustomEvent('zoom-to-node', { detail: { nodeId } }))
+}
 
 // Graph edges between nodes that both appear on the timelines, drawn as arcs
 const edgeLinks = computed(() => {
@@ -440,6 +450,7 @@ onMounted(() => {
               v-for="span in lane.spans"
               :key="`s${span.nodeId}`"
               class="lane-span"
+              :class="{ highlighted: store.hoverHighlightNodeId === span.nodeId }"
               :x="span.x1"
               :y="span.y - 5"
               :width="Math.max(4, span.x2 - span.x1)"
@@ -448,6 +459,7 @@ onMounted(() => {
               :style="{ fill: span.color }"
               @mouseenter="hoverNode(span.nodeId)"
               @mouseleave="hoverEnd"
+              @click.stop="openNode(span.nodeId)"
             />
             <!-- Beads with an oversized invisible hit target -->
             <g v-for="bead in lane.beads" :key="bead.nodeId">
@@ -458,9 +470,11 @@ onMounted(() => {
                 :r="HIT_RADIUS"
                 @mouseenter="hoverNode(bead.nodeId)"
                 @mouseleave="hoverEnd"
+                @click.stop="openNode(bead.nodeId)"
               />
               <circle
                 class="lane-bead"
+                :class="{ highlighted: store.hoverHighlightNodeId === bead.nodeId }"
                 :cx="bead.x"
                 :cy="bead.y"
                 :r="BEAD_RADIUS"
@@ -675,6 +689,16 @@ onMounted(() => {
   stroke-width: 2;
   pointer-events: none;
   transition: r 0.1s;
+}
+
+.lane-bead.highlighted {
+  r: 8;
+  stroke: var(--primary-color);
+}
+
+.lane-span.highlighted {
+  opacity: 1;
+  stroke: var(--primary-color);
 }
 
 .lane-hit:hover + .lane-bead {
