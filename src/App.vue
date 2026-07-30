@@ -68,10 +68,13 @@ const storylinePanel = usePanelReveal({
 // edge steps back. Detected via a capture-phase pointer listener because a
 // hot-zone div can be covered by canvas overlays and never see the pointer.
 const lastReadStorylineId = ref<string | null>(null)
+const readerFullWidth = ref(false)
+const panelVisible = computed(() => storylinePanel.isOpen.value && !readerStorylineId.value)
 
 function openReader(id: string) {
   readerStorylineId.value = id
   lastReadStorylineId.value = id
+  readerFullWidth.value = false
 }
 
 function openReaderFromEdge() {
@@ -81,11 +84,13 @@ function openReaderFromEdge() {
   openReader(remembered ? remembered.id : candidates[0].id)
 }
 
+// Steps: graph -> overview -> half-screen reader -> full-screen reader
 const edgeStepper = createEdgeStepper({
   threshold: 12,
   stepRight: () => {
-    if (readerStorylineId.value) return
-    if (!storylinePanel.isOpen.value) {
+    if (readerStorylineId.value) {
+      readerFullWidth.value = true
+    } else if (!storylinePanel.isOpen.value) {
       storylinePanel.onEdgeEnter()
     } else {
       openReaderFromEdge()
@@ -93,8 +98,12 @@ const edgeStepper = createEdgeStepper({
   },
   stepLeft: () => {
     if (readerStorylineId.value) {
-      readerStorylineId.value = null
-      storylinePanel.onEdgeEnter()
+      if (readerFullWidth.value) {
+        readerFullWidth.value = false
+      } else {
+        readerStorylineId.value = null
+        storylinePanel.onEdgeEnter()
+      }
       return
     }
     if (storylinePanel.isOpen.value) {
@@ -818,17 +827,17 @@ async function openFolderDialog() {
         :class="{ 'with-reader': readerStorylineId }"
         @mouseenter="storylinePanel.onPanelLeave"
       />
-      <!-- Storyline panel slides in from the right; hidden when reader is open -->
+      <!-- Storyline panel slides in from the right; collapsed (but kept
+           mounted, so accordion state survives) while the reader is open -->
       <div
-        v-if="!readerStorylineId"
         ref="storylineRevealRef"
         class="storyline-reveal"
         :class="{ resizing: storylinePanel.resizing.value }"
-        :style="{ width: storylinePanel.isOpen.value ? storylinePanel.width.value + 'px' : '0px' }"
+        :style="{ width: panelVisible ? storylinePanel.width.value + 'px' : '0px' }"
         @mouseleave="storylinePanel.onPanelLeave"
       >
         <div
-          v-if="storylinePanel.isOpen.value"
+          v-if="panelVisible"
           class="panel-resizer"
           @pointerdown="storylinePanel.beginResize"
         ></div>
@@ -840,6 +849,7 @@ async function openFolderDialog() {
       <StorylineReader
         v-if="readerStorylineId"
         :storyline-id="readerStorylineId"
+        :full-width="readerFullWidth"
         @close="readerStorylineId = null"
       />
     </main>

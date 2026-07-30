@@ -24,6 +24,8 @@ const { t } = useI18n()
 
 const props = defineProps<{
   storylineId: string
+  /** Full window width (deepest step); false keeps the graph visible at half */
+  fullWidth?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -46,9 +48,18 @@ function openNodeDetail(nodeId: string) {
   window.dispatchEvent(new CustomEvent('open-node-detail', { detail: { nodeId } }))
 }
 
-// Resizable width; read mode takes the full window until resized
-const readerWidth = ref(window.innerWidth)
+// Resizable width, driven by the step navigation: half screen keeps the
+// graph visible, full width takes the whole window. Manual dragging still
+// overrides until the next step.
+const readerWidth = ref(props.fullWidth ? window.innerWidth : Math.round(window.innerWidth / 2))
 const isResizing = ref(false)
+
+watch(
+  () => props.fullWidth,
+  (full) => {
+    readerWidth.value = full ? window.innerWidth : Math.round(window.innerWidth / 2)
+  }
+)
 
 function startResize(e: PointerEvent) {
   isResizing.value = true
@@ -529,10 +540,12 @@ watch(() => props.storylineId, loadStoryline)
   overscroll-behavior: contain;
 }
 
+/* Contents live on the right, matching the storylines-on-the-right model */
 .toc-sidebar {
   width: 260px;
+  order: 3;
   background: var(--bg-surface);
-  border-right: 1px solid var(--border-default);
+  border-left: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;

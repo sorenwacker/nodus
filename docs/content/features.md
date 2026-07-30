@@ -108,8 +108,10 @@ Create linear narratives through your knowledge graph:
 Moving between graph and storylines works in steps along the screen edges: each push of the pointer against the right edge goes one step deeper into storylines, each push against the left edge steps back toward the graph.
 
 - Push right once: the storyline overview slides open on the right
-- Push right again: the reader opens in full width, showing the last-read storyline (the first storyline initially); drag its left handle to shrink it and reveal the graph
-- Push left: the reader steps back to the overview, and the overview steps back to the plain graph
+- Push right again: the reader opens at half the window, keeping the graph visible, with the last-read storyline (the first storyline initially)
+- Push right a third time: the reader expands to the full window
+- Push left: each push steps back down — full reader to half, half to the overview, overview to the plain graph
+- The reader's left handle still resizes it freely between steps
 - Moving the pointer from the open panel onto the canvas also closes it, unless it is pinned via the toolbar book button
 - Clicking a storyline row opens it in reader mode; the chevron on the row expands its ordered nodes inline instead
 - Several storylines can have their item lists expanded at once
