@@ -150,11 +150,15 @@ pub async fn update_storyline_and_color(
     Ok(())
 }
 
-pub async fn get_edges_from_node(pool: &DbPool, node_id: &str) -> Result<Vec<Edge>, DatabaseError> {
-    let edges = sqlx::query_as::<_, Edge>("SELECT * FROM edges WHERE source_node_id = ?")
-        .bind(node_id)
-        .fetch_all(pool)
-        .await?;
+/// Get all edges touching a node, as source or as target
+pub async fn get_edges_for_node(pool: &DbPool, node_id: &str) -> Result<Vec<Edge>, DatabaseError> {
+    let edges = sqlx::query_as::<_, Edge>(
+        "SELECT * FROM edges WHERE source_node_id = ? OR target_node_id = ?",
+    )
+    .bind(node_id)
+    .bind(node_id)
+    .fetch_all(pool)
+    .await?;
     Ok(edges)
 }
 

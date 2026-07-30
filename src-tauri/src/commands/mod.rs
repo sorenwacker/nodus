@@ -13,6 +13,7 @@ mod storylines;
 mod themes;
 mod vault_watcher;
 mod web_search;
+mod wikilinks;
 mod workspaces;
 
 use crate::database;
@@ -31,6 +32,7 @@ pub use storylines::*;
 pub use themes::*;
 pub use vault_watcher::*;
 pub use web_search::*;
+pub use wikilinks::*;
 pub use workspaces::*;
 
 /// Global watcher state

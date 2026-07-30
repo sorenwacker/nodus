@@ -177,232 +177,9 @@ pub async fn create_node_from_file(
 
     // Create edges for wikilinks
     let links = import_helpers::extract_wikilinks(&content);
-    sync_wikilinks_for_node(pool, &node_id, &links).await?;
+    super::wikilinks::sync_wikilinks_for_node(pool, &node_id, &links).await?;
 
     Ok(node)
-}
-
-/// Sync wikilinks for a node - creates edges for new links
-#[tauri::command]
-pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-
-    let node = database::nodes::get_by_id(pool, &node_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or("Node not found")?;
-
-    let content = node.markdown_content.unwrap_or_default();
-    let links = import_helpers::extract_wikilinks(&content);
-
-    let created = sync_wikilinks_for_node(pool, &node_id, &links).await?;
-
-    // Merge any bidirectional edges that were created
-    let _ = database::edges::merge_bidirectional_wikilinks(pool).await;
-
-    Ok(created)
-}
-
-/// Sync all wikilinks for all nodes in a workspace
-/// Reads from files when available (not just database content) to ensure accurate sync
-#[tauri::command]
-pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-
-    let all_nodes = database::nodes::get_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Build title map ONCE for all nodes (performance optimization)
-    let title_to_id = build_title_to_id_map(&all_nodes);
-    println!(
-        "[SyncWikilinks] Built title map with {} entries",
-        title_to_id.len()
-    );
-
-    let mut total_created = 0;
-    let mut total_removed = 0;
-    let mut processed = 0;
-
-    for node in &all_nodes {
-        // Filter by workspace if specified
-        if let Some(ref ws_id) = workspace_id {
-            if node.workspace_id.as_ref() != Some(ws_id) {
-                continue;
-            }
-        }
-
-        // Read from file if available (more accurate than database content)
-        let (content, _source) = if let Some(ref file_path) = node.file_path {
-            match std::fs::read_to_string(file_path) {
-                Ok(c) => (c, "file"),
-                Err(_) => (
-                    node.markdown_content.clone().unwrap_or_default(),
-                    "db-fallback",
-                ),
-            }
-        } else {
-            (node.markdown_content.clone().unwrap_or_default(), "db")
-        };
-        let links = import_helpers::extract_wikilinks(&content);
-
-        // Sync wikilinks (add new, remove old)
-        match sync_wikilinks_for_node_with_map(pool, &node.id, &links, &title_to_id).await {
-            Ok((created, removed)) => {
-                total_created += created;
-                total_removed += removed;
-            }
-            Err(e) => eprintln!("Failed to sync wikilinks for {}: {}", node.title, e),
-        }
-
-        processed += 1;
-        if processed % 50 == 0 {
-            println!(
-                "[SyncWikilinks] Processed {}/{} nodes...",
-                processed,
-                all_nodes.len()
-            );
-        }
-    }
-
-    // Merge bidirectional wikilinks into single undirected edges
-    let merged = database::edges::merge_bidirectional_wikilinks(pool)
-        .await
-        .unwrap_or(0);
-
-    println!(
-        "[SyncWikilinks] Done: {} created, {} removed, {} merged for workspace {:?}",
-        total_created, total_removed, merged, workspace_id
-    );
-    Ok(total_created)
-}
-
-/// Build title-to-id map for wikilink resolution
-pub(crate) fn build_title_to_id_map(nodes: &[Node]) -> std::collections::HashMap<String, String> {
-    let mut title_to_id: std::collections::HashMap<String, String> =
-        std::collections::HashMap::new();
-    for node in nodes {
-        // Map by title
-        title_to_id.insert(node.title.to_lowercase(), node.id.clone());
-
-        // Also map by relative path (e.g., "concepts/FAIR-Digital-Objects")
-        if let Some(ref file_path) = node.file_path {
-            if let Some(stem) = std::path::Path::new(file_path).file_stem() {
-                let stem_str = stem.to_string_lossy().to_lowercase();
-                if let Some(parent) = std::path::Path::new(file_path).parent() {
-                    if let Some(folder) = parent.file_name() {
-                        let folder_str = folder.to_string_lossy().to_lowercase();
-                        let path_key = format!("{}/{}", folder_str, stem_str);
-                        title_to_id.insert(path_key, node.id.clone());
-                    }
-                }
-            }
-        }
-    }
-    title_to_id
-}
-
-/// Helper to sync wikilinks for a node (uses pre-built title map for performance)
-/// Returns (created_count, removed_count)
-pub(crate) async fn sync_wikilinks_for_node_with_map(
-    pool: &database::DbPool,
-    source_id: &str,
-    links: &[String],
-    title_to_id: &std::collections::HashMap<String, String>,
-) -> Result<(usize, usize), String> {
-    // Get existing wikilink edges from this node
-    let existing_edges = database::edges::get_edges_from_node(pool, source_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let existing_wikilink_edges: Vec<_> = existing_edges
-        .iter()
-        .filter(|e| e.link_type == "wikilink")
-        .collect();
-
-    let existing_targets: std::collections::HashSet<String> = existing_wikilink_edges
-        .iter()
-        .map(|e| e.target_node_id.clone())
-        .collect();
-
-    // Process each link to get target IDs that SHOULD exist
-    let unique_links: std::collections::HashSet<String> = links
-        .iter()
-        .map(|l| {
-            let without_anchor = l.split('#').next().unwrap_or(l);
-            without_anchor.to_lowercase()
-        })
-        .collect();
-
-    // Resolve links to target IDs
-    let mut should_exist: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for link in &unique_links {
-        let target_id = title_to_id
-            .get(link)
-            .or_else(|| {
-                link.rsplit('/')
-                    .next()
-                    .and_then(|name| title_to_id.get(name))
-            })
-            .cloned();
-
-        if let Some(tid) = target_id {
-            if source_id != tid {
-                should_exist.insert(tid);
-            }
-        }
-    }
-
-    let now = chrono::Utc::now().timestamp();
-    let mut created_count = 0;
-    let mut removed_count = 0;
-
-    // Create new edges
-    for target_id in &should_exist {
-        if !existing_targets.contains(target_id) {
-            let edge = database::edges::Edge {
-                id: uuid::Uuid::new_v4().to_string(),
-                source_node_id: source_id.to_string(),
-                target_node_id: target_id.clone(),
-                label: None,
-                link_type: "wikilink".to_string(),
-                weight: 1.0,
-                color: None,
-                storyline_id: None,
-                created_at: now,
-                directed: true,
-            };
-            if database::edges::create(pool, &edge).await.is_ok() {
-                created_count += 1;
-            }
-        }
-    }
-
-    // Remove edges that no longer have corresponding wikilinks
-    for edge in &existing_wikilink_edges {
-        if !should_exist.contains(&edge.target_node_id)
-            && database::edges::delete(pool, &edge.id).await.is_ok()
-        {
-            removed_count += 1;
-        }
-    }
-
-    Ok((created_count, removed_count))
-}
-
-/// Helper for callers that don't have a pre-built title map
-pub(crate) async fn sync_wikilinks_for_node(
-    pool: &database::DbPool,
-    source_id: &str,
-    links: &[String],
-) -> Result<usize, String> {
-    let all_nodes = database::nodes::get_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-    let title_to_id = build_title_to_id_map(&all_nodes);
-    let (created, _removed) =
-        sync_wikilinks_for_node_with_map(pool, source_id, links, &title_to_id).await?;
-    Ok(created)
 }
 
 /// Create a file in the vault for a node
@@ -751,20 +528,27 @@ pub async fn update_node_content_from_file(
 #[tauri::command]
 pub async fn update_node_content(id: String, content: String) -> Result<Option<String>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+    update_node_content_impl(pool, &id, &content).await
+}
 
-    // Check if node has a file_path - if so, write to file with locking
-    if let Some(node) = database::nodes::get_by_id(pool, &id)
+pub(crate) async fn update_node_content_impl(
+    pool: &database::DbPool,
+    id: &str,
+    content: &str,
+) -> Result<Option<String>, String> {
+    // Write back to the backing file only while folder sync is active for it
+    if let Some(node) = database::nodes::get_by_id(pool, id)
         .await
         .map_err(|e| e.to_string())?
     {
         if let Some(ref file_path) = node.file_path {
             let path = std::path::Path::new(file_path);
-            if path.exists() {
+            if path.exists() && file_write_allowed(pool, &node, path).await {
                 // Write to file with exclusive lock and get new checksum
-                let checksum = write_file_locked(path, &content).map_err(|e| e.to_string())?;
+                let checksum = write_file_locked(path, content).map_err(|e| e.to_string())?;
 
                 // Update content and checksum in database
-                database::nodes::update_content_and_checksum(pool, &id, &content, &checksum)
+                database::nodes::update_content_and_checksum(pool, id, content, &checksum)
                     .await
                     .map_err(|e| e.to_string())?;
 
@@ -773,12 +557,41 @@ pub async fn update_node_content(id: String, content: String) -> Result<Option<S
         }
     }
 
-    // No file_path or file doesn't exist - just update database
-    database::nodes::update_content(pool, &id, &content)
+    // Sync off, no file_path, or file doesn't exist - just update database
+    database::nodes::update_content(pool, id, content)
         .await
         .map_err(|e| e.to_string())?;
 
     Ok(None)
+}
+
+/// A node's file may be rewritten only when a workspace with sync enabled
+/// covers it: the node's own workspace, or - for nodes without a workspace -
+/// any workspace whose vault contains the file.
+async fn file_write_allowed(pool: &database::DbPool, node: &Node, path: &std::path::Path) -> bool {
+    let Ok(file) = path.canonicalize() else {
+        return false;
+    };
+
+    let workspaces = match node.workspace_id.as_deref() {
+        Some(ws_id) => match database::workspaces::get_by_id(pool, ws_id).await {
+            Ok(Some(workspace)) => vec![workspace],
+            _ => return false,
+        },
+        None => match database::workspaces::get_all(pool).await {
+            Ok(workspaces) => workspaces,
+            _ => return false,
+        },
+    };
+
+    workspaces.iter().any(|workspace| {
+        workspace.sync_enabled
+            && workspace
+                .vault_path
+                .as_deref()
+                .and_then(|vault| std::path::Path::new(vault).canonicalize().ok())
+                .is_some_and(|vault| file.starts_with(&vault))
+    })
 }
 
 #[tauri::command]
@@ -1013,4 +826,141 @@ pub async fn update_node_tags(id: String, tags: Vec<String>) -> Result<(), Strin
     database::nodes::update_tags(pool, &id, &tags)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::DbPool;
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    async fn memory_pool() -> DbPool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory pool");
+        database::run_migrations(&pool).await.expect("migrations");
+        pool
+    }
+
+    async fn insert_workspace(pool: &DbPool, id: &str, vault_path: &str, sync_enabled: bool) {
+        let workspace = database::workspaces::Workspace {
+            id: id.to_string(),
+            name: id.to_string(),
+            color: None,
+            vault_path: Some(vault_path.to_string()),
+            sync_enabled,
+            created_at: 0,
+            updated_at: 0,
+        };
+        database::workspaces::create(pool, &workspace)
+            .await
+            .expect("insert workspace");
+    }
+
+    async fn insert_file_node(
+        pool: &DbPool,
+        id: &str,
+        file_path: &str,
+        workspace_id: Option<&str>,
+    ) {
+        let node = Node {
+            id: id.to_string(),
+            title: id.to_string(),
+            file_path: Some(file_path.to_string()),
+            markdown_content: Some("original".to_string()),
+            node_type: "note".to_string(),
+            canvas_x: 0.0,
+            canvas_y: 0.0,
+            width: 200.0,
+            height: 120.0,
+            z_index: 0,
+            frame_id: None,
+            color_theme: None,
+            is_collapsed: false,
+            tags: None,
+            workspace_id: workspace_id.map(|w| w.to_string()),
+            checksum: None,
+            created_at: 0,
+            updated_at: 0,
+            deleted_at: None,
+        };
+        database::nodes::create(pool, &node)
+            .await
+            .expect("insert node");
+    }
+
+    fn vault_with_file(content: &str) -> (tempfile::TempDir, String) {
+        let vault = tempfile::tempdir().unwrap();
+        let file = vault.path().join("note.md");
+        std::fs::write(&file, content).unwrap();
+        (vault, file.to_string_lossy().to_string())
+    }
+
+    #[tokio::test]
+    async fn sync_disabled_updates_database_only() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("original");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), false).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        let result = update_node_content_impl(&pool, "n", "changed")
+            .await
+            .unwrap();
+
+        assert_eq!(result, None, "no checksum: file must not be written");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
+        let node = database::nodes::get_by_id(&pool, "n")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(node.markdown_content.as_deref(), Some("changed"));
+    }
+
+    #[tokio::test]
+    async fn sync_enabled_writes_file_in_vault() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("original");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        let result = update_node_content_impl(&pool, "n", "changed")
+            .await
+            .unwrap();
+
+        assert!(result.is_some(), "checksum expected: file must be written");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "changed");
+    }
+
+    #[tokio::test]
+    async fn sync_enabled_ignores_file_outside_vault() {
+        let pool = memory_pool().await;
+        let vault = tempfile::tempdir().unwrap();
+        let (_outside_dir, file) = vault_with_file("original");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        let result = update_node_content_impl(&pool, "n", "changed")
+            .await
+            .unwrap();
+
+        assert_eq!(result, None);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
+    }
+
+    #[tokio::test]
+    async fn workspaceless_node_in_synced_vault_writes_file() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("original");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, None).await;
+
+        let result = update_node_content_impl(&pool, "n", "changed")
+            .await
+            .unwrap();
+
+        assert!(result.is_some());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "changed");
+    }
 }

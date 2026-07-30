@@ -8,8 +8,9 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
 
 use super::{
-    nodes::{build_title_to_id_map, sync_wikilinks_for_node, sync_wikilinks_for_node_with_map},
-    should_exclude_file, WatcherState,
+    should_exclude_file,
+    wikilinks::{build_title_to_id_map, sync_wikilinks_for_node, sync_wikilinks_for_node_with_map},
+    WatcherState,
 };
 
 // ============================================================================

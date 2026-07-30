@@ -102,7 +102,7 @@ async fn edges_has_multi_type_constraint(pool: &DbPool) -> Result<bool, Database
 }
 
 /// Run database migrations
-async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
+pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     // Create tables
     sqlx::query(include_str!("../../migrations/001_init.sql"))
         .execute(pool)
