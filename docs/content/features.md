@@ -101,6 +101,16 @@ Create linear narratives through your knowledge graph:
 - Export storylines as documents
 - Color-code storyline edges
 
+### Storyline Panel
+The storyline panel lists all storylines beside the canvas, on the left:
+
+- Move the pointer to the left edge of the window to slide the panel open; it closes again when the pointer returns to the canvas
+- The toolbar book button pins the panel open; click it again to unpin
+- Each storyline is a collapsible section, and several sections can be open at once, each showing its ordered nodes
+- Storyline titles wrap to at most two lines instead of being truncated
+- Drag the separator between panel and canvas to set the panel width; the width persists across sessions
+- Drag nodes from the canvas onto a storyline section to add them to that storyline
+
 ---
 
 ## Math with Typst

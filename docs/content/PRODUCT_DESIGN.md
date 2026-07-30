@@ -772,7 +772,7 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 - [x] Citation node type
 - [x] Drag citation → create linked node (BibTeX/CSL-JSON drop)
 - [x] Zotero collection → Frame mapping
-- [x] Direct Zotero library access (Settings > Zotero)
+- [x] Direct Zotero library access (Settings > Citations)
 - [ ] PDF import with highlights
 - [ ] PDF highlight → canvas node
 - [x] Typst math rendering (WASM)
@@ -910,23 +910,24 @@ Nodus supports multiple EU languages:
 
 ### Settings
 
-Settings modal with four tabs: General, Themes, Canvas, LLM.
+Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integrations.
 
 **General:**
 - Language selector (en, de, fr, es, it)
-- LLM Features toggle (show/hide AI prompts)
-- Workspace diagnostics (scan for node counts per workspace, recovery)
+- Collapsible About & License section
+- Collapsible Advanced section with workspace diagnostics (scan for node counts per workspace, recovery)
 
-**Themes:**
-- Theme selection grid (built-in + custom)
-- Delete custom themes
+**Appearance:**
+- Theme selection grid (built-in + custom), delete custom themes
+- Display options
 
 **Canvas:**
 - Snap to grid toggle
 - Grid size (px)
 - Edge style (straight, orthogonal, diagonal, curved, hyperbolic)
 
-**LLM:**
+**AI:**
+- LLM Features toggle (show/hide AI prompts)
 - Provider selection (Ollama, OpenAI, Anthropic, OpenAI-compatible)
 - Streaming toggle (optional)
 - API key, base URL, model selection
@@ -934,6 +935,13 @@ Settings modal with four tabs: General, Themes, Canvas, LLM.
 - Neighbor context limit
 - Web search API key (Tavily)
 - System prompt customization
+
+**Citations:**
+- Zotero connection (library access, collection import)
+- Citation import via BibTeX / CSL-JSON
+
+**Integrations:**
+- MCP server controls
 
 **Content Rules (System Prompt):**
 - Title = label, Content = substance
