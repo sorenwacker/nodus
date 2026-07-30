@@ -20,7 +20,8 @@ import {
   axisX,
   type AxisSegment,
 } from '../lib/timelineDates'
-import MarkdownContent from './MarkdownContent.vue'
+import CanvasHoverTooltip from '../canvas/components/CanvasHoverTooltip.vue'
+import { renderMarkdown } from '../services/MarkdownRenderService'
 
 const { t } = useI18n()
 
@@ -54,6 +55,17 @@ function laneColor(storylineId: string, userColor: string | null): string {
   return userColor || `var(--tl-cat-${fallbackHue(storylineId)})`
 }
 
+/** Node colors are soft background tints on the canvas; marks need them opaque */
+function solidColor(color: string | null | undefined): string | null {
+  if (!color) return null
+  const rgba = color.match(/^rgba?\(([^)]+)\)/)
+  if (rgba) {
+    const [r, g, b] = rgba[1].split(',').map(part => part.trim())
+    return `rgb(${r}, ${g}, ${b})`
+  }
+  return color
+}
+
 const storylines = computed(() => store.filteredStorylines)
 
 interface Lane {
@@ -62,13 +74,14 @@ interface Lane {
   color: string
   nodeCount: number
   y: number
-  beads: Array<{ nodeId: string; title: string; x: number; y: number; dateLabel: string | null }>
-  spans: Array<{ nodeId: string; title: string; x1: number; x2: number; y: number; dateLabel: string }>
+  beads: Array<{ nodeId: string; title: string; color: string; x: number; y: number; dateLabel: string | null }>
+  spans: Array<{ nodeId: string; title: string; color: string; x1: number; x2: number; y: number; dateLabel: string }>
 }
 
 interface LaneNode {
   nodeId: string
   title: string
+  color: string | null
   year: number | null
   yearEnd: number | null
   raw: string | null
@@ -88,6 +101,7 @@ const laneNodes = computed<Array<{ storylineId: string; nodes: LaneNode[] }>>(()
       return {
         nodeId,
         title: node?.title || 'Unknown',
+        color: solidColor(node?.color_theme),
         year: parseHistoricalDate(raw),
         yearEnd: parseHistoricalDate(rawEnd),
         raw,
@@ -152,6 +166,7 @@ const lanes = computed<Lane[]>(() => {
         .map(n => ({
           nodeId: n.nodeId,
           title: n.title,
+          color: n.color || base.color,
           x: yearToX(n.year!),
           y,
           dateLabel: n.raw ?? formatYear(n.year!),
@@ -159,6 +174,7 @@ const lanes = computed<Lane[]>(() => {
       spans: dated.filter(isSpan).map(n => ({
         nodeId: n.nodeId,
         title: n.title,
+        color: n.color || base.color,
         x1: yearToX(n.year!),
         x2: yearToX(n.yearEnd!),
         y,
@@ -168,12 +184,31 @@ const lanes = computed<Lane[]>(() => {
   })
 })
 
-// Hovered node preview (same rendered content as canvas previews)
+// Hovered node: shown with the same hover preview window as the canvas
 const hoveredPreview = ref<{ nodeId: string; title: string; dateLabel: string | null; x: number; y: number } | null>(null)
 
-const hoveredPreviewContent = computed(() =>
-  hoveredPreview.value ? store.getNode(hoveredPreview.value.nodeId)?.markdown_content || '' : ''
+const hoveredNode = computed(() =>
+  hoveredPreview.value ? store.getNode(hoveredPreview.value.nodeId) ?? null : null
 )
+
+const hoveredRenderedContent = computed(() =>
+  hoveredNode.value ? renderMarkdown(hoveredNode.value.markdown_content) : ''
+)
+
+const hoveredEdgeStats = computed(() => {
+  if (!hoveredPreview.value) return null
+  const id = hoveredPreview.value.nodeId
+  let incoming = 0
+  let outgoing = 0
+  let bidirectional = 0
+  for (const edge of store.filteredEdges) {
+    if (edge.source_node_id !== id && edge.target_node_id !== id) continue
+    if (edge.directed === false) bidirectional++
+    else if (edge.source_node_id === id) outgoing++
+    else incoming++
+  }
+  return { incoming, outgoing, bidirectional, total: incoming + outgoing + bidirectional }
+})
 
 // Graph edges between nodes that both appear on the timelines, drawn as arcs
 const edgeLinks = computed(() => {
@@ -397,7 +432,7 @@ onMounted(() => {
               :width="Math.max(4, span.x2 - span.x1)"
               height="10"
               rx="5"
-              :style="{ fill: lane.color }"
+              :style="{ fill: span.color }"
               @mouseenter="hoveredPreview = { nodeId: span.nodeId, title: span.title, dateLabel: span.dateLabel, x: span.x1, y: span.y }"
               @mouseleave="hoveredPreview = null"
             >
@@ -418,7 +453,7 @@ onMounted(() => {
                 :cx="bead.x"
                 :cy="bead.y"
                 :r="BEAD_RADIUS"
-                :style="{ fill: lane.color }"
+                :style="{ fill: bead.color }"
               >
                 <title>{{ bead.dateLabel ? `${bead.title} (${bead.dateLabel})` : bead.title }}</title>
               </circle>
@@ -426,20 +461,15 @@ onMounted(() => {
           </g>
         </svg>
 
-        <!-- Hover preview: same rendered content as canvas node previews -->
-        <div
-          v-if="hoveredPreview"
-          class="bead-preview"
-          :style="{ left: `${Math.max(8, hoveredPreview.x - 140)}px`, top: `${hoveredPreview.y + 16}px` }"
-        >
-          <div class="bead-preview-title">{{ hoveredPreview.title }}</div>
-          <div v-if="hoveredPreview.dateLabel" class="bead-preview-date">{{ hoveredPreview.dateLabel }}</div>
-          <MarkdownContent
-            v-if="hoveredPreviewContent"
-            class="bead-preview-content"
-            :content="hoveredPreviewContent"
-          />
-        </div>
+        <!-- Same hover preview window as the canvas -->
+        <CanvasHoverTooltip
+          :visible="hoveredPreview !== null"
+          :position="{ x: hoveredPreview?.x ?? 0, y: hoveredPreview?.y ?? 0 }"
+          :node="hoveredNode"
+          :content="hoveredNode?.markdown_content || ''"
+          :rendered-content="hoveredRenderedContent"
+          :edge-stats="hoveredEdgeStats"
+        />
       </div>
     </div>
   </div>
@@ -689,36 +719,6 @@ onMounted(() => {
   opacity: 0.3;
 }
 
-.bead-preview {
-  position: absolute;
-  width: 280px;
-  max-height: 220px;
-  overflow: hidden;
-  padding: 10px 12px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px var(--shadow-md);
-  pointer-events: none;
-  z-index: 5;
-}
-
-.bead-preview-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.bead-preview-date {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-
-.bead-preview-content {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
 </style>
 
 <style>
