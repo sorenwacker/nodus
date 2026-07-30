@@ -17,6 +17,7 @@ pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
     let links = import_helpers::extract_wikilinks(&content);
 
     let created = sync_wikilinks_for_node(pool, &node_id, &links).await?;
+    set_synced_hash(pool, &node_id, &crate::checksum::compute_string(&content)).await;
 
     // Merge any bidirectional edges that were created
     let _ = database::edges::merge_bidirectional_wikilinks(pool).await;
@@ -24,78 +25,177 @@ pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
     Ok(created)
 }
 
-/// Sync all wikilinks for all nodes in a workspace
-/// Reads from files when available (not just database content) to ensure accurate sync
-#[tauri::command]
-pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
+/// Record the content hash a node's wikilinks were last synced at, so the
+/// full pass can skip it while unchanged
+pub(crate) async fn set_synced_hash(pool: &database::DbPool, node_id: &str, hash: &str) {
+    let _ = sqlx::query("UPDATE nodes SET wikilink_synced_hash = ? WHERE id = ?")
+        .bind(hash)
+        .bind(node_id)
+        .execute(pool)
+        .await;
+}
+
+/// The normalized keys under which a node is reachable by wikilinks
+/// (lowercased title, and folder/stem for file nodes)
+pub(crate) fn node_link_keys(node: &Node) -> Vec<String> {
+    let mut keys = vec![node.title.to_lowercase()];
+    if let Some(ref file_path) = node.file_path {
+        let path = std::path::Path::new(file_path);
+        if let (Some(stem), Some(parent)) = (path.file_stem(), path.parent()) {
+            if let Some(folder) = parent.file_name() {
+                keys.push(format!(
+                    "{}/{}",
+                    folder.to_string_lossy().to_lowercase(),
+                    stem.to_string_lossy().to_lowercase()
+                ));
+            }
+        }
+    }
+    keys
+}
+
+/// Create edges for links elsewhere that dangled until this node appeared
+/// (called on node creation and rename). Returns created edge count.
+pub(crate) async fn resolve_pending_links_to(
+    pool: &database::DbPool,
+    node: &Node,
+) -> Result<usize, String> {
+    let keys = node_link_keys(node);
+    let mut sources: Vec<String> = Vec::new();
+    for key in &keys {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT DISTINCT source_node_id FROM pending_wikilinks WHERE target_key = ?",
+        )
+        .bind(key)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+        for (id,) in rows {
+            if !sources.contains(&id) && id != node.id {
+                sources.push(id);
+            }
+        }
+    }
+    if sources.is_empty() {
+        return Ok(0);
+    }
 
     let all_nodes = database::nodes::get_all(pool)
         .await
         .map_err(|e| e.to_string())?;
-
-    // Build title map ONCE for all nodes (performance optimization)
     let title_to_id = build_title_to_id_map(&all_nodes);
+    let mut created = 0;
+    for source_id in sources {
+        let Some(source) = all_nodes.iter().find(|n| n.id == source_id) else {
+            continue;
+        };
+        let content = source.markdown_content.clone().unwrap_or_default();
+        let links = import_helpers::extract_wikilinks(&content);
+        let (c, _) =
+            sync_wikilinks_for_node_with_map(pool, &source_id, &links, &title_to_id).await?;
+        created += c;
+    }
+    Ok(created)
+}
+
+/// Sync all wikilinks for all nodes in a workspace
+#[tauri::command]
+pub async fn sync_all_wikilinks(workspace_id: Option<String>) -> Result<usize, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let (created, _removed, processed, skipped) =
+        sync_workspace_wikilinks_impl(pool, workspace_id.as_deref()).await?;
     println!(
-        "[SyncWikilinks] Built title map with {} entries",
-        title_to_id.len()
+        "[SyncWikilinks] Done: {} created, {} synced, {} unchanged (skipped) for workspace {:?}",
+        created, processed, skipped, workspace_id
     );
+    Ok(created)
+}
+
+/// Incremental full pass: nodes whose content hash matches their last-synced
+/// hash are skipped without touching the filesystem or the edge table. The
+/// file watcher handles individual changes; this pass is the safety net.
+/// Returns (created, removed, processed, skipped).
+pub(crate) async fn sync_workspace_wikilinks_impl(
+    pool: &database::DbPool,
+    workspace_id: Option<&str>,
+) -> Result<(usize, usize, usize, usize), String> {
+    let all_nodes = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Last-synced hashes, fetched in one query
+    let synced_hashes: std::collections::HashMap<String, String> =
+        sqlx::query_as::<_, (String, Option<String>)>(
+            "SELECT id, wikilink_synced_hash FROM nodes WHERE wikilink_synced_hash IS NOT NULL",
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .filter_map(|(id, hash)| hash.map(|h| (id, h)))
+        .collect();
+
+    // Build title map lazily: only needed once a node actually syncs
+    let mut title_to_id: Option<std::collections::HashMap<String, String>> = None;
 
     let mut total_created = 0;
     let mut total_removed = 0;
     let mut processed = 0;
+    let mut skipped = 0;
 
     for node in &all_nodes {
-        // Filter by workspace if specified
-        if let Some(ref ws_id) = workspace_id {
-            if node.workspace_id.as_ref() != Some(ws_id) {
+        if let Some(ws_id) = workspace_id {
+            if node.workspace_id.as_deref() != Some(ws_id) {
                 continue;
             }
         }
 
-        // Read from file if available (more accurate than database content)
-        let (content, _source) = if let Some(ref file_path) = node.file_path {
-            match std::fs::read_to_string(file_path) {
-                Ok(c) => (c, "file"),
-                Err(_) => (
-                    node.markdown_content.clone().unwrap_or_default(),
-                    "db-fallback",
-                ),
+        // Cheap change check: the watcher keeps checksum current for file
+        // nodes; content-only nodes hash their stored content
+        let current_hash = match (&node.checksum, &node.markdown_content) {
+            (Some(checksum), _) => checksum.clone(),
+            (None, content) => {
+                crate::checksum::compute_string(content.as_deref().unwrap_or_default())
             }
+        };
+        if synced_hashes.get(&node.id) == Some(&current_hash) {
+            skipped += 1;
+            continue;
+        }
+
+        // Changed (or never synced): read the real content and sync
+        let content = if let Some(ref file_path) = node.file_path {
+            std::fs::read_to_string(file_path)
+                .unwrap_or_else(|_| node.markdown_content.clone().unwrap_or_default())
         } else {
-            (node.markdown_content.clone().unwrap_or_default(), "db")
+            node.markdown_content.clone().unwrap_or_default()
         };
         let links = import_helpers::extract_wikilinks(&content);
 
-        // Sync wikilinks (add new, remove old)
-        match sync_wikilinks_for_node_with_map(pool, &node.id, &links, &title_to_id).await {
+        let map = match &title_to_id {
+            Some(map) => map,
+            None => {
+                title_to_id = Some(build_title_to_id_map(&all_nodes));
+                title_to_id.as_ref().unwrap()
+            }
+        };
+        match sync_wikilinks_for_node_with_map(pool, &node.id, &links, map).await {
             Ok((created, removed)) => {
                 total_created += created;
                 total_removed += removed;
+                set_synced_hash(pool, &node.id, &current_hash).await;
             }
             Err(e) => eprintln!("Failed to sync wikilinks for {}: {}", node.title, e),
         }
-
         processed += 1;
-        if processed % 50 == 0 {
-            println!(
-                "[SyncWikilinks] Processed {}/{} nodes...",
-                processed,
-                all_nodes.len()
-            );
-        }
     }
 
-    // Merge bidirectional wikilinks into single undirected edges
-    let merged = database::edges::merge_bidirectional_wikilinks(pool)
-        .await
-        .unwrap_or(0);
+    // Merge bidirectional wikilinks only when something changed
+    if processed > 0 {
+        let _ = database::edges::merge_bidirectional_wikilinks(pool).await;
+    }
 
-    println!(
-        "[SyncWikilinks] Done: {} created, {} removed, {} merged for workspace {:?}",
-        total_created, total_removed, merged, workspace_id
-    );
-    Ok(total_created)
+    Ok((total_created, total_removed, processed, skipped))
 }
 
 /// Build title-to-id map for wikilink resolution
@@ -163,8 +263,10 @@ pub(crate) async fn sync_wikilinks_for_node_with_map(
         })
         .collect();
 
-    // Resolve links to target IDs
+    // Resolve links to target IDs; unresolved keys are remembered so the
+    // edge appears the moment a matching node is created or renamed
     let mut should_exist: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut unresolved: Vec<String> = Vec::new();
     for link in &unique_links {
         let target_id = title_to_id
             .get(link)
@@ -175,11 +277,29 @@ pub(crate) async fn sync_wikilinks_for_node_with_map(
             })
             .cloned();
 
-        if let Some(tid) = target_id {
-            if source_id != tid {
-                should_exist.insert(tid);
+        match target_id {
+            Some(tid) => {
+                if source_id != tid {
+                    should_exist.insert(tid);
+                }
             }
+            None => unresolved.push(link.clone()),
         }
+    }
+
+    // Replace this node's pending-link records with the current unresolved set
+    let _ = sqlx::query("DELETE FROM pending_wikilinks WHERE source_node_id = ?")
+        .bind(source_id)
+        .execute(pool)
+        .await;
+    for key in &unresolved {
+        let _ = sqlx::query(
+            "INSERT OR IGNORE INTO pending_wikilinks (source_node_id, target_key) VALUES (?, ?)",
+        )
+        .bind(source_id)
+        .bind(key)
+        .execute(pool)
+        .await;
     }
 
     let now = chrono::Utc::now().timestamp();
@@ -357,6 +477,111 @@ mod tests {
 
         assert_eq!((created, removed), (0, 0));
         assert_eq!(database::edges::get_all(&pool).await.unwrap().len(), 1);
+    }
+
+    async fn set_content(pool: &DbPool, id: &str, content: &str) {
+        sqlx::query("UPDATE nodes SET markdown_content = ? WHERE id = ?")
+            .bind(content)
+            .bind(id)
+            .execute(pool)
+            .await
+            .expect("set content");
+    }
+
+    async fn pending_count(pool: &DbPool, source: &str) -> i64 {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM pending_wikilinks WHERE source_node_id = ?")
+                .bind(source)
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        row.0
+    }
+
+    #[tokio::test]
+    async fn full_pass_skips_unchanged_nodes() {
+        let pool = memory_pool().await;
+        insert_node(&pool, "a", "alpha").await;
+        insert_node(&pool, "b", "beta").await;
+        set_content(&pool, "a", "see [[beta]]").await;
+
+        let (created, _, processed, skipped) =
+            sync_workspace_wikilinks_impl(&pool, None).await.unwrap();
+        assert_eq!((created, processed, skipped), (1, 2, 0));
+
+        // Nothing changed: the second pass touches no node
+        let (created, _, processed, skipped) =
+            sync_workspace_wikilinks_impl(&pool, None).await.unwrap();
+        assert_eq!((created, processed, skipped), (0, 0, 2));
+
+        // A content change re-syncs exactly that node
+        set_content(&pool, "a", "no links anymore").await;
+        let (created, removed, processed, skipped) =
+            sync_workspace_wikilinks_impl(&pool, None).await.unwrap();
+        assert_eq!((created, removed, processed, skipped), (0, 1, 1, 1));
+    }
+
+    #[tokio::test]
+    async fn dangling_link_resolves_when_target_is_created() {
+        use crate::commands::nodes::{create_node_impl, CreateNodeInput};
+
+        let pool = memory_pool().await;
+        insert_node(&pool, "a", "alpha").await;
+        set_content(&pool, "a", "see [[missing]]").await;
+
+        sync_workspace_wikilinks_impl(&pool, None).await.unwrap();
+        assert!(database::edges::get_all(&pool).await.unwrap().is_empty());
+        assert_eq!(pending_count(&pool, "a").await, 1);
+
+        let created = create_node_impl(
+            &pool,
+            CreateNodeInput {
+                title: "Missing".to_string(),
+                file_path: None,
+                markdown_content: None,
+                node_type: None,
+                canvas_x: 0.0,
+                canvas_y: 0.0,
+                width: None,
+                height: None,
+                tags: None,
+                workspace_id: None,
+                color_theme: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let edges = database::edges::get_all(&pool).await.unwrap();
+        assert_eq!(edges.len(), 1, "dangling link must become an edge");
+        assert_eq!(edges[0].source_node_id, "a");
+        assert_eq!(edges[0].target_node_id, created.id);
+        assert_eq!(pending_count(&pool, "a").await, 0);
+    }
+
+    #[tokio::test]
+    async fn dangling_link_resolves_on_rename() {
+        let pool = memory_pool().await;
+        insert_node(&pool, "a", "alpha").await;
+        insert_node(&pool, "b", "other").await;
+        set_content(&pool, "a", "see [[newname]]").await;
+
+        sync_workspace_wikilinks_impl(&pool, None).await.unwrap();
+        assert!(database::edges::get_all(&pool).await.unwrap().is_empty());
+
+        // Rename b to the dangling target (mirrors the update_node_title command)
+        database::nodes::update_title(&pool, "b", "newname")
+            .await
+            .unwrap();
+        let node = database::nodes::get_by_id(&pool, "b")
+            .await
+            .unwrap()
+            .unwrap();
+        resolve_pending_links_to(&pool, &node).await.unwrap();
+
+        let edges = database::edges::get_all(&pool).await.unwrap();
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].target_node_id, "b");
     }
 
     #[tokio::test]

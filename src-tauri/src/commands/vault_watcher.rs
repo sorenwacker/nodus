@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
 
 use super::{
-    should_exclude_file,
+    should_exclude_file, wikilinks,
     wikilinks::{build_title_to_id_map, sync_wikilinks_for_node, sync_wikilinks_for_node_with_map},
     WatcherState,
 };
@@ -192,6 +192,13 @@ pub async fn sync_missing_files(
         // Create edges for wikilinks
         let links = import_helpers::extract_wikilinks(&content);
         let _ = sync_wikilinks_for_node(pool, &node_id, &links).await;
+        wikilinks::set_synced_hash(pool, &node_id, &crate::checksum::compute_string(&content))
+            .await;
+
+        // Links elsewhere that dangled until this file's node existed
+        if let Err(e) = wikilinks::resolve_pending_links_to(pool, &node).await {
+            eprintln!("[SyncMissing] pending link resolution failed: {}", e);
+        }
 
         created_nodes.push(node);
     }
@@ -683,6 +690,8 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
         if let Err(e) = sync_wikilinks_for_node_with_map(pool, &node.id, &links, &title_to_id).await
         {
             eprintln!("Failed to sync wikilinks for node {}: {}", node.id, e);
+        } else {
+            wikilinks::set_synced_hash(pool, &node.id, &new_checksum).await;
         }
 
         updated += 1;

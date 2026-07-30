@@ -271,6 +271,10 @@ Users don't abandon Obsidian — they enhance it with Nodus.
 - **Text:** Last Write Wins
 - **Canvas position:** Nodus exclusive (Obsidian doesn't care about x,y)
 
+### Wikilink Sync Strategy
+
+Wikilink edges are maintained incrementally. Each node stores the content hash it was last wikilink-synced at (`wikilink_synced_hash`); the full sync pass on startup and workspace switch skips every node whose hash is unchanged, touching neither the filesystem nor the edge table for them. Links whose target does not exist yet are recorded in `pending_wikilinks` (source node, normalized target key) and resolved the moment a node with a matching title or path is created or renamed — so a dangling `[[link]]` becomes an edge without waiting for a full re-scan. The file watcher remains the primary mechanism for reacting to file edits; the full pass is a safety net that is now cheap when nothing changed.
+
 ### Open Knowledge Format (OKF)
 
 Nodus interoperates with Google Cloud's Open Knowledge Format (OKF v0.2), the Markdown-plus-frontmatter spec for agent-readable knowledge bundles:

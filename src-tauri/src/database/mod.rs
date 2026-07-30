@@ -189,6 +189,19 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         .execute(pool)
         .await?;
 
+    // Incremental wikilink sync: last-synced hash per node + pending links
+    run_add_column_migration(
+        pool,
+        "ALTER TABLE nodes ADD COLUMN wikilink_synced_hash TEXT",
+    )
+    .await?;
+    for statement in include_str!("../../migrations/013_wikilink_sync.sql").split(';') {
+        let statement = statement.trim();
+        if !statement.is_empty() {
+            sqlx::query(statement).execute(pool).await?;
+        }
+    }
+
     Ok(())
 }
 

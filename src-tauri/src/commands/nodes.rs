@@ -90,6 +90,17 @@ pub(crate) async fn create_node_impl(
             }
             let _ = database::edges::merge_bidirectional_wikilinks(pool).await;
         }
+        super::wikilinks::set_synced_hash(
+            pool,
+            &node.id,
+            &crate::checksum::compute_string(content),
+        )
+        .await;
+    }
+
+    // Links elsewhere that dangled until this node existed become edges now
+    if let Err(e) = super::wikilinks::resolve_pending_links_to(pool, &node).await {
+        eprintln!("[CreateNode] pending link resolution failed: {}", e);
     }
 
     Ok(node)
@@ -199,6 +210,13 @@ pub async fn create_node_from_file(
     // Create edges for wikilinks
     let links = import_helpers::extract_wikilinks(&content);
     super::wikilinks::sync_wikilinks_for_node(pool, &node_id, &links).await?;
+    super::wikilinks::set_synced_hash(pool, &node_id, &crate::checksum::compute_string(&content))
+        .await;
+
+    // Links elsewhere that dangled until this file's node existed
+    if let Err(e) = super::wikilinks::resolve_pending_links_to(pool, &node).await {
+        eprintln!("[CreateNodeFromFile] pending link resolution failed: {}", e);
+    }
 
     Ok(node)
 }
@@ -625,7 +643,15 @@ pub async fn update_node_title(id: String, title: String) -> Result<(), String> 
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_title(pool, &id, &title)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // The new title may satisfy links elsewhere that dangled until now
+    if let Ok(Some(node)) = database::nodes::get_by_id(pool, &id).await {
+        if let Err(e) = super::wikilinks::resolve_pending_links_to(pool, &node).await {
+            eprintln!("[UpdateTitle] pending link resolution failed: {}", e);
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
