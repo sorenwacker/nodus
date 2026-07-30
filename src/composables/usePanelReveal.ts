@@ -67,6 +67,12 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     }
   }
 
+  /** Close unconditionally, releasing a pin if set */
+  function close() {
+    pinned.value = false
+    peeking.value = false
+  }
+
   function setWidth(value: number) {
     width.value = clamp(value)
     if (storageKey) {
@@ -103,6 +109,7 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     onEdgeEnter,
     onPanelLeave,
     togglePin,
+    close,
     setWidth,
     beginResize,
   }

@@ -7,6 +7,7 @@ import { useAppSearch } from './composables/useAppSearch'
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNotifications } from './composables/useNotifications'
 import { usePanelReveal } from './composables/usePanelReveal'
+import { createEdgeStepper } from './lib/edgeGesture'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
@@ -62,13 +63,48 @@ const storylinePanel = usePanelReveal({
     panelHasTypingFocus(),
 })
 
-// Edge detection via a capture-phase pointer listener: a hot-zone div can be
-// covered by canvas overlays and never see the pointer, this cannot
+// Edge-step navigation: each push against the right edge goes one step
+// deeper (graph -> storyline overview -> reader), each push against the left
+// edge steps back. Detected via a capture-phase pointer listener because a
+// hot-zone div can be covered by canvas overlays and never see the pointer.
+const lastReadStorylineId = ref<string | null>(null)
+
+function openReader(id: string) {
+  readerStorylineId.value = id
+  lastReadStorylineId.value = id
+}
+
+function openReaderFromEdge() {
+  const candidates = storylinesStore.filteredStorylines
+  if (candidates.length === 0) return
+  const remembered = candidates.find(s => s.id === lastReadStorylineId.value)
+  openReader(remembered ? remembered.id : candidates[0].id)
+}
+
+const edgeStepper = createEdgeStepper({
+  threshold: 12,
+  stepRight: () => {
+    if (readerStorylineId.value) return
+    if (!storylinePanel.isOpen.value) {
+      storylinePanel.onEdgeEnter()
+    } else {
+      openReaderFromEdge()
+    }
+  },
+  stepLeft: () => {
+    if (readerStorylineId.value) {
+      readerStorylineId.value = null
+      storylinePanel.onEdgeEnter()
+      return
+    }
+    if (storylinePanel.isOpen.value) {
+      storylinePanel.close()
+    }
+  },
+})
+
 function onEdgePointerMove(e: PointerEvent) {
-  if (storylinePanel.isOpen.value || readerStorylineId.value) return
-  if (e.clientX >= window.innerWidth - 12) {
-    storylinePanel.onEdgeEnter()
-  }
+  edgeStepper.onPointerX(e.clientX, window.innerWidth)
 }
 
 function toggleStorylinePanel() {
@@ -797,7 +833,7 @@ async function openFolderDialog() {
           @pointerdown="storylinePanel.beginResize"
         ></div>
         <div class="storyline-reveal-inner" :style="{ width: storylinePanel.width.value + 'px' }">
-          <StorylinePanel @open-reader="(id) => readerStorylineId = id" />
+          <StorylinePanel @open-reader="openReader" />
         </div>
       </div>
       <!-- Reader slides in from right with its own contents -->

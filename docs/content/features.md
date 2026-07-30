@@ -105,10 +105,12 @@ Create linear narratives through your knowledge graph:
 - Color-code storyline edges
 
 ### Storyline Panel
-The storyline panel lists all storylines beside the canvas, on the right:
+Moving between graph and storylines works in steps along the screen edges: each push of the pointer against the right edge goes one step deeper into storylines, each push against the left edge steps back toward the graph.
 
-- Move the pointer to the right edge of the window to slide the panel open; it closes again when the pointer returns to the canvas
-- The toolbar book button pins the panel open; click it again to unpin
+- Push right once: the storyline overview slides open on the right
+- Push right again: the reader opens, showing the last-read storyline (the first storyline initially)
+- Push left: the reader steps back to the overview, and the overview steps back to the plain graph
+- Moving the pointer from the open panel onto the canvas also closes it, unless it is pinned via the toolbar book button
 - Clicking a storyline row opens it in reader mode; the chevron on the row expands its ordered nodes inline instead
 - Several storylines can have their item lists expanded at once
 - Storyline titles wrap to at most two lines instead of being truncated
