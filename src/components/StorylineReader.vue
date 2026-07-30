@@ -459,7 +459,8 @@ watch(() => props.storylineId, loadStoryline)
   overflow: hidden;
   flex-shrink: 0;
   border-left: 1px solid var(--border-default);
-  height: 100%;
+  /* No explicit height: top plus the (dynamic) bottom offset size the box,
+     letting the reader stop above an open timelines sheet */
   overscroll-behavior: contain;
   transition: width var(--step-duration, 0.3s) var(--step-ease, ease);
   will-change: transform;

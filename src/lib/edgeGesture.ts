@@ -19,6 +19,8 @@ export interface EdgeStepperOptions {
   leftThreshold?: () => number
   /** Dynamic band for the bottom edge; same purpose as rightThreshold */
   bottomThreshold?: () => number
+  /** Dwell time in ms the pointer must stay at the bottom edge before it fires */
+  bottomDwellMs?: number
   stepRight: () => void
   stepLeft: () => void
   /** Optional bottom-edge push (e.g. opening the timelines sheet) */
@@ -26,13 +28,14 @@ export interface EdgeStepperOptions {
 }
 
 export function createEdgeStepper(options: EdgeStepperOptions) {
-  const { threshold, stepRight, stepLeft, stepBottom } = options
+  const { threshold, stepRight, stepLeft, stepBottom, bottomDwellMs = 0 } = options
   const rightThreshold = options.rightThreshold ?? (() => threshold)
   const leftThreshold = options.leftThreshold ?? (() => threshold)
   const bottomThreshold = options.bottomThreshold ?? (() => threshold)
   let rightArmed = true
   let leftArmed = true
   let bottomArmed = true
+  let bottomTimer: ReturnType<typeof setTimeout> | null = null
 
   function onPointerX(x: number, windowWidth: number): void {
     if (x >= windowWidth - rightThreshold()) {
@@ -59,11 +62,23 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
 
     if (!stepBottom) return
     if (y >= windowHeight - bottomThreshold()) {
-      if (bottomArmed) {
+      if (!bottomArmed) return
+      if (bottomDwellMs <= 0) {
         bottomArmed = false
         stepBottom()
+      } else if (bottomTimer === null) {
+        // The pointer must dwell at the edge; leaving cancels the push
+        bottomTimer = setTimeout(() => {
+          bottomTimer = null
+          bottomArmed = false
+          stepBottom()
+        }, bottomDwellMs)
       }
     } else {
+      if (bottomTimer !== null) {
+        clearTimeout(bottomTimer)
+        bottomTimer = null
+      }
       bottomArmed = true
     }
   }

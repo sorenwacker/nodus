@@ -83,6 +83,31 @@ describe('createEdgeStepper', () => {
     expect(stepBottom).toHaveBeenCalledTimes(2)
   })
 
+  it('waits out the bottom dwell time and cancels when the pointer leaves', () => {
+    vi.useFakeTimers()
+    const stepBottom = vi.fn()
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      bottomDwellMs: 1000,
+      stepRight: vi.fn(),
+      stepLeft: vi.fn(),
+      stepBottom,
+    })
+
+    // Passing through the edge briefly fires nothing
+    stepper.onPointer(500, 995, WIDTH, 1000)
+    vi.advanceTimersByTime(400)
+    stepper.onPointer(500, 500, WIDTH, 1000)
+    vi.advanceTimersByTime(2000)
+    expect(stepBottom).not.toHaveBeenCalled()
+
+    // Dwelling the full second fires once
+    stepper.onPointer(500, 995, WIDTH, 1000)
+    vi.advanceTimersByTime(1000)
+    expect(stepBottom).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
   it('does not fire in the middle of the window', () => {
     const { stepper, stepRight, stepLeft } = makeStepper()
     stepper.onPointerX(500, WIDTH)

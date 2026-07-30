@@ -132,7 +132,7 @@ In the overview:
 - Drag nodes from the canvas onto a storyline section to add them to that storyline
 
 ### Timelines
-Timelines live along the bottom of the window: a push of the pointer against the bottom edge (or the timelines button in the storyline overview) slides up a sheet showing all storylines; the graph stays visible above it, and it can be open alongside the overview:
+Timelines live along the bottom of the window: dwelling the pointer at the bottom edge for a second (or the timelines button in the storyline overview) slides up a sheet showing all storylines; the graph stays visible above it, and it can be open alongside the overview and beneath a shortened reader:
 
 - Every storyline is a horizontal lane in its color; its nodes are beads in order
 - A node states its point in time with a `date:` frontmatter field — `date: 20 BC`, `date: 1969-07-20`, `date: 1969-07-20 14:30`, `date: 1500`. Only dated nodes are placed (BC dates and minute-precision timestamps supported); nodes without a date do not appear on the axis
