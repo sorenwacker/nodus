@@ -1,11 +1,10 @@
 /**
  * useStorylineDropTarget - Composable for handling drag-drop onto storyline panel
  *
- * Tracks when nodes are being dragged over the panel and calculates
- * insertion positions based on Y coordinate.
+ * Tracks when nodes are being dragged over the panel and resolves which
+ * storyline section (and insertion position) the pointer is over.
  */
-import { ref, onMounted, onUnmounted, type Ref, type ComponentPublicInstance } from 'vue'
-import type { Node } from '../../../types'
+import { ref, onMounted, onUnmounted, type Ref } from 'vue'
 import type { StorylineService } from '../../../services/storylineService'
 import type { useNodesStore } from '../../../stores/nodes'
 
@@ -17,34 +16,33 @@ declare global {
   }
 }
 
+export interface StorylineDropTarget {
+  storylineId: string
+  /** Insertion index inside the section's node list; null appends at the end */
+  index: number | null
+}
+
 export interface StorylineDropTargetOptions {
   store: NodesStore
   storylineService: StorylineService | undefined
-  selectedStorylineId: Ref<string | null>
-  selectedStorylineNodes: Ref<Node[]>
-  nodeListRef: Ref<ComponentPublicInstance | null>
   showToast?: (message: string, type: 'error' | 'success' | 'info') => void
-  selectStoryline: (id: string) => void
-  storylines: Ref<{ id: string; title: string }[]>
+  /** Section (and index) under the pointer, or null when over none */
+  resolveDropTarget: (clientX: number, clientY: number) => StorylineDropTarget | null
+  /** Target when the pointer is over the panel but not over a section */
+  fallbackTarget: () => StorylineDropTarget | null
+  /** Called after nodes were added, e.g. to expand the receiving section */
+  onNodesAdded?: (storylineId: string) => void
 }
 
 export function useStorylineDropTarget(
   panelRef: Ref<HTMLElement | null>,
   options: StorylineDropTargetOptions
 ) {
-  const {
-    store,
-    storylineService,
-    selectedStorylineId,
-    selectedStorylineNodes,
-    nodeListRef,
-    showToast,
-    selectStoryline,
-    storylines,
-  } = options
+  const { store, storylineService, showToast, resolveDropTarget, fallbackTarget, onNodesAdded } =
+    options
 
   const isDropTarget = ref(false)
-  const dropPreviewIndex = ref<number | null>(null)
+  const dropPreview = ref<StorylineDropTarget | null>(null)
 
   function checkIfOverPanel(clientX: number, clientY: number): boolean {
     if (!panelRef.value) return false
@@ -57,40 +55,18 @@ export function useStorylineDropTarget(
     )
   }
 
-  function calculateDropPosition(clientY: number): number {
-    const nodeListEl =
-      nodeListRef.value?.$el ?? document.querySelector('.storyline-nodes-list .node-list')
-    if (!nodeListEl) return selectedStorylineNodes.value.length
-
-    const nodeItems = nodeListEl.querySelectorAll('.node-item')
-    if (nodeItems.length === 0) return 0
-
-    for (let i = 0; i < nodeItems.length; i++) {
-      const rect = nodeItems[i].getBoundingClientRect()
-      const midpoint = rect.top + rect.height / 2
-      if (clientY < midpoint) {
-        return i
-      }
-    }
-    return nodeItems.length
-  }
-
   function onGlobalPointerMove(e: PointerEvent) {
     if (document.body.classList.contains('node-dragging')) {
       const over = checkIfOverPanel(e.clientX, e.clientY)
       isDropTarget.value = over
       window.__storylinePanelDropTarget = over
-      if (over && selectedStorylineId.value) {
-        dropPreviewIndex.value = calculateDropPosition(e.clientY)
-      } else {
-        dropPreviewIndex.value = null
-      }
+      dropPreview.value = over ? resolveDropTarget(e.clientX, e.clientY) : null
     }
   }
 
   function onDragEnd() {
     isDropTarget.value = false
-    dropPreviewIndex.value = null
+    dropPreview.value = null
     setTimeout(() => {
       window.__storylinePanelDropTarget = false
     }, 0)
@@ -98,40 +74,34 @@ export function useStorylineDropTarget(
 
   async function handleNodeDrop(event: Event) {
     const e = event as CustomEvent<{ nodeIds: string[]; x: number; y: number }>
-    const { nodeIds, y } = e.detail
+    const { nodeIds, x, y } = e.detail
 
-    if (selectedStorylineId.value) {
-      try {
-        let position = calculateDropPosition(y)
-        for (const nodeId of nodeIds) {
-          if (storylineService) {
-            await storylineService.addNode(selectedStorylineId.value, nodeId, position)
-          } else {
-            await store.addNodeToStoryline(selectedStorylineId.value, nodeId, position)
-          }
-          position++
-        }
-        showToast?.(`Added ${nodeIds.length} node(s) to storyline`, 'success')
-      } catch (err) {
-        showToast?.(`Failed to add nodes: ${err}`, 'error')
-      }
-    } else if (storylines.value.length > 0) {
-      const firstStoryline = storylines.value[0]
-      try {
-        for (const nodeId of nodeIds) {
-          if (storylineService) {
-            await storylineService.addNode(firstStoryline.id, nodeId)
-          } else {
-            await store.addNodeToStoryline(firstStoryline.id, nodeId)
-          }
-        }
-        showToast?.(`Added ${nodeIds.length} node(s) to "${firstStoryline.title}"`, 'success')
-        selectStoryline(firstStoryline.id)
-      } catch (err) {
-        showToast?.(`Failed to add nodes: ${err}`, 'error')
-      }
-    } else {
+    const target = resolveDropTarget(x, y) ?? fallbackTarget()
+    if (!target) {
       showToast?.('Create a storyline first', 'info')
+      return
+    }
+
+    try {
+      let position = target.index
+      for (const nodeId of nodeIds) {
+        if (storylineService) {
+          await storylineService.addNode(target.storylineId, nodeId, position ?? undefined)
+        } else {
+          await store.addNodeToStoryline(target.storylineId, nodeId, position ?? undefined)
+        }
+        if (position !== null) position++
+      }
+      const title = store.filteredStorylines.find(s => s.id === target.storylineId)?.title
+      showToast?.(
+        title
+          ? `Added ${nodeIds.length} node(s) to "${title}"`
+          : `Added ${nodeIds.length} node(s) to storyline`,
+        'success'
+      )
+      onNodesAdded?.(target.storylineId)
+    } catch (err) {
+      showToast?.(`Failed to add nodes: ${err}`, 'error')
     }
   }
 
@@ -149,6 +119,6 @@ export function useStorylineDropTarget(
 
   return {
     isDropTarget,
-    dropPreviewIndex,
+    dropPreview,
   }
 }

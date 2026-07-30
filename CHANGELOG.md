@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Storyline panel is now an accordion: every storyline is a collapsible section, several can be open at once, and titles wrap to two lines instead of truncating; dropping a node onto a section adds it to that storyline
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 
 ### Fixed

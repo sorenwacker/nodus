@@ -4,7 +4,6 @@
  * Extracts handler functions for adding, removing, and reordering nodes
  * in storylines. Uses StorylineService for undo support when available.
  */
-import type { Ref } from 'vue'
 import type { StorylineService } from '../services/storylineService'
 import type { useNodesStore } from '../stores/nodes'
 
@@ -13,7 +12,8 @@ type NodesStore = ReturnType<typeof useNodesStore>
 export interface StorylineOperationsOptions {
   store: NodesStore
   storylineService: StorylineService | undefined
-  selectedStorylineId: Ref<string | null>
+  /** Ref or computed holding the storyline the operations apply to */
+  selectedStorylineId: { readonly value: string | null }
   showToast?: (message: string, type: 'error' | 'success' | 'info') => void
 }
 
