@@ -15,6 +15,8 @@ export interface EdgeStepperOptions {
    * accidentally step deeper.
    */
   rightThreshold?: () => number
+  /** Dynamic band for the left edge; same purpose as rightThreshold */
+  leftThreshold?: () => number
   /** Dynamic band for the bottom edge; same purpose as rightThreshold */
   bottomThreshold?: () => number
   stepRight: () => void
@@ -26,6 +28,7 @@ export interface EdgeStepperOptions {
 export function createEdgeStepper(options: EdgeStepperOptions) {
   const { threshold, stepRight, stepLeft, stepBottom } = options
   const rightThreshold = options.rightThreshold ?? (() => threshold)
+  const leftThreshold = options.leftThreshold ?? (() => threshold)
   const bottomThreshold = options.bottomThreshold ?? (() => threshold)
   let rightArmed = true
   let leftArmed = true
@@ -41,7 +44,7 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
       rightArmed = true
     }
 
-    if (x <= threshold) {
+    if (x <= leftThreshold()) {
       if (leftArmed) {
         leftArmed = false
         stepLeft()

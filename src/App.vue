@@ -104,6 +104,10 @@ const edgeStepper = createEdgeStepper({
   // would fire it
   rightThreshold: () =>
     storylinePanel.isOpen.value || readerStorylineId.value ? 3 : 12,
+  // Stepping back too needs a deliberate push once a layer covers the left
+  // region, so mouse travel inside the reader or sheet cannot close them
+  leftThreshold: () =>
+    storylinePanel.isOpen.value || readerStorylineId.value || showTimelines.value ? 3 : 12,
   bottomThreshold: () => (showTimelines.value ? 3 : 12),
   // Bottom edge: the timelines sheet slides up (also while reading)
   stepBottom: () => {
