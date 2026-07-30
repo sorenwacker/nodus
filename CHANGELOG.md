@@ -6,6 +6,7 @@ All notable changes to Nodus are documented in this file.
 
 ### Fixed
 - Nodes created with content (e.g. via MCP create_node or the LLM agent) now get wikilink edges for their `[[links]]` immediately; previously edges only appeared after a later content edit (#45)
+- Hashtags in initial node content are now extracted into tags on creation, matching the behavior of content edits
 - Node content updates no longer rewrite vault files while folder sync is off. Write-back now requires a sync-enabled workspace whose vault contains the file; otherwise only the database changes (#43)
 - Wikilink sync no longer creates a parallel edge when the node pair is already connected by a manual edge, in either direction (#43)
 - Edges of trashed notes are excluded from edge queries, graph summaries, structure, and orphan detection, and the database orphan cleanup now removes them; ghost "Unknown" entries no longer appear in analytics (#44)

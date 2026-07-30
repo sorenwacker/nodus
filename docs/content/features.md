@@ -20,6 +20,13 @@ Pan and zoom freely across an infinite workspace. Semantic zooming adjusts detai
 | **Term** | Entity node for definitions/concepts |
 | **Item** | Entity node for objects/artifacts |
 
+### Tags
+Hashtags in node content become node tags:
+
+- `#tag` tokens are extracted whenever content is set: on node creation and on every content edit, from any interface (canvas editor, MCP tools, LLM agent)
+- Extracted tags merge with the node's existing tags
+- With tag nodes enabled in settings, each tag becomes a tag node connected to the notes that use it
+
 ### Frames
 Group related nodes visually. Frames act as containers that can be moved together with all contained nodes.
 
