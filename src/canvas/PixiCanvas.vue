@@ -2212,9 +2212,10 @@ defineExpose({
         @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
       />
 
-      <!-- Hover tooltip (when zoomed out, hide during drag) -->
+      <!-- Hover tooltip (when zoomed out; hidden during drag and while the
+           click preview panel is open) -->
       <CanvasHoverTooltip
-        :visible="showHoverTooltip && !isDraggingRef"
+        :visible="showHoverTooltip && !isDraggingRef && !(showPreviewPanel && !!previewNode)"
         :position="hoverMousePos"
         :node="hoveredNode"
         :content="tooltipContent"
