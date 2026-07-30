@@ -371,7 +371,9 @@
     "newStoryline": "Nouveau scénario",
     "rename": "Renommer",
     "contents": "Sommaire",
-    "loading": "Chargement..."
+    "loading": "Chargement...",
+    "expandItems": "Afficher les éléments",
+    "collapseItems": "Masquer les éléments"
   },
   "nodePicker": {
     "newNode": "Nouveau nœud",

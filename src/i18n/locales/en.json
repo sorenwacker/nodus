@@ -375,7 +375,9 @@
     "loading": "Loading...",
     "expandNode": "Expand content",
     "collapseNode": "Collapse content",
-    "noContent": "No content"
+    "noContent": "No content",
+    "expandItems": "Show items",
+    "collapseItems": "Hide items"
   },
   "nodePicker": {
     "newNode": "New node",

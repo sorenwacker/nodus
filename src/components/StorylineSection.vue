@@ -115,17 +115,20 @@ function toggleExpandNode(nodeId: string) {
 
 <template>
   <section class="storyline-section" :data-storyline-id="storyline.id">
-    <header
-      class="section-header"
-      @click="emit('toggle')"
-      @dblclick="emit('open-reader', storyline.id)"
-    >
-      <Icon
-        name="chevron-right"
-        :size="14"
-        class="section-chevron"
-        :class="{ rotated: expanded }"
-      />
+    <!-- Row click opens the reader; the chevron manages the item list -->
+    <header class="section-header" @click="emit('open-reader', storyline.id)">
+      <button
+        class="chevron-btn"
+        :data-tooltip="expanded ? t('storyline.collapseItems') : t('storyline.expandItems')"
+        @click.stop="emit('toggle')"
+      >
+        <Icon
+          name="chevron-right"
+          :size="14"
+          class="section-chevron"
+          :class="{ rotated: expanded }"
+        />
+      </button>
       <span
         class="storyline-icon"
         :style="{ backgroundColor: storyline.color || 'var(--primary-color)' }"
@@ -150,16 +153,6 @@ function toggleExpandNode(nodeId: string) {
         <span class="storyline-title">{{ storyline.title }}</span>
         <span class="node-count">{{ nodeCount }}</span>
       </template>
-
-      <!-- Read mode is the primary action: always visible -->
-      <button
-        class="icon-btn reader-btn"
-        :data-tooltip="t('storyline.readMode')"
-        @click.stop="emit('open-reader', storyline.id)"
-        @dblclick.stop
-      >
-        <Icon name="book" :size="12" />
-      </button>
 
       <div class="storyline-actions" @click.stop @dblclick.stop>
         <label class="color-picker" :data-tooltip="t('storyline.edgeColor')">
@@ -275,9 +268,22 @@ function toggleExpandNode(nodeId: string) {
   flex-shrink: 0;
 }
 
-.reader-btn {
+.chevron-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  color: var(--primary-color);
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.chevron-btn:hover {
+  background: var(--bg-elevated);
 }
 
 .storyline-actions {

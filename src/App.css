@@ -368,14 +368,6 @@
   opacity: 0.9;
 }
 
-.edge-hotzone {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 10px;
-  z-index: 40;
-}
 
 /* Reader mode: canvas shrinks, reader slides in */
 .main-content .with-reader {

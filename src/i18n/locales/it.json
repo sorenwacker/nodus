@@ -371,7 +371,9 @@
     "newStoryline": "Nuova trama",
     "rename": "Rinomina",
     "contents": "Indice",
-    "loading": "Caricamento..."
+    "loading": "Caricamento...",
+    "expandItems": "Mostra elementi",
+    "collapseItems": "Nascondi elementi"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",

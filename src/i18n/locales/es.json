@@ -371,7 +371,9 @@
     "newStoryline": "Nueva línea argumental",
     "rename": "Renombrar",
     "contents": "Contenido",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "expandItems": "Mostrar elementos",
+    "collapseItems": "Ocultar elementos"
   },
   "nodePicker": {
     "newNode": "Nuevo nodo",

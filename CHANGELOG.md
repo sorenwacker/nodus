@@ -14,7 +14,8 @@ All notable changes to Nodus are documented in this file.
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 
 ### Fixed
-- Storyline read mode is reachable again at a glance: the book button on each storyline row is always visible and a double-click on the row opens the reader; previously the button only appeared on hover
+- Clicking a storyline row opens the reader directly; expanding the item list moved to the row's chevron. Previously the reader was only reachable via a button that appeared on hover
+- The right-edge hover reveal works regardless of canvas overlays: edge detection moved from an invisible hot-zone element to a capture-phase pointer listener
 - The storyline panel closes again after clicking inside it; a focus guard meant for text inputs was keeping it open after any click
 - Nodes created with content (e.g. via MCP create_node or the LLM agent) now get wikilink edges for their `[[links]]` immediately; previously edges only appeared after a later content edit (#45)
 - Hashtags in initial node content are now extracted into tags on creation, matching the behavior of content edits

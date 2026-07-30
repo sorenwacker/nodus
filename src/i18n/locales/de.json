@@ -371,7 +371,9 @@
     "newStoryline": "Neuer Handlungsstrang",
     "rename": "Umbenennen",
     "contents": "Inhalt",
-    "loading": "Laden..."
+    "loading": "Laden...",
+    "expandItems": "Einträge anzeigen",
+    "collapseItems": "Einträge ausblenden"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",

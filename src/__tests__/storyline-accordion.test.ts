@@ -75,26 +75,18 @@ describe('StorylineSection', () => {
     expect(wrapper.text()).toContain(longTitle)
   })
 
-  it('emits toggle when the header is clicked', async () => {
+  it('opens the reader when the row is clicked', async () => {
     const wrapper = mountSection()
     await wrapper.find('.section-header').trigger('click')
-    expect(wrapper.emitted('toggle')).toBeTruthy()
-  })
-
-  it('emits open-reader from the always-visible read-mode button', async () => {
-    const wrapper = mountSection()
-    const readerBtn = wrapper.find('.reader-btn')
-    expect(readerBtn.exists()).toBe(true)
-    expect(readerBtn.attributes('data-tooltip')).toBe(en.storyline.readMode)
-    await readerBtn.trigger('click')
     expect(wrapper.emitted('open-reader')).toEqual([['s1']])
     expect(wrapper.emitted('toggle')).toBeUndefined()
   })
 
-  it('emits open-reader on header double-click', async () => {
+  it('toggles the item list from the chevron without opening the reader', async () => {
     const wrapper = mountSection()
-    await wrapper.find('.section-header').trigger('dblclick')
-    expect(wrapper.emitted('open-reader')).toEqual([['s1']])
+    await wrapper.find('.chevron-btn').trigger('click')
+    expect(wrapper.emitted('toggle')).toBeTruthy()
+    expect(wrapper.emitted('open-reader')).toBeUndefined()
   })
 
   it('shows the node list only while expanded', async () => {
@@ -142,8 +134,8 @@ describe('StorylinePanel accordion', () => {
     })
 
     const sections = wrapper.findAllComponents(StorylineSection)
-    await sections[0].find('.section-header').trigger('click')
-    await sections[1].find('.section-header').trigger('click')
+    await sections[0].find('.chevron-btn').trigger('click')
+    await sections[1].find('.chevron-btn').trigger('click')
 
     expect(sections[0].props('expanded')).toBe(true)
     expect(sections[1].props('expanded')).toBe(true)

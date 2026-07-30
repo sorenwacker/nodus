@@ -62,6 +62,15 @@ const storylinePanel = usePanelReveal({
     panelHasTypingFocus(),
 })
 
+// Edge detection via a capture-phase pointer listener: a hot-zone div can be
+// covered by canvas overlays and never see the pointer, this cannot
+function onEdgePointerMove(e: PointerEvent) {
+  if (storylinePanel.isOpen.value || readerStorylineId.value) return
+  if (e.clientX >= window.innerWidth - 12) {
+    storylinePanel.onEdgeEnter()
+  }
+}
+
 function toggleStorylinePanel() {
   storylinePanel.togglePin()
   // Close reader when unpinning the panel
@@ -502,6 +511,7 @@ useKeyboardShortcuts({
 })
 
 onMounted(async () => {
+  window.addEventListener('pointermove', onEdgePointerMove, { capture: true, passive: true })
   // Initialize themes first to apply visual styling
   await themesStore.initialize()
   // Then initialize data
@@ -772,12 +782,6 @@ async function openFolderDialog() {
         :class="{ 'with-reader': readerStorylineId }"
         @mouseenter="storylinePanel.onPanelLeave"
       />
-      <!-- Hot zone: pointer at the right edge reveals the panel -->
-      <div
-        v-if="!storylinePanel.isOpen.value && !readerStorylineId"
-        class="edge-hotzone"
-        @mouseenter="storylinePanel.onEdgeEnter"
-      ></div>
       <!-- Storyline panel slides in from the right; hidden when reader is open -->
       <div
         v-if="!readerStorylineId"
