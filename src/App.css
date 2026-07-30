@@ -311,6 +311,16 @@
   min-height: 0;
 }
 
+/* Reader close: slide back out to the right (opening animates in-component) */
+.reader-slide-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.reader-slide-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
 /* Storyline panel reveal: width animates so the separator moves automatically */
 .storyline-reveal {
   position: relative;

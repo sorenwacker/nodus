@@ -845,13 +845,15 @@ async function openFolderDialog() {
           <StorylinePanel @open-reader="openReader" />
         </div>
       </div>
-      <!-- Reader slides in from right with its own contents -->
-      <StorylineReader
-        v-if="readerStorylineId"
-        :storyline-id="readerStorylineId"
-        :full-width="readerFullWidth"
-        @close="readerStorylineId = null"
-      />
+      <!-- Reader slides in from the right and back out on close -->
+      <Transition name="reader-slide">
+        <StorylineReader
+          v-if="readerStorylineId"
+          :storyline-id="readerStorylineId"
+          :full-width="readerFullWidth"
+          @close="readerStorylineId = null"
+        />
+      </Transition>
     </main>
 
     <!-- Import Dialog -->

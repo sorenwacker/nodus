@@ -273,7 +273,7 @@ watch(() => props.storylineId, loadStoryline)
 </script>
 
 <template>
-  <div class="reader-overlay" :style="{ width: readerWidth + 'px' }">
+  <div class="reader-overlay" :class="{ resizing: isResizing }" :style="{ width: readerWidth + 'px' }">
     <!-- Resize handle on left edge -->
     <div
       class="resize-handle"
@@ -456,6 +456,12 @@ watch(() => props.storylineId, loadStoryline)
   border-left: 1px solid var(--border-default);
   height: 100%;
   overscroll-behavior: contain;
+  /* Smooth half <-> full step transitions; disabled while hand-dragging */
+  transition: width 0.25s ease;
+}
+
+.reader-overlay.resizing {
+  transition: none;
 }
 
 @keyframes slideInFromRight {
