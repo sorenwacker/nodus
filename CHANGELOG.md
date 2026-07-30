@@ -9,6 +9,7 @@ All notable changes to Nodus are documented in this file.
 - Open Knowledge Format (OKF v0.2) support: export any workspace as an OKF bundle (frontmatter documents grouped by node type, root index.md, wikilinks rewritten as Markdown links) from the workspace editor; files Nodus creates in a vault carry OKF frontmatter, and content write-backs preserve existing frontmatter blocks
 
 ### Changed
+- Storyline reader opens at full window width; drag its left handle to shrink it and reveal the graph
 - Storylines are navigated in steps along the screen edges: pushing the pointer against the right edge opens the overview, a second push opens the reader (last-read storyline), and pushes against the left edge step back to the overview and then the graph. Returning to the canvas also closes an unpinned overview; the toolbar book button pins it. The separator between panel and canvas is a visible drag handle and the chosen width persists across sessions
 - Storyline panel is now an accordion: every storyline is a collapsible section, several can be open at once, and titles wrap to two lines instead of truncating; dropping a node onto a section adds it to that storyline
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced

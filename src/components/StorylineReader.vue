@@ -46,8 +46,8 @@ function openNodeDetail(nodeId: string) {
   window.dispatchEvent(new CustomEvent('open-node-detail', { detail: { nodeId } }))
 }
 
-// Resizable width
-const readerWidth = ref(600)
+// Resizable width; read mode takes the full window until resized
+const readerWidth = ref(window.innerWidth)
 const isResizing = ref(false)
 
 function startResize(e: PointerEvent) {
