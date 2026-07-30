@@ -15,6 +15,9 @@ import {
   parseHistoricalDate,
   formatYear,
   formatAxisValue,
+  buildBrokenAxis,
+  axisX,
+  type AxisSegment,
 } from '../lib/timelineDates'
 import MarkdownContent from './MarkdownContent.vue'
 
@@ -30,7 +33,6 @@ const { storylineNodes, storylineNodesVersion } = storeToRefs(store)
 
 const LABEL_WIDTH = 170
 const LANE_HEIGHT = 56
-const BEAD_SPACING = 48
 const BEAD_RADIUS = 7
 const PADDING = 24
 const AXIS_HEIGHT = 32
@@ -84,83 +86,59 @@ const rangeToInput = ref(localStorage.getItem('nodus-timeline-range-to') || '')
 watch(rangeFromInput, v => localStorage.setItem('nodus-timeline-range-from', v))
 watch(rangeToInput, v => localStorage.setItem('nodus-timeline-range-to', v))
 
-// Shared time range across all lanes; manual bounds override the automatic
-// fit per side. Null when no node has a date and no bounds are set.
-const timeRange = computed<{ min: number; max: number } | null>(() => {
-  const years = laneNodes.value.flatMap(l =>
-    l.nodes.flatMap(n => [n.year, n.yearEnd]).filter((y): y is number => y !== null)
-  )
+// Broken time axis shared across all lanes: clusters of dated values keep
+// proportional widths, large empty gaps are abbreviated. Manual bounds
+// window the values and anchor the axis ends.
+const axisSegments = computed<AxisSegment[]>(() => {
   const manualMin = parseHistoricalDate(rangeFromInput.value)
   const manualMax = parseHistoricalDate(rangeToInput.value)
-  if (years.length === 0 && (manualMin === null || manualMax === null)) return null
-  const autoMin = years.length ? Math.min(...years) : 0
-  const autoMax = years.length ? Math.max(...years) : 0
-  let min = manualMin ?? autoMin
-  let max = manualMax ?? autoMax
-  if (max <= min) max = min + 1
-  if (manualMin === null || manualMax === null) {
-    const pad = (max - min || 10) * 0.05
-    if (manualMin === null) min -= pad
-    if (manualMax === null) max += pad
-  }
-  return { min, max }
+  let values = laneNodes.value
+    .flatMap(l => l.nodes.flatMap(n => [n.year, n.yearEnd]))
+    .filter((y): y is number => y !== null)
+  if (manualMin !== null) values = values.filter(v => v >= manualMin)
+  if (manualMax !== null) values = values.filter(v => v <= manualMax)
+  if (manualMin !== null) values.push(manualMin)
+  if (manualMax !== null) values.push(manualMax)
+  if (values.length === 0) return []
+  return buildBrokenAxis(values, LABEL_WIDTH + PADDING, PLOT_WIDTH)
 })
 
-function yearToX(year: number): number {
-  const range = timeRange.value!
-  const t = (year - range.min) / (range.max - range.min)
-  return LABEL_WIDTH + PADDING + t * PLOT_WIDTH
-}
+const hasAxis = computed(() => axisSegments.value.length > 0)
 
-/** Bead x positions: dated nodes on the time axis, undated interpolated */
-function laneXs(nodes: LaneNode[]): number[] {
-  if (!timeRange.value) {
-    return nodes.map((_, seq) => LABEL_WIDTH + PADDING + seq * BEAD_SPACING)
-  }
-  const xs: Array<number | null> = nodes.map(n => (n.year !== null ? yearToX(n.year) : null))
-  for (let i = 0; i < xs.length; i++) {
-    if (xs[i] !== null) continue
-    let prev = i - 1
-    while (prev >= 0 && xs[prev] === null) prev--
-    let next = i + 1
-    while (next < xs.length && xs[next] === null) next++
-    const prevX = prev >= 0 ? xs[prev]! : null
-    const nextX = next < xs.length ? xs[next]! : null
-    if (prevX !== null && nextX !== null) {
-      xs[i] = prevX + ((nextX - prevX) * (i - prev)) / (next - prev)
-    } else if (prevX !== null) {
-      xs[i] = prevX + (i - prev) * (BEAD_SPACING / 2)
-    } else if (nextX !== null) {
-      xs[i] = nextX - (next - i) * (BEAD_SPACING / 2)
-    } else {
-      xs[i] = LABEL_WIDTH + PADDING + i * BEAD_SPACING
-    }
-  }
-  return xs as number[]
+function yearToX(year: number): number {
+  return axisX(axisSegments.value, year)
 }
 
 const lanes = computed<Lane[]>(() => {
   return laneNodes.value.map((lane, laneIndex) => {
     const storyline = storylines.value[laneIndex]
     const y = AXIS_HEIGHT + PADDING + laneIndex * LANE_HEIGHT + LANE_HEIGHT / 2
-    const xs = laneXs(lane.nodes)
-    const isSpan = (n: LaneNode) =>
-      timeRange.value !== null && n.year !== null && n.yearEnd !== null && n.yearEnd > n.year
-    return {
+    const base = {
       id: lane.storylineId,
       title: storyline.title,
       color: storyline.color || '#3b82f6',
       y,
-      beads: lane.nodes
+    }
+
+    // Only dated nodes are placed - positions are facts, not guesses
+    if (!hasAxis.value) {
+      return { ...base, beads: [], spans: [] }
+    }
+
+    const dated = lane.nodes.filter(n => n.year !== null)
+    const isSpan = (n: LaneNode) => n.yearEnd !== null && n.yearEnd > n.year!
+    return {
+      ...base,
+      beads: dated
         .filter(n => !isSpan(n))
         .map(n => ({
           nodeId: n.nodeId,
           title: n.title,
-          x: xs[lane.nodes.indexOf(n)],
+          x: yearToX(n.year!),
           y,
-          dateLabel: n.year !== null ? (n.raw ?? formatYear(n.year)) : null,
+          dateLabel: n.raw ?? formatYear(n.year!),
         })),
-      spans: lane.nodes.filter(isSpan).map(n => ({
+      spans: dated.filter(isSpan).map(n => ({
         nodeId: n.nodeId,
         title: n.title,
         x1: yearToX(n.year!),
@@ -179,17 +157,30 @@ const hoveredPreviewContent = computed(() =>
   hoveredPreview.value ? store.getNode(hoveredPreview.value.nodeId)?.markdown_content || '' : ''
 )
 
-// Axis ticks across the shared time range; label detail adapts to the span
-// (years, months, days, or clock time for sub-day narratives)
+// Axis ticks per segment; label detail adapts to each segment's span, so a
+// tight one-hour cluster gets minute labels beside a centuries-wide segment
 const axisTicks = computed(() => {
-  if (!timeRange.value) return []
-  const { min, max } = timeRange.value
-  const count = 6
-  return Array.from({ length: count + 1 }, (_, i) => {
-    const year = min + ((max - min) * i) / count
-    return { x: yearToX(year), label: formatAxisValue(year, max - min) }
-  })
+  const ticks: Array<{ x: number; label: string }> = []
+  for (const seg of axisSegments.value) {
+    const width = seg.x2 - seg.x1
+    const count = Math.max(1, Math.floor(width / 140))
+    for (let i = 0; i <= count; i++) {
+      const value = seg.min + ((seg.max - seg.min) * i) / count
+      ticks.push({
+        x: seg.x1 + (width * i) / count,
+        label: formatAxisValue(value, seg.max - seg.min),
+      })
+    }
+  }
+  return ticks
 })
+
+// Break markers centered in each abbreviated gap
+const axisBreaks = computed(() =>
+  axisSegments.value
+    .slice(1)
+    .map((seg, i) => ({ x: (axisSegments.value[i].x2 + seg.x1) / 2 }))
+)
 
 // Graph edges between nodes that both appear on the timelines, drawn as arcs
 const edgeLinks = computed(() => {
@@ -233,11 +224,7 @@ const connectors = computed(() => {
   return lines
 })
 
-const svgWidth = computed(() => {
-  if (timeRange.value) return LABEL_WIDTH + PADDING * 2 + PLOT_WIDTH
-  const maxBeads = Math.max(0, ...lanes.value.map(l => l.beads.length))
-  return LABEL_WIDTH + PADDING * 2 + Math.max(1, maxBeads) * BEAD_SPACING
-})
+const svgWidth = computed(() => LABEL_WIDTH + PADDING * 2 + PLOT_WIDTH)
 
 const svgHeight = computed(
   () => AXIS_HEIGHT + PADDING * 2 + lanes.value.length * LANE_HEIGHT
@@ -279,17 +266,27 @@ onMounted(() => {
       <p>{{ t('storyline.noStorylines') }}</p>
     </div>
 
+    <div v-else-if="!hasAxis" class="timelines-empty">
+      <p>{{ t('storyline.timelinesDateHint') }}</p>
+    </div>
+
     <div v-else class="timelines-scroll">
       <svg :width="svgWidth" :height="svgHeight" class="timelines-svg">
-        <!-- Time axis (only when nodes carry date frontmatter) -->
+        <!-- Broken time axis: one line per segment, breaks mark abbreviated gaps -->
         <g v-if="axisTicks.length > 0" class="time-axis">
           <line
+            v-for="(seg, i) in axisSegments"
+            :key="`seg${i}`"
             class="axis-line"
-            :x1="LABEL_WIDTH + PADDING"
+            :x1="seg.x1"
             :y1="AXIS_HEIGHT - 8"
-            :x2="LABEL_WIDTH + PADDING + PLOT_WIDTH"
+            :x2="seg.x2"
             :y2="AXIS_HEIGHT - 8"
           />
+          <g v-for="(brk, i) in axisBreaks" :key="`b${i}`" class="axis-break">
+            <line :x1="brk.x - 7" :y1="AXIS_HEIGHT - 3" :x2="brk.x - 1" :y2="AXIS_HEIGHT - 13" />
+            <line :x1="brk.x + 1" :y1="AXIS_HEIGHT - 3" :x2="brk.x + 7" :y2="AXIS_HEIGHT - 13" />
+          </g>
           <g v-for="(tick, i) in axisTicks" :key="`t${i}`">
             <line
               class="axis-tick"
@@ -450,6 +447,11 @@ onMounted(() => {
 .axis-tick {
   stroke: var(--text-muted);
   stroke-width: 1;
+}
+
+.axis-break line {
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
 }
 
 .axis-grid {

@@ -59,6 +59,35 @@ describe('formatYear', () => {
   })
 })
 
+describe('buildBrokenAxis', () => {
+  it('keeps one segment when values are evenly spread', async () => {
+    const { buildBrokenAxis } = await import('../lib/timelineDates')
+    const segments = buildBrokenAxis([0, 25, 50, 75, 100], 0, 900)
+    expect(segments.length).toBe(1)
+    expect(segments[0].x1).toBe(0)
+    expect(segments[0].x2).toBe(900)
+  })
+
+  it('abbreviates a large empty gap into a fixed break', async () => {
+    const { buildBrokenAxis, axisX } = await import('../lib/timelineDates')
+    // Two tight clusters 1900 years apart
+    const segments = buildBrokenAxis([-20, -10, 1880, 1900], 0, 900, { gapWidth: 32 })
+    expect(segments.length).toBe(2)
+    // The pixel gap between the clusters is the fixed break, not ~880px
+    expect(segments[1].x1 - segments[0].x2).toBe(32)
+    // Ordering is preserved across the break
+    expect(axisX(segments, -15)).toBeLessThan(axisX(segments, 1890))
+  })
+
+  it('clamps out-of-segment values into the nearest segment edge', async () => {
+    const { buildBrokenAxis, axisX } = await import('../lib/timelineDates')
+    const segments = buildBrokenAxis([0, 10, 1000, 1010], 0, 900)
+    const gapValue = axisX(segments, 500) // inside the abbreviated gap
+    expect(gapValue).toBeGreaterThanOrEqual(segments[0].x2 - 1)
+    expect(gapValue).toBeLessThanOrEqual(segments[1].x1 + 1)
+  })
+})
+
 describe('time-of-day support', () => {
   it('parses timestamps with minute precision', () => {
     const t1400 = parseHistoricalDate('1969-07-20 14:00')!
