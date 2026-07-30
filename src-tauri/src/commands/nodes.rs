@@ -43,7 +43,13 @@ pub struct CreateNodeInput {
 #[tauri::command]
 pub async fn create_node(input: CreateNodeInput) -> Result<Node, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+    create_node_impl(pool, input).await
+}
 
+pub(crate) async fn create_node_impl(
+    pool: &database::DbPool,
+    input: CreateNodeInput,
+) -> Result<Node, String> {
     let now = chrono::Utc::now().timestamp();
     let node = Node {
         id: uuid::Uuid::new_v4().to_string(),
@@ -70,6 +76,21 @@ pub async fn create_node(input: CreateNodeInput) -> Result<Node, String> {
     database::nodes::create(pool, &node)
         .await
         .map_err(|e| e.to_string())?;
+
+    // Wikilinks in initial content must create edges just like a later
+    // content edit would. Failure must not fail the creation: the node is
+    // already inserted, and an error here would make the frontend fall back
+    // to a duplicate local node.
+    if let Some(ref content) = node.markdown_content {
+        let links = import_helpers::extract_wikilinks(content);
+        if !links.is_empty() {
+            if let Err(e) = super::wikilinks::sync_wikilinks_for_node(pool, &node.id, &links).await
+            {
+                eprintln!("[CreateNode] wikilink sync failed for {}: {}", node.id, e);
+            }
+            let _ = database::edges::merge_bidirectional_wikilinks(pool).await;
+        }
+    }
 
     Ok(node)
 }
@@ -896,6 +917,89 @@ mod tests {
         let file = vault.path().join("note.md");
         std::fs::write(&file, content).unwrap();
         (vault, file.to_string_lossy().to_string())
+    }
+
+    fn create_input(title: &str, content: Option<&str>) -> CreateNodeInput {
+        CreateNodeInput {
+            title: title.to_string(),
+            file_path: None,
+            markdown_content: content.map(|c| c.to_string()),
+            node_type: None,
+            canvas_x: 0.0,
+            canvas_y: 0.0,
+            width: None,
+            height: None,
+            tags: None,
+            workspace_id: None,
+            color_theme: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn create_node_with_wikilink_content_creates_edges() {
+        let pool = memory_pool().await;
+        sqlx::query(
+            "INSERT INTO nodes (id, title, created_at, updated_at) VALUES ('b', 'beta', 0, 0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let node = create_node_impl(&pool, create_input("alpha", Some("see [[beta]]")))
+            .await
+            .unwrap();
+
+        let edges = database::edges::get_all(&pool).await.unwrap();
+        assert_eq!(edges.len(), 1, "initial content must create wikilink edges");
+        assert_eq!(edges[0].source_node_id, node.id);
+        assert_eq!(edges[0].target_node_id, "b");
+        assert_eq!(edges[0].link_type, "wikilink");
+    }
+
+    #[tokio::test]
+    async fn create_node_without_links_creates_no_edges() {
+        let pool = memory_pool().await;
+        sqlx::query(
+            "INSERT INTO nodes (id, title, created_at, updated_at) VALUES ('b', 'beta', 0, 0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        create_node_impl(&pool, create_input("alpha", Some("plain text")))
+            .await
+            .unwrap();
+        create_node_impl(&pool, create_input("gamma", None))
+            .await
+            .unwrap();
+
+        assert!(database::edges::get_all(&pool).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_node_skips_wikilink_edge_for_already_connected_pair() {
+        let pool = memory_pool().await;
+        sqlx::query(
+            "INSERT INTO nodes (id, title, created_at, updated_at) VALUES ('b', 'beta', 0, 0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let node = create_node_impl(
+            &pool,
+            create_input("alpha", Some("see [[beta]] and [[beta]]")),
+        )
+        .await
+        .unwrap();
+
+        let edges = database::edges::get_all(&pool).await.unwrap();
+        assert_eq!(
+            edges.len(),
+            1,
+            "duplicate links must not create parallel edges"
+        );
+        assert_eq!(edges[0].source_node_id, node.id);
     }
 
     #[tokio::test]

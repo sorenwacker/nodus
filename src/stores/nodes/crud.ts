@@ -411,6 +411,15 @@ export async function createNode(
     const node = await invoke<Node>('create_node', { input: inputWithWorkspace })
     state.nodes.value.push(node)
     state.nodeLayoutVersion.value++ // Trigger reactivity for displayNodes/visibleNodes
+    // The backend creates wikilink edges from initial content; pull them in
+    // so they render without waiting for a content edit
+    if (inputWithWorkspace.markdown_content && extractWikilinks(inputWithWorkspace.markdown_content).size > 0) {
+      try {
+        await deps.edgesStore.loadEdges(deps.workspaceStore.currentWorkspaceId)
+      } catch (e) {
+        storeLogger.error('Failed to load wikilink edges for new node:', e)
+      }
+    }
     return node
   } catch (e) {
     console.error('Failed to create node:', e)

@@ -101,6 +101,63 @@ describe('updateNodeContent wikilink sync', () => {
     expect(edgesStore.edges.map((e: Edge) => e.id)).toEqual(['e1'])
   })
 
+  it('reloads edges after creating a node whose content has wikilinks', async () => {
+    const createdNode = { ...makeNode('a', 'alpha'), markdown_content: 'see [[concepts/beta]]' }
+    const backendEdge: Edge = {
+      id: 'e1',
+      source_node_id: 'a',
+      target_node_id: 'b',
+      label: null,
+      link_type: 'wikilink',
+      weight: 1,
+      color: null,
+      storyline_id: null,
+      created_at: 0,
+      directed: true,
+    }
+    invokeMock.mockImplementation((command: string) => {
+      switch (command) {
+        case 'create_node':
+          return Promise.resolve(createdNode)
+        case 'get_edges':
+          return Promise.resolve([backendEdge])
+        default:
+          return Promise.reject(new Error(`Mock: unhandled ${command}`))
+      }
+    })
+
+    const store = useNodesStore()
+    const edgesStore = useEdgesStore()
+    store.nodes.push(makeNode('b', 'beta'))
+
+    // The backend creates wikilink edges from initial content; the store
+    // must pull them in so they render without a content edit
+    await store.createNode({
+      title: 'alpha',
+      markdown_content: 'see [[concepts/beta]]',
+      canvas_x: 0,
+      canvas_y: 0,
+    })
+
+    expect(edgesStore.edges.map((e: Edge) => e.id)).toEqual(['e1'])
+  })
+
+  it('does not reload edges when created content has no wikilinks', async () => {
+    invokeMock.mockImplementation((command: string) => {
+      switch (command) {
+        case 'create_node':
+          return Promise.resolve(makeNode('a', 'alpha'))
+        default:
+          return Promise.reject(new Error(`Mock: unhandled ${command}`))
+      }
+    })
+
+    const store = useNodesStore()
+    await store.createNode({ title: 'alpha', canvas_x: 0, canvas_y: 0 })
+
+    expect(invokeMock).not.toHaveBeenCalledWith('get_edges', expect.anything())
+  })
+
   it('falls back to title-based resolution without a backend', async () => {
     invokeMock.mockRejectedValue(new Error('Mock: No backend'))
 
