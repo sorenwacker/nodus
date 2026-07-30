@@ -87,6 +87,21 @@ export interface McpStoreInterface {
   getFilteredEdges: () => Edge[]
   getNode: (id: string) => Node | undefined
 
+  // Workspace scoping: lets a connection target a workspace other than the
+  // one open in the app (parallel agents on parallel workspaces)
+  getAllNodes: () => Node[]
+  getAllFrames: () => Frame[]
+  getWorkspaces: () => Array<{ id: string; name: string; current: boolean }>
+  loadWorkspaceEdges: (workspaceId: string | null) => Promise<Edge[]>
+  createEdgeRaw: (data: {
+    source_node_id: string
+    target_node_id: string
+    label?: string
+    link_type?: string
+    directed?: boolean
+  }) => Promise<Edge>
+  deleteEdgeRaw: (id: string) => Promise<void>
+
   // Write operations
   createNode: (data: {
     title: string
@@ -96,6 +111,7 @@ export interface McpStoreInterface {
     width?: number
     height?: number
     node_type?: string
+    workspace_id?: string
   }) => Promise<Node>
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
@@ -164,12 +180,54 @@ export function createMcpMessageHandler(
   viewport?: McpViewportInterface,
   undo?: McpUndoInterface
 ) {
+  // Workspace each connection targets; absent = follow the open workspace.
+  // The stored value uses null for the default workspace.
+  const connectionWorkspaces = new Map<string, string | null>()
+
+  function resolveWorkspace(input: string): { id: string | null; name: string } | null {
+    const workspaces = store.getWorkspaces()
+    const match = workspaces.find(
+      w => w.id === input || w.name.toLowerCase() === input.toLowerCase()
+    )
+    if (!match) return null
+    return { id: match.id === 'default' ? null : match.id, name: match.name }
+  }
+
+  /** Store view scoped to one workspace, regardless of what the app shows */
+  async function scopedStoreFor(workspaceId: string | null): Promise<McpStoreInterface> {
+    const edges = await store.loadWorkspaceEdges(workspaceId)
+    return {
+      ...store,
+      getFilteredNodes: () =>
+        store
+          .getAllNodes()
+          .filter(n => (n.workspace_id ?? null) === workspaceId && !n.deleted_at),
+      getFilteredEdges: () => edges,
+      getFilteredFrames: () =>
+        store.getAllFrames().filter(f => (f.workspace_id ?? null) === workspaceId),
+      createNode: data =>
+        store.createNode({ ...data, workspace_id: workspaceId === null ? 'default' : workspaceId }),
+      // Edge writes bypass the live edge store, which only holds the open
+      // workspace's edges
+      createEdge: data => store.createEdgeRaw(data),
+      deleteEdge: id => store.deleteEdgeRaw(id),
+    }
+  }
+
+  /** Forget a connection's workspace when it disconnects */
+  function handleConnectionClosed(connectionId: string): void {
+    connectionWorkspaces.delete(connectionId)
+  }
+
   /**
    * Handle an incoming MCP request and return a response
    */
-  async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+  async function handleRequest(
+    request: JsonRpcRequest,
+    connectionId?: string
+  ): Promise<JsonRpcResponse> {
     try {
-      const result = await routeRequest(request)
+      const result = await routeRequest(request, connectionId)
       return createSuccessResponse(request.id, result)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -192,9 +250,65 @@ export function createMcpMessageHandler(
   }
 
   /**
-   * Route request to appropriate handler
+   * Route a request: workspace-scoping methods are handled here, everything
+   * else dispatches against the connection's effective workspace view
    */
-  async function routeRequest(request: JsonRpcRequest): Promise<unknown> {
+  async function routeRequest(request: JsonRpcRequest, connectionId?: string): Promise<unknown> {
+    const params = (request.params || {}) as Record<string, unknown>
+
+    switch (request.method) {
+      case 'list_workspaces':
+        return store.getWorkspaces()
+
+      case 'set_workspace': {
+        const input = params.workspace
+        if (typeof input !== 'string' || !input) {
+          throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, 'workspace (id or name) required')
+        }
+        if (connectionId === undefined) {
+          throw new McpError(
+            JsonRpcErrorCodes.INVALID_PARAMS,
+            'set_workspace requires a connection'
+          )
+        }
+        const resolved = resolveWorkspace(input)
+        if (!resolved) {
+          throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, `Unknown workspace: ${input}`)
+        }
+        connectionWorkspaces.set(connectionId, resolved.id)
+        return { success: true, workspace: resolved.name }
+      }
+
+      case 'get_workspace': {
+        const scopedTo =
+          connectionId !== undefined && connectionWorkspaces.has(connectionId)
+            ? connectionWorkspaces.get(connectionId)!
+            : undefined
+        if (scopedTo === undefined) {
+          return { scoped: false, workspace: store.getWorkspaces().find(w => w.current)?.name }
+        }
+        const id = scopedTo === null ? 'default' : scopedTo
+        return { scoped: true, workspace: store.getWorkspaces().find(w => w.id === id)?.name }
+      }
+    }
+
+    const hasScope = connectionId !== undefined && connectionWorkspaces.has(connectionId)
+    if (hasScope) {
+      const scopedStore = await scopedStoreFor(connectionWorkspaces.get(connectionId!)!)
+      // Foreign-workspace changes stay off the user's undo stack
+      return dispatchRequest(request, scopedStore, undefined)
+    }
+    return dispatchRequest(request, store, undo)
+  }
+
+  /**
+   * Dispatch a request to its handler against the given store view
+   */
+  async function dispatchRequest(
+    request: JsonRpcRequest,
+    store: McpStoreInterface,
+    undo?: McpUndoInterface
+  ): Promise<unknown> {
     const params = request.params || {}
 
     switch (request.method) {
@@ -458,5 +572,5 @@ export function createMcpMessageHandler(
     return { success: true }
   }
 
-  return { handleRequest }
+  return { handleRequest, handleConnectionClosed }
 }

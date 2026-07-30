@@ -33,7 +33,11 @@ export function useMcpServer(options: UseMcpServerOptions) {
   const error = ref<string | null>(null)
 
   // Create message handler
-  const { handleRequest } = createMcpMessageHandler(options.store, options.viewport, options.undo)
+  const { handleRequest, handleConnectionClosed } = createMcpMessageHandler(
+    options.store,
+    options.viewport,
+    options.undo
+  )
 
   // Event listeners
   const unlistenFns: UnlistenFn[] = []
@@ -136,7 +140,7 @@ export function useMcpServer(options: UseMcpServerOptions) {
    * Handle incoming MCP message
    */
   async function handleMessage(connectionId: string, request: JsonRpcRequest): Promise<void> {
-    const response = await handleRequest(request)
+    const response = await handleRequest(request, connectionId)
     await sendResponse(connectionId, response)
   }
 
@@ -174,6 +178,7 @@ export function useMcpServer(options: UseMcpServerOptions) {
         const { connection_id } = event.payload
         pendingConnections.value = pendingConnections.value.filter((id) => id !== connection_id)
         approvedConnections.value = approvedConnections.value.filter((id) => id !== connection_id)
+        handleConnectionClosed(connection_id)
         options.onConnectionClosed?.(connection_id)
         console.log(`[MCP] Connection closed: ${connection_id}`)
       }

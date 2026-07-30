@@ -957,6 +957,8 @@ Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integr
 
 ### MCP Server
 
+Workspace scoping: each connection can target its own workspace via `list_workspaces` / `set_workspace` (id or name), independent of the workspace open in the app — multiple agents can work different workspaces in parallel. An unscoped connection follows the open workspace. Scoped reads serve that workspace's nodes, edges, and frames; node creation lands there; scoped changes stay off the user's undo stack.
+
 Connection trust: a client's first connection requires user approval in the app. On approval the server issues a random token whose SHA-256 hash is stored in the `mcp_trusted_clients` table; the client persists the token (`~/.nodus/mcp-token`) and presents it via an `authenticate` request on later connections, which are then approved without a prompt. Clients that present no valid token get the approval prompt after a short grace period or on their first request. Settings > Integrations shows the number of trusted clients and can forget them all, which revokes every stored token.
 
 ```yaml

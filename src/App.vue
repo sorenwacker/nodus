@@ -146,7 +146,8 @@ const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
-import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
+import { invoke, getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
+import type { Edge } from './types'
 
 // MCP Server
 import { useMcpServer } from './composables/useMcpServer'
@@ -254,6 +255,19 @@ const mcpServer = useMcpServer({
     getFilteredNodes: () => store.filteredNodes,
     getFilteredEdges: () => store.graphEdges,
     getNode: store.getNode,
+    // Workspace scoping: lets each MCP connection target its own workspace
+    getAllNodes: () => store.nodes,
+    getAllFrames: () => store.frames,
+    getWorkspaces: () => {
+      const current = store.currentWorkspaceId ?? 'default'
+      return [
+        { id: 'default', name: 'Default', current: current === 'default' },
+        ...store.workspaces.map(w => ({ id: w.id, name: w.name, current: w.id === current })),
+      ]
+    },
+    loadWorkspaceEdges: (workspaceId) => invoke<Edge[]>('get_edges', { workspaceId }),
+    createEdgeRaw: (data) => invoke<Edge>('create_edge', { input: data }),
+    deleteEdgeRaw: (id) => invoke('delete_edge', { id }),
     createNode: store.createNode,
     updateNodeContent: store.updateNodeContent,
     updateNodeTitle: store.updateNodeTitle,
