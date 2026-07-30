@@ -127,6 +127,7 @@ Changes sync between Nodus and your vault folder:
 - Edit in Nodus → updates Obsidian vault
 - Edit in Obsidian → updates Nodus canvas
 - File watcher detects external changes
+- With sync disabled, edits change only the Nodus database; vault files are never written
 
 ### Workspace Separation
 Each imported vault becomes a separate workspace, keeping projects organized.

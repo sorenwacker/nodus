@@ -2,6 +2,14 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Node content updates no longer rewrite vault files while folder sync is off. Write-back now requires a sync-enabled workspace whose vault contains the file; otherwise only the database changes (#43)
+- Wikilink sync no longer creates a parallel edge when the node pair is already connected by a manual edge, in either direction (#43)
+- Edges of trashed notes are excluded from edge queries, graph summaries, structure, and orphan detection, and the database orphan cleanup now removes them; ghost "Unknown" entries no longer appear in analytics (#44)
+- Content updates resolve wikilinks through the backend resolver, so `[[folder/note]]` and `[[note#section]]` links create edges from every code path instead of being silently dropped and having their existing edges deleted (#45)
+
 ## [1.0.0] - 2026-07-20
 
 First stable release. Consolidates the 0.7.0-rc.1 review remediation (backend
