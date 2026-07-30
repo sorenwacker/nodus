@@ -311,6 +311,49 @@
   min-height: 0;
 }
 
+/* Storyline panel reveal: width animates so the separator moves automatically */
+.storyline-reveal {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.2s ease;
+  border-right: 1px solid var(--border-default);
+}
+
+.storyline-reveal.resizing {
+  transition: none;
+}
+
+.storyline-reveal-inner {
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.panel-resizer:hover {
+  background: var(--primary-color);
+  opacity: 0.4;
+}
+
+.edge-hotzone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  z-index: 40;
+}
+
 /* Reader mode: canvas shrinks, reader slides in */
 .main-content .with-reader {
   flex: 1;

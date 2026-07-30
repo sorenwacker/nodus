@@ -6,6 +6,7 @@ import { useThemesStore } from './stores/themes'
 import { useAppSearch } from './composables/useAppSearch'
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNotifications } from './composables/useNotifications'
+import { usePanelReveal } from './composables/usePanelReveal'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
@@ -35,13 +36,24 @@ const search = useAppSearch({
 })
 const { searchQuery, showSearch, searchResults, toggleSearch, closeSearch, selectResult: selectSearchResult } = search
 const currentTheme = computed(() => themesStore.currentThemeName)
-const showStorylinePanel = ref(false)
 const readerStorylineId = ref<string | null>(null)
+const storylineRevealRef = ref<HTMLElement | null>(null)
+
+// Storyline panel: opens when the pointer reaches the left edge, closes when
+// it returns to the canvas, and can be pinned via the toolbar button. Kept
+// open during node drags, drop handling, and while an input inside has focus.
+const storylinePanel = usePanelReveal({
+  storageKey: 'nodus-storyline-panel-width',
+  closeGuard: () =>
+    document.body.classList.contains('node-dragging') ||
+    window.__storylinePanelDropTarget === true ||
+    (storylineRevealRef.value?.contains(document.activeElement) ?? false),
+})
 
 function toggleStorylinePanel() {
-  showStorylinePanel.value = !showStorylinePanel.value
-  // Close reader when hiding the panel
-  if (!showStorylinePanel.value) {
+  storylinePanel.togglePin()
+  // Close reader when unpinning the panel
+  if (!storylinePanel.pinned.value) {
     readerStorylineId.value = null
   }
 }
@@ -661,7 +673,7 @@ async function openFolderDialog() {
       <div class="toolbar-actions">
         <button
           class="icon-btn"
-          :class="{ active: showStorylinePanel || readerStorylineId }"
+          :class="{ active: storylinePanel.pinned.value || readerStorylineId }"
           :data-tooltip="t('toolbar.storylines')"
           @click="toggleStorylinePanel"
         >
@@ -721,12 +733,35 @@ async function openFolderDialog() {
     </div>
 
     <main class="main-content">
-      <!-- Canvas always visible -->
-      <PixiCanvas ref="pixiCanvasRef" :class="{ 'with-reader': readerStorylineId }" />
-      <!-- Storyline panel - hidden when reader is open -->
-      <StorylinePanel
-        v-if="showStorylinePanel && !readerStorylineId"
-        @open-reader="(id) => readerStorylineId = id"
+      <!-- Storyline panel slides in from the left; hidden when reader is open -->
+      <div
+        v-if="!readerStorylineId"
+        ref="storylineRevealRef"
+        class="storyline-reveal"
+        :class="{ resizing: storylinePanel.resizing.value }"
+        :style="{ width: storylinePanel.isOpen.value ? storylinePanel.width.value + 'px' : '0px' }"
+        @mouseleave="storylinePanel.onPanelLeave"
+      >
+        <div class="storyline-reveal-inner" :style="{ width: storylinePanel.width.value + 'px' }">
+          <StorylinePanel @open-reader="(id) => readerStorylineId = id" />
+        </div>
+        <div
+          v-if="storylinePanel.isOpen.value"
+          class="panel-resizer"
+          @pointerdown="storylinePanel.beginResize"
+        ></div>
+      </div>
+      <!-- Hot zone: pointer at the left edge reveals the panel -->
+      <div
+        v-if="!storylinePanel.isOpen.value && !readerStorylineId"
+        class="edge-hotzone"
+        @mouseenter="storylinePanel.onEdgeEnter"
+      ></div>
+      <!-- Canvas always visible; entering it closes an unpinned panel peek -->
+      <PixiCanvas
+        ref="pixiCanvasRef"
+        :class="{ 'with-reader': readerStorylineId }"
+        @mouseenter="storylinePanel.onPanelLeave"
       />
       <!-- Reader slides in from right with its own contents -->
       <StorylineReader
