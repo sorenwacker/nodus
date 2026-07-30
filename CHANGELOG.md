@@ -4,6 +4,9 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
+
 ### Fixed
 - Nodes created with content (e.g. via MCP create_node or the LLM agent) now get wikilink edges for their `[[links]]` immediately; previously edges only appeared after a later content edit (#45)
 - Hashtags in initial node content are now extracted into tags on creation, matching the behavior of content edits

@@ -423,7 +423,6 @@
       "canvas": "Canevas",
       "display": "Affichage",
       "llm": "IA",
-      "zotero": "Zotero",
       "citations": "Citations",
       "integrations": "Intégrations"
     },
@@ -432,6 +431,7 @@
       "hint": "Importer des fichiers BibTeX ou CSL-JSON via Fichier > Importer des citations"
     },
     "advanced": "Avancé",
+    "aboutAndLicense": "À propos et licence",
     "display": {
       "fontScale": "Taille de police",
       "fontScaleHint": "Ajuster la taille du texte sur le canevas (Cmd+/Cmd- fonctionne aussi)",

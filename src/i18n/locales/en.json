@@ -427,7 +427,6 @@
       "canvas": "Canvas",
       "display": "Display",
       "llm": "AI",
-      "zotero": "Zotero",
       "citations": "Citations",
       "integrations": "Integrations"
     },
@@ -436,6 +435,7 @@
       "hint": "Import BibTeX or CSL-JSON files via File > Import Citations"
     },
     "advanced": "Advanced",
+    "aboutAndLicense": "About & License",
     "display": {
       "fontScale": "Font Scale",
       "fontScaleHint": "Adjust text size across the canvas (Cmd+/Cmd- also works)",

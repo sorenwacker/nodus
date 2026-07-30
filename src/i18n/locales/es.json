@@ -423,7 +423,6 @@
       "canvas": "Lienzo",
       "display": "Visualización",
       "llm": "IA",
-      "zotero": "Zotero",
       "citations": "Citas",
       "integrations": "Integraciones"
     },
@@ -432,6 +431,7 @@
       "hint": "Importar archivos BibTeX o CSL-JSON a través de Archivo > Importar citas"
     },
     "advanced": "Avanzado",
+    "aboutAndLicense": "Acerca de y licencia",
     "display": {
       "fontScale": "Tamaño de fuente",
       "fontScaleHint": "Ajustar el tamaño del texto en el lienzo (Cmd+/Cmd- también funciona)",

@@ -15,6 +15,7 @@ import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
 import ZoteroSettingsPanel from './settings/ZoteroSettingsPanel.vue'
 import McpSettingsPanel from './settings/McpSettingsPanel.vue'
 import WorkspaceDiagnosticsSection from './settings/WorkspaceDiagnosticsSection.vue'
+import { SETTINGS_TABS, type SettingsTabId } from './settings/tabs'
 
 const { t } = useI18n()
 const themesStore = useThemesStore()
@@ -23,8 +24,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
-// Active tab - broken into separate integration tabs
-const activeTab = ref<'general' | 'appearance' | 'canvas' | 'ai' | 'zotero' | 'citations' | 'integrations'>('general')
+const activeTab = ref<SettingsTabId>('general')
 
 // App version
 const appVersion = ref('')
@@ -35,8 +35,9 @@ const llmEnabled = ref(llmStorage.getLLMEnabled())
 // Language Settings
 const selectedLanguage = ref(getLocale())
 
-// Show advanced settings (diagnostics)
+// Collapsible General sections
 const showAdvanced = ref(false)
+const showAbout = ref(false)
 
 watch(selectedLanguage, async (locale) => {
   await loadLocale(locale)
@@ -73,46 +74,12 @@ function handleClose() {
 
       <nav class="settings-tabs">
         <button
-          :class="{ active: activeTab === 'general' }"
-          @click="activeTab = 'general'"
+          v-for="tab in SETTINGS_TABS"
+          :key="tab.id"
+          :class="{ active: activeTab === tab.id }"
+          @click="activeTab = tab.id"
         >
-          {{ t('settings.tabs.general') }}
-        </button>
-        <button
-          :class="{ active: activeTab === 'appearance' }"
-          @click="activeTab = 'appearance'"
-        >
-          {{ t('settings.tabs.appearance') }}
-        </button>
-        <button
-          :class="{ active: activeTab === 'canvas' }"
-          @click="activeTab = 'canvas'"
-        >
-          {{ t('settings.tabs.canvas') }}
-        </button>
-        <button
-          :class="{ active: activeTab === 'ai' }"
-          @click="activeTab = 'ai'"
-        >
-          {{ t('settings.tabs.llm') }}
-        </button>
-        <button
-          :class="{ active: activeTab === 'zotero' }"
-          @click="activeTab = 'zotero'"
-        >
-          {{ t('settings.tabs.zotero') }}
-        </button>
-        <button
-          :class="{ active: activeTab === 'citations' }"
-          @click="activeTab = 'citations'"
-        >
-          {{ t('settings.tabs.citations') }}
-        </button>
-        <button
-          :class="{ active: activeTab === 'integrations' }"
-          @click="activeTab = 'integrations'"
-        >
-          {{ t('settings.tabs.integrations') }}
+          {{ t(tab.labelKey) }}
         </button>
       </nav>
 
@@ -132,24 +99,6 @@ function handleClose() {
 
           <hr class="divider" />
 
-          <div class="setting-group">
-            <label>{{ t('settings.about') }}</label>
-            <div class="about-info">
-              <p><strong>{{ t('app.name') }}</strong> - {{ t('settings.aboutDescription') }}</p>
-              <p class="version">{{ t('settings.version') }} {{ appVersion }}</p>
-            </div>
-          </div>
-
-          <div class="setting-group">
-            <label>{{ t('settings.license') }}</label>
-            <div class="legal-disclaimer">
-              <p>{{ t('settings.licenseText') }}</p>
-              <p class="copyright">&copy; 2026 Soren Wacker</p>
-            </div>
-          </div>
-
-          <hr class="divider" />
-
           <!-- Advanced Section (collapsible) -->
           <button class="advanced-toggle" @click="showAdvanced = !showAdvanced">
             <svg
@@ -164,6 +113,33 @@ function handleClose() {
 
           <div v-if="showAdvanced" class="advanced-section">
             <WorkspaceDiagnosticsSection @close="handleClose" />
+          </div>
+
+          <!-- About & License Section (collapsible) -->
+          <button class="advanced-toggle" @click="showAbout = !showAbout">
+            <svg
+              class="chevron"
+              :class="{ rotated: showAbout }"
+              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            >
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+            {{ t('settings.aboutAndLicense') }}
+          </button>
+
+          <div v-if="showAbout" class="advanced-section">
+            <div class="setting-group">
+              <div class="about-info">
+                <p><strong>{{ t('app.name') }}</strong> - {{ t('settings.aboutDescription') }}</p>
+                <p class="version">{{ t('settings.version') }} {{ appVersion }}</p>
+              </div>
+            </div>
+            <div class="setting-group">
+              <div class="legal-disclaimer">
+                <p>{{ t('settings.licenseText') }}</p>
+                <p class="copyright">&copy; 2026 Soren Wacker</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -188,14 +164,11 @@ function handleClose() {
           </div>
         </div>
 
-        <!-- Zotero Settings -->
-        <div v-if="activeTab === 'zotero'" class="settings-section">
+        <!-- Citations (Zotero + citation import) -->
+        <div v-if="activeTab === 'citations'" class="settings-section">
           <p class="section-description">{{ t('settings.zotero.description') }}</p>
           <ZoteroSettingsPanel />
-        </div>
-
-        <!-- Citations Settings -->
-        <div v-if="activeTab === 'citations'" class="settings-section">
+          <hr class="divider" />
           <p class="section-description">{{ t('settings.citations.description') }}</p>
           <p class="hint">{{ t('settings.citations.hint') }}</p>
         </div>

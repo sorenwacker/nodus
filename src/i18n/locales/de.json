@@ -423,7 +423,6 @@
       "canvas": "Leinwand",
       "display": "Anzeige",
       "llm": "KI",
-      "zotero": "Zotero",
       "citations": "Zitate",
       "integrations": "Integrationen"
     },
@@ -432,6 +431,7 @@
       "hint": "BibTeX oder CSL-JSON Dateien über Datei > Zitate importieren"
     },
     "advanced": "Erweitert",
+    "aboutAndLicense": "Über & Lizenz",
     "display": {
       "fontScale": "Schriftgröße",
       "fontScaleHint": "Textgröße auf der Leinwand anpassen (Cmd+/Cmd- funktioniert auch)",
