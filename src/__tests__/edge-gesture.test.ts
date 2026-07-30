@@ -46,6 +46,27 @@ describe('createEdgeStepper', () => {
     expect(stepLeft).toHaveBeenCalledTimes(1)
   })
 
+  it('uses the dynamic right threshold per event', () => {
+    let band = 12
+    const stepRight = vi.fn()
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      rightThreshold: () => band,
+      stepRight,
+      stepLeft: vi.fn(),
+    })
+
+    stepper.onPointerX(990, WIDTH) // inside the 12px band
+    expect(stepRight).toHaveBeenCalledTimes(1)
+
+    band = 3 // band narrows once a layer is open
+    stepper.onPointerX(500, WIDTH) // re-arm
+    stepper.onPointerX(990, WIDTH) // 10px from edge: outside the narrow band
+    expect(stepRight).toHaveBeenCalledTimes(1)
+    stepper.onPointerX(998, WIDTH) // pressed against the edge
+    expect(stepRight).toHaveBeenCalledTimes(2)
+  })
+
   it('does not fire in the middle of the window', () => {
     const { stepper, stepRight, stepLeft } = makeStepper()
     stepper.onPointerX(500, WIDTH)

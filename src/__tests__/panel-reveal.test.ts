@@ -21,39 +21,31 @@ describe('usePanelReveal', () => {
     localStorageMock.clear()
   })
 
-  it('opens when the pointer reaches the edge and closes when it leaves the panel', () => {
+  it('opens on an edge push and stays open until closed', () => {
     const reveal = usePanelReveal()
     expect(reveal.isOpen.value).toBe(false)
 
     reveal.onEdgeEnter()
     expect(reveal.isOpen.value).toBe(true)
 
-    reveal.onPanelLeave()
+    reveal.close()
     expect(reveal.isOpen.value).toBe(false)
   })
 
-  it('stays open while pinned, even when the pointer leaves', () => {
+  it('close releases a pin as well', () => {
     const reveal = usePanelReveal()
     reveal.togglePin()
     expect(reveal.isOpen.value).toBe(true)
 
-    reveal.onPanelLeave()
-    expect(reveal.isOpen.value).toBe(true)
-
-    reveal.togglePin()
+    reveal.close()
     expect(reveal.isOpen.value).toBe(false)
+    expect(reveal.pinned.value).toBe(false)
   })
 
-  it('does not close while the close guard is active (e.g. node drag)', () => {
-    let dragging = true
-    const reveal = usePanelReveal({ closeGuard: () => dragging })
-
-    reveal.onEdgeEnter()
-    reveal.onPanelLeave()
-    expect(reveal.isOpen.value).toBe(true)
-
-    dragging = false
-    reveal.onPanelLeave()
+  it('unpinning via toggle closes the panel', () => {
+    const reveal = usePanelReveal()
+    reveal.togglePin()
+    reveal.togglePin()
     expect(reveal.isOpen.value).toBe(false)
   })
 

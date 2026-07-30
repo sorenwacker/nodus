@@ -39,29 +39,13 @@ const search = useAppSearch({
 const { searchQuery, showSearch, searchResults, toggleSearch, closeSearch, selectResult: selectSearchResult } = search
 const currentTheme = computed(() => themesStore.currentThemeName)
 const readerStorylineId = ref<string | null>(null)
-const storylineRevealRef = ref<HTMLElement | null>(null)
 
-// Storyline panel: opens when the pointer reaches the right edge, closes when
-// it returns to the canvas, and can be pinned via the toolbar button. Kept
-// open during node drags, drop handling, and while typing in a panel input.
-// The guard must only match editable elements: any click focuses a button,
-// and guarding on that would keep the panel open forever.
-function panelHasTypingFocus(): boolean {
-  const el = document.activeElement
-  if (!el || !storylineRevealRef.value?.contains(el)) return false
-  return (
-    el.tagName === 'INPUT' ||
-    el.tagName === 'TEXTAREA' ||
-    (el as HTMLElement).isContentEditable
-  )
-}
+// Storyline panel: opens on a right-edge push and stays open until a
+// left-edge push steps back (or the toolbar book button closes it) - steps,
+// not hover states
 const storylinePanel = usePanelReveal({
   side: 'right',
   storageKey: 'nodus-storyline-panel-width',
-  closeGuard: () =>
-    document.body.classList.contains('node-dragging') ||
-    window.__storylinePanelDropTarget === true ||
-    panelHasTypingFocus(),
 })
 
 // Edge-step navigation: each push against the right edge goes one step
@@ -101,6 +85,11 @@ function openReaderFromEdge() {
 // half-screen slot; stepping right from it enters the reader.
 const edgeStepper = createEdgeStepper({
   threshold: 12,
+  // Once a storyline layer occupies the edge, stepping deeper needs a push
+  // against the very edge; otherwise using the panel near the window border
+  // would fire it
+  rightThreshold: () =>
+    storylinePanel.isOpen.value || showTimelines.value || readerStorylineId.value ? 3 : 12,
   stepRight: () => {
     if (readerStorylineId.value) {
       readerFullWidth.value = true
@@ -840,20 +829,14 @@ async function openFolderDialog() {
     </div>
 
     <main class="main-content" :style="{ '--canvas-right-inset': canvasRightInset }">
-      <!-- Canvas always visible; entering it closes an unpinned panel peek -->
-      <PixiCanvas
-        ref="pixiCanvasRef"
-        :class="{ 'with-reader': readerStorylineId }"
-        @mouseenter="storylinePanel.onPanelLeave"
-      />
+      <!-- Canvas always visible beneath the storyline layers -->
+      <PixiCanvas ref="pixiCanvasRef" :class="{ 'with-reader': readerStorylineId }" />
       <!-- Storyline panel slides in from the right; collapsed (but kept
            mounted, so accordion state survives) while the reader is open -->
       <div
-        ref="storylineRevealRef"
         class="storyline-reveal"
         :class="{ resizing: storylinePanel.resizing.value, open: panelVisible }"
         :style="{ width: storylinePanel.width.value + 'px' }"
-        @mouseleave="storylinePanel.onPanelLeave"
       >
         <div
           v-if="panelVisible"

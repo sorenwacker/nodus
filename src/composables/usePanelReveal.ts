@@ -1,10 +1,9 @@
 /**
- * usePanelReveal - edge-hover reveal state for a side panel
+ * usePanelReveal - edge-step reveal state for a side panel
  *
- * The panel opens when the pointer reaches the screen edge and closes when it
- * leaves the panel again, unless it is pinned. A close guard lets callers keep
- * the panel open during interactions such as drag-and-drop. The panel width is
- * user-resizable within a clamped range and persisted under a storage key.
+ * The panel opens on an edge push and stays open until explicitly closed
+ * (a step back or the toolbar toggle). The panel width is user-resizable
+ * within a clamped range and persisted under a storage key.
  */
 import { ref, computed } from 'vue'
 
@@ -16,8 +15,6 @@ export interface PanelRevealOptions {
   side?: 'left' | 'right'
   /** localStorage key for the persisted width; omit to disable persistence */
   storageKey?: string
-  /** Return true while auto-close must be suppressed (drag, focus, ...) */
-  closeGuard?: () => boolean
 }
 
 export function usePanelReveal(options: PanelRevealOptions = {}) {
@@ -27,7 +24,6 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     defaultWidth = 260,
     side = 'left',
     storageKey,
-    closeGuard,
   } = options
 
   const pinned = ref(false)
@@ -53,11 +49,6 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
 
   function onEdgeEnter() {
     peeking.value = true
-  }
-
-  function onPanelLeave() {
-    if (resizing.value || closeGuard?.()) return
-    peeking.value = false
   }
 
   function togglePin() {
@@ -107,7 +98,6 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     resizing,
     width,
     onEdgeEnter,
-    onPanelLeave,
     togglePin,
     close,
     setWidth,
