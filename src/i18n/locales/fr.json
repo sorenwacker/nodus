@@ -376,7 +376,9 @@
     "collapseItems": "Masquer les éléments",
     "timelines": "Chronologies",
     "noStorylines": "Aucune storyline pour le moment",
-    "timelinesDateHint": "Définissez la date d'un nœud avec date: 20 BC ou 1969-07-20 dans son frontmatter"
+    "timelinesDateHint": "Définissez la date d'un nœud avec date: 20 BC ou 1969-07-20 dans son frontmatter",
+    "timelineFrom": "de (500 BC)",
+    "timelineTo": "à (2000)"
   },
   "nodePicker": {
     "newNode": "Nouveau nœud",

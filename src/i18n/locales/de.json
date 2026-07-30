@@ -376,7 +376,9 @@
     "collapseItems": "Einträge ausblenden",
     "timelines": "Zeitleisten",
     "noStorylines": "Noch keine Storylines",
-    "timelinesDateHint": "Den Zeitpunkt eines Knotens mit date: 20 BC oder 1969-07-20 im Frontmatter festlegen"
+    "timelinesDateHint": "Den Zeitpunkt eines Knotens mit date: 20 BC oder 1969-07-20 im Frontmatter festlegen",
+    "timelineFrom": "von (500 BC)",
+    "timelineTo": "bis (2000)"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",

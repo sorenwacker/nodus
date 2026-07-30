@@ -376,7 +376,9 @@
     "collapseItems": "Nascondi elementi",
     "timelines": "Cronologie",
     "noStorylines": "Ancora nessuna storyline",
-    "timelinesDateHint": "Imposta la data di un nodo con date: 20 BC o 1969-07-20 nel frontmatter"
+    "timelinesDateHint": "Imposta la data di un nodo con date: 20 BC o 1969-07-20 nel frontmatter",
+    "timelineFrom": "da (500 BC)",
+    "timelineTo": "a (2000)"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   extractFrontmatterDate,
+  extractFrontmatterField,
   parseHistoricalDate,
   formatYear,
 } from '../lib/timelineDates'
@@ -14,6 +15,13 @@ describe('extractFrontmatterDate', () => {
   it('returns null without frontmatter or date', () => {
     expect(extractFrontmatterDate('plain content')).toBeNull()
     expect(extractFrontmatterDate('---\ntitle: X\n---\nBody')).toBeNull()
+  })
+
+  it('reads arbitrary fields such as date_end for time spans', () => {
+    const content = '---\ndate: 800\ndate_end: 1800\n---\nBody'
+    expect(extractFrontmatterField(content, 'date')).toBe('800')
+    expect(extractFrontmatterField(content, 'date_end')).toBe('1800')
+    expect(extractFrontmatterField(content, 'missing')).toBeNull()
   })
 })
 
@@ -48,5 +56,28 @@ describe('formatYear', () => {
     expect(formatYear(-20)).toBe('20 BC')
     expect(formatYear(1969.55)).toBe('1970')
     expect(formatYear(1500)).toBe('1500')
+  })
+})
+
+describe('time-of-day support', () => {
+  it('parses timestamps with minute precision', () => {
+    const t1400 = parseHistoricalDate('1969-07-20 14:00')!
+    const t1500 = parseHistoricalDate('1969-07-20 15:00')!
+    expect(t1500).toBeGreaterThan(t1400)
+    // one hour apart, as a fraction of a year
+    expect((t1500 - t1400) * 365.25 * 24).toBeCloseTo(1, 1)
+  })
+
+  it('adapts axis labels to the span: years, days, then minutes', async () => {
+    const { formatAxisValue } = await import('../lib/timelineDates')
+    const noon = parseHistoricalDate('1969-07-20 12:30')!
+    expect(formatAxisValue(noon, 100)).toBe('1970')
+    expect(formatAxisValue(noon, 0.01)).toBe('Jul 20, 1969')
+    expect(formatAxisValue(noon, 0.0001)).toBe('Jul 20 12:30')
+  })
+
+  it('keeps BC values on year labels regardless of span', async () => {
+    const { formatAxisValue } = await import('../lib/timelineDates')
+    expect(formatAxisValue(-20, 0.0001)).toBe('20 BC')
   })
 })

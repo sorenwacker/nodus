@@ -6,15 +6,17 @@
  * order. Nodes shared between storylines are joined by dashed connectors.
  * Clicking a lane or bead opens that storyline in the reader.
  */
-import { computed, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import {
-  extractFrontmatterDate,
+  extractFrontmatterField,
   parseHistoricalDate,
   formatYear,
+  formatAxisValue,
 } from '../lib/timelineDates'
+import MarkdownContent from './MarkdownContent.vue'
 
 const { t } = useI18n()
 
@@ -42,13 +44,16 @@ interface Lane {
   color: string
   y: number
   beads: Array<{ nodeId: string; title: string; x: number; y: number; dateLabel: string | null }>
+  spans: Array<{ nodeId: string; title: string; x1: number; x2: number; y: number; dateLabel: string }>
 }
 
 interface LaneNode {
   nodeId: string
   title: string
   year: number | null
+  yearEnd: number | null
   raw: string | null
+  rawEnd: string | null
 }
 
 const laneNodes = computed<Array<{ storylineId: string; nodes: LaneNode[] }>>(() => {
@@ -58,27 +63,47 @@ const laneNodes = computed<Array<{ storylineId: string; nodes: LaneNode[] }>>(()
     storylineId: storyline.id,
     nodes: (storylineNodes.value.get(storyline.id) || []).map(nodeId => {
       const node = store.getNode(nodeId)
-      const raw = extractFrontmatterDate(node?.markdown_content || '')
+      const content = node?.markdown_content || ''
+      const raw = extractFrontmatterField(content, 'date')
+      const rawEnd = extractFrontmatterField(content, 'date_end')
       return {
         nodeId,
         title: node?.title || 'Unknown',
         year: parseHistoricalDate(raw),
+        yearEnd: parseHistoricalDate(rawEnd),
         raw,
+        rawEnd,
       }
     }),
   }))
 })
 
-// Shared time range across all lanes; null when no node has a date
+// Manual axis range, persisted; either side may be empty (auto)
+const rangeFromInput = ref(localStorage.getItem('nodus-timeline-range-from') || '')
+const rangeToInput = ref(localStorage.getItem('nodus-timeline-range-to') || '')
+watch(rangeFromInput, v => localStorage.setItem('nodus-timeline-range-from', v))
+watch(rangeToInput, v => localStorage.setItem('nodus-timeline-range-to', v))
+
+// Shared time range across all lanes; manual bounds override the automatic
+// fit per side. Null when no node has a date and no bounds are set.
 const timeRange = computed<{ min: number; max: number } | null>(() => {
   const years = laneNodes.value.flatMap(l =>
-    l.nodes.map(n => n.year).filter((y): y is number => y !== null)
+    l.nodes.flatMap(n => [n.year, n.yearEnd]).filter((y): y is number => y !== null)
   )
-  if (years.length === 0) return null
-  const min = Math.min(...years)
-  const max = Math.max(...years)
-  const pad = (max - min || 10) * 0.05
-  return { min: min - pad, max: max + pad }
+  const manualMin = parseHistoricalDate(rangeFromInput.value)
+  const manualMax = parseHistoricalDate(rangeToInput.value)
+  if (years.length === 0 && (manualMin === null || manualMax === null)) return null
+  const autoMin = years.length ? Math.min(...years) : 0
+  const autoMax = years.length ? Math.max(...years) : 0
+  let min = manualMin ?? autoMin
+  let max = manualMax ?? autoMax
+  if (max <= min) max = min + 1
+  if (manualMin === null || manualMax === null) {
+    const pad = (max - min || 10) * 0.05
+    if (manualMin === null) min -= pad
+    if (manualMax === null) max += pad
+  }
+  return { min, max }
 })
 
 function yearToX(year: number): number {
@@ -119,30 +144,50 @@ const lanes = computed<Lane[]>(() => {
     const storyline = storylines.value[laneIndex]
     const y = AXIS_HEIGHT + PADDING + laneIndex * LANE_HEIGHT + LANE_HEIGHT / 2
     const xs = laneXs(lane.nodes)
+    const isSpan = (n: LaneNode) =>
+      timeRange.value !== null && n.year !== null && n.yearEnd !== null && n.yearEnd > n.year
     return {
       id: lane.storylineId,
       title: storyline.title,
       color: storyline.color || '#3b82f6',
       y,
-      beads: lane.nodes.map((n, i) => ({
+      beads: lane.nodes
+        .filter(n => !isSpan(n))
+        .map(n => ({
+          nodeId: n.nodeId,
+          title: n.title,
+          x: xs[lane.nodes.indexOf(n)],
+          y,
+          dateLabel: n.year !== null ? (n.raw ?? formatYear(n.year)) : null,
+        })),
+      spans: lane.nodes.filter(isSpan).map(n => ({
         nodeId: n.nodeId,
         title: n.title,
-        x: xs[i],
+        x1: yearToX(n.year!),
+        x2: yearToX(n.yearEnd!),
         y,
-        dateLabel: n.year !== null ? (n.raw ?? formatYear(n.year)) : null,
+        dateLabel: `${n.raw ?? formatYear(n.year!)} - ${n.rawEnd ?? formatYear(n.yearEnd!)}`,
       })),
     }
   })
 })
 
-// Axis ticks across the shared time range
+// Hovered node preview (same rendered content as canvas previews)
+const hoveredPreview = ref<{ nodeId: string; title: string; dateLabel: string | null; x: number; y: number } | null>(null)
+
+const hoveredPreviewContent = computed(() =>
+  hoveredPreview.value ? store.getNode(hoveredPreview.value.nodeId)?.markdown_content || '' : ''
+)
+
+// Axis ticks across the shared time range; label detail adapts to the span
+// (years, months, days, or clock time for sub-day narratives)
 const axisTicks = computed(() => {
   if (!timeRange.value) return []
   const { min, max } = timeRange.value
   const count = 6
   return Array.from({ length: count + 1 }, (_, i) => {
     const year = min + ((max - min) * i) / count
-    return { x: yearToX(year), label: formatYear(year) }
+    return { x: yearToX(year), label: formatAxisValue(year, max - min) }
   })
 })
 
@@ -207,6 +252,21 @@ onMounted(() => {
   <div class="timelines-view">
     <header class="timelines-header">
       <span class="timelines-title">{{ t('storyline.timelines') }}</span>
+      <div class="range-controls">
+        <input
+          v-model.trim="rangeFromInput"
+          type="text"
+          class="range-input"
+          :placeholder="t('storyline.timelineFrom')"
+        />
+        <span class="range-sep">-</span>
+        <input
+          v-model.trim="rangeToInput"
+          type="text"
+          class="range-input"
+          :placeholder="t('storyline.timelineTo')"
+        />
+      </div>
       <span class="timelines-hint">{{ t('storyline.timelinesDateHint') }}</span>
       <button class="close-btn" :data-tooltip="t('common.close')" @click="emit('close')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -285,6 +345,22 @@ onMounted(() => {
             :y2="lane.y"
             :stroke="lane.color"
           />
+          <!-- Time spans (date + date_end): bars instead of beads -->
+          <rect
+            v-for="span in lane.spans"
+            :key="`s${span.nodeId}`"
+            class="lane-span"
+            :x="span.x1"
+            :y="span.y - 6"
+            :width="Math.max(4, span.x2 - span.x1)"
+            height="12"
+            rx="6"
+            :fill="lane.color"
+            @mouseenter="hoveredPreview = { nodeId: span.nodeId, title: span.title, dateLabel: span.dateLabel, x: span.x1, y: span.y }"
+            @mouseleave="hoveredPreview = null"
+          >
+            <title>{{ span.title }} ({{ span.dateLabel }})</title>
+          </rect>
           <circle
             v-for="bead in lane.beads"
             :key="bead.nodeId"
@@ -293,11 +369,28 @@ onMounted(() => {
             :cy="bead.y"
             :r="BEAD_RADIUS"
             :fill="lane.color"
+            @mouseenter="hoveredPreview = { nodeId: bead.nodeId, title: bead.title, dateLabel: bead.dateLabel, x: bead.x, y: bead.y }"
+            @mouseleave="hoveredPreview = null"
           >
             <title>{{ bead.dateLabel ? `${bead.title} (${bead.dateLabel})` : bead.title }}</title>
           </circle>
         </g>
       </svg>
+
+      <!-- Hover preview: same rendered content as canvas node previews -->
+      <div
+        v-if="hoveredPreview"
+        class="bead-preview"
+        :style="{ left: `${Math.max(8, hoveredPreview.x - 140)}px`, top: `${hoveredPreview.y + 16}px` }"
+      >
+        <div class="bead-preview-title">{{ hoveredPreview.title }}</div>
+        <div v-if="hoveredPreview.dateLabel" class="bead-preview-date">{{ hoveredPreview.dateLabel }}</div>
+        <MarkdownContent
+          v-if="hoveredPreviewContent"
+          class="bead-preview-content"
+          :content="hoveredPreviewContent"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -380,10 +473,79 @@ onMounted(() => {
 }
 
 .timelines-scroll {
+  position: relative;
   flex: 1;
   overflow: auto;
   min-height: 0;
   overscroll-behavior: contain;
+}
+
+.range-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.range-input {
+  width: 90px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.range-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.range-sep {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.lane-span {
+  opacity: 0.75;
+  cursor: pointer;
+  stroke: var(--bg-surface);
+  stroke-width: 1;
+}
+
+.lane-span:hover {
+  opacity: 1;
+}
+
+.bead-preview {
+  position: absolute;
+  width: 280px;
+  max-height: 220px;
+  overflow: hidden;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--shadow-md);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.bead-preview-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.bead-preview-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.bead-preview-content {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .timeline-lane {

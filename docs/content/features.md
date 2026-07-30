@@ -127,7 +127,10 @@ In the overview:
 Timelines live along the bottom of the window: a push of the pointer against the bottom edge (or the timelines button in the storyline overview) slides up a sheet showing all storylines; the graph stays visible above it, and it can be open alongside the overview:
 
 - Every storyline is a horizontal lane in its color; its nodes are beads in order
-- A node states its point in time with a `date:` frontmatter field — `date: 20 BC`, `date: 1969-07-20`, `date: 1500`. Dated nodes are placed on a shared time axis (BC dates supported); undated nodes are interpolated between their dated neighbours
+- A node states its point in time with a `date:` frontmatter field — `date: 20 BC`, `date: 1969-07-20`, `date: 1969-07-20 14:30`, `date: 1500`. Dated nodes are placed on a shared time axis (BC dates and minute-precision timestamps supported); undated nodes are interpolated between their dated neighbours
+- A node spanning time (an era, a long work) adds `date_end:` and is drawn as a bar from start to end instead of a bead
+- The from/to fields in the sheet's header fix the axis range (same date formats); either side left empty fits automatically, and the chosen range persists. Axis labels adapt to the span: years, months, days, or clock times for narratives playing out within hours
+- Hovering a bead or bar shows the node's rendered content preview
 - Nodes shared between storylines are joined by dashed connectors, and graph edges between timeline nodes are drawn as arcs
 - Clicking a lane or bead opens that storyline in the reader; a left-edge push or the close button slides the sheet away
 
