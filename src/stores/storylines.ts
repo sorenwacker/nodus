@@ -99,6 +99,21 @@ export const useStorylinesStore = defineStore('storylines', () => {
     }
   }
 
+  /** Persist a user-chosen storyline order (overview and timelines follow it) */
+  async function reorderStorylines(ids: string[]): Promise<void> {
+    const byId = new Map(storylines.value.map(s => [s.id, s]))
+    const reordered = ids
+      .map(id => byId.get(id))
+      .filter((s): s is Storyline => s !== undefined)
+    const rest = storylines.value.filter(s => !ids.includes(s.id))
+    storylines.value = [...reordered, ...rest]
+    try {
+      await invoke('reorder_storylines', { ids })
+    } catch (e) {
+      storeLogger.error('Failed to persist storyline order:', e)
+    }
+  }
+
   async function deleteStoryline(id: string): Promise<void> {
     try {
       await invoke('delete_storyline', { id })
@@ -369,6 +384,7 @@ export const useStorylinesStore = defineStore('storylines', () => {
     createStoryline,
     updateStoryline,
     deleteStoryline,
+    reorderStorylines,
     addNodeToStoryline,
     removeNodeFromStoryline,
     reorderStorylineNodes,

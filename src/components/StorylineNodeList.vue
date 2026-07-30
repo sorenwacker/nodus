@@ -6,6 +6,7 @@ import NodePicker from './NodePicker.vue'
 import type { Node, CommentType } from '../types'
 import { COMMENT_STYLES } from '../types'
 import { parseCommentMeta } from '../composables/useCommentMeta'
+import { usePointerReorder, moveItem } from '../composables/usePointerReorder'
 
 const { t } = useI18n()
 
@@ -88,8 +89,6 @@ function getCommentDisplayText(node: Node): string {
 
 const showingInsertPicker = ref<number | null>(null)
 const hoveringInsertIndex = ref<number | null>(null)
-const draggingNodeIndex = ref<number | null>(null)
-const dragOverIndex = ref<number | null>(null)
 
 const excludedNodeIds = computed(() => props.nodes.map(n => n.id))
 
@@ -131,100 +130,20 @@ function hideNodeHover() {
   window.dispatchEvent(new CustomEvent('storyline-node-hover-end'))
 }
 
-// Pointer-based drag and drop (more reliable than HTML5 drag-drop in WebKit)
-let pointerStartY = 0
-let pointerCurrentY = 0
-let isDragging = false
-
-function onPointerDown(e: PointerEvent, index: number) {
-  // Only handle primary button (left click)
-  if (e.button !== 0) return
-  // Don't start drag on buttons
-  if ((e.target as HTMLElement).closest('button')) return
-
-  // Prevent text selection
-  e.preventDefault()
-
-  draggingNodeIndex.value = index
-  pointerStartY = e.clientY
-  pointerCurrentY = e.clientY
-  isDragging = false
-
-  // Add dragging class to body to prevent text selection globally
-  document.body.classList.add('storyline-dragging')
-
-  // Capture pointer for tracking
-  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-
-  document.addEventListener('pointermove', onPointerMove)
-  document.addEventListener('pointerup', onPointerUp)
-}
-
-function onPointerMove(e: PointerEvent) {
-  if (draggingNodeIndex.value === null) return
-
-  pointerCurrentY = e.clientY
-  const dragDistance = Math.abs(pointerCurrentY - pointerStartY)
-
-  // Start dragging after moving 5px
-  if (dragDistance > 5) {
-    isDragging = true
-  }
-
-  if (!isDragging) return
-
-  // Find which node we're hovering over
-  const elements = document.elementsFromPoint(e.clientX, e.clientY)
-  const nodeItem = elements.find(el => el.classList.contains('node-item'))
-
-  if (nodeItem) {
-    const allItems = Array.from(document.querySelectorAll('.node-list .node-item'))
-    const hoverIndex = allItems.indexOf(nodeItem)
-    if (hoverIndex !== -1 && hoverIndex !== draggingNodeIndex.value) {
-      dragOverIndex.value = hoverIndex
-    }
-  } else {
-    // Check insert zones
-    const insertZone = elements.find(el => el.classList.contains('insert-zone'))
-    if (insertZone) {
-      const allZones = Array.from(document.querySelectorAll('.node-list .insert-zone'))
-      const zoneIndex = allZones.indexOf(insertZone)
-      if (zoneIndex !== -1) {
-        dragOverIndex.value = zoneIndex
-      }
-    }
-  }
-}
-
-function onPointerUp(_e: PointerEvent) {
-  document.removeEventListener('pointermove', onPointerMove)
-  document.removeEventListener('pointerup', onPointerUp)
-
-  // Remove dragging class
-  document.body.classList.remove('storyline-dragging')
-
-  if (draggingNodeIndex.value === null) return
-
-  const fromIndex = draggingNodeIndex.value
-  const toIndex = dragOverIndex.value
-
-  if (isDragging && toIndex !== null && toIndex !== fromIndex) {
-    reorderNodes(fromIndex, toIndex)
-  }
-
-  draggingNodeIndex.value = null
-  dragOverIndex.value = null
-  isDragging = false
-}
+// Pointer-based drag and drop via the shared reorder mechanism
+const {
+  draggingIndex: draggingNodeIndex,
+  dragOverIndex,
+  onPointerDown,
+} = usePointerReorder({
+  itemSelector: '.node-item',
+  containerSelector: '.node-list',
+  onReorder: reorderNodes,
+})
 
 // Reorder nodes by moving from one index to another
 function reorderNodes(fromIndex: number, toIndex: number) {
-  const nodesCopy = [...props.nodes]
-  const [removed] = nodesCopy.splice(fromIndex, 1)
-  // Adjust target index when moving down (since we removed an element before it)
-  const adjustedTarget = toIndex > fromIndex ? toIndex - 1 : toIndex
-  nodesCopy.splice(adjustedTarget, 0, removed)
-  emit('reorder', nodesCopy.map(n => n.id))
+  emit('reorder', moveItem(props.nodes, fromIndex, toIndex).map(n => n.id))
 }
 
 // Handle drag over insert zones between nodes

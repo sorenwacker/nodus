@@ -49,6 +49,15 @@ pub async fn get_storylines(workspace_id: Option<String>) -> Result<Vec<Storylin
         .map_err(|e| e.to_string())
 }
 
+/// Persist a user-chosen storyline order
+#[tauri::command]
+pub async fn reorder_storylines(ids: Vec<String>) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::storylines::reorder(pool, &ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn get_storyline(id: String) -> Result<Option<Storyline>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;

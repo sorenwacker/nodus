@@ -275,6 +275,7 @@ fn main() {
             commands::get_locked_nodes,
             commands::create_storyline,
             commands::get_storylines,
+            commands::reorder_storylines,
             commands::get_storyline,
             commands::update_storyline,
             commands::delete_storyline,

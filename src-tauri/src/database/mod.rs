@@ -189,6 +189,9 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         .execute(pool)
         .await?;
 
+    // User-chosen storyline order in the overview and timelines
+    run_add_column_migration(pool, "ALTER TABLE storylines ADD COLUMN sort_order INTEGER").await?;
+
     // Incremental wikilink sync: last-synced hash per node + pending links
     run_add_column_migration(
         pool,
@@ -334,6 +337,45 @@ mod tests {
         let removed = edges::deduplicate(&pool).await.unwrap();
         assert_eq!(removed, 0, "distinct link_types are not duplicates");
         assert_eq!(edges::get_all(&pool).await.unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn storyline_reorder_persists_user_order() {
+        let pool = memory_pool().await;
+        run_migrations(&pool).await.unwrap();
+        for (id, created) in [("s1", 1), ("s2", 2), ("s3", 3)] {
+            let storyline = storylines::Storyline {
+                id: id.into(),
+                title: id.into(),
+                description: None,
+                color: None,
+                workspace_id: None,
+                created_at: created,
+                updated_at: created,
+            };
+            storylines::create(&pool, &storyline).await.unwrap();
+        }
+
+        // Default order follows creation
+        let before: Vec<String> = storylines::get_by_workspace(&pool, None)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(before, ["s1", "s2", "s3"]);
+
+        storylines::reorder(&pool, &["s3".into(), "s1".into(), "s2".into()])
+            .await
+            .unwrap();
+
+        let after: Vec<String> = storylines::get_by_workspace(&pool, None)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(after, ["s3", "s1", "s2"]);
     }
 
     #[tokio::test]

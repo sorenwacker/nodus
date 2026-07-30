@@ -169,7 +169,8 @@ pub mod storylines {
         let storylines = match workspace_id {
             Some(id) => {
                 sqlx::query_as::<_, Storyline>(
-                    "SELECT * FROM storylines WHERE workspace_id = ? ORDER BY created_at",
+                    "SELECT * FROM storylines WHERE workspace_id = ?
+                     ORDER BY COALESCE(sort_order, 1000000), created_at",
                 )
                 .bind(id)
                 .fetch_all(pool)
@@ -177,13 +178,28 @@ pub mod storylines {
             }
             None => {
                 sqlx::query_as::<_, Storyline>(
-                    "SELECT * FROM storylines WHERE workspace_id IS NULL ORDER BY created_at",
+                    "SELECT * FROM storylines WHERE workspace_id IS NULL
+                     ORDER BY COALESCE(sort_order, 1000000), created_at",
                 )
                 .fetch_all(pool)
                 .await?
             }
         };
         Ok(storylines)
+    }
+
+    /// Persist a user-chosen storyline order; ids are stored by position
+    pub async fn reorder(pool: &DbPool, ids: &[String]) -> Result<(), DatabaseError> {
+        let mut tx = pool.begin().await?;
+        for (position, id) in ids.iter().enumerate() {
+            sqlx::query("UPDATE storylines SET sort_order = ? WHERE id = ?")
+                .bind(position as i64)
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(())
     }
 
     pub async fn get_by_id(pool: &DbPool, id: &str) -> Result<Option<Storyline>, DatabaseError> {

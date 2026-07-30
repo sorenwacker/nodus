@@ -871,7 +871,10 @@ async function openFolderDialog() {
       <div
         class="storyline-reveal"
         :class="{ resizing: storylinePanel.resizing.value, open: panelVisible }"
-        :style="{ width: storylinePanel.width.value + 'px' }"
+        :style="{
+          width: storylinePanel.width.value + 'px',
+          bottom: showTimelines ? timelinesSheetHeight : '0px',
+        }"
       >
         <div
           v-if="panelVisible"

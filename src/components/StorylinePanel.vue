@@ -3,6 +3,8 @@ import { ref, computed, watch, inject, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
+import { useStorylinesStore } from '../stores/storylines'
+import { usePointerReorder, moveItem } from '../composables/usePointerReorder'
 import Icon from './Icon.vue'
 import StorylineSection from './StorylineSection.vue'
 import type { Node } from '../types'
@@ -30,6 +32,21 @@ const expandedStorylineIds = ref<Set<string>>(new Set())
 const panelRef = ref<HTMLElement | null>(null)
 
 const storylines = computed(() => store.filteredStorylines)
+
+// Reordering storylines uses the same mechanism as reordering their items
+const storylinesStore = useStorylinesStore()
+const {
+  draggingIndex: draggingSectionIndex,
+  dragOverIndex: dragOverSectionIndex,
+  onPointerDown: onSectionPointerDown,
+} = usePointerReorder({
+  itemSelector: '.storyline-section',
+  containerSelector: '.storylines-list',
+  // Drags start from the section header only; the body has its own item drag
+  ignoreSelector: '.section-body, button, input, textarea',
+  onReorder: (fromIndex, toIndex) =>
+    storylinesStore.reorderStorylines(moveItem(storylines.value, fromIndex, toIndex).map(s => s.id)),
+})
 
 // Nodes per storyline - reactive to store Map changes
 const nodesByStoryline = computed(() => {
@@ -210,16 +227,21 @@ watch(() => store.currentWorkspaceId, () => {
     <!-- Accordion of storyline sections -->
     <div class="storylines-list">
       <StorylineSection
-        v-for="storyline in storylines"
+        v-for="(storyline, i) in storylines"
         :key="storyline.id"
         :storyline="storyline"
         :nodes="nodesByStoryline[storyline.id] || []"
         :node-count="storylineNodeCounts[storyline.id] || 0"
         :expanded="expandedStorylineIds.has(storyline.id)"
         :drop-preview-index="dropPreviewIndexFor(storyline.id)"
-        :class="{ 'drop-target-section': dropPreview?.storylineId === storyline.id }"
+        :class="{
+          'drop-target-section': dropPreview?.storylineId === storyline.id,
+          'section-dragging': draggingSectionIndex === i,
+          'section-drag-over': dragOverSectionIndex === i,
+        }"
         @toggle="toggleSection(storyline.id)"
         @open-reader="(id) => emit('open-reader', id)"
+        @pointerdown="onSectionPointerDown($event, i)"
       />
 
       <div v-if="!storylines.length && !isCreating" class="empty-panel">
@@ -367,6 +389,14 @@ watch(() => store.currentWorkspaceId, () => {
 .drop-target-section {
   box-shadow: inset 0 0 0 2px var(--primary-color);
   border-radius: 6px;
+}
+
+.section-dragging {
+  opacity: 0.5;
+}
+
+.section-drag-over {
+  box-shadow: inset 0 2px 0 var(--primary-color);
 }
 
 .empty-panel {

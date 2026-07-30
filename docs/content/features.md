@@ -123,7 +123,9 @@ Moving between graph and storylines works in steps along the screen edges: each 
 In the overview:
 
 - Clicking a storyline row opens it in reader mode; the chevron on the row expands its ordered nodes inline instead
+- Drag a storyline row to reorder storylines — the same drag used for reordering nodes within a storyline; the order persists and the timelines lanes follow it
 - Several storylines can have their item lists expanded at once
+- The overview shortens above an open timelines sheet instead of overlapping it
 - Storyline titles wrap to at most two lines instead of being truncated
 - Drag the separator between panel and canvas to set the panel width; the width persists across sessions
 - Drag nodes from the canvas onto a storyline section to add them to that storyline
