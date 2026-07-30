@@ -16,6 +16,7 @@ const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'open-reader', storylineId: string): void
+  (e: 'open-timelines'): void
 }>()
 
 const store = useNodesStore()
@@ -163,6 +164,13 @@ watch(() => store.currentWorkspaceId, () => {
   >
     <header class="panel-header">
       <span class="panel-title">{{ t('toolbar.storylines') }}</span>
+      <button
+        class="add-btn"
+        :data-tooltip="t('storyline.timelines')"
+        @click="emit('open-timelines')"
+      >
+        <Icon name="timeline" :size="14" />
+      </button>
       <button
         v-if="!isCreating"
         class="add-btn"

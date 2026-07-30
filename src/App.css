@@ -311,42 +311,54 @@
   min-height: 0;
 }
 
-/* Timelines step: half window beside the graph */
+/* Storyline layers slide over the canvas with transforms (no layout reflow,
+   so the graph never re-renders during a transition) using one shared curve */
+:root {
+  --step-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --step-duration: 0.3s;
+}
+
+/* Timelines: independent full-screen view */
 .timelines-overlay {
-  width: 50%;
-  height: 100%;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  z-index: 46;
   border-left: 1px solid var(--border-default);
   overflow: hidden;
+  will-change: transform;
 }
 
-.reader-slide-enter-active {
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-
-.reader-slide-enter-from {
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-/* Reader close: slide back out to the right (opening animates in-component) */
+.reader-slide-enter-active,
 .reader-slide-leave-active {
-  transition: transform 0.25s ease, opacity 0.25s ease;
+  transition: transform var(--step-duration) var(--step-ease);
 }
 
+.reader-slide-enter-from,
 .reader-slide-leave-to {
   transform: translateX(100%);
-  opacity: 0;
 }
 
-/* Storyline panel reveal: width animates so the separator moves automatically */
+/* Storyline panel reveal: slides in over the canvas from the right */
 .storyline-reveal {
-  position: relative;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 45;
   display: flex;
-  flex-shrink: 0;
   overflow: hidden;
-  transition: width 0.2s ease;
+  background: var(--bg-surface);
   border-left: 1px solid var(--border-default);
+  transform: translateX(100%);
+  transition: transform var(--step-duration) var(--step-ease);
+  will-change: transform;
+}
+
+.storyline-reveal.open {
+  transform: translateX(0);
 }
 
 .storyline-reveal.resizing {

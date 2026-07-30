@@ -375,7 +375,8 @@
     "expandItems": "Mostra elementi",
     "collapseItems": "Nascondi elementi",
     "timelines": "Cronologie",
-    "noStorylines": "Ancora nessuna storyline"
+    "noStorylines": "Ancora nessuna storyline",
+    "timelinesDateHint": "Imposta la data di un nodo con date: 20 BC o 1969-07-20 nel frontmatter"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",

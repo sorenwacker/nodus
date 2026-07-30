@@ -445,35 +445,30 @@ watch(() => props.storylineId, loadStoryline)
 </template>
 
 <style scoped>
+/* Overlays the canvas (no layout reflow); enter/leave slide via App's
+   reader-slide transition, half <-> full steps animate width */
 .reader-overlay {
-  position: relative;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 47;
   display: flex;
   flex-direction: column;
   background: var(--bg-canvas);
-  animation: slideInFromRight 0.25s ease-out;
   overflow: hidden;
   flex-shrink: 0;
   border-left: 1px solid var(--border-default);
   height: 100%;
   overscroll-behavior: contain;
-  /* Smooth half <-> full step transitions; disabled while hand-dragging */
-  transition: width 0.25s ease;
+  transition: width var(--step-duration, 0.3s) var(--step-ease, ease);
+  will-change: transform;
 }
 
 .reader-overlay.resizing {
   transition: none;
 }
 
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
 
 /* Resize handle */
 .resize-handle {

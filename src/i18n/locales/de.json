@@ -375,7 +375,8 @@
     "expandItems": "Einträge anzeigen",
     "collapseItems": "Einträge ausblenden",
     "timelines": "Zeitleisten",
-    "noStorylines": "Noch keine Storylines"
+    "noStorylines": "Noch keine Storylines",
+    "timelinesDateHint": "Den Zeitpunkt eines Knotens mit date: 20 BC oder 1969-07-20 im Frontmatter festlegen"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",

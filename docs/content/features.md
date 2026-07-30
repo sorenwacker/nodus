@@ -108,11 +108,18 @@ Create linear narratives through your knowledge graph:
 Moving between graph and storylines works in steps along the screen edges: each push of the pointer against the right edge goes one step deeper into storylines, each push against the left edge steps back toward the graph.
 
 - Push right once: the storyline overview slides open on the right
-- Push right again: the timelines view opens at half the window — every storyline as a horizontal lane in its color, nodes as beads in sequence order, with connectors joining nodes shared between storylines
-- Push right a third time: the reader opens at full width with the last-read storyline (the first storyline initially)
-- Push left: each push steps back down — reader to timelines, timelines to the overview, overview to the plain graph
-- Clicking a lane or bead in the timelines view opens that storyline in the reader
+- Push right again: the reader opens at half the window, keeping the graph visible, with the last-read storyline (the first storyline initially)
+- Push right a third time: the reader expands to the full window
+- Push left: each push steps back down — full reader to half, half to the overview (or the timelines view, if the reader was opened from there), overview to the plain graph
 - The reader's left handle still resizes it freely between steps
+
+### Timelines
+The timelines button in the storyline overview opens an independent full-screen view of all storylines:
+
+- Every storyline is a horizontal lane in its color; its nodes are beads in order
+- A node states its point in time with a `date:` frontmatter field — `date: 20 BC`, `date: 1969-07-20`, `date: 1500`. Dated nodes are placed on a shared time axis (BC dates supported); undated nodes are interpolated between their dated neighbours
+- Nodes shared between storylines are joined by dashed connectors, and graph edges between timeline nodes are drawn as arcs
+- Clicking a lane or bead opens that storyline in the reader; a left-edge push or the close button returns to the overview
 - Moving the pointer from the open panel onto the canvas also closes it, unless it is pinned via the toolbar book button
 - Clicking a storyline row opens it in reader mode; the chevron on the row expands its ordered nodes inline instead
 - Several storylines can have their item lists expanded at once
