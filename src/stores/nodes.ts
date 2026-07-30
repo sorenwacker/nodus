@@ -273,7 +273,7 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function createNode(data: CreateNodeInput): Promise<Node> {
-    return createNodeFn(deps, data)
+    return createNodeFn(deps, data, tagNodesComposable)
   }
 
   async function deleteNode(id: string) {

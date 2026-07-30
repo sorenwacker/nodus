@@ -199,38 +199,7 @@ export async function updateNodeContent(
       console.error('Failed to update content:', e)
     }
 
-    // Extract hashtags and update tags
-    const extractedTags = extractHashtags(trimmedContent)
-    if (extractedTags.length > 0) {
-      // Merge with existing tags (deduplicate)
-      let existingTags: string[] = []
-      if (node.tags) {
-        try {
-          const parsed = JSON.parse(node.tags)
-          existingTags = Array.isArray(parsed) ? parsed : []
-        } catch {
-          // Malformed JSON in tags field - reset to empty array
-          storeLogger.warn(`Invalid JSON in tags for node ${id}, resetting`)
-          existingTags = []
-        }
-      }
-      const mergedTags = Array.from(new Set([...existingTags, ...extractedTags]))
-      node.tags = JSON.stringify(mergedTags)
-      try {
-        await invoke('update_node_tags', { id, tags: mergedTags })
-      } catch (e) {
-        console.error('Failed to update tags:', e)
-      }
-
-      // Create tag nodes if setting is enabled
-      if (tagStorage.getShowTagNodes() && tagNodesComposable) {
-        try {
-          await tagNodesComposable.createTagEdges(id, extractedTags)
-        } catch (e) {
-          console.error('Failed to create tag edges:', e)
-        }
-      }
-    }
+    await extractAndPersistHashtags(node, trimmedContent, tagNodesComposable)
 
     // Sync wikilink edges through the backend engine, whose resolver also
     // handles folder/note path links and #section anchors. The frontend
@@ -241,6 +210,49 @@ export async function updateNodeContent(
     } catch {
       // No backend (browser/dev mode): fall back to the local title-only diff
       await syncWikilinkEdgesLocal(deps, id, trimmedContent, createEdgeFn)
+    }
+  }
+}
+
+/**
+ * Extract hashtags from content, merge them into the node's tags, persist the
+ * result, and create tag nodes when the setting is enabled. Shared by content
+ * updates and node creation so both paths produce the same tags.
+ */
+async function extractAndPersistHashtags(
+  node: Node,
+  content: string,
+  tagNodesComposable?: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> }
+): Promise<void> {
+  const extractedTags = extractHashtags(content)
+  if (extractedTags.length === 0) return
+
+  // Merge with existing tags (deduplicate)
+  let existingTags: string[] = []
+  if (node.tags) {
+    try {
+      const parsed = JSON.parse(node.tags)
+      existingTags = Array.isArray(parsed) ? parsed : []
+    } catch {
+      // Malformed JSON in tags field - reset to empty array
+      storeLogger.warn(`Invalid JSON in tags for node ${node.id}, resetting`)
+      existingTags = []
+    }
+  }
+  const mergedTags = Array.from(new Set([...existingTags, ...extractedTags]))
+  node.tags = JSON.stringify(mergedTags)
+  try {
+    await invoke('update_node_tags', { id: node.id, tags: mergedTags })
+  } catch (e) {
+    console.error('Failed to update tags:', e)
+  }
+
+  // Create tag nodes if setting is enabled
+  if (tagStorage.getShowTagNodes() && tagNodesComposable) {
+    try {
+      await tagNodesComposable.createTagEdges(node.id, extractedTags)
+    } catch (e) {
+      console.error('Failed to create tag edges:', e)
     }
   }
 }
@@ -380,7 +392,8 @@ export async function moveNodesToWorkspace(
  */
 export async function createNode(
   deps: NodeStoreDependencies,
-  data: CreateNodeInput
+  data: CreateNodeInput,
+  tagNodesComposable?: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> }
 ): Promise<Node> {
   const { state, computed } = deps
 
@@ -411,6 +424,10 @@ export async function createNode(
     const node = await invoke<Node>('create_node', { input: inputWithWorkspace })
     state.nodes.value.push(node)
     state.nodeLayoutVersion.value++ // Trigger reactivity for displayNodes/visibleNodes
+    // Initial content must produce the same side effects as a content edit
+    if (node.markdown_content) {
+      await extractAndPersistHashtags(node, node.markdown_content, tagNodesComposable)
+    }
     // The backend creates wikilink edges from initial content; pull them in
     // so they render without waiting for a content edit
     if (inputWithWorkspace.markdown_content && extractWikilinks(inputWithWorkspace.markdown_content).size > 0) {

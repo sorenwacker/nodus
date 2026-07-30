@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 
@@ -18,46 +18,51 @@ const localStorageMock = {
 }
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
 
-// Mock Tauri invoke
+const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }))
+
+function defaultInvokeImpl(command: string): Promise<unknown> {
+  if (command === 'create_workspace') return Promise.resolve()
+  if (command === 'update_node_tags') return Promise.resolve()
+  if (command === 'update_node_content') return Promise.resolve(null)
+  if (command === 'create_node') {
+    return Promise.resolve({
+      id: crypto.randomUUID(),
+      title: 'Tag Node',
+      node_type: 'tag',
+      canvas_x: 100,
+      canvas_y: 100,
+      width: 100,
+      height: 40,
+      z_index: 0,
+      frame_id: null,
+      color_theme: 'var(--primary-color)',
+      is_collapsed: false,
+      tags: null,
+      workspace_id: null,
+      checksum: null,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      deleted_at: null,
+    })
+  }
+  if (command === 'create_edge') {
+    return Promise.resolve({
+      id: crypto.randomUUID(),
+      source_node_id: '',
+      target_node_id: '',
+      label: null,
+      link_type: 'tagged',
+      weight: 1,
+      created_at: Date.now(),
+    })
+  }
+  return Promise.reject(new Error('Mock: No backend'))
+}
+
+invokeMock.mockImplementation(defaultInvokeImpl)
+
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn().mockImplementation((command: string) => {
-    if (command === 'create_workspace') return Promise.resolve()
-    if (command === 'update_node_tags') return Promise.resolve()
-    if (command === 'update_node_content') return Promise.resolve(null)
-    if (command === 'create_node') {
-      return Promise.resolve({
-        id: crypto.randomUUID(),
-        title: 'Tag Node',
-        node_type: 'tag',
-        canvas_x: 100,
-        canvas_y: 100,
-        width: 100,
-        height: 40,
-        z_index: 0,
-        frame_id: null,
-        color_theme: 'var(--primary-color)',
-        is_collapsed: false,
-        tags: null,
-        workspace_id: null,
-        checksum: null,
-        created_at: Date.now(),
-        updated_at: Date.now(),
-        deleted_at: null,
-      })
-    }
-    if (command === 'create_edge') {
-      return Promise.resolve({
-        id: crypto.randomUUID(),
-        source_node_id: '',
-        target_node_id: '',
-        label: null,
-        link_type: 'tagged',
-        weight: 1,
-        created_at: Date.now(),
-      })
-    }
-    return Promise.reject(new Error('Mock: No backend'))
-  }),
+  invoke: invokeMock,
 }))
 
 // Mock Tauri event
@@ -201,6 +206,100 @@ See also: #related-work
       // Should return the existing one
       expect(tagNode2.id).toBe(tagNode1.id)
     })
+  })
+})
+
+describe('Hashtag extraction on node creation', () => {
+  beforeEach(() => {
+    localStorageMock.clear()
+    setActivePinia(createPinia())
+    invokeMock.mockReset()
+  })
+
+  afterEach(() => {
+    invokeMock.mockImplementation(defaultInvokeImpl)
+  })
+
+  function mockBackend() {
+    invokeMock.mockImplementation((command: string, args?: Record<string, unknown>) => {
+      if (command === 'create_node') {
+        const input = (args as { input: Record<string, unknown> }).input
+        return Promise.resolve({
+          id: 'n1',
+          title: input.title,
+          file_path: null,
+          markdown_content: input.markdown_content ?? null,
+          node_type: 'note',
+          canvas_x: 0,
+          canvas_y: 0,
+          width: 200,
+          height: 120,
+          z_index: 0,
+          frame_id: null,
+          color_theme: null,
+          is_collapsed: false,
+          tags: input.tags ? JSON.stringify(input.tags) : null,
+          workspace_id: null,
+          checksum: null,
+          created_at: 0,
+          updated_at: 0,
+          deleted_at: null,
+        })
+      }
+      if (command === 'update_node_tags') return Promise.resolve()
+      return Promise.reject(new Error(`Mock: unhandled ${command}`))
+    })
+  }
+
+  it('persists hashtags from initial content as tags', async () => {
+    mockBackend()
+    const store = useNodesStore()
+
+    const node = await store.createNode({
+      title: 'note',
+      markdown_content: 'about #research and #AI2024',
+      canvas_x: 0,
+      canvas_y: 0,
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('update_node_tags', {
+      id: 'n1',
+      tags: ['research', 'AI2024'],
+    })
+    expect(JSON.parse(node.tags!)).toEqual(['research', 'AI2024'])
+  })
+
+  it('merges content hashtags with explicitly provided tags', async () => {
+    mockBackend()
+    const store = useNodesStore()
+
+    const node = await store.createNode({
+      title: 'note',
+      markdown_content: 'about #extra',
+      canvas_x: 0,
+      canvas_y: 0,
+      tags: ['manual'],
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('update_node_tags', {
+      id: 'n1',
+      tags: ['manual', 'extra'],
+    })
+    expect(JSON.parse(node.tags!)).toEqual(['manual', 'extra'])
+  })
+
+  it('leaves tags untouched when content has no hashtags', async () => {
+    mockBackend()
+    const store = useNodesStore()
+
+    await store.createNode({
+      title: 'note',
+      markdown_content: 'plain text',
+      canvas_x: 0,
+      canvas_y: 0,
+    })
+
+    expect(invokeMock).not.toHaveBeenCalledWith('update_node_tags', expect.anything())
   })
 })
 
