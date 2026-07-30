@@ -955,7 +955,9 @@ Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integr
 - No meta-commentary
 - Be concise: data, definitions, or markdown only
 
-### MCP Server (Future)
+### MCP Server
+
+Connection trust: a client's first connection requires user approval in the app. On approval the server issues a random token whose SHA-256 hash is stored in the `mcp_trusted_clients` table; the client persists the token (`~/.nodus/mcp-token`) and presents it via an `authenticate` request on later connections, which are then approved without a prompt. Clients that present no valid token get the approval prompt after a short grace period or on their first request. Settings > Integrations shows the number of trusted clients and can forget them all, which revokes every stored token.
 
 ```yaml
 resources:

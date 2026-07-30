@@ -615,6 +615,9 @@
     "running": "Running",
     "stopped": "Stopped",
     "connections": "connections",
-    "configHint": "Add this to your Claude Desktop config:"
+    "configHint": "Add this to your Claude Desktop config:",
+    "trustedClients": "Trusted clients",
+    "forgetTrusted": "Forget all",
+    "trustedHint": "Approved connections are remembered and reconnect without a prompt. Forgetting revokes all stored trust tokens."
   }
 }

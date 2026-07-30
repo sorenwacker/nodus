@@ -54,6 +54,22 @@ async fn approve_mcp_connection(
 }
 
 #[tauri::command]
+async fn get_mcp_trusted_count() -> Result<i64, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::mcp_trust::count(pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn forget_mcp_trusted_clients() -> Result<u64, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::mcp_trust::clear(pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn send_mcp_response(
     state: tauri::State<'_, McpState>,
     connection_id: String,
@@ -288,6 +304,8 @@ fn main() {
             start_mcp_server,
             stop_mcp_server,
             approve_mcp_connection,
+            get_mcp_trusted_count,
+            forget_mcp_trusted_clients,
             send_mcp_response,
             get_mcp_status,
         ])

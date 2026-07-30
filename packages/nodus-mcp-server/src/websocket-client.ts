@@ -3,10 +3,36 @@
  */
 
 import WebSocket from 'ws'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 const DEFAULT_PORT = 9742
 const RECONNECT_DELAY = 3000
 const MAX_RECONNECT_ATTEMPTS = 10
+
+// Trust token issued by Nodus on first approval; presenting it on
+// reconnect skips the in-app approval prompt
+const TOKEN_DIR = join(homedir(), '.nodus')
+const TOKEN_FILE = join(TOKEN_DIR, 'mcp-token')
+
+function loadTrustToken(): string | null {
+  try {
+    const token = readFileSync(TOKEN_FILE, 'utf8').trim()
+    return token.length > 0 ? token : null
+  } catch {
+    return null
+  }
+}
+
+function saveTrustToken(token: string): void {
+  try {
+    mkdirSync(TOKEN_DIR, { recursive: true })
+    writeFileSync(TOKEN_FILE, token, { mode: 0o600 })
+  } catch (e) {
+    console.error('[MCP Client] Could not persist trust token:', e)
+  }
+}
 
 export interface JsonRpcRequest {
   jsonrpc: '2.0'
@@ -70,6 +96,7 @@ export class NodusWebSocketClient {
       this.ws.on('open', () => {
         console.error('[MCP Client] Connected')
         this.reconnectAttempts = 0
+        this.authenticate()
         this.options.onConnected?.()
         resolve()
       })
@@ -145,6 +172,22 @@ export class NodusWebSocketClient {
   }
 
   /**
+   * Present the stored trust token (if any) right after connecting, so a
+   * previously approved client skips the in-app approval prompt
+   */
+  private authenticate(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+    const token = loadTrustToken()
+    const request: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 'authenticate',
+      method: 'authenticate',
+      params: { label: 'nodus-mcp-server', ...(token ? { token } : {}) },
+    }
+    this.ws.send(JSON.stringify(request))
+  }
+
+  /**
    * Handle incoming message
    */
   private handleMessage(data: string): void {
@@ -155,7 +198,10 @@ export class NodusWebSocketClient {
       if (message.result && typeof message.result === 'object') {
         const result = message.result as Record<string, unknown>
         if (result.status === 'approved') {
-          console.error('[MCP Client] Connection approved by user')
+          console.error('[MCP Client] Connection approved')
+          if (typeof result.token === 'string') {
+            saveTrustToken(result.token)
+          }
           this.isApproved = true
           this.options.onApproved?.()
           return

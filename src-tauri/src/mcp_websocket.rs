@@ -7,6 +7,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tauri::Emitter;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message;
@@ -28,6 +29,10 @@ pub struct McpConnection {
     pub id: String,
     pub state: ConnectionState,
     pub sender: mpsc::UnboundedSender<Message>,
+    /// Self-reported client name from `authenticate`, stored with its trust record
+    pub label: String,
+    /// Whether the approval prompt has been shown for this connection
+    pub prompt_requested: bool,
 }
 
 impl McpConnection {
@@ -262,11 +267,25 @@ pub async fn approve_connection(
 
     if approved {
         conn.state = ConnectionState::Approved;
-        // Send approval confirmation
-        let response = JsonRpcResponse::success(
-            None,
-            serde_json::json!({"status": "approved", "message": "Connection approved by user"}),
-        );
+        // Issue a trust token so this client reconnects without re-prompting.
+        // Only its hash is stored; the token goes to the client.
+        let token = generate_trust_token();
+        let mut payload = serde_json::json!({
+            "status": "approved",
+            "message": "Connection approved by user",
+        });
+        match crate::database::get_pool() {
+            Ok(pool) => {
+                let hash = crate::checksum::compute_string(&token);
+                if let Err(e) = crate::database::mcp_trust::trust(pool, &hash, &conn.label).await {
+                    eprintln!("[MCP] Failed to persist trust token: {}", e);
+                } else {
+                    payload["token"] = serde_json::json!(token);
+                }
+            }
+            Err(e) => eprintln!("[MCP] No database for trust token: {}", e),
+        }
+        let response = JsonRpcResponse::success(None, payload);
         conn.send_text(serde_json::to_string(&response).unwrap());
         println!("[MCP] Connection {} approved", connection_id);
     } else {
@@ -282,6 +301,40 @@ pub async fn approve_connection(
     }
 
     Ok(())
+}
+
+/// Random 128-bit-plus token for persisted client trust
+fn generate_trust_token() -> String {
+    format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    )
+}
+
+/// Emit the approval prompt for a pending connection, once
+async fn request_prompt(
+    state: &Arc<McpServerState>,
+    app_handle: &tauri::AppHandle,
+    connection_id: &str,
+    peer_addr: Option<String>,
+) {
+    let mut connections = state.connections.write().await;
+    let Some(conn) = connections.get_mut(connection_id) else {
+        return;
+    };
+    if conn.state != ConnectionState::PendingApproval || conn.prompt_requested {
+        return;
+    }
+    conn.prompt_requested = true;
+    drop(connections);
+    let _ = app_handle.emit(
+        "mcp-connection-request",
+        ConnectionRequestEvent {
+            connection_id: connection_id.to_string(),
+            peer_addr,
+        },
+    );
 }
 
 /// Send a response to a specific connection
@@ -361,9 +414,9 @@ async fn handle_connection(
     // Create channel for sending messages to this connection
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
-    // All connections require approval (user preference)
-    let initial_state = ConnectionState::PendingApproval;
-    println!("[MCP] New connection {} requires approval", connection_id);
+    // All connections start pending; a client with a valid trust token
+    // authenticates silently, anything else gets the approval prompt
+    println!("[MCP] New connection {} pending", connection_id);
 
     // Register connection
     {
@@ -372,21 +425,28 @@ async fn handle_connection(
             connection_id.clone(),
             McpConnection {
                 id: connection_id.clone(),
-                state: initial_state.clone(),
+                state: ConnectionState::PendingApproval,
                 sender: tx,
+                label: String::new(),
+                prompt_requested: false,
             },
         );
     }
 
-    // Emit connection request for user approval
-    use tauri::Emitter;
-    let _ = app_handle.emit(
-        "mcp-connection-request",
-        ConnectionRequestEvent {
-            connection_id: connection_id.clone(),
-            peer_addr: peer_addr.map(|a| a.to_string()),
-        },
-    );
+    // Grace period: give the client a moment to authenticate with a trust
+    // token before showing the approval prompt (also covers clients that
+    // never authenticate: they get the prompt after the delay)
+    let peer_addr_str = peer_addr.map(|a| a.to_string());
+    {
+        let state = state.clone();
+        let app_handle = app_handle.clone();
+        let connection_id = connection_id.clone();
+        let peer_addr_str = peer_addr_str.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            request_prompt(&state, &app_handle, &connection_id, peer_addr_str).await;
+        });
+    }
 
     // Spawn task to forward outgoing messages
     let conn_id_out = connection_id.clone();
@@ -418,13 +478,74 @@ async fn handle_connection(
                         };
 
                         if !is_approved {
-                            // Only allow status check before approval
-                            let response = if request.method == "get_status" {
+                            // Before approval, a client may authenticate with
+                            // a previously issued trust token or check status;
+                            // anything else surfaces the approval prompt
+                            let response = if request.method == "authenticate" {
+                                let token = request.params.get("token").and_then(|t| t.as_str());
+                                let label = request
+                                    .params
+                                    .get("label")
+                                    .and_then(|l| l.as_str())
+                                    .unwrap_or("MCP client")
+                                    .to_string();
+                                let trusted = match token {
+                                    Some(token) => {
+                                        let hash = crate::checksum::compute_string(token);
+                                        match crate::database::get_pool() {
+                                            Ok(pool) => {
+                                                crate::database::mcp_trust::verify(pool, &hash)
+                                                    .await
+                                                    .unwrap_or(false)
+                                            }
+                                            Err(_) => false,
+                                        }
+                                    }
+                                    None => false,
+                                };
+                                let mut connections = state.connections.write().await;
+                                if let Some(conn) = connections.get_mut(&connection_id) {
+                                    conn.label = label;
+                                    if trusted {
+                                        conn.state = ConnectionState::Approved;
+                                    }
+                                }
+                                drop(connections);
+                                if trusted {
+                                    println!(
+                                        "[MCP] Connection {} trusted via token",
+                                        connection_id
+                                    );
+                                    JsonRpcResponse::success(
+                                        request.id.clone(),
+                                        serde_json::json!({"status": "approved", "message": "Trusted client"}),
+                                    )
+                                } else {
+                                    request_prompt(
+                                        &state,
+                                        &app_handle,
+                                        &connection_id,
+                                        peer_addr_str.clone(),
+                                    )
+                                    .await;
+                                    JsonRpcResponse::success(
+                                        request.id.clone(),
+                                        serde_json::json!({"status": "pending_approval"}),
+                                    )
+                                }
+                            } else if request.method == "get_status" {
                                 JsonRpcResponse::success(
                                     request.id.clone(),
                                     serde_json::json!({"status": "pending_approval"}),
                                 )
                             } else {
+                                request_prompt(
+                                    &state,
+                                    &app_handle,
+                                    &connection_id,
+                                    peer_addr_str.clone(),
+                                )
+                                .await;
                                 JsonRpcResponse::error(
                                     request.id.clone(),
                                     NOT_APPROVED,

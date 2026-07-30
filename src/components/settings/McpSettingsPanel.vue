@@ -5,10 +5,31 @@
  * Configure and control the MCP WebSocket server for AI tool integrations.
  * Uses shared MCP state from App.vue via inject.
  */
-import { computed, onMounted, inject, type Ref } from 'vue'
+import { computed, onMounted, inject, ref, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { invoke } from '../../lib/tauri'
 
 const { t } = useI18n()
+
+// Trusted clients (persisted approvals)
+const trustedCount = ref(0)
+
+async function refreshTrustedCount() {
+  try {
+    trustedCount.value = await invoke<number>('get_mcp_trusted_count')
+  } catch {
+    trustedCount.value = 0
+  }
+}
+
+async function forgetTrustedClients() {
+  try {
+    await invoke<number>('forget_mcp_trusted_clients')
+    await refreshTrustedCount()
+  } catch (e) {
+    console.error('[McpSettings] Failed to forget trusted clients:', e)
+  }
+}
 
 // Inject shared MCP state from App.vue
 const mcpRunning = inject<Ref<boolean>>('mcpRunning')
@@ -27,6 +48,7 @@ const error = computed(() => null) // TODO: inject error state if needed
 const MCP_ENABLED_KEY = 'nodus-mcp-enabled'
 
 onMounted(async () => {
+  refreshTrustedCount()
   // Sync state with backend
   if (mcpGetStatus && mcpRunning) {
     try {
@@ -100,6 +122,21 @@ const configSnippet = `{
         <pre class="config-snippet">{{ configSnippet }}</pre>
       </div>
     </div>
+
+    <div class="setting-group">
+      <div class="status-row">
+        <span class="status-label">{{ t('mcp.trustedClients') }}:</span>
+        <span class="status-value">{{ trustedCount }}</span>
+        <button
+          v-if="trustedCount > 0"
+          class="forget-btn"
+          @click="forgetTrustedClients"
+        >
+          {{ t('mcp.forgetTrusted') }}
+        </button>
+      </div>
+      <span class="hint">{{ t('mcp.trustedHint') }}</span>
+    </div>
   </div>
 </template>
 
@@ -147,6 +184,22 @@ const configSnippet = `{
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: 8px;
+}
+
+.forget-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.forget-btn:hover {
+  border-color: var(--danger-color, #ef4444);
+  color: var(--danger-color, #ef4444);
 }
 
 .status-row {

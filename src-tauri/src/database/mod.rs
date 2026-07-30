@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
 pub mod edges;
+pub mod mcp_trust;
 pub mod models;
 pub mod nodes;
 
@@ -182,6 +183,11 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
 
     // Add parent_frame_id column for nested frames support
     run_add_column_migration(pool, include_str!("../../migrations/011_frame_parent.sql")).await?;
+
+    // Trusted MCP clients (persisted connection approval)
+    sqlx::query(include_str!("../../migrations/012_mcp_trust.sql"))
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
