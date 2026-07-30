@@ -177,7 +177,7 @@ export async function updateNodeContent(
   tagNodesComposable?: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> },
   createEdgeFn?: (data: CreateEdgeInput) => Promise<Edge>
 ): Promise<void> {
-  const { state, edgesStore, computed } = deps
+  const { state, edgesStore } = deps
 
   // Remove trailing whitespace from each line, then trim the whole content
   const trimmedContent = content
@@ -232,60 +232,82 @@ export async function updateNodeContent(
       }
     }
 
-    // Extract wikilinks and sync edges
-    const links = extractWikilinks(trimmedContent)
-
-    // Build set of target node IDs from current wikilinks
-    const currentTargetIds = new Set<string>()
-    for (const linkTitle of links) {
-      const targetNode = findNodeByTitle(state.nodes.value, linkTitle)
-      if (targetNode && targetNode.id !== id) {
-        currentTargetIds.add(targetNode.id)
-      }
+    // Sync wikilink edges through the backend engine, whose resolver also
+    // handles folder/note path links and #section anchors. The frontend
+    // resolver matches exact titles only and would silently drop such links.
+    try {
+      await invoke<number>('sync_node_wikilinks', { nodeId: id })
+      await edgesStore.loadEdges(deps.workspaceStore.currentWorkspaceId)
+    } catch {
+      // No backend (browser/dev mode): fall back to the local title-only diff
+      await syncWikilinkEdgesLocal(deps, id, trimmedContent, createEdgeFn)
     }
+  }
+}
 
-    // Find existing wikilink edges from this node
-    const existingWikilinkEdges = computed.edges.value.filter(e =>
-      e.source_node_id === id && e.link_type === 'wikilink'
+/**
+ * Local wikilink edge diff used when no backend is available.
+ * Resolves links by exact title only.
+ */
+async function syncWikilinkEdgesLocal(
+  deps: NodeStoreDependencies,
+  id: string,
+  content: string,
+  createEdgeFn?: (data: CreateEdgeInput) => Promise<Edge>
+): Promise<void> {
+  const { state, edgesStore, computed } = deps
+  const links = extractWikilinks(content)
+
+  // Build set of target node IDs from current wikilinks
+  const currentTargetIds = new Set<string>()
+  for (const linkTitle of links) {
+    const targetNode = findNodeByTitle(state.nodes.value, linkTitle)
+    if (targetNode && targetNode.id !== id) {
+      currentTargetIds.add(targetNode.id)
+    }
+  }
+
+  // Find existing wikilink edges from this node
+  const existingWikilinkEdges = computed.edges.value.filter(e =>
+    e.source_node_id === id && e.link_type === 'wikilink'
+  )
+
+  // Delete edges that no longer have corresponding wikilinks
+  for (const edge of existingWikilinkEdges) {
+    if (!currentTargetIds.has(edge.target_node_id)) {
+      await edgesStore.deleteEdge(edge.id)
+    }
+  }
+
+  // Create edges for new wikilinks (or make existing reverse edges non-directional)
+  for (const targetId of currentTargetIds) {
+    // Check if edge already exists in this direction
+    const existsForward = computed.edges.value.some(e =>
+      e.source_node_id === id &&
+      e.target_node_id === targetId &&
+      e.link_type === 'wikilink'
+    )
+    if (existsForward) continue
+
+    // Check if reverse edge exists (target→source)
+    const reverseEdge = computed.edges.value.find(e =>
+      e.source_node_id === targetId &&
+      e.target_node_id === id &&
+      e.link_type === 'wikilink'
     )
 
-    // Delete edges that no longer have corresponding wikilinks
-    for (const edge of existingWikilinkEdges) {
-      if (!currentTargetIds.has(edge.target_node_id)) {
-        await edgesStore.deleteEdge(edge.id)
+    if (reverseEdge) {
+      // Reverse edge exists - make it non-directional instead of creating duplicate
+      if (reverseEdge.directed !== false) {
+        await edgesStore.updateEdgeDirected(reverseEdge.id, false)
       }
-    }
-
-    // Create edges for new wikilinks (or make existing reverse edges non-directional)
-    for (const targetId of currentTargetIds) {
-      // Check if edge already exists in this direction
-      const existsForward = computed.edges.value.some(e =>
-        e.source_node_id === id &&
-        e.target_node_id === targetId &&
-        e.link_type === 'wikilink'
-      )
-      if (existsForward) continue
-
-      // Check if reverse edge exists (target→source)
-      const reverseEdge = computed.edges.value.find(e =>
-        e.source_node_id === targetId &&
-        e.target_node_id === id &&
-        e.link_type === 'wikilink'
-      )
-
-      if (reverseEdge) {
-        // Reverse edge exists - make it non-directional instead of creating duplicate
-        if (reverseEdge.directed !== false) {
-          await edgesStore.updateEdgeDirected(reverseEdge.id, false)
-        }
-      } else if (createEdgeFn) {
-        // No edge in either direction - create new one
-        await createEdgeFn({
-          source_node_id: id,
-          target_node_id: targetId,
-          link_type: 'wikilink',
-        })
-      }
+    } else if (createEdgeFn) {
+      // No edge in either direction - create new one
+      await createEdgeFn({
+        source_node_id: id,
+        target_node_id: targetId,
+        link_type: 'wikilink',
+      })
     }
   }
 }
