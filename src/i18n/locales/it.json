@@ -411,7 +411,8 @@
     "importSuccess": "{count} nodi importati",
     "importFailed": "Importazione vault fallita",
     "syncedFiles": "{count} file sincronizzati",
-    "noMissingFiles": "Tutti i file sono già sincronizzati"
+    "noMissingFiles": "Tutti i file sono già sincronizzati",
+    "okfExported": "{count} documenti esportati come bundle OKF"
   },
   "settings": {
     "title": "Impostazioni",
@@ -561,7 +562,11 @@
     "vaultSyncHint": "Quando abilitato, i nuovi file nel vault vengono aggiunti come nodi e le modifiche ai file vengono sincronizzate.",
     "noWorkspaceSelected": "Nessuno spazio di lavoro selezionato",
     "syncMissingFiles": "Sincronizza file",
-    "syncing": "Sincronizzazione..."
+    "syncing": "Sincronizzazione...",
+    "okfExport": "Open Knowledge Format",
+    "okfExportBtn": "Esporta come bundle OKF",
+    "okfExporting": "Esportazione...",
+    "okfExportHint": "Scrive un bundle OKF v0.2 (Markdown con frontmatter e indice) nella cartella scelta. Lo spazio di lavoro non viene modificato."
   },
   "fileMove": {
     "collision": {

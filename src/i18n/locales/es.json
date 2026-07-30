@@ -411,7 +411,8 @@
     "importSuccess": "{count} nodos importados",
     "importFailed": "Error al importar el vault",
     "syncedFiles": "{count} archivos sincronizados",
-    "noMissingFiles": "Todos los archivos ya están sincronizados"
+    "noMissingFiles": "Todos los archivos ya están sincronizados",
+    "okfExported": "{count} documentos exportados como bundle OKF"
   },
   "settings": {
     "title": "Configuración",
@@ -561,7 +562,11 @@
     "vaultSyncHint": "Cuando está habilitado, los nuevos archivos en el vault se agregan como nodos y los cambios de archivos se sincronizan.",
     "noWorkspaceSelected": "Ningún espacio de trabajo seleccionado",
     "syncMissingFiles": "Sincronizar archivos",
-    "syncing": "Sincronizando..."
+    "syncing": "Sincronizando...",
+    "okfExport": "Open Knowledge Format",
+    "okfExportBtn": "Exportar como bundle OKF",
+    "okfExporting": "Exportando...",
+    "okfExportHint": "Escribe un bundle OKF v0.2 (Markdown con frontmatter e índice) en la carpeta que elija. El espacio de trabajo no se modifica."
   },
   "fileMove": {
     "collision": {

@@ -63,7 +63,7 @@ const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
-import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles } from './lib/tauri'
+import { getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
 
 // MCP Server
 import { useMcpServer } from './composables/useMcpServer'
@@ -74,6 +74,7 @@ import { useStorylinesStore } from './stores/storylines'
 const pixiCanvasRef = ref<ComponentPublicInstance<{ focusNode: (id: string) => void; getViewport: () => { x: number; y: number; zoom: number } }> | null>(null)
 
 const syncingFiles = ref(false)
+const exportingOkf = ref(false)
 
 // Toast notifications - use unified notification system
 const notifications = useNotifications()
@@ -337,6 +338,26 @@ function clearVaultPath() {
   if (!editingWorkspace.value) return
   editingWorkspace.value.vault_path = null
   editingWorkspace.value.sync_enabled = false
+}
+
+async function exportWorkspaceAsOkf() {
+  if (!editingWorkspace.value) return
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: t('settings.okfExportBtn'),
+    })
+    if (!selected) return
+    exportingOkf.value = true
+    const count = await exportOkfBundle(editingWorkspace.value.id, selected as string)
+    showToast(t('toasts.okfExported', { count }), 'success')
+  } catch (e) {
+    showToast(`${t('settings.okfExport')}: ${e}`, 'error')
+  } finally {
+    exportingOkf.value = false
+  }
 }
 
 async function syncVaultFiles() {
@@ -911,6 +932,20 @@ async function openFolderDialog() {
               {{ syncingFiles ? t('settings.syncing') : t('settings.syncMissingFiles') }}
             </button>
             <span class="hint">{{ t('settings.vaultSyncHint') }}</span>
+          </div>
+
+          <!-- OKF bundle export -->
+          <div class="vault-settings">
+            <label>{{ t('settings.okfExport') }}:</label>
+            <button
+              class="sync-files-btn"
+              type="button"
+              :disabled="exportingOkf"
+              @click="exportWorkspaceAsOkf"
+            >
+              {{ exportingOkf ? t('settings.okfExporting') : t('settings.okfExportBtn') }}
+            </button>
+            <span class="hint">{{ t('settings.okfExportHint') }}</span>
           </div>
 
           <div class="workspace-stats">

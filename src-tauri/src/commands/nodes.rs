@@ -249,8 +249,8 @@ pub async fn create_file_for_node(node_id: String) -> Result<String, String> {
 
     let file_path_str = file_path.to_string_lossy().to_string();
 
-    // Write content to file
-    let content = node.markdown_content.unwrap_or_default();
+    // Write content with OKF frontmatter (new files only carry it from birth)
+    let content = super::okf::with_frontmatter(&node);
     std::fs::write(&file_path, &content).map_err(|e| e.to_string())?;
 
     // Compute checksum
@@ -364,8 +364,8 @@ pub async fn export_nodes_to_files(workspace_id: String) -> Result<i32, String> 
 
         let file_path_str = file_path.to_string_lossy().to_string();
 
-        // Write content to file
-        let content = node.markdown_content.unwrap_or_default();
+        // Write content with OKF frontmatter (new files only carry it from birth)
+        let content = super::okf::with_frontmatter(&node);
         if let Err(e) = std::fs::write(&file_path, &content) {
             eprintln!("[ExportNodes] Failed to write {}: {}", file_path_str, e);
             continue;
@@ -565,8 +565,13 @@ pub(crate) async fn update_node_content_impl(
         if let Some(ref file_path) = node.file_path {
             let path = std::path::Path::new(file_path);
             if path.exists() && file_write_allowed(pool, &node, path).await {
+                // Keep a frontmatter block already present in the file (e.g.
+                // OKF metadata written at creation) instead of stripping it
+                let existing = std::fs::read_to_string(path).unwrap_or_default();
+                let to_write = super::okf::preserve_frontmatter(&existing, content);
+
                 // Write to file with exclusive lock and get new checksum
-                let checksum = write_file_locked(path, content).map_err(|e| e.to_string())?;
+                let checksum = write_file_locked(path, &to_write).map_err(|e| e.to_string())?;
 
                 // Update content and checksum in database
                 database::nodes::update_content_and_checksum(pool, id, content, &checksum)
@@ -1051,6 +1056,23 @@ mod tests {
 
         assert_eq!(result, None);
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
+    }
+
+    #[tokio::test]
+    async fn write_back_keeps_file_frontmatter() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("---\ntype: Note\n---\noriginal");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        update_node_content_impl(&pool, "n", "changed")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "---\ntype: Note\n---\nchanged"
+        );
     }
 
     #[tokio::test]

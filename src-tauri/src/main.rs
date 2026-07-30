@@ -240,6 +240,7 @@ fn main() {
             commands::sync_all_wikilinks,
             commands::create_file_for_node,
             commands::export_nodes_to_files,
+            commands::export_okf_bundle,
             commands::deduplicate_edges,
             commands::merge_bidirectional_edges,
             commands::cleanup_orphan_edges,

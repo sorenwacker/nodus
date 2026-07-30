@@ -4,6 +4,9 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Open Knowledge Format (OKF v0.2) support: export any workspace as an OKF bundle (frontmatter documents grouped by node type, root index.md, wikilinks rewritten as Markdown links) from the workspace editor; files Nodus creates in a vault carry OKF frontmatter, and content write-backs preserve existing frontmatter blocks
+
 ### Changed
 - Storyline panel opens when the pointer reaches the right screen edge and closes when it returns to the canvas; the toolbar book button pins it open. The separator between panel and canvas is a visible drag handle and the chosen width persists across sessions
 - Storyline panel is now an accordion: every storyline is a collapsible section, several can be open at once, and titles wrap to two lines instead of truncating; dropping a node onto a section adds it to that storyline

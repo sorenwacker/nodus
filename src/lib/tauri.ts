@@ -146,6 +146,13 @@ export async function exportNodesToFiles(workspaceId: string): Promise<number> {
   return invoke<number>('export_nodes_to_files', { workspaceId })
 }
 
+export async function exportOkfBundle(
+  workspaceId: string | null,
+  targetDir: string
+): Promise<number> {
+  return invoke<number>('export_okf_bundle', { workspaceId, targetDir })
+}
+
 // Convert local file path to URL that webview can access
 let convertFileSrcFunc: ((path: string) => string) | null = null
 

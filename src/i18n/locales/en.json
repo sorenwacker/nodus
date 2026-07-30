@@ -415,7 +415,8 @@
     "importSuccess": "Imported {count} nodes",
     "importFailed": "Failed to import vault",
     "syncedFiles": "Synced {count} files",
-    "noMissingFiles": "All files are already synced"
+    "noMissingFiles": "All files are already synced",
+    "okfExported": "Exported {count} documents as OKF bundle"
   },
   "settings": {
     "title": "Settings",
@@ -572,7 +573,11 @@
     "vaultSyncHint": "When enabled, new files in the vault are added as nodes and file changes are synced.",
     "noWorkspaceSelected": "No workspace selected",
     "syncMissingFiles": "Sync Files",
-    "syncing": "Syncing..."
+    "syncing": "Syncing...",
+    "okfExport": "Open Knowledge Format",
+    "okfExportBtn": "Export as OKF bundle",
+    "okfExporting": "Exporting...",
+    "okfExportHint": "Writes an OKF v0.2 bundle (Markdown with frontmatter and an index) to a folder of your choice. The workspace is not modified."
   },
   "fileMove": {
     "collision": {

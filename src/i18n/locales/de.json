@@ -411,7 +411,8 @@
     "importSuccess": "{count} Knoten importiert",
     "importFailed": "Vault-Import fehlgeschlagen",
     "syncedFiles": "{count} Dateien synchronisiert",
-    "noMissingFiles": "Alle Dateien sind bereits synchronisiert"
+    "noMissingFiles": "Alle Dateien sind bereits synchronisiert",
+    "okfExported": "{count} Dokumente als OKF-Bundle exportiert"
   },
   "settings": {
     "title": "Einstellungen",
@@ -561,7 +562,11 @@
     "vaultSyncHint": "Bei Aktivierung werden neue Dateien im Vault als Knoten hinzugefügt und Dateiänderungen synchronisiert.",
     "noWorkspaceSelected": "Kein Arbeitsbereich ausgewählt",
     "syncMissingFiles": "Dateien synchronisieren",
-    "syncing": "Synchronisiere..."
+    "syncing": "Synchronisiere...",
+    "okfExport": "Open Knowledge Format",
+    "okfExportBtn": "Als OKF-Bundle exportieren",
+    "okfExporting": "Exportiere...",
+    "okfExportHint": "Schreibt ein OKF-v0.2-Bundle (Markdown mit Frontmatter und Index) in einen Ordner Ihrer Wahl. Der Workspace wird nicht verändert."
   },
   "fileMove": {
     "collision": {
