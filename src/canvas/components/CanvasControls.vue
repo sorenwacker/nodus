@@ -284,10 +284,11 @@ const emit = defineEmits<{
 <style scoped>
 .zoom-controls {
   position: absolute;
-  bottom: 16px;
-  /* Shifts left in sync with the storyline layers overlaying the canvas */
+  /* Shifts with the storyline layers overlaying the canvas */
+  bottom: calc(16px + var(--canvas-bottom-inset, 0px));
   right: calc(16px + var(--canvas-right-inset, 0px));
-  transition: right var(--step-duration, 0.3s) var(--step-ease, ease);
+  transition: right var(--step-duration, 0.3s) var(--step-ease, ease),
+    bottom var(--step-duration, 0.3s) var(--step-ease, ease);
   display: flex;
   align-items: center;
   gap: 6px;

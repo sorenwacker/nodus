@@ -56,16 +56,20 @@ const lastReadStorylineId = ref<string | null>(null)
 const readerFullWidth = ref(false)
 const showTimelines = ref(false)
 const panelVisible = computed(
-  () => storylinePanel.isOpen.value && !readerStorylineId.value && !showTimelines.value
+  () => storylinePanel.isOpen.value && !readerStorylineId.value
 )
 
 // Canvas overlays (minimap) shift left by the width of the open storyline layer
 const canvasRightInset = computed(() => {
   if (readerStorylineId.value) return readerFullWidth.value ? '0px' : '50%'
-  if (showTimelines.value) return '0px'
   if (panelVisible.value) return `${storylinePanel.width.value}px`
   return '0px'
 })
+
+// Bottom overlays (zoom controls) shift up over the timelines sheet
+const canvasBottomInset = computed(() =>
+  showTimelines.value && !readerStorylineId.value ? '45%' : '0px'
+)
 
 function openReader(id: string) {
   readerStorylineId.value = id
@@ -89,7 +93,14 @@ const edgeStepper = createEdgeStepper({
   // against the very edge; otherwise using the panel near the window border
   // would fire it
   rightThreshold: () =>
-    storylinePanel.isOpen.value || showTimelines.value || readerStorylineId.value ? 3 : 12,
+    storylinePanel.isOpen.value || readerStorylineId.value ? 3 : 12,
+  bottomThreshold: () => (showTimelines.value ? 3 : 12),
+  // Bottom edge: the timelines sheet slides up
+  stepBottom: () => {
+    if (!readerStorylineId.value) {
+      showTimelines.value = true
+    }
+  },
   stepRight: () => {
     if (readerStorylineId.value) {
       readerFullWidth.value = true
@@ -111,7 +122,6 @@ const edgeStepper = createEdgeStepper({
     }
     if (showTimelines.value) {
       showTimelines.value = false
-      storylinePanel.onEdgeEnter()
       return
     }
     if (storylinePanel.isOpen.value) {
@@ -121,7 +131,7 @@ const edgeStepper = createEdgeStepper({
 })
 
 function onEdgePointerMove(e: PointerEvent) {
-  edgeStepper.onPointerX(e.clientX, window.innerWidth)
+  edgeStepper.onPointer(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
 }
 
 function toggleStorylinePanel() {
@@ -828,7 +838,10 @@ async function openFolderDialog() {
       </div>
     </div>
 
-    <main class="main-content" :style="{ '--canvas-right-inset': canvasRightInset }">
+    <main
+      class="main-content"
+      :style="{ '--canvas-right-inset': canvasRightInset, '--canvas-bottom-inset': canvasBottomInset }"
+    >
       <!-- Canvas always visible beneath the storyline layers -->
       <PixiCanvas ref="pixiCanvasRef" :class="{ 'with-reader': readerStorylineId }" />
       <!-- Storyline panel slides in from the right; collapsed (but kept
@@ -847,12 +860,12 @@ async function openFolderDialog() {
           <StorylinePanel @open-reader="openReader" @open-timelines="showTimelines = true" />
         </div>
       </div>
-      <!-- Timelines: all storylines as lanes, half screen -->
-      <Transition name="reader-slide">
+      <!-- Timelines: all storylines as lanes, sliding up from the bottom -->
+      <Transition name="sheet-slide">
         <div v-if="showTimelines && !readerStorylineId" class="timelines-overlay">
           <StorylineTimelines
             @open-reader="openReader"
-            @close="showTimelines = false; storylinePanel.onEdgeEnter()"
+            @close="showTimelines = false"
           />
         </div>
       </Transition>

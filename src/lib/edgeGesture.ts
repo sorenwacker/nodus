@@ -15,15 +15,21 @@ export interface EdgeStepperOptions {
    * accidentally step deeper.
    */
   rightThreshold?: () => number
+  /** Dynamic band for the bottom edge; same purpose as rightThreshold */
+  bottomThreshold?: () => number
   stepRight: () => void
   stepLeft: () => void
+  /** Optional bottom-edge push (e.g. opening the timelines sheet) */
+  stepBottom?: () => void
 }
 
 export function createEdgeStepper(options: EdgeStepperOptions) {
-  const { threshold, stepRight, stepLeft } = options
+  const { threshold, stepRight, stepLeft, stepBottom } = options
   const rightThreshold = options.rightThreshold ?? (() => threshold)
+  const bottomThreshold = options.bottomThreshold ?? (() => threshold)
   let rightArmed = true
   let leftArmed = true
+  let bottomArmed = true
 
   function onPointerX(x: number, windowWidth: number): void {
     if (x >= windowWidth - rightThreshold()) {
@@ -45,5 +51,19 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
     }
   }
 
-  return { onPointerX }
+  function onPointer(x: number, y: number, windowWidth: number, windowHeight: number): void {
+    onPointerX(x, windowWidth)
+
+    if (!stepBottom) return
+    if (y >= windowHeight - bottomThreshold()) {
+      if (bottomArmed) {
+        bottomArmed = false
+        stepBottom()
+      }
+    } else {
+      bottomArmed = true
+    }
+  }
+
+  return { onPointerX, onPointer }
 }

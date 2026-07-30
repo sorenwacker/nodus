@@ -124,12 +124,12 @@ In the overview:
 - Drag nodes from the canvas onto a storyline section to add them to that storyline
 
 ### Timelines
-The timelines button in the storyline overview opens an independent full-screen view of all storylines:
+Timelines live along the bottom of the window: a push of the pointer against the bottom edge (or the timelines button in the storyline overview) slides up a sheet showing all storylines; the graph stays visible above it, and it can be open alongside the overview:
 
 - Every storyline is a horizontal lane in its color; its nodes are beads in order
 - A node states its point in time with a `date:` frontmatter field — `date: 20 BC`, `date: 1969-07-20`, `date: 1500`. Dated nodes are placed on a shared time axis (BC dates supported); undated nodes are interpolated between their dated neighbours
 - Nodes shared between storylines are joined by dashed connectors, and graph edges between timeline nodes are drawn as arcs
-- Clicking a lane or bead opens that storyline in the reader; a left-edge push or the close button returns to the overview
+- Clicking a lane or bead opens that storyline in the reader; a left-edge push or the close button slides the sheet away
 
 ---
 

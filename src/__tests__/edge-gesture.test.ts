@@ -67,6 +67,22 @@ describe('createEdgeStepper', () => {
     expect(stepRight).toHaveBeenCalledTimes(2)
   })
 
+  it('fires one bottom step per push against the bottom edge', () => {
+    const stepBottom = vi.fn()
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      stepRight: vi.fn(),
+      stepLeft: vi.fn(),
+      stepBottom,
+    })
+    stepper.onPointer(500, 995, WIDTH, 1000)
+    stepper.onPointer(500, 999, WIDTH, 1000) // held at the edge: no re-fire
+    expect(stepBottom).toHaveBeenCalledTimes(1)
+    stepper.onPointer(500, 500, WIDTH, 1000) // pull away re-arms
+    stepper.onPointer(500, 996, WIDTH, 1000)
+    expect(stepBottom).toHaveBeenCalledTimes(2)
+  })
+
   it('does not fire in the middle of the window', () => {
     const { stepper, stepRight, stepLeft } = makeStepper()
     stepper.onPointerX(500, WIDTH)
