@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import en from '../i18n/locales/en.json'
-import { stripFrontmatter } from '../lib/contentParser'
+import { stripFrontmatter, splitFrontmatter, joinFrontmatter } from '../lib/contentParser'
 import { renderMarkdown } from '../services/MarkdownRenderService'
+import { useNodeEditor } from '../canvas/composables/nodes/useNodeEditor'
 import CanvasNodeCard from '../canvas/components/CanvasNodeCard.vue'
+import type { Node } from '../types'
 
 describe('stripFrontmatter', () => {
   it('removes a leading frontmatter block', () => {
@@ -17,6 +19,79 @@ describe('stripFrontmatter', () => {
 
   it('leaves an unterminated block untouched', () => {
     expect(stripFrontmatter('---\nbroken yaml')).toBe('---\nbroken yaml')
+  })
+
+  it('split and join round-trip content exactly', () => {
+    const content = '---\ndate: 20 BC\ntags:\n  - a\n---\nBody line\nmore'
+    const { frontmatter, body } = splitFrontmatter(content)
+    expect(body).toBe('Body line\nmore')
+    expect(joinFrontmatter(frontmatter, body)).toBe(content)
+    expect(joinFrontmatter(frontmatter, 'edited body')).toBe(
+      '---\ndate: 20 BC\ntags:\n  - a\n---\nedited body'
+    )
+    expect(joinFrontmatter(null, 'plain')).toBe('plain')
+  })
+})
+
+describe('editing keeps the metadata header out of the editor', () => {
+  function makeEditorNode(content: string): Node {
+    return {
+      id: 'n1',
+      title: 'Alpha',
+      file_path: null,
+      markdown_content: content,
+      node_type: 'note',
+      canvas_x: 0,
+      canvas_y: 0,
+      width: 200,
+      height: 120,
+      z_index: 0,
+      frame_id: null,
+      color_theme: null,
+      is_collapsed: false,
+      tags: null,
+      workspace_id: null,
+      checksum: null,
+      created_at: 0,
+      updated_at: 0,
+      deleted_at: null,
+    }
+  }
+
+  it('shows only the body and restores the header on save', () => {
+    const node = makeEditorNode('---\ndate: 20 BC\n---\nThe body')
+    const updateNodeContent = vi.fn().mockResolvedValue(undefined)
+    const editor = useNodeEditor({
+      store: {
+        getNode: () => node,
+        updateNodeContent,
+        updateNodeTitle: vi.fn().mockResolvedValue(undefined),
+      },
+    })
+
+    editor.startEditing('n1')
+    expect(editor.editContent.value).toBe('The body')
+
+    editor.editContent.value = 'Edited body'
+    editor.saveEditing()
+    expect(updateNodeContent).toHaveBeenCalledWith('n1', '---\ndate: 20 BC\n---\nEdited body')
+  })
+
+  it('adds no header when the node never had one', () => {
+    const node = makeEditorNode('Just text')
+    const updateNodeContent = vi.fn().mockResolvedValue(undefined)
+    const editor = useNodeEditor({
+      store: {
+        getNode: () => node,
+        updateNodeContent,
+        updateNodeTitle: vi.fn().mockResolvedValue(undefined),
+      },
+    })
+
+    editor.startEditing('n1')
+    editor.editContent.value = 'New text'
+    editor.saveEditing()
+    expect(updateNodeContent).toHaveBeenCalledWith('n1', 'New text')
   })
 })
 
@@ -77,5 +152,43 @@ describe('CanvasNodeCard tag chips', () => {
   it('renders no chip row for nodes without tags', () => {
     expect(mountCard(null).find('.node-tag-footer').exists()).toBe(false)
     expect(mountCard('not-json').find('.node-tag-footer').exists()).toBe(false)
+  })
+
+  it('surfaces OKF date and status frontmatter as chips', () => {
+    const wrapper = mount(CanvasNodeCard, {
+      props: {
+        node: {
+          id: 'n1',
+          title: 'Alpha',
+          node_type: 'note',
+          markdown_content: '---\ndate: 800\ndate_end: 1800\nstatus: draft\n---\nBody',
+          canvas_x: 0,
+          canvas_y: 0,
+          tags: null,
+        },
+        style: {},
+        isSelected: false,
+        isDragging: false,
+        isResizing: false,
+        isEditing: false,
+        isCollapsed: false,
+        isNeighborhoodMode: false,
+        isNeighborhoodFocus: false,
+        isNeighborHighlighted: false,
+        showThumbnail: false,
+        renderedContent: '<p>Body</p>',
+        editingTitleId: null,
+        editTitle: '',
+        editContent: '',
+        scale: 1,
+        showNodeSearch: false,
+        nodeSearchQuery: '',
+        nodeSearchMatchCount: 0,
+        nodeSearchIndex: 0,
+      },
+      global: { plugins: [i18n] },
+    })
+    expect(wrapper.find('.node-date-chip').text()).toBe('800 – 1800')
+    expect(wrapper.find('.node-status-chip').text()).toBe('draft')
   })
 })

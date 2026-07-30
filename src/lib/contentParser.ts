@@ -33,15 +33,33 @@ export function extractHashtags(content: string): string[] {
  * Returns lowercased, trimmed link targets
  */
 /**
- * Remove a leading YAML frontmatter block (OKF/Obsidian metadata) so it is
- * not rendered as visible text. Content without a terminated block at the
- * very start is returned unchanged.
+ * Split content into its leading YAML frontmatter block (OKF/Obsidian
+ * metadata, delimiters included) and the body. Content without a terminated
+ * block at the very start is all body.
+ */
+export function splitFrontmatter(content: string): { frontmatter: string | null; body: string } {
+  if (!content.startsWith('---\n')) return { frontmatter: null, body: content }
+  const end = content.indexOf('\n---', 4)
+  if (end === -1) return { frontmatter: null, body: content }
+  const rest = content.slice(end + 4)
+  const bodyStart = rest.startsWith('\r\n') ? 2 : rest.startsWith('\n') ? 1 : 0
+  return {
+    frontmatter: content.slice(0, end + 4 + bodyStart),
+    body: rest.slice(bodyStart),
+  }
+}
+
+/** Reattach a preserved frontmatter block to an edited body */
+export function joinFrontmatter(frontmatter: string | null, body: string): string {
+  return frontmatter ? frontmatter + body : body
+}
+
+/**
+ * Remove a leading YAML frontmatter block so it is not rendered as visible
+ * text; the fields surface as structured node metadata instead.
  */
 export function stripFrontmatter(content: string): string {
-  if (!content.startsWith('---\n')) return content
-  const end = content.indexOf('\n---', 4)
-  if (end === -1) return content
-  return content.slice(end + 4).replace(/^\r?\n/, '')
+  return splitFrontmatter(content).body
 }
 
 export function extractWikilinks(content: string): Set<string> {

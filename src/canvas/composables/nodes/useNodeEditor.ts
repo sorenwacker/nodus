@@ -3,6 +3,7 @@
  * Manages inline editing of node content and titles with autosave
  */
 import { ref, watch, nextTick } from 'vue'
+import { splitFrontmatter, joinFrontmatter } from '../../../lib/contentParser'
 import type { Node } from '../../../types'
 
 export interface NodeEditorStore {
@@ -37,6 +38,10 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   const nodeSearchMatches = ref<number[]>([]) // Start positions of matches
   const searchNodeId = ref<string | null>(null) // Node being searched (for view mode)
 
+  // Frontmatter of the node being edited: metadata is never shown in the
+  // editor, but survives the edit untouched
+  let editingFrontmatter: string | null = null
+
   // Autosave timers
   let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
   let autosaveTitleTimer: ReturnType<typeof setTimeout> | null = null
@@ -47,7 +52,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     if (autosaveContentTimer) clearTimeout(autosaveContentTimer)
     autosaveContentTimer = setTimeout(() => {
       if (editingNodeId.value) {
-        store.updateNodeContent(editingNodeId.value, newContent)
+        store.updateNodeContent(editingNodeId.value, joinFrontmatter(editingFrontmatter, newContent))
       }
     }, autosaveDelay)
   })
@@ -81,7 +86,11 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     }
 
     editingNodeId.value = nodeId
-    editContent.value = node.markdown_content || ''
+    // The editor shows only the body; a metadata header stays out of sight
+    // and out of reach of accidental edits
+    const { frontmatter, body } = splitFrontmatter(node.markdown_content || '')
+    editingFrontmatter = frontmatter
+    editContent.value = body
     // Focus the textarea after Vue updates the DOM (but not if editing title)
     setTimeout(() => {
       if (editingTitleId.value) return // Don't steal focus from title editor
@@ -152,11 +161,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
 
     const nodeId = editingNodeId.value
     if (nodeId) {
-      store.updateNodeContent(nodeId, editContent.value)
+      store.updateNodeContent(nodeId, joinFrontmatter(editingFrontmatter, editContent.value))
       onAfterSave?.(nodeId)
     }
     editingNodeId.value = null
     editContent.value = ''
+    editingFrontmatter = null
     onSaveComplete?.()
   }
 

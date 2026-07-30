@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
+import { splitFrontmatter, joinFrontmatter } from '../lib/contentParser'
 import { openExternal } from '../lib/tauri'
 import {
   renderMarkdown,
@@ -53,10 +54,15 @@ let saveTimeout: ReturnType<typeof setTimeout> | null = null
 // Load node data when nodeId changes
 const node = computed(() => props.nodeId ? store.getNode(props.nodeId) : null)
 
+// Metadata header of the loaded node: hidden from the editor, kept on save
+let editingFrontmatter: string | null = null
+
 watch(() => props.nodeId, (id) => {
   if (id && node.value) {
     editTitle.value = node.value.title || ''
-    editContent.value = node.value.markdown_content || ''
+    const { frontmatter, body } = splitFrontmatter(node.value.markdown_content || '')
+    editingFrontmatter = frontmatter
+    editContent.value = body
     hasUnsavedChanges.value = false
   }
 }, { immediate: true })
@@ -132,8 +138,9 @@ async function save() {
   if (editTitle.value !== node.value.title) {
     await store.updateNodeTitle(props.nodeId, editTitle.value)
   }
-  if (editContent.value !== node.value.markdown_content) {
-    await store.updateNodeContent(props.nodeId, editContent.value)
+  const fullContent = joinFrontmatter(editingFrontmatter, editContent.value)
+  if (fullContent !== node.value.markdown_content) {
+    await store.updateNodeContent(props.nodeId, fullContent)
   }
 
   hasUnsavedChanges.value = false

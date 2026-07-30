@@ -28,7 +28,11 @@ Hashtags in node content become node tags:
 - A node's tags appear as chips at the bottom of its card
 - With tag nodes enabled in settings, each tag becomes a tag node connected to the notes that use it
 
-YAML frontmatter at the top of a note (OKF or Obsidian metadata) is treated as metadata: its title and tags feed the node, and the block is hidden from the rendered card instead of appearing as raw text.
+YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treated as structured node metadata, never as text:
+
+- The block is hidden from rendered cards, and all editors (inline, fullscreen, preview panel) show only the body — the metadata header survives every edit untouched
+- Its fields surface as chips on the node card: tags, the date (or date range), and the OKF lifecycle `status` when it is `draft` or `deprecated` (`stable` is the silent default)
+- Title and tags from frontmatter also feed the node record during vault sync
 
 ### Frames
 Group related nodes visually. Frames act as containers that can be moved together with all contained nodes.

@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import NodePicker from '../../components/NodePicker.vue'
 import { useNodesStore } from '../../stores/nodes'
 import { useDisplayStore } from '../../stores/display'
+import { splitFrontmatter, joinFrontmatter } from '../../lib/contentParser'
 import { openExternal } from '../../lib/tauri'
 import { notifications$ } from '../../composables/useNotifications'
 import { resolveWikilink } from '../../lib/wikilink'
@@ -62,8 +63,13 @@ watch(() => props.nodeId, () => {
   isEditing.value = false
 })
 
+// Metadata header of the edited node: hidden from the editor, kept on save
+let editingFrontmatter: string | null = null
+
 function startEditing() {
-  editContent.value = props.rawContent
+  const { frontmatter, body } = splitFrontmatter(props.rawContent)
+  editingFrontmatter = frontmatter
+  editContent.value = body
   editTitle.value = props.title
   isEditing.value = true
 }
@@ -72,8 +78,9 @@ function saveAndClose() {
   if (editTitle.value !== props.title) {
     emit('saveTitle', props.nodeId, editTitle.value)
   }
-  if (editContent.value !== props.rawContent) {
-    emit('save', props.nodeId, editContent.value)
+  const fullContent = joinFrontmatter(editingFrontmatter, editContent.value)
+  if (fullContent !== props.rawContent) {
+    emit('save', props.nodeId, fullContent)
   }
   isEditing.value = false
 }

@@ -9,6 +9,7 @@ import EntityBadge from '../../components/EntityBadge.vue'
 import type { Node as EntityNode, EntityNodeType } from '../../types'
 import { ENTITY_NODE_TYPES } from '../../types'
 import { nodeDisplayTitle } from '../utils/nodeDisplayTitle'
+import { extractFrontmatterField } from '../../lib/timelineDates'
 
 interface Node {
   id: string
@@ -139,8 +140,27 @@ const nodeTags = computed<string[]>(() => {
     return []
   }
 })
-const showTagChips = computed(() =>
-  !isTagNode.value && !props.isCollapsed && !props.isEditing && nodeTags.value.length > 0
+
+// OKF frontmatter metadata, shown as chips like tags
+const nodeDate = computed<string | null>(() => {
+  const content = props.node.markdown_content || ''
+  const date = extractFrontmatterField(content, 'date')
+  if (!date) return null
+  const dateEnd = extractFrontmatterField(content, 'date_end')
+  return dateEnd ? `${date} – ${dateEnd}` : date
+})
+
+// OKF lifecycle: stable is the default and stays silent
+const nodeStatus = computed<string | null>(() => {
+  const status = extractFrontmatterField(props.node.markdown_content || '', 'status')
+  return status && status !== 'stable' ? status : null
+})
+
+const showMetaChips = computed(() =>
+  !isTagNode.value &&
+  !props.isCollapsed &&
+  !props.isEditing &&
+  (nodeTags.value.length > 0 || nodeDate.value !== null || nodeStatus.value !== null)
 )
 </script>
 
@@ -238,8 +258,10 @@ const showTagChips = computed(() =>
     ></div>
     <!-- eslint-enable vue/no-v-html -->
 
-    <!-- Tag chips footer -->
-    <div v-if="showTagChips" class="node-tag-footer">
+    <!-- Metadata chips footer (OKF frontmatter surfaces here, not as text) -->
+    <div v-if="showMetaChips" class="node-tag-footer">
+      <span v-if="nodeStatus" class="node-status-chip" :data-status="nodeStatus">{{ nodeStatus }}</span>
+      <span v-if="nodeDate" class="node-date-chip">{{ nodeDate }}</span>
       <span v-for="tag in nodeTags" :key="tag" class="node-tag-chip">#{{ tag }}</span>
     </div>
 
@@ -298,6 +320,38 @@ const showTagChips = computed(() =>
   background: rgba(59, 130, 246, 0.1);
   border-radius: 8px;
   white-space: nowrap;
+}
+
+.node-date-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.node-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  text-transform: capitalize;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-default);
+}
+
+.node-status-chip[data-status='deprecated'] {
+  color: var(--danger-color, #ef4444);
+  border-color: var(--danger-color, #ef4444);
+  background: var(--danger-bg, rgba(239, 68, 68, 0.08));
 }
 
 .node-entity-footer {
