@@ -43,6 +43,7 @@ const storylineRevealRef = ref<HTMLElement | null>(null)
 // it returns to the canvas, and can be pinned via the toolbar button. Kept
 // open during node drags, drop handling, and while an input inside has focus.
 const storylinePanel = usePanelReveal({
+  side: 'right',
   storageKey: 'nodus-storyline-panel-width',
   closeGuard: () =>
     document.body.classList.contains('node-dragging') ||
@@ -733,7 +734,19 @@ async function openFolderDialog() {
     </div>
 
     <main class="main-content">
-      <!-- Storyline panel slides in from the left; hidden when reader is open -->
+      <!-- Canvas always visible; entering it closes an unpinned panel peek -->
+      <PixiCanvas
+        ref="pixiCanvasRef"
+        :class="{ 'with-reader': readerStorylineId }"
+        @mouseenter="storylinePanel.onPanelLeave"
+      />
+      <!-- Hot zone: pointer at the right edge reveals the panel -->
+      <div
+        v-if="!storylinePanel.isOpen.value && !readerStorylineId"
+        class="edge-hotzone"
+        @mouseenter="storylinePanel.onEdgeEnter"
+      ></div>
+      <!-- Storyline panel slides in from the right; hidden when reader is open -->
       <div
         v-if="!readerStorylineId"
         ref="storylineRevealRef"
@@ -742,27 +755,15 @@ async function openFolderDialog() {
         :style="{ width: storylinePanel.isOpen.value ? storylinePanel.width.value + 'px' : '0px' }"
         @mouseleave="storylinePanel.onPanelLeave"
       >
-        <div class="storyline-reveal-inner" :style="{ width: storylinePanel.width.value + 'px' }">
-          <StorylinePanel @open-reader="(id) => readerStorylineId = id" />
-        </div>
         <div
           v-if="storylinePanel.isOpen.value"
           class="panel-resizer"
           @pointerdown="storylinePanel.beginResize"
         ></div>
+        <div class="storyline-reveal-inner" :style="{ width: storylinePanel.width.value + 'px' }">
+          <StorylinePanel @open-reader="(id) => readerStorylineId = id" />
+        </div>
       </div>
-      <!-- Hot zone: pointer at the left edge reveals the panel -->
-      <div
-        v-if="!storylinePanel.isOpen.value && !readerStorylineId"
-        class="edge-hotzone"
-        @mouseenter="storylinePanel.onEdgeEnter"
-      ></div>
-      <!-- Canvas always visible; entering it closes an unpinned panel peek -->
-      <PixiCanvas
-        ref="pixiCanvasRef"
-        :class="{ 'with-reader': readerStorylineId }"
-        @mouseenter="storylinePanel.onPanelLeave"
-      />
       <!-- Reader slides in from right with its own contents -->
       <StorylineReader
         v-if="readerStorylineId"

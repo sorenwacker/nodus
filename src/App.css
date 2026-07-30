@@ -318,7 +318,7 @@
   flex-shrink: 0;
   overflow: hidden;
   transition: width 0.2s ease;
-  border-right: 1px solid var(--border-default);
+  border-left: 1px solid var(--border-default);
 }
 
 .storyline-reveal.resizing {
@@ -328,28 +328,51 @@
 .storyline-reveal-inner {
   flex-shrink: 0;
   height: 100%;
+  margin-left: 6px;
 }
 
+/* Visible separator handle on the panel's canvas-facing edge */
 .panel-resizer {
   position: absolute;
   top: 0;
   bottom: 0;
-  right: 0;
-  width: 5px;
+  left: 0;
+  width: 6px;
   cursor: col-resize;
   z-index: 10;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border-default);
 }
 
-.panel-resizer:hover {
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 2px;
+  height: 36px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.panel-resizer:hover,
+.storyline-reveal.resizing .panel-resizer {
   background: var(--primary-color);
-  opacity: 0.4;
+}
+
+.panel-resizer:hover::after,
+.storyline-reveal.resizing .panel-resizer::after {
+  background: white;
+  opacity: 0.9;
 }
 
 .edge-hotzone {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  right: 0;
   width: 10px;
   z-index: 40;
 }

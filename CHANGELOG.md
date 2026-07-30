@@ -5,7 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Changed
-- Storyline panel opens when the pointer reaches the left screen edge and closes when it returns to the canvas; the toolbar book button pins it open. The separator between panel and canvas is draggable and the chosen width persists across sessions
+- Storyline panel opens when the pointer reaches the right screen edge and closes when it returns to the canvas; the toolbar book button pins it open. The separator between panel and canvas is a visible drag handle and the chosen width persists across sessions
 - Storyline panel is now an accordion: every storyline is a collapsible section, several can be open at once, and titles wrap to two lines instead of truncating; dropping a node onto a section adds it to that storyline
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 

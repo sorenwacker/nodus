@@ -12,6 +12,8 @@ export interface PanelRevealOptions {
   minWidth?: number
   maxWidth?: number
   defaultWidth?: number
+  /** Which screen edge the panel lives on; affects resize direction */
+  side?: 'left' | 'right'
   /** localStorage key for the persisted width; omit to disable persistence */
   storageKey?: string
   /** Return true while auto-close must be suppressed (drag, focus, ...) */
@@ -23,6 +25,7 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     minWidth = 200,
     maxWidth = 480,
     defaultWidth = 260,
+    side = 'left',
     storageKey,
     closeGuard,
   } = options
@@ -78,8 +81,10 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     const startX = e.clientX
     const startWidth = width.value
 
+    // A right-side panel grows when the separator is dragged leftwards
+    const sign = side === 'right' ? -1 : 1
     function onMove(ev: PointerEvent) {
-      setWidth(startWidth + (ev.clientX - startX))
+      setWidth(startWidth + sign * (ev.clientX - startX))
     }
     function onUp() {
       resizing.value = false
