@@ -75,6 +75,9 @@ export interface McpNode {
   height: number
   markdown_content?: string | null
   tags?: string[]
+  /** Raw date frontmatter values, surfaced so agents need not parse YAML */
+  date?: string
+  date_end?: string
   created_at: number
   updated_at: number
 }

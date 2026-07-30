@@ -8,6 +8,8 @@ import type { Node, Edge, Frame } from '../../types'
 import type { McpNode, McpEdge } from '../types'
 import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface, McpUndoInterface } from '../messageHandler'
+import { upsertFrontmatterField } from '../../lib/contentParser'
+import { extractFrontmatterField } from '../../lib/timelineDates'
 
 /**
  * Convert internal Node to MCP format
@@ -37,7 +39,31 @@ export function nodeToMcp(node: Node, includeContent = false): McpNode {
     }
   }
 
+  // Surface date metadata as fields so agents need not parse frontmatter
+  const date = extractFrontmatterField(node.markdown_content || '', 'date')
+  if (date) {
+    mcpNode.date = date
+    const dateEnd = extractFrontmatterField(node.markdown_content || '', 'date_end')
+    if (dateEnd) mcpNode.date_end = dateEnd
+  }
+
   return mcpNode
+}
+
+/** Apply date/date_end parameters into content frontmatter */
+function withDateFields(
+  content: string,
+  date: string | undefined,
+  dateEnd: string | undefined
+): string {
+  let result = content
+  if (date !== undefined) {
+    result = upsertFrontmatterField(result, 'date', date || null)
+  }
+  if (dateEnd !== undefined) {
+    result = upsertFrontmatterField(result, 'date_end', dateEnd || null)
+  }
+  return result
 }
 
 /**
@@ -480,6 +506,9 @@ export async function handleCreateNode(
     x?: number
     y?: number
     node_type?: string
+    date?: string
+    date_end?: string
+    tags?: string[]
   }
 ): Promise<{ id: string; warning?: string; duplicate_ids?: string[] }> {
   // Check for existing nodes with the same title
@@ -489,10 +518,11 @@ export async function handleCreateNode(
 
   const node = await store.createNode({
     title: params.title,
-    markdown_content: params.content,
+    markdown_content: withDateFields(params.content ?? '', params.date, params.date_end),
     canvas_x: params.x ?? 100,
     canvas_y: params.y ?? 100,
     node_type: params.node_type,
+    tags: params.tags,
   })
 
   // Capture creation for undo
@@ -520,6 +550,9 @@ export async function handleUpdateNode(
       content?: string
       x?: number
       y?: number
+      date?: string
+      date_end?: string
+      tags?: string[]
     }
   }
 ): Promise<{ success: boolean }> {
@@ -537,8 +570,18 @@ export async function handleUpdateNode(
     await store.updateNodeTitle(params.id, updates.title)
   }
 
-  if (updates.content !== undefined) {
-    await store.updateNodeContent(params.id, updates.content)
+  // Date changes rewrite the frontmatter of the effective content (empty
+  // string clears a field)
+  if (updates.content !== undefined || updates.date !== undefined || updates.date_end !== undefined) {
+    const base = updates.content ?? node.markdown_content ?? ''
+    await store.updateNodeContent(
+      params.id,
+      withDateFields(base, updates.date, updates.date_end)
+    )
+  }
+
+  if (updates.tags !== undefined) {
+    await store.updateNodeTags(params.id, updates.tags)
   }
 
   if (updates.x !== undefined && updates.y !== undefined) {

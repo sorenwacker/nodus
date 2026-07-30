@@ -230,6 +230,19 @@ export const NODUS_TOOLS: Tool[] = [
           type: 'string',
           description: 'Node type: note, comment, character, location, citation, term, item. Default: note.',
         },
+        date: {
+          type: 'string',
+          description: "Point in time for timelines, e.g. '20 BC', '1500', '1969-07-20', '1969-07-20 14:30'. Stored as frontmatter.",
+        },
+        date_end: {
+          type: 'string',
+          description: 'End of a time span (same formats as date); renders as a bar on the timelines.',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the node (without #).',
+        },
       },
       required: ['title'],
     },
@@ -263,6 +276,19 @@ export const NODUS_TOOLS: Tool[] = [
             y: {
               type: 'number',
               description: 'New Y position',
+            },
+            date: {
+              type: 'string',
+              description: "Set the node's date (e.g. '20 BC', '1969-07-20 14:30'); empty string clears it.",
+            },
+            date_end: {
+              type: 'string',
+              description: 'Set the end of a time span; empty string clears it.',
+            },
+            tags: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Replace the node tags (without #).',
             },
           },
         },

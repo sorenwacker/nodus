@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Added
+- MCP node tools understand metadata: create_node and update_node accept `date`, `date_end` (written as frontmatter, empty string clears), and `tags`; node reads expose the date fields directly so agents can build timelines without parsing YAML
 - Storylines can be reordered by dragging their rows in the overview, with the same pointer-drag mechanism as node reordering (extracted into one shared composable); the order persists and the timelines lanes follow it. The overview also shortens above an open timelines sheet instead of overlapping it
 - Node dates are editable in place: click the date chip (or "+ Set date" on a selected node) to set `date` and `date_end` without touching YAML; the timelines sheet also sizes itself to its lanes instead of always taking 45% of the window
 - MCP connections can scope themselves to a specific workspace (`list_workspaces` / `set_workspace`), independent of the one open in the app, so several agents can work different workspaces in parallel; scoped changes stay off the user's undo stack

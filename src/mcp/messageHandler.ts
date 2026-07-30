@@ -112,8 +112,10 @@ export interface McpStoreInterface {
     height?: number
     node_type?: string
     workspace_id?: string
+    tags?: string[]
   }) => Promise<Node>
   updateNodeContent: (id: string, content: string) => Promise<void>
+  updateNodeTags: (id: string, tags: string[]) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
   updateNodeSize: (id: string, width: number, height: number) => Promise<void>

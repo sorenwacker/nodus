@@ -278,6 +278,11 @@ const mcpServer = useMcpServer({
     deleteEdgeRaw: (id) => invoke('delete_edge', { id }),
     createNode: store.createNode,
     updateNodeContent: store.updateNodeContent,
+    updateNodeTags: async (id: string, tags: string[]) => {
+      await invoke('update_node_tags', { id, tags })
+      const node = store.getNode(id)
+      if (node) node.tags = JSON.stringify(tags)
+    },
     updateNodeTitle: store.updateNodeTitle,
     updateNodePosition: store.updateNodePosition,
     updateNodeSize: store.updateNodeSize,
