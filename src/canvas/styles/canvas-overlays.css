@@ -502,6 +502,63 @@
   max-height: none;
 }
 
+/* Date metadata row in the node preview panel */
+.preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 8px;
+}
+
+.preview-date-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-date-chip:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.preview-date-chip.ghost {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+.preview-date-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.preview-date-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.preview-date-save {
+  padding: 3px 10px;
+  font-size: 11px;
+  border: none;
+  border-radius: 4px;
+  background: var(--primary-color);
+  color: white;
+  cursor: pointer;
+}
+
 .preview-header {
   display: flex;
   align-items: center;

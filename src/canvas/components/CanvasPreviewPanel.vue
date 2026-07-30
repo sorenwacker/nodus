@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import NodePicker from '../../components/NodePicker.vue'
 import { useNodesStore } from '../../stores/nodes'
 import { useDisplayStore } from '../../stores/display'
-import { splitFrontmatter, joinFrontmatter } from '../../lib/contentParser'
+import { splitFrontmatter, joinFrontmatter, upsertFrontmatterField } from '../../lib/contentParser'
+import { extractFrontmatterField } from '../../lib/timelineDates'
 import { openExternal } from '../../lib/tauri'
 import { notifications$ } from '../../composables/useNotifications'
 import { resolveWikilink } from '../../lib/wikilink'
@@ -65,6 +66,34 @@ watch(() => props.nodeId, () => {
 
 // Metadata header of the edited node: hidden from the editor, kept on save
 let editingFrontmatter: string | null = null
+
+// Date metadata editor (works at any zoom level, unlike the card chips)
+const showDateEditor = ref(false)
+const dateInput = ref('')
+const dateEndInput = ref('')
+
+const dateLabel = computed(() => {
+  const date = extractFrontmatterField(props.rawContent, 'date')
+  if (!date) return null
+  const dateEnd = extractFrontmatterField(props.rawContent, 'date_end')
+  return dateEnd ? `${date} – ${dateEnd}` : date
+})
+
+function openDateEditor() {
+  dateInput.value = extractFrontmatterField(props.rawContent, 'date') || ''
+  dateEndInput.value = extractFrontmatterField(props.rawContent, 'date_end') || ''
+  showDateEditor.value = true
+}
+
+function saveDate() {
+  let content = props.rawContent
+  content = upsertFrontmatterField(content, 'date', dateInput.value || null)
+  content = upsertFrontmatterField(content, 'date_end', dateEndInput.value || null)
+  showDateEditor.value = false
+  if (content !== props.rawContent) {
+    emit('save', props.nodeId, content)
+  }
+}
 
 function startEditing() {
   const { frontmatter, body } = splitFrontmatter(props.rawContent)
@@ -249,6 +278,37 @@ function stopNodeAgent() {
         />
         <h3 v-else @dblclick="startEditing">{{ title }}</h3>
         <button class="preview-close" @click="emit('close')">&times;</button>
+      </div>
+
+      <!-- Date metadata: view chip and inline editor -->
+      <div class="preview-meta">
+        <button
+          v-if="!showDateEditor"
+          class="preview-date-chip"
+          :class="{ ghost: !dateLabel }"
+          @click="openDateEditor"
+        >
+          {{ dateLabel || `+ ${t('canvas.node.setDate')}` }}
+        </button>
+        <template v-else>
+          <input
+            v-model.trim="dateInput"
+            type="text"
+            class="preview-date-input"
+            :placeholder="t('canvas.node.datePlaceholder')"
+            @keydown.enter="saveDate"
+            @keydown.escape="showDateEditor = false"
+          />
+          <input
+            v-model.trim="dateEndInput"
+            type="text"
+            class="preview-date-input"
+            :placeholder="t('canvas.node.dateEndPlaceholder')"
+            @keydown.enter="saveDate"
+            @keydown.escape="showDateEditor = false"
+          />
+          <button class="preview-date-save" @click="saveDate">{{ t('common.save') }}</button>
+        </template>
       </div>
 
       <!-- AI toolbar -->
