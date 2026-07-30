@@ -93,7 +93,9 @@ const displayTitle = computed(() =>
 .hover-tooltip {
   position: absolute;
   top: 8px;
-  right: 16px;
+  /* Shifts left in sync with the storyline layers overlaying the canvas */
+  right: calc(16px + var(--canvas-right-inset, 0px));
+  transition: right var(--step-duration, 0.3s) var(--step-ease, ease);
   z-index: 2001;
   width: 280px;
   max-height: 396px; /* A4 aspect ratio: 280 × 1.414 */

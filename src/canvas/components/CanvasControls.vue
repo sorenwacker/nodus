@@ -285,7 +285,9 @@ const emit = defineEmits<{
 .zoom-controls {
   position: absolute;
   bottom: 16px;
-  right: 16px;
+  /* Shifts left in sync with the storyline layers overlaying the canvas */
+  right: calc(16px + var(--canvas-right-inset, 0px));
+  transition: right var(--step-duration, 0.3s) var(--step-ease, ease);
   display: flex;
   align-items: center;
   gap: 6px;

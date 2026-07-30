@@ -15,6 +15,7 @@ All notable changes to Nodus are documented in this file.
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 
 ### Fixed
+- Canvas overlays (minimap, zoom controls, hover preview) shift left in sync with the storyline layers instead of being covered by or floating above them
 - Clicking a storyline row opens the reader directly; expanding the item list moved to the row's chevron. Previously the reader was only reachable via a button that appeared on hover
 - The right-edge hover reveal works regardless of canvas overlays: edge detection moved from an invisible hot-zone element to a capture-phase pointer listener
 - The storyline panel closes again after clicking inside it; a focus guard meant for text inputs was keeping it open after any click

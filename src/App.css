@@ -325,7 +325,7 @@
   bottom: 0;
   right: 0;
   width: 100%;
-  z-index: 46;
+  z-index: 61;
   border-left: 1px solid var(--border-default);
   overflow: hidden;
   will-change: transform;
@@ -347,7 +347,7 @@
   top: 0;
   bottom: 0;
   right: 0;
-  z-index: 45;
+  z-index: 60;
   display: flex;
   overflow: hidden;
   background: var(--bg-surface);

@@ -75,6 +75,14 @@ const panelVisible = computed(
   () => storylinePanel.isOpen.value && !readerStorylineId.value && !showTimelines.value
 )
 
+// Canvas overlays (minimap) shift left by the width of the open storyline layer
+const canvasRightInset = computed(() => {
+  if (readerStorylineId.value) return readerFullWidth.value ? '0px' : '50%'
+  if (showTimelines.value) return '0px'
+  if (panelVisible.value) return `${storylinePanel.width.value}px`
+  return '0px'
+})
+
 function openReader(id: string) {
   readerStorylineId.value = id
   lastReadStorylineId.value = id
@@ -831,7 +839,7 @@ async function openFolderDialog() {
       </div>
     </div>
 
-    <main class="main-content">
+    <main class="main-content" :style="{ '--canvas-right-inset': canvasRightInset }">
       <!-- Canvas always visible; entering it closes an unpinned panel peek -->
       <PixiCanvas
         ref="pixiCanvasRef"

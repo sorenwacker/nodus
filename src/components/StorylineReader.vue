@@ -452,7 +452,7 @@ watch(() => props.storylineId, loadStoryline)
   top: 0;
   bottom: 0;
   right: 0;
-  z-index: 47;
+  z-index: 62;
   display: flex;
   flex-direction: column;
   background: var(--bg-canvas);

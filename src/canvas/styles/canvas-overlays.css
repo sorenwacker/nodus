@@ -71,7 +71,9 @@
 .minimap {
   position: absolute;
   top: 16px;
-  right: 16px;
+  /* Slides left in sync with the storyline layers overlaying the canvas */
+  right: calc(16px + var(--canvas-right-inset, 0px));
+  transition: right var(--step-duration, 0.3s) var(--step-ease, ease);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 8px;
