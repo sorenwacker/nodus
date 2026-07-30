@@ -271,6 +271,13 @@ Users don't abandon Obsidian — they enhance it with Nodus.
 - **Text:** Last Write Wins
 - **Canvas position:** Nodus exclusive (Obsidian doesn't care about x,y)
 
+### Open Knowledge Format (OKF)
+
+Nodus interoperates with Google Cloud's Open Knowledge Format (OKF v0.2), the Markdown-plus-frontmatter spec for agent-readable knowledge bundles:
+
+- **Bundle export:** A workspace exports to an OKF bundle — concept documents with `type`/`title`/`tags`/`generated` frontmatter grouped by node type, a root `index.md` with `okf_version: "0.2"`, and wikilinks rewritten as bundle-relative Markdown links. The source workspace and vault are untouched.
+- **New files:** Note files that Nodus itself creates carry OKF frontmatter, so vaults grown inside Nodus converge toward OKF conformance without rewriting pre-existing user files.
+
 ---
 
 ## Rendering: Markdown + Typst

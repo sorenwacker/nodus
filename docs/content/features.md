@@ -252,6 +252,17 @@ Generate PDFs directly using Typst compilation.
 ### Markdown Export
 Export nodes as standard Markdown files.
 
+### Open Knowledge Format Export
+Export a workspace as an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) (OKF v0.2) bundle so AI agents and other OKF consumers can read it without Nodus:
+
+- Every node with content becomes a Markdown concept document with YAML frontmatter: `type` (from the node type), `title`, `tags`, and `generated` provenance
+- Documents are grouped into subdirectories by node type (`notes/`, `citations/`, ...)
+- A root `index.md` declares `okf_version: "0.2"` and lists all documents by section with descriptions
+- Wikilinks are rewritten to bundle-relative Markdown links in the exported copy; unresolvable links are left unchanged
+- The export writes to a folder you choose; the workspace and its vault files are not modified
+
+Files that Nodus itself creates in a vault (via "create file for node" or the export-to-files action) also carry OKF frontmatter, unless the content already starts with its own frontmatter block. Existing vault files are never rewritten to add frontmatter.
+
 ---
 
 ## Data Storage
