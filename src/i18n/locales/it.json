@@ -381,7 +381,8 @@
     "noStorylines": "Ancora nessuna storyline",
     "timelinesDateHint": "Imposta la data di un nodo con date: 20 BC o 1969-07-20 nel frontmatter",
     "timelineFrom": "da (500 BC)",
-    "timelineTo": "a (2000)"
+    "timelineTo": "a (2000)",
+    "unassigned": "Non assegnato"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",

@@ -136,8 +136,11 @@ Timelines live along the bottom of the window: a push of the pointer against the
 - Large empty stretches between clusters of events are abbreviated: the axis breaks (marked with a double slash) instead of wasting space, and each segment labels itself at its own level of detail
 - A node spanning time (an era, a long work) adds `date_end:` and is drawn as a bar from start to end instead of a bead
 - The from/to fields in the sheet's header fix the axis range (same date formats); either side left empty fits automatically, and the chosen range persists. Axis labels adapt to the span: years, months, days, or clock times for narratives playing out within hours
-- Hovering a bead or bar shows the node's rendered content preview
 - Nodes shared between storylines are joined by dashed connectors, and graph edges between timeline nodes are drawn as arcs
+- Dated nodes outside every storyline appear in a gray "Unassigned" lane, so the timeline covers every dated node in the workspace
+- Marks carry the node's own color when set, falling back to the lane's storyline color
+- Hovering a bead or bar shows the same hover preview as the canvas
+- The sheet stays open alongside the storyline overview and the reader (the reader sits above it)
 - Clicking a lane or bead opens that storyline in the reader; a left-edge push or the close button slides the sheet away
 
 ---

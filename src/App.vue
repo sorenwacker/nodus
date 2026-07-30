@@ -66,9 +66,11 @@ const canvasRightInset = computed(() => {
   return '0px'
 })
 
-// The timelines sheet is only as tall as its lanes need, capped at 45%
+// The timelines sheet is only as tall as its lanes need, capped at 45%.
+// The component reports its lane count (including the unassigned lane).
+const timelinesLaneCount = ref(1)
 const timelinesSheetHeight = computed(() => {
-  const laneCount = Math.max(1, storylinesStore.filteredStorylines.length)
+  const laneCount = Math.max(1, timelinesLaneCount.value)
   // header + axis + lanes + padding and scrollbar allowance
   const contentPx = 52 + 34 + 8 + 14 + laneCount * 52
   return `min(${contentPx}px, 45vh)`
@@ -76,7 +78,7 @@ const timelinesSheetHeight = computed(() => {
 
 // Bottom overlays (zoom controls) shift up over the timelines sheet
 const canvasBottomInset = computed(() =>
-  showTimelines.value && !readerStorylineId.value ? timelinesSheetHeight.value : '0px'
+  showTimelines.value ? timelinesSheetHeight.value : '0px'
 )
 
 function openReader(id: string) {
@@ -103,11 +105,9 @@ const edgeStepper = createEdgeStepper({
   rightThreshold: () =>
     storylinePanel.isOpen.value || readerStorylineId.value ? 3 : 12,
   bottomThreshold: () => (showTimelines.value ? 3 : 12),
-  // Bottom edge: the timelines sheet slides up
+  // Bottom edge: the timelines sheet slides up (also while reading)
   stepBottom: () => {
-    if (!readerStorylineId.value) {
-      showTimelines.value = true
-    }
+    showTimelines.value = true
   },
   stepRight: () => {
     if (readerStorylineId.value) {
@@ -885,22 +885,24 @@ async function openFolderDialog() {
       <!-- Timelines: all storylines as lanes, sliding up from the bottom -->
       <Transition name="sheet-slide">
         <div
-          v-if="showTimelines && !readerStorylineId"
+          v-if="showTimelines"
           class="timelines-overlay"
           :style="{ height: timelinesSheetHeight }"
         >
           <StorylineTimelines
             @open-reader="openReader"
             @close="showTimelines = false"
+            @lane-count="(count) => timelinesLaneCount = count"
           />
         </div>
       </Transition>
-      <!-- Reader slides in from the right and back out on close -->
+      <!-- Reader slides in from the right; sits above an open timelines sheet -->
       <Transition name="reader-slide">
         <StorylineReader
           v-if="readerStorylineId"
           :storyline-id="readerStorylineId"
           :full-width="readerFullWidth"
+          :style="{ bottom: showTimelines ? timelinesSheetHeight : '0px' }"
           @close="readerStorylineId = null"
         />
       </Transition>

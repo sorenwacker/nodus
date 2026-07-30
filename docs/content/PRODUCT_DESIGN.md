@@ -271,6 +271,20 @@ Users don't abandon Obsidian — they enhance it with Nodus.
 - **Text:** Last Write Wins
 - **Canvas position:** Nodus exclusive (Obsidian doesn't care about x,y)
 
+### Timelines: Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Only dated nodes are placed | Positions are facts, not guesses; no interpolation, no sequence fallback. Undated nodes simply do not appear |
+| Dates live in frontmatter (`date:`, `date_end:`) | Files stay the source of truth; Obsidian/OKF compatible; the in-app date editor (node card chip, preview panel) writes the same fields |
+| Broken axis | Large empty stretches between event clusters are abbreviated with a marked break; gap detection compares against both span share and median spacing so even spreads never fragment |
+| Per-segment label detail | Each axis segment labels itself at its own scale — years, months, days, or clock times — so a one-hour narrative and a millennium can share one axis |
+| Bottom sheet, sized to content | Timelines slide up from the bottom edge (spatial model: storylines right, time below, graph above), only as tall as the lanes need, capped at 45% |
+| Coexists with overview and reader | The sheet stays open alongside the storyline overview and under a shortened reader; left-edge pushes still step back |
+| Unassigned lane | Dated nodes outside every storyline get a neutral gray lane so the timeline shows every dated node in the workspace |
+| Marks colored by node, lanes by storyline | Color follows the entity; node colors are solidified from their canvas background tints. Uncolored storylines get a stable hue from a colorblind-validated palette |
+| One hover tool | Beads drive the canvas's own hover tooltip through the shared external-hover events; no second preview implementation |
+
 ### Wikilink Sync Strategy
 
 Wikilink edges are maintained incrementally. Each node stores the content hash it was last wikilink-synced at (`wikilink_synced_hash`); the full sync pass on startup and workspace switch skips every node whose hash is unchanged, touching neither the filesystem nor the edge table for them. Links whose target does not exist yet are recorded in `pending_wikilinks` (source node, normalized target key) and resolved the moment a node with a matching title or path is created or renamed — so a dangling `[[link]]` becomes an edge without waiting for a full re-scan. The file watcher remains the primary mechanism for reacting to file edits; the full pass is a safety net that is now cheap when nothing changed.

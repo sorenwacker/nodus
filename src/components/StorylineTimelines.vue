@@ -7,7 +7,7 @@
  * dated nodes are beads, date ranges are bars, and nodes shared between
  * storylines are joined by dashed connectors. Only dated nodes are placed.
  */
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
@@ -20,15 +20,17 @@ import {
   axisX,
   type AxisSegment,
 } from '../lib/timelineDates'
-import CanvasHoverTooltip from '../canvas/components/CanvasHoverTooltip.vue'
-import { renderMarkdown } from '../services/MarkdownRenderService'
 
 const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'open-reader', storylineId: string): void
   (e: 'close'): void
+  (e: 'lane-count', count: number): void
 }>()
+
+/** Pseudo-lane id for dated nodes outside every storyline */
+const UNASSIGNED = '__unassigned__'
 
 const store = useNodesStore()
 const { storylineNodes, storylineNodesVersion } = storeToRefs(store)
@@ -88,27 +90,41 @@ interface LaneNode {
   rawEnd: string | null
 }
 
+function toLaneNode(nodeId: string): LaneNode {
+  const node = store.getNode(nodeId)
+  const content = node?.markdown_content || ''
+  const raw = extractFrontmatterField(content, 'date')
+  const rawEnd = extractFrontmatterField(content, 'date_end')
+  return {
+    nodeId,
+    title: node?.title || 'Unknown',
+    color: solidColor(node?.color_theme),
+    year: parseHistoricalDate(raw),
+    yearEnd: parseHistoricalDate(rawEnd),
+    raw,
+    rawEnd,
+  }
+}
+
 const laneNodes = computed<Array<{ storylineId: string; nodes: LaneNode[] }>>(() => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _version = storylineNodesVersion.value // Reactivity on Map changes
-  return storylines.value.map(storyline => ({
+  const lanes = storylines.value.map(storyline => ({
     storylineId: storyline.id,
-    nodes: (storylineNodes.value.get(storyline.id) || []).map(nodeId => {
-      const node = store.getNode(nodeId)
-      const content = node?.markdown_content || ''
-      const raw = extractFrontmatterField(content, 'date')
-      const rawEnd = extractFrontmatterField(content, 'date_end')
-      return {
-        nodeId,
-        title: node?.title || 'Unknown',
-        color: solidColor(node?.color_theme),
-        year: parseHistoricalDate(raw),
-        yearEnd: parseHistoricalDate(rawEnd),
-        raw,
-        rawEnd,
-      }
-    }),
+    nodes: (storylineNodes.value.get(storyline.id) || []).map(toLaneNode),
   }))
+
+  // Dated nodes outside every storyline get their own lane, so the timeline
+  // shows every dated node in the workspace
+  const assigned = new Set(lanes.flatMap(l => l.nodes.map(n => n.nodeId)))
+  const unassigned = store.filteredNodes
+    .filter(n => !assigned.has(n.id))
+    .map(n => toLaneNode(n.id))
+    .filter(n => n.year !== null)
+  if (unassigned.length > 0) {
+    lanes.push({ storylineId: UNASSIGNED, nodes: unassigned })
+  }
+  return lanes
 })
 
 // Manual axis range, persisted; either side may be empty (auto)
@@ -142,12 +158,12 @@ function yearToX(year: number): number {
 
 const lanes = computed<Lane[]>(() => {
   return laneNodes.value.map((lane, laneIndex) => {
-    const storyline = storylines.value[laneIndex]
+    const storyline = storylines.value.find(s => s.id === lane.storylineId)
     const y = AXIS_HEIGHT + laneIndex * LANE_HEIGHT + LANE_HEIGHT / 2
     const base = {
       id: lane.storylineId,
-      title: storyline.title,
-      color: laneColor(lane.storylineId, storyline.color),
+      title: storyline ? storyline.title : t('storyline.unassigned'),
+      color: storyline ? laneColor(lane.storylineId, storyline.color) : '#9ca3af',
       nodeCount: lane.nodes.length,
       y,
     }
@@ -184,31 +200,20 @@ const lanes = computed<Lane[]>(() => {
   })
 })
 
-// Hovered node: shown with the same hover preview window as the canvas
-const hoveredPreview = ref<{ nodeId: string; title: string; dateLabel: string | null; x: number; y: number } | null>(null)
-
-const hoveredNode = computed(() =>
-  hoveredPreview.value ? store.getNode(hoveredPreview.value.nodeId) ?? null : null
-)
-
-const hoveredRenderedContent = computed(() =>
-  hoveredNode.value ? renderMarkdown(hoveredNode.value.markdown_content) : ''
-)
-
-const hoveredEdgeStats = computed(() => {
-  if (!hoveredPreview.value) return null
-  const id = hoveredPreview.value.nodeId
-  let incoming = 0
-  let outgoing = 0
-  let bidirectional = 0
-  for (const edge of store.filteredEdges) {
-    if (edge.source_node_id !== id && edge.target_node_id !== id) continue
-    if (edge.directed === false) bidirectional++
-    else if (edge.source_node_id === id) outgoing++
-    else incoming++
+// One tool: bead hovers drive the canvas's own hover tooltip via the same
+// events the storyline panel uses
+function hoverNode(nodeId: string) {
+  const node = store.getNode(nodeId)
+  if (node) {
+    window.dispatchEvent(new CustomEvent('storyline-node-hover', { detail: { node } }))
   }
-  return { incoming, outgoing, bidirectional, total: incoming + outgoing + bidirectional }
-})
+}
+
+function hoverEnd() {
+  window.dispatchEvent(new CustomEvent('storyline-node-hover-end'))
+}
+
+onUnmounted(hoverEnd)
 
 // Graph edges between nodes that both appear on the timelines, drawn as arcs
 const edgeLinks = computed(() => {
@@ -280,6 +285,13 @@ const axisBreaks = computed(() =>
 const svgWidth = computed(() => PADDING * 2 + PLOT_WIDTH)
 const svgHeight = computed(() => AXIS_HEIGHT + lanes.value.length * LANE_HEIGHT + 8)
 
+// The sheet sizes itself to the lane count (including the unassigned lane)
+watch(
+  () => lanes.value.length,
+  count => emit('lane-count', count),
+  { immediate: true }
+)
+
 onMounted(() => {
   store.loadStorylines()
 })
@@ -328,9 +340,9 @@ onMounted(() => {
           v-for="(lane, i) in lanes"
           :key="lane.id"
           class="tl-label-row"
-          :class="{ striped: i % 2 === 1 }"
+          :class="{ striped: i % 2 === 1, unassigned: lane.id === UNASSIGNED }"
           :style="{ height: `${LANE_HEIGHT}px` }"
-          @click="emit('open-reader', lane.id)"
+          @click="lane.id !== UNASSIGNED && emit('open-reader', lane.id)"
         >
           <span class="tl-chip" :style="{ backgroundColor: lane.color }"></span>
           <span class="tl-label-title">{{ lane.title }}</span>
@@ -411,7 +423,8 @@ onMounted(() => {
             v-for="lane in lanes"
             :key="lane.id"
             class="timeline-lane"
-            @click="emit('open-reader', lane.id)"
+            :class="{ unassigned: lane.id === UNASSIGNED }"
+            @click="lane.id !== UNASSIGNED && emit('open-reader', lane.id)"
           >
             <line
               v-if="lane.beads.length > 1"
@@ -433,11 +446,9 @@ onMounted(() => {
               height="10"
               rx="5"
               :style="{ fill: span.color }"
-              @mouseenter="hoveredPreview = { nodeId: span.nodeId, title: span.title, dateLabel: span.dateLabel, x: span.x1, y: span.y }"
-              @mouseleave="hoveredPreview = null"
-            >
-              <title>{{ span.title }} ({{ span.dateLabel }})</title>
-            </rect>
+              @mouseenter="hoverNode(span.nodeId)"
+              @mouseleave="hoverEnd"
+            />
             <!-- Beads with an oversized invisible hit target -->
             <g v-for="bead in lane.beads" :key="bead.nodeId">
               <circle
@@ -445,8 +456,8 @@ onMounted(() => {
                 :cx="bead.x"
                 :cy="bead.y"
                 :r="HIT_RADIUS"
-                @mouseenter="hoveredPreview = { nodeId: bead.nodeId, title: bead.title, dateLabel: bead.dateLabel, x: bead.x, y: bead.y }"
-                @mouseleave="hoveredPreview = null"
+                @mouseenter="hoverNode(bead.nodeId)"
+                @mouseleave="hoverEnd"
               />
               <circle
                 class="lane-bead"
@@ -454,22 +465,11 @@ onMounted(() => {
                 :cy="bead.y"
                 :r="BEAD_RADIUS"
                 :style="{ fill: bead.color }"
-              >
-                <title>{{ bead.dateLabel ? `${bead.title} (${bead.dateLabel})` : bead.title }}</title>
-              </circle>
+              />
             </g>
           </g>
         </svg>
 
-        <!-- Same hover preview window as the canvas -->
-        <CanvasHoverTooltip
-          :visible="hoveredPreview !== null"
-          :position="{ x: hoveredPreview?.x ?? 0, y: hoveredPreview?.y ?? 0 }"
-          :node="hoveredNode"
-          :content="hoveredNode?.markdown_content || ''"
-          :rendered-content="hoveredRenderedContent"
-          :edge-stats="hoveredEdgeStats"
-        />
       </div>
     </div>
   </div>
@@ -602,6 +602,16 @@ onMounted(() => {
 
 .tl-label-row.striped {
   background: var(--bg-elevated);
+}
+
+.tl-label-row.unassigned,
+.timeline-lane.unassigned {
+  cursor: default;
+}
+
+.tl-label-row.unassigned .tl-label-title {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .tl-label-row:hover {

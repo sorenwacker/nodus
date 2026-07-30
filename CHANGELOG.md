@@ -20,6 +20,7 @@ All notable changes to Nodus are documented in this file.
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 
 ### Fixed
+- Timelines now cover every dated node: nodes outside all storylines appear in a gray Unassigned lane; marks use the node's own color (solidified) with the storyline color as fallback; bead hovers drive the same hover tooltip as the canvas instead of a separate preview; and the sheet stays open alongside the overview and reader (the reader shortens to sit above it)
 - Mermaid diagram labels render again: DOMPurify 3.4.12 empties foreignObject content (mXSS hardening), which blanked mermaid's HTML labels, so mermaid now renders native SVG text labels instead
 - Storyline layers stay open while the pointer is inside them: auto-close on mouse-leave is gone (left-edge push or the book button steps back), and stepping deeper while a layer is open requires pressing against the very window edge so panel interaction near the border no longer skips ahead
 - Canvas overlays (minimap, zoom controls, hover preview) shift left in sync with the storyline layers instead of being covered by or floating above them

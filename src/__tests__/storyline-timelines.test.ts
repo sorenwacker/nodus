@@ -113,14 +113,11 @@ describe('StorylineTimelines', () => {
     seedDatedNodes()
     const wrapper = await mountTimelines()
 
-    const beadTitles = wrapper.findAll('.lane-bead title').map(t => t.text())
-    // n1 + shared (twice, once per lane) + n3
-    expect(beadTitles.length).toBe(4)
-    expect(beadTitles.some(t => t.includes('Undated'))).toBe(false)
-
-    const spans = wrapper.findAll('.lane-span')
-    expect(spans.length).toBe(1)
-    expect(spans[0].find('title').text()).toContain('Era')
+    // n1 + shared (twice, once per lane) + n3 are beads; the undated nodes
+    // (n2, 'Undated too') must not appear anywhere
+    expect(wrapper.findAll('.lane-bead').length).toBe(4)
+    // The date+date_end node renders as one span bar
+    expect(wrapper.findAll('.lane-span').length).toBe(1)
   })
 
   it('draws a connector for a node shared between storylines', async () => {
@@ -134,6 +131,28 @@ describe('StorylineTimelines', () => {
     const wrapper = await mountTimelines()
     await wrapper.findAll('.timeline-lane')[1].trigger('click')
     expect(wrapper.emitted('open-reader')).toEqual([['s2']])
+  })
+
+  it('gives dated nodes outside every storyline their own lane', async () => {
+    seedDatedNodes()
+    useNodesStore().nodes.push({
+      ...BASE_NODE,
+      id: 'loose',
+      title: 'Loose event',
+      markdown_content: '---\ndate: 1200\n---\nx',
+    })
+    const wrapper = mount(StorylineTimelines, { global: { plugins: [i18n] } })
+    await vi.waitFor(() => {
+      expect(wrapper.findAll('.timeline-lane').length).toBe(3)
+    })
+
+    const labels = wrapper.findAll('.tl-label-row')
+    expect(labels[2].text()).toContain(en.storyline.unassigned)
+    expect(labels[2].text()).toContain('1')
+
+    // The unassigned lane opens no reader
+    await labels[2].trigger('click')
+    expect(wrapper.emitted('open-reader')).toBeUndefined()
   })
 
   it('shows the date hint instead of guessing positions when nothing is dated', async () => {
