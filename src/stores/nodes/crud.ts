@@ -325,6 +325,25 @@ async function syncWikilinkEdgesLocal(
 }
 
 /**
+ * Replace a node's tags (used by the tag editors and MCP)
+ */
+export async function updateNodeTags(
+  nodes: Ref<Node[]>,
+  id: string,
+  tags: string[]
+): Promise<void> {
+  const node = nodes.value.find(n => n.id === id)
+  if (!node) return
+  node.tags = JSON.stringify(tags)
+  node.updated_at = Date.now()
+  try {
+    await invoke('update_node_tags', { id, tags })
+  } catch (e) {
+    console.error('Failed to update tags:', e)
+  }
+}
+
+/**
  * Update node title
  */
 export async function updateNodeTitle(

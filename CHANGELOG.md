@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Tags are editable on the card: a selected node's chips gain remove buttons and a "+ #" chip adds tags; tag nodes and tagged edges are a toggleable canvas layer, and all edge-filter toggles moved from the toolbar to a cluster on the canvas beside the content they filter
 - MCP node tools understand metadata: create_node and update_node accept `date`, `date_end` (written as frontmatter, empty string clears), and `tags`; node reads expose the date fields directly so agents can build timelines without parsing YAML
 - Storylines can be reordered by dragging their rows in the overview, with the same pointer-drag mechanism as node reordering (extracted into one shared composable); the order persists and the timelines lanes follow it. The overview also shortens above an open timelines sheet instead of overlapping it
 - Node dates are editable in place: click the date chip (or "+ Set date" on a selected node) to set `date` and `date_end` without touching YAML; the timelines sheet also sizes itself to its lanes instead of always taking 45% of the window

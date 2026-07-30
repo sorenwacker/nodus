@@ -130,7 +130,7 @@ describe('renderMarkdown frontmatter handling', () => {
 describe('CanvasNodeCard tag chips', () => {
   const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
 
-  function mountCard(tags: string | null) {
+  function mountCard(tags: string | null, isSelected = false) {
     return mount(CanvasNodeCard, {
       props: {
         node: {
@@ -142,8 +142,8 @@ describe('CanvasNodeCard tag chips', () => {
           canvas_y: 0,
           tags,
         },
+        isSelected,
         style: {},
-        isSelected: false,
         isDragging: false,
         isResizing: false,
         isEditing: false,
@@ -175,6 +175,18 @@ describe('CanvasNodeCard tag chips', () => {
   it('renders no chip row for nodes without tags', () => {
     expect(mountCard(null).find('.node-tag-footer').exists()).toBe(false)
     expect(mountCard('not-json').find('.node-tag-footer').exists()).toBe(false)
+  })
+
+  it('offers tag editing on a selected node', () => {
+    const selected = mountCard('["research"]', true)
+    // Each chip gets a remove button, plus a ghost chip to add tags
+    expect(selected.findAll('.tag-remove').length).toBe(1)
+    expect(selected.find('.node-tag-chip.ghost').exists()).toBe(true)
+
+    // Unselected cards stay read-only
+    const unselected = mountCard('["research"]', false)
+    expect(unselected.findAll('.tag-remove').length).toBe(0)
+    expect(unselected.find('.node-tag-chip.ghost').exists()).toBe(false)
   })
 
   it('surfaces OKF date and status frontmatter as chips', () => {

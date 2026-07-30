@@ -41,6 +41,7 @@ export {
   refreshNodeFromFile,
   updateNodeContent,
   updateNodeTitle,
+  updateNodeTags,
   updateNodeColor,
   moveNodesToWorkspace,
   createNode,

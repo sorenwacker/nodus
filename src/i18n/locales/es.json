@@ -29,7 +29,9 @@
       "connections": "conexiones",
       "setDate": "Fijar fecha",
       "datePlaceholder": "fecha (20 BC, 1969-07-20)",
-      "dateEndPlaceholder": "fin (opcional)"
+      "dateEndPlaceholder": "fin (opcional)",
+      "addTag": "Añadir etiqueta",
+      "addTagPlaceholder": "nombre"
     },
     "edge": {
       "labelPlaceholder": "ej. depende de",

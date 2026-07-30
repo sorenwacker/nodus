@@ -37,6 +37,7 @@ import {
   refreshNodeFromFile as refreshNodeFromFileFn,
   updateNodeContent as updateNodeContentFn,
   updateNodeTitle as updateNodeTitleFn,
+  updateNodeTags as updateNodeTagsFn,
   updateNodeColor as updateNodeColorFn,
   moveNodesToWorkspace as moveNodesToWorkspaceFn,
   createNode as createNodeFn,
@@ -124,7 +125,7 @@ export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, Fi
 export const useNodesStore = defineStore('nodes', () => {
   // Create core state
   const state = createState()
-  const { nodes, selectedNodeIds, loading, error, nodeLayoutVersion, showManualEdges, showStorylineEdges, showWikilinkEdges } = state
+  const { nodes, selectedNodeIds, loading, error, nodeLayoutVersion, showManualEdges, showStorylineEdges, showWikilinkEdges, showTagEdges } = state
 
   // Create store instances
   const stores = createStoreInstances()
@@ -262,6 +263,10 @@ export const useNodesStore = defineStore('nodes', () => {
 
   async function updateNodeTitle(id: string, title: string) {
     await updateNodeTitleFn(nodes, id, title)
+  }
+
+  async function updateNodeTags(id: string, tags: string[]) {
+    await updateNodeTagsFn(nodes, id, tags)
   }
 
   async function updateNodeColor(id: string, color: string | null) {
@@ -548,6 +553,7 @@ export const useNodesStore = defineStore('nodes', () => {
     showManualEdges,
     showStorylineEdges,
     showWikilinkEdges,
+    showTagEdges,
     workspaces,
     currentWorkspaceId,
     storylines,
@@ -566,6 +572,7 @@ export const useNodesStore = defineStore('nodes', () => {
     updateNodeSize,
     updateNodeContent,
     updateNodeTitle,
+    updateNodeTags,
     updateNodeColor,
     moveNodesToWorkspace,
     selectNode,

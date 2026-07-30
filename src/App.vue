@@ -769,32 +769,6 @@ async function openFolderDialog() {
         <button class="icon-btn" :disabled="redoStack.length === 0" :data-tooltip="`${t('toolbar.redo')} (Cmd+Shift+Z)`" @click="redo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
-        <div class="toolbar-divider"></div>
-        <!-- Edge category filters -->
-        <button
-          class="icon-btn filter-btn"
-          :class="{ active: store.showManualEdges }"
-          data-tooltip="Toggle manual edges"
-          @click="store.showManualEdges = !store.showManualEdges"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><circle cx="5" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-        </button>
-        <button
-          class="icon-btn filter-btn"
-          :class="{ active: store.showStorylineEdges }"
-          data-tooltip="Toggle storyline edges"
-          @click="store.showStorylineEdges = !store.showStorylineEdges"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-        </button>
-        <button
-          class="icon-btn filter-btn"
-          :class="{ active: store.showWikilinkEdges }"
-          data-tooltip="Toggle wikilink edges"
-          @click="store.showWikilinkEdges = !store.showWikilinkEdges"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        </button>
       </div>
       <div class="toolbar-center">
         <button class="search-trigger" @click="showSearch = true">

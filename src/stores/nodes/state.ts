@@ -26,6 +26,7 @@ export function createState(): NodeStoreState {
     showManualEdges: ref(true),
     showStorylineEdges: ref(true),
     showWikilinkEdges: ref(true),
+    showTagEdges: ref(true),
   }
 }
 
@@ -48,7 +49,7 @@ export function createComputedProperties(
   state: NodeStoreState,
   stores: ReturnType<typeof createStoreInstances>
 ): NodeStoreComputed {
-  const { nodes, showManualEdges, showStorylineEdges, showWikilinkEdges } = state
+  const { nodes, showManualEdges, showStorylineEdges, showWikilinkEdges, showTagEdges } = state
   const { edgesStore, framesStore, workspaceStore, storylinesStore } = stores
 
   // Expose edges and frames from their stores for backwards compatibility
@@ -64,15 +65,15 @@ export function createComputedProperties(
     nodes.value.find(n => n.id === selectedNodeId.value)
   )
 
-  // Filtered nodes/edges for current workspace
+  // Filtered nodes/edges for current workspace. Tag nodes are a display
+  // layer: hidden together with their tagged edges when the toggle is off.
   const filteredNodes = computed(() => {
     const wsId = workspaceStore.currentWorkspaceId
-    // Treat null, undefined, and "default" as the default workspace
-    // Default workspace shows nodes with no workspace_id (null)
-    if (!wsId || wsId === 'default') {
-      return nodes.value.filter(n => !n.workspace_id)
-    }
-    return nodes.value.filter(n => n.workspace_id === wsId)
+    const inWorkspace =
+      !wsId || wsId === 'default'
+        ? nodes.value.filter(n => !n.workspace_id)
+        : nodes.value.filter(n => n.workspace_id === wsId)
+    return showTagEdges.value ? inWorkspace : inWorkspace.filter(n => n.node_type !== 'tag')
   })
 
   const filteredFrames = computed(() => {
@@ -99,6 +100,9 @@ export function createComputedProperties(
       }
       if (e.link_type === 'wikilink') {
         return showWikilinkEdges.value
+      }
+      if (e.link_type === 'tagged') {
+        return showTagEdges.value
       }
       // Manual edges (everything else)
       return showManualEdges.value

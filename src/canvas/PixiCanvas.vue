@@ -67,6 +67,7 @@ import ImportOptionsModal from '../components/ImportOptionsModal.vue'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
+import CanvasEdgeFilters from './components/CanvasEdgeFilters.vue'
 import CanvasContextMenu from './components/CanvasContextMenu.vue'
 import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
 import CanvasLLMBar from './components/CanvasLLMBar.vue'
@@ -2147,6 +2148,9 @@ defineExpose({
         @content-updated="savePreviewContent"
         @navigate-to-node="handlePreviewNavigateToNode"
       />
+
+      <!-- Edge/tag layer toggles, next to the content they filter -->
+      <CanvasEdgeFilters />
 
       <!-- Controls -->
       <CanvasControls

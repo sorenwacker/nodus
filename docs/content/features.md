@@ -25,7 +25,8 @@ Hashtags in node content become node tags:
 
 - `#tag` tokens are extracted whenever content is set: on node creation and on every content edit, from any interface (canvas editor, MCP tools, LLM agent)
 - Extracted tags merge with the node's existing tags
-- A node's tags appear as chips at the bottom of its card
+- A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
+- Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
 - With tag nodes enabled in settings, each tag becomes a tag node connected to the notes that use it
 
 YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treated as structured node metadata, never as text:
