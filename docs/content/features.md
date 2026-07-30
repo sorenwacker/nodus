@@ -58,6 +58,14 @@ Open any node in a fullscreen split-view editor for focused writing:
 | Contradicts | Orange | Opposing viewpoint |
 | Blocks | Red | Dependency or blocker |
 
+### Wikilink Edges
+Writing `[[link]]` in a node's content creates a wikilink edge to the referenced node:
+
+- Edges are created whenever content is set: on node creation and on every content edit, from any interface (canvas editor, MCP tools, LLM agent, vault import)
+- Links resolve by note title, by relative path (`[[folder/note]]`), and with section anchors (`[[note#section]]`)
+- A pair already connected by a manual edge does not receive a parallel wikilink edge
+- Removing the link removes the wikilink edge; manual edges are kept
+
 ### Edge Routing
 Multiple routing styles for visual clarity:
 
