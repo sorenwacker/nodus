@@ -871,20 +871,19 @@ async function openFolderDialog() {
           <StorylinePanel @open-reader="openReader" @open-timelines="showTimelines = true" />
         </div>
       </div>
-      <!-- Timelines: all storylines as lanes, sliding up from the bottom -->
-      <Transition name="sheet-slide">
-        <div
-          v-if="showTimelines"
-          class="timelines-overlay"
-          :style="{ height: timelinesSheetHeight }"
-        >
-          <StorylineTimelines
-            @open-reader="openReader"
-            @close="showTimelines = false"
-            @lane-count="(count) => timelinesLaneCount = count"
-          />
-        </div>
-      </Transition>
+      <!-- Timelines: all storylines as lanes. Kept mounted so opening is a
+           pure transform slide with the height already settled -->
+      <div
+        class="timelines-overlay"
+        :class="{ open: showTimelines }"
+        :style="{ height: timelinesSheetHeight }"
+      >
+        <StorylineTimelines
+          @open-reader="openReader"
+          @close="showTimelines = false"
+          @lane-count="(count) => timelinesLaneCount = count"
+        />
+      </div>
       <!-- Reader slides in from the right; sits above an open timelines sheet -->
       <Transition name="reader-slide">
         <StorylineReader

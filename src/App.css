@@ -318,7 +318,8 @@
   --step-duration: 0.3s;
 }
 
-/* Timelines: sheet sliding up from the bottom, graph stays visible above */
+/* Timelines: sheet sliding up from the bottom, graph stays visible above.
+   Always mounted; opening toggles a transform for a smooth slide */
 .timelines-overlay {
   position: absolute;
   bottom: 0;
@@ -328,17 +329,13 @@
   z-index: 61;
   border-top: 1px solid var(--border-default);
   overflow: hidden;
+  transform: translateY(102%);
+  transition: transform var(--step-duration) var(--step-ease);
   will-change: transform;
 }
 
-.sheet-slide-enter-active,
-.sheet-slide-leave-active {
-  transition: transform var(--step-duration) var(--step-ease);
-}
-
-.sheet-slide-enter-from,
-.sheet-slide-leave-to {
-  transform: translateY(100%);
+.timelines-overlay.open {
+  transform: translateY(0);
 }
 
 .reader-slide-enter-active,

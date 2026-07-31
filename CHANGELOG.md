@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- The timelines sheet opens smoothly: it stays mounted with its height settled, so sliding up is a pure transform instead of a mount-render-resize stutter
 - The reader genuinely stops above an open timelines sheet: an explicit height on its overlay was overriding the bottom offset, so the two overlapped
 - The timelines sheet no longer opens from a glancing pass: the pointer must dwell at the bottom edge briefly (100ms) before it slides up
 
