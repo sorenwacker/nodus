@@ -2,14 +2,7 @@
 
 All notable changes to Nodus are documented in this file.
 
-## [Unreleased]
-
-### Fixed
-- The timelines sheet opens smoothly: it stays mounted with its height settled, so sliding up is a pure transform instead of a mount-render-resize stutter
-- The reader genuinely stops above an open timelines sheet: an explicit height on its overlay was overriding the bottom offset, so the two overlapped
-- The timelines sheet no longer opens from a glancing pass: the pointer must dwell at the bottom edge briefly (100ms) before it slides up
-
-## [1.1.0-rc.1] - 2026-07-30
+## [1.1.0] - 2026-07-31
 
 ### Added
 - Canvas and timelines are cross-linked: hovering a node highlights its timeline mark and vice versa, and clicking a timeline mark selects the node (opening the preview at low zoom, like a canvas click) and zooms to it. Tags are also editable in the preview panel, which works at any zoom level
@@ -31,6 +24,9 @@ All notable changes to Nodus are documented in this file.
 - Settings modal reorganized into six tabs: Zotero merged into Citations, and About/License moved into a collapsible section under General alongside Advanced
 
 ### Fixed
+- The timelines sheet opens smoothly: it stays mounted with its height settled, so sliding up is a pure transform instead of a mount-render-resize stutter
+- The reader genuinely stops above an open timelines sheet: an explicit height on its overlay was overriding the bottom offset, so the two overlapped
+- The timelines sheet no longer opens from a glancing pass: the pointer must dwell at the bottom edge briefly (100ms) before it slides up
 - Timelines now cover every dated node: nodes outside all storylines appear in a gray Unassigned lane; marks use the node's own color (solidified) with the storyline color as fallback; bead hovers drive the same hover tooltip as the canvas instead of a separate preview; and the sheet stays open alongside the overview and reader (the reader shortens to sit above it)
 - Mermaid diagram labels render again: DOMPurify 3.4.12 empties foreignObject content (mXSS hardening), which blanked mermaid's HTML labels, so mermaid now renders native SVG text labels instead
 - Storyline layers stay open while the pointer is inside them: auto-close on mouse-leave is gone (left-edge push or the book button steps back), and stepping deeper while a layer is open requires pressing against the very window edge so panel interaction near the border no longer skips ahead
@@ -44,7 +40,6 @@ All notable changes to Nodus are documented in this file.
 - Wikilink sync no longer creates a parallel edge when the node pair is already connected by a manual edge, in either direction (#43)
 - Edges of trashed notes are excluded from edge queries, graph summaries, structure, and orphan detection, and the database orphan cleanup now removes them; ghost "Unknown" entries no longer appear in analytics (#44)
 - Content updates resolve wikilinks through the backend resolver, so `[[folder/note]]` and `[[note#section]]` links create edges from every code path instead of being silently dropped and having their existing edges deleted (#45)
-
 ## [1.0.0] - 2026-07-20
 
 First stable release. Consolidates the 0.7.0-rc.1 review remediation (backend
