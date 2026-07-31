@@ -111,7 +111,7 @@ const edgeStepper = createEdgeStepper({
   bottomThreshold: () => (showTimelines.value ? 3 : 12),
   // The sheet opens only after the pointer dwells at the bottom edge, so
   // passing near it does not fire accidentally
-  bottomDwellMs: 400,
+  bottomDwellMs: 100,
   // Bottom edge: the timelines sheet slides up (also while reading)
   stepBottom: () => {
     showTimelines.value = true

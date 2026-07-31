@@ -6,7 +6,7 @@ All notable changes to Nodus are documented in this file.
 
 ### Fixed
 - The reader genuinely stops above an open timelines sheet: an explicit height on its overlay was overriding the bottom offset, so the two overlapped
-- The timelines sheet no longer opens from a glancing pass: the pointer must dwell at the bottom edge briefly (400ms) before it slides up
+- The timelines sheet no longer opens from a glancing pass: the pointer must dwell at the bottom edge briefly (100ms) before it slides up
 
 ## [1.1.0-rc.1] - 2026-07-30
 
