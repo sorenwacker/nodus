@@ -394,6 +394,16 @@ size. The divisor is clamped to a 0.2–3× zoom window so labels neither balloo
 when zoomed far out nor collapse when zoomed far in; the base size still comes
 from the user's `edgeLabelSize` canvas setting.
 
+**Edge label zoom threshold (required behavior):** Analogous to the semantic
+zoom threshold for node content, edge labels have their own zoom threshold.
+When the viewport zoom is below the threshold, edge labels are not rendered;
+at or above it, they render normally. Because labels are counter-scaled, they
+would otherwise stay full-size while nodes collapse, dominating the zoomed-out
+view. The threshold is a display setting (`edgeLabelZoomThreshold`, range 0–1,
+default 0.5) configurable via a slider in Settings > Appearance next to the
+semantic zoom threshold; setting it to 0 keeps labels visible at every zoom
+level.
+
 ### Canvas Features
 
 - Infinite pan/zoom
