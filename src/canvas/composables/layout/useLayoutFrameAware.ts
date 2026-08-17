@@ -3,7 +3,7 @@
  * Handles preparation and post-processing for layouts that respect frame boundaries
  */
 import { NODE_DEFAULTS } from '../../constants'
-import { constrainNodesToFrame, type FrameRect, type NodeSize } from './useFrameCollision'
+import { constrainNodesToFrame, resolveFrameOverlaps, type FrameRect, type NodeSize } from './useFrameCollision'
 
 // Constant for frame virtual node prefix
 export const FRAME_PREFIX = '___FRAME___'
@@ -24,6 +24,7 @@ export interface Frame {
   width: number
   height: number
   title?: string
+  parent_frame_id?: string | null
 }
 
 export interface Edge {
@@ -54,6 +55,13 @@ export interface PreparedLayoutData {
   layoutEdges: Array<{ source: string; target: string }>
   frameSnapshot: Map<string, { x: number; y: number }>
   nodeToFrameId: Map<string, string>
+  /**
+   * Frame-relative offsets of member nodes captured when the layout starts.
+   * Targets are computed as frame position + offset, never incrementally from
+   * the node's current (possibly mid-animation) position, so interrupted or
+   * repeated runs cannot displace nodes relative to their frame.
+   */
+  nodeFrameOffsets: Map<string, { dx: number; dy: number }>
 }
 
 /**
@@ -76,11 +84,14 @@ export function prepareFrameAwareLayout(
 
   const frameSnapshot = new Map<string, { x: number; y: number }>()
   const nodeToFrameId = new Map<string, string>()
+  const nodeFrameOffsets = new Map<string, { dx: number; dy: number }>()
 
   if (!frameId) {
     // Global layout: add frames as virtual nodes
+    const framePos = new Map<string, { x: number; y: number }>()
     for (const frame of allFrames) {
       frameSnapshot.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
+      framePos.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
       layoutNodes.push({
         id: FRAME_PREFIX + frame.id,
         x: frame.canvas_x + frame.width / 2,
@@ -90,10 +101,26 @@ export function prepareFrameAwareLayout(
       })
     }
 
-    // Map framed nodes to their frame
+    // Map framed nodes to their frame and capture their frame-relative
+    // offset, clamped into the frame bounds: a run then repairs any node that
+    // previously escaped its frame instead of preserving the escape
+    const frameById = new Map(allFrames.map(f => [f.id, f]))
+    const clampPadding = 10
     for (const [fId, nodesInFrame] of frameNodes) {
+      const pos = framePos.get(fId)
+      const frame = frameById.get(fId)
       for (const node of nodesInFrame) {
         nodeToFrameId.set(node.id, fId)
+        if (pos && frame) {
+          const nodeW = node.width || NODE_DEFAULTS.WIDTH
+          const nodeH = node.height || NODE_DEFAULTS.HEIGHT
+          const maxDx = Math.max(clampPadding, frame.width - nodeW - clampPadding)
+          const maxDy = Math.max(clampPadding, frame.height - nodeH - clampPadding)
+          nodeFrameOffsets.set(node.id, {
+            dx: Math.min(Math.max(node.canvas_x - pos.x, clampPadding), maxDx),
+            dy: Math.min(Math.max(node.canvas_y - pos.y, clampPadding), maxDy),
+          })
+        }
       }
     }
   }
@@ -120,7 +147,7 @@ export function prepareFrameAwareLayout(
     .filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target))
     .filter(e => e.source !== e.target)
 
-  return { layoutNodes, layoutEdges, frameSnapshot, nodeToFrameId }
+  return { layoutNodes, layoutEdges, frameSnapshot, nodeToFrameId, nodeFrameOffsets }
 }
 
 /**
@@ -130,12 +157,13 @@ export function prepareFrameAwareLayout(
 export function processFrameAwareLayoutResults(
   ctx: FrameAwareLayoutContext,
   positions: Map<string, { x: number; y: number }>,
-  frameSnapshot: Map<string, { x: number; y: number }>,
+  prepared: Pick<PreparedLayoutData, 'frameSnapshot' | 'nodeFrameOffsets'>,
   updateFramePosition: (id: string, x: number, y: number) => void,
   pushOutOfFrames: (targets: Map<string, { x: number; y: number }>, nodeSizes: Map<string, NodeSize>) => Map<string, { x: number; y: number }>,
   updateFrameSize?: (id: string, width: number, height: number) => void
 ): Map<string, { x: number; y: number }> {
   const { virtualNodes, allFrames, frameNodes, frameId, nodes, targetFrame } = ctx
+  const { frameSnapshot, nodeFrameOffsets } = prepared
 
   // Build final targets map - exclude frame virtual nodes
   const nodeTargets = new Map<string, { x: number; y: number }>()
@@ -145,31 +173,45 @@ export function processFrameAwareLayoutResults(
     }
   }
 
-  // For global layout, move frames and their contents together
+  // For global layout, move frames and their contents together as rigid
+  // units, then resolve frame-frame overlaps so repeated runs cannot stack
+  // frames on top of each other
   if (!frameId) {
-    for (const frame of allFrames) {
-      const virtualId = FRAME_PREFIX + frame.id
-      const newPos = positions.get(virtualId)
-      if (!newPos) continue
-
+    // Prospective frame positions from the layout result
+    const prospective = allFrames.map(frame => {
+      const newPos = positions.get(FRAME_PREFIX + frame.id)
       const oldPos = frameSnapshot.get(frame.id)
-      if (!oldPos) continue
+      const x = newPos && oldPos ? newPos.x - frame.width / 2 : frame.canvas_x
+      const y = newPos && oldPos ? newPos.y - frame.height / 2 : frame.canvas_y
+      return {
+        id: frame.id,
+        canvas_x: x,
+        canvas_y: y,
+        width: frame.width,
+        height: frame.height,
+        parent_frame_id: frame.parent_frame_id ?? null,
+      }
+    })
 
-      const oldCenterX = oldPos.x + frame.width / 2
-      const oldCenterY = oldPos.y + frame.height / 2
-      const deltaX = newPos.x - oldCenterX
-      const deltaY = newPos.y - oldCenterY
+    // Push overlapping frames apart before committing anything
+    const resolved = resolveFrameOverlaps(prospective)
 
-      if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue
+    for (const frame of allFrames) {
+      const planned = prospective.find(p => p.id === frame.id)!
+      const finalPos = resolved.get(frame.id) ?? { x: planned.canvas_x, y: planned.canvas_y }
 
-      updateFramePosition(frame.id, oldPos.x + deltaX, oldPos.y + deltaY)
+      if (Math.abs(finalPos.x - frame.canvas_x) >= 1 || Math.abs(finalPos.y - frame.canvas_y) >= 1) {
+        updateFramePosition(frame.id, finalPos.x, finalPos.y)
+      }
 
+      // Member node targets come from the offsets captured at snapshot time,
+      // never from the node's current (possibly mid-animation) position
       const nodesInFrame = frameNodes.get(frame.id) || []
       for (const node of nodesInFrame) {
-        nodeTargets.set(node.id, {
-          x: node.canvas_x + deltaX,
-          y: node.canvas_y + deltaY,
-        })
+        const offset = nodeFrameOffsets.get(node.id)
+        if (offset) {
+          nodeTargets.set(node.id, { x: finalPos.x + offset.dx, y: finalPos.y + offset.dy })
+        }
       }
     }
   }

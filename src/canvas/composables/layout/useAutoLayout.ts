@@ -42,6 +42,13 @@ export interface AutoLayoutOptions {
     nodeMap: Map<string, NodeSize>
   ) => Map<string, { x: number; y: number }>
   expandFramesToFitNodes: () => Promise<void>
+  /**
+   * Schedule expandFramesToFitNodes after the given delay. The scheduler owns
+   * a single pending timer: scheduling again (or starting a new layout run)
+   * replaces it, so a stale pass can never fire against another run's
+   * in-flight positions. Optional for callers that apply positions instantly.
+   */
+  scheduleExpandFrames?: (delayMs: number) => void
 }
 
 /**
@@ -54,6 +61,8 @@ export async function executeAutoLayout(
   options: AutoLayoutOptions
 ): Promise<boolean> {
   const { store, animateToPositions, applyFrameConstraints, pushOutOfFrames, expandFramesToFitNodes } = options
+  const scheduleExpandFrames = options.scheduleExpandFrames
+    ?? ((delayMs: number) => { setTimeout(() => expandFramesToFitNodes(), delayMs) })
 
   // Radial layout is handled separately (requires exactly one selected node)
   if (layout === 'radial') {
@@ -235,7 +244,8 @@ export async function executeAutoLayout(
       nodes,
       targetFrame: targetFrame || null,
     }
-    const { layoutNodes, layoutEdges, frameSnapshot } = prepareFrameAwareLayout(ctx, edges)
+    const prepared = prepareFrameAwareLayout(ctx, edges)
+    const { layoutNodes, layoutEdges } = prepared
 
     // Execute the specific layout algorithm
     let positions: Map<string, { x: number; y: number }>
@@ -273,7 +283,7 @@ export async function executeAutoLayout(
     const finalTargets = processFrameAwareLayoutResults(
       ctx,
       positions,
-      frameSnapshot,
+      prepared,
       store.updateFramePosition,
       pushOutOfFrames,
       store.updateFrameSize
@@ -293,7 +303,7 @@ export async function executeAutoLayout(
       // After global layout, ensure all framed nodes are inside their assigned frames
       // Skip for frame-scoped layout since we expanded the frame to fit
       if (!frameId) {
-        setTimeout(() => expandFramesToFitNodes(), animationDuration + 100)
+        scheduleExpandFrames(animationDuration + 100)
       }
     }
     return true
@@ -362,8 +372,8 @@ export async function executeAutoLayout(
   animateToPositions(finalTargets, 500)
 
   // After layout, ensure all framed nodes are inside their assigned frames
-  // Use setTimeout to let animation complete first
-  setTimeout(() => expandFramesToFitNodes(), 600)
+  // Scheduled so the animation completes first
+  scheduleExpandFrames(600)
 
   return true
 }

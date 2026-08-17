@@ -6,6 +6,13 @@
 export interface LayoutAnimationState {
   animationId: number | null
   stop: () => void
+  /**
+   * Complete the in-flight animation instantly: apply all remaining targets
+   * and stop. Starting a new layout run must settle (not freeze) the previous
+   * one, so state is never left mid-flight between a frame and its nodes.
+   */
+  settle: () => void
+  pending: { targets: Map<string, { x: number; y: number }>; update: (id: string, x: number, y: number) => void } | null
 }
 
 /**
@@ -20,11 +27,22 @@ export function easeOutCubic(t: number): number {
  */
 export function createLayoutAnimator(): LayoutAnimationState {
   let animationId: number | null = null
+  let pending: LayoutAnimationState['pending'] = null
 
   function stop() {
     if (animationId !== null) {
       cancelAnimationFrame(animationId)
       animationId = null
+    }
+  }
+
+  function settle() {
+    stop()
+    if (pending) {
+      for (const [id, pos] of pending.targets) {
+        pending.update(id, pos.x, pos.y)
+      }
+      pending = null
     }
   }
 
@@ -35,7 +53,14 @@ export function createLayoutAnimator(): LayoutAnimationState {
     set animationId(id: number | null) {
       animationId = id
     },
+    get pending() {
+      return pending
+    },
+    set pending(value: LayoutAnimationState['pending']) {
+      pending = value
+    },
     stop,
+    settle,
   }
 }
 
@@ -50,6 +75,7 @@ export function animateToPositions(
   duration = 400
 ): void {
   state.stop()
+  state.pending = { targets, update: updateNodePosition }
 
   const startTime = performance.now()
   const startPositions = new Map<string, { x: number; y: number }>()
@@ -79,6 +105,7 @@ export function animateToPositions(
       state.animationId = requestAnimationFrame(animate)
     } else {
       state.animationId = null
+      state.pending = null
     }
   }
 

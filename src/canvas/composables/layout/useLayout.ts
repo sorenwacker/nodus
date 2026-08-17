@@ -82,6 +82,25 @@ export function useLayout(options: UseLayoutOptions) {
   // Flag to prevent concurrent layout operations (rapid clicking)
   let isLayoutInProgress = false
 
+  // Single pending post-layout frame-expansion timer. A new layout run
+  // replaces it, so a stale pass never fires against in-flight positions.
+  let expandFramesTimer: ReturnType<typeof setTimeout> | null = null
+
+  function cancelPendingExpandFrames() {
+    if (expandFramesTimer !== null) {
+      clearTimeout(expandFramesTimer)
+      expandFramesTimer = null
+    }
+  }
+
+  function scheduleExpandFrames(delayMs: number) {
+    cancelPendingExpandFrames()
+    expandFramesTimer = setTimeout(() => {
+      expandFramesTimer = null
+      expandFramesToFitNodes()
+    }, delayMs)
+  }
+
   function stopAnimation() {
     animationState.stop()
   }
@@ -232,7 +251,7 @@ export function useLayout(options: UseLayoutOptions) {
     if (!result) return
 
     pushUndo()
-    stopAnimation()
+    animationState.settle()
 
     const { targets, zOrder } = result
 
@@ -263,7 +282,10 @@ export function useLayout(options: UseLayoutOptions) {
       }
 
       pushUndo()
-      stopAnimation()
+      // Settle (not freeze) any in-flight animation so frames and their
+      // nodes are never read mid-flight by the new run
+      animationState.settle()
+      cancelPendingExpandFrames()
 
       await executeAutoLayout(layout, frameId, {
         store,
@@ -271,6 +293,7 @@ export function useLayout(options: UseLayoutOptions) {
         applyFrameConstraints,
         pushOutOfFrames,
         expandFramesToFitNodes,
+        scheduleExpandFrames,
       })
     } finally {
       isLayoutInProgress = false
