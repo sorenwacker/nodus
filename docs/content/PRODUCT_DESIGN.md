@@ -475,6 +475,12 @@ Frames are spatial grouping containers that organize related nodes on the canvas
 - Moving a frame moves all contained nodes
 - Nodes can be moved independently in/out of frames
 
+**Layout invariants (required behavior):**
+- A global layout treats each frame as one rigid unit: the frame and its member nodes (by `frame_id`) move together, and member node targets are computed from the node's offset to the frame captured when the layout starts - never incrementally from the node's current (possibly mid-animation) position, so interrupted or repeated layout runs cannot displace nodes relative to their frame
+- After a global layout places frames, frame-frame overlaps are resolved (`resolveFrameOverlaps`) and the resolution deltas apply to frames and their member nodes together, so repeated layout presses cannot stack frames
+- A pending post-layout frame-expansion pass is cancelled when a new layout starts, so it can never fire against another run's in-flight positions
+- These invariants are enforced by tests that run the layout pipeline with framed nodes and assert membership containment and frame separation after single and repeated (interrupting) runs
+
 ### Zotero Integration
 
 Two methods for importing citations from Zotero:
