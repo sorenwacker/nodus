@@ -2,6 +2,19 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.2.0-rc.1] - 2026-08-17
+
+### Added
+- Edge labels have their own zoom threshold (Settings > Appearance, default 50%): below it labels are hidden, since counter-scaled labels otherwise stay full-size while nodes collapse and dominate the zoomed-out view. Setting it to 0 keeps labels always visible
+- Starter content now demos every feature: a "Demo Project" frame with three dated notes (including a date range) threaded by a violet "Project Story" storyline, hashtags that become tag chips, a dated DOI citation outside the storyline (showing the timeline's unassigned lane and the broken-axis gap), an "Entity Types" frame with character, location, term, and item nodes cross-linked by wikilinks, and a comment node annotating the research example - localized in all five languages. Resetting the default workspace clears its previous frames and storylines before reseeding
+
+### Changed
+- The timelines sheet closes with an upward motion instead of a left-edge push: a push into the top edge band or the pointer leaving the window through the top region folds it in, mirroring how it opened from the bottom. The left edge remains reserved for stepping back through the storyline layers
+
+### Fixed
+- Repeated layout runs no longer displace nodes out of their frames or stack frames on top of each other: layouts treat each frame and its member nodes as one rigid unit (member targets come from offsets captured at run start, clamped into the frame, so a run repairs prior escapes), frame-frame overlaps are resolved after every global layout, a new run settles the previous in-flight animation instead of freezing it mid-flight, and stale post-layout expansion timers are cancelled. Enforced by invariant tests covering single and interrupting runs
+- CI's Rust job no longer fails every pull request: a new clippy lint (result_large_err) fired on the websocket origin-check callback whose error type is imposed by tungstenite's API
+
 ## [1.1.0] - 2026-07-31
 
 ### Added
