@@ -944,6 +944,24 @@ Nodus supports multiple EU languages:
 - Locale files: `src/i18n/locales/{lang}.json`
 - All UI strings are translatable; user content remains in original language
 
+### Starter Content
+
+After onboarding (and via Settings > Reset default workspace), the empty default workspace is seeded with starter content. The starter content must demo every user-facing feature, localized in all five locales:
+
+| Feature | Demonstrated by |
+|---------|-----------------|
+| Notes, colors, untitled node | Tutorial and research-example notes (4 colored, 1 untitled) |
+| All five edge link types, labels, directed/undirected | Edges between the tutorial and research nodes |
+| Wikilinks | `[[links]]` in tutorial content become auto-edges |
+| Typst math, Mermaid diagrams | Dedicated reference nodes |
+| Frames | "Demo Project" frame (dated story nodes) and "Entity Types" frame |
+| Storylines (panel, reader, timelines lane) | A storyline threading the three dated project notes in order |
+| Timelines / dated nodes | `date:`/`date_end:` frontmatter on the project notes (incl. one date range); a dated citation outside the storyline shows the unassigned lane |
+| Hashtags / tags | `#hashtags` in the project notes become tag chips |
+| Entity node types | One node each: citation (with DOI), comment, character, location, term, item |
+
+Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
+
 ### Settings
 
 Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integrations.
