@@ -455,6 +455,8 @@
       "lodThresholdHint": "Mostra nodi come punti quando più di questo numero sono visibili",
       "semanticZoomThreshold": "Soglia zoom semantico",
       "semanticZoomThresholdHint": "Riduci nodi solo al titolo sotto questo livello di zoom",
+      "edgeLabelZoomThreshold": "Soglia zoom etichette archi",
+      "edgeLabelZoomThresholdHint": "Nascondi le etichette degli archi sotto questo livello di zoom (0 = mostra sempre)",
       "edgeHoverThreshold": "Soglia bordi al passaggio",
       "edgeHoverThresholdHint": "Mostra bordi solo al passaggio quando più di questo numero di bordi",
       "magnifier": "Lente",

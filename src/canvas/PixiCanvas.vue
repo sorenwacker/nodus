@@ -2045,6 +2045,7 @@ defineExpose({
           :edge-stroke-width="edgeStrokeWidth"
           :edge-label-size="edgeLabelSize"
           :zoom="scale"
+          :edge-label-zoom-threshold="displayStore.edgeLabelZoomThreshold"
           :lasso-points="lassoPoints"
           :is-lasso-selecting="isLassoSelecting"
           :current-theme="currentTheme"

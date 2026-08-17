@@ -9,6 +9,8 @@ const props = defineProps<{
   edgeLabelSize: number
   /** Current viewport zoom, used to keep labels a constant on-screen size */
   zoom: number
+  /** Hide edge labels below this zoom level (0 = always show) */
+  edgeLabelZoomThreshold: number
   lassoPoints: Array<{ x: number; y: number }>
   isLassoSelecting: boolean
   currentTheme: string
@@ -26,6 +28,10 @@ const renderedLabelSize = computed(() => {
   const z = Math.min(Math.max(props.zoom, 0.2), 3)
   return props.edgeLabelSize / z
 })
+
+// Counter-scaled labels stay full-size while nodes collapse on zoom-out, so
+// hide them below the user's edge label zoom threshold (0 = always show).
+const showEdgeLabels = computed(() => props.zoom >= props.edgeLabelZoomThreshold)
 
 defineEmits<{
   (e: 'edge-click', event: MouseEvent, edgeId: string): void
@@ -123,7 +129,7 @@ function getArrowMarkerId(color: string): string {
           pointer-events="none"
         />
         <text
-          v-if="edge.label"
+          v-if="edge.label && showEdgeLabels"
           :x="edge.labelX || (edge.x1 + edge.x2) / 2"
           :y="(edge.labelY || (edge.y1 + edge.y2) / 2) - 2"
           class="edge-label"

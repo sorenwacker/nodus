@@ -10,6 +10,7 @@ export const useDisplayStore = defineStore('display', () => {
   // Reactive refs for all display settings
   const lodThreshold = ref(displayStorage.getLodThreshold())
   const semanticZoomThreshold = ref(displayStorage.getSemanticZoomThreshold())
+  const edgeLabelZoomThreshold = ref(displayStorage.getEdgeLabelZoomThreshold())
   const edgeHoverThreshold = ref(displayStorage.getEdgeHoverThreshold())
   const magnifierZoomThreshold = ref(displayStorage.getMagnifierZoomThreshold())
   const magnifierEnabled = ref(uiStorage.getMagnifierEnabled())
@@ -21,6 +22,7 @@ export const useDisplayStore = defineStore('display', () => {
   function reload() {
     lodThreshold.value = displayStorage.getLodThreshold()
     semanticZoomThreshold.value = displayStorage.getSemanticZoomThreshold()
+    edgeLabelZoomThreshold.value = displayStorage.getEdgeLabelZoomThreshold()
     edgeHoverThreshold.value = displayStorage.getEdgeHoverThreshold()
     magnifierZoomThreshold.value = displayStorage.getMagnifierZoomThreshold()
     magnifierEnabled.value = uiStorage.getMagnifierEnabled()
@@ -47,6 +49,7 @@ export const useDisplayStore = defineStore('display', () => {
     // State
     lodThreshold,
     semanticZoomThreshold,
+    edgeLabelZoomThreshold,
     edgeHoverThreshold,
     magnifierZoomThreshold,
     magnifierEnabled,

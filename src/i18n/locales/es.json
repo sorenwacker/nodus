@@ -455,6 +455,8 @@
       "lodThresholdHint": "Mostrar nodos como puntos cuando hay más de este número visibles",
       "semanticZoomThreshold": "Umbral de zoom semántico",
       "semanticZoomThresholdHint": "Reducir nodos solo al título por debajo de este nivel de zoom",
+      "edgeLabelZoomThreshold": "Umbral de zoom de etiquetas de aristas",
+      "edgeLabelZoomThresholdHint": "Ocultar las etiquetas de aristas por debajo de este nivel de zoom (0 = mostrar siempre)",
       "edgeHoverThreshold": "Umbral de aristas al pasar",
       "edgeHoverThresholdHint": "Mostrar aristas solo al pasar cuando hay más de este número de aristas",
       "magnifier": "Lupa",

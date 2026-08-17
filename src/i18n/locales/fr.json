@@ -455,6 +455,8 @@
       "lodThresholdHint": "Afficher les noeuds comme des points quand plus de ce nombre sont visibles",
       "semanticZoomThreshold": "Seuil de zoom sémantique",
       "semanticZoomThresholdHint": "Réduire les noeuds au titre seul en dessous de ce niveau de zoom",
+      "edgeLabelZoomThreshold": "Seuil de zoom des libellés d'arêtes",
+      "edgeLabelZoomThresholdHint": "Masquer les libellés des arêtes en dessous de ce niveau de zoom (0 = toujours afficher)",
       "edgeHoverThreshold": "Seuil de survol des arêtes",
       "edgeHoverThresholdHint": "Afficher les arêtes uniquement au survol quand plus de ce nombre d'arêtes",
       "magnifier": "Loupe",

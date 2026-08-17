@@ -28,6 +28,7 @@ const hoverTooltipEnabled = ref(uiStorage.getHoverTooltipEnabled())
 
 // Display thresholds
 const semanticZoomThreshold = ref(displayStorage.getSemanticZoomThreshold())
+const edgeLabelZoomThreshold = ref(displayStorage.getEdgeLabelZoomThreshold())
 
 // Save functions
 function saveFontScale() {
@@ -38,6 +39,7 @@ function saveFontScale() {
 
 function saveDisplaySettings() {
   displayStorage.setSemanticZoomThreshold(semanticZoomThreshold.value)
+  displayStorage.setEdgeLabelZoomThreshold(edgeLabelZoomThreshold.value)
   window.dispatchEvent(new CustomEvent('nodus-display-settings-change'))
 }
 
@@ -54,6 +56,7 @@ function saveHoverTooltipSetting() {
 // Auto-save on changes
 watch(fontScale, saveFontScale)
 watch(semanticZoomThreshold, saveDisplaySettings)
+watch(edgeLabelZoomThreshold, saveDisplaySettings)
 watch(spellcheckEnabled, saveSpellcheckSetting)
 watch(hoverTooltipEnabled, saveHoverTooltipSetting)
 
@@ -69,6 +72,7 @@ function resetDisplayDefaults() {
   spellcheckEnabled.value = false
   hoverTooltipEnabled.value = true
   semanticZoomThreshold.value = 0.5
+  edgeLabelZoomThreshold.value = 0.5
   saveFontScale()
   saveSpellcheckSetting()
   saveHoverTooltipSetting()
@@ -159,6 +163,21 @@ function resetDisplayDefaults() {
         step="0.05"
       />
       <span class="hint">{{ t('settings.display.semanticZoomThresholdHint') }}</span>
+    </div>
+
+    <div class="setting-group">
+      <label>
+        {{ t('settings.display.edgeLabelZoomThreshold') }}
+        <span class="value-display">{{ (edgeLabelZoomThreshold * 100).toFixed(0) }}%</span>
+      </label>
+      <input
+        v-model.number="edgeLabelZoomThreshold"
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+      />
+      <span class="hint">{{ t('settings.display.edgeLabelZoomThresholdHint') }}</span>
     </div>
 
     <hr class="divider" />

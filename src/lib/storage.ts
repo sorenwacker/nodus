@@ -15,6 +15,7 @@ const KEYS = {
   // Display thresholds
   lodThreshold: 'nodus-lod-threshold',
   semanticZoomThreshold: 'nodus-semantic-zoom-threshold',
+  edgeLabelZoomThreshold: 'nodus-edge-label-zoom-threshold',
   edgeHoverThreshold: 'nodus-edge-hover-threshold',
   magnifierZoomThreshold: 'nodus-magnifier-zoom-threshold',
   promptHistory: 'nodus-prompt-history',
@@ -140,6 +141,15 @@ export const displayStorage = {
   },
   setSemanticZoomThreshold(value: number): void {
     localStorage.setItem(KEYS.semanticZoomThreshold, String(value))
+  },
+
+  // Edge label zoom threshold - hide edge labels below this zoom level (0-1, 0 = always show)
+  getEdgeLabelZoomThreshold(): number {
+    const val = localStorage.getItem(KEYS.edgeLabelZoomThreshold)
+    return val ? parseFloat(val) : 0.5
+  },
+  setEdgeLabelZoomThreshold(value: number): void {
+    localStorage.setItem(KEYS.edgeLabelZoomThreshold, String(value))
   },
 
   // Edge hover-only threshold - only show edges on hover when this many edges

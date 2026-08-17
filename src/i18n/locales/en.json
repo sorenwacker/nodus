@@ -459,6 +459,8 @@
       "lodThresholdHint": "Show nodes as dots when more than this many are visible",
       "semanticZoomThreshold": "Semantic Zoom Threshold",
       "semanticZoomThresholdHint": "Collapse nodes to title-only below this zoom level",
+      "edgeLabelZoomThreshold": "Edge Label Zoom Threshold",
+      "edgeLabelZoomThresholdHint": "Hide edge labels below this zoom level (0 = always show)",
       "edgeHoverThreshold": "Edge Hover Threshold",
       "edgeHoverThresholdHint": "Only show edges on hover when more than this many edges",
       "magnifier": "Magnifier",
