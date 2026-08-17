@@ -108,6 +108,39 @@ describe('createEdgeStepper', () => {
     vi.useRealTimers()
   })
 
+  it('fires one top step per push against the top edge', () => {
+    const stepTop = vi.fn()
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      stepRight: vi.fn(),
+      stepLeft: vi.fn(),
+      stepTop,
+    })
+    stepper.onPointer(500, 5, WIDTH, 1000)
+    stepper.onPointer(500, 2, WIDTH, 1000) // held at the edge: no re-fire
+    expect(stepTop).toHaveBeenCalledTimes(1)
+    stepper.onPointer(500, 500, WIDTH, 1000) // pull away re-arms
+    stepper.onPointer(500, 3, WIDTH, 1000)
+    expect(stepTop).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses the dynamic top threshold per event', () => {
+    let band = 0
+    const stepTop = vi.fn()
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      topThreshold: () => band,
+      stepRight: vi.fn(),
+      stepLeft: vi.fn(),
+      stepTop,
+    })
+    stepper.onPointer(500, 5, WIDTH, 1000) // band 0: top edge disabled
+    expect(stepTop).not.toHaveBeenCalled()
+    band = 12
+    stepper.onPointer(500, 5, WIDTH, 1000)
+    expect(stepTop).toHaveBeenCalledTimes(1)
+  })
+
   it('does not fire in the middle of the window', () => {
     const { stepper, stepRight, stepLeft } = makeStepper()
     stepper.onPointerX(500, WIDTH)

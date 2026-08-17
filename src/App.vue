@@ -109,12 +109,18 @@ const edgeStepper = createEdgeStepper({
   leftThreshold: () =>
     storylinePanel.isOpen.value || readerStorylineId.value || showTimelines.value ? 3 : 12,
   bottomThreshold: () => (showTimelines.value ? 3 : 12),
+  // The top edge only acts while the sheet is open; 0 disables it otherwise
+  topThreshold: () => (showTimelines.value ? 12 : 0),
   // The sheet opens only after the pointer dwells at the bottom edge, so
   // passing near it does not fire accidentally
   bottomDwellMs: 100,
   // Bottom edge: the timelines sheet slides up (also while reading)
   stepBottom: () => {
     showTimelines.value = true
+  },
+  // Top edge: the sheet came up from below, so pushing up closes it
+  stepTop: () => {
+    showTimelines.value = false
   },
   stepRight: () => {
     if (readerStorylineId.value) {
@@ -133,10 +139,6 @@ const edgeStepper = createEdgeStepper({
         readerStorylineId.value = null
         if (!showTimelines.value) storylinePanel.onEdgeEnter()
       }
-      return
-    }
-    if (showTimelines.value) {
-      showTimelines.value = false
       return
     }
     if (storylinePanel.isOpen.value) {

@@ -4,7 +4,8 @@
  * edge re-arms when the pointer leaves its band.
  *
  * The right edge steps deeper (graph -> storyline overview -> reader), the
- * left edge steps back; the caller decides what each step does.
+ * left edge steps back, the bottom edge opens the timelines sheet and the top
+ * edge closes it; the caller decides what each step does.
  */
 export interface EdgeStepperOptions {
   /** Edge band width in px */
@@ -19,22 +20,28 @@ export interface EdgeStepperOptions {
   leftThreshold?: () => number
   /** Dynamic band for the bottom edge; same purpose as rightThreshold */
   bottomThreshold?: () => number
+  /** Dynamic band for the top edge; returning 0 disables the edge */
+  topThreshold?: () => number
   /** Dwell time in ms the pointer must stay at the bottom edge before it fires */
   bottomDwellMs?: number
   stepRight: () => void
   stepLeft: () => void
   /** Optional bottom-edge push (e.g. opening the timelines sheet) */
   stepBottom?: () => void
+  /** Optional top-edge push (e.g. closing the timelines sheet) */
+  stepTop?: () => void
 }
 
 export function createEdgeStepper(options: EdgeStepperOptions) {
-  const { threshold, stepRight, stepLeft, stepBottom, bottomDwellMs = 0 } = options
+  const { threshold, stepRight, stepLeft, stepBottom, stepTop, bottomDwellMs = 0 } = options
   const rightThreshold = options.rightThreshold ?? (() => threshold)
   const leftThreshold = options.leftThreshold ?? (() => threshold)
   const bottomThreshold = options.bottomThreshold ?? (() => threshold)
+  const topThreshold = options.topThreshold ?? (() => threshold)
   let rightArmed = true
   let leftArmed = true
   let bottomArmed = true
+  let topArmed = true
   let bottomTimer: ReturnType<typeof setTimeout> | null = null
 
   function onPointerX(x: number, windowWidth: number): void {
@@ -59,6 +66,18 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
 
   function onPointer(x: number, y: number, windowWidth: number, windowHeight: number): void {
     onPointerX(x, windowWidth)
+
+    if (stepTop) {
+      const topBand = topThreshold()
+      if (topBand > 0 && y <= topBand) {
+        if (topArmed) {
+          topArmed = false
+          stepTop()
+        }
+      } else {
+        topArmed = true
+      }
+    }
 
     if (!stepBottom) return
     if (y >= windowHeight - bottomThreshold()) {
