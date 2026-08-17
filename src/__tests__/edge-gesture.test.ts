@@ -141,6 +141,48 @@ describe('createEdgeStepper', () => {
     expect(stepTop).toHaveBeenCalledTimes(1)
   })
 
+  it('fires the top step when the pointer leaves the window through the top region', () => {
+    const stepTop = vi.fn()
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      stepRight: vi.fn(),
+      stepLeft: vi.fn(),
+      stepTop,
+    })
+    stepper.onPointerLeave(40) // exits upward: last y well above the 12px band
+    expect(stepTop).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a window leave below the top region or while the top edge is disabled', () => {
+    const stepTop = vi.fn()
+    let band = 12
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      topThreshold: () => band,
+      stepRight: vi.fn(),
+      stepLeft: vi.fn(),
+      stepTop,
+    })
+    stepper.onPointerLeave(500) // left through a side, not the top
+    expect(stepTop).not.toHaveBeenCalled()
+    band = 0 // top edge disabled (sheet closed)
+    stepper.onPointerLeave(40)
+    expect(stepTop).not.toHaveBeenCalled()
+  })
+
+  it('does not double-fire when an in-band push is followed by a window leave', () => {
+    const stepTop = vi.fn()
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      stepRight: vi.fn(),
+      stepLeft: vi.fn(),
+      stepTop,
+    })
+    stepper.onPointer(500, 5, WIDTH, 1000) // in-band fire
+    stepper.onPointerLeave(3) // cursor continues out of the window
+    expect(stepTop).toHaveBeenCalledTimes(1)
+  })
+
   it('does not fire in the middle of the window', () => {
     const { stepper, stepRight, stepLeft } = makeStepper()
     stepper.onPointerX(500, WIDTH)

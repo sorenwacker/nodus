@@ -151,6 +151,14 @@ function onEdgePointerMove(e: PointerEvent) {
   edgeStepper.onPointer(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
 }
 
+// An upward motion exits into the title bar before any pointermove lands in
+// the top band, so leaving the window through the top region must also close
+function onEdgePointerOut(e: PointerEvent) {
+  if (e.relatedTarget === null) {
+    edgeStepper.onPointerLeave(e.clientY)
+  }
+}
+
 function toggleStorylinePanel() {
   storylinePanel.togglePin()
   // Close reader when unpinning the panel
@@ -611,6 +619,7 @@ useKeyboardShortcuts({
 
 onMounted(async () => {
   window.addEventListener('pointermove', onEdgePointerMove, { capture: true, passive: true })
+  window.addEventListener('pointerout', onEdgePointerOut, { capture: true, passive: true })
   // Initialize themes first to apply visual styling
   await themesStore.initialize()
   // Then initialize data

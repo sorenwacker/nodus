@@ -102,5 +102,19 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
     }
   }
 
-  return { onPointerX, onPointer }
+  // An upward mouse motion usually exits the window (into the title bar)
+  // before any pointermove lands inside the narrow top band, so a window
+  // leave through this taller region also counts as a top push
+  const TOP_LEAVE_BAND = 80
+
+  function onPointerLeave(y: number): void {
+    if (!stepTop) return
+    if (topThreshold() <= 0) return
+    if (y <= TOP_LEAVE_BAND && topArmed) {
+      topArmed = false
+      stepTop()
+    }
+  }
+
+  return { onPointerX, onPointer, onPointerLeave }
 }
