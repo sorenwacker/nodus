@@ -6,7 +6,18 @@ import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { getWorkspace } from '../../lib/tauri'
 import { canvasStorage } from '../../lib/storage'
-import { getStarterTemplates, getStarterTitles, getStarterNodeConfigs, getStarterEdgeConfigs, getEdgeLabel } from '../../lib/templates'
+import {
+  getStarterTemplates,
+  getStarterTitles,
+  getStarterNodeConfigs,
+  getStarterEdgeConfigs,
+  getEdgeLabel,
+  getStarterFrameConfigs,
+  getStarterFrameTitle,
+  getStarterStorylineConfig,
+  getStarterStorylineTitle,
+  getStarterStorylineDescription,
+} from '../../lib/templates'
 import type {
   Node,
   CreateNodeInput,
@@ -140,7 +151,7 @@ export async function resetDefaultWorkspace(
   createNodeFn: (data: CreateNodeInput) => Promise<Node>,
   createEdgeFn: (data: CreateEdgeInput) => Promise<import('../../types').Edge>
 ): Promise<void> {
-  const { state } = deps
+  const { state, framesStore, storylinesStore } = deps
   storeLogger.info('Resetting default workspace to initial state')
 
   // Delete all nodes in the default workspace (workspace_id = null)
@@ -157,6 +168,20 @@ export async function resetDefaultWorkspace(
   state.nodes.value = state.nodes.value.filter(n => n.workspace_id !== null)
   state.selectedNodeIds.value = []
 
+  // Remove previous default-workspace frames and storylines so repeated
+  // resets do not accumulate duplicates
+  const isDefaultWorkspace = (id: string | null | undefined) => !id || id === 'default'
+  for (const frame of [...framesStore.frames.filter(f => isDefaultWorkspace(f.workspace_id))]) {
+    framesStore.deleteFrame(frame.id)
+  }
+  for (const storyline of [...storylinesStore.storylines.filter(s => isDefaultWorkspace(s.workspace_id))]) {
+    try {
+      await storylinesStore.deleteStoryline(storyline.id)
+    } catch (e) {
+      storeLogger.error(`Failed to delete storyline ${storyline.id}:`, e)
+    }
+  }
+
   // Get localized content and node configurations
   const locale = localStorage.getItem('nodus-locale') || 'en'
   const templates = getStarterTemplates(locale)
@@ -170,6 +195,7 @@ export async function resetDefaultWorkspace(
     const node = await createNodeFn({
       title: titles[config.key],
       markdown_content: templates[config.key],
+      node_type: config.node_type,
       canvas_x: config.canvas_x,
       canvas_y: config.canvas_y,
       width: config.width,
@@ -192,6 +218,46 @@ export async function resetDefaultWorkspace(
         directed: config.directed,
       })
     }
+  }
+
+  // Create demo frames and put their nodes inside (spatial grouping demo)
+  for (const frameConfig of getStarterFrameConfigs()) {
+    const frame = await framesStore.createFrameAsync(
+      frameConfig.canvas_x,
+      frameConfig.canvas_y,
+      frameConfig.width,
+      frameConfig.height,
+      getStarterFrameTitle(frameConfig.key, locale),
+      null
+    )
+    for (const key of frameConfig.nodeKeys) {
+      const node = createdNodes.get(key)
+      if (node) {
+        node.frame_id = frame.id
+        invoke('assign_node_to_frame', { nodeId: node.id, frameId: frame.id }).catch(e =>
+          storeLogger.error(`Failed to assign starter node ${node.id} to frame:`, e)
+        )
+      }
+    }
+  }
+
+  // Thread the dated project notes into a storyline so the storyline panel,
+  // reader, and timelines sheet have content out of the box
+  const storylineConfig = getStarterStorylineConfig()
+  try {
+    const storyline = await storylinesStore.createStoryline(
+      getStarterStorylineTitle(locale),
+      getStarterStorylineDescription(locale),
+      storylineConfig.color
+    )
+    for (const key of storylineConfig.nodeKeys) {
+      const node = createdNodes.get(key)
+      if (node) {
+        await storylinesStore.addNodeToStoryline(storyline.id, node.id)
+      }
+    }
+  } catch (e) {
+    storeLogger.error('Failed to create starter storyline:', e)
   }
 
   // Set hyperbolic edge style for starter content

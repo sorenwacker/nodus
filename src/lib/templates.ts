@@ -14,6 +14,15 @@ interface StarterTemplates {
   quickNote: string
   counterpoint: string
   evidence: string
+  projectKickoff: string
+  experimentRun: string
+  keyFindings: string
+  demoCitation: string
+  demoComment: string
+  demoCharacter: string
+  demoLocation: string
+  demoTerm: string
+  demoItem: string
 }
 
 const templates: Record<SupportedLocale, StarterTemplates> = {
@@ -160,6 +169,40 @@ Studies show spatial memory aids recall:
 - Visual learner preferences
 
 This node shows the **supports** edge type (green).`,
+    projectKickoff: `---
+date: 2026-01-12
+---
+
+Define the research question and success criteria.
+
+The team agrees to test whether visual graphs improve recall. #demo #planning`,
+    experimentRun: `---
+date: 2026-02-03
+date_end: 2026-02-14
+---
+
+Two-week study with 24 participants using [[Sensor Kit A]].
+
+Daily sessions recorded at [[Field Station North]]. #demo`,
+    keyFindings: `---
+date: 2026-03-02
+---
+
+Recall improved by 23% in the graph condition.
+
+Consistent with Doe et al. 2024. #demo #results`,
+    demoCitation: `---
+date: 2024-11-05
+---
+
+Doe, J., Roe, R. (2024). Visual knowledge graphs and recall. Journal of Note-Taking, 12(3).
+
+DOI: 10.1000/demo.2024.001`,
+    demoComment: `Is the sample size large enough to generalize? #demo`,
+    demoCharacter: `Principal investigator of the demo study. Based at [[Field Station North]].`,
+    demoLocation: `Remote research site hosting the study sessions.`,
+    demoTerm: `A network of nodes and edges that represents knowledge as linked concepts.`,
+    demoItem: `Portable eye-tracking hardware used during [[Experiment Run]].`,
   },
 
   de: {
@@ -293,6 +336,40 @@ Studien zeigen, dass raumliches Gedachtnis die Erinnerung unterstutzt:
 - Praferenzen visueller Lerner
 
 Dieser Knoten zeigt den **supports** Kantentyp (grun).`,
+    projectKickoff: `---
+date: 2026-01-12
+---
+
+Forschungsfrage und Erfolgskriterien festlegen.
+
+Das Team testet, ob visuelle Graphen das Erinnern verbessern. #demo #planung`,
+    experimentRun: `---
+date: 2026-02-03
+date_end: 2026-02-14
+---
+
+Zweiwoechige Studie mit 24 Teilnehmenden mit [[Sensorkit A]].
+
+Taegliche Sitzungen an der [[Feldstation Nord]]. #demo`,
+    keyFindings: `---
+date: 2026-03-02
+---
+
+Das Erinnern verbesserte sich in der Graph-Bedingung um 23%.
+
+Deckt sich mit Doe et al. 2024. #demo #ergebnisse`,
+    demoCitation: `---
+date: 2024-11-05
+---
+
+Doe, J., Roe, R. (2024). Visual knowledge graphs and recall. Journal of Note-Taking, 12(3).
+
+DOI: 10.1000/demo.2024.001`,
+    demoComment: `Ist die Stichprobe gross genug fuer Verallgemeinerungen? #demo`,
+    demoCharacter: `Leitet die Demo-Studie. Arbeitet an der [[Feldstation Nord]].`,
+    demoLocation: `Abgelegener Forschungsstandort fuer die Studiensitzungen.`,
+    demoTerm: `Ein Netz aus Knoten und Kanten, das Wissen als verknuepfte Konzepte darstellt.`,
+    demoItem: `Tragbare Eye-Tracking-Hardware fuer den [[Experimentlauf]].`,
   },
 
   fr: {
@@ -426,6 +503,40 @@ Les etudes montrent que la memoire spatiale aide la memorisation:
 - Preferences des apprenants visuels
 
 Ce noeud montre le type de connexion **supports** (vert).`,
+    projectKickoff: `---
+date: 2026-01-12
+---
+
+Definir la question de recherche et les criteres de reussite.
+
+L'equipe teste si les graphes visuels ameliorent la memorisation. #demo #planification`,
+    experimentRun: `---
+date: 2026-02-03
+date_end: 2026-02-14
+---
+
+Etude de deux semaines avec 24 participants utilisant le [[Kit de Capteurs A]].
+
+Sessions quotidiennes enregistrees a la [[Station de Terrain Nord]]. #demo`,
+    keyFindings: `---
+date: 2026-03-02
+---
+
+La memorisation s'est amelioree de 23% dans la condition graphe.
+
+Coherent avec Doe et al. 2024. #demo #resultats`,
+    demoCitation: `---
+date: 2024-11-05
+---
+
+Doe, J., Roe, R. (2024). Visual knowledge graphs and recall. Journal of Note-Taking, 12(3).
+
+DOI: 10.1000/demo.2024.001`,
+    demoComment: `L'echantillon est-il assez grand pour generaliser ? #demo`,
+    demoCharacter: `Chercheuse principale de l'etude de demonstration. Basee a la [[Station de Terrain Nord]].`,
+    demoLocation: `Site de recherche isole accueillant les sessions de l'etude.`,
+    demoTerm: `Un reseau de noeuds et d'aretes representant le savoir sous forme de concepts relies.`,
+    demoItem: `Materiel portable de suivi oculaire utilise pendant la [[Phase de Test]].`,
   },
 
   es: {
@@ -559,6 +670,40 @@ Estudios muestran que la memoria espacial ayuda al recuerdo:
 - Preferencias de aprendices visuales
 
 Este nodo muestra el tipo de conexion **supports** (verde).`,
+    projectKickoff: `---
+date: 2026-01-12
+---
+
+Definir la pregunta de investigacion y los criterios de exito.
+
+El equipo prueba si los grafos visuales mejoran el recuerdo. #demo #planificacion`,
+    experimentRun: `---
+date: 2026-02-03
+date_end: 2026-02-14
+---
+
+Estudio de dos semanas con 24 participantes usando el [[Kit de Sensores A]].
+
+Sesiones diarias registradas en la [[Estacion de Campo Norte]]. #demo`,
+    keyFindings: `---
+date: 2026-03-02
+---
+
+El recuerdo mejoro un 23% en la condicion de grafo.
+
+Coincide con Doe et al. 2024. #demo #resultados`,
+    demoCitation: `---
+date: 2024-11-05
+---
+
+Doe, J., Roe, R. (2024). Visual knowledge graphs and recall. Journal of Note-Taking, 12(3).
+
+DOI: 10.1000/demo.2024.001`,
+    demoComment: `Es la muestra lo bastante grande para generalizar? #demo`,
+    demoCharacter: `Investigadora principal del estudio de demostracion. Trabaja en la [[Estacion de Campo Norte]].`,
+    demoLocation: `Sitio de investigacion remoto que acoge las sesiones del estudio.`,
+    demoTerm: `Una red de nodos y aristas que representa el conocimiento como conceptos enlazados.`,
+    demoItem: `Hardware portatil de seguimiento ocular usado durante la [[Fase de Experimento]].`,
   },
 
   it: {
@@ -692,6 +837,40 @@ Gli studi mostrano che la memoria spaziale aiuta il richiamo:
 - Preferenze degli apprendisti visivi
 
 Questo nodo mostra il tipo di connessione **supports** (verde).`,
+    projectKickoff: `---
+date: 2026-01-12
+---
+
+Definire la domanda di ricerca e i criteri di successo.
+
+Il team verifica se i grafi visivi migliorano il ricordo. #demo #pianificazione`,
+    experimentRun: `---
+date: 2026-02-03
+date_end: 2026-02-14
+---
+
+Studio di due settimane con 24 partecipanti usando il [[Kit Sensori A]].
+
+Sessioni giornaliere registrate alla [[Stazione di Campo Nord]]. #demo`,
+    keyFindings: `---
+date: 2026-03-02
+---
+
+Il ricordo e migliorato del 23% nella condizione grafo.
+
+Coerente con Doe et al. 2024. #demo #risultati`,
+    demoCitation: `---
+date: 2024-11-05
+---
+
+Doe, J., Roe, R. (2024). Visual knowledge graphs and recall. Journal of Note-Taking, 12(3).
+
+DOI: 10.1000/demo.2024.001`,
+    demoComment: `Il campione e abbastanza grande per generalizzare? #demo`,
+    demoCharacter: `Ricercatrice principale dello studio dimostrativo. Lavora alla [[Stazione di Campo Nord]].`,
+    demoLocation: `Sito di ricerca remoto che ospita le sessioni dello studio.`,
+    demoTerm: `Una rete di nodi e archi che rappresenta la conoscenza come concetti collegati.`,
+    demoItem: `Hardware portatile di eye-tracking usato durante la [[Fase Sperimentale]].`,
   },
 }
 
@@ -717,6 +896,15 @@ export interface StarterTitles {
   quickNote: string  // Empty title - demonstrates untitled node
   counterpoint: string
   evidence: string
+  projectKickoff: string
+  experimentRun: string
+  keyFindings: string
+  demoCitation: string
+  demoComment: string
+  demoCharacter: string
+  demoLocation: string
+  demoTerm: string
+  demoItem: string
 }
 
 /**
@@ -733,6 +921,15 @@ export function getStarterTitles(locale: string): StarterTitles {
       quickNote: '',  // Untitled node
       counterpoint: 'Alternative View',
       evidence: 'Supporting Evidence',
+      projectKickoff: 'Project Kickoff',
+      experimentRun: 'Experiment Run',
+      keyFindings: 'Key Findings',
+      demoCitation: 'Doe et al. 2024',
+      demoComment: 'Reviewer Comment',
+      demoCharacter: 'Dr. Ada Example',
+      demoLocation: 'Field Station North',
+      demoTerm: 'Knowledge Graph',
+      demoItem: 'Sensor Kit A',
     },
     de: {
       gettingStarted: 'Erste Schritte mit Nodus',
@@ -743,6 +940,15 @@ export function getStarterTitles(locale: string): StarterTitles {
       quickNote: '',
       counterpoint: 'Alternative Sicht',
       evidence: 'Unterstutzende Belege',
+      projectKickoff: 'Projektstart',
+      experimentRun: 'Experimentlauf',
+      keyFindings: 'Zentrale Ergebnisse',
+      demoCitation: 'Doe et al. 2024',
+      demoComment: 'Gutachterkommentar',
+      demoCharacter: 'Dr. Ada Beispiel',
+      demoLocation: 'Feldstation Nord',
+      demoTerm: 'Wissensgraph',
+      demoItem: 'Sensorkit A',
     },
     fr: {
       gettingStarted: 'Premiers pas avec Nodus',
@@ -753,6 +959,15 @@ export function getStarterTitles(locale: string): StarterTitles {
       quickNote: '',
       counterpoint: 'Vue Alternative',
       evidence: 'Preuves de Support',
+      projectKickoff: 'Lancement du Projet',
+      experimentRun: 'Phase de Test',
+      keyFindings: 'Resultats Cles',
+      demoCitation: 'Doe et al. 2024',
+      demoComment: 'Commentaire du Relecteur',
+      demoCharacter: 'Dr Ada Exemple',
+      demoLocation: 'Station de Terrain Nord',
+      demoTerm: 'Graphe de Connaissances',
+      demoItem: 'Kit de Capteurs A',
     },
     es: {
       gettingStarted: 'Primeros pasos con Nodus',
@@ -763,6 +978,15 @@ export function getStarterTitles(locale: string): StarterTitles {
       quickNote: '',
       counterpoint: 'Vista Alternativa',
       evidence: 'Evidencia de Apoyo',
+      projectKickoff: 'Inicio del Proyecto',
+      experimentRun: 'Fase de Experimento',
+      keyFindings: 'Hallazgos Clave',
+      demoCitation: 'Doe et al. 2024',
+      demoComment: 'Comentario del Revisor',
+      demoCharacter: 'Dra. Ada Ejemplo',
+      demoLocation: 'Estacion de Campo Norte',
+      demoTerm: 'Grafo de Conocimiento',
+      demoItem: 'Kit de Sensores A',
     },
     it: {
       gettingStarted: 'Primi passi con Nodus',
@@ -773,6 +997,15 @@ export function getStarterTitles(locale: string): StarterTitles {
       quickNote: '',
       counterpoint: 'Vista Alternativa',
       evidence: 'Prove di Supporto',
+      projectKickoff: 'Avvio del Progetto',
+      experimentRun: 'Fase Sperimentale',
+      keyFindings: 'Risultati Chiave',
+      demoCitation: 'Doe et al. 2024',
+      demoComment: 'Commento del Revisore',
+      demoCharacter: 'Dr.ssa Ada Esempio',
+      demoLocation: 'Stazione di Campo Nord',
+      demoTerm: 'Grafo della Conoscenza',
+      demoItem: 'Kit Sensori A',
     },
   }
   const supported = locale as SupportedLocale
@@ -789,6 +1022,7 @@ export interface StarterNodeConfig {
   width: number
   height: number
   color_theme?: string | null  // Node background color
+  node_type?: string  // note (default), citation, comment, character, location, term, item
 }
 
 export function getStarterNodeConfigs(): StarterNodeConfig[] {
@@ -803,7 +1037,88 @@ export function getStarterNodeConfigs(): StarterNodeConfig[] {
     { key: 'quickNote', canvas_x: 1340, canvas_y: 480, width: 300, height: 150, color_theme: 'rgba(234, 179, 8, 0.18)' },  // yellow (no title)
     { key: 'counterpoint', canvas_x: 1340, canvas_y: 700, width: 380, height: 280, color_theme: 'rgba(249, 115, 22, 0.18)' },  // orange
     { key: 'evidence', canvas_x: 1340, canvas_y: 1040, width: 380, height: 280, color_theme: 'rgba(34, 197, 94, 0.18)' },  // green
+    // Dated project notes (framed and threaded by the demo storyline)
+    { key: 'projectKickoff', canvas_x: 1860, canvas_y: 180, width: 380, height: 240 },
+    { key: 'experimentRun', canvas_x: 1860, canvas_y: 470, width: 380, height: 240 },
+    { key: 'keyFindings', canvas_x: 1860, canvas_y: 760, width: 380, height: 240 },
+    // Dated citation outside the storyline - shows the timeline's unassigned lane
+    { key: 'demoCitation', canvas_x: 2400, canvas_y: 760, width: 400, height: 240, node_type: 'citation' },
+    // Comment annotating the research example
+    { key: 'demoComment', canvas_x: 1340, canvas_y: 1380, width: 360, height: 140, node_type: 'comment' },
+    // One node per entity type, grouped by the entity frame
+    { key: 'demoCharacter', canvas_x: 1860, canvas_y: 1350, width: 340, height: 170, node_type: 'character' },
+    { key: 'demoLocation', canvas_x: 2240, canvas_y: 1350, width: 340, height: 170, node_type: 'location' },
+    { key: 'demoTerm', canvas_x: 1860, canvas_y: 1560, width: 340, height: 170, node_type: 'term' },
+    { key: 'demoItem', canvas_x: 2240, canvas_y: 1560, width: 340, height: 170, node_type: 'item' },
   ]
+}
+
+/**
+ * Starter frame configurations (spatial grouping demo)
+ */
+export type StarterFrameKey = 'demoProject' | 'entityTypes'
+
+export interface StarterFrameConfig {
+  key: StarterFrameKey
+  canvas_x: number
+  canvas_y: number
+  width: number
+  height: number
+  nodeKeys: Array<keyof StarterTemplates>
+}
+
+export function getStarterFrameConfigs(): StarterFrameConfig[] {
+  return [
+    { key: 'demoProject', canvas_x: 1820, canvas_y: 110, width: 460, height: 950, nodeKeys: ['projectKickoff', 'experimentRun', 'keyFindings'] },
+    { key: 'entityTypes', canvas_x: 1820, canvas_y: 1280, width: 800, height: 500, nodeKeys: ['demoCharacter', 'demoLocation', 'demoTerm', 'demoItem'] },
+  ]
+}
+
+const frameTitles: Record<SupportedLocale, Record<StarterFrameKey, string>> = {
+  en: { demoProject: 'Demo Project', entityTypes: 'Entity Types' },
+  de: { demoProject: 'Demo-Projekt', entityTypes: 'Entitaetstypen' },
+  fr: { demoProject: 'Projet de Demo', entityTypes: "Types d'Entites" },
+  es: { demoProject: 'Proyecto de Demostracion', entityTypes: 'Tipos de Entidad' },
+  it: { demoProject: 'Progetto Demo', entityTypes: 'Tipi di Entita' },
+}
+
+export function getStarterFrameTitle(key: StarterFrameKey, locale: string): string {
+  const supported = locale as SupportedLocale
+  return (frameTitles[supported] || frameTitles.en)[key]
+}
+
+/**
+ * Starter storyline configuration (threads the dated project notes, giving
+ * the storyline panel, reader, and timelines sheet content out of the box)
+ */
+export interface StarterStorylineConfig {
+  nodeKeys: Array<keyof StarterTemplates>
+  color: string
+}
+
+export function getStarterStorylineConfig(): StarterStorylineConfig {
+  return {
+    nodeKeys: ['projectKickoff', 'experimentRun', 'keyFindings'],
+    color: '#8b5cf6',
+  }
+}
+
+const storylineTitles: Record<SupportedLocale, { title: string; description: string }> = {
+  en: { title: 'Project Story', description: 'From kickoff to findings' },
+  de: { title: 'Projektgeschichte', description: 'Vom Start zu den Ergebnissen' },
+  fr: { title: 'Recit du Projet', description: 'Du lancement aux resultats' },
+  es: { title: 'Historia del Proyecto', description: 'Del inicio a los hallazgos' },
+  it: { title: 'Storia del Progetto', description: "Dall'avvio ai risultati" },
+}
+
+export function getStarterStorylineTitle(locale: string): string {
+  const supported = locale as SupportedLocale
+  return (storylineTitles[supported] || storylineTitles.en).title
+}
+
+export function getStarterStorylineDescription(locale: string): string {
+  const supported = locale as SupportedLocale
+  return (storylineTitles[supported] || storylineTitles.en).description
 }
 
 /**
@@ -821,7 +1136,7 @@ export interface StarterEdgeConfig {
 /**
  * Edge label translations
  */
-export type EdgeLabelKey = 'seeAlso' | 'diagrams' | 'references' | 'backedBy' | 'challenges' | 'disputes' | 'example'
+export type EdgeLabelKey = 'seeAlso' | 'diagrams' | 'references' | 'backedBy' | 'challenges' | 'disputes' | 'example' | 'source'
 
 interface EdgeLabels {
   seeAlso: string
@@ -831,6 +1146,7 @@ interface EdgeLabels {
   challenges: string
   disputes: string
   example: string
+  source: string
 }
 
 const edgeLabels: Record<SupportedLocale, EdgeLabels> = {
@@ -842,6 +1158,7 @@ const edgeLabels: Record<SupportedLocale, EdgeLabels> = {
     challenges: 'challenges',
     disputes: 'disputes',
     example: 'example',
+    source: 'source',
   },
   de: {
     seeAlso: 'siehe auch',
@@ -851,6 +1168,7 @@ const edgeLabels: Record<SupportedLocale, EdgeLabels> = {
     challenges: 'widerspricht',
     disputes: 'bestreitet',
     example: 'Beispiel',
+    source: 'Quelle',
   },
   fr: {
     seeAlso: 'voir aussi',
@@ -860,6 +1178,7 @@ const edgeLabels: Record<SupportedLocale, EdgeLabels> = {
     challenges: 'contredit',
     disputes: 'conteste',
     example: 'exemple',
+    source: 'source',
   },
   es: {
     seeAlso: 'ver también',
@@ -869,6 +1188,7 @@ const edgeLabels: Record<SupportedLocale, EdgeLabels> = {
     challenges: 'contradice',
     disputes: 'disputa',
     example: 'ejemplo',
+    source: 'fuente',
   },
   it: {
     seeAlso: 'vedi anche',
@@ -878,6 +1198,7 @@ const edgeLabels: Record<SupportedLocale, EdgeLabels> = {
     challenges: 'contraddice',
     disputes: 'contesta',
     example: 'esempio',
+    source: 'fonte',
   },
 }
 
@@ -914,6 +1235,11 @@ export function getStarterEdgeConfigs(): StarterEdgeConfig[] {
 
     // Cross-reference between tutorial and examples
     { sourceKey: 'gettingStarted', targetKey: 'researchIdea', linkType: 'cites', labelKey: 'example', directed: true },  // blue arrow
+
+    // Demo project: findings cite the dated citation node
+    { sourceKey: 'keyFindings', targetKey: 'demoCitation', linkType: 'cites', labelKey: 'source', directed: true },
+    // Comment node annotating the research example
+    { sourceKey: 'demoComment', targetKey: 'researchIdea', linkType: 'related', labelKey: '', directed: false },
   ]
 }
 
