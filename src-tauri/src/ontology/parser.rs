@@ -782,7 +782,7 @@ ex:jane a ex:Person ;
         for entry in std::fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "ttl") {
+            if path.extension().is_some_and(|e| e == "ttl") {
                 if let Ok(data) = parse_ontology(&path) {
                     combined.classes.extend(data.classes);
                 }
@@ -829,7 +829,7 @@ ex:jane a ex:Person ;
         for entry in std::fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "owl") {
+            if path.extension().is_some_and(|e| e == "owl") {
                 if let Ok(data) = parse_ontology(&path) {
                     combined.classes.extend(data.classes);
                 }

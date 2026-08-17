@@ -380,6 +380,29 @@ async fn find_available_port(start_port: u16) -> Result<TcpListener, String> {
     Err("No available port found".to_string())
 }
 
+/// Reject handshakes carrying an Origin header: those come from browsers,
+/// and a malicious web page must not be able to reach the local MCP server.
+/// Native MCP clients do not send Origin.
+// The large Err variant is imposed by tungstenite's Callback trait
+// (ErrorResponse = http::Response<Option<String>>), so it cannot be boxed
+#[allow(clippy::result_large_err)]
+fn reject_browser_origin(
+    request: &tokio_tungstenite::tungstenite::handshake::server::Request,
+    response: tokio_tungstenite::tungstenite::handshake::server::Response,
+) -> Result<
+    tokio_tungstenite::tungstenite::handshake::server::Response,
+    tokio_tungstenite::tungstenite::handshake::server::ErrorResponse,
+> {
+    if request.headers().contains_key("origin") {
+        let mut forbidden = tokio_tungstenite::tungstenite::handshake::server::ErrorResponse::new(
+            Some("Browser connections are not allowed".to_string()),
+        );
+        *forbidden.status_mut() = tokio_tungstenite::tungstenite::http::StatusCode::FORBIDDEN;
+        return Err(forbidden);
+    }
+    Ok(response)
+}
+
 /// Handle a single WebSocket connection
 async fn handle_connection(
     stream: TcpStream,
@@ -389,26 +412,7 @@ async fn handle_connection(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let peer_addr = stream.peer_addr().ok();
 
-    // Reject handshakes carrying an Origin header: those come from browsers,
-    // and a malicious web page must not be able to reach the local MCP server.
-    // Native MCP clients do not send Origin.
-    let ws_stream = tokio_tungstenite::accept_hdr_async(
-        stream,
-        |request: &tokio_tungstenite::tungstenite::handshake::server::Request,
-         response: tokio_tungstenite::tungstenite::handshake::server::Response| {
-            if request.headers().contains_key("origin") {
-                let mut forbidden =
-                    tokio_tungstenite::tungstenite::handshake::server::ErrorResponse::new(Some(
-                        "Browser connections are not allowed".to_string(),
-                    ));
-                *forbidden.status_mut() =
-                    tokio_tungstenite::tungstenite::http::StatusCode::FORBIDDEN;
-                return Err(forbidden);
-            }
-            Ok(response)
-        },
-    )
-    .await?;
+    let ws_stream = tokio_tungstenite::accept_hdr_async(stream, reject_browser_origin).await?;
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
     // Create channel for sending messages to this connection
