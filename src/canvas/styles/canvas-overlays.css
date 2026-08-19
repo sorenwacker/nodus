@@ -73,7 +73,8 @@
   top: 4px;
   /* Slides left in sync with the storyline layers overlaying the canvas */
   right: calc(4px + var(--canvas-right-inset, 0px));
-  transition: right var(--step-duration, 0.3s) var(--step-ease, ease);
+  /* 0s while the panel separator is dragged, so this tracks the pointer */
+  transition: right var(--inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 8px;

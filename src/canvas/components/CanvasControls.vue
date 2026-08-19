@@ -287,7 +287,9 @@ const emit = defineEmits<{
   /* Shifts with the storyline layers overlaying the canvas */
   bottom: calc(16px + var(--canvas-bottom-inset, 0px));
   right: calc(16px + var(--canvas-right-inset, 0px));
-  transition: right var(--step-duration, 0.3s) var(--step-ease, ease),
+  /* right: 0s while the panel separator is dragged, so this tracks the
+     pointer; bottom follows the timelines sheet and keeps the step easing */
+  transition: right var(--inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease),
     bottom var(--step-duration, 0.3s) var(--step-ease, ease);
   display: flex;
   align-items: center;

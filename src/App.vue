@@ -59,6 +59,12 @@ const panelVisible = computed(
   () => storylinePanel.isOpen.value && !readerStorylineId.value
 )
 
+// Overlays animate with the layer steps, but must track the pointer exactly
+// while the panel separator is dragged - a transition would lag behind it
+const insetDuration = computed(() =>
+  storylinePanel.resizing.value ? '0s' : 'var(--step-duration, 0.3s)'
+)
+
 // Canvas overlays (minimap) shift left by the width of the open storyline layer
 const canvasRightInset = computed(() => {
   if (readerStorylineId.value) return readerFullWidth.value ? '0px' : '50%'
@@ -859,7 +865,11 @@ async function openFolderDialog() {
 
     <main
       class="main-content"
-      :style="{ '--canvas-right-inset': canvasRightInset, '--canvas-bottom-inset': canvasBottomInset }"
+      :style="{
+        '--canvas-right-inset': canvasRightInset,
+        '--canvas-bottom-inset': canvasBottomInset,
+        '--inset-duration': insetDuration,
+      }"
     >
       <!-- Canvas always visible beneath the storyline layers -->
       <PixiCanvas ref="pixiCanvasRef" :class="{ 'with-reader': readerStorylineId }" />
