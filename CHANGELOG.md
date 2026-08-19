@@ -2,7 +2,7 @@
 
 All notable changes to Nodus are documented in this file.
 
-## [1.2.0-rc.1] - 2026-08-17
+## [1.2.0] - 2026-08-19
 
 ### Added
 - Edge labels have their own zoom threshold (Settings > Appearance, default 50%): below it labels are hidden, since counter-scaled labels otherwise stay full-size while nodes collapse and dominate the zoomed-out view. Setting it to 0 keeps labels always visible
@@ -10,10 +10,14 @@ All notable changes to Nodus are documented in this file.
 
 ### Changed
 - The timelines sheet closes with an upward motion instead of a left-edge push: a push into the top edge band or the pointer leaving the window through the top region folds it in, mirroring how it opened from the bottom. The left edge remains reserved for stepping back through the storyline layers
+- The minimap sits tucked into the canvas's top-right corner instead of floating 16px away from it
+- Tagged builds publish their GitHub release immediately instead of leaving a draft that only reaches users when someone presses publish
 
 ### Fixed
 - Repeated layout runs no longer displace nodes out of their frames or stack frames on top of each other: layouts treat each frame and its member nodes as one rigid unit (member targets come from offsets captured at run start, clamped into the frame, so a run repairs prior escapes), frame-frame overlaps are resolved after every global layout, a new run settles the previous in-flight animation instead of freezing it mid-flight, and stale post-layout expansion timers are cancelled. Enforced by invariant tests covering single and interrupting runs
 - CI's Rust job no longer fails every pull request: a new clippy lint (result_large_err) fired on the websocket origin-check callback whose error type is imposed by tungstenite's API
+- Canvas overlays (minimap, zoom controls) no longer lag behind the pointer and rubber-band when the storyline panel's separator is dragged: their offset transition is suppressed for the duration of the drag, while edge-step opens and closes keep the shared easing
+- Releases reach users again: the release pipeline had been failing since June - the version-consistency gate compared a stripped tag against the full manifest version so every rc tag failed its own check, and the MSI bundler rejects pre-release versions outright (Windows now ships the NSIS installer)
 
 ## [1.1.0] - 2026-07-31
 
