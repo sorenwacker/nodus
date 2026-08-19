@@ -414,7 +414,7 @@ level.
 - Drag between nodes → create connection
 - Node auto-resizes to fit content
 - **Multi-directional resize:** All edges and corners (8 handles)
-- Minimap navigation
+- Minimap navigation (tucked into the canvas's top-right corner)
 - **Frames:** Spatial grouping containers (see Frames section below)
 - **Undo/Redo system:** Full support including node deletion with edge restoration
 - **Cmd/Ctrl+Click:** Zoom-to-fit on specific node (auto-scales based on node size)
@@ -422,6 +422,8 @@ level.
 - **Context menu:** Right-click for node actions (fit, storyline, send to workspace, delete)
 - **Copy/Paste nodes:** Cmd+C/Cmd+V to copy and paste nodes (preserves layout)
 - **File drop import:** Drag files directly onto canvas (see File Drop Import below)
+
+**Canvas overlays and the storyline panel (required behavior):** Overlays anchored to the canvas's right edge (minimap, zoom controls) are offset by `--canvas-right-inset`, the width of whatever storyline layer covers the canvas, so they stay beside it instead of underneath it. That offset animates on the shared step easing when a layer opens or closes by an edge step, but the animation must be suppressed while the user drags the panel's separator: a transition makes every overlay lag behind the pointer and rubber-band after the drag stops. The panel exposes its drag state, App publishes it as `--inset-duration` (`0s` while resizing), and every overlay that reads `--canvas-right-inset` must time its transition with that variable - enforced by a gate test that scans the stylesheets.
 
 ### File Drop Import
 
