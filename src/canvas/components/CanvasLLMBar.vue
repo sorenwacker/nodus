@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import CanvasChatTranscript from './CanvasChatTranscript.vue'
+import type { ChatTurn } from '../../llm/chatTranscript'
 
 const { t } = useI18n()
 
@@ -9,6 +11,7 @@ const props = defineProps<{
   isLoading: boolean
   isRunning: boolean
   conversationHistory: unknown[]
+  transcript: ChatTurn[]
   agentTasks: Array<{ id: string; status: string; description: string }>
   agentLog: string[]
   showLog: boolean
@@ -31,6 +34,8 @@ async function copyLog(log: string[]) {
 
 <template>
   <div class="graph-llm-bar">
+    <!-- Conversation grows upward from the input row -->
+    <CanvasChatTranscript :turns="props.transcript" :is-running="props.isRunning" />
     <div class="llm-input-row">
       <span v-if="props.selectedCount && props.selectedCount > 0" class="selection-badge">
         {{ t('canvas.agent.selectedCount', { count: props.selectedCount }) }}

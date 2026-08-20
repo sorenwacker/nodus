@@ -5,6 +5,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
+import type { ChatTurn } from './chatTranscript'
 import { providerRegistry } from './providers'
 import type { ProviderConfig } from './providers/types'
 import { agentTools } from './tools'
@@ -52,6 +53,9 @@ export function useLLM() {
   const tasks = ref<AgentTask[]>([])
   const log = ref<string[]>([])
   const conversationHistory = ref<ChatMessage[]>([])
+  // What the user sees: prompts and full answers. conversationHistory is the
+  // model's context and log is the error surface; neither is a chat view.
+  const transcript = ref<ChatTurn[]>([])
 
   // Prompt history
   const promptHistory = ref<string[]>(llmStorage.getPromptHistory())
@@ -109,6 +113,7 @@ export function useLLM() {
     tasks.value = []
     log.value = []
     conversationHistory.value = []
+    transcript.value = []
     isRunning.value = false
   }
 
@@ -132,6 +137,7 @@ export function useLLM() {
     tasks,
     log,
     conversationHistory,
+    transcript,
     promptHistory,
 
     // Methods

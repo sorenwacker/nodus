@@ -18,7 +18,11 @@
       "stopAgent": "Detener agente",
       "stop": "Detener",
       "go": "Ir",
-      "copyLog": "Copiar registro"
+      "copyLog": "Copiar registro",
+      "chatYou": "Tu",
+      "chatAgent": "Agente",
+      "chatActions": "{count} llamadas de herramientas",
+      "chatWorking": "Trabajando..."
     },
     "node": {
       "writePlaceholder": "Escribir markdown...",

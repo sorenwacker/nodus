@@ -18,7 +18,11 @@
       "stopAgent": "Ferma agente",
       "stop": "Ferma",
       "go": "Vai",
-      "copyLog": "Copia registro"
+      "copyLog": "Copia registro",
+      "chatYou": "Tu",
+      "chatAgent": "Agente",
+      "chatActions": "{count} chiamate di strumenti",
+      "chatWorking": "In corso..."
     },
     "node": {
       "writePlaceholder": "Scrivi markdown...",

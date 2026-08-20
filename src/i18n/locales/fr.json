@@ -18,7 +18,11 @@
       "stopAgent": "Arrêter l'agent",
       "stop": "Arrêter",
       "go": "Go",
-      "copyLog": "Copier le journal"
+      "copyLog": "Copier le journal",
+      "chatYou": "Vous",
+      "chatAgent": "Agent",
+      "chatActions": "{count} appels d'outils",
+      "chatWorking": "En cours..."
     },
     "node": {
       "writePlaceholder": "Écrire en markdown...",

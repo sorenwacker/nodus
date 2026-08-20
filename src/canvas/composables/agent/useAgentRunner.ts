@@ -13,6 +13,13 @@ import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } fro
 import { llmQueue } from '../../../llm/queue'
 import { errorLog } from '../../../llm/agentLog'
 import {
+  appendUserTurn,
+  appendAssistantText,
+  recordAction,
+  failCurrentTurn,
+  type ChatTurn,
+} from '../../../llm/chatTranscript'
+import {
   filterToolsForMode,
   getModeMaxIterations,
   DEFAULT_AGENT_MODE,
@@ -87,6 +94,8 @@ export interface AgentContext {
   log: Ref<string[]>
   tasks: Ref<AgentTask[]>
   conversationHistory: Ref<ChatMessage[]>
+  /** Visible chat transcript; the log stays the diagnostic surface */
+  transcript: Ref<ChatTurn[]>
 
   // Tools
   agentTools: ToolDefinition[]
@@ -231,8 +240,10 @@ export function useAgentRunner(ctx: AgentContext) {
     ]
     pinnedMessageCount = messages.length
 
-    // Add current request to conversation history
+    // Add current request to conversation history (model context) and to the
+    // transcript (what the user sees)
     ctx.conversationHistory.value.push({ role: 'user', content: userRequest })
+    appendUserTurn(ctx.transcript.value, userRequest)
 
     const maxIterations = getModeMaxIterations(mode.value)
     const pruneEvery = 10
@@ -376,6 +387,7 @@ export function useAgentRunner(ctx: AgentContext) {
             }
             const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
+            recordAction(ctx.transcript.value, tc.function.name)
 
             // Log graph state after mutations
             if (['create_node', 'create_nodes_batch', 'create_edge', 'create_edges_batch', 'delete_node', 'delete_matching'].includes(tc.function.name)) {
@@ -390,6 +402,7 @@ export function useAgentRunner(ctx: AgentContext) {
                 role: 'assistant',
                 content: result.replace('AGENT_DONE:', '').trim()
               })
+              appendAssistantText(ctx.transcript.value, result.replace('AGENT_DONE:', '').trim())
               ctx.isRunning.value = false
               return { status: 'done', message: result.replace('AGENT_DONE:', '').trim() }
             }
@@ -439,7 +452,11 @@ export function useAgentRunner(ctx: AgentContext) {
             }
           }
         } else if (msg.content) {
+          // The log keeps a short line for diagnostics; the transcript keeps
+          // the answer in full, since a text-only reply changes nothing on
+          // the canvas and would otherwise leave no trace
           ctx.log.value.push(`LLM: ${msg.content.slice(0, 80)}...`)
+          appendAssistantText(ctx.transcript.value, msg.content)
 
           // Try to parse tool calls from text FIRST (fallback for models
           // without native tool calling). The done/question heuristics below
@@ -533,12 +550,15 @@ export function useAgentRunner(ctx: AgentContext) {
         if (isTokenLimitError) {
           ctx.log.value.push(errorLog(`Context too large - ${errorMsg}`))
           ctx.log.value.push('> Tip: Select fewer nodes or reduce node content')
+          const limitMessage = 'Context exceeds model limit. Select fewer nodes or reduce content.'
+          failCurrentTurn(ctx.transcript.value, limitMessage)
           ctx.isRunning.value = false
-          return { status: 'error', message: 'Context exceeds model limit. Select fewer nodes or reduce content.' }
+          return { status: 'error', message: limitMessage }
         }
 
         console.error('Agent error:', e)
         ctx.log.value.push(errorLog(errorMsg))
+        failCurrentTurn(ctx.transcript.value, errorMsg)
         ctx.isRunning.value = false
         return { status: 'error', message: errorMsg }
       }

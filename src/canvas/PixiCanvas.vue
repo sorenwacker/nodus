@@ -1065,6 +1065,7 @@ const {
   log: agentLog,
   tasks: agentTasks,
   conversationHistory,
+  transcript: agentTranscript,
   simpleGenerate: callOllama,
   savePromptToHistory,
   navigateHistory,
@@ -1238,7 +1239,9 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
 }
 
 function clearConversation() {
+  // What the user sees and what the model remembers clear together
   conversationHistory.value = []
+  agentTranscript.value = []
 }
 
 // Agent runner composable - handles the main agent loop
@@ -1261,6 +1264,7 @@ const agentContext: AgentContext = {
   log: agentLog,
   tasks: agentTasks,
   conversationHistory,
+  transcript: agentTranscript,
   agentTools,
   executeAgentTool,
 }
@@ -1950,6 +1954,7 @@ defineExpose({
       :is-loading="isGraphLLMLoading"
       :is-running="agentRunning"
       :conversation-history="conversationHistory"
+      :transcript="agentTranscript"
       :agent-tasks="agentTasks"
       :agent-log="agentLog"
       :show-log="showAgentLogPanel"
