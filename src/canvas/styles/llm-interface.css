@@ -63,6 +63,13 @@
   border-color: var(--primary-color);
 }
 
+/* Anchored to the button's left edge: a centered tooltip on a corner button
+   runs off the screen */
+.agent-toggle-corner:hover::after {
+  left: 0;
+  transform: none;
+}
+
 .agent-toggle-corner.folded {
   color: var(--primary-color);
   border-color: var(--primary-color);

@@ -70,11 +70,13 @@ watch(
 
 <style scoped>
 .chat-empty {
-  margin: 0;
+  /* auto margins centre it in the empty panel, vertically and horizontally */
+  margin: auto;
   padding: 2px 8px;
   color: var(--text-muted);
   font-size: 11px;
   font-style: italic;
+  text-align: center;
 }
 
 .chat-transcript {
