@@ -31,6 +31,9 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    outputs:
+      # This tag's CHANGELOG section, used as the release body
+      notes: ${{ steps.notes.outputs.body }}
     steps:
       - uses: actions/checkout@v4
 
@@ -106,6 +109,17 @@ jobs:
         run: cargo clippy -- -D warnings
         working-directory: src-tauri
 
+      # Extracted here (one Linux runner) rather than per platform, so the
+      # three release jobs publish an identical body
+      - name: Build release notes
+        id: notes
+        run: |
+          {
+            echo 'body<<RELEASE_NOTES_EOF'
+            ./scripts/release-notes.sh "${{ github.ref_name }}"
+            echo 'RELEASE_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
   release:
     name: Release (${{ matrix.platform }})
     needs: [test, validate-r2]
@@ -168,10 +182,8 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Nodus ${{ github.ref_name }}'
-          releaseBody: |
-            See the [changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-
-            Download links available at https://sorenwacker.github.io/nodus/downloads/
+          # This version's CHANGELOG section, extracted once in the test job
+          releaseBody: ${{ needs.test.outputs.notes }}
           # Publish straight away: a draft only reaches users if someone
           # remembers to press publish, which stranded six past versions
           releaseDraft: false
