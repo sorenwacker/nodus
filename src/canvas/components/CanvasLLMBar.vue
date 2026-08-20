@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import CanvasChatTranscript from './CanvasChatTranscript.vue'
@@ -16,7 +17,24 @@ const props = defineProps<{
   agentLog: string[]
   showLog: boolean
   selectedCount?: number
+  /** Titles of the nodes that will be sent as context */
+  contextNodeTitles: string[]
+  /** True when the context is the user's selection rather than the graph */
+  contextIsSelection: boolean
+  contextTotal: number
 }>()
+
+// A selection is worth naming node by node; the whole graph is not, so only
+// the count is shown then
+const MAX_SHOWN_TITLES = 4
+// Untitled nodes are real context too, so they are named rather than blank
+const labelledTitles = computed(() =>
+  props.contextNodeTitles.map(title => title?.trim() || t('canvas.node.untitled'))
+)
+const shownTitles = computed(() => labelledTitles.value.slice(0, MAX_SHOWN_TITLES))
+const hiddenTitleCount = computed(() =>
+  Math.max(0, props.contextNodeTitles.length - shownTitles.value.length)
+)
 
 defineEmits<{
   (e: 'update:graphPrompt', value: string): void
@@ -34,12 +52,7 @@ async function copyLog(log: string[]) {
 
 <template>
   <div class="graph-llm-bar">
-    <!-- Conversation grows upward from the input row -->
-    <CanvasChatTranscript :turns="props.transcript" :is-running="props.isRunning" />
     <div class="llm-input-row">
-      <span v-if="props.selectedCount && props.selectedCount > 0" class="selection-badge">
-        {{ t('canvas.agent.selectedCount', { count: props.selectedCount }) }}
-      </span>
       <input
         :value="graphPrompt"
         type="text"
@@ -70,6 +83,25 @@ async function copyLog(log: string[]) {
       </button>
       <button v-else class="llm-stop" :data-tooltip="t('canvas.agent.stopAgent')" @click="$emit('stop')">{{ t('canvas.agent.stop') }}</button>
     </div>
+    <!-- What the agent will actually see -->
+    <div class="llm-context">
+      <span class="context-label">{{
+        contextIsSelection
+          ? t('canvas.agent.contextSelected', { count: contextTotal })
+          : t('canvas.agent.contextAll', { count: contextTotal })
+      }}</span>
+      <span
+        v-if="contextIsSelection && shownTitles.length > 0"
+        class="context-titles"
+        :title="labelledTitles.join(', ')"
+      >
+        {{ shownTitles.join(', ')
+        }}<template v-if="hiddenTitleCount > 0">
+          {{ t('canvas.agent.contextMore', { count: hiddenTitleCount }) }}</template>
+      </span>
+    </div>
+    <!-- Conversation, directly under the input row this bar sits in -->
+    <CanvasChatTranscript :turns="props.transcript" :is-running="props.isRunning" />
     <!-- Agent Task List -->
     <div v-if="agentTasks.length > 0" class="agent-tasks">
       <div v-for="task in agentTasks" :key="task.id" class="agent-task" :class="task.status">
@@ -98,12 +130,35 @@ async function copyLog(log: string[]) {
 </template>
 
 <style scoped>
+.llm-context {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.context-label {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.context-titles {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .graph-llm-bar {
   display: flex;
   flex-direction: column;
   gap: 0;
   padding: 8px 16px;
-  height: 52px;
+  /* Grows with the transcript instead of clipping it; the input row alone is
+     52px, and the transcript caps its own height */
+  min-height: 52px;
   box-sizing: border-box;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
@@ -115,16 +170,6 @@ async function copyLog(log: string[]) {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.selection-badge {
-  padding: 4px 8px;
-  background: var(--primary-color);
-  color: white;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .llm-input {

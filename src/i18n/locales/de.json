@@ -23,7 +23,10 @@
       "chatAgent": "Agent",
       "chatActions": "{count} Werkzeugaufrufe",
       "chatWorking": "Arbeitet...",
-      "chatEmpty": "Antworten des Agenten erscheinen hier."
+      "chatEmpty": "Antworten des Agenten erscheinen hier.",
+      "contextSelected": "Kontext: {count} ausgewaehlt",
+      "contextAll": "Kontext: alle {count} Knoten",
+      "contextMore": "+{count} weitere"
     },
     "node": {
       "writePlaceholder": "Markdown schreiben...",

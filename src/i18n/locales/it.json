@@ -23,7 +23,10 @@
       "chatAgent": "Agente",
       "chatActions": "{count} chiamate di strumenti",
       "chatWorking": "In corso...",
-      "chatEmpty": "Le risposte dell'agente appaiono qui."
+      "chatEmpty": "Le risposte dell'agente appaiono qui.",
+      "contextSelected": "Contesto: {count} selezionati",
+      "contextAll": "Contesto: tutti i {count} nodi",
+      "contextMore": "+{count} altri"
     },
     "node": {
       "writePlaceholder": "Scrivi markdown...",

@@ -1245,14 +1245,21 @@ function clearConversation() {
 }
 
 // Agent runner composable - handles the main agent loop
+// The nodes the agent will see: the selection when there is one, otherwise
+// the whole filtered graph. The bar displays this same list, so what the user
+// is told and what the model receives cannot drift apart.
+const agentContextIsSelection = computed(() => store.selectedNodeIds.length > 0)
+const agentContextNodes = computed(() =>
+  agentContextIsSelection.value
+    ? store.filteredNodes.filter((n: { id: string }) => store.selectedNodeIds.includes(n.id))
+    : store.filteredNodes
+)
+const agentContextTitles = computed(() =>
+  agentContextNodes.value.map((n: { title: string }) => n.title)
+)
+
 const agentContext: AgentContext = {
-  filteredNodes: () => {
-    // Use selected nodes if any, otherwise all filtered nodes
-    const hasSelection = store.selectedNodeIds.length > 0
-    return hasSelection
-      ? store.filteredNodes.filter(n => store.selectedNodeIds.includes(n.id))
-      : store.filteredNodes
-  },
+  filteredNodes: () => agentContextNodes.value,
   filteredEdges: () => store.filteredEdges,
   selectedNodeIds: () => [...store.selectedNodeIds],
   cleanupOrphanEdges: () => store.cleanupOrphanEdges(),
@@ -1959,6 +1966,9 @@ defineExpose({
       :agent-log="agentLog"
       :show-log="showAgentLogPanel"
       :selected-count="store.selectedNodeIds.length"
+      :context-node-titles="agentContextTitles"
+      :context-is-selection="agentContextIsSelection"
+      :context-total="agentContextNodes.length"
       @update:graph-prompt="graphPrompt = $event"
       @send="sendGraphPrompt"
       @stop="stopAgent"
