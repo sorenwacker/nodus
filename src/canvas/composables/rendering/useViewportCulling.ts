@@ -83,6 +83,31 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
     window.removeEventListener('resize', onResize)
   })
 
+  // Previous result, returned unchanged while the same nodes are on screen.
+  // Panning changes the viewport every frame; without this, edge styling and
+  // the node list recompute on each one even though nothing entered or left.
+  let lastSource: Node[] | null = null
+  let lastVisible: Node[] = []
+  let lastVisibleIds = new Set<string>()
+
+  function stabilise(next: Node[], source: Node[]): Node[] {
+    // A replaced node set means new objects: never reuse the old ones
+    if (source === lastSource && next.length === lastVisibleIds.size) {
+      let same = true
+      for (const node of next) {
+        if (!lastVisibleIds.has(node.id)) {
+          same = false
+          break
+        }
+      }
+      if (same) return lastVisible
+    }
+    lastSource = source
+    lastVisible = next
+    lastVisibleIds = new Set(next.map(n => n.id))
+    return next
+  }
+
   // Only render nodes visible in viewport (with margin for smooth scrolling)
   // Always include selected nodes so they can be measured/fitted even if off-screen
   const visibleNodes = computed(() => {
@@ -116,7 +141,7 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
           node.canvas_y <= viewBottom
         )
       })
-      return result
+      return stabilise(result, nodes)
     }
 
     // For large graphs, use spatial index for O(k) query
@@ -159,7 +184,7 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
       }
     }
 
-    return result
+    return stabilise(result, nodes)
   })
 
   // Set of visible node IDs for quick lookup

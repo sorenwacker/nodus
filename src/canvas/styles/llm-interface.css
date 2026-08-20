@@ -65,9 +65,10 @@
 
 /* Anchored to the button's left edge: a centered tooltip on a corner button
    runs off the screen */
-.agent-toggle-corner:hover::after {
-  left: 0;
-  transform: none;
+button.agent-toggle-corner[data-tooltip]:hover::after {
+  left: 0 !important;
+  right: auto !important;
+  transform: none !important;
 }
 
 .agent-toggle-corner.folded {
