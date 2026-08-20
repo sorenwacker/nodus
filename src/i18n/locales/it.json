@@ -421,8 +421,7 @@
     "storylines": "Trame",
     "importVault": "Importa vault",
     "theme": "Tema",
-    "settings": "Impostazioni",
-    "agent": "Pannello dell'agente"
+    "settings": "Impostazioni"
   },
   "toasts": {
     "resetNodeSizes": "{count} dimensioni nodi reimpostate",

@@ -103,6 +103,16 @@ describe('canvas overlay inset contract', () => {
     }
   })
 
+  it('ends the agent panel above the timelines sheet', () => {
+    const css = readFileSync(join(SRC, 'canvas/styles/llm-interface.css'), 'utf8')
+    const at = css.indexOf('.graph-llm-bar {')
+    const block = css.slice(at, css.indexOf('}', at))
+    expect(
+      /bottom:[^;]*var\(--canvas-bottom-inset/.test(block),
+      'the agent panel ignores the timelines sheet and would sit behind it'
+    ).toBe(true)
+  })
+
   it('App publishes --inset-duration as 0s while the panel is being resized', () => {
     const app = readFileSync(join(SRC, 'App.vue'), 'utf8')
 

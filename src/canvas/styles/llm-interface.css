@@ -15,17 +15,20 @@
   position: absolute;
   top: 0;
   left: 0;
-  bottom: 0;
+  /* Stops above the timelines sheet instead of hiding behind it */
+  bottom: var(--canvas-bottom-inset, 0px);
   width: var(--chat-panel-width, 380px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
+  /* Top padding leaves room for the corner toggle above the conversation */
+  padding: 46px 12px 12px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border-default);
   z-index: 55;
-  transition: transform var(--step-duration, 0.3s) var(--step-ease, ease);
+  transition: transform var(--step-duration, 0.3s) var(--step-ease, ease),
+    bottom var(--step-duration, 0.3s) var(--step-ease, ease);
 }
 
 /* Folded: the panel slides out to the left, leaving its toggle as a rail */
@@ -33,42 +36,38 @@
   transform: translateX(calc(-1 * var(--chat-panel-width, 380px)));
 }
 
-/* The rail: the only way back once the panel is folded, so it is sized and
-   coloured to be found rather than hidden as a hairline */
-.agent-fold-btn {
+/* The agent toggle sits in the canvas's top-left corner and stays there
+   whether the panel is folded or not, so it is never hidden with it */
+.agent-toggle-corner {
   position: absolute;
-  top: 12px;
-  right: -24px;
-  width: 24px;
-  height: 64px;
+  top: 8px;
+  left: 8px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 1px solid var(--border-default);
-  border-left: none;
-  border-radius: 0 8px 8px 0;
+  border-radius: 6px;
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  box-shadow: 2px 0 6px var(--shadow-sm);
+  box-shadow: 0 2px 6px var(--shadow-sm);
 }
 
-.agent-fold-btn:hover {
+.agent-toggle-corner:hover {
   color: white;
   background: var(--primary-color);
   border-color: var(--primary-color);
 }
 
-/* Folded, it is the app's only agent affordance: make it read as a handle */
-.graph-llm-bar.collapsed .agent-fold-btn {
+.agent-toggle-corner.folded {
   color: var(--primary-color);
   border-color: var(--primary-color);
-  border-left: 1px solid var(--primary-color);
 }
 
-.graph-llm-bar.collapsed .agent-fold-btn:hover {
-  color: white;
-}
 
 /* Light mode: stronger AI panel contrast */
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .graph-llm-bar {
@@ -76,13 +75,7 @@
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.08);
 }
 
-/* The conversation takes the free space; everything else keeps its height */
-.graph-llm-bar .chat-transcript {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-}
-
+/* Everything but the conversation keeps its natural height */
 .graph-llm-bar .llm-input-row,
 .graph-llm-bar .llm-context,
 .graph-llm-bar .agent-tasks,

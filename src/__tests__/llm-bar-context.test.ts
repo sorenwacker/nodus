@@ -52,19 +52,18 @@ describe('agent panel layout', () => {
 })
 
 describe('agent panel folding', () => {
-  it('marks itself folded and keeps its toggle reachable', () => {
+  it('reflects the folded state without owning a toggle', () => {
     const folded = mountBar({ collapsed: true })
     expect(folded.find('.graph-llm-bar').classes()).toContain('collapsed')
-    // The toggle is the rail that brings a folded panel back, so it must
-    // still be rendered while folded
-    expect(folded.find('.agent-fold-btn').exists()).toBe(true)
+
+    // The only toggle lives in the canvas corner, outside this panel: a
+    // control inside the panel slides away with it and cannot bring it back
+    expect(folded.find('.agent-fold-btn').exists()).toBe(false)
+    expect(folded.find('button.agent-toggle-corner').exists()).toBe(false)
   })
 
-  it('asks the parent to fold rather than deciding alone', async () => {
-    const wrapper = mountBar()
-    expect(wrapper.find('.graph-llm-bar').classes()).not.toContain('collapsed')
-    await wrapper.find('.agent-fold-btn').trigger('click')
-    expect(wrapper.emitted('toggle-collapsed')).toHaveLength(1)
+  it('is not folded by default', () => {
+    expect(mountBar().find('.graph-llm-bar').classes()).not.toContain('collapsed')
   })
 })
 

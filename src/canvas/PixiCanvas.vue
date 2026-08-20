@@ -8,6 +8,7 @@ import type { Node } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
+import { useI18n } from 'vue-i18n'
 import { memoryStorage, agentMemoryStorage } from '../lib/storage'
 import {
   useMinimap,
@@ -112,6 +113,7 @@ const {
 const store = useNodesStore()
 const themesStore = useThemesStore()
 const agentTasksStore = useAgentTasksStore()
+const { t } = useI18n()
 const displayStore = useDisplayStore()
 const showToast = inject<(message: string, type: 'error' | 'success' | 'info' | 'warning') => void>('showToast')
 const nodeService = useNodeService()
@@ -1963,6 +1965,23 @@ defineExpose({
     }"
   >
     <!-- Graph-level LLM prompt bar -->
+    <!-- One fixed toggle in the canvas corner: never hidden with the panel -->
+    <button
+      v-if="showLLMBar"
+      class="agent-toggle-corner"
+      :class="{ folded: displayStore.agentPanelCollapsed }"
+      :data-tooltip="
+        displayStore.agentPanelCollapsed
+          ? t('canvas.agent.unfoldPanel')
+          : t('canvas.agent.foldPanel')
+      "
+      @click="displayStore.toggleAgentPanel()"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="4" y="8" width="16" height="12" rx="2" />
+        <path d="M12 4v4M9 14h.01M15 14h.01" />
+      </svg>
+    </button>
     <CanvasLLMBar
       v-if="showLLMBar"
       :graph-prompt="graphPrompt"
@@ -1978,7 +1997,6 @@ defineExpose({
       :context-is-selection="agentContextIsSelection"
       :context-total="agentContextNodes.length"
       :collapsed="displayStore.agentPanelCollapsed"
-      @toggle-collapsed="displayStore.toggleAgentPanel()"
       @update:graph-prompt="graphPrompt = $event"
       @send="sendGraphPrompt"
       @stop="stopAgent"

@@ -34,6 +34,13 @@ export const useDisplayStore = defineStore('display', () => {
     agentPanelCollapsed.value = uiStorage.getAgentPanelCollapsed()
   }
 
+  /** Reveal the panel (used by the left-edge push) */
+  function showAgentPanel() {
+    if (!agentPanelCollapsed.value) return
+    agentPanelCollapsed.value = false
+    uiStorage.setAgentPanelCollapsed(false)
+  }
+
   function toggleAgentPanel() {
     agentPanelCollapsed.value = !agentPanelCollapsed.value
     uiStorage.setAgentPanelCollapsed(agentPanelCollapsed.value)
@@ -67,6 +74,7 @@ export const useDisplayStore = defineStore('display', () => {
     agentPanelCollapsed,
     // Actions
     toggleAgentPanel,
+    showAgentPanel,
     reload,
     setupListener,
     cleanupListener,

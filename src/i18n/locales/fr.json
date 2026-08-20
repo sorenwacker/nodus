@@ -421,8 +421,7 @@
     "storylines": "Scénarios",
     "importVault": "Importer un vault",
     "theme": "Thème",
-    "settings": "Paramètres",
-    "agent": "Panneau de l'agent"
+    "settings": "Paramètres"
   },
   "toasts": {
     "resetNodeSizes": "{count} tailles de noeuds réinitialisées",

@@ -78,7 +78,9 @@ watch(
 }
 
 .chat-transcript {
-  max-height: 45vh;
+  /* Fills the agent panel; the panel owns the outer height */
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;

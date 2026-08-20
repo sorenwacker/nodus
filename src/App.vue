@@ -151,7 +151,11 @@ const edgeStepper = createEdgeStepper({
     }
     if (storylinePanel.isOpen.value) {
       storylinePanel.close()
+      return
     }
+    // Nothing left to step back through: the left edge reveals the agent
+    // panel, mirroring the right edge revealing the storyline overview
+    displayStore.showAgentPanel()
   },
 })
 
@@ -813,17 +817,6 @@ async function openFolderDialog() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-          </svg>
-        </button>
-        <button
-          class="icon-btn"
-          :class="{ active: !displayStore.agentPanelCollapsed }"
-          :data-tooltip="t('toolbar.agent')"
-          @click="displayStore.toggleAgentPanel()"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="4" y="8" width="16" height="12" rx="2" />
-            <path d="M12 4v4M9 14h.01M15 14h.01" />
           </svg>
         </button>
         <button class="icon-btn" :data-tooltip="t('toolbar.importVault')" @click="showImportDialog = true">

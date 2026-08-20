@@ -421,8 +421,7 @@
     "storylines": "Handlungsstränge",
     "importVault": "Vault importieren",
     "theme": "Design",
-    "settings": "Einstellungen",
-    "agent": "Agenten-Panel"
+    "settings": "Einstellungen"
   },
   "toasts": {
     "resetNodeSizes": "{count} Knotengrößen zurückgesetzt",

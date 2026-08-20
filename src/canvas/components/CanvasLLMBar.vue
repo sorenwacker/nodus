@@ -46,7 +46,6 @@ defineEmits<{
   (e: 'clear-conversation'): void
   (e: 'prompt-keydown', event: KeyboardEvent): void
   (e: 'clear-log'): void
-  (e: 'toggle-collapsed'): void
 }>()
 
 async function copyLog(log: string[]) {
@@ -56,14 +55,6 @@ async function copyLog(log: string[]) {
 
 <template>
   <div class="graph-llm-bar" :class="{ collapsed }">
-    <!-- Folds the panel away like the storyline panel; the rail brings it back -->
-    <button
-      class="agent-fold-btn"
-      :data-tooltip="collapsed ? t('canvas.agent.unfoldPanel') : t('canvas.agent.foldPanel')"
-      @click="$emit('toggle-collapsed')"
-    >
-      {{ collapsed ? '&#9656;' : '&#9666;' }}
-    </button>
     <!-- The conversation fills the panel -->
     <CanvasChatTranscript :turns="props.transcript" :is-running="props.isRunning" />
     <!-- Agent Task List -->
@@ -165,7 +156,7 @@ async function copyLog(log: string[]) {
 
 
 .llm-input-row {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   gap: 8px;
   align-items: center;
