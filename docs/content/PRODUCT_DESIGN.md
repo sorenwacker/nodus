@@ -891,10 +891,10 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 
 | Tool | Description |
 |------|-------------|
-| `create_node(title, content)` | Create a single node |
+| `create_node(title, content, date?, date_end?, tags?)` | Create a single node, optionally dated and tagged |
 | `create_nodes_batch(nodes)` | Upsert multiple nodes (updates existing by title, creates new) |
 | `create_edge(from_title, to_title)` | Connect two nodes |
-| `update_node(title, new_content)` | Update node content |
+| `update_node(title, new_content?, date?, date_end?, tags?)` | Update node content, timeline dates, or tags (dates are written as frontmatter; empty string clears one) |
 | `delete_node(title)` | Remove a node |
 | `query_nodes(filter)` | Query DB: "all", "empty", "has_content", or search term |
 | `for_each_node(filter, action, template)` | Iterator: action="search"\|"set"\|"append", uses {title} |
@@ -906,6 +906,8 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 | `create_theme(name, description)` | Generate custom YAML theme |
 | `update_theme(name, changes)` | Modify existing theme |
 | `done(summary)` | Signal completion |
+
+**Tool surface parity (required behavior):** Every capability is reachable from both surfaces - the MCP server for external agents and the in-app agent for the user's own. A capability on one surface only is invisible to half the users: node date fields were MCP-only, so asking the in-app agent to date nodes could not work no matter how it was phrased. A gate test compares both surfaces and fails on any tool, or any field of a shared tool, that exists on one side without either a counterpart or an explicit recorded reason. Naming differences are recorded deliberately (MCP addresses nodes by id, the in-app agent by title), and the asymmetry that predates the gate is listed as debt rather than hidden, so new drift stands out against it.
 
 **Node Agent Tools (per-node AI):**
 
