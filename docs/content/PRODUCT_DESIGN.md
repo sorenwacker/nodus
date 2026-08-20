@@ -405,6 +405,8 @@ default 0.5) configurable via a slider in Settings > Appearance next to the
 semantic zoom threshold; setting it to 0 keeps labels visible at every zoom
 level.
 
+**Pan and zoom cost (required behavior):** Panning and zooming change the viewport on every frame, and the culling result feeds everything downstream - the rendered node list and all edge styling. The culled result therefore keeps its identity while the same nodes are on screen: a frame that moves the viewport a few pixels returns the previous array and set, so no dependent recomputes. A new result is produced only when a node actually enters or leaves the viewport, or when the node set itself is replaced (new objects must never be served from the cache). Enforced by tests that pan without changing visibility and assert referential stability, on both the linear-scan and spatial-index paths.
+
 ### Canvas Features
 
 - Infinite pan/zoom
