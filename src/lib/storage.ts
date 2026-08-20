@@ -12,6 +12,7 @@ const KEYS = {
   currentWorkspace: 'nodus-current-workspace',
   magnifier: 'nodus-magnifier',
   agentPanelCollapsed: 'nodus-agent-panel-collapsed',
+  readerTocVisible: 'nodus-reader-toc-visible',
   fontScale: 'nodus-font-scale',
   // Display thresholds
   lodThreshold: 'nodus-lod-threshold',
@@ -94,6 +95,15 @@ export const workspaceStorage = {
  * UI preferences storage
  */
 export const uiStorage = {
+  // Reader contents sidebar - shown until the user hides it, and the choice
+  // survives folding the storyline layers away and back
+  getReaderTocVisible(): boolean {
+    return localStorage.getItem(KEYS.readerTocVisible) !== 'false'
+  },
+  setReaderTocVisible(value: boolean): void {
+    localStorage.setItem(KEYS.readerTocVisible, String(value))
+  },
+
   // Agent panel folded state - the panel is open until folded away
   getAgentPanelCollapsed(): boolean {
     return localStorage.getItem(KEYS.agentPanelCollapsed) === 'true'

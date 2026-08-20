@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
+import { uiStorage } from '../lib/storage'
 import type { StorylineService } from '../services/storylineService'
 import StorylineNodeList from './StorylineNodeList.vue'
 import StorylineReaderHeader from './StorylineReaderHeader.vue'
@@ -39,7 +40,10 @@ const storyline = ref<Storyline | null>(null)
 const nodes = ref<Node[]>([])
 const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
-const showToc = ref(true) // Show contents sidebar
+// The contents sidebar keeps its state across folding the reader away and
+// back, and across sessions
+const showToc = ref(uiStorage.getReaderTocVisible())
+watch(showToc, value => uiStorage.setReaderTocVisible(value))
 const showEntitySidebar = ref(false)
 const showReferencesSidebar = ref(false) // Hidden by default - optional
 

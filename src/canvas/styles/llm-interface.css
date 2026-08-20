@@ -33,26 +33,41 @@
   transform: translateX(calc(-1 * var(--chat-panel-width, 380px)));
 }
 
+/* The rail: the only way back once the panel is folded, so it is sized and
+   coloured to be found rather than hidden as a hairline */
 .agent-fold-btn {
   position: absolute;
-  top: 8px;
-  right: -22px;
-  width: 22px;
-  height: 32px;
+  top: 12px;
+  right: -24px;
+  width: 24px;
+  height: 64px;
   padding: 0;
   border: 1px solid var(--border-default);
   border-left: none;
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 8px 8px 0;
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
+  box-shadow: 2px 0 6px var(--shadow-sm);
 }
 
 .agent-fold-btn:hover {
-  color: var(--text-main);
+  color: white;
+  background: var(--primary-color);
   border-color: var(--primary-color);
+}
+
+/* Folded, it is the app's only agent affordance: make it read as a handle */
+.graph-llm-bar.collapsed .agent-fold-btn {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+  border-left: 1px solid var(--primary-color);
+}
+
+.graph-llm-bar.collapsed .agent-fold-btn:hover {
+  color: white;
 }
 
 /* Light mode: stronger AI panel contrast */
