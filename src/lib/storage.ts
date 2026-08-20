@@ -11,6 +11,7 @@ const KEYS = {
   workspaces: 'nodus-workspaces',
   currentWorkspace: 'nodus-current-workspace',
   magnifier: 'nodus-magnifier',
+  agentPanelCollapsed: 'nodus-agent-panel-collapsed',
   fontScale: 'nodus-font-scale',
   // Display thresholds
   lodThreshold: 'nodus-lod-threshold',
@@ -93,6 +94,13 @@ export const workspaceStorage = {
  * UI preferences storage
  */
 export const uiStorage = {
+  // Agent panel folded state - the panel is open until folded away
+  getAgentPanelCollapsed(): boolean {
+    return localStorage.getItem(KEYS.agentPanelCollapsed) === 'true'
+  },
+  setAgentPanelCollapsed(value: boolean): void {
+    localStorage.setItem(KEYS.agentPanelCollapsed, String(value))
+  },
   getMagnifierEnabled(): boolean {
     return localStorage.getItem(KEYS.magnifier) !== 'false'
   },

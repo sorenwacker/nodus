@@ -8,7 +8,7 @@ import type { Node } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
-import { memoryStorage, agentMemoryStorage } from '../lib/storage'
+import { memoryStorage, agentMemoryStorage, uiStorage } from '../lib/storage'
 import {
   useMinimap,
   useViewState,
@@ -1248,6 +1248,10 @@ function clearConversation() {
 // The nodes the agent will see: the selection when there is one, otherwise
 // the whole filtered graph. The bar displays this same list, so what the user
 // is told and what the model receives cannot drift apart.
+// Folded state persists, like the storyline panel's width
+const agentPanelCollapsed = ref(uiStorage.getAgentPanelCollapsed())
+watch(agentPanelCollapsed, value => uiStorage.setAgentPanelCollapsed(value))
+
 const agentContextIsSelection = computed(() => store.selectedNodeIds.length > 0)
 const agentContextNodes = computed(() =>
   agentContextIsSelection.value
@@ -1953,7 +1957,13 @@ defineExpose({
 </script>
 
 <template>
-  <div class="canvas-wrapper">
+  <div
+    class="canvas-wrapper"
+    :style="{
+      '--canvas-chat-inset':
+        showLLMBar && !agentPanelCollapsed ? 'var(--chat-panel-width, 380px)' : '0px',
+    }"
+  >
     <!-- Graph-level LLM prompt bar -->
     <CanvasLLMBar
       v-if="showLLMBar"
@@ -1969,6 +1979,8 @@ defineExpose({
       :context-node-titles="agentContextTitles"
       :context-is-selection="agentContextIsSelection"
       :context-total="agentContextNodes.length"
+      :collapsed="agentPanelCollapsed"
+      @toggle-collapsed="agentPanelCollapsed = !agentPanelCollapsed"
       @update:graph-prompt="graphPrompt = $event"
       @send="sendGraphPrompt"
       @stop="stopAgent"

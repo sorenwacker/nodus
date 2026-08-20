@@ -7,20 +7,72 @@
   position: relative;
 }
 
+/* The agent is a full-height panel on the canvas's left edge, not a band
+   across the header: the transcript needs vertical room, and the input
+   belongs at the bottom of the conversation it feeds. The left edge also
+   leaves the right one to the storyline layers. */
 .graph-llm-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--chat-panel-width, 380px);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 12px;
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-  flex-shrink: 0;
+  border-right: 1px solid var(--border-default);
+  z-index: 55;
+  transition: transform var(--step-duration, 0.3s) var(--step-ease, ease);
 }
 
-/* Light mode: stronger AI bar contrast */
+/* Folded: the panel slides out to the left, leaving its toggle as a rail */
+.graph-llm-bar.collapsed {
+  transform: translateX(calc(-1 * var(--chat-panel-width, 380px)));
+}
+
+.agent-fold-btn {
+  position: absolute;
+  top: 8px;
+  right: -22px;
+  width: 22px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.agent-fold-btn:hover {
+  color: var(--text-main);
+  border-color: var(--primary-color);
+}
+
+/* Light mode: stronger AI panel contrast */
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .graph-llm-bar {
-  border-bottom-color: #94a3b8;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-right-color: #94a3b8;
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.08);
+}
+
+/* The conversation takes the free space; everything else keeps its height */
+.graph-llm-bar .chat-transcript {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.graph-llm-bar .llm-input-row,
+.graph-llm-bar .llm-context,
+.graph-llm-bar .agent-tasks,
+.graph-llm-bar .agent-log {
+  flex-shrink: 0;
 }
 
 .agent-tasks {

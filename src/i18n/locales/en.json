@@ -26,7 +26,9 @@
       "chatEmpty": "Answers from the agent appear here.",
       "contextSelected": "Context: {count} selected",
       "contextAll": "Context: all {count} nodes",
-      "contextMore": "+{count} more"
+      "contextMore": "+{count} more",
+      "foldPanel": "Fold the agent panel away",
+      "unfoldPanel": "Show the agent panel"
     },
     "node": {
       "writePlaceholder": "Write markdown...",

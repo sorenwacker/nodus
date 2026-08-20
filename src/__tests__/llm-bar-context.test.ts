@@ -24,22 +24,47 @@ function mountBar(overrides: Record<string, unknown> = {}) {
       contextNodeTitles: [],
       contextIsSelection: false,
       contextTotal: 0,
+      collapsed: false,
       ...overrides,
     },
     global: { plugins: [i18n] },
   })
 }
 
-describe('agent bar layout', () => {
-  it('keeps its controls in one right-aligned column', () => {
+describe('agent panel layout', () => {
+  it('puts the conversation above the context line and the input last', () => {
     const wrapper = mountBar()
-    const column = wrapper.find('.graph-llm-bar > .llm-column')
-    expect(column.exists()).toBe(true)
-    // Input, context line and transcript all live inside that column, so the
-    // whole agent UI moves together and the top-left stays free
-    expect(column.find('.llm-input-row').exists()).toBe(true)
-    expect(column.find('.llm-context').exists()).toBe(true)
-    expect(column.find('.chat-transcript').exists()).toBe(true)
+    const panel = wrapper.find('.graph-llm-bar')
+    expect(panel.exists()).toBe(true)
+
+    // Order matters: the transcript takes the panel's height and the input
+    // sits at the bottom of the conversation it feeds
+    const order = Array.from(panel.element.children).map(el => el.className)
+    const transcriptAt = order.findIndex(c => c.includes('chat-transcript'))
+    const contextAt = order.findIndex(c => c.includes('llm-context'))
+    const inputAt = order.findIndex(c => c.includes('llm-input-row'))
+
+    expect(transcriptAt).toBeGreaterThanOrEqual(0)
+    expect(transcriptAt).toBeLessThan(contextAt)
+    expect(contextAt).toBeLessThan(inputAt)
+    expect(inputAt).toBe(order.length - 1)
+  })
+})
+
+describe('agent panel folding', () => {
+  it('marks itself folded and keeps its toggle reachable', () => {
+    const folded = mountBar({ collapsed: true })
+    expect(folded.find('.graph-llm-bar').classes()).toContain('collapsed')
+    // The toggle is the rail that brings a folded panel back, so it must
+    // still be rendered while folded
+    expect(folded.find('.agent-fold-btn').exists()).toBe(true)
+  })
+
+  it('asks the parent to fold rather than deciding alone', async () => {
+    const wrapper = mountBar()
+    expect(wrapper.find('.graph-llm-bar').classes()).not.toContain('collapsed')
+    await wrapper.find('.agent-fold-btn').trigger('click')
+    expect(wrapper.emitted('toggle-collapsed')).toHaveLength(1)
   })
 })
 

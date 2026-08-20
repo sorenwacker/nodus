@@ -26,7 +26,9 @@
       "chatEmpty": "Les reponses de l'agent apparaissent ici.",
       "contextSelected": "Contexte : {count} selectionnes",
       "contextAll": "Contexte : les {count} noeuds",
-      "contextMore": "+{count} autres"
+      "contextMore": "+{count} autres",
+      "foldPanel": "Replier le panneau de l'agent",
+      "unfoldPanel": "Afficher le panneau de l'agent"
     },
     "node": {
       "writePlaceholder": "Écrire en markdown...",

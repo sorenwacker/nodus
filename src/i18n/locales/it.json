@@ -26,7 +26,9 @@
       "chatEmpty": "Le risposte dell'agente appaiono qui.",
       "contextSelected": "Contesto: {count} selezionati",
       "contextAll": "Contesto: tutti i {count} nodi",
-      "contextMore": "+{count} altri"
+      "contextMore": "+{count} altri",
+      "foldPanel": "Chiudi il pannello dell'agente",
+      "unfoldPanel": "Mostra il pannello dell'agente"
     },
     "node": {
       "writePlaceholder": "Scrivi markdown...",

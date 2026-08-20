@@ -484,7 +484,7 @@
 .node-preview-panel {
   position: absolute;
   top: 8px;
-  left: 16px;
+  left: calc(16px + var(--canvas-chat-inset, 0px));
   width: 480px;
   max-height: calc(98% - 60px);
   background: var(--bg-surface);
@@ -802,7 +802,7 @@
 .citation-fetch-progress {
   position: absolute;
   bottom: 80px;
-  left: 20px;
+  left: calc(20px + var(--canvas-chat-inset, 0px));
   z-index: 200;
   pointer-events: auto;
 }

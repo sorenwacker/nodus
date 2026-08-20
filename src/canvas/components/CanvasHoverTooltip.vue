@@ -94,7 +94,7 @@ const displayTitle = computed(() =>
   position: absolute;
   top: 8px;
   /* Left side, in the spot of the click preview panel (never both visible) */
-  left: 16px;
+  left: calc(16px + var(--canvas-chat-inset, 0px));
   z-index: 2001;
   width: 280px;
   max-height: 396px; /* A4 aspect ratio: 280 × 1.414 */

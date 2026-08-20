@@ -51,7 +51,7 @@ const store = useNodesStore()
 .edge-filters {
   position: absolute;
   bottom: calc(52px + var(--canvas-bottom-inset, 0px));
-  left: 16px;
+  left: calc(16px + var(--canvas-chat-inset, 0px));
   display: flex;
   gap: 2px;
   padding: 4px;

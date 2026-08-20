@@ -22,6 +22,8 @@ const props = defineProps<{
   /** True when the context is the user's selection rather than the graph */
   contextIsSelection: boolean
   contextTotal: number
+  /** Folded away, leaving only the rail that brings it back */
+  collapsed: boolean
 }>()
 
 // A selection is worth naming node by node; the whole graph is not, so only
@@ -36,6 +38,7 @@ const hiddenTitleCount = computed(() =>
   Math.max(0, props.contextNodeTitles.length - shownTitles.value.length)
 )
 
+
 defineEmits<{
   (e: 'update:graphPrompt', value: string): void
   (e: 'send'): void
@@ -43,6 +46,7 @@ defineEmits<{
   (e: 'clear-conversation'): void
   (e: 'prompt-keydown', event: KeyboardEvent): void
   (e: 'clear-log'): void
+  (e: 'toggle-collapsed'): void
 }>()
 
 async function copyLog(log: string[]) {
@@ -51,8 +55,58 @@ async function copyLog(log: string[]) {
 </script>
 
 <template>
-  <div class="graph-llm-bar">
-    <div class="llm-column">
+  <div class="graph-llm-bar" :class="{ collapsed }">
+    <!-- Folds the panel away like the storyline panel; the rail brings it back -->
+    <button
+      class="agent-fold-btn"
+      :data-tooltip="collapsed ? t('canvas.agent.unfoldPanel') : t('canvas.agent.foldPanel')"
+      @click="$emit('toggle-collapsed')"
+    >
+      {{ collapsed ? '&#9656;' : '&#9666;' }}
+    </button>
+    <!-- The conversation fills the panel -->
+    <CanvasChatTranscript :turns="props.transcript" :is-running="props.isRunning" />
+    <!-- Agent Task List -->
+    <div v-if="agentTasks.length > 0" class="agent-tasks">
+      <div v-for="task in agentTasks" :key="task.id" class="agent-task" :class="task.status">
+        <span class="task-status">{{ task.status === 'done' ? 'v' : task.status === 'running' ? '~' : 'o' }}</span>
+        <span class="task-desc">{{ task.description }}</span>
+      </div>
+    </div>
+    <!-- Agent activity log -->
+    <div v-if="showLog && agentLog.length > 0" class="agent-log">
+      <div class="log-buttons">
+        <button class="log-btn" :title="t('canvas.agent.copyLog')" @click="copyLog(agentLog)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+        <button class="log-btn" :title="t('canvas.agent.clearLog')" @click="$emit('clear-log')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
+    </div>
+    <!-- What the agent will actually see -->
+    <div class="llm-context">
+      <span class="context-label">{{
+        contextIsSelection
+          ? t('canvas.agent.contextSelected', { count: contextTotal })
+          : t('canvas.agent.contextAll', { count: contextTotal })
+      }}</span>
+      <span
+        v-if="contextIsSelection && shownTitles.length > 0"
+        class="context-titles"
+        :title="labelledTitles.join(', ')"
+      >
+        {{ shownTitles.join(', ')
+        }}<template v-if="hiddenTitleCount > 0">
+          {{ t('canvas.agent.contextMore', { count: hiddenTitleCount }) }}</template>
+      </span>
+    </div>
     <div class="llm-input-row">
       <input
         :value="graphPrompt"
@@ -84,50 +138,6 @@ async function copyLog(log: string[]) {
       </button>
       <button v-else class="llm-stop" :data-tooltip="t('canvas.agent.stopAgent')" @click="$emit('stop')">{{ t('canvas.agent.stop') }}</button>
     </div>
-    <!-- What the agent will actually see -->
-    <div class="llm-context">
-      <span class="context-label">{{
-        contextIsSelection
-          ? t('canvas.agent.contextSelected', { count: contextTotal })
-          : t('canvas.agent.contextAll', { count: contextTotal })
-      }}</span>
-      <span
-        v-if="contextIsSelection && shownTitles.length > 0"
-        class="context-titles"
-        :title="labelledTitles.join(', ')"
-      >
-        {{ shownTitles.join(', ')
-        }}<template v-if="hiddenTitleCount > 0">
-          {{ t('canvas.agent.contextMore', { count: hiddenTitleCount }) }}</template>
-      </span>
-    </div>
-    <!-- Conversation, directly under the input row this bar sits in -->
-    <CanvasChatTranscript :turns="props.transcript" :is-running="props.isRunning" />
-    <!-- Agent Task List -->
-    <div v-if="agentTasks.length > 0" class="agent-tasks">
-      <div v-for="task in agentTasks" :key="task.id" class="agent-task" :class="task.status">
-        <span class="task-status">{{ task.status === 'done' ? 'v' : task.status === 'running' ? '~' : 'o' }}</span>
-        <span class="task-desc">{{ task.description }}</span>
-      </div>
-    </div>
-    <!-- Agent activity log -->
-    <div v-if="showLog && agentLog.length > 0" class="agent-log">
-      <div class="log-buttons">
-        <button class="log-btn" :title="t('canvas.agent.copyLog')" @click="copyLog(agentLog)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-        </button>
-        <button class="log-btn" :title="t('canvas.agent.clearLog')" @click="$emit('clear-log')">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
-    </div>
-    </div>
   </div>
 </template>
 
@@ -153,29 +163,6 @@ async function copyLog(log: string[]) {
   white-space: nowrap;
 }
 
-.graph-llm-bar {
-  /* A transparent strip: the agent UI is a right-aligned column, leaving the
-     top-left free instead of banding the whole width */
-  display: flex;
-  justify-content: flex-end;
-  padding: 8px 16px;
-  min-height: 52px;
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
-
-.llm-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  width: min(480px, 100%);
-  padding: 6px 8px;
-  box-sizing: border-box;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px var(--shadow-sm);
-}
 
 .llm-input-row {
   flex: 1;
