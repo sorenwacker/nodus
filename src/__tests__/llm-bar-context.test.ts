@@ -30,6 +30,19 @@ function mountBar(overrides: Record<string, unknown> = {}) {
   })
 }
 
+describe('agent bar layout', () => {
+  it('keeps its controls in one right-aligned column', () => {
+    const wrapper = mountBar()
+    const column = wrapper.find('.graph-llm-bar > .llm-column')
+    expect(column.exists()).toBe(true)
+    // Input, context line and transcript all live inside that column, so the
+    // whole agent UI moves together and the top-left stays free
+    expect(column.find('.llm-input-row').exists()).toBe(true)
+    expect(column.find('.llm-context').exists()).toBe(true)
+    expect(column.find('.chat-transcript').exists()).toBe(true)
+  })
+})
+
 describe('agent context indicator', () => {
   it('names the selected nodes that will be sent', () => {
     const wrapper = mountBar({

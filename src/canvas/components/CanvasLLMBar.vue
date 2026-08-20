@@ -52,6 +52,7 @@ async function copyLog(log: string[]) {
 
 <template>
   <div class="graph-llm-bar">
+    <div class="llm-column">
     <div class="llm-input-row">
       <input
         :value="graphPrompt"
@@ -126,6 +127,7 @@ async function copyLog(log: string[]) {
       </div>
       <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -152,17 +154,27 @@ async function copyLog(log: string[]) {
 }
 
 .graph-llm-bar {
+  /* A transparent strip: the agent UI is a right-aligned column, leaving the
+     top-left free instead of banding the whole width */
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px;
+  min-height: 52px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.llm-column {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 8px 16px;
-  /* Grows with the transcript instead of clipping it; the input row alone is
-     52px, and the transcript caps its own height */
-  min-height: 52px;
+  width: min(480px, 100%);
+  padding: 6px 8px;
   box-sizing: border-box;
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-  flex-shrink: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow-sm);
 }
 
 .llm-input-row {
