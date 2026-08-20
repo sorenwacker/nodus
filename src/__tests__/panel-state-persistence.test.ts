@@ -41,3 +41,24 @@ describe('agent panel folded state', () => {
     expect(uiStorage.getAgentPanelCollapsed()).toBe(true)
   })
 })
+
+describe('agent panel toggle is reachable while folded', () => {
+  it('exposes the fold state and a toggle on the shared display store', async () => {
+    const { setActivePinia, createPinia } = await import('pinia')
+    setActivePinia(createPinia())
+    const { useDisplayStore } = await import('../stores/display')
+    localStorage.removeItem('nodus-agent-panel-collapsed')
+
+    const store = useDisplayStore()
+    expect(store.agentPanelCollapsed).toBe(false)
+
+    // The toolbar and the panel share this state, so a folded panel can
+    // always be brought back from outside itself
+    store.toggleAgentPanel()
+    expect(store.agentPanelCollapsed).toBe(true)
+    expect(localStorage.getItem('nodus-agent-panel-collapsed')).toBe('true')
+
+    store.toggleAgentPanel()
+    expect(store.agentPanelCollapsed).toBe(false)
+  })
+})

@@ -421,7 +421,8 @@
     "storylines": "Líneas argumentales",
     "importVault": "Importar vault",
     "theme": "Tema",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "agent": "Panel del agente"
   },
   "toasts": {
     "resetNodeSizes": "{count} tamaños de nodos restablecidos",

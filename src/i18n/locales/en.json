@@ -425,7 +425,8 @@
     "storylines": "Storylines",
     "importVault": "Import Vault",
     "theme": "Theme",
-    "settings": "Settings"
+    "settings": "Settings",
+    "agent": "Agent panel"
   },
   "toasts": {
     "resetNodeSizes": "Reset {count} node sizes to default",

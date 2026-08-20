@@ -17,6 +17,8 @@ export const useDisplayStore = defineStore('display', () => {
   const fontScale = ref(uiStorage.getFontScale())
   const spellcheckEnabled = ref(uiStorage.getSpellcheckEnabled())
   const hoverTooltipEnabled = ref(uiStorage.getHoverTooltipEnabled())
+  // Agent panel fold state: shared so the toolbar and the canvas agree
+  const agentPanelCollapsed = ref(uiStorage.getAgentPanelCollapsed())
 
   // Reload all values from storage
   function reload() {
@@ -29,6 +31,12 @@ export const useDisplayStore = defineStore('display', () => {
     fontScale.value = uiStorage.getFontScale()
     spellcheckEnabled.value = uiStorage.getSpellcheckEnabled()
     hoverTooltipEnabled.value = uiStorage.getHoverTooltipEnabled()
+    agentPanelCollapsed.value = uiStorage.getAgentPanelCollapsed()
+  }
+
+  function toggleAgentPanel() {
+    agentPanelCollapsed.value = !agentPanelCollapsed.value
+    uiStorage.setAgentPanelCollapsed(agentPanelCollapsed.value)
   }
 
   // Event handler for settings changes
@@ -56,7 +64,9 @@ export const useDisplayStore = defineStore('display', () => {
     fontScale,
     spellcheckEnabled,
     hoverTooltipEnabled,
+    agentPanelCollapsed,
     // Actions
+    toggleAgentPanel,
     reload,
     setupListener,
     cleanupListener,
