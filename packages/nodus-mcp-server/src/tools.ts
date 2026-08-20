@@ -443,6 +443,10 @@ export const NODUS_TOOLS: Tool[] = [
           type: 'boolean',
           description: 'Whether the edge is directed. Default: true.',
         },
+        color: {
+          type: 'string',
+          description: 'Edge color as a name or hex value (optional)',
+        },
       },
       required: ['source_node_id', 'target_node_id'],
     },
@@ -464,6 +468,10 @@ export const NODUS_TOOLS: Tool[] = [
         directed: {
           type: 'boolean',
           description: 'Whether the edge is directed',
+        },
+        color: {
+          type: 'string',
+          description: 'Edge color as a name or hex value; empty string clears it',
         },
       },
       required: ['id'],

@@ -60,6 +60,7 @@ export interface INodeStore {
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
+  updateNodeTags?: (id: string, tags: string[]) => Promise<void>
   updateNodeColor?: (id: string, color: string) => Promise<void>
   updateEdgeLabel?: (id: string, label: string | null) => Promise<void>
   updateEdgeColor?: (id: string, color: string | null) => Promise<void>

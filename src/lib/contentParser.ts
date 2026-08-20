@@ -95,3 +95,25 @@ export function extractWikilinks(content: string): Set<string> {
   }
   return links
 }
+
+/**
+ * Apply date/date_end values into a content block's frontmatter.
+ *
+ * Shared by the MCP handlers and the in-app agent tools: a second copy would
+ * let the two surfaces disagree about how a date is written.
+ * An empty string clears the field; undefined leaves it untouched.
+ */
+export function withDateFields(
+  content: string,
+  date: string | undefined,
+  dateEnd: string | undefined
+): string {
+  let result = content
+  if (date !== undefined) {
+    result = upsertFrontmatterField(result, 'date', date || null)
+  }
+  if (dateEnd !== undefined) {
+    result = upsertFrontmatterField(result, 'date_end', dateEnd || null)
+  }
+  return result
+}

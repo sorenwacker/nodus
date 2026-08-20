@@ -6,25 +6,61 @@
 
 import { defineTool, findNodeByTitle } from '../registry'
 import { cleanContent } from '../utils'
+import { withDateFields } from '../../lib/contentParser'
 
 export function registerUpdateTools(): void {
-  defineTool<{ title: string; new_content: string }>(
+  defineTool<{
+    title: string
+    new_content?: string
+    date?: string
+    date_end?: string
+    tags?: string[]
+  }>(
     'update_node',
-    'Update ONE node. For multiple nodes use batch_update.',
+    'Update ONE node: content, date or tags. For multiple nodes use batch_update.',
     {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Title of node to update' },
         new_content: { type: 'string', description: 'Literal content (no templates)' },
+        date: {
+          type: 'string',
+          description: 'Point in time for the timeline, e.g. "1969-07-20", "1500", "20 BC". Empty string clears it',
+        },
+        date_end: { type: 'string', description: 'End of a date range; empty string clears it' },
+        tags: { type: 'array', description: 'Replace the node tags' },
       },
-      required: ['title', 'new_content'],
+      required: ['title'],
     },
     async (args, ctx) => {
       const node = findNodeByTitle(ctx.store.filteredNodes, args.title)
       if (!node) return `Error: Node "${args.title}" not found`
-      // Push to undo stack before modifying
-      ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)
-      await ctx.store.updateNodeContent(node.id, cleanContent(args.new_content))
+
+      const changingContent =
+        args.new_content !== undefined || args.date !== undefined || args.date_end !== undefined
+
+      if (changingContent) {
+        // Push to undo stack before modifying
+        ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)
+        // Dates are frontmatter on the existing content, so an update that
+        // only sets a date must not erase the body
+        const base =
+          args.new_content !== undefined
+            ? cleanContent(args.new_content)
+            : node.markdown_content || ''
+        await ctx.store.updateNodeContent(
+          node.id,
+          withDateFields(base, args.date, args.date_end)
+        )
+      }
+
+      if (args.tags !== undefined) {
+        await ctx.store.updateNodeTags?.(node.id, args.tags)
+      }
+
+      if (!changingContent && args.tags === undefined) {
+        return `Nothing to update on "${args.title}": pass new_content, date, date_end or tags`
+      }
       return `Updated node "${args.title}"`
     },
     { category: 'update' }

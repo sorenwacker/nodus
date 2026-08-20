@@ -6,6 +6,7 @@
 
 import { defineTool, findNodeByTitle } from '../registry'
 import { cleanContent } from '../utils'
+import { withDateFields } from '../../lib/contentParser'
 
 // Position counter for new nodes (module-level state)
 let nodePositionCounter = 0
@@ -15,7 +16,15 @@ export function resetPositionCounter() {
 }
 
 export function registerNodeTools(): void {
-  defineTool<{ title: string; content?: string; x?: number; y?: number }>(
+  defineTool<{
+    title: string
+    content?: string
+    x?: number
+    y?: number
+    date?: string
+    date_end?: string
+    tags?: string[]
+  }>(
     'create_node',
     'Create a new node on the canvas with a title and markdown content',
     {
@@ -25,6 +34,12 @@ export function registerNodeTools(): void {
         content: { type: 'string', description: 'Markdown content for the node' },
         x: { type: 'number', description: 'X position (optional)' },
         y: { type: 'number', description: 'Y position (optional)' },
+        date: {
+          type: 'string',
+          description: 'Point in time for the timeline, e.g. "1969-07-20", "1500", "20 BC"',
+        },
+        date_end: { type: 'string', description: 'End of a date range (optional)' },
+        tags: { type: 'array', description: 'Tags for the node (optional)' },
       },
       required: ['title'],
     },
@@ -38,7 +53,14 @@ export function registerNodeTools(): void {
         const node = await ctx.store.createNode({
           title: args.title || '',
           node_type: 'note',
-          markdown_content: cleanContent(args.content),
+          // Dates live in frontmatter, written by the same helper the MCP
+          // surface uses
+          markdown_content: withDateFields(
+            cleanContent(args.content),
+            args.date,
+            args.date_end
+          ),
+          tags: args.tags,
           canvas_x: ctx.snapToGrid(args.x ?? pos.x + offsetX),
           canvas_y: ctx.snapToGrid(args.y ?? pos.y + offsetY),
         })

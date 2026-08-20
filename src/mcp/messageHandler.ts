@@ -99,6 +99,7 @@ export interface McpStoreInterface {
     label?: string
     link_type?: string
     directed?: boolean
+    color?: string
   }) => Promise<Edge>
   deleteEdgeRaw: (id: string) => Promise<void>
 
@@ -129,9 +130,12 @@ export interface McpStoreInterface {
     label?: string
     link_type?: string
     directed?: boolean
+    color?: string
   }) => Promise<Edge>
   deleteEdge: (id: string) => Promise<void>
   updateEdgeDirected: (id: string, directed: boolean) => Promise<void>
+  updateEdgeLabel: (id: string, label: string | null) => Promise<void>
+  updateEdgeColor: (id: string, color: string | null) => Promise<void>
 
   // Frame operations
   getFilteredFrames: () => Frame[]

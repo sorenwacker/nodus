@@ -1200,6 +1200,7 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
       updateNodePosition: store.updateNodePosition,
       updateNodeContent: store.updateNodeContent,
       updateNodeTitle: store.updateNodeTitle,
+      updateNodeTags: store.updateNodeTags,
       updateEdgeLabel: store.updateEdgeLabel,
       updateEdgeColor: store.updateEdgeColor,
     },

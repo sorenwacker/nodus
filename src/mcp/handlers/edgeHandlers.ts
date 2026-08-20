@@ -5,6 +5,7 @@
  */
 
 import type { Edge } from '../../types'
+import { normalizeColor } from './nodeHandlers'
 import type { McpEdge } from '../types'
 import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface } from '../messageHandler'
@@ -37,6 +38,7 @@ export async function handleCreateEdge(
     label?: string
     link_type?: string
     directed?: boolean
+    color?: string
   }
 ): Promise<{ id: string }> {
   // Validate nodes exist
@@ -59,6 +61,8 @@ export async function handleCreateEdge(
     label: params.label,
     link_type: params.link_type || 'related',
     directed: params.directed ?? true,
+    // Colour names are accepted here as they are for nodes
+    color: normalizeColor(params.color ?? null) ?? undefined,
   })
 
   return { id: edge.id }
@@ -70,6 +74,7 @@ export async function handleUpdateEdge(
     id: string
     label?: string
     directed?: boolean
+    color?: string
   }
 ): Promise<{ success: boolean }> {
   const edge = store.getFilteredEdges().find((e) => e.id === params.id)
@@ -82,6 +87,16 @@ export async function handleUpdateEdge(
 
   if (params.directed !== undefined) {
     await store.updateEdgeDirected(params.id, params.directed)
+  }
+
+  // label and color were advertised by the schema but never applied: the call
+  // reported success while changing nothing
+  if (params.label !== undefined) {
+    await store.updateEdgeLabel(params.id, params.label || null)
+  }
+
+  if (params.color !== undefined) {
+    await store.updateEdgeColor(params.id, normalizeColor(params.color || null))
   }
 
   return { success: true }

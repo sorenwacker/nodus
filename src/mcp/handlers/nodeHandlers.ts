@@ -8,7 +8,7 @@ import type { Node, Edge, Frame } from '../../types'
 import type { McpNode, McpEdge } from '../types'
 import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface, McpUndoInterface } from '../messageHandler'
-import { upsertFrontmatterField } from '../../lib/contentParser'
+import { withDateFields } from '../../lib/contentParser'
 import { extractFrontmatterField } from '../../lib/timelineDates'
 
 /**
@@ -48,22 +48,6 @@ export function nodeToMcp(node: Node, includeContent = false): McpNode {
   }
 
   return mcpNode
-}
-
-/** Apply date/date_end parameters into content frontmatter */
-function withDateFields(
-  content: string,
-  date: string | undefined,
-  dateEnd: string | undefined
-): string {
-  let result = content
-  if (date !== undefined) {
-    result = upsertFrontmatterField(result, 'date', date || null)
-  }
-  if (dateEnd !== undefined) {
-    result = upsertFrontmatterField(result, 'date_end', dateEnd || null)
-  }
-  return result
 }
 
 /**

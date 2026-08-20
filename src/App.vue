@@ -321,6 +321,7 @@ const mcpServer = useMcpServer({
     deleteEdge: store.deleteEdge,
     updateEdgeDirected: edgesStore.updateEdgeDirected,
     updateEdgeLabel: edgesStore.updateEdgeLabel,
+    updateEdgeColor: edgesStore.updateEdgeColor,
     // Frame operations
     getFilteredFrames: () => store.filteredFrames,
     getFrame: (id: string) => store.filteredFrames.find(f => f.id === id),
