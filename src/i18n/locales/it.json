@@ -22,7 +22,8 @@
       "chatYou": "Tu",
       "chatAgent": "Agente",
       "chatActions": "{count} chiamate di strumenti",
-      "chatWorking": "In corso..."
+      "chatWorking": "In corso...",
+      "chatEmpty": "Le risposte dell'agente appaiono qui."
     },
     "node": {
       "writePlaceholder": "Scrivi markdown...",

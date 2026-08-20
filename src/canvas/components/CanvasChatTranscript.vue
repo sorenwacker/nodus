@@ -42,7 +42,8 @@ watch(
 </script>
 
 <template>
-  <div v-if="turns.length > 0" ref="scroller" class="chat-transcript">
+  <div ref="scroller" class="chat-transcript" :class="{ empty: turns.length === 0 }">
+    <p v-if="turns.length === 0" class="chat-empty">{{ t('canvas.agent.chatEmpty') }}</p>
     <div
       v-for="turn in turns"
       :key="turn.id"
@@ -68,6 +69,14 @@ watch(
 </template>
 
 <style scoped>
+.chat-empty {
+  margin: 0;
+  padding: 2px 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
 .chat-transcript {
   max-height: 45vh;
   overflow-y: auto;

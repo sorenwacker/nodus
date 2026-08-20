@@ -23,8 +23,18 @@ function mountChat(turns: ChatTurn[]) {
 }
 
 describe('canvas chat transcript', () => {
-  it('renders nothing when there is no conversation yet', () => {
-    expect(mountChat([]).find('.chat-turn').exists()).toBe(false)
+  it('shows where answers will appear before the first exchange', () => {
+    const wrapper = mountChat([])
+    // The area must exist up front: one that appears only once there is
+    // output leaves "where does the output go" unanswered
+    expect(wrapper.find('.chat-transcript').exists()).toBe(true)
+    expect(wrapper.find('.chat-empty').exists()).toBe(true)
+    expect(wrapper.find('.chat-turn').exists()).toBe(false)
+  })
+
+  it('drops the placeholder once the conversation starts', () => {
+    const wrapper = mountChat([turn({ id: '1', role: 'user', text: 'hello' })])
+    expect(wrapper.find('.chat-empty').exists()).toBe(false)
   })
 
   it('shows user prompts and assistant answers in order', () => {
