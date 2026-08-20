@@ -102,12 +102,37 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
     }
   }
 
-  // An upward mouse motion usually exits the window (into the title bar)
-  // before any pointermove lands inside the narrow top band, so a window
-  // leave through this taller region also counts as a top push
+  // A fast motion exits the window before any pointermove lands inside the
+  // narrow edge band, so a window leave through these wider regions counts as
+  // a push on the edge it left through. Without this, a quick flick at the
+  // edge does nothing and the gesture feels unreliable.
   const TOP_LEAVE_BAND = 80
+  const SIDE_LEAVE_BAND = 40
 
-  function onPointerLeave(y: number): void {
+  /**
+   * The pointer left the window at (x, y). Horizontal exits win over vertical
+   * ones: leaving through a corner is a side push, which is the deliberate
+   * gesture, while the top band exists only to catch the title-bar exit.
+   */
+  function onPointerLeave(x: number, y: number, windowWidth: number, windowHeight: number): void {
+    void windowHeight
+
+    if (x >= windowWidth - SIDE_LEAVE_BAND) {
+      if (rightArmed) {
+        rightArmed = false
+        stepRight()
+      }
+      return
+    }
+
+    if (x <= SIDE_LEAVE_BAND) {
+      if (leftArmed) {
+        leftArmed = false
+        stepLeft()
+      }
+      return
+    }
+
     if (!stepTop) return
     if (topThreshold() <= 0) return
     if (y <= TOP_LEAVE_BAND && topArmed) {

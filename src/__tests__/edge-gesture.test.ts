@@ -149,7 +149,7 @@ describe('createEdgeStepper', () => {
       stepLeft: vi.fn(),
       stepTop,
     })
-    stepper.onPointerLeave(40) // exits upward: last y well above the 12px band
+    stepper.onPointerLeave(500, 40, WIDTH, 1000) // exits upward, mid-width
     expect(stepTop).toHaveBeenCalledTimes(1)
   })
 
@@ -163,10 +163,10 @@ describe('createEdgeStepper', () => {
       stepLeft: vi.fn(),
       stepTop,
     })
-    stepper.onPointerLeave(500) // left through a side, not the top
+    stepper.onPointerLeave(500, 500, WIDTH, 1000) // left mid-window, not the top
     expect(stepTop).not.toHaveBeenCalled()
     band = 0 // top edge disabled (sheet closed)
-    stepper.onPointerLeave(40)
+    stepper.onPointerLeave(500, 40, WIDTH, 1000)
     expect(stepTop).not.toHaveBeenCalled()
   })
 
@@ -179,8 +179,44 @@ describe('createEdgeStepper', () => {
       stepTop,
     })
     stepper.onPointer(500, 5, WIDTH, 1000) // in-band fire
-    stepper.onPointerLeave(3) // cursor continues out of the window
+    stepper.onPointerLeave(500, 3, WIDTH, 1000) // cursor continues out
     expect(stepTop).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires the right step when the pointer leaves through the right region', () => {
+    // A fast flick can jump past the narrow edge band without a pointermove
+    // landing inside it; the window leave is the only evidence left
+    const { stepper, stepRight } = makeStepper()
+    stepper.onPointerLeave(WIDTH - 6, 400, WIDTH, 1000)
+    expect(stepRight).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires the left step when the pointer leaves through the left region', () => {
+    const { stepper, stepLeft } = makeStepper()
+    stepper.onPointerLeave(4, 400, WIDTH, 1000)
+    expect(stepLeft).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not double-fire when an in-band push precedes the leave', () => {
+    const { stepper, stepRight } = makeStepper()
+    stepper.onPointerX(WIDTH - 5, WIDTH) // in-band push fires
+    stepper.onPointerLeave(WIDTH - 1, 400, WIDTH, 1000) // then exits
+    expect(stepRight).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-arms the side edges after the pointer comes back inside', () => {
+    const { stepper, stepRight } = makeStepper()
+    stepper.onPointerLeave(WIDTH - 3, 400, WIDTH, 1000)
+    stepper.onPointerX(600, WIDTH) // back inside re-arms
+    stepper.onPointerLeave(WIDTH - 3, 400, WIDTH, 1000)
+    expect(stepRight).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores a leave through the middle of an edgeless region', () => {
+    const { stepper, stepRight, stepLeft } = makeStepper()
+    stepper.onPointerLeave(WIDTH / 2, 900, WIDTH, 1000)
+    expect(stepRight).not.toHaveBeenCalled()
+    expect(stepLeft).not.toHaveBeenCalled()
   })
 
   it('does not fire in the middle of the window', () => {

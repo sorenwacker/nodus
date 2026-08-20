@@ -163,11 +163,11 @@ function onEdgePointerMove(e: PointerEvent) {
   edgeStepper.onPointer(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
 }
 
-// An upward motion exits into the title bar before any pointermove lands in
-// the top band, so leaving the window through the top region must also close
+// A fast motion exits the window before any pointermove lands in the narrow
+// edge band, so a leave counts as a push on the edge it left through
 function onEdgePointerOut(e: PointerEvent) {
   if (e.relatedTarget === null) {
-    edgeStepper.onPointerLeave(e.clientY)
+    edgeStepper.onPointerLeave(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
   }
 }
 
