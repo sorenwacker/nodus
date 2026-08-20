@@ -868,6 +868,12 @@ Users want to point Ollama at their notes. We make this easy:
 
 The canvas includes a built-in agent that can build and modify knowledge graphs via natural language.
 
+**Chat transcript (required behavior):** The agent bar is a chat window, not a fire-and-forget input. A scrollable transcript grows upward from the input row, capped at 45% of the window height, and shows the exchange in order: each prompt the user sent, and each answer the agent gave in full. An answer that arrives as plain text is displayed as written - never truncated - because otherwise a reply that performs no canvas action leaves no visible trace at all.
+
+Under each assistant turn, the actions taken during it collapse into a single line (`4 tool calls`) that expands to the list of tools and their outcomes. This is a summary of what the agent *did*, distinct from the activity log panel, which remains a diagnostic surface for errors and opens itself only when a run genuinely fails.
+
+The transcript persists for the session, scrolls to the newest turn as it arrives, and is cleared by the same control that clears the agent's conversation memory, so what the user sees and what the model remembers are cleared together.
+
 **Architecture:**
 - Direct Ollama API integration (`/api/chat` with tools)
 - Tool calling with native support + fallback JSON parsing
