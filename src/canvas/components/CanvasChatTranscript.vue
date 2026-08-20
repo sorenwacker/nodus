@@ -4,7 +4,7 @@
  * upward from the input row. Tool activity collapses to one line per turn;
  * errors and raw diagnostics stay in the agent log panel.
  */
-import { ref, watch, nextTick, useTemplateRef } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ChatTurn } from '../../llm/chatTranscript'
 
@@ -15,7 +15,9 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-const scroller = useTemplateRef<HTMLElement>('scroller')
+// A plain template ref, not useTemplateRef: that API needs Vue 3.5 while the
+// declared bound allows 3.4
+const scroller = ref<HTMLElement | null>(null)
 const expanded = ref<Set<string>>(new Set())
 
 function toggleActions(id: string) {
