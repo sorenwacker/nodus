@@ -24,6 +24,8 @@ const props = defineProps<{
   contextTotal: number
   /** Folded away, leaving only the rail that brings it back */
   collapsed: boolean
+  /** True while the user drags the panel's separator */
+  resizing: boolean
 }>()
 
 // A selection is worth naming node by node; the whole graph is not, so only
@@ -46,6 +48,7 @@ defineEmits<{
   (e: 'clear-conversation'): void
   (e: 'prompt-keydown', event: KeyboardEvent): void
   (e: 'clear-log'): void
+  (e: 'begin-resize', event: PointerEvent): void
 }>()
 
 async function copyLog(log: string[]) {
@@ -54,7 +57,9 @@ async function copyLog(log: string[]) {
 </script>
 
 <template>
-  <div class="graph-llm-bar" :class="{ collapsed }">
+  <div class="graph-llm-bar" :class="{ collapsed, resizing }">
+    <!-- Separator on the canvas-facing edge, like the storyline panel's -->
+    <div class="agent-resizer" @pointerdown="$emit('begin-resize', $event)"></div>
     <!-- The conversation fills the panel -->
     <CanvasChatTranscript :turns="props.transcript" :is-running="props.isRunning" />
     <!-- Agent Task List -->

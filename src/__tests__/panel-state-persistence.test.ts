@@ -62,3 +62,55 @@ describe('agent panel toggle is reachable while folded', () => {
     expect(store.agentPanelCollapsed).toBe(false)
   })
 })
+
+describe('panel sizes the user chooses persist', () => {
+  it('remembers the agent panel width across sessions', async () => {
+    const { usePanelReveal } = await import('../composables/usePanelReveal')
+    localStorage.removeItem('nodus-agent-panel-width')
+
+    const panel = usePanelReveal({
+      side: 'left',
+      minSize: 280,
+      maxSize: 640,
+      defaultSize: 380,
+      storageKey: 'nodus-agent-panel-width',
+    })
+    expect(panel.size.value).toBe(380)
+
+    panel.setSize(520)
+    const reopened = usePanelReveal({
+      side: 'left',
+      minSize: 280,
+      maxSize: 640,
+      defaultSize: 380,
+      storageKey: 'nodus-agent-panel-width',
+    })
+    expect(reopened.size.value).toBe(520)
+  })
+
+  it('remembers the timelines height and only then stops sizing to content', async () => {
+    const { usePanelReveal } = await import('../composables/usePanelReveal')
+    localStorage.removeItem('nodus-timelines-height')
+
+    const sheet = usePanelReveal({
+      side: 'bottom',
+      minSize: 120,
+      maxSize: 900,
+      defaultSize: 240,
+      storageKey: 'nodus-timelines-height',
+    })
+    // Until the user drags it, the sheet fits its lanes
+    expect(sheet.hasStoredSize.value).toBe(false)
+
+    sheet.setSize(420)
+    const reopened = usePanelReveal({
+      side: 'bottom',
+      minSize: 120,
+      maxSize: 900,
+      defaultSize: 240,
+      storageKey: 'nodus-timelines-height',
+    })
+    expect(reopened.hasStoredSize.value).toBe(true)
+    expect(reopened.size.value).toBe(420)
+  })
+})

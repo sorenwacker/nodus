@@ -9,6 +9,7 @@ import type { Node } from '../types'
 import { openExternal } from '../lib/tauri'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
 import { useI18n } from 'vue-i18n'
+import { usePanelReveal } from '../composables/usePanelReveal'
 import { memoryStorage, agentMemoryStorage } from '../lib/storage'
 import {
   useMinimap,
@@ -1251,6 +1252,16 @@ function clearConversation() {
 // The nodes the agent will see: the selection when there is one, otherwise
 // the whole filtered graph. The bar displays this same list, so what the user
 // is told and what the model receives cannot drift apart.
+// The panel's width is the user's choice and persists, like the storyline
+// panel's; the fold state lives in the display store beside it
+const agentPanel = usePanelReveal({
+  side: 'left',
+  minSize: 280,
+  maxSize: 640,
+  defaultSize: 380,
+  storageKey: 'nodus-agent-panel-width',
+})
+
 const agentContextIsSelection = computed(() => store.selectedNodeIds.length > 0)
 const agentContextNodes = computed(() =>
   agentContextIsSelection.value
@@ -1959,9 +1970,10 @@ defineExpose({
   <div
     class="canvas-wrapper"
     :style="{
+      '--chat-panel-width': agentPanel.size.value + 'px',
       '--canvas-chat-inset':
         showLLMBar && !displayStore.agentPanelCollapsed
-          ? 'var(--chat-panel-width, 380px)'
+          ? agentPanel.size.value + 'px'
           : '0px',
     }"
   >
@@ -1998,6 +2010,8 @@ defineExpose({
       :context-is-selection="agentContextIsSelection"
       :context-total="agentContextNodes.length"
       :collapsed="displayStore.agentPanelCollapsed"
+      :resizing="agentPanel.resizing.value"
+      @begin-resize="agentPanel.beginResize($event)"
       @update:graph-prompt="graphPrompt = $event"
       @send="sendGraphPrompt"
       @stop="stopAgent"

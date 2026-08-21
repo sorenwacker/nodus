@@ -400,7 +400,8 @@
     "timelinesDateHint": "Den Zeitpunkt eines Knotens mit date: 20 BC oder 1969-07-20 im Frontmatter festlegen",
     "timelineFrom": "von (500 BC)",
     "timelineTo": "bis (2000)",
-    "unassigned": "Nicht zugeordnet"
+    "unassigned": "Nicht zugeordnet",
+    "resizeTimelines": "Ziehen, um die Zeitleisten zu skalieren"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",

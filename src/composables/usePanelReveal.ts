@@ -1,27 +1,30 @@
 /**
- * usePanelReveal - edge-step reveal state for a side panel
+ * usePanelReveal - edge-step reveal state and user-set size for a panel
  *
  * The panel opens on an edge push and stays open until explicitly closed
- * (a step back or the toolbar toggle). The panel width is user-resizable
- * within a clamped range and persisted under a storage key.
+ * (a step back or the toolbar toggle). Its size - width for a side panel,
+ * height for a bottom sheet - is user-resizable within a clamped range and
+ * persisted under a storage key.
  */
 import { ref, computed } from 'vue'
 
+/** Which screen edge the panel is attached to; decides the resize axis */
+export type PanelSide = 'left' | 'right' | 'bottom'
+
 export interface PanelRevealOptions {
-  minWidth?: number
-  maxWidth?: number
-  defaultWidth?: number
-  /** Which screen edge the panel lives on; affects resize direction */
-  side?: 'left' | 'right'
-  /** localStorage key for the persisted width; omit to disable persistence */
+  minSize?: number
+  maxSize?: number
+  defaultSize?: number
+  side?: PanelSide
+  /** localStorage key for the persisted size; omit to disable persistence */
   storageKey?: string
 }
 
 export function usePanelReveal(options: PanelRevealOptions = {}) {
   const {
-    minWidth = 200,
-    maxWidth = 480,
-    defaultWidth = 260,
+    minSize = 200,
+    maxSize = 480,
+    defaultSize = 260,
     side = 'left',
     storageKey,
   } = options
@@ -29,22 +32,21 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
   const pinned = ref(false)
   const peeking = ref(false)
   const resizing = ref(false)
-  const width = ref(restoreWidth())
+  const stored = readStored()
+  /** True once the user has chosen a size; callers may size to content until then */
+  const hasStoredSize = ref(stored !== null)
+  const size = ref(stored ?? defaultSize)
 
   const isOpen = computed(() => pinned.value || peeking.value)
 
-  function restoreWidth(): number {
-    if (storageKey) {
-      const stored = Number(localStorage.getItem(storageKey))
-      if (Number.isFinite(stored) && stored > 0) {
-        return clamp(stored)
-      }
-    }
-    return defaultWidth
+  function readStored(): number | null {
+    if (!storageKey) return null
+    const value = Number(localStorage.getItem(storageKey))
+    return Number.isFinite(value) && value > 0 ? clamp(value) : null
   }
 
   function clamp(value: number): number {
-    return Math.min(maxWidth, Math.max(minWidth, value))
+    return Math.min(maxSize, Math.max(minSize, value))
   }
 
   function onEdgeEnter() {
@@ -64,24 +66,32 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     peeking.value = false
   }
 
-  function setWidth(value: number) {
-    width.value = clamp(value)
+  function setSize(value: number) {
+    size.value = clamp(value)
+    hasStoredSize.value = true
     if (storageKey) {
-      localStorage.setItem(storageKey, String(width.value))
+      localStorage.setItem(storageKey, String(size.value))
     }
   }
 
-  /** Start a pointer-driven resize from the panel's separator */
+  /**
+   * Start a pointer-driven resize from the panel's separator.
+   *
+   * Each side grows in the direction that points away from its edge: a
+   * right-hand panel widens as the separator is dragged left, a bottom sheet
+   * grows taller as it is dragged up.
+   */
   function beginResize(e: PointerEvent) {
     e.preventDefault()
     resizing.value = true
-    const startX = e.clientX
-    const startWidth = width.value
+    const vertical = side === 'bottom'
+    const start = vertical ? e.clientY : e.clientX
+    const startSize = size.value
+    const sign = side === 'left' ? 1 : -1
 
-    // A right-side panel grows when the separator is dragged leftwards
-    const sign = side === 'right' ? -1 : 1
     function onMove(ev: PointerEvent) {
-      setWidth(startWidth + sign * (ev.clientX - startX))
+      const current = vertical ? ev.clientY : ev.clientX
+      setSize(startSize + sign * (current - start))
     }
     function onUp() {
       resizing.value = false
@@ -96,11 +106,12 @@ export function usePanelReveal(options: PanelRevealOptions = {}) {
     isOpen,
     pinned,
     resizing,
-    width,
+    size,
+    hasStoredSize,
     onEdgeEnter,
     togglePin,
     close,
-    setWidth,
+    setSize,
     beginResize,
   }
 }

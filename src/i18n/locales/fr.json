@@ -400,7 +400,8 @@
     "timelinesDateHint": "Définissez la date d'un nœud avec date: 20 BC ou 1969-07-20 dans son frontmatter",
     "timelineFrom": "de (500 BC)",
     "timelineTo": "à (2000)",
-    "unassigned": "Non assigné"
+    "unassigned": "Non assigné",
+    "resizeTimelines": "Faites glisser pour redimensionner les chronologies"
   },
   "nodePicker": {
     "newNode": "Nouveau nœud",

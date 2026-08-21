@@ -25,6 +25,7 @@ function mountBar(overrides: Record<string, unknown> = {}) {
       contextIsSelection: false,
       contextTotal: 0,
       collapsed: false,
+      resizing: false,
       ...overrides,
     },
     global: { plugins: [i18n] },

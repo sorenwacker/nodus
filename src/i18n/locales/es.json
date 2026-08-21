@@ -400,7 +400,8 @@
     "timelinesDateHint": "Defina la fecha de un nodo con date: 20 BC o 1969-07-20 en su frontmatter",
     "timelineFrom": "desde (500 BC)",
     "timelineTo": "hasta (2000)",
-    "unassigned": "Sin asignar"
+    "unassigned": "Sin asignar",
+    "resizeTimelines": "Arrastra para redimensionar las cronologias"
   },
   "nodePicker": {
     "newNode": "Nuevo nodo",

@@ -70,14 +70,23 @@ const insetDuration = computed(() =>
 // Canvas overlays (minimap) shift left by the width of the open storyline layer
 const canvasRightInset = computed(() => {
   if (readerStorylineId.value) return readerFullWidth.value ? '0px' : '50%'
-  if (panelVisible.value) return `${storylinePanel.width.value}px`
+  if (panelVisible.value) return `${storylinePanel.size.value}px`
   return '0px'
 })
 
-// The timelines sheet is only as tall as its lanes need, capped at 45%.
-// The component reports its lane count (including the unassigned lane).
+// The timelines sheet fits its lanes until the user drags it to a height of
+// their own, which then persists. The component reports its lane count
+// (including the unassigned lane).
 const timelinesLaneCount = ref(1)
+const timelinesPanel = usePanelReveal({
+  side: 'bottom',
+  minSize: 120,
+  maxSize: 900,
+  defaultSize: 240,
+  storageKey: 'nodus-timelines-height',
+})
 const timelinesSheetHeight = computed(() => {
+  if (timelinesPanel.hasStoredSize.value) return `${timelinesPanel.size.value}px`
   const laneCount = Math.max(1, timelinesLaneCount.value)
   // header + axis + lanes + padding and scrollbar allowance
   const contentPx = 52 + 34 + 8 + 14 + laneCount * 52
@@ -886,7 +895,7 @@ async function openFolderDialog() {
         class="storyline-reveal"
         :class="{ resizing: storylinePanel.resizing.value, open: panelVisible }"
         :style="{
-          width: storylinePanel.width.value + 'px',
+          width: storylinePanel.size.value + 'px',
           bottom: showTimelines ? timelinesSheetHeight : '0px',
         }"
       >
@@ -895,7 +904,7 @@ async function openFolderDialog() {
           class="panel-resizer"
           @pointerdown="storylinePanel.beginResize"
         ></div>
-        <div class="storyline-reveal-inner" :style="{ width: storylinePanel.width.value + 'px' }">
+        <div class="storyline-reveal-inner" :style="{ width: storylinePanel.size.value + 'px' }">
           <StorylinePanel @open-reader="openReader" @open-timelines="showTimelines = true" />
         </div>
       </div>
@@ -903,9 +912,14 @@ async function openFolderDialog() {
            pure transform slide with the height already settled -->
       <div
         class="timelines-overlay"
-        :class="{ open: showTimelines }"
+        :class="{ open: showTimelines, resizing: timelinesPanel.resizing.value }"
         :style="{ height: timelinesSheetHeight }"
       >
+        <div
+          class="timelines-resizer"
+          :data-tooltip="t('storyline.resizeTimelines')"
+          @pointerdown="timelinesPanel.beginResize"
+        ></div>
         <StorylineTimelines
           @open-reader="openReader"
           @close="showTimelines = false"

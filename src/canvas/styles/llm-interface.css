@@ -31,6 +31,28 @@
     bottom var(--step-duration, 0.3s) var(--step-ease, ease);
 }
 
+/* Dragging must track the pointer, so the fold transition is suspended */
+.graph-llm-bar.resizing {
+  transition: none;
+}
+
+/* Grab handle on the panel's canvas-facing edge */
+.agent-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+}
+
+.agent-resizer:hover,
+.graph-llm-bar.resizing .agent-resizer {
+  background: var(--primary-color);
+}
+
 /* Folded: the panel slides out to the left, leaving its toggle as a rail */
 .graph-llm-bar.collapsed {
   transform: translateX(calc(-1 * var(--chat-panel-width, 380px)));

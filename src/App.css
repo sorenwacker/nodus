@@ -334,6 +334,28 @@
   will-change: transform;
 }
 
+/* Dragging must track the pointer, so the slide transition is suspended */
+.timelines-overlay.resizing {
+  transition: none;
+}
+
+/* Grab handle along the sheet's top edge */
+.timelines-resizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 5;
+  background: transparent;
+}
+
+.timelines-resizer:hover,
+.timelines-overlay.resizing .timelines-resizer {
+  background: var(--primary-color);
+}
+
 .timelines-overlay.open {
   transform: translateY(0);
 }
