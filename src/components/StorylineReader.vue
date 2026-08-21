@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick, inject }
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import { uiStorage } from '../lib/storage'
+import { usePanelReveal } from '../composables/usePanelReveal'
 import type { StorylineService } from '../services/storylineService'
 import StorylineNodeList from './StorylineNodeList.vue'
 import StorylineReaderHeader from './StorylineReaderHeader.vue'
@@ -52,41 +53,37 @@ function openNodeDetail(nodeId: string) {
   window.dispatchEvent(new CustomEvent('open-node-detail', { detail: { nodeId } }))
 }
 
-// Resizable width, driven by the step navigation: half screen keeps the
-// graph visible, full width takes the whole window. Manual dragging still
-// overrides until the next step.
-const readerWidth = ref(props.fullWidth ? window.innerWidth : Math.round(window.innerWidth / 2))
-const isResizing = ref(false)
-
-watch(
-  () => props.fullWidth,
-  (full) => {
-    readerWidth.value = full ? window.innerWidth : Math.round(window.innerWidth / 2)
-  }
+// Resizable width through the shared panel composable, so the drag, clamping
+// and persistence behave as they do for the storyline panel, agent panel and
+// timelines sheet. Full width is a navigation step, not a user size, so it
+// overrides the stored width without replacing it: stepping back returns to
+// the width the user chose.
+const CLOSE_ON_DRAG_BELOW = 100
+const halfWindow = () => Math.round(window.innerWidth / 2)
+const readerPanel = usePanelReveal({
+  side: 'right',
+  minSize: 0,
+  maxSize: Math.max(window.innerWidth, 1),
+  defaultSize: halfWindow(),
+  storageKey: 'nodus-reader-width',
+})
+const isResizing = computed(() => readerPanel.resizing.value)
+const readerWidth = computed(() =>
+  props.fullWidth ? window.innerWidth : readerPanel.size.value
 )
 
 function startResize(e: PointerEvent) {
-  isResizing.value = true
-  const startX = e.clientX
-  const startWidth = readerWidth.value
-  const maxWidth = window.innerWidth // Allow full width
-
-  const onMove = (e: PointerEvent) => {
-    const delta = startX - e.clientX
-    readerWidth.value = Math.max(0, Math.min(maxWidth, startWidth + delta))
-  }
+  readerPanel.beginResize(e)
 
   const onUp = () => {
-    isResizing.value = false
-    document.removeEventListener('pointermove', onMove)
     document.removeEventListener('pointerup', onUp)
-    // Close reader if dragged too small
-    if (readerWidth.value < 100) {
+    // Dragging the reader shut is a close gesture, but an unusable width must
+    // not be what gets remembered for next time
+    if (readerPanel.size.value < CLOSE_ON_DRAG_BELOW) {
+      readerPanel.setSize(halfWindow())
       emit('close')
     }
   }
-
-  document.addEventListener('pointermove', onMove)
   document.addEventListener('pointerup', onUp)
 }
 

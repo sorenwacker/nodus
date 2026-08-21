@@ -134,3 +134,50 @@ describe('usePanelReveal vertical panels', () => {
     expect(sheet.size.value).toBe(150)
   })
 })
+
+describe('one resize implementation', () => {
+  it('is the only place panels implement pointer-driven resizing', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs')
+    const { join, resolve } = await import('node:path')
+    const SRC = resolve(__dirname, '..')
+
+    function files(dir: string): string[] {
+      const found: string[] = []
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name)
+        if (entry.isDirectory()) {
+          if (entry.name === '__tests__') continue
+          found.push(...files(path))
+        } else if (entry.name.endsWith('.vue') || entry.name.endsWith('.ts')) {
+          found.push(path)
+        }
+      }
+      return found
+    }
+
+    // Resizing that is not a UI panel, with the reason
+    const NOT_PANELS: Record<string, string> = {
+      'src/canvas/composables/frames/useFrames.ts':
+        'resizes canvas frames - graph objects in canvas coordinates with eight handles - not UI panels',
+    }
+
+    // A hand-rolled panel resize drifts from the shared one: different
+    // clamping, no persistence, its own transition bug.
+    const offenders: string[] = []
+    for (const file of files(SRC)) {
+      if (file.endsWith('usePanelReveal.ts')) continue
+      const text = readFileSync(file, 'utf8')
+      const listensForDrag =
+        text.includes("addEventListener('pointermove'") && /startResize|beginResize|onResizeStart/.test(text)
+      const relative = file.replace(SRC, 'src')
+      if (listensForDrag && !text.includes('usePanelReveal') && !(relative in NOT_PANELS)) {
+        offenders.push(relative)
+      }
+    }
+
+    expect(
+      offenders,
+      `these implement their own panel resize instead of usePanelReveal: ${offenders.join(', ')}`
+    ).toEqual([])
+  })
+})
