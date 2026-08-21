@@ -222,7 +222,7 @@ A "Living Documentation" workspace where:
 
 ### Sync Architecture (Future)
 
-- **CRDT-based** for conflict-free merging (Yjs)
+- **CRDT-based** for conflict-free merging (planned; no CRDT library is wired up yet)
 - **Zero-knowledge E2E encryption** — server cannot read content
 - **EU-hosted infrastructure** (Hetzner, OVH, Scaleway)
 - **Self-hosted option** for enterprises
@@ -1111,7 +1111,7 @@ tools:
 | Frontend | Vue 3, TypeScript | Proven, ecosystem |
 | Canvas | **PixiJS + DOM hybrid** | PixiJS for performance, DOM for text editing |
 | Desktop | **Tauri v2** | Small binary (~10MB), Rust security, native WebView |
-| Database | **LibSQL** (SQLite fork) | WAL mode, `BEGIN CONCURRENT` for AI+user writes |
+| Database | **SQLite** via `sqlx` | Embedded, WAL mode, no server to run |
 | Content | **.md files** | Text content in Markdown files, NOT in SQLite |
 | State | Pinia | Vue standard |
 | Math | **@myriaddreamin/typst.ts** | Typst WASM, sub-second rendering |
@@ -1119,25 +1119,25 @@ tools:
 | Layout | D3-force | Force-directed auto-layout on import |
 | Edge Routing | Custom PCB-style | Lane-based routing with GridTracker, obstacle avoidance |
 | File Watch | Rust `notify` crate + **file locking** | Prevent corruption with Obsidian |
-| Sync | **Yjs** (CRDTs) | **Canvas positions only**, NOT text content |
-| Backend | Rust (Axum) | Sync server, performance |
-| Hosting | Hetzner | EU, affordable, GDPR-native |
+| Sync | *Not implemented* | Planned: CRDT merge of canvas positions only, never text |
+| Backend | Rust (Tauri commands) | Local file, database and watcher work; no sync server exists yet |
+| Hosting | *Not implemented* | Planned for sync: EU, GDPR-native |
 
 ### Critical Architecture Rule
 
 **Separation of Concerns:**
 - **SQLite:** Metadata, canvas positions, edges, tags
 - **.md files:** Actual text content (Obsidian compatible)
-- **Yjs/CRDTs:** Sync canvas positions across devices only
+- **CRDTs (planned):** Would sync canvas positions across devices only
 
-**Never** store Yjs binary data in the same column as Markdown content.
+**Never** store CRDT binary data in the same column as Markdown content.
 
 ### Why No "Conflicting Copies" (Unlike OneNote)
 
 OneNote creates duplicates because it syncs at file/section level. Nodus avoids this:
 
 1. **Local-first:** All edits happen locally. No internet needed.
-2. **CRDT sync for positions:** Yjs syncs node x,y coordinates, NOT text.
+2. **CRDT sync for positions (planned):** would sync node x,y coordinates, NOT text.
 3. **File locking:** Rust acquires lock on .md when open in Nodus.
 4. **Checksum detection:** SHA-256 detects external changes.
 
@@ -1198,7 +1198,7 @@ Given the priority on data integrity (no OneNote-style conflicts), but also need
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Sync method | Local SQLite + Yjs | Granular CRDT merge, no file-level conflicts |
+| Sync method (planned) | Local SQLite + a CRDT layer | Granular merge of positions, no file-level conflicts |
 | Data locality | Local-first | Instant editing, internet only for sync |
 | File handling | Rust notify + locking | Prevents corruption when Obsidian open |
 | Canvas renderer | PixiJS (WebGL) | 60fps with 1000+ nodes |
@@ -1239,7 +1239,7 @@ nodus/
 | `sha2` | Checksum calculation |
 | `uuid` | Node ID generation |
 | `serde` | JSON serialization |
-| `y-crdt` | Yjs Rust bindings for position sync |
+| `y-crdt` *(planned)* | CRDT bindings for position sync; not a dependency yet |
 
 ### File Locking Workflow
 
@@ -1263,12 +1263,13 @@ User saves → Write to .md → Release lock
 
 **Important:** Do NOT lock during initial import checksum scan — only during active editing.
 
-### Yjs ↔ PixiJS Integration
+### CRDT to PixiJS Integration (planned)
 
-Since Yjs only syncs canvas positions (not text):
+The sync layer below is a design, not shipped code. Since it would sync canvas
+positions only (never text):
 
 ```
-Yjs Document (Backend)
+CRDT Document (Backend)
     │
     │  Maps: NodeID → (x, y, z_index)
     ↓
@@ -1330,7 +1331,7 @@ function syncDOMToPixi(nodeId: string, pixi: PIXI.Container) {
 
 | Approach | Pros | Cons | Use Case |
 |----------|------|------|----------|
-| **CRDTs (Yjs)** | Automatic merge, no data loss | More complex | Collaborative editing |
+| **CRDTs** | Automatic merge, no data loss | More complex | Collaborative editing |
 | **Last-Write-Wins** | Simple, fast | May lose data | Single-user sync |
 
 **Recommendation:** CRDTs for content, LWW for metadata (positions, colors).
@@ -1430,7 +1431,7 @@ Tasks and projects are **nodes in the graph**, not separate silos.
 
 #### 1. The Sync Trilemma
 
-**Problem:** SQLite (data) + Yjs/CRDTs (collab) + Obsidian (.md files) creates conflict risk.
+**Problem:** SQLite (data) + a future CRDT layer (collab) + Obsidian (.md files) creates conflict risk. Only the first and third exist today; the mitigations below are the rules a sync layer would have to follow.
 
 If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data corruption**.
 
@@ -1440,9 +1441,9 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 |----------|----------------|
 | **File Locking** | Rust backend acquires lock on .md when open in Nodus |
 | **Separation of Concerns** | SQLite for metadata/positions only; .md files for content |
-| **CRDTs for Canvas Only** | Yjs syncs node positions, NOT text content |
+| **CRDTs for Canvas Only** | A CRDT layer would sync node positions, NOT text content |
 
-**Critical Rule:** Do NOT store Yjs binary data in `markdown_content` column. Keep text in .md files.
+**Critical Rule:** Do NOT store CRDT binary data in the `markdown_content` column. Keep text in .md files.
 
 #### 2. Obsidian Canvas Drift
 
@@ -1559,7 +1560,7 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 
 20. [ ] **Obsidian Plugin** — sync x,y coordinates between Nodus and Obsidian Canvas
 21. [ ] PDF import + highlights
-22. [ ] EU sync service (Yjs for positions + Hetzner)
+22. [ ] EU sync service (a CRDT layer for positions + hosting)
 23. [ ] Mobile PWA capture app
 24. [ ] User interviews with PhD students
 
@@ -1571,7 +1572,7 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 - **PixiJS:** https://pixijs.com (WebGL canvas)
 - **Typst:** https://typst.app
 - **typst.ts:** https://github.com/myriaddreamin/typst.ts (WASM)
-- **Yjs:** https://yjs.dev (CRDTs)
+- **Yjs:** https://yjs.dev (CRDT library considered for the planned sync layer)
 - **LibSQL:** https://libsql.org (SQLite fork)
 - **D3-force:** https://d3js.org/d3-force
 - **notify (Rust):** https://docs.rs/notify (file watcher)

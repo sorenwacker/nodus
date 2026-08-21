@@ -58,7 +58,7 @@ nodus/
 | Desktop | Tauri v2 |
 | Frontend | Vue 3 + TypeScript |
 | Canvas | PixiJS + DOM hybrid |
-| Database | LibSQL (SQLite) |
+| Database | SQLite via `sqlx` |
 | Math | Typst WASM |
 
 ## Logging

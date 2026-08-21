@@ -7,6 +7,7 @@ site_dir = "public/"
 site_url = "/"
 docs_dir = "content/"
 repo_url = "https://github.com/sorenwacker/nodus"
+copyright = "Documentation generated with Claude Code"
 
 extra_css = ["assets/nightsky.css"]
 extra_js = ["assets/lightbox.js"]
@@ -18,6 +19,8 @@ nav = [
     {"Features" = "features.md"},
     {"Typst Math Reference" = "typst-math-reference.md"},
     {"Development" = "development.md"},
+    {"Product Design" = "PRODUCT_DESIGN.md"},
+    {"Agent Architecture" = "AGENT_ARCHITECTURE.md"},
 ]
 
 [project.theme]

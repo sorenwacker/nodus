@@ -163,10 +163,10 @@ clean-build:
 # =============================================================================
 
 docs:
-	uvx --with mkdocs-material mkdocs serve
+	cd docs && uvx --from zensical zensical serve
 
 docs-build:
-	uvx --with mkdocs-material mkdocs build
+	cd docs && uvx --from zensical zensical build
 
 docs-rust:
 	cd src-tauri && cargo doc --open

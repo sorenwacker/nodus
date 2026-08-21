@@ -21,6 +21,8 @@ Edge labels have their own zoom threshold (Settings > Appearance): below it, lab
 | **Location** | Entity node for places |
 | **Term** | Entity node for definitions/concepts |
 | **Item** | Entity node for objects/artifacts |
+| **Tag** | Created automatically for a `#hashtag` when tag nodes are enabled |
+| **Citation stub** | Placeholder created while a citation's metadata is still being fetched |
 
 ### Tags
 Hashtags in node content become node tags:
@@ -245,8 +247,13 @@ Connect AI assistants for research help:
 
 Two scopes keep AI actions predictable:
 
-- **Canvas "Ask AI" bar** runs the graph agent, which can create and edit nodes,
-  add edges, and lay out the graph.
+- **Agent panel** on the canvas's left edge runs the graph agent, which can create
+  and edit nodes, add edges, and lay out the graph. It is a chat: prompts and full
+  answers stay in a transcript, each answer listing the tools it used, and a line
+  above the input names the nodes going into the context (the current selection, or
+  the whole graph when nothing is selected). Fold it away with the toggle in the
+  canvas's top-left corner, or reveal it with a left-edge push; drag its inner edge
+  to resize it.
 - **Node "Ask" bar** (in the node preview) runs the node agent, which only edits
   the current note. It never creates new nodes.
 
@@ -338,7 +345,7 @@ All data stored on your device:
 | Find in node | `Cmd+F` | `Ctrl+F` |
 | Settings | `Cmd+,` | `Ctrl+,` |
 
-See Settings → Keyboard Shortcuts for full list.
+Press `?` on the canvas for the full list.
 
 ---
 
