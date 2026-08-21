@@ -407,6 +407,8 @@ level.
 
 **Pan and zoom cost (required behavior):** Panning and zooming change the viewport on every frame, and the culling result feeds everything downstream - the rendered node list and all edge styling. The culled result therefore keeps its identity while the same nodes are on screen: a frame that moves the viewport a few pixels returns the previous array and set, so no dependent recomputes. A new result is produced only when a node actually enters or leaves the viewport, or when the node set itself is replaced (new objects must never be served from the cache). Enforced by tests that pan without changing visibility and assert referential stability, on both the linear-scan and spatial-index paths.
 
+**Tooltip placement (required behavior):** Tooltips default to below the element and centred on it, which is only safe away from a window edge. Every container holding controls against an edge declares the direction that keeps its labels on screen: the top-right toolbar aligns them to the button's right edge, bottom-anchored clusters (zoom controls, edge filters, timelines sheet, the agent panel's input row) open upward, and right-side storyline layers align right. Tooltip text always comes from the locale files - a literal string cannot be translated. Both rules are enforced by a gate test that names the edge-anchored containers and fails on any hardcoded tooltip text.
+
 ### Canvas Features
 
 - Infinite pan/zoom
