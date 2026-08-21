@@ -1115,7 +1115,7 @@ tools:
 | Content | **.md files** | Text content in Markdown files, NOT in SQLite |
 | State | Pinia | Vue standard |
 | Math | **@myriaddreamin/typst.ts** | Typst WASM, sub-second rendering |
-| Editor | TipTap/ProseMirror | Markdown + inline Typst extensions |
+| Editor | Plain `textarea` overlay | Markdown edited as text; rendered separately, with Typst and Mermaid blocks |
 | Layout | D3-force | Force-directed auto-layout on import |
 | Edge Routing | Custom PCB-style | Lane-based routing with GridTracker, obstacle avoidance |
 | File Watch | Rust `notify` crate + **file locking** | Prevent corruption with Obsidian |
