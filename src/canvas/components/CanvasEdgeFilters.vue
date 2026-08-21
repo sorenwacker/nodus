@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 /**
  * CanvasEdgeFilters - edge/tag layer visibility toggles
  *
@@ -6,6 +7,8 @@
  * interactive legend: manual, storyline, wikilink, and tag layers.
  */
 import { useNodesStore } from '../../stores/nodes'
+
+const { t } = useI18n()
 
 const store = useNodesStore()
 </script>
@@ -15,7 +18,7 @@ const store = useNodesStore()
     <button
       class="filter-toggle"
       :class="{ active: store.showManualEdges }"
-      data-tooltip="Manual edges"
+      :data-tooltip="t('canvas.edgeFilters.manual')"
       @click="store.showManualEdges = !store.showManualEdges"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><circle cx="5" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -23,7 +26,7 @@ const store = useNodesStore()
     <button
       class="filter-toggle"
       :class="{ active: store.showStorylineEdges }"
-      data-tooltip="Storyline edges"
+      :data-tooltip="t('canvas.edgeFilters.storyline')"
       @click="store.showStorylineEdges = !store.showStorylineEdges"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
@@ -31,7 +34,7 @@ const store = useNodesStore()
     <button
       class="filter-toggle"
       :class="{ active: store.showWikilinkEdges }"
-      data-tooltip="Wikilink edges"
+      :data-tooltip="t('canvas.edgeFilters.wikilink')"
       @click="store.showWikilinkEdges = !store.showWikilinkEdges"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
@@ -39,7 +42,7 @@ const store = useNodesStore()
     <button
       class="filter-toggle"
       :class="{ active: store.showTagEdges }"
-      data-tooltip="Tag nodes and edges"
+      :data-tooltip="t('canvas.edgeFilters.tags')"
       @click="store.showTagEdges = !store.showTagEdges"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>

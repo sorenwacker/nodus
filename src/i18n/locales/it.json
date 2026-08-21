@@ -108,6 +108,12 @@
     "search": {
       "placeholder": "Cerca nodi...",
       "noResults": "Nessun nodo corrispondente trovato"
+    },
+    "edgeFilters": {
+      "manual": "Archi manuali",
+      "storyline": "Archi della storia",
+      "wikilink": "Archi wikilink",
+      "tags": "Nodi e archi dei tag"
     }
   },
   "llm": {

@@ -109,6 +109,12 @@
     "search": {
       "placeholder": "Search nodes...",
       "noResults": "No matching nodes found"
+    },
+    "edgeFilters": {
+      "manual": "Manual edges",
+      "storyline": "Storyline edges",
+      "wikilink": "Wikilink edges",
+      "tags": "Tag nodes and edges"
     }
   },
   "llm": {

@@ -108,6 +108,12 @@
     "search": {
       "placeholder": "Knoten suchen...",
       "noResults": "Keine passenden Knoten gefunden"
+    },
+    "edgeFilters": {
+      "manual": "Manuelle Kanten",
+      "storyline": "Storyline-Kanten",
+      "wikilink": "Wikilink-Kanten",
+      "tags": "Tag-Knoten und -Kanten"
     }
   },
   "llm": {

@@ -108,6 +108,12 @@
     "search": {
       "placeholder": "Buscar nodos...",
       "noResults": "No se encontraron nodos coincidentes"
+    },
+    "edgeFilters": {
+      "manual": "Aristas manuales",
+      "storyline": "Aristas de historia",
+      "wikilink": "Aristas wikilink",
+      "tags": "Nodos y aristas de etiquetas"
     }
   },
   "llm": {

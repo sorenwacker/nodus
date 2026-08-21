@@ -294,6 +294,42 @@ html, body, #app {
   transform: translateX(-50%);
 }
 
+/* Edge-anchored containers: a centred tooltip below the element runs off the
+   window when the anchor sits against a window edge, so each container states
+   the direction that keeps its tooltips on screen. */
+
+/* Top-right toolbar: anchor the tooltip's right edge to the button's */
+.toolbar-actions [data-tooltip]:hover::after {
+  left: auto !important;
+  right: 0 !important;
+  transform: none !important;
+}
+
+/* Bottom-left edge filters: open upward, aligned to the left edge */
+.edge-filters [data-tooltip]:hover::after {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
+  left: 0 !important;
+  transform: none !important;
+}
+
+/* Timelines sheet sits at the window bottom: open upward */
+.timelines-overlay [data-tooltip]:hover::after {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
+  left: auto !important;
+  right: 0 !important;
+  transform: none !important;
+}
+
+/* Right-side storyline layers: keep tooltips inside the panel */
+.storyline-reveal [data-tooltip]:hover::after,
+.reader-overlay [data-tooltip]:hover::after {
+  left: auto !important;
+  right: 0 !important;
+  transform: none !important;
+}
+
 /* Tooltip above (for bottom-positioned elements) */
 [data-tooltip-pos="top"]:hover::after {
   top: auto;

@@ -108,6 +108,12 @@
     "search": {
       "placeholder": "Rechercher des nœuds...",
       "noResults": "Aucun nœud correspondant trouvé"
+    },
+    "edgeFilters": {
+      "manual": "Aretes manuelles",
+      "storyline": "Aretes de recit",
+      "wikilink": "Aretes wikilink",
+      "tags": "Noeuds et aretes de tags"
     }
   },
   "llm": {
