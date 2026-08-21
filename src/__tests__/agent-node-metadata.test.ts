@@ -10,8 +10,8 @@ import type { ToolContext } from '../llm'
 import { extractFrontmatterField } from '../lib/timelineDates'
 
 function makeContext(nodes: Array<{ id: string; title: string; markdown_content?: string }>) {
-  const updateNodeContent = vi.fn(async () => {})
-  const updateNodeTags = vi.fn(async () => {})
+  const updateNodeContent = vi.fn(async (_id: string, _content: string) => {})
+  const updateNodeTags = vi.fn(async (_id: string, _tags: string[]) => {})
   const createNode = vi.fn(async (data: Record<string, unknown>) => ({ id: 'new', ...data }))
 
   const ctx = {
@@ -44,7 +44,7 @@ describe('agent update_node metadata', () => {
     const result = await executeTool('update_node', { title: 'Alpha', date: '1969-07-20' }, ctx)
 
     expect(result).toContain('Updated')
-    const written = updateNodeContent.mock.calls[0][1] as unknown as string
+    const written = updateNodeContent.mock.calls[0][1]
     expect(extractFrontmatterField(written, 'date')).toBe('1969-07-20')
     expect(written).toContain('The body text stays.')
   })
@@ -58,7 +58,7 @@ describe('agent update_node metadata', () => {
       ctx
     )
 
-    const written = updateNodeContent.mock.calls[0][1] as unknown as string
+    const written = updateNodeContent.mock.calls[0][1]
     expect(extractFrontmatterField(written, 'date')).toBe('2026-02-03')
     expect(extractFrontmatterField(written, 'date_end')).toBe('2026-02-14')
   })
@@ -70,7 +70,7 @@ describe('agent update_node metadata', () => {
 
     await executeTool('update_node', { title: 'Alpha', date: '' }, ctx)
 
-    const written = updateNodeContent.mock.calls[0][1] as unknown as string
+    const written = updateNodeContent.mock.calls[0][1]
     expect(extractFrontmatterField(written, 'date')).toBeNull()
     expect(written).toContain('body')
   })
