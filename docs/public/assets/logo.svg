@@ -26,18 +26,6 @@
     </filter>
   </defs>
 
-  <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="#0a0a12"/>
-
-  <!-- Subtle grid pattern -->
-  <g stroke="#00ffcc" stroke-opacity="0.08" stroke-width="1">
-    <line x1="128" y1="0" x2="128" y2="512"/>
-    <line x1="256" y1="0" x2="256" y2="512"/>
-    <line x1="384" y1="0" x2="384" y2="512"/>
-    <line x1="0" y1="128" x2="512" y2="128"/>
-    <line x1="0" y1="256" x2="512" y2="256"/>
-    <line x1="0" y1="384" x2="512" y2="384"/>
-  </g>
 
   <!-- Edges (connections between nodes) -->
   <g filter="url(#glow-edge)" stroke-width="16" stroke-linecap="round" fill="none">
@@ -53,19 +41,19 @@
 
   <!-- Outer nodes (smaller) -->
   <g filter="url(#glow-cyan)">
-    <circle cx="420" cy="95" r="36" fill="#0a0a12" stroke="#00ffcc" stroke-width="10"/>
-    <circle cx="85" cy="410" r="36" fill="#0a0a12" stroke="#00ffcc" stroke-width="10"/>
-    <circle cx="70" cy="170" r="32" fill="#0a0a12" stroke="#00ccff" stroke-width="10"/>
+    <circle cx="420" cy="95" r="36" fill="none" stroke="#00ffcc" stroke-width="10"/>
+    <circle cx="85" cy="410" r="36" fill="none" stroke="#00ffcc" stroke-width="10"/>
+    <circle cx="70" cy="170" r="32" fill="none" stroke="#00ccff" stroke-width="10"/>
   </g>
 
   <!-- Magenta node -->
   <g filter="url(#glow-magenta)">
-    <circle cx="430" cy="390" r="34" fill="#0a0a12" stroke="#ff00ff" stroke-width="10"/>
+    <circle cx="430" cy="390" r="34" fill="none" stroke="#ff00ff" stroke-width="10"/>
   </g>
 
   <!-- Center node (main, larger) -->
   <g filter="url(#glow-magenta)">
-    <circle cx="256" cy="256" r="68" fill="#0a0a12" stroke="#ff00ff" stroke-width="14"/>
+    <circle cx="256" cy="256" r="68" fill="none" stroke="#ff00ff" stroke-width="14"/>
     <circle cx="256" cy="256" r="34" fill="#ff00ff" fill-opacity="0.8"/>
   </g>
 
