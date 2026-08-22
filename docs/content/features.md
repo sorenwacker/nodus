@@ -114,6 +114,12 @@ Create linear narratives through your knowledge graph:
 - Export storylines as documents
 - Color-code storyline edges
 
+### Learning the edge gestures
+
+The edge gestures are not visible on screen, so a short coach runs once after onboarding. It teaches three of them in turn - the right edge for storylines, a dwell at the bottom edge for timelines, the left edge for the agent - and moves on only when you actually perform the gesture it is asking for. Skip it at any time; it does not come back.
+
+To see it again, open Settings > General and choose "Replay gesture tour".
+
 ### Storyline Panel
 Moving between graph and storylines works in steps along the screen edges: each push of the pointer against the right edge goes one step deeper into storylines, each push against the left edge steps back toward the graph.
 

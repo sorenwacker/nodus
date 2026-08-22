@@ -1079,6 +1079,15 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
 
+### First-run gesture coach
+
+**Required behavior:** The edge-step gestures are the canvas's primary navigation and are invisible: nothing on screen suggests that pushing the pointer against a screen edge reveals the storyline overview, that dwelling at the bottom edge raises the timelines sheet, or that the left edge reveals the agent. A user who never discovers them never finds those features at all.
+
+- After onboarding, a coach teaches one gesture at a time, in the order a new user would need them: storylines (right edge), timelines (bottom edge dwell), agent (left edge).
+- A lesson advances only when the user actually performs the gesture, not on a timer or a click. Reading about a gesture is not learning it, and the coach exists precisely because the gesture is hard to guess.
+- The coach can be skipped at any point, remembers that it has been completed or skipped, and never appears again.
+- It listens to the same edge-step events the application already uses, so it cannot drift from the gestures it teaches: if a gesture stops firing, the lesson stops advancing.
+
 ### Updates
 
 **Required behavior:** An installed copy checks for a newer release on startup and tells the user, rather than leaving them frozen on whatever version they first downloaded. Without this, every fix reaches only people who happen to visit the download page again.

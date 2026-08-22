@@ -598,7 +598,9 @@
     "okfExport": "Open Knowledge Format",
     "okfExportBtn": "Exporter en bundle OKF",
     "okfExporting": "Export en cours...",
-    "okfExportHint": "Écrit un bundle OKF v0.2 (Markdown avec frontmatter et index) dans le dossier de votre choix. L'espace de travail n'est pas modifié."
+    "okfExportHint": "Écrit un bundle OKF v0.2 (Markdown avec frontmatter et index) dans le dossier de votre choix. L'espace de travail n'est pas modifié.",
+    "replayTour": "Rejouer le tour des gestes",
+    "replayTourHint": "Affiche de nouveau la courte présentation des gestes de bord."
   },
   "fileMove": {
     "collision": {
@@ -622,5 +624,20 @@
     "later": "Plus tard",
     "checkAutomatically": "Verifier les mises a jour au demarrage",
     "checkHint": "Demande une fois par lancement s'il existe une version plus recente. Rien n'est telecharge avant votre accord."
+  },
+  "gestureCoach": {
+    "skip": "Passer",
+    "right": {
+      "title": "Trouver vos storylines",
+      "instruction": "Amenez le pointeur contre le bord droit de la fenêtre pour afficher l'aperçu des storylines."
+    },
+    "bottom": {
+      "title": "Voir la chronologie",
+      "instruction": "Maintenez le pointeur un instant contre le bord inférieur. Le panneau des chronologies remonte."
+    },
+    "left": {
+      "title": "Interroger l'agent",
+      "instruction": "Amenez le pointeur contre le bord gauche pour afficher le panneau de l'agent."
+    }
   }
 }

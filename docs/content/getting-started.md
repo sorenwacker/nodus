@@ -47,6 +47,12 @@ See [Typst Math Reference](typst-math-reference.md) for syntax.
 3. Click "Import Vault"
 4. Select your Obsidian vault folder
 
+## Staying up to date
+
+Nodus asks the release server once per launch whether a newer version exists and shows a strip at the bottom of the window when there is one. Nothing is downloaded until you choose to install; choosing to install downloads the update, verifies its signature and restarts the application.
+
+Turn the check off in Settings > General if you would rather update by hand.
+
 ## Keyboard Shortcuts
 
 | Action | Shortcut |

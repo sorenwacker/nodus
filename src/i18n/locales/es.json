@@ -598,7 +598,9 @@
     "okfExport": "Open Knowledge Format",
     "okfExportBtn": "Exportar como bundle OKF",
     "okfExporting": "Exportando...",
-    "okfExportHint": "Escribe un bundle OKF v0.2 (Markdown con frontmatter e índice) en la carpeta que elija. El espacio de trabajo no se modifica."
+    "okfExportHint": "Escribe un bundle OKF v0.2 (Markdown con frontmatter e índice) en la carpeta que elija. El espacio de trabajo no se modifica.",
+    "replayTour": "Repetir el recorrido de gestos",
+    "replayTourHint": "Vuelve a mostrar la breve guía de los gestos de borde."
   },
   "fileMove": {
     "collision": {
@@ -622,5 +624,20 @@
     "later": "Mas tarde",
     "checkAutomatically": "Buscar actualizaciones al iniciar",
     "checkHint": "Pregunta una vez por inicio si hay una version mas reciente. No se descarga nada hasta que lo aceptes."
+  },
+  "gestureCoach": {
+    "skip": "Omitir",
+    "right": {
+      "title": "Encontrar tus storylines",
+      "instruction": "Lleva el puntero al borde derecho de la ventana para mostrar el resumen de storylines."
+    },
+    "bottom": {
+      "title": "Ver la línea de tiempo",
+      "instruction": "Mantén el puntero un momento en el borde inferior. El panel de líneas de tiempo sube."
+    },
+    "left": {
+      "title": "Preguntar al agente",
+      "instruction": "Lleva el puntero al borde izquierdo para mostrar el panel del agente."
+    }
   }
 }

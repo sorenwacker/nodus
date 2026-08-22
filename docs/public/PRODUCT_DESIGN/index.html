@@ -1221,6 +1221,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#first-run-gesture-coach" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        First-run gesture coach
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#updates" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2474,6 +2485,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Starter Content
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#first-run-gesture-coach" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        First-run gesture coach
       </span>
     </span>
   </a>
@@ -4647,6 +4669,14 @@ A "Living Documentation" workspace where everything is a node on one canvas. No 
 </tbody>
 </table>
 <p>Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.</p>
+<h3 id="first-run-gesture-coach">First-run gesture coach</h3>
+<p><strong>Required behavior:</strong> The edge-step gestures are the canvas's primary navigation and are invisible: nothing on screen suggests that pushing the pointer against a screen edge reveals the storyline overview, that dwelling at the bottom edge raises the timelines sheet, or that the left edge reveals the agent. A user who never discovers them never finds those features at all.</p>
+<ul>
+<li>After onboarding, a coach teaches one gesture at a time, in the order a new user would need them: storylines (right edge), timelines (bottom edge dwell), agent (left edge).</li>
+<li>A lesson advances only when the user actually performs the gesture, not on a timer or a click. Reading about a gesture is not learning it, and the coach exists precisely because the gesture is hard to guess.</li>
+<li>The coach can be skipped at any point, remembers that it has been completed or skipped, and never appears again.</li>
+<li>It listens to the same edge-step events the application already uses, so it cannot drift from the gestures it teaches: if a gesture stops firing, the lesson stops advancing.</li>
+</ul>
 <h3 id="updates">Updates</h3>
 <p><strong>Required behavior:</strong> An installed copy checks for a newer release on startup and tells the user, rather than leaving them frozen on whatever version they first downloaded. Without this, every fix reaches only people who happen to visit the download page again.</p>
 <ul>

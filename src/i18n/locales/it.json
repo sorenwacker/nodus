@@ -598,7 +598,9 @@
     "okfExport": "Open Knowledge Format",
     "okfExportBtn": "Esporta come bundle OKF",
     "okfExporting": "Esportazione...",
-    "okfExportHint": "Scrive un bundle OKF v0.2 (Markdown con frontmatter e indice) nella cartella scelta. Lo spazio di lavoro non viene modificato."
+    "okfExportHint": "Scrive un bundle OKF v0.2 (Markdown con frontmatter e indice) nella cartella scelta. Lo spazio di lavoro non viene modificato.",
+    "replayTour": "Ripeti il tour dei gesti",
+    "replayTourHint": "Mostra di nuovo la breve guida ai gesti sui bordi."
   },
   "fileMove": {
     "collision": {
@@ -622,5 +624,20 @@
     "later": "Piu tardi",
     "checkAutomatically": "Cerca aggiornamenti all avvio",
     "checkHint": "Chiede una volta per avvio se esiste una versione piu recente. Nulla viene scaricato finche non accetti."
+  },
+  "gestureCoach": {
+    "skip": "Salta",
+    "right": {
+      "title": "Trova le tue storyline",
+      "instruction": "Porta il puntatore contro il bordo destro della finestra per mostrare la panoramica delle storyline."
+    },
+    "bottom": {
+      "title": "Vedi la linea temporale",
+      "instruction": "Tieni il puntatore per un momento sul bordo inferiore. Il pannello delle linee temporali sale."
+    },
+    "left": {
+      "title": "Chiedi all'agente",
+      "instruction": "Porta il puntatore contro il bordo sinistro per mostrare il pannello dell'agente."
+    }
   }
 }

@@ -609,7 +609,9 @@
     "okfExport": "Open Knowledge Format",
     "okfExportBtn": "Export as OKF bundle",
     "okfExporting": "Exporting...",
-    "okfExportHint": "Writes an OKF v0.2 bundle (Markdown with frontmatter and an index) to a folder of your choice. The workspace is not modified."
+    "okfExportHint": "Writes an OKF v0.2 bundle (Markdown with frontmatter and an index) to a folder of your choice. The workspace is not modified.",
+    "replayTour": "Replay gesture tour",
+    "replayTourHint": "Shows the short walkthrough of the edge gestures again."
   },
   "fileMove": {
     "collision": {
@@ -653,5 +655,20 @@
     "later": "Later",
     "checkAutomatically": "Check for updates on launch",
     "checkHint": "Asks the release server once per launch whether a newer version exists. Nothing is downloaded until you choose to install."
+  },
+  "gestureCoach": {
+    "skip": "Skip",
+    "right": {
+      "title": "Find your storylines",
+      "instruction": "Push the pointer against the right edge of the window to reveal the storyline overview."
+    },
+    "bottom": {
+      "title": "See the timeline",
+      "instruction": "Rest the pointer at the bottom edge for a moment. The timelines sheet slides up."
+    },
+    "left": {
+      "title": "Ask the agent",
+      "instruction": "Push the pointer against the left edge to reveal the agent panel."
+    }
   }
 }

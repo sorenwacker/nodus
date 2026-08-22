@@ -598,7 +598,9 @@
     "okfExport": "Open Knowledge Format",
     "okfExportBtn": "Als OKF-Bundle exportieren",
     "okfExporting": "Exportiere...",
-    "okfExportHint": "Schreibt ein OKF-v0.2-Bundle (Markdown mit Frontmatter und Index) in einen Ordner Ihrer Wahl. Der Workspace wird nicht verändert."
+    "okfExportHint": "Schreibt ein OKF-v0.2-Bundle (Markdown mit Frontmatter und Index) in einen Ordner Ihrer Wahl. Der Workspace wird nicht verändert.",
+    "replayTour": "Gesten-Tour wiederholen",
+    "replayTourHint": "Zeigt die kurze Einführung in die Randgesten erneut."
   },
   "fileMove": {
     "collision": {
@@ -622,5 +624,20 @@
     "later": "Spaeter",
     "checkAutomatically": "Beim Start nach Updates suchen",
     "checkHint": "Fragt beim Start einmal, ob eine neuere Version vorliegt. Es wird nichts geladen, bis du zustimmst."
+  },
+  "gestureCoach": {
+    "skip": "Überspringen",
+    "right": {
+      "title": "Storylines finden",
+      "instruction": "Bewegen Sie den Zeiger an den rechten Fensterrand, um die Storyline-Übersicht einzublenden."
+    },
+    "bottom": {
+      "title": "Zeitachse ansehen",
+      "instruction": "Halten Sie den Zeiger einen Moment am unteren Rand. Die Zeitachsen-Ansicht fährt hoch."
+    },
+    "left": {
+      "title": "Den Agenten fragen",
+      "instruction": "Bewegen Sie den Zeiger an den linken Fensterrand, um das Agenten-Panel einzublenden."
+    }
   }
 }

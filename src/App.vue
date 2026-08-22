@@ -15,6 +15,8 @@ import NotificationToast from './components/NotificationToast.vue'
 import UpdateNotice from './components/UpdateNotice.vue'
 import { useUpdateCheck } from './composables/useUpdateCheck'
 import OnboardingFlow from './components/OnboardingFlow.vue'
+import GestureCoach from './components/GestureCoach.vue'
+import { useGestureCoach } from './composables/useGestureCoach'
 import StorylinePanel from './components/StorylinePanel.vue'
 import StorylineReader from './components/StorylineReader.vue'
 import StorylineTimelines from './components/StorylineTimelines.vue'
@@ -115,6 +117,10 @@ function openReaderFromEdge() {
   openReader(remembered ? remembered.id : candidates[0].id)
 }
 
+// The edge gestures are invisible, so a first-run coach teaches them by
+// having the user perform each one (PRODUCT_DESIGN.md > First-run gesture coach)
+const gestureCoach = useGestureCoach()
+
 // Steps: graph -> overview -> half-screen reader -> full-screen reader.
 // The timelines view opens from the overview's button and sits in the
 // half-screen slot; stepping right from it enters the reader.
@@ -138,12 +144,14 @@ const edgeStepper = createEdgeStepper({
   // Bottom edge: the timelines sheet slides up (also while reading)
   stepBottom: () => {
     showTimelines.value = true
+    gestureCoach.recordGesture('bottom')
   },
   // Top edge: the sheet came up from below, so pushing up closes it
   stepTop: () => {
     showTimelines.value = false
   },
   stepRight: () => {
+    gestureCoach.recordGesture('right')
     if (readerStorylineId.value) {
       readerFullWidth.value = true
     } else if (showTimelines.value || storylinePanel.isOpen.value) {
@@ -153,6 +161,7 @@ const edgeStepper = createEdgeStepper({
     }
   },
   stepLeft: () => {
+    gestureCoach.recordGesture('left')
     if (readerStorylineId.value) {
       if (readerFullWidth.value) {
         readerFullWidth.value = false
@@ -762,6 +771,7 @@ async function onOnboardingComplete() {
   if (isDefaultWorkspace && defaultNodes.length === 0) {
     await store.resetDefaultWorkspace()
   }
+  gestureCoach.start()
 }
 
 async function openFolderDialog() {
@@ -1157,10 +1167,21 @@ async function openFolderDialog() {
     </div>
 
     <!-- Settings Modal -->
-    <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <SettingsModal
+      v-if="showSettings"
+      @close="showSettings = false"
+      @replay-tour="showSettings = false; gestureCoach.restart()"
+    />
 
     <!-- Onboarding Flow -->
     <OnboardingFlow @complete="onOnboardingComplete" />
+
+    <GestureCoach
+      :lesson="gestureCoach.lesson.value"
+      :step="gestureCoach.step.value"
+      :total="gestureCoach.total"
+      @skip="gestureCoach.skip()"
+    />
 
     <!-- Global notifications -->
     <NotificationToast />

@@ -16,13 +16,18 @@ import ZoteroSettingsPanel from './settings/ZoteroSettingsPanel.vue'
 import McpSettingsPanel from './settings/McpSettingsPanel.vue'
 import WorkspaceDiagnosticsSection from './settings/WorkspaceDiagnosticsSection.vue'
 import { SETTINGS_TABS, type SettingsTabId } from './settings/tabs'
+import { useUpdateCheck } from '../composables/useUpdateCheck'
 
 const { t } = useI18n()
 const themesStore = useThemesStore()
 
 const emit = defineEmits<{
   close: []
+  replayTour: []
 }>()
+
+// Reads and writes the same stored preference the launch check consults
+const updateCheck = useUpdateCheck()
 
 const activeTab = ref<SettingsTabId>('general')
 
@@ -95,6 +100,25 @@ function handleClose() {
               <option value="es">Espanol</option>
               <option value="it">Italiano</option>
             </select>
+          </div>
+
+          <div class="setting-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                :checked="updateCheck.enabled.value"
+                @change="updateCheck.setEnabled(($event.target as HTMLInputElement).checked)"
+              />
+              {{ t('updates.checkAutomatically') }}
+            </label>
+            <p class="setting-hint">{{ t('updates.checkHint') }}</p>
+          </div>
+
+          <div class="setting-group">
+            <button class="secondary-button" @click="emit('replayTour')">
+              {{ t('settings.replayTour') }}
+            </button>
+            <p class="setting-hint">{{ t('settings.replayTourHint') }}</p>
           </div>
 
           <hr class="divider" />
@@ -345,6 +369,28 @@ function handleClose() {
 .hint {
   font-size: 11px;
   color: var(--text-muted, #71717a);
+}
+
+.setting-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.secondary-button {
+  padding: 7px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  color: var(--text-main);
+  border-color: var(--text-muted);
 }
 
 .divider {
