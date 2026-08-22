@@ -4,7 +4,7 @@ site_description = "Local-first knowledge graph with EU sovereignty"
 site_author = "Sören Wacker"
 
 site_dir = "public/"
-site_url = "/"
+site_url = "https://sorenwacker.github.io/nodus/"
 docs_dir = "content/"
 repo_url = "https://github.com/sorenwacker/nodus"
 copyright = "Documentation generated with Claude Code"

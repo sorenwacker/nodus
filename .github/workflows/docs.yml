@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
-      - 'mkdocs.yml'
   release:
     types: [published]
   workflow_dispatch:
@@ -30,11 +29,14 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install MkDocs Material
-        run: pip install mkdocs-material
+      - name: Install Zensical
+        run: pip install zensical
 
+      # Zensical is the documentation toolchain (docs/zensical.toml); it
+      # writes the site to docs/public
       - name: Build docs
-        run: mkdocs build
+        run: zensical build
+        working-directory: docs
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -44,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: docs/public
 
   deploy:
     environment:

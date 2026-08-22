@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
       <url>
-        <loc>/</loc>
+        <loc>https://sorenwacker.github.io/nodus/</loc>
       </url>
       <url>
-        <loc>/downloads/</loc>
+        <loc>https://sorenwacker.github.io/nodus/downloads/</loc>
       </url>
       <url>
-        <loc>/getting-started/</loc>
+        <loc>https://sorenwacker.github.io/nodus/getting-started/</loc>
       </url>
       <url>
-        <loc>/features/</loc>
+        <loc>https://sorenwacker.github.io/nodus/features/</loc>
       </url>
       <url>
-        <loc>/typst-math-reference/</loc>
+        <loc>https://sorenwacker.github.io/nodus/typst-math-reference/</loc>
       </url>
       <url>
-        <loc>/development/</loc>
+        <loc>https://sorenwacker.github.io/nodus/development/</loc>
       </url>
       <url>
-        <loc>/PRODUCT_DESIGN/</loc>
+        <loc>https://sorenwacker.github.io/nodus/PRODUCT_DESIGN/</loc>
       </url>
       <url>
-        <loc>/AGENT_ARCHITECTURE/</loc>
+        <loc>https://sorenwacker.github.io/nodus/AGENT_ARCHITECTURE/</loc>
       </url>
 </urlset>
