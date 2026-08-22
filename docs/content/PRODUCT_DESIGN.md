@@ -891,27 +891,107 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 - System prompt includes current canvas state (existing nodes)
 - **Queue manager:** Sequential request processing to prevent race conditions
 
-**Graph Agent Tools:**
+**Graph Agent Tools:** every tool the in-app agent can call. Which ones are offered depends on the mode: explore is read-only, plan designs for approval, execute may mutate. A gate test fails when this list and the registry disagree.
+
+*Nodes and edges*
 
 | Tool | Description |
 |------|-------------|
-| `create_node(title, content, date?, date_end?, tags?)` | Create a single node, optionally dated and tagged |
-| `create_nodes_batch(nodes)` | Upsert multiple nodes (updates existing by title, creates new) |
-| `create_edge(from_title, to_title)` | Connect two nodes |
-| `update_node(title, new_content?, date?, date_end?, tags?)` | Update node content, timeline dates, or tags (dates are written as frontmatter; empty string clears one) |
-| `delete_node(title)` | Remove a node |
-| `query_nodes(filter)` | Query DB: "all", "empty", "has_content", or search term |
-| `for_each_node(filter, action, template)` | Iterator: action="search"\|"set"\|"append", uses {title} |
-| `web_search(query)` | Search web with thinking layer (query refinement) |
-| `auto_layout(layout)` | Arrange nodes: "grid", "horizontal", "vertical", "force" |
-| `think(thought)` | Express reasoning before acting |
-| `plan(tasks)` | Create task list for complex operations |
-| `remember(memory)` | Save information to per-workspace memory |
-| `create_theme(name, description)` | Generate custom YAML theme |
-| `update_theme(name, changes)` | Modify existing theme |
-| `done(summary)` | Signal completion |
+| `create_node(title, content, x, y, date, date_end, tags)` | Create a new node on the canvas with a title and markdown content |
+| `create_edge(from_title, to_title, label, color)` | Create an edge connecting two nodes by their titles |
+| `create_edges_batch(edges)` | Create multiple edges at once. More efficient than create_edge for mind maps and graphs |
+| `create_nodes_batch(nodes)` | Create or update multiple nodes. Handles any size array by processing in chunks |
+| `update_node(title, new_content, date, date_end, tags)` | Update ONE node: content, date or tags. For multiple nodes use batch_update |
+| `update_edge(from_title, to_title, label, color)` | Update an edge label or color by specifying the connected node titles |
+| `update_title(title)` | Change the note title |
+| `update_content(content)` | Update the note content with new text. THIS SAVES YOUR WORK |
+| `append_content(text)` | Append text to the end of the note |
+| `move_node(title, x, y)` | Move a single node to a new position |
+| `batch_update(updates)` | Update multiple nodes. LLM decides values. Use for titles, content, OR positions |
+| `delete_node(title)` | Delete a single node by its title |
+| `delete_edges(filter)` | Delete edges. Use to remove connections without deleting nodes |
+| `delete_matching(filter)` | Delete multiple nodes matching a filter |
+| `generate_sequence(count, title_pattern, content_pattern, layout, connect)` | Generate N nodes with a pattern. Use for large batches (100+). Pattern uses {n} for number |
+| `format_math()` | Reformat the math in the note to Typst syntax using the model. Use this when the note contains LaTeX (like \frac{a}{b} or \alpha) or other non-Typst math that should render correctly |
+| `node_done(summary)` | Signal that the node editing task is complete. You MUST call update_content first |
 
-**Tool surface parity (required behavior):** Every capability is reachable from both surfaces - the MCP server for external agents and the in-app agent for the user's own. A capability on one surface only is invisible to half the users: node date fields were MCP-only, so asking the in-app agent to date nodes could not work no matter how it was phrased. A gate test compares both surfaces and fails on any tool, or any field of a shared tool, that exists on one side without either a counterpart or an explicit recorded reason. Naming differences are recorded deliberately (MCP addresses nodes by id, the in-app agent by title), and the asymmetry that predates the gate is listed as debt rather than hidden, so new drift stands out against it.
+*Reading the graph*
+
+| Tool | Description |
+|------|-------------|
+| `read_graph(mode, include_content, max_content_length)` | Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full" |
+| `query_nodes(filter)` | Query nodes from database. Returns list of {title, content} for planning |
+| `for_each_node(filter, action, template)` | Process nodes: set/append content with templates, or use LLM to generate/transform content |
+| `check_completeness(topic, findings)` | Assess if research on a topic is complete. Returns coverage score and suggests follow-up queries if gaps exist |
+
+*Selection*
+
+| Tool | Description |
+|------|-------------|
+| `update_selected_content(content)` | Replace the content of the selected node(s). Use when user says "update this", "change this to", etc |
+| `append_to_selected(text)` | Append text to the end of the selected node(s). Use when user says "add to this", "append", etc |
+| `rename_selected(title)` | Rename the selected node. Only works with single selection |
+| `color_selected(color)` | Set the color of all selected nodes. Use when user says "color these", "make these red", etc |
+| `delete_selected()` | Delete all selected nodes. Use when user says "delete these", "remove selected", etc |
+| `connect_selected_to(target_title, label)` | Connect the selected node(s) to another node by title. Creates edges from all selected to target |
+| `summarize_selected(instruction)` | Create a summary of all selected nodes. Generates a new node with the summary |
+| `expand_selected(instruction)` | Expand the selected node with more detail. Use when user says "expand this", "add more detail", etc |
+
+*Layout and colour*
+
+| Tool | Description |
+|------|-------------|
+| `auto_layout(layout, sort)` | Arrange nodes in a layout |
+| `smart_move(instruction)` | Move nodes based on semantic criteria. LLM reasons about each node. Use for "move cars left, animals right" |
+| `smart_connect(groups)` | Connect nodes within semantic groups. E.g., "connect animals together, connect cars together, but not across" |
+| `smart_color(instruction)` | Color nodes into multiple categories based on what they represent. LLM semantically classifies each node |
+| `color_matching(pattern, color)` | Color nodes by SEMANTIC criterion (what nodes represent). Use for categories like "person", "organization", "question". NOT for text patterns - use color_regex instead |
+| `color_regex(regex, color, field)` | Color nodes by regex pattern on title. Use for "starts with x" (^x), "ends with .md" (\.md$), "contains foo" (foo). Fast batch operation, no LLM needed |
+| `reset_edge_colors()` | Reset all edge colors to default. Removes custom colors from all edges |
+
+*Themes*
+
+| Tool | Description |
+|------|-------------|
+| `create_theme(name, description)` | Create a new custom theme. LLM generates YAML based on description |
+| `update_theme(name, changes)` | Update an existing custom theme based on changes description |
+| `apply_theme(name)` | Switch to a named theme |
+| `list_themes()` | List available themes |
+
+*Research*
+
+| Tool | Description |
+|------|-------------|
+| `research(query, sources)` | Research a topic across web and local nodes. Returns results with source attribution |
+| `deep_research(topic, depth, aspects)` | Perform deep, iterative research with cross-validation. Use for comprehensive research that needs multiple rounds of queries, Wikipedia article fetching, and source validation. Returns findings with confidence levels |
+| `research_topic(topic, target_count, batch_size)` | Research a topic and create many nodes. Makes multiple LLM calls to avoid truncation |
+| `web_search(query)` | Search the web for information. Use this to research topics before creating nodes |
+| `fetch_url(url)` | Fetch and read the content of a web page. Use this after web_search to read full articles |
+| `fetch_wikipedia(title)` | Fetch full Wikipedia article content for a topic. Use to get detailed information on a specific subject |
+| `wikipedia_search(query, limit)` | Search Wikipedia for articles matching a query. Returns list of matching articles with snippets. Use this to discover relevant Wikipedia articles before fetching full content |
+| `validate_claim(claim)` | Cross-validate a specific claim or fact across multiple sources. Returns confidence level and supporting sources |
+| `build_knowledge_base(topic, scope, target_nodes, phases)` | Build a comprehensive knowledge graph about a topic. Runs multiple research phases with supervisor checks. Use for "create a knowledge base about X" requests |
+| `check_progress(topic)` | Ask the supervisor to evaluate current knowledge graph progress. Returns recommendations |
+| `expand_aspect(aspect, depth)` | Expand the knowledge graph by researching a specific aspect. Use after check_progress identifies gaps |
+
+*Reasoning, planning and memory*
+
+| Tool | Description |
+|------|-------------|
+| `think(thought)` | Express your reasoning or thinking process. Use this to plan before acting |
+| `plan(tasks)` | Create a task list for a complex operation. Each task will be shown in the log |
+| `create_plan(title, steps)` | Create a detailed plan with steps for user approval. Every step MUST declare its "action" so the user can see what will be created vs edited before approving. IMPORTANT: Plans for graphs MUST include separate steps for: 1) Creating nodes, 2) Creating edges with labels, 3) Applying layout |
+| `request_approval(plan_id, message)` | Request user approval for the current plan. Agent will pause until user approves, rejects, or modifies |
+| `update_task(task_index, status)` | Update the status of a task in the current plan |
+| `set_goal(goal, steps)` | Start tracking a new goal. Clears previous session memory |
+| `update_progress(progress, completed_action)` | Update progress on current goal (0-100%) |
+| `complete_goal(summary)` | Mark current goal as complete and clear session memory |
+| `push_task(description, priority, context)` | Add a task to the todo stack for later. Tasks are processed LIFO (last in, first out) |
+| `pop_task()` | Get and remove the top task from the stack |
+| `peek_stack()` | View the task stack without removing tasks |
+| `clear_stack()` | Clear all tasks from the stack |
+| `remember(message)` | Store important information for future reference in this conversation |
+| `done(summary, force)` | Signal completion. BLOCKED if graph has nodes but no edges - you MUST create edges first with create_edges_batch |
 
 **Node Agent Tools (per-node AI):**
 

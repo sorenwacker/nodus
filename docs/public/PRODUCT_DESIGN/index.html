@@ -4083,7 +4083,8 @@ A "Living Documentation" workspace where everything is a node on one canvas. No 
 - Stateless requests (no history bleeding between requests)
 - System prompt includes current canvas state (existing nodes)
 - <strong>Queue manager:</strong> Sequential request processing to prevent race conditions</p>
-<p><strong>Graph Agent Tools:</strong></p>
+<p><strong>Graph Agent Tools:</strong> every tool the in-app agent can call. Which ones are offered depends on the mode: explore is read-only, plan designs for approval, execute may mutate. A gate test fails when this list and the registry disagree.</p>
+<p><em>Nodes and edges</em></p>
 <table>
 <thead>
 <tr>
@@ -4093,68 +4094,333 @@ A "Living Documentation" workspace where everything is a node on one canvas. No 
 </thead>
 <tbody>
 <tr>
-<td><code>create_node(title, content, date?, date_end?, tags?)</code></td>
-<td>Create a single node, optionally dated and tagged</td>
+<td><code>create_node(title, content, x, y, date, date_end, tags)</code></td>
+<td>Create a new node on the canvas with a title and markdown content</td>
+</tr>
+<tr>
+<td><code>create_edge(from_title, to_title, label, color)</code></td>
+<td>Create an edge connecting two nodes by their titles</td>
+</tr>
+<tr>
+<td><code>create_edges_batch(edges)</code></td>
+<td>Create multiple edges at once. More efficient than create_edge for mind maps and graphs</td>
 </tr>
 <tr>
 <td><code>create_nodes_batch(nodes)</code></td>
-<td>Upsert multiple nodes (updates existing by title, creates new)</td>
+<td>Create or update multiple nodes. Handles any size array by processing in chunks</td>
 </tr>
 <tr>
-<td><code>create_edge(from_title, to_title)</code></td>
-<td>Connect two nodes</td>
+<td><code>update_node(title, new_content, date, date_end, tags)</code></td>
+<td>Update ONE node: content, date or tags. For multiple nodes use batch_update</td>
 </tr>
 <tr>
-<td><code>update_node(title, new_content?, date?, date_end?, tags?)</code></td>
-<td>Update node content, timeline dates, or tags (dates are written as frontmatter; empty string clears one)</td>
+<td><code>update_edge(from_title, to_title, label, color)</code></td>
+<td>Update an edge label or color by specifying the connected node titles</td>
+</tr>
+<tr>
+<td><code>update_title(title)</code></td>
+<td>Change the note title</td>
+</tr>
+<tr>
+<td><code>update_content(content)</code></td>
+<td>Update the note content with new text. THIS SAVES YOUR WORK</td>
+</tr>
+<tr>
+<td><code>append_content(text)</code></td>
+<td>Append text to the end of the note</td>
+</tr>
+<tr>
+<td><code>move_node(title, x, y)</code></td>
+<td>Move a single node to a new position</td>
+</tr>
+<tr>
+<td><code>batch_update(updates)</code></td>
+<td>Update multiple nodes. LLM decides values. Use for titles, content, OR positions</td>
 </tr>
 <tr>
 <td><code>delete_node(title)</code></td>
-<td>Remove a node</td>
+<td>Delete a single node by its title</td>
 </tr>
 <tr>
-<td><code>query_nodes(filter)</code></td>
-<td>Query DB: "all", "empty", "has_content", or search term</td>
+<td><code>delete_edges(filter)</code></td>
+<td>Delete edges. Use to remove connections without deleting nodes</td>
 </tr>
 <tr>
-<td><code>for_each_node(filter, action, template)</code></td>
-<td>Iterator: action="search"|"set"|"append", uses {title}</td>
+<td><code>delete_matching(filter)</code></td>
+<td>Delete multiple nodes matching a filter</td>
 </tr>
 <tr>
-<td><code>web_search(query)</code></td>
-<td>Search web with thinking layer (query refinement)</td>
+<td><code>generate_sequence(count, title_pattern, content_pattern, layout, connect)</code></td>
+<td>Generate N nodes with a pattern. Use for large batches (100+). Pattern uses {n} for number</td>
 </tr>
 <tr>
-<td><code>auto_layout(layout)</code></td>
-<td>Arrange nodes: "grid", "horizontal", "vertical", "force"</td>
+<td><code>format_math()</code></td>
+<td>Reformat the math in the note to Typst syntax using the model. Use this when the note contains LaTeX (like \frac{a}{b} or \alpha) or other non-Typst math that should render correctly</td>
 </tr>
 <tr>
-<td><code>think(thought)</code></td>
-<td>Express reasoning before acting</td>
-</tr>
-<tr>
-<td><code>plan(tasks)</code></td>
-<td>Create task list for complex operations</td>
-</tr>
-<tr>
-<td><code>remember(memory)</code></td>
-<td>Save information to per-workspace memory</td>
-</tr>
-<tr>
-<td><code>create_theme(name, description)</code></td>
-<td>Generate custom YAML theme</td>
-</tr>
-<tr>
-<td><code>update_theme(name, changes)</code></td>
-<td>Modify existing theme</td>
-</tr>
-<tr>
-<td><code>done(summary)</code></td>
-<td>Signal completion</td>
+<td><code>node_done(summary)</code></td>
+<td>Signal that the node editing task is complete. You MUST call update_content first</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Tool surface parity (required behavior):</strong> Every capability is reachable from both surfaces - the MCP server for external agents and the in-app agent for the user's own. A capability on one surface only is invisible to half the users: node date fields were MCP-only, so asking the in-app agent to date nodes could not work no matter how it was phrased. A gate test compares both surfaces and fails on any tool, or any field of a shared tool, that exists on one side without either a counterpart or an explicit recorded reason. Naming differences are recorded deliberately (MCP addresses nodes by id, the in-app agent by title), and the asymmetry that predates the gate is listed as debt rather than hidden, so new drift stands out against it.</p>
+<p><em>Reading the graph</em></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>read_graph(mode, include_content, max_content_length)</code></td>
+<td>Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full"</td>
+</tr>
+<tr>
+<td><code>query_nodes(filter)</code></td>
+<td>Query nodes from database. Returns list of {title, content} for planning</td>
+</tr>
+<tr>
+<td><code>for_each_node(filter, action, template)</code></td>
+<td>Process nodes: set/append content with templates, or use LLM to generate/transform content</td>
+</tr>
+<tr>
+<td><code>check_completeness(topic, findings)</code></td>
+<td>Assess if research on a topic is complete. Returns coverage score and suggests follow-up queries if gaps exist</td>
+</tr>
+</tbody>
+</table>
+<p><em>Selection</em></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>update_selected_content(content)</code></td>
+<td>Replace the content of the selected node(s). Use when user says "update this", "change this to", etc</td>
+</tr>
+<tr>
+<td><code>append_to_selected(text)</code></td>
+<td>Append text to the end of the selected node(s). Use when user says "add to this", "append", etc</td>
+</tr>
+<tr>
+<td><code>rename_selected(title)</code></td>
+<td>Rename the selected node. Only works with single selection</td>
+</tr>
+<tr>
+<td><code>color_selected(color)</code></td>
+<td>Set the color of all selected nodes. Use when user says "color these", "make these red", etc</td>
+</tr>
+<tr>
+<td><code>delete_selected()</code></td>
+<td>Delete all selected nodes. Use when user says "delete these", "remove selected", etc</td>
+</tr>
+<tr>
+<td><code>connect_selected_to(target_title, label)</code></td>
+<td>Connect the selected node(s) to another node by title. Creates edges from all selected to target</td>
+</tr>
+<tr>
+<td><code>summarize_selected(instruction)</code></td>
+<td>Create a summary of all selected nodes. Generates a new node with the summary</td>
+</tr>
+<tr>
+<td><code>expand_selected(instruction)</code></td>
+<td>Expand the selected node with more detail. Use when user says "expand this", "add more detail", etc</td>
+</tr>
+</tbody>
+</table>
+<p><em>Layout and colour</em></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auto_layout(layout, sort)</code></td>
+<td>Arrange nodes in a layout</td>
+</tr>
+<tr>
+<td><code>smart_move(instruction)</code></td>
+<td>Move nodes based on semantic criteria. LLM reasons about each node. Use for "move cars left, animals right"</td>
+</tr>
+<tr>
+<td><code>smart_connect(groups)</code></td>
+<td>Connect nodes within semantic groups. E.g., "connect animals together, connect cars together, but not across"</td>
+</tr>
+<tr>
+<td><code>smart_color(instruction)</code></td>
+<td>Color nodes into multiple categories based on what they represent. LLM semantically classifies each node</td>
+</tr>
+<tr>
+<td><code>color_matching(pattern, color)</code></td>
+<td>Color nodes by SEMANTIC criterion (what nodes represent). Use for categories like "person", "organization", "question". NOT for text patterns - use color_regex instead</td>
+</tr>
+<tr>
+<td><code>color_regex(regex, color, field)</code></td>
+<td>Color nodes by regex pattern on title. Use for "starts with x" (^x), "ends with .md" (.md$), "contains foo" (foo). Fast batch operation, no LLM needed</td>
+</tr>
+<tr>
+<td><code>reset_edge_colors()</code></td>
+<td>Reset all edge colors to default. Removes custom colors from all edges</td>
+</tr>
+</tbody>
+</table>
+<p><em>Themes</em></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_theme(name, description)</code></td>
+<td>Create a new custom theme. LLM generates YAML based on description</td>
+</tr>
+<tr>
+<td><code>update_theme(name, changes)</code></td>
+<td>Update an existing custom theme based on changes description</td>
+</tr>
+<tr>
+<td><code>apply_theme(name)</code></td>
+<td>Switch to a named theme</td>
+</tr>
+<tr>
+<td><code>list_themes()</code></td>
+<td>List available themes</td>
+</tr>
+</tbody>
+</table>
+<p><em>Research</em></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>research(query, sources)</code></td>
+<td>Research a topic across web and local nodes. Returns results with source attribution</td>
+</tr>
+<tr>
+<td><code>deep_research(topic, depth, aspects)</code></td>
+<td>Perform deep, iterative research with cross-validation. Use for comprehensive research that needs multiple rounds of queries, Wikipedia article fetching, and source validation. Returns findings with confidence levels</td>
+</tr>
+<tr>
+<td><code>research_topic(topic, target_count, batch_size)</code></td>
+<td>Research a topic and create many nodes. Makes multiple LLM calls to avoid truncation</td>
+</tr>
+<tr>
+<td><code>web_search(query)</code></td>
+<td>Search the web for information. Use this to research topics before creating nodes</td>
+</tr>
+<tr>
+<td><code>fetch_url(url)</code></td>
+<td>Fetch and read the content of a web page. Use this after web_search to read full articles</td>
+</tr>
+<tr>
+<td><code>fetch_wikipedia(title)</code></td>
+<td>Fetch full Wikipedia article content for a topic. Use to get detailed information on a specific subject</td>
+</tr>
+<tr>
+<td><code>wikipedia_search(query, limit)</code></td>
+<td>Search Wikipedia for articles matching a query. Returns list of matching articles with snippets. Use this to discover relevant Wikipedia articles before fetching full content</td>
+</tr>
+<tr>
+<td><code>validate_claim(claim)</code></td>
+<td>Cross-validate a specific claim or fact across multiple sources. Returns confidence level and supporting sources</td>
+</tr>
+<tr>
+<td><code>build_knowledge_base(topic, scope, target_nodes, phases)</code></td>
+<td>Build a comprehensive knowledge graph about a topic. Runs multiple research phases with supervisor checks. Use for "create a knowledge base about X" requests</td>
+</tr>
+<tr>
+<td><code>check_progress(topic)</code></td>
+<td>Ask the supervisor to evaluate current knowledge graph progress. Returns recommendations</td>
+</tr>
+<tr>
+<td><code>expand_aspect(aspect, depth)</code></td>
+<td>Expand the knowledge graph by researching a specific aspect. Use after check_progress identifies gaps</td>
+</tr>
+</tbody>
+</table>
+<p><em>Reasoning, planning and memory</em></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>think(thought)</code></td>
+<td>Express your reasoning or thinking process. Use this to plan before acting</td>
+</tr>
+<tr>
+<td><code>plan(tasks)</code></td>
+<td>Create a task list for a complex operation. Each task will be shown in the log</td>
+</tr>
+<tr>
+<td><code>create_plan(title, steps)</code></td>
+<td>Create a detailed plan with steps for user approval. Every step MUST declare its "action" so the user can see what will be created vs edited before approving. IMPORTANT: Plans for graphs MUST include separate steps for: 1) Creating nodes, 2) Creating edges with labels, 3) Applying layout</td>
+</tr>
+<tr>
+<td><code>request_approval(plan_id, message)</code></td>
+<td>Request user approval for the current plan. Agent will pause until user approves, rejects, or modifies</td>
+</tr>
+<tr>
+<td><code>update_task(task_index, status)</code></td>
+<td>Update the status of a task in the current plan</td>
+</tr>
+<tr>
+<td><code>set_goal(goal, steps)</code></td>
+<td>Start tracking a new goal. Clears previous session memory</td>
+</tr>
+<tr>
+<td><code>update_progress(progress, completed_action)</code></td>
+<td>Update progress on current goal (0-100%)</td>
+</tr>
+<tr>
+<td><code>complete_goal(summary)</code></td>
+<td>Mark current goal as complete and clear session memory</td>
+</tr>
+<tr>
+<td><code>push_task(description, priority, context)</code></td>
+<td>Add a task to the todo stack for later. Tasks are processed LIFO (last in, first out)</td>
+</tr>
+<tr>
+<td><code>pop_task()</code></td>
+<td>Get and remove the top task from the stack</td>
+</tr>
+<tr>
+<td><code>peek_stack()</code></td>
+<td>View the task stack without removing tasks</td>
+</tr>
+<tr>
+<td><code>clear_stack()</code></td>
+<td>Clear all tasks from the stack</td>
+</tr>
+<tr>
+<td><code>remember(message)</code></td>
+<td>Store important information for future reference in this conversation</td>
+</tr>
+<tr>
+<td><code>done(summary, force)</code></td>
+<td>Signal completion. BLOCKED if graph has nodes but no edges - you MUST create edges first with create_edges_batch</td>
+</tr>
+</tbody>
+</table>
 <p><strong>Node Agent Tools (per-node AI):</strong></p>
 <table>
 <thead>

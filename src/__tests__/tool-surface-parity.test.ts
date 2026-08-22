@@ -321,3 +321,34 @@ describe('tool surface parity', () => {
     }
   })
 })
+
+describe('the documented tool table matches the registry', () => {
+  const DESIGN_DOC = resolve(__dirname, '../../docs/content/PRODUCT_DESIGN.md')
+
+  /** Tool names listed in the Graph Agent Tools section */
+  function documentedTools(): string[] {
+    const doc = readFileSync(DESIGN_DOC, 'utf8')
+    const start = doc.indexOf('**Graph Agent Tools:**')
+    const end = doc.indexOf('**Node Agent Tools')
+    expect(start, 'Graph Agent Tools section missing').toBeGreaterThan(-1)
+    const section = doc.slice(start, end)
+    return [...new Set([...section.matchAll(/\| `([a-z_0-9]+)\(/g)].map(m => m[1]))]
+  }
+
+  it('documents every tool the agent can call', () => {
+    const undocumented = agentToolNames().filter(name => !documentedTools().includes(name))
+    expect(
+      undocumented,
+      `these tools exist but are undocumented: ${undocumented.join(', ')}`
+    ).toEqual([])
+  })
+
+  it('documents no tool that does not exist', () => {
+    const agent = new Set(agentToolNames())
+    const phantom = documentedTools().filter(name => !agent.has(name))
+    expect(
+      phantom,
+      `the documentation promises tools the agent does not have: ${phantom.join(', ')}`
+    ).toEqual([])
+  })
+})
