@@ -88,6 +88,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Nothing enforced this before, which is how 83 type errors accumulated
+      - name: Typecheck
+        run: npm run typecheck
+
   build:
     name: Build (${{ matrix.platform }})
     needs: [test-rust, test-frontend]
