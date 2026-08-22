@@ -2,6 +2,29 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.3.0] - 2026-08-22
+
+### Added
+- The canvas agent is a chat, not a fire-and-forget prompt. A full-height panel on the canvas's left edge holds the conversation: every prompt and every answer in full, each answer listing the tools it used behind a collapsible line. Previously a text-only reply was truncated to 80 characters into a log panel that opened only on errors, so an answer that changed nothing on the canvas left no trace at all. The panel folds away and back through one toggle in the canvas's top-left corner or a left-edge push, and its folded state persists
+- The agent states what it will actually see before a prompt is sent: with nodes selected it names them, otherwise it gives the node count of the whole graph. The list shown and the list handed to the model come from one source, so the claim cannot drift from the payload
+- The in-app agent can set node dates and tags. `create_node` and `update_node` accept `date`, `date_end` and `tags`, with dates written as frontmatter by the same helper the MCP surface uses; setting a date leaves the note body intact. Asking the agent to date nodes previously could not work, because only MCP clients could write those fields
+- MCP `create_edge` accepts a colour, which the Rust backend has always stored but the TypeScript plumbing dropped
+- The agent panel and the timelines sheet are resizable and remember their size, as the storyline overview already did. The timelines sheet keeps fitting its lane count until the user drags it, after which their height wins
+- The storyline reader's contents sidebar and width now persist across folding the layer away and coming back
+
+### Changed
+- Every panel that can be resized uses one composable, so drag direction, clamping and persistence cannot drift between them; the reader's separate implementation is gone
+- Documentation is built and deployed with Zensical, the toolchain its config describes; the unused mkdocs config is removed and every page carries a generation notice
+
+### Fixed
+- Panning and zooming no longer recompute every visible edge on every frame. Culling returned a fresh array and set each frame even when the same nodes were on screen, invalidating all downstream work; it now keeps its identity until a node genuinely enters or leaves the viewport
+- Edge gestures fire reliably: a fast flick reached the desktop before any pointer sample landed inside the 12px edge band, so the storyline reveal and timelines sheet often ignored it. Leaving the window now counts as a push on the edge it left through
+- MCP `update_edge` applies the label it advertised. It accepted the parameter, reported success, and changed nothing
+- Tooltips no longer open off screen: controls anchored to a window edge state a direction, so the toolbar, edge filters, timelines sheet, storyline layers and the agent panel's input row all keep their labels on screen. The edge filter tooltips were also hardcoded English and are now translated
+- The published documentation site works again: its images were left out of the build after the toolchain change, its reference pages were unreachable from the navigation, and its links were generated for the wrong base path
+- Emoji removed from the documentation. They were encoded as HTML entities, so they survived every scan for emoji characters while rendering as icons on the published page
+- Dependencies nothing imports are gone (yjs, three TipTap packages, the Tauri fs JS binding, and the Rust `dirs` crate), and the documentation no longer claims an editor and a database the project does not use
+
 ## [1.2.0] - 2026-08-19
 
 ### Added
