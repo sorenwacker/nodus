@@ -40,6 +40,8 @@ export interface NodeStoreState {
   showManualEdges: Ref<boolean>
   showStorylineEdges: Ref<boolean>
   showWikilinkEdges: Ref<boolean>
+  showTagEdges: Ref<boolean>
+  hoverHighlightNodeId: Ref<string | null>
 }
 
 /**
@@ -58,7 +60,7 @@ export interface NodeStoreComputed {
   graphEdges: ComputedRef<Edge[]>
   filteredFrames: ComputedRef<Frame[]>
   storylines: ComputedRef<Storyline[]>
-  storylineNodes: ComputedRef<Map<string, StorylineNode[]>>
+  storylineNodes: ComputedRef<Map<string, string[]>>
   storylineNodesVersion: ComputedRef<number>
   filteredStorylines: ComputedRef<Storyline[]>
 }
@@ -81,5 +83,5 @@ export interface NodeStoreDependencies {
 export interface FileSyncInterface {
   watchVault: (path: string) => Promise<void>
   stopWatching: () => Promise<void>
-  markProgrammaticMove: (paths: string[]) => void
+  markProgrammaticMove: (nodeId: string) => void
 }

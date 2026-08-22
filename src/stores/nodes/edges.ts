@@ -81,7 +81,7 @@ export function updateEdgeLinkType(
   edgesStore: NodeStoreDependencies['edgesStore'],
   id: string,
   linkType: string
-): Promise<void> {
+): void {
   return edgesStore.updateEdgeLinkType(id, linkType)
 }
 

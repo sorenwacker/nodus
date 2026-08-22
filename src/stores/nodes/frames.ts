@@ -16,7 +16,7 @@ export function createFrame(
   width = 400,
   height = 300,
   title = 'Frame'
-): string {
+): import('../../types').Frame {
   const { workspaceStore, framesStore } = deps
   const wsId = workspaceStore.currentWorkspaceId
   const workspaceForBackend = wsId === 'default' ? null : wsId

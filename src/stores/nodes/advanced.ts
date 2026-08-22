@@ -104,7 +104,7 @@ export function deleteWorkspace(
 export function recoverWorkspace(
   workspaceStore: NodeStoreDependencies['workspaceStore'],
   id: string
-): Promise<void> {
+): Promise<import('../../types').Workspace | null> {
   return workspaceStore.recoverWorkspace(id)
 }
 
@@ -330,7 +330,7 @@ export function reorderStorylineNodes(
 export function getStorylineNodes(
   storylinesStore: NodeStoreDependencies['storylinesStore'],
   storylineId: string
-): import('../../types').StorylineNode[] {
+): Promise<import('../../types').Node[]> {
   return storylinesStore.getStorylineNodes(storylineId)
 }
 
