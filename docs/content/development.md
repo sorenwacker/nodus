@@ -91,3 +91,12 @@ storeLogger.info('General information')       // Development only
 storeLogger.warn('Warning message')           // Always shown
 storeLogger.error('Error occurred', error)    // Always shown
 ```
+
+## Known dependency advisory
+
+`glib` 0.18 carries a medium-severity unsoundness advisory (`VariantStrIter`). It
+cannot be upgraded from this repository: Tauri 2.11.5, the latest release, pins
+it transitively through `gtk` 0.18 and `muda`. Nodus contains no direct `glib`
+usage and never calls the affected API, and the issue is Linux-only. The alert is
+dismissed as tolerable risk and should be revisited when Tauri's gtk stack moves
+to `glib` 0.20.
