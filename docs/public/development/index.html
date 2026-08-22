@@ -683,6 +683,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#release-signing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Release signing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release signing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#update-signatures-required-for-auto-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Update signatures (required for auto-update)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distribution-signatures-removes-the-install-warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distribution signatures (removes the install warnings)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -899,6 +938,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#release-signing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Release signing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release signing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#update-signatures-required-for-auto-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Update signatures (required for auto-update)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distribution-signatures-removes-the-install-warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distribution signatures (removes the install warnings)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1092,6 +1170,34 @@ it transitively through <code>gtk</code> 0.18 and <code>muda</code>. Nodus conta
 usage and never calls the affected API, and the issue is Linux-only. The alert is
 dismissed as tolerable risk and should be revisited when Tauri's gtk stack moves
 to <code>glib</code> 0.20.</p>
+<h2 id="release-signing">Release signing</h2>
+<p>Two independent signatures matter, and neither is configured in this repository
+because both require credentials the maintainer holds.</p>
+<h3 id="update-signatures-required-for-auto-update">Update signatures (required for auto-update)</h3>
+<p>The updater refuses any payload whose signature does not verify, so the release
+pipeline needs a keypair:</p>
+<ol>
+<li><code>npm run tauri signer generate -- -w ~/.nodus-updater.key</code></li>
+<li>Put the <strong>public</strong> key in <code>src-tauri/tauri.conf.json</code> under
+   <code>plugins.updater.pubkey</code>, replacing the placeholder.</li>
+<li>Add the <strong>private</strong> key and its password as the repository secrets
+   <code>TAURI_SIGNING_PRIVATE_KEY</code> and <code>TAURI_SIGNING_PRIVATE_KEY_PASSWORD</code>.</li>
+</ol>
+<p>Until then the release still builds; it simply publishes no <code>latest.json</code>, and
+the workflow logs a warning rather than shipping a manifest the updater would
+reject.</p>
+<h3 id="distribution-signatures-removes-the-install-warnings">Distribution signatures (removes the install warnings)</h3>
+<p>Unsigned builds are the largest avoidable loss of users: macOS reports an
+unidentified developer and Windows SmartScreen warns before the first run.</p>
+<ul>
+<li><strong>macOS</strong> needs an Apple Developer account. Set <code>APPLE_CERTIFICATE</code>,
+  <code>APPLE_CERTIFICATE_PASSWORD</code>, <code>APPLE_SIGNING_IDENTITY</code>, <code>APPLE_ID</code>,
+  <code>APPLE_PASSWORD</code> and <code>APPLE_TEAM_ID</code> as repository secrets; <code>tauri-action</code>
+  signs and notarises when they are present.</li>
+<li><strong>Windows</strong> needs a code-signing certificate; set
+  <code>bundle.windows.certificateThumbprint</code> in <code>tauri.conf.json</code>, or supply the
+  certificate to the signing step.</li>
+</ul>
 
 
 

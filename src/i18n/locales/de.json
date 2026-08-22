@@ -613,5 +613,14 @@
       "replace": "Ersetzen",
       "replaceDesc": "Vorhandene Datei überschreiben (nicht rückgängig machbar)"
     }
+  },
+  "updates": {
+    "available": "Nodus {version} ist verfuegbar",
+    "installed": "Installiert: {version}",
+    "install": "Installieren und neu starten",
+    "installing": "Wird installiert...",
+    "later": "Spaeter",
+    "checkAutomatically": "Beim Start nach Updates suchen",
+    "checkHint": "Fragt beim Start einmal, ob eine neuere Version vorliegt. Es wird nichts geladen, bis du zustimmst."
   }
 }

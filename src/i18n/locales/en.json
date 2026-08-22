@@ -644,5 +644,14 @@
     "trustedClients": "Trusted clients",
     "forgetTrusted": "Forget all",
     "trustedHint": "Approved connections are remembered and reconnect without a prompt. Forgetting revokes all stored trust tokens."
+  },
+  "updates": {
+    "available": "Nodus {version} is available",
+    "installed": "You have {version}",
+    "install": "Install and restart",
+    "installing": "Installing...",
+    "later": "Later",
+    "checkAutomatically": "Check for updates on launch",
+    "checkHint": "Asks the release server once per launch whether a newer version exists. Nothing is downloaded until you choose to install."
   }
 }

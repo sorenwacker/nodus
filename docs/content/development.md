@@ -100,3 +100,36 @@ it transitively through `gtk` 0.18 and `muda`. Nodus contains no direct `glib`
 usage and never calls the affected API, and the issue is Linux-only. The alert is
 dismissed as tolerable risk and should be revisited when Tauri's gtk stack moves
 to `glib` 0.20.
+
+## Release signing
+
+Two independent signatures matter, and neither is configured in this repository
+because both require credentials the maintainer holds.
+
+### Update signatures (required for auto-update)
+
+The updater refuses any payload whose signature does not verify, so the release
+pipeline needs a keypair:
+
+1. `npm run tauri signer generate -- -w ~/.nodus-updater.key`
+2. Put the **public** key in `src-tauri/tauri.conf.json` under
+   `plugins.updater.pubkey`, replacing the placeholder.
+3. Add the **private** key and its password as the repository secrets
+   `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+Until then the release still builds; it simply publishes no `latest.json`, and
+the workflow logs a warning rather than shipping a manifest the updater would
+reject.
+
+### Distribution signatures (removes the install warnings)
+
+Unsigned builds are the largest avoidable loss of users: macOS reports an
+unidentified developer and Windows SmartScreen warns before the first run.
+
+- **macOS** needs an Apple Developer account. Set `APPLE_CERTIFICATE`,
+  `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
+  `APPLE_PASSWORD` and `APPLE_TEAM_ID` as repository secrets; `tauri-action`
+  signs and notarises when they are present.
+- **Windows** needs a code-signing certificate; set
+  `bundle.windows.certificateThumbprint` in `tauri.conf.json`, or supply the
+  certificate to the signing step.

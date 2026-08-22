@@ -179,6 +179,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater artifacts are signed here; without these secrets the build
+          # still succeeds but produces no .sig files, and the manifest step
+          # below will say so rather than publishing an unusable manifest
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Nodus ${{ github.ref_name }}'
@@ -229,6 +234,7 @@ jobs:
 
           # Generate latest.yml for version tracking
           VERSION="${GITHUB_REF_NAME#v}"
+          BASE_URL="https://pub-99aa2887ef464cdeac1ab7be9b4fa860.r2.dev/nodus"
           cat > assets/latest.yml << EOF
           version: $VERSION
           date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -240,6 +246,52 @@ jobs:
             - name: Nodus_${VERSION}_amd64.deb
               platform: linux
           EOF
+
+          # The manifest the installed application polls. Each platform entry
+          # carries the detached signature tauri-action produced; the updater
+          # refuses a payload whose signature does not verify, so a manifest
+          # without signatures is worse than none and is skipped instead.
+          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          NOTES="See https://github.com/${{ github.repository }}/releases/tag/${GITHUB_REF_NAME}"
+
+          sig() {
+            local file="assets/$1"
+            [ -f "$file.sig" ] && cat "$file.sig" || echo ""
+          }
+
+          MAC_SIG=$(sig "Nodus_universal.app.tar.gz")
+          WIN_SIG=$(sig "Nodus_${VERSION}_x64-setup.exe")
+          LINUX_SIG=$(sig "Nodus_${VERSION}_amd64.AppImage")
+
+          if [ -z "$MAC_SIG" ] && [ -z "$WIN_SIG" ] && [ -z "$LINUX_SIG" ]; then
+            echo "::warning::No updater signatures found - skipping latest.json. Set TAURI_SIGNING_PRIVATE_KEY to enable auto-update."
+          else
+            cat > assets/latest.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": "$NOTES",
+            "pub_date": "$PUB_DATE",
+            "platforms": {
+              "darwin-x86_64": {
+                "signature": "$MAC_SIG",
+                "url": "$BASE_URL/Nodus_universal.app.tar.gz"
+              },
+              "darwin-aarch64": {
+                "signature": "$MAC_SIG",
+                "url": "$BASE_URL/Nodus_universal.app.tar.gz"
+              },
+              "windows-x86_64": {
+                "signature": "$WIN_SIG",
+                "url": "$BASE_URL/Nodus_${VERSION}_x64-setup.exe"
+              },
+              "linux-x86_64": {
+                "signature": "$LINUX_SIG",
+                "url": "$BASE_URL/Nodus_${VERSION}_amd64.AppImage"
+              }
+            }
+          }
+          EOF
+          fi
 
           rclone copy assets/ r2:binaries/nodus/
 

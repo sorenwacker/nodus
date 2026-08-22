@@ -1221,6 +1221,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Updates
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#settings" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2463,6 +2474,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Starter Content
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Updates
       </span>
     </span>
   </a>
@@ -4625,6 +4647,14 @@ A "Living Documentation" workspace where everything is a node on one canvas. No 
 </tbody>
 </table>
 <p>Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.</p>
+<h3 id="updates">Updates</h3>
+<p><strong>Required behavior:</strong> An installed copy checks for a newer release on startup and tells the user, rather than leaving them frozen on whatever version they first downloaded. Without this, every fix reaches only people who happen to visit the download page again.</p>
+<ul>
+<li>The check runs once per launch, in the background, and never blocks the canvas. A failure to reach the network is silence, not an error: being offline is the normal case for a local-first application, not a fault to report.</li>
+<li>When a newer version exists the user is told what it is and chooses whether to install; nothing downloads or restarts on its own.</li>
+<li>Update manifests and binaries are served from the same R2 bucket the download page uses, and every artifact is signed. An unsigned or mis-signed payload is refused by the updater, so a compromised bucket cannot push code to users.</li>
+<li>The setting is user-controllable and persisted: automatic checks can be turned off entirely in Settings &gt; General, in which case the app never contacts the update endpoint.</li>
+</ul>
 <h3 id="settings">Settings</h3>
 <p>Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integrations.</p>
 <p><strong>General:</strong>

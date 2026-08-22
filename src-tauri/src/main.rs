@@ -98,6 +98,10 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Desktop-only: the updater replaces the installed binary, and
+        // process restarts it once the user accepts
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(commands::WatcherState(Mutex::new(None)))
         .manage(commands::LocksState(Mutex::new(
             std::collections::HashMap::new(),

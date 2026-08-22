@@ -1079,6 +1079,15 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
 
+### Updates
+
+**Required behavior:** An installed copy checks for a newer release on startup and tells the user, rather than leaving them frozen on whatever version they first downloaded. Without this, every fix reaches only people who happen to visit the download page again.
+
+- The check runs once per launch, in the background, and never blocks the canvas. A failure to reach the network is silence, not an error: being offline is the normal case for a local-first application, not a fault to report.
+- When a newer version exists the user is told what it is and chooses whether to install; nothing downloads or restarts on its own.
+- Update manifests and binaries are served from the same R2 bucket the download page uses, and every artifact is signed. An unsigned or mis-signed payload is refused by the updater, so a compromised bucket cannot push code to users.
+- The setting is user-controllable and persisted: automatic checks can be turned off entirely in Settings > General, in which case the app never contacts the update endpoint.
+
 ### Settings
 
 Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integrations.

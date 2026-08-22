@@ -12,6 +12,8 @@ import { createEdgeStepper } from './lib/edgeGesture'
 import PixiCanvas from './canvas/PixiCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
+import UpdateNotice from './components/UpdateNotice.vue'
+import { useUpdateCheck } from './composables/useUpdateCheck'
 import OnboardingFlow from './components/OnboardingFlow.vue'
 import StorylinePanel from './components/StorylinePanel.vue'
 import StorylineReader from './components/StorylineReader.vue'
@@ -22,6 +24,8 @@ const { t } = useI18n()
 const store = useNodesStore()
 const themesStore = useThemesStore()
 const displayStore = useDisplayStore()
+// Checked once per launch; installing is always the user's choice
+const updateCheck = useUpdateCheck()
 const showImportDialog = ref(false)
 const showWorkspaceDialog = ref(false)
 const showWorkspaceEditor = ref(false)
@@ -642,6 +646,9 @@ useKeyboardShortcuts({
 onMounted(async () => {
   window.addEventListener('pointermove', onEdgePointerMove, { capture: true, passive: true })
   window.addEventListener('pointerout', onEdgePointerOut, { capture: true, passive: true })
+  // Not awaited: the canvas must not wait on a network round trip, and a
+  // failed check is silence rather than an error
+  void updateCheck.checkForUpdate()
   // Initialize themes first to apply visual styling
   await themesStore.initialize()
   // Then initialize data
@@ -1157,6 +1164,14 @@ async function openFolderDialog() {
 
     <!-- Global notifications -->
     <NotificationToast />
+
+    <UpdateNotice
+      :update="updateCheck.available.value"
+      :installing="updateCheck.installing.value"
+      :error="updateCheck.error.value"
+      @install="updateCheck.installUpdate()"
+      @dismiss="updateCheck.dismiss()"
+    />
 
     <!-- MCP Connection Approval -->
     <McpApprovalModal

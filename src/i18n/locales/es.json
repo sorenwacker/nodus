@@ -613,5 +613,14 @@
       "replace": "Reemplazar",
       "replaceDesc": "Sobrescribir el archivo existente (no se puede deshacer)"
     }
+  },
+  "updates": {
+    "available": "Nodus {version} esta disponible",
+    "installed": "Tienes {version}",
+    "install": "Instalar y reiniciar",
+    "installing": "Instalando...",
+    "later": "Mas tarde",
+    "checkAutomatically": "Buscar actualizaciones al iniciar",
+    "checkHint": "Pregunta una vez por inicio si hay una version mas reciente. No se descarga nada hasta que lo aceptes."
   }
 }
