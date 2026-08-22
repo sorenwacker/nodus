@@ -42,6 +42,7 @@ interface Store {
   updateFrameTitle: (id: string, title: string) => void
   updateNodePosition: (id: string, x: number, y: number, options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }) => void
   persistNodePosition: (id: string) => void
+  assignNodesToFrame: (nodeIds: string[], frameId: string | null) => void
 }
 
 interface ViewState {

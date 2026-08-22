@@ -7,7 +7,7 @@
  * - Single source of truth for tool definitions and execution
  */
 
-import type { Node, Edge } from '../types'
+import type { CreateNodeInput, Node, Edge } from '../types'
 import type { NodeService } from '../services/nodeService'
 import { errorLog } from './agentLog'
 
@@ -53,7 +53,7 @@ export interface ToolContext {
 export interface INodeStore {
   filteredNodes: Node[]
   filteredEdges: Edge[]
-  createNode: (data: Partial<Node>) => Promise<Node>
+  createNode: (data: CreateNodeInput) => Promise<Node>
   createEdge: (data: { source_node_id: string; target_node_id: string; label?: string; color?: string }) => Promise<Edge>
   deleteNode: (id: string) => Promise<void>
   deleteEdge: (id: string) => Promise<void>

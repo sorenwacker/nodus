@@ -223,10 +223,7 @@ function handleWikilinkClick(target: string) {
   if (linkedNode) {
     emit('navigateToNode', linkedNode.id)
   } else {
-    notifications$.next({
-      type: 'warning',
-      message: `Node "${target}" not found`,
-    })
+    notifications$.warning(`Node "${target}" not found`)
   }
 }
 

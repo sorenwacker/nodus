@@ -8,7 +8,7 @@ export interface UseEntityOperationsOptions {
     getLinkedEntities: (nodeId: string) => Node[]
     selectNode: (id: string) => void
     createEntityNode: (type: EntityNodeType, title: string) => Promise<Node>
-    linkToEntity: (nodeId: string, entityId: string) => Promise<void>
+    linkToEntity: (nodeId: string, entityId: string, linkType?: string) => Promise<unknown>
     getNode: (id: string) => Node | undefined
   }
   contextMenu: {

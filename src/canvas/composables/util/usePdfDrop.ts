@@ -54,7 +54,7 @@ interface Store {
     source_node_id: string
     target_node_id: string
     link_type?: string
-  }) => Promise<void>
+  }) => Promise<unknown>
   importOntology: (
     filePath: string,
     options?: { createClassNodes?: boolean; layout?: 'grid' | 'hierarchical' }
