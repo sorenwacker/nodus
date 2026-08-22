@@ -28,7 +28,7 @@ describe('settings tab layout', () => {
   })
 
   it('has no separate Zotero tab; Zotero lives inside Citations', () => {
-    expect(SETTINGS_TABS.some(t => t.id === 'zotero')).toBe(false)
+    expect(SETTINGS_TABS.map(t => t.id as string)).not.toContain('zotero')
     expect(resolveKey(en, 'settings.tabs.zotero')).toBeUndefined()
   })
 

@@ -47,11 +47,11 @@ export interface UseCanvasEventHandlersContext {
   /** Create a new node */
   createNode: (options: {
     title: string
-    node_type: string
-    markdown_content: string
+    node_type?: string
+    markdown_content?: string
     canvas_x: number
     canvas_y: number
-  }) => Promise<void>
+  }) => Promise<unknown>
   /** Last drag end timestamp */
   lastDragEndTime: () => number
   /** Context menu interface */

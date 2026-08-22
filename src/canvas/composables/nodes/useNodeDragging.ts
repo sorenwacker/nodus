@@ -36,7 +36,7 @@ export interface UseNodeDraggingContext {
   ) => Promise<{ resolution: 'cancel' | 'rename' | 'replace'; newName?: string }>
   scale: Ref<number>
   offset: Ref<{ x: number; y: number }>
-  canvasRef: Ref<HTMLDivElement | null>
+  canvasRef: Ref<HTMLElement | null>
   gridLockEnabled: Ref<boolean>
   snapToGrid: (value: number) => number
   neighborhoodMode: Ref<boolean>

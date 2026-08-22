@@ -12,7 +12,7 @@ defineProps<{
   waitStatus: {
     isWaiting: boolean
     remainingSeconds: number
-    reason: 'backoff' | 'rateLimit'
+    reason: 'rate-limit' | 'backoff' | null
   } | null
 }>()
 

@@ -10,7 +10,10 @@ describe('Edge Manipulation', () => {
     link_type: 'related',
     label: label ?? null,
     directed: true,
-    created_at: new Date().toISOString(),
+    created_at: Date.now(),
+    weight: 1,
+    color: null,
+    storyline_id: null,
   })
 
   describe('changeEdgeLabel', () => {

@@ -336,8 +336,11 @@ export async function handleBatchAssignNodesToFrame(
       }
     }
 
-    // Fit frame to nodes and resolve overlaps
-    await fitFrameToNodesAndResolveOverlaps(store, frameId)
+    // Fit frame to nodes and resolve overlaps. Nodes can also be assigned to
+    // no frame at all, and there is then nothing to fit.
+    if (frameId !== null) {
+      await fitFrameToNodesAndResolveOverlaps(store, frameId)
+    }
   }
 
   return { success: true, count: validNodeIds.length, moved: movedCount }

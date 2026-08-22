@@ -39,7 +39,7 @@ const props = defineProps<{
   isNeighborhoodFocus: boolean
   isNeighborHighlighted: boolean
   showThumbnail: boolean
-  thumbnailSrc?: string
+  thumbnailSrc?: string | null
   renderedContent: string
   editingTitleId: string | null
   editTitle: string

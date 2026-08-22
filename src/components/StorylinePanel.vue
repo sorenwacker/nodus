@@ -50,8 +50,8 @@ const {
 
 // Nodes per storyline - reactive to store Map changes
 const nodesByStoryline = computed(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _version = storylineNodesVersion.value // Force reactivity on Map changes
+  // Touch the version so the computed re-runs when the Map mutates in place
+  void storylineNodesVersion.value
   const result: Record<string, Node[]> = {}
   for (const storyline of storylines.value) {
     const nodeIds = storylineNodes.value.get(storyline.id) || []
@@ -63,8 +63,8 @@ const nodesByStoryline = computed(() => {
 })
 
 const storylineNodeCounts = computed(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _version = storylineNodesVersion.value // Force reactivity
+  // Touch the version so the computed re-runs when the Map mutates in place
+  void storylineNodesVersion.value
   const counts: Record<string, number> = {}
   for (const [id, nodeIds] of storylineNodes.value.entries()) {
     counts[id] = nodeIds.length

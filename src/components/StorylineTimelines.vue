@@ -107,8 +107,8 @@ function toLaneNode(nodeId: string): LaneNode {
 }
 
 const laneNodes = computed<Array<{ storylineId: string; nodes: LaneNode[] }>>(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _version = storylineNodesVersion.value // Reactivity on Map changes
+  // Touch the version so the computed re-runs when the Map mutates in place
+  void storylineNodesVersion.value
   const lanes = storylines.value.map(storyline => ({
     storylineId: storyline.id,
     nodes: (storylineNodes.value.get(storyline.id) || []).map(toLaneNode),

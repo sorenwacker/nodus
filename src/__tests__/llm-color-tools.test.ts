@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ref } from 'vue'
 import { useLLMTools, type LLMToolsContext } from '../canvas/composables/agent/useLLMTools'
+import type { Node } from '../types'
 
 // Mock node data
 const createMockNodes = () => [
@@ -36,7 +37,8 @@ function createMockContext(mockLLMResponse?: (prompt: string) => string): LLMToo
     },
     callOllama: vi.fn().mockResolvedValue(''),
     store: {
-      getFilteredNodes: () => nodes,
+      // Partial fixtures: the colour tools only read id, title and content
+      getFilteredNodes: () => nodes as unknown as Node[],
       getFilteredEdges: () => [],
       updateNodeContent: vi.fn().mockResolvedValue(undefined),
       updateNodePosition: vi.fn().mockResolvedValue(undefined),

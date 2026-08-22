@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, getLocale, loadLocale } from '../i18n'
+import type { SupportedLocale } from '../lib/templates'
 
 const { t } = useI18n()
 
@@ -9,7 +10,7 @@ const STORAGE_KEY = 'nodus-onboarding-complete'
 
 // Language selection
 const selectedLanguage = ref(getLocale())
-const languages = [
+const languages: Array<{ code: SupportedLocale; name: string }> = [
   { code: 'en', name: 'English' },
   { code: 'de', name: 'Deutsch' },
   { code: 'fr', name: 'Francais' },
@@ -17,7 +18,7 @@ const languages = [
   { code: 'it', name: 'Italiano' },
 ]
 
-async function selectLanguage(code: string) {
+async function selectLanguage(code: SupportedLocale) {
   selectedLanguage.value = code
   await loadLocale(code)
   setLocale(code)

@@ -8,8 +8,8 @@ const { t } = useI18n()
 const props = defineProps<{
   selectedEdge: string | null
   edges: Edge[]
-  edgeColorPalette: Array<{ value: string; label: string }>
-  getEdgeColor: (edge: { link_type: string | null }) => string
+  edgeColorPalette: Array<{ value: string }>
+  getEdgeColor: (edge: { link_type: string; color?: string | null }) => string
   isEdgeDirected: (edgeId: string) => boolean
 }>()
 
