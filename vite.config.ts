@@ -16,6 +16,11 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    watch: {
+      // The docs site and the Rust build are not app sources; watching them
+      // reloads the running app every time documentation is rebuilt
+      ignored: ['**/docs/**', '**/src-tauri/target/**'],
+    },
   },
   envPrefix: ['VITE_', 'TAURI_'],
   optimizeDeps: {
