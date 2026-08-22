@@ -418,7 +418,9 @@ onUnmounted(() => {
             <!-- Preview pane -->
             <div class="preview-pane">
               <div class="pane-header">Preview</div>
-              <!-- eslint-disable-next-line vue/no-v-html -->
+              <!-- Safe: renderMarkdown returns sanitizeHtml() output, so this
+                   markup has already been through DOMPurify -->
+              <!-- eslint-disable vue/no-v-html -->
               <div
                 ref="previewRef"
                 class="fullscreen-preview node-content"
@@ -426,6 +428,7 @@ onUnmounted(() => {
                 @click="handlePreviewClick"
                 v-html="renderedContent"
               ></div>
+              <!-- eslint-enable vue/no-v-html -->
             </div>
           </div>
 

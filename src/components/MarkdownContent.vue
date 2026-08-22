@@ -97,6 +97,9 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
+  <!-- Safe: renderMarkdown returns sanitizeHtml() output, so everything bound
+       here has already been through DOMPurify -->
+  <!-- eslint-disable vue/no-v-html -->
   <div
     ref="containerRef"
     class="markdown-content"
@@ -104,6 +107,7 @@ function handleClick(e: MouseEvent) {
     @click="handleClick"
     v-html="renderedHtml"
   ></div>
+  <!-- eslint-enable vue/no-v-html -->
 </template>
 
 <style>
