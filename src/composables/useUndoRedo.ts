@@ -62,7 +62,7 @@ export interface UndoRedoStore {
   updateNodeTitle: (id: string, title: string) => Promise<void>
   updateNodeColor: (id: string, color: string | null) => Promise<void>
   restoreNode: (node: Node) => Promise<void>
-  restoreEdge: (edge: Edge) => Promise<void>
+  restoreEdge: (edge: Edge) => void
   deleteNode: (id: string) => Promise<void>
   // Frame operations
   getFilteredFrames?: () => Array<{ id: string; canvas_x: number; canvas_y: number }>
@@ -257,7 +257,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
       await store.restoreNode(node)
       // Restore connected edges
       for (const edge of edges) {
-        await store.restoreEdge(edge)
+        store.restoreEdge(edge)
       }
       showToast('Undo deletion', 'info')
     } else if (snapshot.type === 'creation') {

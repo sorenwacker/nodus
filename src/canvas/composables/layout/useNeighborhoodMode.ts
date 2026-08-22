@@ -4,14 +4,7 @@
  */
 import { ref, computed, type Ref } from 'vue'
 import { NODE_DEFAULTS, LAYOUT_GAPS } from '../../constants'
-
-interface Node {
-  id: string
-  canvas_x: number
-  canvas_y: number
-  width?: number
-  height?: number
-}
+import type { Node } from '../../../types'
 
 interface Edge {
   id: string

@@ -141,10 +141,10 @@ export interface McpStoreInterface {
   getFilteredFrames: () => Frame[]
   getFrame: (id: string) => Frame | undefined
   createFrame: (x: number, y: number, width: number, height: number, title: string) => Frame
-  updateFramePosition: (id: string, x: number, y: number) => Promise<void>
-  updateFrameSize: (id: string, width: number, height: number) => Promise<void>
-  updateFrameTitle: (id: string, title: string) => Promise<void>
-  updateFrameColor: (id: string, color: string | null) => Promise<void>
+  updateFramePosition: (id: string, x: number, y: number) => void
+  updateFrameSize: (id: string, width: number, height: number) => void
+  updateFrameTitle: (id: string, title: string) => void
+  updateFrameColor: (id: string, color: string | null) => void
   deleteFrame: (id: string) => void
   assignNodesToFrame: (nodeIds: string[], frameId: string | null) => void
 

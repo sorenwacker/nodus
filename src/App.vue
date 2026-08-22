@@ -189,7 +189,7 @@ function toggleStorylinePanel() {
 }
 const mcpPendingConnectionId = ref<string | null>(null)
 const newWorkspaceName = ref('')
-const editingWorkspace = ref<{ id: string; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
+const editingWorkspace = ref<{ id: string | null; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
 import { invoke, getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
