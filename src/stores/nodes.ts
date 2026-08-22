@@ -52,6 +52,7 @@ import {
   restoreEdge as restoreEdgeFn,
   updateEdgeLinkType as updateEdgeLinkTypeFn,
   updateEdgeColor as updateEdgeColorFn,
+  updateEdgeLabel as updateEdgeLabelFn,
   updateEdgeDirected as updateEdgeDirectedFn,
   cleanupOrphanEdges as cleanupOrphanEdgesFn,
   deduplicateEdges as deduplicateEdgesFn,
@@ -303,6 +304,7 @@ export const useNodesStore = defineStore('nodes', () => {
   const restoreEdge = (edge: Edge) => restoreEdgeFn(edgesStore, edge)
   const updateEdgeLinkType = (id: string, linkType: string) => updateEdgeLinkTypeFn(edgesStore, id, linkType)
   const updateEdgeColor = (id: string, color: string | null) => updateEdgeColorFn(edgesStore, id, color)
+  const updateEdgeLabel = (id: string, label: string | null) => updateEdgeLabelFn(edgesStore, id, label)
   const updateEdgeDirected = (id: string, directed: boolean) => updateEdgeDirectedFn(edgesStore, id, directed)
   const cleanupOrphanEdges = () => cleanupOrphanEdgesFn(edgesStore, nodes.value)
   const deduplicateEdges = () => deduplicateEdgesFn(edgesStore)
@@ -588,6 +590,7 @@ export const useNodesStore = defineStore('nodes', () => {
     restoreEdge,
     updateEdgeLinkType,
     updateEdgeColor,
+    updateEdgeLabel,
     updateEdgeDirected,
     updateStorylineEdgeColors,
     // Frame operations

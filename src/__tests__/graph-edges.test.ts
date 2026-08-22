@@ -99,3 +99,20 @@ describe('graphEdges', () => {
     expect(store.graphEdges.map((e: Edge) => e.id)).toEqual(['e1'])
   })
 })
+
+describe('nodes store exposes the edge operations its consumers use', () => {
+  it('surfaces updateEdgeLabel, not just updateEdgeColor', async () => {
+    // The canvas and the agent both receive store.updateEdgeLabel; when the
+    // store did not export it they silently received undefined
+    const { setActivePinia, createPinia } = await import('pinia')
+    setActivePinia(createPinia())
+    const { useNodesStore } = await import('../stores/nodes')
+
+    const store = useNodesStore()
+    for (const method of ['updateEdgeLabel', 'updateEdgeColor', 'updateEdgeDirected', 'updateEdgeLinkType']) {
+      expect(typeof (store as unknown as Record<string, unknown>)[method], `${method} missing`).toBe(
+        'function'
+      )
+    }
+  })
+})

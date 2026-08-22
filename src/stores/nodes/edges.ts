@@ -88,6 +88,14 @@ export function updateEdgeLinkType(
 /**
  * Update edge color - forwarded to edges store
  */
+export function updateEdgeLabel(
+  edgesStore: NodeStoreDependencies['edgesStore'],
+  id: string,
+  label: string | null
+): Promise<void> {
+  return edgesStore.updateEdgeLabel(id, label)
+}
+
 export function updateEdgeColor(
   edgesStore: NodeStoreDependencies['edgesStore'],
   id: string,
