@@ -4163,6 +4163,41 @@ A "Living Documentation" workspace where everything is a node on one canvas. No 
 </tr>
 </tbody>
 </table>
+<p><em>Frames and storylines</em></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_frame(title, node_titles?)</code></td>
+<td>Create a frame, sized around the named nodes and enclosing them</td>
+</tr>
+<tr>
+<td><code>assign_node_to_frame(frame_title, node_titles)</code></td>
+<td>Move existing nodes into an existing frame</td>
+</tr>
+<tr>
+<td><code>list_frames()</code></td>
+<td>List the frames with the number of nodes in each</td>
+</tr>
+<tr>
+<td><code>create_storyline(title, description?, node_titles?)</code></td>
+<td>Create a storyline and thread the named nodes into it, in order</td>
+</tr>
+<tr>
+<td><code>add_node_to_storyline(storyline_title, node_titles)</code></td>
+<td>Append existing nodes to an existing storyline</td>
+</tr>
+<tr>
+<td><code>list_storylines()</code></td>
+<td>List the storylines in this workspace</td>
+</tr>
+</tbody>
+</table>
 <p><em>Reading the graph</em></p>
 <table>
 <thead>

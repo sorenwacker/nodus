@@ -915,6 +915,17 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 | `format_math()` | Reformat the math in the note to Typst syntax using the model. Use this when the note contains LaTeX (like \frac{a}{b} or \alpha) or other non-Typst math that should render correctly |
 | `node_done(summary)` | Signal that the node editing task is complete. You MUST call update_content first |
 
+*Frames and storylines*
+
+| Tool | Description |
+|------|-------------|
+| `create_frame(title, node_titles?)` | Create a frame, sized around the named nodes and enclosing them |
+| `assign_node_to_frame(frame_title, node_titles)` | Move existing nodes into an existing frame |
+| `list_frames()` | List the frames with the number of nodes in each |
+| `create_storyline(title, description?, node_titles?)` | Create a storyline and thread the named nodes into it, in order |
+| `add_node_to_storyline(storyline_title, node_titles)` | Append existing nodes to an existing storyline |
+| `list_storylines()` | List the storylines in this workspace |
+
 *Reading the graph*
 
 | Tool | Description |

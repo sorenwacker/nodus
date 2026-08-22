@@ -70,9 +70,7 @@ const INTENTIONAL_AGENT_ONLY: Record<string, string> = {
 
 /** Pre-existing asymmetry, recorded so new drift stands out. Shrink over time. */
 const BASELINE_MCP_ONLY: Record<string, string> = {
-  add_node_to_storyline: 'baseline debt: no in-app agent counterpart yet',
   arrange_radial: 'baseline debt: no in-app agent counterpart yet',
-  assign_node_to_frame: 'baseline debt: no in-app agent counterpart yet',
   batch_assign_nodes_to_frame: 'baseline debt: no in-app agent counterpart yet',
   batch_create_edges: 'baseline debt: no in-app agent counterpart yet',
   batch_delete_edges: 'baseline debt: no in-app agent counterpart yet',
@@ -82,8 +80,6 @@ const BASELINE_MCP_ONLY: Record<string, string> = {
   batch_resize_nodes: 'baseline debt: no in-app agent counterpart yet',
   batch_set_node_colors: 'baseline debt: no in-app agent counterpart yet',
   check_frame_overlaps: 'baseline debt: no in-app agent counterpart yet',
-  create_frame: 'baseline debt: no in-app agent counterpart yet',
-  create_storyline: 'baseline debt: no in-app agent counterpart yet',
   delete_edge: 'baseline debt: no in-app agent counterpart yet',
   delete_edges_for_node: 'baseline debt: no in-app agent counterpart yet',
   delete_frame: 'baseline debt: no in-app agent counterpart yet',
@@ -104,9 +100,7 @@ const BASELINE_MCP_ONLY: Record<string, string> = {
   get_root_nodes: 'baseline debt: no in-app agent counterpart yet',
   get_storyline: 'baseline debt: no in-app agent counterpart yet',
   get_storyline_nodes: 'baseline debt: no in-app agent counterpart yet',
-  list_frames: 'baseline debt: no in-app agent counterpart yet',
   list_nodes: 'baseline debt: no in-app agent counterpart yet',
-  list_storylines: 'baseline debt: no in-app agent counterpart yet',
   remove_node_from_frame: 'baseline debt: no in-app agent counterpart yet',
   remove_node_from_storyline: 'baseline debt: no in-app agent counterpart yet',
   reorder_storyline_nodes: 'baseline debt: no in-app agent counterpart yet',
@@ -188,6 +182,35 @@ const FIELD_EXCEPTIONS: Record<string, { mcpOnly?: string[]; agentOnly?: string[
     mcpOnly: ['id'],
     agentOnly: ['title'],
     reason: 'MCP addresses nodes by id; the app addresses by title',
+  },
+  create_frame: {
+    mcpOnly: ['x', 'y', 'width', 'height', 'color', 'workspace_id', 'parent_frame_id', 'folder_path'],
+    agentOnly: ['node_titles'],
+    reason:
+      'MCP places frames by coordinates; the agent sizes a frame around the nodes it is asked to enclose',
+  },
+  assign_node_to_frame: {
+    mcpOnly: ['node_id', 'frame_id'],
+    agentOnly: ['frame_title', 'node_titles'],
+    reason: 'MCP addresses by id and one node at a time; the agent addresses by title in batches',
+  },
+  create_storyline: {
+    mcpOnly: ['color', 'workspace_id'],
+    agentOnly: ['node_titles'],
+    reason: 'the agent threads nodes as it creates the storyline; colour is a UI choice',
+  },
+  add_node_to_storyline: {
+    mcpOnly: ['storyline_id', 'node_id', 'position'],
+    agentOnly: ['storyline_title', 'node_titles'],
+    reason: 'MCP addresses by id and one node at a time; the agent addresses by title in batches',
+  },
+  list_frames: {
+    mcpOnly: ['workspace_id'],
+    reason: 'the agent works in the workspace the user has open',
+  },
+  list_storylines: {
+    mcpOnly: ['workspace_id'],
+    reason: 'the agent works in the workspace the user has open',
   },
   create_edge: {
     mcpOnly: ['source_node_id', 'target_node_id', 'label', 'directed', 'weight', 'color', 'link_type'],

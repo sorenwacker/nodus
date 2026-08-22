@@ -61,6 +61,20 @@ export interface INodeStore {
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
   updateNodeTags?: (id: string, tags: string[]) => Promise<void>
+  // Frames and storylines: optional so contexts that do not provide them
+  // simply report the capability as unavailable rather than crashing
+  getFrames?: () => Array<{ id: string; title?: string }>
+  createFrame?: (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    title: string
+  ) => Promise<{ id: string; title?: string }> | { id: string; title?: string }
+  assignNodesToFrame?: (nodeIds: string[], frameId: string | null) => void
+  getStorylines?: () => Array<{ id: string; title: string; description?: string | null }>
+  createStoryline?: (title: string, description?: string) => Promise<{ id: string }>
+  addNodeToStoryline?: (storylineId: string, nodeId: string) => Promise<void>
   updateNodeColor?: (id: string, color: string) => Promise<void>
   updateEdgeLabel?: (id: string, label: string | null) => Promise<void>
   updateEdgeColor?: (id: string, color: string | null) => Promise<void>

@@ -1204,6 +1204,15 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
       updateNodeTags: store.updateNodeTags,
       updateEdgeLabel: store.updateEdgeLabel,
       updateEdgeColor: store.updateEdgeColor,
+      getFrames: () => store.filteredFrames,
+      createFrame: (x: number, y: number, width: number, height: number, title: string) =>
+        store.createFrame(x, y, width, height, title),
+      assignNodesToFrame: store.assignNodesToFrame,
+      getStorylines: () => store.filteredStorylines,
+      createStoryline: (title: string, description?: string) =>
+        store.createStoryline(title, description),
+      addNodeToStoryline: (storylineId: string, nodeId: string) =>
+        store.addNodeToStoryline(storylineId, nodeId),
     },
     log: (msg: string) => agentLog.value.push(msg),
     screenToCanvas,

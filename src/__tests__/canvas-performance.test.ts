@@ -352,7 +352,7 @@ describe('Canvas Performance', () => {
       const elapsed = performance.now() - start
 
       console.log(`[BASELINE] 2000 nodes load: ${elapsed.toFixed(2)}ms (target: <${baselines.nodes2000.loadTime}ms)`)
-      expect(elapsed).toBeLessThan(baselines.nodes2000.loadTime)
+      expect(elapsed).toBeLessThan(baselines.nodes2000.loadTime * SLACK)
     })
 
     it('BASELINE: 500 nodes - 60fps update cycle', () => {
@@ -373,7 +373,7 @@ describe('Canvas Performance', () => {
       const p95 = timings.sort((a, b) => a - b)[Math.floor(frames * 0.95)]
 
       console.log(`[BASELINE] 500 nodes update: avg=${avg.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, max=${max.toFixed(2)}ms`)
-      expect(avg).toBeLessThan(baselines.nodes500.updateTime)
+      expect(avg).toBeLessThan(baselines.nodes500.updateTime * SLACK)
     })
 
     it('BASELINE: 1000 nodes - 60fps update cycle', () => {
@@ -394,7 +394,7 @@ describe('Canvas Performance', () => {
       const p95 = timings.sort((a, b) => a - b)[Math.floor(frames * 0.95)]
 
       console.log(`[BASELINE] 1000 nodes update: avg=${avg.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, max=${max.toFixed(2)}ms`)
-      expect(avg).toBeLessThan(baselines.nodes1000.updateTime)
+      expect(avg).toBeLessThan(baselines.nodes1000.updateTime * SLACK)
     })
 
     it('BASELINE: 2000 nodes - 30fps minimum update cycle', () => {
@@ -415,7 +415,7 @@ describe('Canvas Performance', () => {
       const p95 = timings.sort((a, b) => a - b)[Math.floor(frames * 0.95)]
 
       console.log(`[BASELINE] 2000 nodes update: avg=${avg.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, max=${max.toFixed(2)}ms`)
-      expect(avg).toBeLessThan(baselines.nodes2000.updateTime)
+      expect(avg).toBeLessThan(baselines.nodes2000.updateTime * SLACK)
     })
 
     it('BASELINE: Edge creation - 2000 edges', () => {

@@ -19,6 +19,7 @@ import { registerResearchTools } from './researchTools'
 import { registerNodeEditTools } from './nodeEditTools'
 import { registerSelectionTools } from './selectionTools'
 import { registerKnowledgeBaseTools } from './knowledgeBaseTools'
+import { registerGroupingTools } from './groupingTools'
 
 export { resetPositionCounter } from './nodeTools'
 
@@ -45,6 +46,7 @@ export function registerCoreTools(): void {
   registerNodeEditTools()
   registerSelectionTools()
   registerKnowledgeBaseTools()
+  registerGroupingTools()
 }
 
 // Ensure tools are registered before exporting
