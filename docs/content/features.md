@@ -114,6 +114,18 @@ Create linear narratives through your knowledge graph:
 - Export storylines as documents
 - Color-code storyline edges
 
+### Importing PDF highlights
+
+Drop a PDF that you have already annotated and Nodus offers its highlights for import.
+
+1. Drop the PDF onto the canvas. The document is imported as a node as usual.
+2. If the file carries highlights, a picker lists them with their page number, colour and any comment you wrote.
+3. Choose the ones worth keeping and confirm. Each becomes a node holding the passage and your comment, linked back to the document node.
+
+Highlights already imported from that file are marked as such and are not imported again, so re-dropping an updated PDF brings in only what is new.
+
+A highlight can only be imported when the PDF stores the highlighted text alongside the annotation. Zotero and Adobe Acrobat do this; macOS Preview records only the marked region, so highlights made there appear in the picker as unavailable. This is a limitation of what the file contains, not of the file being unreadable.
+
 ### Exporting a document
 
 Turn work on the canvas into a document in two formats:

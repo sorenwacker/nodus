@@ -659,5 +659,15 @@
       "typst": "Eine Datei zum Weiterbearbeiten außerhalb von Nodus"
     },
     "reader": "Exportieren"
+  },
+  "highlights": {
+    "title": "Markierungen importieren",
+    "lead": "{count} Markierungen in diesem PDF gefunden.",
+    "page": "Seite {page}",
+    "noText": "Dieses PDF speichert den Text dieser Markierung nicht",
+    "alreadyImported": "bereits importiert",
+    "unavailableNote": "{count} Markierungen enthalten nur den markierten Bereich. Zotero und Acrobat speichern den Text, macOS Preview nicht.",
+    "confirm": "{count} importieren",
+    "imported": "{count} Markierungen importiert"
   }
 }

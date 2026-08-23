@@ -659,5 +659,15 @@
       "typst": "Un fichier à modifier hors de Nodus"
     },
     "reader": "Exporter"
+  },
+  "highlights": {
+    "title": "Importer les surlignages",
+    "lead": "{count} surlignages trouvés dans ce PDF.",
+    "page": "Page {page}",
+    "noText": "Ce PDF ne conserve pas le texte de ce surlignage",
+    "alreadyImported": "déjà importé",
+    "unavailableNote": "{count} surlignages n'enregistrent que la zone marquée. Zotero et Acrobat conservent le texte, pas macOS Preview.",
+    "confirm": "Importer {count}",
+    "imported": "{count} surlignages importés"
   }
 }

@@ -659,5 +659,15 @@
       "typst": "Un archivo para seguir editando fuera de Nodus"
     },
     "reader": "Exportar"
+  },
+  "highlights": {
+    "title": "Importar subrayados",
+    "lead": "{count} subrayados encontrados en este PDF.",
+    "page": "Página {page}",
+    "noText": "Este PDF no guarda el texto de este subrayado",
+    "alreadyImported": "ya importado",
+    "unavailableNote": "{count} subrayados solo registran la zona marcada. Zotero y Acrobat guardan el texto; macOS Preview no.",
+    "confirm": "Importar {count}",
+    "imported": "{count} subrayados importados"
   }
 }

@@ -66,6 +66,8 @@ import {
 import { measureNodeContent } from './utils/nodeSizing'
 import { findConnectedNodes } from './utils/graphTraversal'
 import ImportOptionsModal from '../components/ImportOptionsModal.vue'
+import PdfHighlightPicker from '../components/PdfHighlightPicker.vue'
+import type { HighlightImport } from '../lib/pdfHighlights'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
@@ -790,6 +792,11 @@ watch(hoveredNode, (n) => {
   store.hoverHighlightNodeId = n?.id ?? null
 })
 
+async function handleHighlightImport(chosen: HighlightImport[]) {
+  const count = await pdfDrop.confirmHighlightImport(chosen)
+  if (count > 0) showToast?.(t('highlights.imported', { count }), 'success')
+}
+
 // Export dialog: empty means closed
 const exportNodes = ref<Node[]>([])
 const exportEdges = computed(() => {
@@ -1126,6 +1133,8 @@ const pdfDrop = usePdfDrop({
     createEdge: store.createEdge,
     createFrame: store.createFrame,
     importOntology: store.importOntology,
+    getNodes: () => store.nodes,
+    updateNodeColor: store.updateNodeColor,
   },
   viewState: {
     getViewportCenter: () => {
@@ -2409,6 +2418,15 @@ defineExpose({
         :has-attachments="pdfDrop.pendingBibImport.value.hasAttachments"
         @import="pdfDrop.confirmBibImport($event)"
         @cancel="pdfDrop.cancelBibImport()"
+      />
+
+      <!-- Highlights of a dropped PDF: the reader chooses which become nodes -->
+      <PdfHighlightPicker
+        v-if="pdfDrop.pendingHighlights.value"
+        :entries="pdfDrop.pendingHighlights.value.entries"
+        :filename="pdfDrop.pendingHighlights.value.filename"
+        @import="handleHighlightImport"
+        @cancel="pdfDrop.cancelHighlightImport()"
       />
 
       <!-- Plan approval modal for agent planning -->

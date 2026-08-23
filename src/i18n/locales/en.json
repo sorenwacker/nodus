@@ -690,5 +690,15 @@
       "typst": "A file to keep editing outside Nodus"
     },
     "reader": "Export"
+  },
+  "highlights": {
+    "title": "Import highlights",
+    "lead": "{count} highlights found in this PDF.",
+    "page": "Page {page}",
+    "noText": "This PDF does not store the text of this highlight",
+    "alreadyImported": "already imported",
+    "unavailableNote": "{count} highlights record only the marked region. Zotero and Acrobat store the text; macOS Preview does not.",
+    "confirm": "Import {count}",
+    "imported": "Imported {count} highlights"
   }
 }

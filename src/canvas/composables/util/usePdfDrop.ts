@@ -3,10 +3,17 @@
  * Handles file drops: PDF, Markdown, BibTeX, and Ontology files
  */
 import { ref } from 'vue'
-import { extractPdfText, readTextFile } from '../../../lib/tauri'
+import { extractPdfText, extractPdfAnnotations, readTextFile } from '../../../lib/tauri'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { parseReferences, citationToMarkdown, type BibEntry } from '../../../lib/bibtex'
+import {
+  toHighlightImports,
+  highlightNodeContent,
+  highlightNodeTitle,
+  importedHighlightKeys,
+  type HighlightImport,
+} from '../../../lib/pdfHighlights'
 import {
   splitIntoChunks,
   preProcessPdfText,
@@ -60,6 +67,18 @@ interface Store {
     options?: { createClassNodes?: boolean; layout?: 'grid' | 'hierarchical' }
   ) => Promise<{ nodesCreated: number; edgesCreated: number; nodeIds: string[] }>
   createFrame?: (x: number, y: number, width: number, height: number, title: string) => Frame
+  /** Existing nodes, read to avoid importing the same highlight twice */
+  getNodes?: () => { markdown_content?: string | null }[]
+  updateNodeColor?: (id: string, color: string) => Promise<void>
+}
+
+/** Highlights of a dropped PDF, waiting for the reader to choose among them */
+export interface PendingHighlightImport {
+  filename: string
+  sourceNodeId: string
+  entries: HighlightImport[]
+  x: number
+  y: number
 }
 
 const ONTOLOGY_EXTENSIONS = ['.ttl', '.rdf', '.owl', '.jsonld']
@@ -95,6 +114,7 @@ export function usePdfDrop(options: UsePdfDropOptions) {
 
   // Pending bib import (for modal confirmation)
   const pendingBibImport = ref<PendingBibImport | null>(null)
+  const pendingHighlights = ref<PendingHighlightImport | null>(null)
   const showImportOptions = ref(false)
 
   function stop() {
@@ -193,6 +213,8 @@ ${preprocessed}`
       await store.updateNodeTitle(loadingNode.id, title)
       await store.updateNodeContent(loadingNode.id, contentWithSource)
 
+      await offerHighlights(filePath, filename, loadingNode.id, x, y)
+
     } catch (error) {
       const errorNode = await store.createNode({
         title: 'PDF Error',
@@ -209,6 +231,77 @@ ${preprocessed}`
         pushCreationUndo(lastImportNodeIds)
       }
     }
+  }
+
+  /**
+   * Offer the highlights of a dropped PDF for import. Which passages deserve a
+   * node is the reader's judgement, so nothing is imported here
+   * (PRODUCT_DESIGN.md > PDF highlights as nodes).
+   */
+  async function offerHighlights(
+    filePath: string,
+    filename: string,
+    sourceNodeId: string,
+    x: number,
+    y: number
+  ) {
+    let annotations
+    try {
+      annotations = await extractPdfAnnotations(filePath)
+    } catch {
+      // A PDF that cannot be read for annotations still imported its text
+      return
+    }
+    if (annotations.length === 0) return
+
+    const entries = toHighlightImports(
+      annotations,
+      `${filename}.pdf`,
+      importedHighlightKeys(store.getNodes?.() ?? [])
+    )
+    pendingHighlights.value = { filename: `${filename}.pdf`, sourceNodeId, entries, x, y }
+  }
+
+  /** Create a node per chosen highlight, each linked to the document it came from */
+  async function confirmHighlightImport(chosen: HighlightImport[]): Promise<number> {
+    const pending = pendingHighlights.value
+    pendingHighlights.value = null
+    if (!pending || chosen.length === 0) return 0
+
+    const created: string[] = []
+    // A column beside the document node, so the source stays visible next to
+    // what was taken from it
+    const columnX = pending.x + 420
+
+    for (let i = 0; i < chosen.length; i++) {
+      const entry = chosen[i]
+      const node = await store.createNode({
+        title: highlightNodeTitle(entry),
+        node_type: 'note',
+        markdown_content: highlightNodeContent(pending.filename, entry.annotation),
+        canvas_x: columnX,
+        canvas_y: pending.y + i * 200,
+      })
+      created.push(node.id)
+
+      await store.createEdge({
+        source_node_id: pending.sourceNodeId,
+        target_node_id: node.id,
+        link_type: 'cites',
+      })
+
+      // Readers who colour-code their highlights assign meaning to the colours
+      if (entry.color && store.updateNodeColor) {
+        await store.updateNodeColor(node.id, entry.color)
+      }
+    }
+
+    if (created.length > 0 && pushCreationUndo) pushCreationUndo(created)
+    return created.length
+  }
+
+  function cancelHighlightImport() {
+    pendingHighlights.value = null
   }
 
   async function processOntologyDrop(filePath: string) {
@@ -520,6 +613,7 @@ ${preprocessed}`
     // Import options modal state
     showImportOptions,
     pendingBibImport,
+    pendingHighlights,
     // Actions
     setup,
     cleanup,
@@ -532,6 +626,9 @@ ${preprocessed}`
     previewBibFile,
     confirmBibImport,
     cancelBibImport,
+    // Highlight import
+    confirmHighlightImport,
+    cancelHighlightImport,
     // File type checks
     isOntologyFile,
     isBibFile,

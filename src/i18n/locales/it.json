@@ -659,5 +659,15 @@
       "typst": "Un file da modificare fuori da Nodus"
     },
     "reader": "Esporta"
+  },
+  "highlights": {
+    "title": "Importa evidenziazioni",
+    "lead": "{count} evidenziazioni trovate in questo PDF.",
+    "page": "Pagina {page}",
+    "noText": "Questo PDF non memorizza il testo di questa evidenziazione",
+    "alreadyImported": "già importata",
+    "unavailableNote": "{count} evidenziazioni registrano solo la zona marcata. Zotero e Acrobat memorizzano il testo, macOS Preview no.",
+    "confirm": "Importa {count}",
+    "imported": "{count} evidenziazioni importate"
   }
 }

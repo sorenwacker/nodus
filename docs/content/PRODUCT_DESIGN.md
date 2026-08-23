@@ -331,6 +331,17 @@ The integral is: $ integral_a^b f(x) dif x $
 ```
 ```
 
+### PDF highlights as nodes
+
+**Required behavior:** A researcher's reading already happened somewhere else. The highlights in a PDF are the parts they judged worth keeping, so re-typing them onto the canvas is work they have already done once.
+
+- Dropping a PDF that carries highlights offers them for import instead of importing them silently. Which passages are worth a node is the reader's judgement, not the application's.
+- Each imported highlight becomes a node holding the highlighted passage and the reader's own comment if there is one, linked to the node created for the source document. The link is what makes the passage traceable back to what it came from.
+- Highlight colour is carried onto the node, because readers who colour-code assign meaning to the colours.
+- Import is additive: a highlight that has already been imported is not imported twice.
+
+**Known limitation:** a highlight can only be imported when the PDF stores the highlighted text with the annotation, which annotators such as Zotero and Acrobat do and some, notably macOS Preview, do not. Recovering the text for the rest means locating it geometrically in the page content stream, which is not implemented. Highlights whose text cannot be recovered are reported as such rather than imported as empty nodes.
+
 ### Document export
 
 **Required behavior:** Everything in Nodus moves thinking onto the canvas; export is the only path that takes finished work back off it. Without it a completed argument has to be retyped somewhere else to become a document, which is where the tool stops being useful and the user goes back to a word processor.
@@ -841,8 +852,8 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 - [x] Drag citation → create linked node (BibTeX/CSL-JSON drop)
 - [x] Zotero collection → Frame mapping
 - [x] Direct Zotero library access (Settings > Citations)
-- [ ] PDF import with highlights
-- [ ] PDF highlight → canvas node
+- [x] PDF import with highlights
+- [x] PDF highlight → canvas node
 - [x] Typst math rendering (WASM)
 - [x] Live-rendered equations
 - [ ] "Modernize My Math" import

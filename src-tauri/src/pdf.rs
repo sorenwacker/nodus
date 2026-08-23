@@ -125,10 +125,10 @@ fn parse_annotation(doc: &Document, obj: &Object, page_num: u32) -> Option<PdfAn
         .ok()
         .and_then(|obj| get_string(doc, obj));
 
-    // Only include annotations that have content or comments
-    if content.is_empty() && comment.is_none() {
-        return None;
-    }
+    // An annotation whose text the file does not store is still reported, with
+    // empty content, so the interface can say so rather than silently losing a
+    // highlight the reader can see in their PDF viewer
+    // (PRODUCT_DESIGN.md > PDF highlights as nodes)
 
     Some(PdfAnnotation {
         annotation_type: annotation_type.to_string(),
@@ -261,5 +261,85 @@ mod tests {
             strip_xml_tags("<p><b>Bold</b> and <i>italic</i></p>"),
             "Bold and italic"
         );
+    }
+
+    /// Build a one-page PDF carrying the two kinds of highlight that matter:
+    /// one whose text the file stores, and one that records only the marked
+    /// region (what macOS Preview writes).
+    fn write_pdf_with_highlights(path: &std::path::Path) {
+        use lopdf::dictionary;
+
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+
+        let stored = doc.add_object(dictionary! {
+            "Type" => "Annot",
+            "Subtype" => "Highlight",
+            "Contents" => Object::string_literal("a passage worth keeping"),
+            "C" => vec![Object::Real(1.0), Object::Real(0.9), Object::Real(0.2)],
+        });
+        let geometry_only = doc.add_object(dictionary! {
+            "Type" => "Annot",
+            "Subtype" => "Highlight",
+            "QuadPoints" => vec![
+                Object::Real(72.0), Object::Real(700.0),
+                Object::Real(300.0), Object::Real(700.0),
+                Object::Real(72.0), Object::Real(688.0),
+                Object::Real(300.0), Object::Real(688.0),
+            ],
+        });
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Annots" => vec![stored.into(), geometry_only.into()],
+        });
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        doc.save(path).unwrap();
+    }
+
+    #[test]
+    fn reads_the_text_of_a_highlight_the_file_stores() {
+        let path = std::env::temp_dir().join("nodus-highlight-stored.pdf");
+        write_pdf_with_highlights(&path);
+
+        let annotations = extract_annotations(&path).unwrap();
+        let stored = annotations
+            .iter()
+            .find(|a| !a.content.is_empty())
+            .expect("the annotation carrying text should be read");
+
+        assert_eq!(stored.annotation_type, "highlight");
+        assert_eq!(stored.content, "a passage worth keeping");
+        assert_eq!(stored.color.as_deref(), Some("#ffe533"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn reports_a_highlight_whose_text_the_file_does_not_store() {
+        // Dropping it would lose a highlight the reader can see in their
+        // viewer; the interface needs to be able to say why it is unavailable
+        let path = std::env::temp_dir().join("nodus-highlight-geometry.pdf");
+        write_pdf_with_highlights(&path);
+
+        let annotations = extract_annotations(&path).unwrap();
+
+        assert_eq!(annotations.len(), 2);
+        assert!(annotations
+            .iter()
+            .any(|a| a.content.is_empty() && a.comment.is_none()));
+        std::fs::remove_file(&path).ok();
     }
 }
