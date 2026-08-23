@@ -18,6 +18,7 @@ import { createPinia } from 'pinia'
 import { h, ref } from 'vue'
 import en from '../i18n/locales/en.json'
 import CanvasNodeCard from '../canvas/components/CanvasNodeCard.vue'
+import CanvasEdgesSVG from '../canvas/components/CanvasEdgesSVG.vue'
 import type { Node } from '../types'
 
 // Wall-clock budgets are load-sensitive; the full suite runs these alongside
@@ -122,5 +123,106 @@ describe('rendering cost by node count', () => {
       expect(wrapper.find('.node-card').element).toBe(firstCard)
       wrapper.unmount()
     })
+  })
+})
+
+/** Build the edge lines the SVG layer receives, already routed */
+function edgeLines(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `e${i}`,
+    source_node_id: `n${i}`,
+    target_node_id: `n${(i + 1) % count}`,
+    x1: (i % 100) * 300,
+    y1: Math.floor(i / 100) * 220,
+    x2: ((i + 1) % 100) * 300,
+    y2: Math.floor((i + 1) / 100) * 220,
+    labelX: 0,
+    labelY: 0,
+    path: `M ${(i % 100) * 300} ${Math.floor(i / 100) * 220} L ${((i + 1) % 100) * 300} ${Math.floor((i + 1) / 100) * 220}`,
+    style: 'solid',
+    strokeWidth: 2,
+    hitX1: 0,
+    hitY1: 0,
+    hitX2: 0,
+    hitY2: 0,
+    link_type: 'related',
+    color: '#888888',
+    label: null,
+    isBidirectional: false,
+    isShortEdge: false,
+    isHighlighted: false,
+    isSelected: false,
+    isNeighborEdge: false,
+    opacity: 1,
+    edgeHighlightColor: '#3b82f6',
+    renderStrokeWidth: 2,
+    glowStrokeWidth: 4,
+    arrowMarkerId: 'arrow',
+  }))
+}
+
+function mountEdges(count: number, isLargeGraph: boolean) {
+  const edges = edgeLines(count)
+
+  const start = performance.now()
+  const wrapper = mount(CanvasEdgesSVG, {
+    props: {
+      edges,
+      isLargeGraph,
+      edgeStrokeWidth: 2,
+      edgeLabelSize: 12,
+      zoom: 1,
+      edgeLabelZoomThreshold: 0,
+      lassoPoints: [],
+      isLassoSelecting: false,
+      currentTheme: 'light',
+      highlightColor: '#3b82f6',
+      isCreatingEdge: false,
+      edgePreviewStart: null,
+      edgePreviewEnd: { x: 0, y: 0 },
+    },
+    global: { plugins: [i18n, createPinia()] },
+  })
+  const mountMs = performance.now() - start
+
+  return { wrapper, mountMs }
+}
+
+describe('where the rendering cost actually is', () => {
+  it('compares a card against an edge, so the next optimisation targets the right layer', () => {
+    const cards = mountCards(500)
+    const cardsMs = cards.mountMs
+    cards.wrapper.unmount()
+
+    const interactive = mountEdges(500, false)
+    const interactiveMs = interactive.mountMs
+    interactive.wrapper.unmount()
+
+    const fast = mountEdges(500, true)
+    const fastMs = fast.mountMs
+    fast.wrapper.unmount()
+
+    console.log(
+      `500 each: cards ${cardsMs.toFixed(1)}ms, ` +
+        `edges interactive ${interactiveMs.toFixed(1)}ms, edges fast-path ${fastMs.toFixed(1)}ms ` +
+        `(card is ${(cardsMs / Math.max(interactiveMs, 0.01)).toFixed(1)}x an interactive edge)`
+    )
+
+    expect(cardsMs).toBeGreaterThan(0)
+    expect(interactiveMs).toBeGreaterThan(0)
+  })
+
+  it('keeps the fast edge path cheaper than the interactive one', () => {
+    // The fast path draws one element per edge instead of three; if that stops
+    // being cheaper there is no reason to keep two paths
+    const interactive = mountEdges(800, false)
+    const interactiveMs = interactive.mountMs
+    interactive.wrapper.unmount()
+
+    const fast = mountEdges(800, true)
+    const fastMs = fast.mountMs
+    fast.wrapper.unmount()
+
+    expect(fastMs).toBeLessThan(interactiveMs * 1.5)
   })
 })
