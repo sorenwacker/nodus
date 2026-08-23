@@ -364,6 +364,23 @@ The integral is: $ integral_a^b f(x) dif x $
 - The grant comes from the operating system's drop event as the backend receives it, never from a path handed over by the interface. A caller that can name a path could otherwise grant itself access to it, which is the check this guard exists to make.
 - Everything else is unchanged: a path that was neither dropped nor inside a vault is still refused.
 
+### PDF as a graph
+
+**Required behavior:** A paper is already a structure - sections, an argument, a bibliography - and flattening it into one node discards exactly what a graph tool is for. Dropping a PDF offers a choice of how it lands:
+
+| Mode | What is built | Needs |
+|------|---------------|-------|
+| Single node | The whole document in one node, as before | Nothing |
+| Section graph | One node per heading section, edges following the document tree, all in a frame named after the paper | Nothing - structural, deterministic |
+| + References | Entries in the references section become citation nodes with `cites` edges from the paper | Nothing to parse; a lookup service to verify |
+| + Semantic graph | An LLM pass per section extracts claims and findings as nodes with typed edges (`supports`, `contradicts`, `related`) | The configured language model |
+
+- The section graph and references never depend on the LLM: they must work offline and when the model is down.
+- **Verification states are three, not two.** A parsed reference checked against the lookup service is `verified` (found), `not_found` (the service answered and has no match), or `not_checked` (the service could not be reached). An outage must never mark a reference as missing: someone else's downtime must not invalidate the user's bibliography. The state is stored in the citation node's frontmatter and shown on the node.
+- References with a DOI are checked by DOI; those without are matched by title. A title match below the service's own confidence is `not_found`, not a guess.
+- **Zotero is opt-in per import.** When the Zotero integration is configured, the import dialog offers to add the extracted references to Zotero; nothing is written without that choice. Verified references carry their resolved DOI into Zotero.
+- The semantic graph is a choice in the same dialog, never a default: it spends model time and its quality depends on the model. Sections whose extraction fails are skipped with a notice, and the structural graph is never held up by it.
+
 ### PDF highlights as nodes
 
 **Required behavior:** A researcher's reading already happened somewhere else. The highlights in a PDF are the parts they judged worth keeping, so re-typing them onto the canvas is work they have already done once.

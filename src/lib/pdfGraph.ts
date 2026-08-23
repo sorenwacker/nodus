@@ -1,0 +1,242 @@
+/**
+ * Turning a document's structure into graph structure.
+ *
+ * A paper is already sections, an argument, and a bibliography; these helpers
+ * recover that structure from the imported markdown. Everything here is
+ * deterministic - no model, no network - so the structural import works
+ * offline (PRODUCT_DESIGN.md > PDF as a graph).
+ */
+
+import { upsertFrontmatterField } from './contentParser'
+
+/** One heading section of a document */
+export interface DocumentSection {
+  title: string
+  /** Heading level, 1 for the document title */
+  level: number
+  /** Body text of this section, without its child sections */
+  content: string
+  /** Index of the enclosing section, or null for the root */
+  parentIndex: number | null
+}
+
+/** A parsed bibliography entry */
+export interface ReferenceEntry {
+  /** The entry as written */
+  raw: string
+  /** Best-effort title, for lookup and for the citation node */
+  title: string
+  doi: string | null
+}
+
+export type VerificationState = 'verified' | 'not_found' | 'not_checked'
+
+export interface Verification {
+  state: VerificationState
+  detail?: string
+}
+
+/**
+ * Split markdown into heading sections, keeping the hierarchy. A document with
+ * no headings is one section.
+ */
+export function splitIntoSections(markdown: string): DocumentSection[] {
+  const lines = markdown.split('\n')
+  const sections: DocumentSection[] = []
+  // Innermost open section per level, to resolve parents
+  const openByLevel = new Map<number, number>()
+  let current: DocumentSection | null = null
+  let buffer: string[] = []
+
+  function flush() {
+    if (current) current.content = buffer.join('\n').trim()
+    buffer = []
+  }
+
+  for (const line of lines) {
+    const heading = line.match(/^(#{1,6})\s+(.+)$/)
+    if (!heading) {
+      buffer.push(line)
+      continue
+    }
+
+    flush()
+    const level = heading[1].length
+    // The parent is the nearest open section above this level
+    let parentIndex: number | null = null
+    for (let l = level - 1; l >= 1; l--) {
+      const open = openByLevel.get(l)
+      if (open !== undefined) {
+        parentIndex = open
+        break
+      }
+    }
+
+    current = { title: heading[2].trim(), level, content: '', parentIndex }
+    sections.push(current)
+    openByLevel.set(level, sections.length - 1)
+    // A new section closes anything deeper
+    for (const l of [...openByLevel.keys()]) {
+      if (l > level) openByLevel.delete(l)
+    }
+  }
+  flush()
+
+  if (sections.length === 0) {
+    return [{ title: '', level: 1, content: markdown.trim(), parentIndex: null }]
+  }
+  return sections
+}
+
+const REFERENCE_TITLES = /^(references|bibliography|literature|works cited|literatur)\b/i
+
+/** The section holding the bibliography, or null when there is none */
+export function findReferencesSection(sections: DocumentSection[]): DocumentSection | null {
+  return sections.find(s => REFERENCE_TITLES.test(s.title)) ?? null
+}
+
+const DOI_PATTERN = /\b(10\.\d{4,9}\/[-._;()/:a-zA-Z0-9]+)/
+
+/**
+ * Parse bibliography text into entries. Entries are list items or blank-line
+ * separated blocks; the title is the first sentence after the year when one is
+ * recognisable, otherwise the longest fragment of the entry.
+ */
+export function parseReferenceEntries(text: string): ReferenceEntry[] {
+  const blocks = text
+    .split(/\n(?=- |\* |\d+\.\s)|\n\s*\n/)
+    .map(b => b.replace(/^[-*]\s+|^\d+\.\s+/, '').replace(/\s+/g, ' ').trim())
+    .filter(b => b.length > 10)
+
+  return blocks.map(raw => {
+    const doi = raw.match(DOI_PATTERN)?.[1]?.replace(/[).,;]+$/, '') ?? null
+
+    // Title: the fragment after "(year)." up to the next period, the common
+    // author-year form; otherwise the longest period-separated fragment
+    // A period only ends the title before whitespace and a capital, so
+    // "LCDB 1.0: ..." keeps its version number
+    const afterYear = raw.match(/\(\d{4}\)\.?\s+(.+?)(?:\.\s+[A-Z]|$)/)?.[1]
+    const title = (afterYear ?? longestFragment(raw)).trim()
+
+    return { raw, title, doi }
+  })
+}
+
+function longestFragment(text: string): string {
+  return text
+    .split(/\.\s+(?=[A-Z])/)
+    .reduce((best, part) => (part.length > best.length ? part : best), '')
+}
+
+/**
+ * Map a lookup outcome to a verification state. Three states, not two: an
+ * outage must never mark a reference as missing
+ * (PRODUCT_DESIGN.md > PDF as a graph).
+ */
+export function verificationFromLookup(outcome: {
+  found?: boolean
+  error?: string
+}): Verification {
+  if (outcome.error !== undefined) {
+    return { state: 'not_checked', detail: outcome.error }
+  }
+  return { state: outcome.found ? 'verified' : 'not_found' }
+}
+
+/** A node the import will create */
+export interface PlannedNode {
+  /** Stable key within the plan, for edges */
+  key: string
+  title: string
+  content: string
+  nodeType: 'note' | 'citation'
+  x: number
+  y: number
+}
+
+export interface PlannedEdge {
+  fromKey: string
+  toKey: string
+  linkType: 'related' | 'cites'
+}
+
+export interface GraphImportPlan {
+  frameTitle: string
+  rootKey: string
+  nodes: PlannedNode[]
+  edges: PlannedEdge[]
+}
+
+const COLUMN_WIDTH = 300
+const ROW_HEIGHT = 200
+const SECTIONS_PER_ROW = 4
+
+/**
+ * Plan the nodes and edges of a section graph: one node per content section,
+ * edges following the document tree, citation nodes for the references, all
+ * relative to the drop position. Pure planning - the caller materialises it
+ * (PRODUCT_DESIGN.md > PDF as a graph).
+ */
+export function planGraphImport(
+  sections: DocumentSection[],
+  references: ReferenceEntry[],
+  origin: { x: number; y: number }
+): GraphImportPlan {
+  const referencesSection = findReferencesSection(sections)
+  const content = sections.filter(s => s !== referencesSection)
+
+  const root = content[0]
+  const frameTitle = root?.title || 'Imported document'
+
+  const nodes: PlannedNode[] = []
+  const edges: PlannedEdge[] = []
+  const keyByIndex = new Map<number, string>()
+
+  content.forEach((section, i) => {
+    const key = `s${i}`
+    keyByIndex.set(sections.indexOf(section), key)
+    nodes.push({
+      key,
+      title: section.title || frameTitle,
+      content: section.content,
+      nodeType: 'note',
+      x: origin.x + (i % SECTIONS_PER_ROW) * COLUMN_WIDTH,
+      y: origin.y + Math.floor(i / SECTIONS_PER_ROW) * ROW_HEIGHT,
+    })
+  })
+
+  // Edges follow the document tree
+  content.forEach(section => {
+    const childKey = keyByIndex.get(sections.indexOf(section))!
+    if (section.parentIndex === null) return
+    const parentKey = keyByIndex.get(section.parentIndex)
+    if (parentKey && parentKey !== childKey) {
+      edges.push({ fromKey: parentKey, toKey: childKey, linkType: 'related' })
+    }
+  })
+
+  // Citations in their own column right of the sections, cited by the root
+  const rootKey = keyByIndex.get(sections.indexOf(root)) ?? 's0'
+  const citationX = origin.x + SECTIONS_PER_ROW * COLUMN_WIDTH + COLUMN_WIDTH / 2
+  references.forEach((ref, i) => {
+    const key = `r${i}`
+    nodes.push({
+      key,
+      title: ref.title,
+      content: ref.raw + (ref.doi ? `\n\nDOI: ${ref.doi}` : ''),
+      nodeType: 'citation',
+      x: citationX,
+      y: origin.y + i * (ROW_HEIGHT * 0.75),
+    })
+    edges.push({ fromKey: rootKey, toKey: key, linkType: 'cites' })
+  })
+
+  return { frameTitle, rootKey, nodes, edges }
+}
+
+/** Record a verification state in a citation node's frontmatter */
+export function withVerification(content: string, verification: Verification): string {
+  const value =
+    verification.state + (verification.detail ? ` (${verification.detail.slice(0, 120)})` : '')
+  return upsertFrontmatterField(content, 'verification', value)
+}

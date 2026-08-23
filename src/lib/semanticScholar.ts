@@ -164,6 +164,40 @@ export class SemanticScholarProvider {
   }
 
   /**
+   * Look a reference up for verification, keeping "no match" distinct from
+   * "could not check": an outage must never mark a reference as missing
+   * (PRODUCT_DESIGN.md > PDF as a graph).
+   */
+  async lookupForVerification(entry: {
+    title: string
+    doi: string | null
+  }): Promise<{ found?: boolean; paper?: SemanticScholarPaper; error?: string }> {
+    try {
+      if (entry.doi) {
+        const response = await this.rateLimitedFetch(
+          `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(entry.doi)}?fields=paperId,externalIds,title,authors,year,venue`
+        )
+        if (response.status === 404) return { found: false }
+        if (!response.ok) return { error: `lookup failed: HTTP ${response.status}` }
+        return { found: true, paper: (await response.json()) as SemanticScholarPaper }
+      }
+
+      // Title match: the service's own best-match endpoint, which answers 404
+      // when nothing matches confidently enough - a non-match, not an error
+      const response = await this.rateLimitedFetch(
+        `https://api.semanticscholar.org/graph/v1/paper/search/match?query=${encodeURIComponent(entry.title)}&fields=paperId,externalIds,title,authors,year,venue`
+      )
+      if (response.status === 404) return { found: false }
+      if (!response.ok) return { error: `lookup failed: HTTP ${response.status}` }
+      const body = (await response.json()) as { data?: SemanticScholarPaper[] }
+      const paper = body.data?.[0]
+      return paper ? { found: true, paper } : { found: false }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  /**
    * Get paper metadata by Semantic Scholar paper ID
    */
   async getPaperById(paperId: string): Promise<SemanticScholarPaper | null> {

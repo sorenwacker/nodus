@@ -669,5 +669,23 @@
     "unavailableNote": "{count} evidenziazioni registrano solo la zona marcata. Zotero e Acrobat memorizzano il testo, macOS Preview no.",
     "confirm": "Importa {count}",
     "imported": "{count} evidenziazioni importate"
+  },
+  "pdfGraph": {
+    "title": "Espandere in un grafo",
+    "lead": "Questo documento ha una struttura. Scegli cosa entra nel grafo; il nodo singolo resta comunque.",
+    "sections": "{count} sezioni come nodi",
+    "sectionsHint": "Un nodo per titolo, collegati secondo la struttura del documento, raggruppati in una cornice",
+    "references": "{count} riferimenti come nodi di citazione",
+    "referencesHint": "Ogni voce della bibliografia diventa un nodo di citazione",
+    "verify": "Verifica con Semantic Scholar",
+    "verifyHint": "Segna ogni riferimento come trovato, non trovato o non verificato se il servizio non risponde",
+    "zotero": "Aggiungi i riferimenti a Zotero",
+    "zoteroHint": "Aggiunge i riferimenti estratti alla tua libreria Zotero",
+    "semantic": "Estrai le affermazioni con l'IA",
+    "semanticHint": "Una passata per sezione; le affermazioni diventano nodi collegati",
+    "keepSingle": "Mantieni nodo singolo",
+    "confirm": "Costruisci grafo",
+    "built": "{count} nodi costruiti dal documento",
+    "semanticSkipped": "{count} sezioni saltate dal passaggio IA"
   }
 }

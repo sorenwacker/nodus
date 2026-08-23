@@ -109,6 +109,18 @@ export interface UsePdfDropOptions {
   viewState: ViewState
   llm: LLM
   pushCreationUndo?: (nodeIds: string[]) => void
+  /**
+   * Called when a document finished importing, with its cleaned markdown.
+   * The graph offer lives behind this seam (usePdfGraphImport), so the drop
+   * pipeline needs no knowledge of graph building.
+   */
+  onDocumentImported?: (
+    markdown: string,
+    filename: string,
+    documentNodeId: string,
+    x: number,
+    y: number
+  ) => void
 }
 
 export function usePdfDrop(options: UsePdfDropOptions) {
@@ -277,6 +289,7 @@ ${preprocessed}`
       await store.updateNodeContent(loadingNode.id, contentWithSource)
 
       await offerHighlights(filePath, filename, loadingNode.id, x, y)
+      options.onDocumentImported?.(cleanedText, filename, loadingNode.id, x, y)
 
     } catch (error) {
       const errorNode = await store.createNode({

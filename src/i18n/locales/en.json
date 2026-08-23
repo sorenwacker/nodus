@@ -700,5 +700,23 @@
     "unavailableNote": "{count} highlights record only the marked region. Zotero and Acrobat store the text; macOS Preview does not.",
     "confirm": "Import {count}",
     "imported": "Imported {count} highlights"
+  },
+  "pdfGraph": {
+    "title": "Expand into a graph",
+    "lead": "This document has structure. Choose what becomes part of your graph; the single node stays either way.",
+    "sections": "{count} sections as nodes",
+    "sectionsHint": "One node per heading, connected along the document outline, grouped in a frame",
+    "references": "{count} references as citation nodes",
+    "referencesHint": "Each entry in the bibliography becomes a citation node cited by the paper",
+    "verify": "Verify against Semantic Scholar",
+    "verifyHint": "Marks each reference found, not found, or not checked when the service is unreachable",
+    "zotero": "Add references to Zotero",
+    "zoteroHint": "Adds the extracted references to your Zotero library",
+    "semantic": "Extract claims with the AI",
+    "semanticHint": "One pass per section; claims become nodes linked as supporting or contradicting",
+    "keepSingle": "Keep single node",
+    "confirm": "Build graph",
+    "built": "Built {count} nodes from the document",
+    "semanticSkipped": "{count} sections skipped by the AI pass"
   }
 }

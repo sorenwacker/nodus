@@ -669,5 +669,23 @@
     "unavailableNote": "{count} subrayados solo registran la zona marcada. Zotero y Acrobat guardan el texto; macOS Preview no.",
     "confirm": "Importar {count}",
     "imported": "{count} subrayados importados"
+  },
+  "pdfGraph": {
+    "title": "Expandir en un grafo",
+    "lead": "Este documento tiene estructura. Elige qué pasa a tu grafo; el nodo único se conserva en cualquier caso.",
+    "sections": "{count} secciones como nodos",
+    "sectionsHint": "Un nodo por título, conectados según el esquema del documento, agrupados en un marco",
+    "references": "{count} referencias como nodos de cita",
+    "referencesHint": "Cada entrada de la bibliografía se convierte en un nodo de cita",
+    "verify": "Verificar con Semantic Scholar",
+    "verifyHint": "Marca cada referencia como encontrada, no encontrada o sin verificar si el servicio no responde",
+    "zotero": "Añadir referencias a Zotero",
+    "zoteroHint": "Añade las referencias extraídas a tu biblioteca de Zotero",
+    "semantic": "Extraer afirmaciones con la IA",
+    "semanticHint": "Una pasada por sección; las afirmaciones se vuelven nodos enlazados",
+    "keepSingle": "Mantener nodo único",
+    "confirm": "Construir grafo",
+    "built": "{count} nodos construidos desde el documento",
+    "semanticSkipped": "{count} secciones omitidas por la pasada de IA"
   }
 }

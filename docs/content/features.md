@@ -136,6 +136,16 @@ Dropping a PDF creates its node immediately, and the AI cleanup that follows is 
 - The node currently being written carries a **pulsing outline** so it is findable on a busy canvas. The pulse stops and the outline disappears the moment processing ends, whether it finished or was aborted.
 - The status line still names the section being cleaned, which remains the only progress signal for multi-section documents on non-streaming providers.
 
+### Expanding a PDF into a graph
+
+When a dropped PDF has structure - several sections or a bibliography - Nodus offers to expand it after the document imports. The single node stays either way; the dialog chooses what is added:
+
+- **Sections as nodes.** One node per heading, connected along the document outline, grouped in a frame named after the paper.
+- **References as citation nodes.** Each bibliography entry becomes a citation node, cited by the paper.
+- **Verify against Semantic Scholar.** Each reference is marked `verified`, `not_found`, or `not_checked` in its frontmatter. A reference is only marked not found when the service answered; if the service is unreachable, the state is not checked - an outage never invalidates your bibliography.
+- **Add references to Zotero.** Shown when the Zotero integration is configured; nothing is written to Zotero without this choice.
+- **Extract claims with the AI.** One model pass per section; claims become nodes linked to their section as supporting or contradicting. Sections the model fails on are skipped and counted, and the structural graph is never held up by the model.
+
 ### Importing PDF highlights
 
 Drop a PDF that you have already annotated and Nodus offers its highlights for import.

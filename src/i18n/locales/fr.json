@@ -669,5 +669,23 @@
     "unavailableNote": "{count} surlignages n'enregistrent que la zone marquée. Zotero et Acrobat conservent le texte, pas macOS Preview.",
     "confirm": "Importer {count}",
     "imported": "{count} surlignages importés"
+  },
+  "pdfGraph": {
+    "title": "Déployer en graphe",
+    "lead": "Ce document a une structure. Choisissez ce qui rejoint votre graphe ; le nœud unique reste dans tous les cas.",
+    "sections": "{count} sections en nœuds",
+    "sectionsHint": "Un nœud par titre, reliés selon le plan du document, groupés dans un cadre",
+    "references": "{count} références en nœuds de citation",
+    "referencesHint": "Chaque entrée de la bibliographie devient un nœud de citation",
+    "verify": "Vérifier via Semantic Scholar",
+    "verifyHint": "Marque chaque référence trouvée, introuvable, ou non vérifiée si le service est injoignable",
+    "zotero": "Ajouter les références à Zotero",
+    "zoteroHint": "Ajoute les références extraites à votre bibliothèque Zotero",
+    "semantic": "Extraire les affirmations avec l'IA",
+    "semanticHint": "Une passe par section ; les affirmations deviennent des nœuds reliés",
+    "keepSingle": "Garder le nœud unique",
+    "confirm": "Construire le graphe",
+    "built": "{count} nœuds construits depuis le document",
+    "semanticSkipped": "{count} sections ignorées par la passe IA"
   }
 }

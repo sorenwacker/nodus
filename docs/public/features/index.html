@@ -683,6 +683,50 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#anchored-notes-and-comments" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Anchored notes and comments
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Agent log
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#watching-a-pdf-import-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Watching a PDF import work
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expanding-a-pdf-into-a-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Expanding a PDF into a graph
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#importing-pdf-highlights" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1384,6 +1428,50 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#anchored-notes-and-comments" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Anchored notes and comments
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Agent log
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#watching-a-pdf-import-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Watching a PDF import work
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expanding-a-pdf-into-a-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Expanding a PDF into a graph
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#importing-pdf-highlights" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1950,6 +2038,32 @@
 <li>Export storylines as documents</li>
 <li>Color-code storyline edges</li>
 </ul>
+<h3 id="anchored-notes-and-comments">Anchored notes and comments</h3>
+<p>A note about a passage sits at that passage. Write a <code>[[wikilink]]</code> where it belongs, and while reading that node at full width the linked node opens as a callout at exactly that point. Narrower reader widths keep links inline, because a callout needs the room.</p>
+<ul>
+<li>Expansion goes one level deep: links inside an expanded note stay links.</li>
+<li>A link to a node that does not exist stays an inline link, marked as missing.</li>
+<li>Creating a comment writes such a link into the text it comments on, so the comment travels with the passage rather than with a position in the sequence.</li>
+</ul>
+<p>To read one node on its own, right-click it on the canvas and choose <strong>Read node</strong>. It opens in the same reader the storylines use, at full width, with its anchored notes expanded.</p>
+<h3 id="agent-log">Agent log</h3>
+<p>The chat panel shows the conversation; the log shows what the agent did and anything that failed. Open it with the <strong>Log</strong> button in the status bar at the bottom of the canvas, next to the node and edge counts. The button is present whenever the AI is enabled, so errors have a known place to be even before anything goes wrong.</p>
+<h3 id="watching-a-pdf-import-work">Watching a PDF import work</h3>
+<p>Dropping a PDF creates its node immediately, and the AI cleanup that follows is visible rather than opaque:</p>
+<ul>
+<li>The cleaned text <strong>streams into the node as it is generated</strong>. With the Ollama provider each token appears as the model produces it (updates are throttled to keep the canvas smooth); providers without streaming support fall back to updating the node as each section completes.</li>
+<li>The node currently being written carries a <strong>pulsing outline</strong> so it is findable on a busy canvas. The pulse stops and the outline disappears the moment processing ends, whether it finished or was aborted.</li>
+<li>The status line still names the section being cleaned, which remains the only progress signal for multi-section documents on non-streaming providers.</li>
+</ul>
+<h3 id="expanding-a-pdf-into-a-graph">Expanding a PDF into a graph</h3>
+<p>When a dropped PDF has structure - several sections or a bibliography - Nodus offers to expand it after the document imports. The single node stays either way; the dialog chooses what is added:</p>
+<ul>
+<li><strong>Sections as nodes.</strong> One node per heading, connected along the document outline, grouped in a frame named after the paper.</li>
+<li><strong>References as citation nodes.</strong> Each bibliography entry becomes a citation node, cited by the paper.</li>
+<li><strong>Verify against Semantic Scholar.</strong> Each reference is marked <code>verified</code>, <code>not_found</code>, or <code>not_checked</code> in its frontmatter. A reference is only marked not found when the service answered; if the service is unreachable, the state is not checked - an outage never invalidates your bibliography.</li>
+<li><strong>Add references to Zotero.</strong> Shown when the Zotero integration is configured; nothing is written to Zotero without this choice.</li>
+<li><strong>Extract claims with the AI.</strong> One model pass per section; claims become nodes linked to their section as supporting or contradicting. Sections the model fails on are skipped and counted, and the structural graph is never held up by the model.</li>
+</ul>
 <h3 id="importing-pdf-highlights">Importing PDF highlights</h3>
 <p>Drop a PDF that you have already annotated and Nodus offers its highlights for import.</p>
 <ol>
@@ -1977,6 +2091,7 @@
 <p>To see it again, open Settings &gt; General and choose "Replay gesture tour".</p>
 <h3 id="storyline-panel">Storyline Panel</h3>
 <p>Moving between graph and storylines works in steps along the screen edges: each push of the pointer against the right edge goes one step deeper into storylines, each push against the left edge steps back toward the graph.</p>
+<p>Each edge is active only at a handle in the middle of that edge, marked on screen. Pushing the border anywhere else - reaching for another window, the dock or the desktop - does nothing, so panels open when you aim for them and not while you work.</p>
 <ul>
 <li>Push right once: the storyline overview slides open on the right</li>
 <li>Push right again: the reader opens at half the window, keeping the graph visible, with the last-read storyline (the first storyline initially)</li>

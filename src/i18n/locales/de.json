@@ -669,5 +669,23 @@
     "unavailableNote": "{count} Markierungen enthalten nur den markierten Bereich. Zotero und Acrobat speichern den Text, macOS Preview nicht.",
     "confirm": "{count} importieren",
     "imported": "{count} Markierungen importiert"
+  },
+  "pdfGraph": {
+    "title": "Als Graph auffächern",
+    "lead": "Dieses Dokument hat Struktur. Wählen Sie, was Teil des Graphen wird; der einzelne Knoten bleibt in jedem Fall.",
+    "sections": "{count} Abschnitte als Knoten",
+    "sectionsHint": "Ein Knoten pro Überschrift, entlang der Gliederung verbunden, in einem Rahmen gruppiert",
+    "references": "{count} Referenzen als Zitatknoten",
+    "referencesHint": "Jeder Eintrag im Literaturverzeichnis wird ein Zitatknoten",
+    "verify": "Mit Semantic Scholar prüfen",
+    "verifyHint": "Markiert jede Referenz als gefunden, nicht gefunden oder nicht geprüft, wenn der Dienst nicht erreichbar ist",
+    "zotero": "Referenzen zu Zotero hinzufügen",
+    "zoteroHint": "Fügt die extrahierten Referenzen Ihrer Zotero-Bibliothek hinzu",
+    "semantic": "Aussagen mit der KI extrahieren",
+    "semanticHint": "Ein Durchlauf pro Abschnitt; Aussagen werden Knoten mit stützenden oder widersprechenden Kanten",
+    "keepSingle": "Einzelnen Knoten behalten",
+    "confirm": "Graph erstellen",
+    "built": "{count} Knoten aus dem Dokument erstellt",
+    "semanticSkipped": "{count} Abschnitte im KI-Durchlauf übersprungen"
   }
 }

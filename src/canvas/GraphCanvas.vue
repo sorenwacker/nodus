@@ -50,6 +50,7 @@ import {
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
 import { useLayout, useNeighborhoodMode } from './composables/layout'
 import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
+import { usePdfGraphImport } from './composables/util/usePdfGraphImport'
 import {
   useCanvasKeyboardShortcuts,
   usePdfDrop,
@@ -67,6 +68,7 @@ import { measureNodeContent } from './utils/nodeSizing'
 import { findConnectedNodes } from './utils/graphTraversal'
 import ImportOptionsModal from '../components/ImportOptionsModal.vue'
 import PdfHighlightPicker from '../components/PdfHighlightPicker.vue'
+import PdfGraphDialog from '../components/PdfGraphDialog.vue'
 import type { HighlightImport } from '../lib/pdfHighlights'
 import { NODE_DEFAULTS } from './constants'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
@@ -1123,6 +1125,44 @@ watch(
   }
 )
 
+// Graph expansion of a dropped PDF (PRODUCT_DESIGN.md > PDF as a graph)
+const pdfGraph = usePdfGraphImport({
+  store: {
+    createNode: store.createNode,
+    createEdge: store.createEdge,
+    updateNodeContent: store.updateNodeContent,
+    createFrame: store.createFrame,
+    assignNodeToFrame: (nodeId: string, frameId: string | null) =>
+      store.assignNodesToFrame([nodeId], frameId),
+    getNode: store.getNode,
+  },
+  llm: { simpleGenerate: (prompt: string) => llm.simpleGenerate(prompt) },
+  pushCreationUndo,
+})
+
+async function handleGraphImport(choices: {
+  sections: boolean
+  references: boolean
+  verify: boolean
+  zotero: boolean
+  semantic: boolean
+}) {
+  const result = await pdfGraph.confirmGraphImport(choices)
+  if (result.createdNodeIds.length > 0) {
+    showToast?.(t('pdfGraph.built', { count: result.createdNodeIds.length }), 'success')
+  }
+  if (result.semanticSkipped > 0) {
+    showToast?.(t('pdfGraph.semanticSkipped', { count: result.semanticSkipped }), 'warning')
+  }
+  // Zotero is opt-in per import; nothing is written without the choice
+  if (choices.zotero && result.citationNodeIds.length > 0) {
+    const nodes = result.citationNodeIds
+      .map((id: string) => store.getNode(id))
+      .filter((n: Node | undefined): n is Node => n !== undefined)
+    await zotero.addNodesToZotero(nodes)
+  }
+}
+
 // PDF drop composable
 const pdfDrop = usePdfDrop({
   store: {
@@ -1136,6 +1176,7 @@ const pdfDrop = usePdfDrop({
     getNodes: () => store.nodes,
     updateNodeColor: store.updateNodeColor,
   },
+  onDocumentImported: pdfGraph.offerGraph,
   viewState: {
     getViewportCenter: () => {
       const rect = canvasRef.value?.getBoundingClientRect()
@@ -2305,7 +2346,7 @@ defineExpose({
         :is-layouting="isLayouting"
         :is-large-graph="isLargeGraph"
         :is-pdf-processing="pdfDrop.isProcessing.value"
-        :pdf-status="pdfDrop.processingStatus.value"
+        :pdf-status="pdfDrop.processingStatus.value || pdfGraph.importStatus.value"
         :agent-log="agentLog"
         :show-agent-log="showAgentLogPanel"
         :llm-enabled="llmEnabled"
@@ -2429,6 +2470,19 @@ defineExpose({
         :filename="pdfDrop.pendingHighlights.value.filename"
         @import="handleHighlightImport"
         @cancel="pdfDrop.cancelHighlightImport()"
+      />
+
+      <!-- Expanding a dropped PDF into a graph; waits its turn behind the
+           highlight picker so two modals never stack -->
+      <PdfGraphDialog
+        v-if="pdfGraph.pendingGraphImport.value && !pdfDrop.pendingHighlights.value"
+        :filename="pdfGraph.pendingGraphImport.value.filename"
+        :section-count="pdfGraph.pendingGraphImport.value.sectionCount"
+        :reference-count="pdfGraph.pendingGraphImport.value.references.length"
+        :zotero-available="zotero.isConnected.value"
+        :llm-available="llmEnabled"
+        @import="handleGraphImport"
+        @cancel="pdfGraph.cancelGraphImport()"
       />
 
       <!-- Plan approval modal for agent planning -->
