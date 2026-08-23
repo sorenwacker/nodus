@@ -3503,299 +3503,317 @@ A "Living Documentation" workspace where everything is a node on one canvas. No 
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  [Alpha], [0.5],
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>)
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>### "Modernize My Math" Import
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>### Document export
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>On Obsidian import:
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>- Detect LaTeX math (`$\frac{a}{b}$`)
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>- Offer to convert to Typst syntax
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>- Immediate visual improvement
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>---
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>## UX: The Canvas
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>**Required behavior:** Everything in Nodus moves thinking onto the canvas; export is the only path that takes finished work back off it. Without it a completed argument has to be retyped somewhere else to become a document, which is where the tool stops being useful and the user goes back to a word processor.
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>Two formats, one code path: the Typst source is generated first and PDF is that source compiled by the Typst WASM the application already loads for math.
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>| Format | Purpose |
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>|--------|---------|
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>| PDF | A finished document to send or submit |
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>| Typst source | A starting point to keep editing outside Nodus |
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>### The "Living Documentation" Experience
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>Scope is whatever the user is looking at when they ask:
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>Everything is a node. Nodes can be:
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>- Text (Markdown)
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>- Math (Typst)
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>- Citation (from Zotero)
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>- PDF highlight
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>- Image
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>- Task
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>- Person
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
-<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>All nodes:
-<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>- Exist on the same canvas
-<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>- Can be connected with visual arrows
-<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>- Can be grouped into frames
-<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>- Are editable in place
-<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>
-<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>### Editing Philosophy: "Inline-First, Modal-Second"
-<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>
-<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>Users want the node on the canvas to be the "source of truth." They dislike clicking a node and having a sidebar that feels like a different app.
-<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>
-<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>**Principle:** The ability to double-click a node and start typing immediately *inside* that box, with the box expanding to fit text.
-<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>
-<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>**The Hybrid Sweet Spot:**
-<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>- **Inline editing** for content (the default)
-<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>- **Modal/sidebar** only for metadata (tags, properties, file path) or long-form writing (&gt;500 words)
-<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>
-<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>### Node Interaction States
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>- **A storyline** exports in storyline order. The sequence is the argument the user built; reordering it by canvas geometry would destroy the one thing that makes a storyline a document.
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>- **A selection** exports in reading order - top to bottom, left to right - because a loose set of nodes has no order of its own.
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>The export dialog collects title, author, paper size and whether to append the connections between exported nodes, then writes the file to a location chosen through the system save dialog. Compilation failures are reported in the dialog; a PDF that failed to compile must never be written as an empty or partial file.
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>### "Modernize My Math" Import
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>On Obsidian import:
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>- Detect LaTeX math (`$\frac{a}{b}$`)
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>- Offer to convert to Typst syntax
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>- Immediate visual improvement
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>---
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>## UX: The Canvas
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>### The "Living Documentation" Experience
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>Everything is a node. Nodes can be:
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>- Text (Markdown)
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>- Math (Typst)
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>- Citation (from Zotero)
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>- PDF highlight
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>- Image
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>- Task
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>- Person
 <a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>
-<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>| State | User Action | System Response |
-<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>|-------|-------------|-----------------|
-<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>| **Idle** | Click node | Highlight node, show contextual toolbar (color, link, edit) |
-<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>| **Quick Edit** | Double-click | Enable inline `textarea` within the canvas node |
-<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>| **Long Edit** | `Cmd/Ctrl + Enter` | Open note in modal/pane for distraction-free writing |
-<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>| **Connect** | Drag from edge | Draw connection line to target node |
-<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a>| **Move** | Drag node | Update canvas_x, canvas_y in real-time |
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>All nodes:
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>- Exist on the same canvas
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>- Can be connected with visual arrows
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>- Can be grouped into frames
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>- Are editable in place
+<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>
+<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a>### Editing Philosophy: "Inline-First, Modal-Second"
 <a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a>
-<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a>### Semantic Zooming
+<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a>Users want the node on the canvas to be the "source of truth." They dislike clicking a node and having a sidebar that feels like a different app.
 <a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a>
-<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a>**Problem:** 500+ nodes become "dust" when zoomed out.
+<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a>**Principle:** The ability to double-click a node and start typing immediately *inside* that box, with the box expanding to fit text.
 <a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a>
-<a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a>**Solution:**
-<a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a>- Zoom out: Nodes aggregate into clusters, show only titles
-<a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a>- Zoom in: Content reveals, full editing mode
+<a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a>**The Hybrid Sweet Spot:**
+<a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a>- **Inline editing** for content (the default)
+<a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a>- **Modal/sidebar** only for metadata (tags, properties, file path) or long-form writing (&gt;500 words)
 <a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a>
-<a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a>**Edge label sizing (required behavior):** Edge labels are rendered in canvas
-<a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a>coordinates inside the zoom-scaled layer, so a fixed canvas font shrinks as the
-<a id="__codelineno-2-59" name="__codelineno-2-59" href="#__codelineno-2-59"></a>user zooms out and grows as they zoom in. To keep labels legible, the rendered
-<a id="__codelineno-2-60" name="__codelineno-2-60" href="#__codelineno-2-60"></a>font is counter-scaled by `1/zoom` so labels hold a roughly constant on-screen
-<a id="__codelineno-2-61" name="__codelineno-2-61" href="#__codelineno-2-61"></a>size. The divisor is clamped to a 0.2–3× zoom window so labels neither balloon
-<a id="__codelineno-2-62" name="__codelineno-2-62" href="#__codelineno-2-62"></a>when zoomed far out nor collapse when zoomed far in; the base size still comes
-<a id="__codelineno-2-63" name="__codelineno-2-63" href="#__codelineno-2-63"></a>from the user's `edgeLabelSize` canvas setting.
-<a id="__codelineno-2-64" name="__codelineno-2-64" href="#__codelineno-2-64"></a>
-<a id="__codelineno-2-65" name="__codelineno-2-65" href="#__codelineno-2-65"></a>**Edge label zoom threshold (required behavior):** Analogous to the semantic
-<a id="__codelineno-2-66" name="__codelineno-2-66" href="#__codelineno-2-66"></a>zoom threshold for node content, edge labels have their own zoom threshold.
-<a id="__codelineno-2-67" name="__codelineno-2-67" href="#__codelineno-2-67"></a>When the viewport zoom is below the threshold, edge labels are not rendered;
-<a id="__codelineno-2-68" name="__codelineno-2-68" href="#__codelineno-2-68"></a>at or above it, they render normally. Because labels are counter-scaled, they
-<a id="__codelineno-2-69" name="__codelineno-2-69" href="#__codelineno-2-69"></a>would otherwise stay full-size while nodes collapse, dominating the zoomed-out
-<a id="__codelineno-2-70" name="__codelineno-2-70" href="#__codelineno-2-70"></a>view. The threshold is a display setting (`edgeLabelZoomThreshold`, range 0–1,
-<a id="__codelineno-2-71" name="__codelineno-2-71" href="#__codelineno-2-71"></a>default 0.5) configurable via a slider in Settings &gt; Appearance next to the
-<a id="__codelineno-2-72" name="__codelineno-2-72" href="#__codelineno-2-72"></a>semantic zoom threshold; setting it to 0 keeps labels visible at every zoom
-<a id="__codelineno-2-73" name="__codelineno-2-73" href="#__codelineno-2-73"></a>level.
+<a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a>### Node Interaction States
+<a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a>
+<a id="__codelineno-2-59" name="__codelineno-2-59" href="#__codelineno-2-59"></a>| State | User Action | System Response |
+<a id="__codelineno-2-60" name="__codelineno-2-60" href="#__codelineno-2-60"></a>|-------|-------------|-----------------|
+<a id="__codelineno-2-61" name="__codelineno-2-61" href="#__codelineno-2-61"></a>| **Idle** | Click node | Highlight node, show contextual toolbar (color, link, edit) |
+<a id="__codelineno-2-62" name="__codelineno-2-62" href="#__codelineno-2-62"></a>| **Quick Edit** | Double-click | Enable inline `textarea` within the canvas node |
+<a id="__codelineno-2-63" name="__codelineno-2-63" href="#__codelineno-2-63"></a>| **Long Edit** | `Cmd/Ctrl + Enter` | Open note in modal/pane for distraction-free writing |
+<a id="__codelineno-2-64" name="__codelineno-2-64" href="#__codelineno-2-64"></a>| **Connect** | Drag from edge | Draw connection line to target node |
+<a id="__codelineno-2-65" name="__codelineno-2-65" href="#__codelineno-2-65"></a>| **Move** | Drag node | Update canvas_x, canvas_y in real-time |
+<a id="__codelineno-2-66" name="__codelineno-2-66" href="#__codelineno-2-66"></a>
+<a id="__codelineno-2-67" name="__codelineno-2-67" href="#__codelineno-2-67"></a>### Semantic Zooming
+<a id="__codelineno-2-68" name="__codelineno-2-68" href="#__codelineno-2-68"></a>
+<a id="__codelineno-2-69" name="__codelineno-2-69" href="#__codelineno-2-69"></a>**Problem:** 500+ nodes become "dust" when zoomed out.
+<a id="__codelineno-2-70" name="__codelineno-2-70" href="#__codelineno-2-70"></a>
+<a id="__codelineno-2-71" name="__codelineno-2-71" href="#__codelineno-2-71"></a>**Solution:**
+<a id="__codelineno-2-72" name="__codelineno-2-72" href="#__codelineno-2-72"></a>- Zoom out: Nodes aggregate into clusters, show only titles
+<a id="__codelineno-2-73" name="__codelineno-2-73" href="#__codelineno-2-73"></a>- Zoom in: Content reveals, full editing mode
 <a id="__codelineno-2-74" name="__codelineno-2-74" href="#__codelineno-2-74"></a>
-<a id="__codelineno-2-75" name="__codelineno-2-75" href="#__codelineno-2-75"></a>**Pan and zoom cost (required behavior):** Panning and zooming change the viewport on every frame, and the culling result feeds everything downstream - the rendered node list and all edge styling. The culled result therefore keeps its identity while the same nodes are on screen: a frame that moves the viewport a few pixels returns the previous array and set, so no dependent recomputes. A new result is produced only when a node actually enters or leaves the viewport, or when the node set itself is replaced (new objects must never be served from the cache). Enforced by tests that pan without changing visibility and assert referential stability, on both the linear-scan and spatial-index paths.
-<a id="__codelineno-2-76" name="__codelineno-2-76" href="#__codelineno-2-76"></a>
-<a id="__codelineno-2-77" name="__codelineno-2-77" href="#__codelineno-2-77"></a>**Panel sizing (required behavior):** Every panel the user can resize uses one composable, so the drag behaviour, clamping and persistence cannot drift between them: the storyline overview (width), the agent panel (width) and the timelines sheet (height). Each grows in the direction that points away from its edge - a right-hand panel widens as its separator is dragged left, a bottom sheet grows taller as it is dragged up - within a clamped range, and the chosen size is stored per panel and restored on the next launch. The timelines sheet keeps sizing itself to its lane count until the user drags it, after which their height wins. While a separator is being dragged the panel's own slide transition is suspended, for the same reason the canvas overlays suspend theirs: a transition lags behind the pointer.
-<a id="__codelineno-2-78" name="__codelineno-2-78" href="#__codelineno-2-78"></a>
-<a id="__codelineno-2-79" name="__codelineno-2-79" href="#__codelineno-2-79"></a>**Tooltip placement (required behavior):** Tooltips default to below the element and centred on it, which is only safe away from a window edge. Every container holding controls against an edge declares the direction that keeps its labels on screen: the top-right toolbar aligns them to the button's right edge, bottom-anchored clusters (zoom controls, edge filters, timelines sheet, the agent panel's input row) open upward, and right-side storyline layers align right. Tooltip text always comes from the locale files - a literal string cannot be translated. Both rules are enforced by a gate test that names the edge-anchored containers and fails on any hardcoded tooltip text.
-<a id="__codelineno-2-80" name="__codelineno-2-80" href="#__codelineno-2-80"></a>
-<a id="__codelineno-2-81" name="__codelineno-2-81" href="#__codelineno-2-81"></a>### Canvas Features
+<a id="__codelineno-2-75" name="__codelineno-2-75" href="#__codelineno-2-75"></a>**Edge label sizing (required behavior):** Edge labels are rendered in canvas
+<a id="__codelineno-2-76" name="__codelineno-2-76" href="#__codelineno-2-76"></a>coordinates inside the zoom-scaled layer, so a fixed canvas font shrinks as the
+<a id="__codelineno-2-77" name="__codelineno-2-77" href="#__codelineno-2-77"></a>user zooms out and grows as they zoom in. To keep labels legible, the rendered
+<a id="__codelineno-2-78" name="__codelineno-2-78" href="#__codelineno-2-78"></a>font is counter-scaled by `1/zoom` so labels hold a roughly constant on-screen
+<a id="__codelineno-2-79" name="__codelineno-2-79" href="#__codelineno-2-79"></a>size. The divisor is clamped to a 0.2–3× zoom window so labels neither balloon
+<a id="__codelineno-2-80" name="__codelineno-2-80" href="#__codelineno-2-80"></a>when zoomed far out nor collapse when zoomed far in; the base size still comes
+<a id="__codelineno-2-81" name="__codelineno-2-81" href="#__codelineno-2-81"></a>from the user's `edgeLabelSize` canvas setting.
 <a id="__codelineno-2-82" name="__codelineno-2-82" href="#__codelineno-2-82"></a>
-<a id="__codelineno-2-83" name="__codelineno-2-83" href="#__codelineno-2-83"></a>- Infinite pan/zoom
-<a id="__codelineno-2-84" name="__codelineno-2-84" href="#__codelineno-2-84"></a>- Manual node positioning (drag to place)
-<a id="__codelineno-2-85" name="__codelineno-2-85" href="#__codelineno-2-85"></a>- Double-click canvas → create node
-<a id="__codelineno-2-86" name="__codelineno-2-86" href="#__codelineno-2-86"></a>- Double-click node → inline edit
-<a id="__codelineno-2-87" name="__codelineno-2-87" href="#__codelineno-2-87"></a>- Drag between nodes → create connection
-<a id="__codelineno-2-88" name="__codelineno-2-88" href="#__codelineno-2-88"></a>- Node auto-resizes to fit content
-<a id="__codelineno-2-89" name="__codelineno-2-89" href="#__codelineno-2-89"></a>- **Multi-directional resize:** All edges and corners (8 handles)
-<a id="__codelineno-2-90" name="__codelineno-2-90" href="#__codelineno-2-90"></a>- Minimap navigation (tucked into the canvas's top-right corner)
-<a id="__codelineno-2-91" name="__codelineno-2-91" href="#__codelineno-2-91"></a>- **Frames:** Spatial grouping containers (see Frames section below)
-<a id="__codelineno-2-92" name="__codelineno-2-92" href="#__codelineno-2-92"></a>- **Undo/Redo system:** Full support including node deletion with edge restoration
-<a id="__codelineno-2-93" name="__codelineno-2-93" href="#__codelineno-2-93"></a>- **Cmd/Ctrl+Click:** Zoom-to-fit on specific node (auto-scales based on node size)
-<a id="__codelineno-2-94" name="__codelineno-2-94" href="#__codelineno-2-94"></a>- **External links:** Open in default system browser
-<a id="__codelineno-2-95" name="__codelineno-2-95" href="#__codelineno-2-95"></a>- **Context menu:** Right-click for node actions (fit, storyline, send to workspace, delete)
-<a id="__codelineno-2-96" name="__codelineno-2-96" href="#__codelineno-2-96"></a>- **Copy/Paste nodes:** Cmd+C/Cmd+V to copy and paste nodes (preserves layout)
-<a id="__codelineno-2-97" name="__codelineno-2-97" href="#__codelineno-2-97"></a>- **File drop import:** Drag files directly onto canvas (see File Drop Import below)
+<a id="__codelineno-2-83" name="__codelineno-2-83" href="#__codelineno-2-83"></a>**Edge label zoom threshold (required behavior):** Analogous to the semantic
+<a id="__codelineno-2-84" name="__codelineno-2-84" href="#__codelineno-2-84"></a>zoom threshold for node content, edge labels have their own zoom threshold.
+<a id="__codelineno-2-85" name="__codelineno-2-85" href="#__codelineno-2-85"></a>When the viewport zoom is below the threshold, edge labels are not rendered;
+<a id="__codelineno-2-86" name="__codelineno-2-86" href="#__codelineno-2-86"></a>at or above it, they render normally. Because labels are counter-scaled, they
+<a id="__codelineno-2-87" name="__codelineno-2-87" href="#__codelineno-2-87"></a>would otherwise stay full-size while nodes collapse, dominating the zoomed-out
+<a id="__codelineno-2-88" name="__codelineno-2-88" href="#__codelineno-2-88"></a>view. The threshold is a display setting (`edgeLabelZoomThreshold`, range 0–1,
+<a id="__codelineno-2-89" name="__codelineno-2-89" href="#__codelineno-2-89"></a>default 0.5) configurable via a slider in Settings &gt; Appearance next to the
+<a id="__codelineno-2-90" name="__codelineno-2-90" href="#__codelineno-2-90"></a>semantic zoom threshold; setting it to 0 keeps labels visible at every zoom
+<a id="__codelineno-2-91" name="__codelineno-2-91" href="#__codelineno-2-91"></a>level.
+<a id="__codelineno-2-92" name="__codelineno-2-92" href="#__codelineno-2-92"></a>
+<a id="__codelineno-2-93" name="__codelineno-2-93" href="#__codelineno-2-93"></a>**Pan and zoom cost (required behavior):** Panning and zooming change the viewport on every frame, and the culling result feeds everything downstream - the rendered node list and all edge styling. The culled result therefore keeps its identity while the same nodes are on screen: a frame that moves the viewport a few pixels returns the previous array and set, so no dependent recomputes. A new result is produced only when a node actually enters or leaves the viewport, or when the node set itself is replaced (new objects must never be served from the cache). Enforced by tests that pan without changing visibility and assert referential stability, on both the linear-scan and spatial-index paths.
+<a id="__codelineno-2-94" name="__codelineno-2-94" href="#__codelineno-2-94"></a>
+<a id="__codelineno-2-95" name="__codelineno-2-95" href="#__codelineno-2-95"></a>**Panel sizing (required behavior):** Every panel the user can resize uses one composable, so the drag behaviour, clamping and persistence cannot drift between them: the storyline overview (width), the agent panel (width) and the timelines sheet (height). Each grows in the direction that points away from its edge - a right-hand panel widens as its separator is dragged left, a bottom sheet grows taller as it is dragged up - within a clamped range, and the chosen size is stored per panel and restored on the next launch. The timelines sheet keeps sizing itself to its lane count until the user drags it, after which their height wins. While a separator is being dragged the panel's own slide transition is suspended, for the same reason the canvas overlays suspend theirs: a transition lags behind the pointer.
+<a id="__codelineno-2-96" name="__codelineno-2-96" href="#__codelineno-2-96"></a>
+<a id="__codelineno-2-97" name="__codelineno-2-97" href="#__codelineno-2-97"></a>**Tooltip placement (required behavior):** Tooltips default to below the element and centred on it, which is only safe away from a window edge. Every container holding controls against an edge declares the direction that keeps its labels on screen: the top-right toolbar aligns them to the button's right edge, bottom-anchored clusters (zoom controls, edge filters, timelines sheet, the agent panel's input row) open upward, and right-side storyline layers align right. Tooltip text always comes from the locale files - a literal string cannot be translated. Both rules are enforced by a gate test that names the edge-anchored containers and fails on any hardcoded tooltip text.
 <a id="__codelineno-2-98" name="__codelineno-2-98" href="#__codelineno-2-98"></a>
-<a id="__codelineno-2-99" name="__codelineno-2-99" href="#__codelineno-2-99"></a>**Canvas overlays and the storyline panel (required behavior):** Overlays anchored to the canvas's right edge (minimap, zoom controls) are offset by `--canvas-right-inset`, the width of whatever storyline layer covers the canvas, so they stay beside it instead of underneath it. That offset animates on the shared step easing when a layer opens or closes by an edge step, but the animation must be suppressed while the user drags the panel's separator: a transition makes every overlay lag behind the pointer and rubber-band after the drag stops. The panel exposes its drag state, App publishes it as `--inset-duration` (`0s` while resizing), and every overlay that reads `--canvas-right-inset` must time its transition with that variable - enforced by a gate test that scans the stylesheets.
+<a id="__codelineno-2-99" name="__codelineno-2-99" href="#__codelineno-2-99"></a>### Canvas Features
 <a id="__codelineno-2-100" name="__codelineno-2-100" href="#__codelineno-2-100"></a>
-<a id="__codelineno-2-101" name="__codelineno-2-101" href="#__codelineno-2-101"></a>### File Drop Import
-<a id="__codelineno-2-102" name="__codelineno-2-102" href="#__codelineno-2-102"></a>
-<a id="__codelineno-2-103" name="__codelineno-2-103" href="#__codelineno-2-103"></a>Drag and drop files directly onto the canvas to import them. Supported formats:
-<a id="__codelineno-2-104" name="__codelineno-2-104" href="#__codelineno-2-104"></a>
-<a id="__codelineno-2-105" name="__codelineno-2-105" href="#__codelineno-2-105"></a>| Format | Extension | Import Behavior |
-<a id="__codelineno-2-106" name="__codelineno-2-106" href="#__codelineno-2-106"></a>|--------|-----------|-----------------|
-<a id="__codelineno-2-107" name="__codelineno-2-107" href="#__codelineno-2-107"></a>| **PDF** | `.pdf` | Extract text, clean up with AI, create note node(s) |
-<a id="__codelineno-2-108" name="__codelineno-2-108" href="#__codelineno-2-108"></a>| **Markdown** | `.md` | Create note node with content |
-<a id="__codelineno-2-109" name="__codelineno-2-109" href="#__codelineno-2-109"></a>| **BibTeX** | `.bib` | Parse citations, create citation nodes |
-<a id="__codelineno-2-110" name="__codelineno-2-110" href="#__codelineno-2-110"></a>| **CSL-JSON** | `.json` | Parse citations, create citation nodes (Zotero export) |
-<a id="__codelineno-2-111" name="__codelineno-2-111" href="#__codelineno-2-111"></a>| **Ontology** | `.ttl`, `.rdf`, `.owl`, `.jsonld` | Import RDF graph as nodes and edges |
-<a id="__codelineno-2-112" name="__codelineno-2-112" href="#__codelineno-2-112"></a>
-<a id="__codelineno-2-113" name="__codelineno-2-113" href="#__codelineno-2-113"></a>**PDF Import:**
-<a id="__codelineno-2-114" name="__codelineno-2-114" href="#__codelineno-2-114"></a>- Extracts text from PDF using Rust backend
-<a id="__codelineno-2-115" name="__codelineno-2-115" href="#__codelineno-2-115"></a>- Splits long documents into multiple connected nodes
-<a id="__codelineno-2-116" name="__codelineno-2-116" href="#__codelineno-2-116"></a>- AI cleanup: fixes OCR errors, rejoins broken paragraphs, formats as markdown
-<a id="__codelineno-2-117" name="__codelineno-2-117" href="#__codelineno-2-117"></a>- Shows progress indicator during processing
+<a id="__codelineno-2-101" name="__codelineno-2-101" href="#__codelineno-2-101"></a>- Infinite pan/zoom
+<a id="__codelineno-2-102" name="__codelineno-2-102" href="#__codelineno-2-102"></a>- Manual node positioning (drag to place)
+<a id="__codelineno-2-103" name="__codelineno-2-103" href="#__codelineno-2-103"></a>- Double-click canvas → create node
+<a id="__codelineno-2-104" name="__codelineno-2-104" href="#__codelineno-2-104"></a>- Double-click node → inline edit
+<a id="__codelineno-2-105" name="__codelineno-2-105" href="#__codelineno-2-105"></a>- Drag between nodes → create connection
+<a id="__codelineno-2-106" name="__codelineno-2-106" href="#__codelineno-2-106"></a>- Node auto-resizes to fit content
+<a id="__codelineno-2-107" name="__codelineno-2-107" href="#__codelineno-2-107"></a>- **Multi-directional resize:** All edges and corners (8 handles)
+<a id="__codelineno-2-108" name="__codelineno-2-108" href="#__codelineno-2-108"></a>- Minimap navigation (tucked into the canvas's top-right corner)
+<a id="__codelineno-2-109" name="__codelineno-2-109" href="#__codelineno-2-109"></a>- **Frames:** Spatial grouping containers (see Frames section below)
+<a id="__codelineno-2-110" name="__codelineno-2-110" href="#__codelineno-2-110"></a>- **Undo/Redo system:** Full support including node deletion with edge restoration
+<a id="__codelineno-2-111" name="__codelineno-2-111" href="#__codelineno-2-111"></a>- **Cmd/Ctrl+Click:** Zoom-to-fit on specific node (auto-scales based on node size)
+<a id="__codelineno-2-112" name="__codelineno-2-112" href="#__codelineno-2-112"></a>- **External links:** Open in default system browser
+<a id="__codelineno-2-113" name="__codelineno-2-113" href="#__codelineno-2-113"></a>- **Context menu:** Right-click for node actions (fit, storyline, send to workspace, delete)
+<a id="__codelineno-2-114" name="__codelineno-2-114" href="#__codelineno-2-114"></a>- **Copy/Paste nodes:** Cmd+C/Cmd+V to copy and paste nodes (preserves layout)
+<a id="__codelineno-2-115" name="__codelineno-2-115" href="#__codelineno-2-115"></a>- **File drop import:** Drag files directly onto canvas (see File Drop Import below)
+<a id="__codelineno-2-116" name="__codelineno-2-116" href="#__codelineno-2-116"></a>
+<a id="__codelineno-2-117" name="__codelineno-2-117" href="#__codelineno-2-117"></a>**Canvas overlays and the storyline panel (required behavior):** Overlays anchored to the canvas's right edge (minimap, zoom controls) are offset by `--canvas-right-inset`, the width of whatever storyline layer covers the canvas, so they stay beside it instead of underneath it. That offset animates on the shared step easing when a layer opens or closes by an edge step, but the animation must be suppressed while the user drags the panel's separator: a transition makes every overlay lag behind the pointer and rubber-band after the drag stops. The panel exposes its drag state, App publishes it as `--inset-duration` (`0s` while resizing), and every overlay that reads `--canvas-right-inset` must time its transition with that variable - enforced by a gate test that scans the stylesheets.
 <a id="__codelineno-2-118" name="__codelineno-2-118" href="#__codelineno-2-118"></a>
-<a id="__codelineno-2-119" name="__codelineno-2-119" href="#__codelineno-2-119"></a>**Ontology Import:**
-<a id="__codelineno-2-120" name="__codelineno-2-120" href="#__codelineno-2-120"></a>- When ontology files are dropped, a modal appears with options:
-<a id="__codelineno-2-121" name="__codelineno-2-121" href="#__codelineno-2-121"></a>  - Create nodes for classes
-<a id="__codelineno-2-122" name="__codelineno-2-122" href="#__codelineno-2-122"></a>  - Create nodes for individuals/instances
-<a id="__codelineno-2-123" name="__codelineno-2-123" href="#__codelineno-2-123"></a>- Nodes are auto-laid out after import
-<a id="__codelineno-2-124" name="__codelineno-2-124" href="#__codelineno-2-124"></a>- RDF properties become edges between nodes
-<a id="__codelineno-2-125" name="__codelineno-2-125" href="#__codelineno-2-125"></a>
-<a id="__codelineno-2-126" name="__codelineno-2-126" href="#__codelineno-2-126"></a>### Frames
-<a id="__codelineno-2-127" name="__codelineno-2-127" href="#__codelineno-2-127"></a>
-<a id="__codelineno-2-128" name="__codelineno-2-128" href="#__codelineno-2-128"></a>Frames are spatial grouping containers that organize related nodes on the canvas.
-<a id="__codelineno-2-129" name="__codelineno-2-129" href="#__codelineno-2-129"></a>
-<a id="__codelineno-2-130" name="__codelineno-2-130" href="#__codelineno-2-130"></a>**Creating Frames:**
-<a id="__codelineno-2-131" name="__codelineno-2-131" href="#__codelineno-2-131"></a>- Press `Shift+F` to create a frame:
-<a id="__codelineno-2-132" name="__codelineno-2-132" href="#__codelineno-2-132"></a>  - If nodes are selected: creates frame around selected nodes with padding
-<a id="__codelineno-2-133" name="__codelineno-2-133" href="#__codelineno-2-133"></a>  - If no selection: enters placement mode (click to place frame center)
-<a id="__codelineno-2-134" name="__codelineno-2-134" href="#__codelineno-2-134"></a>- Frames auto-size when created around existing nodes
-<a id="__codelineno-2-135" name="__codelineno-2-135" href="#__codelineno-2-135"></a>
-<a id="__codelineno-2-136" name="__codelineno-2-136" href="#__codelineno-2-136"></a>**Frame Interactions:**
-<a id="__codelineno-2-137" name="__codelineno-2-137" href="#__codelineno-2-137"></a>- Click frame to select (shows controls)
-<a id="__codelineno-2-138" name="__codelineno-2-138" href="#__codelineno-2-138"></a>- Drag frame to move it along with contained nodes
-<a id="__codelineno-2-139" name="__codelineno-2-139" href="#__codelineno-2-139"></a>- Double-click title to rename
-<a id="__codelineno-2-140" name="__codelineno-2-140" href="#__codelineno-2-140"></a>- Resize using bottom-right handle
-<a id="__codelineno-2-141" name="__codelineno-2-141" href="#__codelineno-2-141"></a>
-<a id="__codelineno-2-142" name="__codelineno-2-142" href="#__codelineno-2-142"></a>**Frame Controls (when selected):**
-<a id="__codelineno-2-143" name="__codelineno-2-143" href="#__codelineno-2-143"></a>- Title label (top): displays frame name, editable on double-click
-<a id="__codelineno-2-144" name="__codelineno-2-144" href="#__codelineno-2-144"></a>- Delete button (top-right): circular x button (same style as nodes)
-<a id="__codelineno-2-145" name="__codelineno-2-145" href="#__codelineno-2-145"></a>- Color bar (bottom): color picker dots to change border color
-<a id="__codelineno-2-146" name="__codelineno-2-146" href="#__codelineno-2-146"></a>- Resize handle (bottom-right): drag to resize frame
+<a id="__codelineno-2-119" name="__codelineno-2-119" href="#__codelineno-2-119"></a>### File Drop Import
+<a id="__codelineno-2-120" name="__codelineno-2-120" href="#__codelineno-2-120"></a>
+<a id="__codelineno-2-121" name="__codelineno-2-121" href="#__codelineno-2-121"></a>Drag and drop files directly onto the canvas to import them. Supported formats:
+<a id="__codelineno-2-122" name="__codelineno-2-122" href="#__codelineno-2-122"></a>
+<a id="__codelineno-2-123" name="__codelineno-2-123" href="#__codelineno-2-123"></a>| Format | Extension | Import Behavior |
+<a id="__codelineno-2-124" name="__codelineno-2-124" href="#__codelineno-2-124"></a>|--------|-----------|-----------------|
+<a id="__codelineno-2-125" name="__codelineno-2-125" href="#__codelineno-2-125"></a>| **PDF** | `.pdf` | Extract text, clean up with AI, create note node(s) |
+<a id="__codelineno-2-126" name="__codelineno-2-126" href="#__codelineno-2-126"></a>| **Markdown** | `.md` | Create note node with content |
+<a id="__codelineno-2-127" name="__codelineno-2-127" href="#__codelineno-2-127"></a>| **BibTeX** | `.bib` | Parse citations, create citation nodes |
+<a id="__codelineno-2-128" name="__codelineno-2-128" href="#__codelineno-2-128"></a>| **CSL-JSON** | `.json` | Parse citations, create citation nodes (Zotero export) |
+<a id="__codelineno-2-129" name="__codelineno-2-129" href="#__codelineno-2-129"></a>| **Ontology** | `.ttl`, `.rdf`, `.owl`, `.jsonld` | Import RDF graph as nodes and edges |
+<a id="__codelineno-2-130" name="__codelineno-2-130" href="#__codelineno-2-130"></a>
+<a id="__codelineno-2-131" name="__codelineno-2-131" href="#__codelineno-2-131"></a>**PDF Import:**
+<a id="__codelineno-2-132" name="__codelineno-2-132" href="#__codelineno-2-132"></a>- Extracts text from PDF using Rust backend
+<a id="__codelineno-2-133" name="__codelineno-2-133" href="#__codelineno-2-133"></a>- Splits long documents into multiple connected nodes
+<a id="__codelineno-2-134" name="__codelineno-2-134" href="#__codelineno-2-134"></a>- AI cleanup: fixes OCR errors, rejoins broken paragraphs, formats as markdown
+<a id="__codelineno-2-135" name="__codelineno-2-135" href="#__codelineno-2-135"></a>- Shows progress indicator during processing
+<a id="__codelineno-2-136" name="__codelineno-2-136" href="#__codelineno-2-136"></a>
+<a id="__codelineno-2-137" name="__codelineno-2-137" href="#__codelineno-2-137"></a>**Ontology Import:**
+<a id="__codelineno-2-138" name="__codelineno-2-138" href="#__codelineno-2-138"></a>- When ontology files are dropped, a modal appears with options:
+<a id="__codelineno-2-139" name="__codelineno-2-139" href="#__codelineno-2-139"></a>  - Create nodes for classes
+<a id="__codelineno-2-140" name="__codelineno-2-140" href="#__codelineno-2-140"></a>  - Create nodes for individuals/instances
+<a id="__codelineno-2-141" name="__codelineno-2-141" href="#__codelineno-2-141"></a>- Nodes are auto-laid out after import
+<a id="__codelineno-2-142" name="__codelineno-2-142" href="#__codelineno-2-142"></a>- RDF properties become edges between nodes
+<a id="__codelineno-2-143" name="__codelineno-2-143" href="#__codelineno-2-143"></a>
+<a id="__codelineno-2-144" name="__codelineno-2-144" href="#__codelineno-2-144"></a>### Frames
+<a id="__codelineno-2-145" name="__codelineno-2-145" href="#__codelineno-2-145"></a>
+<a id="__codelineno-2-146" name="__codelineno-2-146" href="#__codelineno-2-146"></a>Frames are spatial grouping containers that organize related nodes on the canvas.
 <a id="__codelineno-2-147" name="__codelineno-2-147" href="#__codelineno-2-147"></a>
-<a id="__codelineno-2-148" name="__codelineno-2-148" href="#__codelineno-2-148"></a>**Containment Rules:**
-<a id="__codelineno-2-149" name="__codelineno-2-149" href="#__codelineno-2-149"></a>- Nodes are considered "inside" a frame if &gt;50% of node area overlaps the frame
-<a id="__codelineno-2-150" name="__codelineno-2-150" href="#__codelineno-2-150"></a>- Moving a frame moves all contained nodes
-<a id="__codelineno-2-151" name="__codelineno-2-151" href="#__codelineno-2-151"></a>- Nodes can be moved independently in/out of frames
-<a id="__codelineno-2-152" name="__codelineno-2-152" href="#__codelineno-2-152"></a>
-<a id="__codelineno-2-153" name="__codelineno-2-153" href="#__codelineno-2-153"></a>**Layout invariants (required behavior):**
-<a id="__codelineno-2-154" name="__codelineno-2-154" href="#__codelineno-2-154"></a>- A global layout treats each frame as one rigid unit: the frame and its member nodes (by `frame_id`) move together, and member node targets are computed from the node's offset to the frame captured when the layout starts - never incrementally from the node's current (possibly mid-animation) position, so interrupted or repeated layout runs cannot displace nodes relative to their frame
-<a id="__codelineno-2-155" name="__codelineno-2-155" href="#__codelineno-2-155"></a>- After a global layout places frames, frame-frame overlaps are resolved (`resolveFrameOverlaps`) and the resolution deltas apply to frames and their member nodes together, so repeated layout presses cannot stack frames
-<a id="__codelineno-2-156" name="__codelineno-2-156" href="#__codelineno-2-156"></a>- A pending post-layout frame-expansion pass is cancelled when a new layout starts, so it can never fire against another run's in-flight positions
-<a id="__codelineno-2-157" name="__codelineno-2-157" href="#__codelineno-2-157"></a>- These invariants are enforced by tests that run the layout pipeline with framed nodes and assert membership containment and frame separation after single and repeated (interrupting) runs
-<a id="__codelineno-2-158" name="__codelineno-2-158" href="#__codelineno-2-158"></a>
-<a id="__codelineno-2-159" name="__codelineno-2-159" href="#__codelineno-2-159"></a>### Zotero Integration
-<a id="__codelineno-2-160" name="__codelineno-2-160" href="#__codelineno-2-160"></a>
-<a id="__codelineno-2-161" name="__codelineno-2-161" href="#__codelineno-2-161"></a>Two methods for importing citations from Zotero:
-<a id="__codelineno-2-162" name="__codelineno-2-162" href="#__codelineno-2-162"></a>
-<a id="__codelineno-2-163" name="__codelineno-2-163" href="#__codelineno-2-163"></a>**Method 1: File Drop (Export/Import)**
-<a id="__codelineno-2-164" name="__codelineno-2-164" href="#__codelineno-2-164"></a>1. In Zotero: Right-click collection → Export Collection → CSL-JSON (Better BibTeX recommended)
-<a id="__codelineno-2-165" name="__codelineno-2-165" href="#__codelineno-2-165"></a>2. Drop the `.json` file onto the Nodus canvas
-<a id="__codelineno-2-166" name="__codelineno-2-166" href="#__codelineno-2-166"></a>3. If collection metadata detected, ImportOptionsModal appears with options:
-<a id="__codelineno-2-167" name="__codelineno-2-167" href="#__codelineno-2-167"></a>   - Create frame for collection (auto-named from Zotero collection)
-<a id="__codelineno-2-168" name="__codelineno-2-168" href="#__codelineno-2-168"></a>   - Import attached PDFs (future)
-<a id="__codelineno-2-169" name="__codelineno-2-169" href="#__codelineno-2-169"></a>   - Layout choice (grid/force)
-<a id="__codelineno-2-170" name="__codelineno-2-170" href="#__codelineno-2-170"></a>4. Citation nodes created inside frame
-<a id="__codelineno-2-171" name="__codelineno-2-171" href="#__codelineno-2-171"></a>
-<a id="__codelineno-2-172" name="__codelineno-2-172" href="#__codelineno-2-172"></a>**Method 2: Direct Library Access (Settings)**
-<a id="__codelineno-2-173" name="__codelineno-2-173" href="#__codelineno-2-173"></a>1. Settings → Zotero → Detect (auto-detects local Zotero installation)
-<a id="__codelineno-2-174" name="__codelineno-2-174" href="#__codelineno-2-174"></a>2. Browse collections with item counts
-<a id="__codelineno-2-175" name="__codelineno-2-175" href="#__codelineno-2-175"></a>3. (Future: Click to import collection directly)
+<a id="__codelineno-2-148" name="__codelineno-2-148" href="#__codelineno-2-148"></a>**Creating Frames:**
+<a id="__codelineno-2-149" name="__codelineno-2-149" href="#__codelineno-2-149"></a>- Press `Shift+F` to create a frame:
+<a id="__codelineno-2-150" name="__codelineno-2-150" href="#__codelineno-2-150"></a>  - If nodes are selected: creates frame around selected nodes with padding
+<a id="__codelineno-2-151" name="__codelineno-2-151" href="#__codelineno-2-151"></a>  - If no selection: enters placement mode (click to place frame center)
+<a id="__codelineno-2-152" name="__codelineno-2-152" href="#__codelineno-2-152"></a>- Frames auto-size when created around existing nodes
+<a id="__codelineno-2-153" name="__codelineno-2-153" href="#__codelineno-2-153"></a>
+<a id="__codelineno-2-154" name="__codelineno-2-154" href="#__codelineno-2-154"></a>**Frame Interactions:**
+<a id="__codelineno-2-155" name="__codelineno-2-155" href="#__codelineno-2-155"></a>- Click frame to select (shows controls)
+<a id="__codelineno-2-156" name="__codelineno-2-156" href="#__codelineno-2-156"></a>- Drag frame to move it along with contained nodes
+<a id="__codelineno-2-157" name="__codelineno-2-157" href="#__codelineno-2-157"></a>- Double-click title to rename
+<a id="__codelineno-2-158" name="__codelineno-2-158" href="#__codelineno-2-158"></a>- Resize using bottom-right handle
+<a id="__codelineno-2-159" name="__codelineno-2-159" href="#__codelineno-2-159"></a>
+<a id="__codelineno-2-160" name="__codelineno-2-160" href="#__codelineno-2-160"></a>**Frame Controls (when selected):**
+<a id="__codelineno-2-161" name="__codelineno-2-161" href="#__codelineno-2-161"></a>- Title label (top): displays frame name, editable on double-click
+<a id="__codelineno-2-162" name="__codelineno-2-162" href="#__codelineno-2-162"></a>- Delete button (top-right): circular x button (same style as nodes)
+<a id="__codelineno-2-163" name="__codelineno-2-163" href="#__codelineno-2-163"></a>- Color bar (bottom): color picker dots to change border color
+<a id="__codelineno-2-164" name="__codelineno-2-164" href="#__codelineno-2-164"></a>- Resize handle (bottom-right): drag to resize frame
+<a id="__codelineno-2-165" name="__codelineno-2-165" href="#__codelineno-2-165"></a>
+<a id="__codelineno-2-166" name="__codelineno-2-166" href="#__codelineno-2-166"></a>**Containment Rules:**
+<a id="__codelineno-2-167" name="__codelineno-2-167" href="#__codelineno-2-167"></a>- Nodes are considered "inside" a frame if &gt;50% of node area overlaps the frame
+<a id="__codelineno-2-168" name="__codelineno-2-168" href="#__codelineno-2-168"></a>- Moving a frame moves all contained nodes
+<a id="__codelineno-2-169" name="__codelineno-2-169" href="#__codelineno-2-169"></a>- Nodes can be moved independently in/out of frames
+<a id="__codelineno-2-170" name="__codelineno-2-170" href="#__codelineno-2-170"></a>
+<a id="__codelineno-2-171" name="__codelineno-2-171" href="#__codelineno-2-171"></a>**Layout invariants (required behavior):**
+<a id="__codelineno-2-172" name="__codelineno-2-172" href="#__codelineno-2-172"></a>- A global layout treats each frame as one rigid unit: the frame and its member nodes (by `frame_id`) move together, and member node targets are computed from the node's offset to the frame captured when the layout starts - never incrementally from the node's current (possibly mid-animation) position, so interrupted or repeated layout runs cannot displace nodes relative to their frame
+<a id="__codelineno-2-173" name="__codelineno-2-173" href="#__codelineno-2-173"></a>- After a global layout places frames, frame-frame overlaps are resolved (`resolveFrameOverlaps`) and the resolution deltas apply to frames and their member nodes together, so repeated layout presses cannot stack frames
+<a id="__codelineno-2-174" name="__codelineno-2-174" href="#__codelineno-2-174"></a>- A pending post-layout frame-expansion pass is cancelled when a new layout starts, so it can never fire against another run's in-flight positions
+<a id="__codelineno-2-175" name="__codelineno-2-175" href="#__codelineno-2-175"></a>- These invariants are enforced by tests that run the layout pipeline with framed nodes and assert membership containment and frame separation after single and repeated (interrupting) runs
 <a id="__codelineno-2-176" name="__codelineno-2-176" href="#__codelineno-2-176"></a>
-<a id="__codelineno-2-177" name="__codelineno-2-177" href="#__codelineno-2-177"></a>**Supported Formats:**
-<a id="__codelineno-2-178" name="__codelineno-2-178" href="#__codelineno-2-178"></a>- CSL-JSON (Zotero native, Better BibTeX extended)
-<a id="__codelineno-2-179" name="__codelineno-2-179" href="#__codelineno-2-179"></a>- BibTeX (.bib)
+<a id="__codelineno-2-177" name="__codelineno-2-177" href="#__codelineno-2-177"></a>### Zotero Integration
+<a id="__codelineno-2-178" name="__codelineno-2-178" href="#__codelineno-2-178"></a>
+<a id="__codelineno-2-179" name="__codelineno-2-179" href="#__codelineno-2-179"></a>Two methods for importing citations from Zotero:
 <a id="__codelineno-2-180" name="__codelineno-2-180" href="#__codelineno-2-180"></a>
-<a id="__codelineno-2-181" name="__codelineno-2-181" href="#__codelineno-2-181"></a>**Better BibTeX Extensions:**
-<a id="__codelineno-2-182" name="__codelineno-2-182" href="#__codelineno-2-182"></a>- `citation-key` field for custom citation keys
-<a id="__codelineno-2-183" name="__codelineno-2-183" href="#__codelineno-2-183"></a>- `collections` array for collection names
-<a id="__codelineno-2-184" name="__codelineno-2-184" href="#__codelineno-2-184"></a>- `attachments` array for linked PDFs
-<a id="__codelineno-2-185" name="__codelineno-2-185" href="#__codelineno-2-185"></a>
-<a id="__codelineno-2-186" name="__codelineno-2-186" href="#__codelineno-2-186"></a>### Keyboard Shortcuts
-<a id="__codelineno-2-187" name="__codelineno-2-187" href="#__codelineno-2-187"></a>
-<a id="__codelineno-2-188" name="__codelineno-2-188" href="#__codelineno-2-188"></a>| Shortcut | Action |
-<a id="__codelineno-2-189" name="__codelineno-2-189" href="#__codelineno-2-189"></a>|----------|--------|
-<a id="__codelineno-2-190" name="__codelineno-2-190" href="#__codelineno-2-190"></a>| `Delete` / `Backspace` | Delete selected nodes/edges/frames |
-<a id="__codelineno-2-191" name="__codelineno-2-191" href="#__codelineno-2-191"></a>| `L` | Force layout (D3-force) |
-<a id="__codelineno-2-192" name="__codelineno-2-192" href="#__codelineno-2-192"></a>| `N` | Toggle neighborhood mode |
-<a id="__codelineno-2-193" name="__codelineno-2-193" href="#__codelineno-2-193"></a>| `F` | Fit to content |
-<a id="__codelineno-2-194" name="__codelineno-2-194" href="#__codelineno-2-194"></a>| `Shift+R` | Reset all node sizes to default |
-<a id="__codelineno-2-195" name="__codelineno-2-195" href="#__codelineno-2-195"></a>| `Shift+E` | Export graph as YAML (debug) |
-<a id="__codelineno-2-196" name="__codelineno-2-196" href="#__codelineno-2-196"></a>| `Shift+F` | Create frame (around selection or placement mode) |
-<a id="__codelineno-2-197" name="__codelineno-2-197" href="#__codelineno-2-197"></a>| `Cmd/Ctrl+A` | Select all nodes |
-<a id="__codelineno-2-198" name="__codelineno-2-198" href="#__codelineno-2-198"></a>| `Cmd/Ctrl+C` | Copy selected nodes as JSON |
-<a id="__codelineno-2-199" name="__codelineno-2-199" href="#__codelineno-2-199"></a>| `Cmd/Ctrl+V` | Paste nodes from clipboard |
-<a id="__codelineno-2-200" name="__codelineno-2-200" href="#__codelineno-2-200"></a>| `Ctrl+Shift+R` | Refresh workspace from files |
-<a id="__codelineno-2-201" name="__codelineno-2-201" href="#__codelineno-2-201"></a>
-<a id="__codelineno-2-202" name="__codelineno-2-202" href="#__codelineno-2-202"></a>### Context Menu
+<a id="__codelineno-2-181" name="__codelineno-2-181" href="#__codelineno-2-181"></a>**Method 1: File Drop (Export/Import)**
+<a id="__codelineno-2-182" name="__codelineno-2-182" href="#__codelineno-2-182"></a>1. In Zotero: Right-click collection → Export Collection → CSL-JSON (Better BibTeX recommended)
+<a id="__codelineno-2-183" name="__codelineno-2-183" href="#__codelineno-2-183"></a>2. Drop the `.json` file onto the Nodus canvas
+<a id="__codelineno-2-184" name="__codelineno-2-184" href="#__codelineno-2-184"></a>3. If collection metadata detected, ImportOptionsModal appears with options:
+<a id="__codelineno-2-185" name="__codelineno-2-185" href="#__codelineno-2-185"></a>   - Create frame for collection (auto-named from Zotero collection)
+<a id="__codelineno-2-186" name="__codelineno-2-186" href="#__codelineno-2-186"></a>   - Import attached PDFs (future)
+<a id="__codelineno-2-187" name="__codelineno-2-187" href="#__codelineno-2-187"></a>   - Layout choice (grid/force)
+<a id="__codelineno-2-188" name="__codelineno-2-188" href="#__codelineno-2-188"></a>4. Citation nodes created inside frame
+<a id="__codelineno-2-189" name="__codelineno-2-189" href="#__codelineno-2-189"></a>
+<a id="__codelineno-2-190" name="__codelineno-2-190" href="#__codelineno-2-190"></a>**Method 2: Direct Library Access (Settings)**
+<a id="__codelineno-2-191" name="__codelineno-2-191" href="#__codelineno-2-191"></a>1. Settings → Zotero → Detect (auto-detects local Zotero installation)
+<a id="__codelineno-2-192" name="__codelineno-2-192" href="#__codelineno-2-192"></a>2. Browse collections with item counts
+<a id="__codelineno-2-193" name="__codelineno-2-193" href="#__codelineno-2-193"></a>3. (Future: Click to import collection directly)
+<a id="__codelineno-2-194" name="__codelineno-2-194" href="#__codelineno-2-194"></a>
+<a id="__codelineno-2-195" name="__codelineno-2-195" href="#__codelineno-2-195"></a>**Supported Formats:**
+<a id="__codelineno-2-196" name="__codelineno-2-196" href="#__codelineno-2-196"></a>- CSL-JSON (Zotero native, Better BibTeX extended)
+<a id="__codelineno-2-197" name="__codelineno-2-197" href="#__codelineno-2-197"></a>- BibTeX (.bib)
+<a id="__codelineno-2-198" name="__codelineno-2-198" href="#__codelineno-2-198"></a>
+<a id="__codelineno-2-199" name="__codelineno-2-199" href="#__codelineno-2-199"></a>**Better BibTeX Extensions:**
+<a id="__codelineno-2-200" name="__codelineno-2-200" href="#__codelineno-2-200"></a>- `citation-key` field for custom citation keys
+<a id="__codelineno-2-201" name="__codelineno-2-201" href="#__codelineno-2-201"></a>- `collections` array for collection names
+<a id="__codelineno-2-202" name="__codelineno-2-202" href="#__codelineno-2-202"></a>- `attachments` array for linked PDFs
 <a id="__codelineno-2-203" name="__codelineno-2-203" href="#__codelineno-2-203"></a>
-<a id="__codelineno-2-204" name="__codelineno-2-204" href="#__codelineno-2-204"></a>Right-click on a node to access:
+<a id="__codelineno-2-204" name="__codelineno-2-204" href="#__codelineno-2-204"></a>### Keyboard Shortcuts
 <a id="__codelineno-2-205" name="__codelineno-2-205" href="#__codelineno-2-205"></a>
-<a id="__codelineno-2-206" name="__codelineno-2-206" href="#__codelineno-2-206"></a>| Action | Description |
-<a id="__codelineno-2-207" name="__codelineno-2-207" href="#__codelineno-2-207"></a>|--------|-------------|
-<a id="__codelineno-2-208" name="__codelineno-2-208" href="#__codelineno-2-208"></a>| **Fit to Content** | Auto-resize node to fit its content |
-<a id="__codelineno-2-209" name="__codelineno-2-209" href="#__codelineno-2-209"></a>| **Add to Storyline** | Add node(s) to existing or new storyline |
-<a id="__codelineno-2-210" name="__codelineno-2-210" href="#__codelineno-2-210"></a>| **Send to Workspace** | Move node(s) to a different workspace |
-<a id="__codelineno-2-211" name="__codelineno-2-211" href="#__codelineno-2-211"></a>| **Delete** | Remove node(s) from canvas |
-<a id="__codelineno-2-212" name="__codelineno-2-212" href="#__codelineno-2-212"></a>
-<a id="__codelineno-2-213" name="__codelineno-2-213" href="#__codelineno-2-213"></a>Multi-selection: All context menu actions work on multiple selected nodes.
-<a id="__codelineno-2-214" name="__codelineno-2-214" href="#__codelineno-2-214"></a>
-<a id="__codelineno-2-215" name="__codelineno-2-215" href="#__codelineno-2-215"></a>### Neighborhood Mode
-<a id="__codelineno-2-216" name="__codelineno-2-216" href="#__codelineno-2-216"></a>
-<a id="__codelineno-2-217" name="__codelineno-2-217" href="#__codelineno-2-217"></a>Focus view that isolates a node and its connected neighbors:
-<a id="__codelineno-2-218" name="__codelineno-2-218" href="#__codelineno-2-218"></a>
-<a id="__codelineno-2-219" name="__codelineno-2-219" href="#__codelineno-2-219"></a>- **Depth control:** Configurable 1-5 hops (edges away from focus node)
-<a id="__codelineno-2-220" name="__codelineno-2-220" href="#__codelineno-2-220"></a>- **BFS traversal:** Finds all nodes within specified depth
-<a id="__codelineno-2-221" name="__codelineno-2-221" href="#__codelineno-2-221"></a>- **Layout modes:**
-<a id="__codelineno-2-222" name="__codelineno-2-222" href="#__codelineno-2-222"></a>  - Depth 1: Hierarchical layout (parents above, children below, siblings aside)
-<a id="__codelineno-2-223" name="__codelineno-2-223" href="#__codelineno-2-223"></a>  - Depth 2+: Concentric ring layout around focus node
-<a id="__codelineno-2-224" name="__codelineno-2-224" href="#__codelineno-2-224"></a>- **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
-<a id="__codelineno-2-225" name="__codelineno-2-225" href="#__codelineno-2-225"></a>
-<a id="__codelineno-2-226" name="__codelineno-2-226" href="#__codelineno-2-226"></a>### Edge Routing (PCB-Style)
-<a id="__codelineno-2-227" name="__codelineno-2-227" href="#__codelineno-2-227"></a>
-<a id="__codelineno-2-228" name="__codelineno-2-228" href="#__codelineno-2-228"></a>Edges are routed using a motherboard/PCB-inspired lane system:
-<a id="__codelineno-2-229" name="__codelineno-2-229" href="#__codelineno-2-229"></a>
-<a id="__codelineno-2-230" name="__codelineno-2-230" href="#__codelineno-2-230"></a>| Parameter | Value | Purpose |
-<a id="__codelineno-2-231" name="__codelineno-2-231" href="#__codelineno-2-231"></a>|-----------|-------|---------|
-<a id="__codelineno-2-232" name="__codelineno-2-232" href="#__codelineno-2-232"></a>| `STANDOFF` | 80px | Minimum distance from node edge before routing |
-<a id="__codelineno-2-233" name="__codelineno-2-233" href="#__codelineno-2-233"></a>| `LANE_WIDTH` | 12px | Spacing between parallel edge lanes |
-<a id="__codelineno-2-234" name="__codelineno-2-234" href="#__codelineno-2-234"></a>| `PORT_SPACING` | 25px | Spacing between connection ports on same side |
-<a id="__codelineno-2-235" name="__codelineno-2-235" href="#__codelineno-2-235"></a>
-<a id="__codelineno-2-236" name="__codelineno-2-236" href="#__codelineno-2-236"></a>**Routing algorithm:**
-<a id="__codelineno-2-237" name="__codelineno-2-237" href="#__codelineno-2-237"></a>1. Analyze edges and determine exit/entry sides based on relative positions
-<a id="__codelineno-2-238" name="__codelineno-2-238" href="#__codelineno-2-238"></a>2. Assign ports on each node side, sorted to minimize crossings
-<a id="__codelineno-2-239" name="__codelineno-2-239" href="#__codelineno-2-239"></a>3. Route each edge through dedicated lanes using GridTracker
-<a id="__codelineno-2-240" name="__codelineno-2-240" href="#__codelineno-2-240"></a>4. Obstacle avoidance via spatial indexing
-<a id="__codelineno-2-241" name="__codelineno-2-241" href="#__codelineno-2-241"></a>
-<a id="__codelineno-2-242" name="__codelineno-2-242" href="#__codelineno-2-242"></a>**Edge styles:**
-<a id="__codelineno-2-243" name="__codelineno-2-243" href="#__codelineno-2-243"></a>- `straight`: Direct line between nodes
-<a id="__codelineno-2-244" name="__codelineno-2-244" href="#__codelineno-2-244"></a>- `orthogonal`: 90-degree turns only (default)
-<a id="__codelineno-2-245" name="__codelineno-2-245" href="#__codelineno-2-245"></a>- `diagonal`: Angled routing with obstacle avoidance
-<a id="__codelineno-2-246" name="__codelineno-2-246" href="#__codelineno-2-246"></a>- `curved`: Smooth Bezier curve
-<a id="__codelineno-2-247" name="__codelineno-2-247" href="#__codelineno-2-247"></a>- `hyperbolic`: S-curve that exits/enters nodes orthogonally
-<a id="__codelineno-2-248" name="__codelineno-2-248" href="#__codelineno-2-248"></a>
-<a id="__codelineno-2-249" name="__codelineno-2-249" href="#__codelineno-2-249"></a>**Live routing during drag and zoom (required behavior):**
-<a id="__codelineno-2-250" name="__codelineno-2-250" href="#__codelineno-2-250"></a>
-<a id="__codelineno-2-251" name="__codelineno-2-251" href="#__codelineno-2-251"></a>While a node is being dragged or the canvas is being zoomed, edges must
-<a id="__codelineno-2-252" name="__codelineno-2-252" href="#__codelineno-2-252"></a>re-route on every animation frame so they follow the moving node and keep
-<a id="__codelineno-2-253" name="__codelineno-2-253" href="#__codelineno-2-253"></a>their configured style. This is intentional, not a performance oversight:
-<a id="__codelineno-2-254" name="__codelineno-2-254" href="#__codelineno-2-254"></a>freezing the routing (reusing the pre-drag cached paths) leaves edges
-<a id="__codelineno-2-255" name="__codelineno-2-255" href="#__codelineno-2-255"></a>stationary until the drag ends, and substituting cheap straight/orthogonal
-<a id="__codelineno-2-256" name="__codelineno-2-256" href="#__codelineno-2-256"></a>fallback paths makes the edge style visibly "pop" during the drag. Both were
-<a id="__codelineno-2-257" name="__codelineno-2-257" href="#__codelineno-2-257"></a>tried and rejected as regressions.
-<a id="__codelineno-2-258" name="__codelineno-2-258" href="#__codelineno-2-258"></a>
-<a id="__codelineno-2-259" name="__codelineno-2-259" href="#__codelineno-2-259"></a>Implementation note: `useEdgeRouting` recomputes `routeAllEdges` when the
-<a id="__codelineno-2-260" name="__codelineno-2-260" href="#__codelineno-2-260"></a>routing key changes **or** while `isDragging`/`isZooming` is true, and commits
-<a id="__codelineno-2-261" name="__codelineno-2-261" href="#__codelineno-2-261"></a>the routing key only when not deferring, so the final positions are routed once
-<a id="__codelineno-2-262" name="__codelineno-2-262" href="#__codelineno-2-262"></a>more when the interaction ends. Do not "optimize" this by skipping the
-<a id="__codelineno-2-263" name="__codelineno-2-263" href="#__codelineno-2-263"></a>per-frame recompute during drag/zoom without preserving both the live-follow
-<a id="__codelineno-2-264" name="__codelineno-2-264" href="#__codelineno-2-264"></a>and the styled appearance. If per-frame routing ever becomes a measured
-<a id="__codelineno-2-265" name="__codelineno-2-265" href="#__codelineno-2-265"></a>bottleneck on very large graphs, gate any simplification behind a node-count
-<a id="__codelineno-2-266" name="__codelineno-2-266" href="#__codelineno-2-266"></a>threshold rather than applying it to all graphs.
-<a id="__codelineno-2-267" name="__codelineno-2-267" href="#__codelineno-2-267"></a>
-<a id="__codelineno-2-268" name="__codelineno-2-268" href="#__codelineno-2-268"></a>### Themes
-<a id="__codelineno-2-269" name="__codelineno-2-269" href="#__codelineno-2-269"></a>
-<a id="__codelineno-2-270" name="__codelineno-2-270" href="#__codelineno-2-270"></a>YAML-based theme system with SQLite storage. Four built-in themes, plus LLM-generated custom themes.
-<a id="__codelineno-2-271" name="__codelineno-2-271" href="#__codelineno-2-271"></a>
-<a id="__codelineno-2-272" name="__codelineno-2-272" href="#__codelineno-2-272"></a>| Theme | Background | Use Case |
-<a id="__codelineno-2-273" name="__codelineno-2-273" href="#__codelineno-2-273"></a>|-------|------------|----------|
-<a id="__codelineno-2-274" name="__codelineno-2-274" href="#__codelineno-2-274"></a>| `light` | Light gray | Default daytime |
-<a id="__codelineno-2-275" name="__codelineno-2-275" href="#__codelineno-2-275"></a>| `dark` | Dark zinc | Evening work |
-<a id="__codelineno-2-276" name="__codelineno-2-276" href="#__codelineno-2-276"></a>| `pitch-black` | True black | OLED displays |
-<a id="__codelineno-2-277" name="__codelineno-2-277" href="#__codelineno-2-277"></a>| `cyber` | Neon accents | Aesthetic preference |
-<a id="__codelineno-2-278" name="__codelineno-2-278" href="#__codelineno-2-278"></a>
-<a id="__codelineno-2-279" name="__codelineno-2-279" href="#__codelineno-2-279"></a>**Custom Themes:** Users can ask the graph agent to create themes:
-<a id="__codelineno-2-280" name="__codelineno-2-280" href="#__codelineno-2-280"></a>- "Create a crazy bananas theme" generates YAML with custom colors
-<a id="__codelineno-2-281" name="__codelineno-2-281" href="#__codelineno-2-281"></a>- Themes stored in `themes` table with workspace association
-<a id="__codelineno-2-282" name="__codelineno-2-282" href="#__codelineno-2-282"></a>- Theme YAML defines CSS variables, effects, and metadata
-<a id="__codelineno-2-283" name="__codelineno-2-283" href="#__codelineno-2-283"></a>
-<a id="__codelineno-2-284" name="__codelineno-2-284" href="#__codelineno-2-284"></a>**Theme Schema (YAML):**
-<a id="__codelineno-2-285" name="__codelineno-2-285" href="#__codelineno-2-285"></a>```yaml
-<a id="__codelineno-2-286" name="__codelineno-2-286" href="#__codelineno-2-286"></a>name: "custom-theme"
-<a id="__codelineno-2-287" name="__codelineno-2-287" href="#__codelineno-2-287"></a>display_name: "Custom Theme"
-<a id="__codelineno-2-288" name="__codelineno-2-288" href="#__codelineno-2-288"></a>is_dark: false
-<a id="__codelineno-2-289" name="__codelineno-2-289" href="#__codelineno-2-289"></a>variables:
-<a id="__codelineno-2-290" name="__codelineno-2-290" href="#__codelineno-2-290"></a>  bg_canvas: "#f4f4f5"
-<a id="__codelineno-2-291" name="__codelineno-2-291" href="#__codelineno-2-291"></a>  bg_surface: "#ffffff"
-<a id="__codelineno-2-292" name="__codelineno-2-292" href="#__codelineno-2-292"></a>  text_main: "#18181b"
-<a id="__codelineno-2-293" name="__codelineno-2-293" href="#__codelineno-2-293"></a>  primary_color: "#3b82f6"
+<a id="__codelineno-2-206" name="__codelineno-2-206" href="#__codelineno-2-206"></a>| Shortcut | Action |
+<a id="__codelineno-2-207" name="__codelineno-2-207" href="#__codelineno-2-207"></a>|----------|--------|
+<a id="__codelineno-2-208" name="__codelineno-2-208" href="#__codelineno-2-208"></a>| `Delete` / `Backspace` | Delete selected nodes/edges/frames |
+<a id="__codelineno-2-209" name="__codelineno-2-209" href="#__codelineno-2-209"></a>| `L` | Force layout (D3-force) |
+<a id="__codelineno-2-210" name="__codelineno-2-210" href="#__codelineno-2-210"></a>| `N` | Toggle neighborhood mode |
+<a id="__codelineno-2-211" name="__codelineno-2-211" href="#__codelineno-2-211"></a>| `F` | Fit to content |
+<a id="__codelineno-2-212" name="__codelineno-2-212" href="#__codelineno-2-212"></a>| `Shift+R` | Reset all node sizes to default |
+<a id="__codelineno-2-213" name="__codelineno-2-213" href="#__codelineno-2-213"></a>| `Shift+E` | Export graph as YAML (debug) |
+<a id="__codelineno-2-214" name="__codelineno-2-214" href="#__codelineno-2-214"></a>| `Shift+F` | Create frame (around selection or placement mode) |
+<a id="__codelineno-2-215" name="__codelineno-2-215" href="#__codelineno-2-215"></a>| `Cmd/Ctrl+A` | Select all nodes |
+<a id="__codelineno-2-216" name="__codelineno-2-216" href="#__codelineno-2-216"></a>| `Cmd/Ctrl+C` | Copy selected nodes as JSON |
+<a id="__codelineno-2-217" name="__codelineno-2-217" href="#__codelineno-2-217"></a>| `Cmd/Ctrl+V` | Paste nodes from clipboard |
+<a id="__codelineno-2-218" name="__codelineno-2-218" href="#__codelineno-2-218"></a>| `Ctrl+Shift+R` | Refresh workspace from files |
+<a id="__codelineno-2-219" name="__codelineno-2-219" href="#__codelineno-2-219"></a>
+<a id="__codelineno-2-220" name="__codelineno-2-220" href="#__codelineno-2-220"></a>### Context Menu
+<a id="__codelineno-2-221" name="__codelineno-2-221" href="#__codelineno-2-221"></a>
+<a id="__codelineno-2-222" name="__codelineno-2-222" href="#__codelineno-2-222"></a>Right-click on a node to access:
+<a id="__codelineno-2-223" name="__codelineno-2-223" href="#__codelineno-2-223"></a>
+<a id="__codelineno-2-224" name="__codelineno-2-224" href="#__codelineno-2-224"></a>| Action | Description |
+<a id="__codelineno-2-225" name="__codelineno-2-225" href="#__codelineno-2-225"></a>|--------|-------------|
+<a id="__codelineno-2-226" name="__codelineno-2-226" href="#__codelineno-2-226"></a>| **Fit to Content** | Auto-resize node to fit its content |
+<a id="__codelineno-2-227" name="__codelineno-2-227" href="#__codelineno-2-227"></a>| **Add to Storyline** | Add node(s) to existing or new storyline |
+<a id="__codelineno-2-228" name="__codelineno-2-228" href="#__codelineno-2-228"></a>| **Send to Workspace** | Move node(s) to a different workspace |
+<a id="__codelineno-2-229" name="__codelineno-2-229" href="#__codelineno-2-229"></a>| **Delete** | Remove node(s) from canvas |
+<a id="__codelineno-2-230" name="__codelineno-2-230" href="#__codelineno-2-230"></a>
+<a id="__codelineno-2-231" name="__codelineno-2-231" href="#__codelineno-2-231"></a>Multi-selection: All context menu actions work on multiple selected nodes.
+<a id="__codelineno-2-232" name="__codelineno-2-232" href="#__codelineno-2-232"></a>
+<a id="__codelineno-2-233" name="__codelineno-2-233" href="#__codelineno-2-233"></a>### Neighborhood Mode
+<a id="__codelineno-2-234" name="__codelineno-2-234" href="#__codelineno-2-234"></a>
+<a id="__codelineno-2-235" name="__codelineno-2-235" href="#__codelineno-2-235"></a>Focus view that isolates a node and its connected neighbors:
+<a id="__codelineno-2-236" name="__codelineno-2-236" href="#__codelineno-2-236"></a>
+<a id="__codelineno-2-237" name="__codelineno-2-237" href="#__codelineno-2-237"></a>- **Depth control:** Configurable 1-5 hops (edges away from focus node)
+<a id="__codelineno-2-238" name="__codelineno-2-238" href="#__codelineno-2-238"></a>- **BFS traversal:** Finds all nodes within specified depth
+<a id="__codelineno-2-239" name="__codelineno-2-239" href="#__codelineno-2-239"></a>- **Layout modes:**
+<a id="__codelineno-2-240" name="__codelineno-2-240" href="#__codelineno-2-240"></a>  - Depth 1: Hierarchical layout (parents above, children below, siblings aside)
+<a id="__codelineno-2-241" name="__codelineno-2-241" href="#__codelineno-2-241"></a>  - Depth 2+: Concentric ring layout around focus node
+<a id="__codelineno-2-242" name="__codelineno-2-242" href="#__codelineno-2-242"></a>- **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
+<a id="__codelineno-2-243" name="__codelineno-2-243" href="#__codelineno-2-243"></a>
+<a id="__codelineno-2-244" name="__codelineno-2-244" href="#__codelineno-2-244"></a>### Edge Routing (PCB-Style)
+<a id="__codelineno-2-245" name="__codelineno-2-245" href="#__codelineno-2-245"></a>
+<a id="__codelineno-2-246" name="__codelineno-2-246" href="#__codelineno-2-246"></a>Edges are routed using a motherboard/PCB-inspired lane system:
+<a id="__codelineno-2-247" name="__codelineno-2-247" href="#__codelineno-2-247"></a>
+<a id="__codelineno-2-248" name="__codelineno-2-248" href="#__codelineno-2-248"></a>| Parameter | Value | Purpose |
+<a id="__codelineno-2-249" name="__codelineno-2-249" href="#__codelineno-2-249"></a>|-----------|-------|---------|
+<a id="__codelineno-2-250" name="__codelineno-2-250" href="#__codelineno-2-250"></a>| `STANDOFF` | 80px | Minimum distance from node edge before routing |
+<a id="__codelineno-2-251" name="__codelineno-2-251" href="#__codelineno-2-251"></a>| `LANE_WIDTH` | 12px | Spacing between parallel edge lanes |
+<a id="__codelineno-2-252" name="__codelineno-2-252" href="#__codelineno-2-252"></a>| `PORT_SPACING` | 25px | Spacing between connection ports on same side |
+<a id="__codelineno-2-253" name="__codelineno-2-253" href="#__codelineno-2-253"></a>
+<a id="__codelineno-2-254" name="__codelineno-2-254" href="#__codelineno-2-254"></a>**Routing algorithm:**
+<a id="__codelineno-2-255" name="__codelineno-2-255" href="#__codelineno-2-255"></a>1. Analyze edges and determine exit/entry sides based on relative positions
+<a id="__codelineno-2-256" name="__codelineno-2-256" href="#__codelineno-2-256"></a>2. Assign ports on each node side, sorted to minimize crossings
+<a id="__codelineno-2-257" name="__codelineno-2-257" href="#__codelineno-2-257"></a>3. Route each edge through dedicated lanes using GridTracker
+<a id="__codelineno-2-258" name="__codelineno-2-258" href="#__codelineno-2-258"></a>4. Obstacle avoidance via spatial indexing
+<a id="__codelineno-2-259" name="__codelineno-2-259" href="#__codelineno-2-259"></a>
+<a id="__codelineno-2-260" name="__codelineno-2-260" href="#__codelineno-2-260"></a>**Edge styles:**
+<a id="__codelineno-2-261" name="__codelineno-2-261" href="#__codelineno-2-261"></a>- `straight`: Direct line between nodes
+<a id="__codelineno-2-262" name="__codelineno-2-262" href="#__codelineno-2-262"></a>- `orthogonal`: 90-degree turns only (default)
+<a id="__codelineno-2-263" name="__codelineno-2-263" href="#__codelineno-2-263"></a>- `diagonal`: Angled routing with obstacle avoidance
+<a id="__codelineno-2-264" name="__codelineno-2-264" href="#__codelineno-2-264"></a>- `curved`: Smooth Bezier curve
+<a id="__codelineno-2-265" name="__codelineno-2-265" href="#__codelineno-2-265"></a>- `hyperbolic`: S-curve that exits/enters nodes orthogonally
+<a id="__codelineno-2-266" name="__codelineno-2-266" href="#__codelineno-2-266"></a>
+<a id="__codelineno-2-267" name="__codelineno-2-267" href="#__codelineno-2-267"></a>**Live routing during drag and zoom (required behavior):**
+<a id="__codelineno-2-268" name="__codelineno-2-268" href="#__codelineno-2-268"></a>
+<a id="__codelineno-2-269" name="__codelineno-2-269" href="#__codelineno-2-269"></a>While a node is being dragged or the canvas is being zoomed, edges must
+<a id="__codelineno-2-270" name="__codelineno-2-270" href="#__codelineno-2-270"></a>re-route on every animation frame so they follow the moving node and keep
+<a id="__codelineno-2-271" name="__codelineno-2-271" href="#__codelineno-2-271"></a>their configured style. This is intentional, not a performance oversight:
+<a id="__codelineno-2-272" name="__codelineno-2-272" href="#__codelineno-2-272"></a>freezing the routing (reusing the pre-drag cached paths) leaves edges
+<a id="__codelineno-2-273" name="__codelineno-2-273" href="#__codelineno-2-273"></a>stationary until the drag ends, and substituting cheap straight/orthogonal
+<a id="__codelineno-2-274" name="__codelineno-2-274" href="#__codelineno-2-274"></a>fallback paths makes the edge style visibly "pop" during the drag. Both were
+<a id="__codelineno-2-275" name="__codelineno-2-275" href="#__codelineno-2-275"></a>tried and rejected as regressions.
+<a id="__codelineno-2-276" name="__codelineno-2-276" href="#__codelineno-2-276"></a>
+<a id="__codelineno-2-277" name="__codelineno-2-277" href="#__codelineno-2-277"></a>Implementation note: `useEdgeRouting` recomputes `routeAllEdges` when the
+<a id="__codelineno-2-278" name="__codelineno-2-278" href="#__codelineno-2-278"></a>routing key changes **or** while `isDragging`/`isZooming` is true, and commits
+<a id="__codelineno-2-279" name="__codelineno-2-279" href="#__codelineno-2-279"></a>the routing key only when not deferring, so the final positions are routed once
+<a id="__codelineno-2-280" name="__codelineno-2-280" href="#__codelineno-2-280"></a>more when the interaction ends. Do not "optimize" this by skipping the
+<a id="__codelineno-2-281" name="__codelineno-2-281" href="#__codelineno-2-281"></a>per-frame recompute during drag/zoom without preserving both the live-follow
+<a id="__codelineno-2-282" name="__codelineno-2-282" href="#__codelineno-2-282"></a>and the styled appearance. If per-frame routing ever becomes a measured
+<a id="__codelineno-2-283" name="__codelineno-2-283" href="#__codelineno-2-283"></a>bottleneck on very large graphs, gate any simplification behind a node-count
+<a id="__codelineno-2-284" name="__codelineno-2-284" href="#__codelineno-2-284"></a>threshold rather than applying it to all graphs.
+<a id="__codelineno-2-285" name="__codelineno-2-285" href="#__codelineno-2-285"></a>
+<a id="__codelineno-2-286" name="__codelineno-2-286" href="#__codelineno-2-286"></a>### Themes
+<a id="__codelineno-2-287" name="__codelineno-2-287" href="#__codelineno-2-287"></a>
+<a id="__codelineno-2-288" name="__codelineno-2-288" href="#__codelineno-2-288"></a>YAML-based theme system with SQLite storage. Four built-in themes, plus LLM-generated custom themes.
+<a id="__codelineno-2-289" name="__codelineno-2-289" href="#__codelineno-2-289"></a>
+<a id="__codelineno-2-290" name="__codelineno-2-290" href="#__codelineno-2-290"></a>| Theme | Background | Use Case |
+<a id="__codelineno-2-291" name="__codelineno-2-291" href="#__codelineno-2-291"></a>|-------|------------|----------|
+<a id="__codelineno-2-292" name="__codelineno-2-292" href="#__codelineno-2-292"></a>| `light` | Light gray | Default daytime |
+<a id="__codelineno-2-293" name="__codelineno-2-293" href="#__codelineno-2-293"></a>| `dark` | Dark zinc | Evening work |
+<a id="__codelineno-2-294" name="__codelineno-2-294" href="#__codelineno-2-294"></a>| `pitch-black` | True black | OLED displays |
+<a id="__codelineno-2-295" name="__codelineno-2-295" href="#__codelineno-2-295"></a>| `cyber` | Neon accents | Aesthetic preference |
+<a id="__codelineno-2-296" name="__codelineno-2-296" href="#__codelineno-2-296"></a>
+<a id="__codelineno-2-297" name="__codelineno-2-297" href="#__codelineno-2-297"></a>**Custom Themes:** Users can ask the graph agent to create themes:
+<a id="__codelineno-2-298" name="__codelineno-2-298" href="#__codelineno-2-298"></a>- "Create a crazy bananas theme" generates YAML with custom colors
+<a id="__codelineno-2-299" name="__codelineno-2-299" href="#__codelineno-2-299"></a>- Themes stored in `themes` table with workspace association
+<a id="__codelineno-2-300" name="__codelineno-2-300" href="#__codelineno-2-300"></a>- Theme YAML defines CSS variables, effects, and metadata
+<a id="__codelineno-2-301" name="__codelineno-2-301" href="#__codelineno-2-301"></a>
+<a id="__codelineno-2-302" name="__codelineno-2-302" href="#__codelineno-2-302"></a>**Theme Schema (YAML):**
+<a id="__codelineno-2-303" name="__codelineno-2-303" href="#__codelineno-2-303"></a>```yaml
+<a id="__codelineno-2-304" name="__codelineno-2-304" href="#__codelineno-2-304"></a>name: "custom-theme"
+<a id="__codelineno-2-305" name="__codelineno-2-305" href="#__codelineno-2-305"></a>display_name: "Custom Theme"
+<a id="__codelineno-2-306" name="__codelineno-2-306" href="#__codelineno-2-306"></a>is_dark: false
+<a id="__codelineno-2-307" name="__codelineno-2-307" href="#__codelineno-2-307"></a>variables:
+<a id="__codelineno-2-308" name="__codelineno-2-308" href="#__codelineno-2-308"></a>  bg_canvas: "#f4f4f5"
+<a id="__codelineno-2-309" name="__codelineno-2-309" href="#__codelineno-2-309"></a>  bg_surface: "#ffffff"
+<a id="__codelineno-2-310" name="__codelineno-2-310" href="#__codelineno-2-310"></a>  text_main: "#18181b"
+<a id="__codelineno-2-311" name="__codelineno-2-311" href="#__codelineno-2-311"></a>  primary_color: "#3b82f6"
 </code></pre></div></p>
 <hr />
 <h2 id="data-model">Data Model</h2>
@@ -4078,8 +4096,8 @@ A "Living Documentation" workspace where everything is a node on one canvas. No 
 <li>[x] Typst math rendering (WASM)</li>
 <li>[x] Live-rendered equations</li>
 <li>[ ] "Modernize My Math" import</li>
-<li>[ ] Export to Typst</li>
-<li>[ ] Export to PDF (journal-quality)</li>
+<li>[x] Export to Typst</li>
+<li>[x] Export to PDF (journal-quality)</li>
 <li>[ ] LaTeX export (legacy support)</li>
 </ul>
 <h3 id="phase-3-eu-sync-collaboration">Phase 3: EU Sync + Collaboration</h3>

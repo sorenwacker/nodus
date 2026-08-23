@@ -670,5 +670,25 @@
       "title": "Ask the agent",
       "instruction": "Push the pointer against the left edge to reveal the agent panel."
     }
+  },
+  "export": {
+    "title": "Export document",
+    "confirm": "Export",
+    "working": "Exporting...",
+    "documentTitle": "Title",
+    "author": "Author",
+    "paperSize": "Paper size",
+    "includeConnections": "Append the connections between exported nodes",
+    "untitled": "Untitled",
+    "nodeCount": "{count} nodes",
+    "format": {
+      "pdf": "PDF",
+      "typst": "Typst source"
+    },
+    "formatHint": {
+      "pdf": "A finished document to send",
+      "typst": "A file to keep editing outside Nodus"
+    },
+    "reader": "Export"
   }
 }

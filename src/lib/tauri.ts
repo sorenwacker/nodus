@@ -67,6 +67,17 @@ export async function readTextFile(path: string): Promise<string> {
   return invoke<string>('read_file_content', { path })
 }
 
+/**
+ * Write an exported document to a path the user chose in the save dialog.
+ *
+ * Written through the backend rather than a browser download so the file lands
+ * where the user pointed, and whole rather than truncated
+ * (PRODUCT_DESIGN.md > Document export).
+ */
+export async function writeExportFile(path: string, data: Uint8Array): Promise<void> {
+  return invoke<void>('write_export_file', { path, data: Array.from(data) })
+}
+
 export async function extractPdfText(path: string): Promise<string> {
   return invoke<string>('extract_pdf_text', { path })
 }

@@ -639,5 +639,25 @@
       "title": "Preguntar al agente",
       "instruction": "Lleva el puntero al borde izquierdo para mostrar el panel del agente."
     }
+  },
+  "export": {
+    "title": "Exportar documento",
+    "confirm": "Exportar",
+    "working": "Exportando...",
+    "documentTitle": "Título",
+    "author": "Autor",
+    "paperSize": "Tamaño de papel",
+    "includeConnections": "Añadir las conexiones entre los nodos exportados",
+    "untitled": "Sin título",
+    "nodeCount": "{count} nodos",
+    "format": {
+      "pdf": "PDF",
+      "typst": "Fuente Typst"
+    },
+    "formatHint": {
+      "pdf": "Un documento terminado para enviar",
+      "typst": "Un archivo para seguir editando fuera de Nodus"
+    },
+    "reader": "Exportar"
   }
 }

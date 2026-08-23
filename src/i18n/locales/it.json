@@ -639,5 +639,25 @@
       "title": "Chiedi all'agente",
       "instruction": "Porta il puntatore contro il bordo sinistro per mostrare il pannello dell'agente."
     }
+  },
+  "export": {
+    "title": "Esporta documento",
+    "confirm": "Esporta",
+    "working": "Esportazione...",
+    "documentTitle": "Titolo",
+    "author": "Autore",
+    "paperSize": "Formato carta",
+    "includeConnections": "Aggiungi le connessioni tra i nodi esportati",
+    "untitled": "Senza titolo",
+    "nodeCount": "{count} nodi",
+    "format": {
+      "pdf": "PDF",
+      "typst": "Sorgente Typst"
+    },
+    "formatHint": {
+      "pdf": "Un documento finito da inviare",
+      "typst": "Un file da modificare fuori da Nodus"
+    },
+    "reader": "Esporta"
   }
 }

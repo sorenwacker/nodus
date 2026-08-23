@@ -331,6 +331,24 @@ The integral is: $ integral_a^b f(x) dif x $
 ```
 ```
 
+### Document export
+
+**Required behavior:** Everything in Nodus moves thinking onto the canvas; export is the only path that takes finished work back off it. Without it a completed argument has to be retyped somewhere else to become a document, which is where the tool stops being useful and the user goes back to a word processor.
+
+Two formats, one code path: the Typst source is generated first and PDF is that source compiled by the Typst WASM the application already loads for math.
+
+| Format | Purpose |
+|--------|---------|
+| PDF | A finished document to send or submit |
+| Typst source | A starting point to keep editing outside Nodus |
+
+Scope is whatever the user is looking at when they ask:
+
+- **A storyline** exports in storyline order. The sequence is the argument the user built; reordering it by canvas geometry would destroy the one thing that makes a storyline a document.
+- **A selection** exports in reading order - top to bottom, left to right - because a loose set of nodes has no order of its own.
+
+The export dialog collects title, author, paper size and whether to append the connections between exported nodes, then writes the file to a location chosen through the system save dialog. Compilation failures are reported in the dialog; a PDF that failed to compile must never be written as an empty or partial file.
+
 ### "Modernize My Math" Import
 
 On Obsidian import:
@@ -828,8 +846,8 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 - [x] Typst math rendering (WASM)
 - [x] Live-rendered equations
 - [ ] "Modernize My Math" import
-- [ ] Export to Typst
-- [ ] Export to PDF (journal-quality)
+- [x] Export to Typst
+- [x] Export to PDF (journal-quality)
 - [ ] LaTeX export (legacy support)
 
 ### Phase 3: EU Sync + Collaboration

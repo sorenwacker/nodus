@@ -267,6 +267,7 @@ fn main() {
             commands::debug_get_all_edges,
             commands::read_file_content,
             commands::http_request,
+            commands::write_export_file,
             commands::extract_pdf_text,
             commands::extract_pdf_annotations,
             commands::refresh_workspace,

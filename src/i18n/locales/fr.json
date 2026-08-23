@@ -639,5 +639,25 @@
       "title": "Interroger l'agent",
       "instruction": "Amenez le pointeur contre le bord gauche pour afficher le panneau de l'agent."
     }
+  },
+  "export": {
+    "title": "Exporter le document",
+    "confirm": "Exporter",
+    "working": "Exportation...",
+    "documentTitle": "Titre",
+    "author": "Auteur",
+    "paperSize": "Format de papier",
+    "includeConnections": "Ajouter les connexions entre les nœuds exportés",
+    "untitled": "Sans titre",
+    "nodeCount": "{count} nœuds",
+    "format": {
+      "pdf": "PDF",
+      "typst": "Source Typst"
+    },
+    "formatHint": {
+      "pdf": "Un document fini à envoyer",
+      "typst": "Un fichier à modifier hors de Nodus"
+    },
+    "reader": "Exporter"
   }
 }

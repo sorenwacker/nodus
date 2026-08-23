@@ -10,6 +10,8 @@ import StorylineReaderHeader from './StorylineReaderHeader.vue'
 import StorylineEntitySidebar from './StorylineEntitySidebar.vue'
 import StorylineReferencesSidebar from './StorylineReferencesSidebar.vue'
 import StorylineReaderFooter from './StorylineReaderFooter.vue'
+import ExportDialog from './ExportDialog.vue'
+import { useEdgesStore } from '../stores/edges'
 import Icon from './Icon.vue'
 import { useStorylineNavigation } from '../composables/useStorylineNavigation'
 import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdownRendering'
@@ -39,6 +41,14 @@ const storylineService = inject<StorylineService>('storylineService')
 
 const storyline = ref<Storyline | null>(null)
 const nodes = ref<Node[]>([])
+const edgesStore = useEdgesStore()
+const showExport = ref(false)
+
+// Only the edges between exported nodes belong in the document
+const storylineEdges = computed(() => {
+  const ids = new Set(nodes.value.map(n => n.id))
+  return edgesStore.edges.filter(e => ids.has(e.source_node_id) && ids.has(e.target_node_id))
+})
 const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
 // The contents sidebar keeps its state across folding the reader away and
@@ -300,6 +310,18 @@ watch(() => props.storylineId, loadStoryline)
         @toggle-toc="showToc = !showToc"
         @toggle-entities="showEntitySidebar = !showEntitySidebar"
         @toggle-references="showReferencesSidebar = !showReferencesSidebar"
+        @export="showExport = true"
+      />
+
+      <!-- A storyline exports in its own order: the sequence is the argument
+           the user built (PRODUCT_DESIGN.md > Document export) -->
+      <ExportDialog
+        v-if="showExport"
+        :nodes="nodes"
+        :edges="storylineEdges"
+        :default-title="storyline?.title || ''"
+        preserve-order
+        @close="showExport = false"
       />
 
       <div class="reader-body">

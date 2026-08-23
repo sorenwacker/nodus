@@ -18,6 +18,7 @@ defineEmits<{
   (e: 'toggle-toc'): void
   (e: 'toggle-entities'): void
   (e: 'toggle-references'): void
+  (e: 'export'): void
 }>()
 </script>
 
@@ -55,6 +56,14 @@ defineEmits<{
         @click="$emit('toggle-references')"
       >
         <Icon name="link" :size="18" />
+      </button>
+      <button
+        class="export-btn"
+        :title="t('export.reader')"
+        :aria-label="t('export.reader')"
+        @click="$emit('export')"
+      >
+        <Icon name="file-text" :size="18" />
       </button>
       <button
         class="close-btn"

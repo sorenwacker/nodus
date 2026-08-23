@@ -114,6 +114,22 @@ Create linear narratives through your knowledge graph:
 - Export storylines as documents
 - Color-code storyline edges
 
+### Exporting a document
+
+Turn work on the canvas into a document in two formats:
+
+- **PDF** - compiled in the application, ready to send
+- **Typst source** - to keep editing outside Nodus
+
+Two ways in:
+
+1. In the storyline reader, choose **Export**. The document follows the storyline order, so the sequence you arranged is the sequence in the document.
+2. Select nodes on the canvas, right-click, and choose **Export selection**. Nodes are ordered top to bottom, left to right.
+
+The dialog collects a title, an optional author, the paper size, and whether to append a list of the connections between the exported nodes. Choose where to save with the system dialog. If a PDF fails to compile, the dialog says so and writes nothing, so a broken file never lands on disk.
+
+Nodes with Typst math export as math, not as source text, since the same engine renders both on the canvas and in the document.
+
 ### Learning the edge gestures
 
 The edge gestures are not visible on screen, so a short coach runs once after onboarding. It teaches three of them in turn - the right edge for storylines, a dwell at the bottom edge for timelines, the left edge for the agent - and moves on only when you actually perform the gesture it is asking for. Skip it at any time; it does not come back.

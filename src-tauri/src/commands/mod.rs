@@ -3,6 +3,7 @@
 //! All commands are async and return Results for proper error handling.
 
 mod edges;
+mod exports;
 mod file_locks;
 mod frames;
 mod http;
@@ -23,6 +24,7 @@ use std::sync::Mutex;
 
 // Re-export all commands
 pub use edges::*;
+pub use exports::*;
 pub use file_locks::*;
 pub use frames::*;
 pub use http::*;

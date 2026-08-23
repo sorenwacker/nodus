@@ -11,6 +11,12 @@ export interface ExportOptions {
   date?: string
   includeConnections?: boolean
   paperSize?: 'a4' | 'us-letter' | 'a5'
+  /**
+   * Keep the order the nodes were passed in rather than sorting by canvas
+   * position. A storyline's sequence is the document's argument; sorting it by
+   * geometry would destroy it (PRODUCT_DESIGN.md > Document export).
+   */
+  preserveOrder?: boolean
   fontSize?: string
   marginSize?: string
 }
@@ -254,8 +260,9 @@ export function exportToTypst(
   // Add preamble
   sections.push(generatePreamble(opts))
 
-  // Sort nodes by position (top-left first) for logical reading order
-  const sortedNodes = [...nodes].sort((a, b) => {
+  // A loose selection has no order of its own, so it reads top to bottom and
+  // left to right; a caller that already has a sequence keeps it
+  const sortedNodes = opts.preserveOrder ? [...nodes] : [...nodes].sort((a, b) => {
     const rowA = Math.floor(a.canvas_y / 200)
     const rowB = Math.floor(b.canvas_y / 200)
     if (rowA !== rowB) return rowA - rowB

@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
 import { useDisplayStore } from '../stores/display'
-import type { Node } from '../types'
+import type { Node, Edge } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
 import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
@@ -71,6 +71,7 @@ import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
 import CanvasEdgeFilters from './components/CanvasEdgeFilters.vue'
 import CanvasContextMenu from './components/CanvasContextMenu.vue'
+import ExportDialog from '../components/ExportDialog.vue'
 import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
 import CanvasLLMBar from './components/CanvasLLMBar.vue'
 import CanvasHoverTooltip from './components/CanvasHoverTooltip.vue'
@@ -788,6 +789,19 @@ const {
 watch(hoveredNode, (n) => {
   store.hoverHighlightNodeId = n?.id ?? null
 })
+
+// Export dialog: empty means closed
+const exportNodes = ref<Node[]>([])
+const exportEdges = computed(() => {
+  const ids = new Set(exportNodes.value.map(n => n.id))
+  return store.edges.filter((e: Edge) => ids.has(e.source_node_id) && ids.has(e.target_node_id))
+})
+
+function openExportForSelection(nodeIds: string[]) {
+  exportNodes.value = nodeIds
+    .map(id => store.nodes.find(n => n.id === id))
+    .filter((n): n is Node => n !== undefined)
+}
 
 // Context menu composable
 const contextMenu = useContextMenu({
@@ -2335,6 +2349,7 @@ defineExpose({
         @zoom-to-node="zoomToNodeDefault"
         @open-link-picker="openLinkPicker"
         @delete-nodes="deleteSelectedNodes(contextMenu.affectedNodeIds.value)"
+        @export-selection="openExportForSelection(contextMenu.affectedNodeIds.value)"
         @add-to-storyline="addNodeToStoryline"
         @create-storyline="createStorylineFromNode"
         @move-to-workspace="moveNodesToWorkspace"
@@ -2347,6 +2362,15 @@ defineExpose({
         @update:storyline-submenu="contextMenuStorylineSubmenu = $event"
         @update:workspace-submenu="contextMenuWorkspaceSubmenu = $event"
         @update:entity-submenu="contextMenuEntitySubmenu = $event"
+      />
+
+      <!-- A loose selection has no order of its own, so it exports in reading
+           order (PRODUCT_DESIGN.md > Document export) -->
+      <ExportDialog
+        v-if="exportNodes.length > 0"
+        :nodes="exportNodes"
+        :edges="exportEdges"
+        @close="exportNodes = []"
       />
 
       <!-- Citation fetch progress indicator -->

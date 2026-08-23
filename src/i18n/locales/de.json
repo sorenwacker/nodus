@@ -639,5 +639,25 @@
       "title": "Den Agenten fragen",
       "instruction": "Bewegen Sie den Zeiger an den linken Fensterrand, um das Agenten-Panel einzublenden."
     }
+  },
+  "export": {
+    "title": "Dokument exportieren",
+    "confirm": "Exportieren",
+    "working": "Exportiere...",
+    "documentTitle": "Titel",
+    "author": "Autor",
+    "paperSize": "Papierformat",
+    "includeConnections": "Verbindungen zwischen exportierten Knoten anhängen",
+    "untitled": "Ohne Titel",
+    "nodeCount": "{count} Knoten",
+    "format": {
+      "pdf": "PDF",
+      "typst": "Typst-Quelle"
+    },
+    "formatHint": {
+      "pdf": "Ein fertiges Dokument zum Versenden",
+      "typst": "Eine Datei zum Weiterbearbeiten außerhalb von Nodus"
+    },
+    "reader": "Exportieren"
   }
 }
