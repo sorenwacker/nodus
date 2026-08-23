@@ -128,7 +128,9 @@ export function useLayout(options: UseLayoutOptions) {
     positions: Map<string, { x: number; y: number }>,
     nodeMap: Map<string, NodeSize>
   ): Map<string, { x: number; y: number }> {
-    return pushNodesOutOfFrames(positions, nodeMap, getFramesForCollision())
+    // A node keeps its frame; only foreign frames push it away
+    const frameOfNode = new Map(store.getFilteredNodes().map(n => [n.id, n.frame_id]))
+    return pushNodesOutOfFrames(positions, nodeMap, getFramesForCollision(), frameOfNode)
   }
 
   /**

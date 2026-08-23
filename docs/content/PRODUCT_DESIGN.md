@@ -1130,6 +1130,15 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
 
+### Layout of a selection
+
+**Required behavior:** A selection is an instruction. Every node the user selected takes part in the layout, and a node that is silently left where it was reads as the layout being broken - which is how it looked when nodes belonging to a frame were filtered out of a selected layout without a word.
+
+- With a selection, exactly the selected nodes are laid out, including those that belong to a frame.
+- A framed node keeps its frame. After the layout settles, each affected frame is re-fitted around its contents and frame overlaps are resolved, so nodes stay inside the frame they belong to instead of escaping it.
+- Without a selection, the whole graph is laid out and frame contents are handled by the frame-aware path as before.
+- Re-fitting a frame to its contents has one implementation, shared by the layout and the agent's frame tools; a second copy would let the two drift.
+
 ### Edge handles
 
 **Required behavior:** An edge that is live along its whole length fires during ordinary mouse travel. In a window that does not fill the screen the pointer crosses a border constantly - reaching for another application, the dock, the desktop - and every crossing opened a panel the user did not ask for. The gesture has to be aimed to count.

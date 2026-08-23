@@ -55,6 +55,8 @@ interface Store {
     canvas_y: number
   }) => Promise<{ id: string }>
   updateNodeContent: (id: string, content: string) => Promise<void>
+  /** Node an AI task is writing into; drives the canvas working pulse. */
+  aiWorkingNodeId?: { value: string | null }
   updateNodeTitle: (id: string, title: string) => Promise<void>
   deleteNode: (id: string) => Promise<void>
   createEdge: (data: {
@@ -91,7 +93,11 @@ interface ViewState {
 }
 
 interface LLM {
-  simpleGenerate: (prompt: string) => Promise<string>
+  simpleGenerate: (
+    prompt: string,
+    customSystem?: string,
+    onProgress?: (textSoFar: string) => void
+  ) => Promise<string>
 }
 
 export interface UsePdfDropOptions {
@@ -131,7 +137,11 @@ export function usePdfDrop(options: UsePdfDropOptions) {
    * the model is unreachable. The text extracted from the PDF is the import;
    * cleanup only makes it nicer, so a failed request must not discard it.
    */
-  async function cleanupChunk(rawText: string, isFirstChunk: boolean): Promise<string> {
+  async function cleanupChunk(
+    rawText: string,
+    isFirstChunk: boolean,
+    onProgress?: (textSoFar: string) => void
+  ): Promise<string> {
     // Pre-process to merge broken lines
     const preprocessed = preProcessPdfText(rawText)
 
@@ -150,7 +160,7 @@ Text to clean:
 ${preprocessed}`
 
     try {
-      return await llm.simpleGenerate(prompt)
+      return await llm.simpleGenerate(prompt, undefined, onProgress)
     } catch (error) {
       cleanupFailure = error instanceof Error ? error.message : String(error)
       return preprocessed
@@ -199,10 +209,31 @@ ${preprocessed}`
       lastImportNodeIds.push(loadingNode.id)
 
       processingStatus.value = 'Cleaning up text...'
+      if (store.aiWorkingNodeId) store.aiWorkingNodeId.value = loadingNode.id
 
       // Split into chunks at natural boundaries
       const textChunks = splitIntoChunks(rawText, MAX_CLEANUP_SIZE)
       const cleanedChunks: string[] = []
+
+      // Stream the accumulating document into the node as the model produces
+      // it, throttled so the canvas is not re-rendered on every token. Writes
+      // are serialized: a progress report arriving while one is in flight only
+      // replaces the pending text, it never queues a second write.
+      let streamWriteInFlight = false
+      let lastStreamWrite = 0
+      const streamIntoNode = (sectionsDone: string[], currentText: string) => {
+        const now = Date.now()
+        if (streamWriteInFlight || now - lastStreamWrite < 250 || aborted) return
+        streamWriteInFlight = true
+        lastStreamWrite = now
+        const doc = [...sectionsDone, currentText].join('\n\n')
+        store
+          .updateNodeContent(loadingNode.id, doc)
+          .catch(() => {})
+          .finally(() => {
+            streamWriteInFlight = false
+          })
+      }
 
       for (let i = 0; i < textChunks.length && !aborted; i++) {
         if (textChunks.length > 1) {
@@ -210,7 +241,9 @@ ${preprocessed}`
         }
 
         const isFirst = i === 0
-        const cleaned = await cleanupChunk(textChunks[i], isFirst)
+        const cleaned = await cleanupChunk(textChunks[i], isFirst, text =>
+          streamIntoNode(cleanedChunks, text)
+        )
         cleanedChunks.push(cleaned)
       }
 
@@ -242,6 +275,7 @@ ${preprocessed}`
       })
       lastImportNodeIds.push(errorNode.id)
     } finally {
+      if (store.aiWorkingNodeId) store.aiWorkingNodeId.value = null
       isProcessing.value = false
       processingStatus.value = ''
       if (lastImportNodeIds.length > 0 && pushCreationUndo) {

@@ -118,6 +118,14 @@ Create linear narratives through your knowledge graph:
 
 The chat panel shows the conversation; the log shows what the agent did and anything that failed. Open it with the **Log** button in the status bar at the bottom of the canvas, next to the node and edge counts. The button is present whenever the AI is enabled, so errors have a known place to be even before anything goes wrong.
 
+### Watching a PDF import work
+
+Dropping a PDF creates its node immediately, and the AI cleanup that follows is visible rather than opaque:
+
+- The cleaned text **streams into the node as it is generated**. With the Ollama provider each token appears as the model produces it (updates are throttled to keep the canvas smooth); providers without streaming support fall back to updating the node as each section completes.
+- The node currently being written carries a **pulsing outline** so it is findable on a busy canvas. The pulse stops and the outline disappears the moment processing ends, whether it finished or was aborted.
+- The status line still names the section being cleaned, which remains the only progress signal for multi-section documents on non-streaming providers.
+
 ### Importing PDF highlights
 
 Drop a PDF that you have already annotated and Nodus offers its highlights for import.

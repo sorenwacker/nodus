@@ -87,8 +87,12 @@ export function useLLM() {
   /**
    * Simple generate (no tools) - goes through queue
    */
-  async function simpleGenerate(prompt: string, customSystem?: string): Promise<string> {
-    return llmQueue.generate(prompt, customSystem || systemPrompt.value)
+  async function simpleGenerate(
+    prompt: string,
+    customSystem?: string,
+    onProgress?: (textSoFar: string) => void
+  ): Promise<string> {
+    return llmQueue.generate(prompt, customSystem || systemPrompt.value, 0, onProgress)
   }
 
   /**

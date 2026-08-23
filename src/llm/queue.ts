@@ -24,6 +24,7 @@ interface GenerateRequest extends BaseRequest {
   type: 'generate'
   prompt: string
   system?: string
+  onProgress?: (textSoFar: string) => void
 }
 
 interface ChatRequest extends BaseRequest {
@@ -51,13 +52,19 @@ class LLMQueue {
   /**
    * Generate text (queued)
    */
-  async generate(prompt: string, system?: string, priority = 0): Promise<string> {
+  async generate(
+    prompt: string,
+    system?: string,
+    priority = 0,
+    onProgress?: (textSoFar: string) => void
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const request: GenerateRequest = {
         id: crypto.randomUUID(),
         type: 'generate',
         prompt,
         system,
+        onProgress,
         priority,
         resolve: resolve as (value: unknown) => void,
         reject,
@@ -124,6 +131,7 @@ class LLMQueue {
             return provider.generate({
               prompt: request.prompt,
               system: request.system,
+              onProgress: request.onProgress,
             })
           },
           {
@@ -237,8 +245,8 @@ export const llmQueue = new LLMQueue()
  */
 export function useLLMQueue() {
   return {
-    generate: (prompt: string, system?: string, priority?: number) =>
-      llmQueue.generate(prompt, system, priority),
+    generate: (prompt: string, system?: string, priority?: number, onProgress?: (textSoFar: string) => void) =>
+      llmQueue.generate(prompt, system, priority, onProgress),
     chat: (messages: ChatMessage[], tools?: LLMTool[]) =>
       llmQueue.chat(messages, tools),
     cancel: () => llmQueue.cancel(),

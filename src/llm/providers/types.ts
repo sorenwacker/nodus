@@ -31,6 +31,12 @@ export interface GenerateOptions {
   prompt: string
   system?: string
   maxTokens?: number
+  /** When given, providers that support streaming report the accumulated text
+   *  after each token; the promise still resolves with the complete text.
+   *  Reporting the running total rather than deltas keeps consumers correct
+   *  when the queue retries a failed request mid-stream. Providers without
+   *  streaming support ignore it. */
+  onProgress?: (textSoFar: string) => void
 }
 
 export interface ChatOptions {

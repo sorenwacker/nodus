@@ -5,6 +5,8 @@
 import { NODE_DEFAULTS } from '../../constants'
 
 export interface FrameRect {
+  /** Present so a node is never pushed out of the frame it belongs to */
+  id?: string
   canvas_x: number
   canvas_y: number
   width: number
@@ -96,7 +98,13 @@ export function isNodeCenterInFrame(
 export function pushNodesOutOfFrames(
   positions: Map<string, { x: number; y: number }>,
   nodeMap: Map<string, NodeSize>,
-  frames: FrameRect[]
+  frames: FrameRect[],
+  /**
+   * Which frame each node belongs to. A node is never pushed out of its own
+   * frame: it belongs there, and ejecting it is exactly the "nodes leave
+   * frames" behaviour (PRODUCT_DESIGN.md > Layout of a selection)
+   */
+  frameOfNode?: Map<string, string | null | undefined>
 ): Map<string, { x: number; y: number }> {
   if (frames.length === 0) return positions
 
@@ -121,6 +129,10 @@ export function pushNodesOutOfFrames(
 
       for (let frameIdx = 0; frameIdx < frames.length; frameIdx++) {
         const frame = frames[frameIdx]
+        // The node belongs in this frame; the frame grows around it instead.
+        // Both ids must be present: absent ownership must never match absent id
+        const owner = frameOfNode?.get(nodeId)
+        if (owner && frame.id && owner === frame.id) continue
         const nodeRight = newX + nodeWidth
         const nodeBottom = newY + nodeHeight
         const frameRight = frame.canvas_x + frame.width

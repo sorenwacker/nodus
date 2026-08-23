@@ -42,6 +42,8 @@ export interface NodeStoreState {
   showWikilinkEdges: Ref<boolean>
   showTagEdges: Ref<boolean>
   hoverHighlightNodeId: Ref<string | null>
+  /** Node an AI task is currently writing into; drives the working pulse. */
+  aiWorkingNodeId: Ref<string | null>
 }
 
 /**

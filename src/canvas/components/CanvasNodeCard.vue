@@ -96,6 +96,8 @@ const classes = computed(() => ({
   // Shared hover bus: lights up when this node is hovered anywhere
   // (timelines, storyline panel, canvas)
   'hover-highlighted': nodesStore.hoverHighlightNodeId === props.node.id,
+  // An AI task is writing into this node right now
+  'ai-working': nodesStore.aiWorkingNodeId === props.node.id,
   'tag-node': isTagNode.value,
 }))
 
@@ -409,6 +411,22 @@ async function removeTag(tag: string) {
 <style scoped>
 .node-card.hover-highlighted {
   box-shadow: 0 0 0 2px var(--primary-color), 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
+/* An AI task is writing into this node: pulse so it is findable on a busy
+   canvas, and stop the moment the store flag clears. */
+.node-card.ai-working {
+  animation: ai-working-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ai-working-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px var(--primary-color), 0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 3px var(--primary-color), 0 0 22px rgba(59, 130, 246, 0.65);
+  }
 }
 
 .node-tag-footer {

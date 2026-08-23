@@ -179,6 +179,12 @@ export async function executeAutoLayout(
     // Primary: use frame_id from database (authoritative)
     // Fallback: spatial check for nodes without frame_id (newly placed nodes)
 
+    // A selection is an instruction: every selected node takes part, framed
+    // ones included, and their frames are re-fitted around them afterwards.
+    // Excluding them left part of the selection sitting exactly where it was
+    // (PRODUCT_DESIGN.md > Layout of a selection)
+    const laidOutBySelection = selectedIds.length > 0
+
     for (const node of nodes) {
       // frame_id is the ONLY source of truth for frame membership
       // NO spatial fallback - that creates non-deterministic behavior
@@ -189,14 +195,11 @@ export async function executeAutoLayout(
           }
           frameNodes.get(node.frame_id)!.push(node)
         }
-        // Node with frame_id is always considered "framed" - skip layout
-        continue
+        if (!laidOutBySelection) continue
       }
 
-      // No frame_id = unframed node = participates in layout
       unframedNodes.push(node)
     }
-    // Only layout unframed nodes - nodes with frame_id stay fixed
     virtualNodes = [...unframedNodes]
   }
 

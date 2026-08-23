@@ -73,6 +73,7 @@ export class OllamaProvider implements ILLMProvider {
   async generate(options: GenerateOptions): Promise<GenerateResult> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), this.timeout)
+    const streaming = typeof options.onProgress === 'function'
 
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
@@ -82,7 +83,7 @@ export class OllamaProvider implements ILLMProvider {
           model: this.model,
           prompt: options.prompt,
           system: options.system,
-          stream: false,
+          stream: streaming,
           options: {
             num_ctx: this.contextLength,
           },
@@ -90,18 +91,48 @@ export class OllamaProvider implements ILLMProvider {
         signal: controller.signal,
       })
 
-      clearTimeout(timeout)
-
       if (!response.ok) {
+        clearTimeout(timeout)
         throw new Error(`Ollama error: ${response.status}`)
       }
 
-      const data = await response.json()
-      return { content: data.response || '' }
+      if (!streaming) {
+        clearTimeout(timeout)
+        const data = await response.json()
+        return { content: data.response || '' }
+      }
+
+      // Streamed responses arrive as NDJSON. A network chunk can end mid-line,
+      // so buffer the tail until its closing newline arrives.
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let content = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let newline
+        while ((newline = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, newline).trim()
+          buffer = buffer.slice(newline + 1)
+          if (!line) continue
+          const data = JSON.parse(line)
+          if (data.response) {
+            content += data.response
+            options.onProgress!(content)
+          }
+        }
+      }
+      clearTimeout(timeout)
+      return { content }
     } catch (e: unknown) {
       clearTimeout(timeout)
       if (e instanceof Error && e.name === 'AbortError') {
         throw new Error('Request timed out')
+      }
+      if (e instanceof Error && e.message.startsWith('Ollama error')) {
+        throw e
       }
       throw new Error('Cannot connect to Ollama. Start it with: ollama serve')
     }

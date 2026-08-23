@@ -37,7 +37,37 @@ export interface LayoutStrategyStore {
   updateNodePosition: (id: string, x: number, y: number) => void
 }
 
+
+/**
+ * Which nodes a layout moves, and which frames must be re-fitted afterwards.
+ *
+ * A selection is an instruction: every selected node takes part, including
+ * nodes that belong to a frame. The node keeps its frame and the frame is
+ * re-fitted around its contents afterwards, so nothing escapes its frame and
+ * nothing is silently left behind (PRODUCT_DESIGN.md > Layout of a selection).
+ *
+ * With no selection the whole graph is laid out and frame contents are left to
+ * the frame-aware path.
+ */
+export function selectionForLayout(
+  allNodes: Node[],
+  selectedIds: string[]
+): { nodes: Node[]; affectedFrameIds: Set<string> } {
+  if (selectedIds.length === 0) {
+    return { nodes: allNodes.filter(n => !n.frame_id), affectedFrameIds: new Set() }
+  }
+
+  const selected = new Set(selectedIds)
+  const nodes = allNodes.filter(n => selected.has(n.id))
+  const affectedFrameIds = new Set(
+    nodes.map(n => n.frame_id).filter((id): id is string => !!id)
+  )
+  return { nodes, affectedFrameIds }
+}
+
 export interface LayoutStrategyOptions {
+  /** Re-fit frames around their contents after nodes inside them have moved */
+  expandFramesToFitNodes?: () => Promise<void>
   store: LayoutStrategyStore
   viewState: ViewState
   pushUndo: () => void
@@ -110,14 +140,7 @@ export async function executeStrategy(
   const selectedIds = store.getSelectedNodeIds()
   const allNodes = store.getFilteredNodes()
 
-  // frame_id is the ONLY source of truth
-  const isNodeInAnyFrame = (node: Node): boolean => !!node.frame_id
-
-  // Filter nodes: selected ones, excluding those in frames
-  const candidateNodes = selectedIds.length > 0
-    ? allNodes.filter(n => selectedIds.includes(n.id))
-    : allNodes
-  const nodes = candidateNodes.filter(n => !isNodeInAnyFrame(n))
+  const { nodes, affectedFrameIds } = selectionForLayout(allNodes, selectedIds)
 
   if (nodes.length === 0) return
 
@@ -168,5 +191,11 @@ export async function executeStrategy(
     animateToPositions(positions, duration)
   } else {
     await batchUpdatePositions(positions, store.updateNodePosition, 200)
+  }
+
+  // Frames follow the nodes that moved inside them, so a selected node keeps
+  // its frame instead of escaping it
+  if (affectedFrameIds.size > 0) {
+    await options.expandFramesToFitNodes?.()
   }
 }

@@ -126,7 +126,7 @@ export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, Fi
 export const useNodesStore = defineStore('nodes', () => {
   // Create core state
   const state = createState()
-  const { nodes, selectedNodeIds, loading, error, nodeLayoutVersion, showManualEdges, showStorylineEdges, showWikilinkEdges, showTagEdges, hoverHighlightNodeId } = state
+  const { nodes, selectedNodeIds, loading, error, nodeLayoutVersion, showManualEdges, showStorylineEdges, showWikilinkEdges, showTagEdges, hoverHighlightNodeId, aiWorkingNodeId } = state
 
   // Create store instances
   const stores = createStoreInstances()
@@ -557,6 +557,7 @@ export const useNodesStore = defineStore('nodes', () => {
     showWikilinkEdges,
     showTagEdges,
     hoverHighlightNodeId,
+    aiWorkingNodeId,
     workspaces,
     currentWorkspaceId,
     storylines,

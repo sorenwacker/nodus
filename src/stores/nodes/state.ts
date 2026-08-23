@@ -29,6 +29,7 @@ export function createState(): NodeStoreState {
     showTagEdges: ref(true),
     // Shared hover bus: canvas and timelines highlight each other's hovered node
     hoverHighlightNodeId: ref<string | null>(null),
+    aiWorkingNodeId: ref<string | null>(null),
   }
 }
 
