@@ -19,6 +19,11 @@ export const useDisplayStore = defineStore('display', () => {
   const hoverTooltipEnabled = ref(uiStorage.getHoverTooltipEnabled())
   // Agent panel fold state: shared so the toolbar and the canvas agree
   const agentPanelCollapsed = ref(uiStorage.getAgentPanelCollapsed())
+  /**
+   * A node asked to be read on its own. The canvas sets it, App opens the
+   * reader on it (PRODUCT_DESIGN.md > Reading a single node).
+   */
+  const readingNodeId = ref<string | null>(null)
 
   // Reload all values from storage
   function reload() {
@@ -35,6 +40,10 @@ export const useDisplayStore = defineStore('display', () => {
   }
 
   /** Reveal the panel (used by the left-edge push) */
+  function readNode(nodeId: string) {
+    readingNodeId.value = nodeId
+  }
+
   function showAgentPanel() {
     if (!agentPanelCollapsed.value) return
     agentPanelCollapsed.value = false
@@ -75,6 +84,8 @@ export const useDisplayStore = defineStore('display', () => {
     // Actions
     toggleAgentPanel,
     showAgentPanel,
+    readingNodeId,
+    readNode,
     reload,
     setupListener,
     cleanupListener,

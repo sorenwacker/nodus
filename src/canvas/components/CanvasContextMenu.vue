@@ -26,6 +26,7 @@ const emit = defineEmits<{
   (e: 'open-link-picker'): void
   (e: 'delete-nodes'): void
   (e: 'export-selection'): void
+  (e: 'read-node'): void
   (e: 'add-to-storyline', storylineId: string): void
   (e: 'create-storyline'): void
   (e: 'move-to-workspace', workspaceId: string | null): void
@@ -100,6 +101,11 @@ function handleZoomToNode() {
 
 function handleOpenLinkPicker() {
   emit('open-link-picker')
+}
+
+function handleReadNode() {
+  emit('read-node')
+  emit('close')
 }
 
 function handleExportSelection() {
@@ -358,6 +364,14 @@ function handleCreateEntity(type: EntityNodeType) {
     </div>
 
     <div class="context-menu-divider"></div>
+
+    <div v-if="nodeId" class="context-menu-item" @click="handleReadNode">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+      </svg>
+      <span>Read node</span>
+    </div>
 
     <div class="context-menu-item" @click="handleExportSelection">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

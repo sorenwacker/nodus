@@ -18,6 +18,7 @@ import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdo
 import { useScrollPositionMemory } from '../composables/useScrollPositionMemory'
 import { useScrollObserver } from '../composables/useScrollObserver'
 import { createCommentContent } from '../composables/useCommentMeta'
+import { commentAnchorTitle, anchorCommentInText } from '../lib/anchoredNodes'
 import { useStorylineReaderContent } from '../composables/useStorylineReaderContent'
 import { useStorylineReaderComments } from '../composables/useStorylineReaderComments'
 import { useStorylineReaderEntities } from '../composables/useStorylineReaderEntities'
@@ -27,7 +28,13 @@ import { COMMENT_STYLES } from '../types'
 const { t } = useI18n()
 
 const props = defineProps<{
+  /** Empty when reading a single node rather than a storyline */
   storylineId: string
+  /**
+   * Read this node on its own, using the same reader the storylines use
+   * (PRODUCT_DESIGN.md > Reading a single node)
+   */
+  singleNodeId?: string
   /** Full window width (deepest step); false keeps the graph visible at half */
   fullWidth?: boolean
 }>()
@@ -147,6 +154,18 @@ function handleScroll() {
 const markdownRendering = useStorylineMarkdownRendering()
 const { renderNodeContent, renderAllNodes, processPendingContent, getRenderedContent } = markdownRendering
 
+// Only the full-width reader has room for anchored callouts; narrower steps
+// keep links inline (PRODUCT_DESIGN.md > Anchored nodes)
+watch(
+  () => props.fullWidth,
+  full => {
+    markdownRendering.expandAnchors.value = !!full
+    markdownRendering.clearCache()
+    renderAllNodes(nodes.value)
+  },
+  { immediate: true }
+)
+
 // Content interaction composable
 const contentInteraction = useStorylineReaderContent({
   nodes,
@@ -170,6 +189,14 @@ const { entitiesByType, hasEntities, navigateToEntityNode, panToEntity } = entit
 async function loadStoryline() {
   loading.value = true
   try {
+    if (props.singleNodeId) {
+      const node = store.nodes.find(n => n.id === props.singleNodeId)
+      nodes.value = node ? [node] : []
+      storyline.value = node
+        ? ({ id: node.id, title: node.title } as typeof storyline.value)
+        : null
+      return
+    }
     // Find storyline
     const found = store.storylines.find(s => s.id === props.storylineId)
     if (found) {
@@ -213,13 +240,25 @@ async function handleCommentCreate(index: number, text: string, commentType: Com
   if (!storyline.value || !storylineService) return
   try {
     const content = createCommentContent(text, commentType)
+    // The comment is anchored by a wikilink in the text it comments on, so it
+    // stays with that passage (PRODUCT_DESIGN.md > Anchored nodes)
+    const title = commentAnchorTitle(text, store.nodes.map(n => n.title))
     const node = await store.createNode({
-      title: 'Comment',
+      title,
       node_type: 'comment',
       markdown_content: content,
       canvas_x: 0,
       canvas_y: 0,
     })
+
+    const anchorNode = nodes.value[index - 1] ?? nodes.value[index] ?? nodes.value[0]
+    if (anchorNode) {
+      await store.updateNodeContent(
+        anchorNode.id,
+        anchorCommentInText(anchorNode.markdown_content || '', title)
+      )
+    }
+
     await storylineService.addNode(storyline.value.id, node.id, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
     renderNodeContent(node)
@@ -280,7 +319,7 @@ watch(nodes, () => {
   })
 })
 
-watch(() => props.storylineId, loadStoryline)
+watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
 </script>
 
 <template>
@@ -468,6 +507,42 @@ watch(() => props.storylineId, loadStoryline)
 </template>
 
 <style scoped>
+/* Anchored nodes read like comments, at the point in the text that links them
+   (PRODUCT_DESIGN.md > Anchored nodes) */
+:deep(.anchored-node) {
+  display: block;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--primary-color);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-surface-alt);
+}
+
+:deep(.anchored-title) {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+:deep(.anchored-body) {
+  display: block;
+  font-size: 0.94em;
+  color: var(--text-secondary);
+}
+
+:deep(.anchored-para) {
+  display: block;
+  margin: 0 0 8px;
+}
+
+:deep(.anchored-para:last-child) {
+  margin-bottom: 0;
+}
+
 /* Overlays the canvas (no layout reflow); enter/leave slide via App's
    reader-slide transition, half <-> full steps animate width */
 .reader-overlay {

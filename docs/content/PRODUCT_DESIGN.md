@@ -1130,6 +1130,23 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
 
+### Anchored nodes
+
+**Required behavior:** A note about a passage belongs at that passage. A comment that floats between sections says only which node it concerns, leaving the reader to work out which sentence provoked it - and the position is lost as soon as the text is edited anywhere above it.
+
+- The anchor is a `[[wikilink]]` written at the point in the text it refers to. The text is the anchor, so it survives editing here, in Obsidian, or in any other editor, and needs no stored offsets that a later edit would silently invalidate.
+- While reading a node at full width, every wikilink expands into a callout carrying the linked node's title and content, at exactly the point where the link sits. At smaller widths links stay inline, because a callout needs room the half-width reader does not have.
+- Expansion is one level deep: the links inside an expanded node stay inline links. A note that expanded its own links would loop on any pair of nodes that reference each other.
+- A link whose target does not exist stays an inline link, marked missing, as it is elsewhere.
+- Creating a comment writes such a link at the anchor point, so a comment is an anchored node rather than a separate kind of thing.
+
+### Reading a single node
+
+**Required behavior:** Reading is currently only reachable through a storyline, so a node that belongs to no storyline cannot be read at all - and anchored nodes are exactly what one wants to read a single node for.
+
+- Any node can be opened in the reader on its own, showing its text with its anchored nodes expanded, using the same reader the storylines use rather than a second implementation.
+- The single-node reader is reachable from the node itself on the canvas.
+
 ### Layout of a selection
 
 **Required behavior:** A selection is an instruction. Every node the user selected takes part in the layout, and a node that is silently left where it was reads as the layout being broken - which is how it looked when nodes belonging to a frame were filtered out of a selected layout without a word.

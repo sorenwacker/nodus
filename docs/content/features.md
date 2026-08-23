@@ -114,6 +114,16 @@ Create linear narratives through your knowledge graph:
 - Export storylines as documents
 - Color-code storyline edges
 
+### Anchored notes and comments
+
+A note about a passage sits at that passage. Write a `[[wikilink]]` where it belongs, and while reading that node at full width the linked node opens as a callout at exactly that point. Narrower reader widths keep links inline, because a callout needs the room.
+
+- Expansion goes one level deep: links inside an expanded note stay links.
+- A link to a node that does not exist stays an inline link, marked as missing.
+- Creating a comment writes such a link into the text it comments on, so the comment travels with the passage rather than with a position in the sequence.
+
+To read one node on its own, right-click it on the canvas and choose **Read node**. It opens in the same reader the storylines use, at full width, with its anchored notes expanded.
+
 ### Agent log
 
 The chat panel shows the conversation; the log shows what the agent did and anything that failed. Open it with the **Log** button in the status bar at the bottom of the canvas, next to the node and edge counts. The button is present whenever the AI is enabled, so errors have a known place to be even before anything goes wrong.

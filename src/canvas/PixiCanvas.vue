@@ -2360,6 +2360,7 @@ defineExpose({
         @open-link-picker="openLinkPicker"
         @delete-nodes="deleteSelectedNodes(contextMenu.affectedNodeIds.value)"
         @export-selection="openExportForSelection(contextMenu.affectedNodeIds.value)"
+        @read-node="contextMenuNodeId && displayStore.readNode(contextMenuNodeId)"
         @add-to-storyline="addNodeToStoryline"
         @create-storyline="createStorylineFromNode"
         @move-to-workspace="moveNodesToWorkspace"

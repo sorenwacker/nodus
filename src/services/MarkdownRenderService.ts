@@ -48,6 +48,12 @@ let mermaidRenderQueued = false
 export interface RenderOptions {
   /** Function to check if a wikilink target exists */
   wikilinkExists?: (target: string) => boolean
+  /**
+   * Resolve a wikilink target to the node it names, so the link can be
+   * expanded into a callout at the point where it sits. Provided only while
+   * reading at full width (PRODUCT_DESIGN.md > Anchored nodes).
+   */
+  anchoredNode?: (target: string) => { id: string; title: string; markdown: string } | null
 }
 
 /**
@@ -124,6 +130,29 @@ export function renderMarkdown(content: string | null, options: RenderOptions = 
   html = html.replace(wikilinkRegex, (_match, target, display) => {
     const displayText = display || target
     const targetTrimmed = target.trim()
+
+    const anchored = options.anchoredNode?.(targetTrimmed)
+    if (anchored) {
+      // One level deep: the links inside an expanded node stay inline, or two
+      // nodes referencing each other would expand forever
+      // Paragraphs become block-displayed spans: the callout sits inside a
+      // paragraph, and a <p> nested there is hoisted out by the parser,
+      // leaving the callout empty and its text loose in the document
+      const body = renderMarkdown(anchored.markdown, {
+        wikilinkExists: options.wikilinkExists,
+      })
+        .replace(/<p>/g, '<span class="anchored-para">')
+        .replace(/<\/p>/g, '</span>')
+      // A span rather than a div: the callout often sits inside a paragraph,
+      // where a block element would be closed out by the parser
+      return (
+        `<span class="anchored-node" data-node-id="${escapeText(anchored.id)}">` +
+        `<span class="anchored-title">${escapeText(anchored.title)}</span>` +
+        `<span class="anchored-body">${body}</span>` +
+        `</span>`
+      )
+    }
+
     const targetExists = options.wikilinkExists?.(targetTrimmed) ?? false
     const missingClass = targetExists ? '' : ' missing'
     return `<a class="wikilink${missingClass}" data-target="${targetTrimmed}">${displayText}</a>`

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, provide, type ComponentPublicInstance } from 'vue'
+import { onMounted, ref, computed, provide, type ComponentPublicInstance, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from './stores/nodes'
 import { useThemesStore } from './stores/themes'
@@ -111,6 +111,20 @@ function openReader(id: string) {
   lastReadStorylineId.value = id
   readerFullWidth.value = false
 }
+
+// A node asked to be read on its own (PRODUCT_DESIGN.md > Reading a single node)
+const readerNodeId = ref<string | null>(null)
+watch(
+  () => displayStore.readingNodeId,
+  id => {
+    if (!id) return
+    readerNodeId.value = id
+    readerStorylineId.value = null
+    // A single node is read at full width, where its anchored nodes expand
+    readerFullWidth.value = true
+    displayStore.readingNodeId = null
+  }
+)
 
 function openReaderFromEdge() {
   const candidates = storylinesStore.filteredStorylines
@@ -948,11 +962,12 @@ async function openFolderDialog() {
       <!-- Reader slides in from the right; sits above an open timelines sheet -->
       <Transition name="reader-slide">
         <StorylineReader
-          v-if="readerStorylineId"
-          :storyline-id="readerStorylineId"
+          v-if="readerStorylineId || readerNodeId"
+          :storyline-id="readerStorylineId || ''"
+          :single-node-id="readerNodeId || undefined"
           :full-width="readerFullWidth"
           :style="{ bottom: showTimelines ? timelinesSheetHeight : '0px' }"
-          @close="readerStorylineId = null"
+          @close="readerStorylineId = null; readerNodeId = null"
         />
       </Transition>
     </main>
