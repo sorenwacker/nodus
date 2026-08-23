@@ -201,7 +201,7 @@ const emit = defineEmits<{
       </svg>
     </button>
     <button
-      data-tooltip-pos="top-left"
+      data-tooltip-pos="top"
       :class="{ active: highlightAllEdges }"
       :data-tooltip="t('canvas.controls.highlightEdges')"
       @click="emit('toggleHighlightEdges')"
@@ -213,7 +213,7 @@ const emit = defineEmits<{
       </svg>
     </button>
     <button
-      data-tooltip-pos="top-left"
+      data-tooltip-pos="top"
       :class="{ active: neighborhoodMode }"
       :data-tooltip="t('canvas.controls.neighborhoodView')"
       @mousedown.stop.prevent="emit('toggleNeighborhoodMode')"
@@ -231,7 +231,7 @@ const emit = defineEmits<{
       </svg>
     </button>
     <button
-      data-tooltip-pos="top-left"
+      data-tooltip-pos="top"
       :class="{ active: bubbleModeActive }"
       :data-tooltip="t('canvas.controls.bubbleMode')"
       @click="emit('toggleBubbleMode')"
@@ -244,7 +244,7 @@ const emit = defineEmits<{
     </button>
     <select
       v-if="neighborhoodMode"
-      data-tooltip-pos="top-left"
+      data-tooltip-pos="top"
       class="depth-select"
       :value="neighborhoodDepth"
       :data-tooltip="t('canvas.controls.neighborhoodDepth')"
@@ -257,7 +257,7 @@ const emit = defineEmits<{
       <option value="5">5 {{ t('canvas.controls.hops') }}</option>
     </select>
     <button
-      data-tooltip-pos="top-left"
+      data-tooltip-pos="top"
       :data-tooltip="pendingFramePlacement ? t('canvas.frame.clickToPlace') : t('canvas.frame.addFrame')"
       :class="{ active: pendingFramePlacement }"
       @click="emit('createFrame')"
@@ -268,7 +268,7 @@ const emit = defineEmits<{
       </svg>
     </button>
     <button
-      data-tooltip-pos="top-left"
+      data-tooltip-pos="top"
       :data-tooltip="t('canvas.controls.help')"
       @click="emit('showHelp')"
     >

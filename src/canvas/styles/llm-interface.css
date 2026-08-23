@@ -85,31 +85,15 @@
   border-color: var(--primary-color);
 }
 
-/* Anchored to the button's left edge: a centered tooltip on a corner button
-   runs off the screen */
-button.agent-toggle-corner[data-tooltip]:hover::after {
-  left: 0 !important;
-  right: auto !important;
-  transform: none !important;
-}
-
 .agent-toggle-corner.folded {
   color: var(--primary-color);
   border-color: var(--primary-color);
 }
 
-
 /* Light mode: stronger AI panel contrast */
 :root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber']) .graph-llm-bar {
   border-right-color: #94a3b8;
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.08);
-}
-
-/* The input row sits at the panel's bottom, so its tooltips open upward
-   rather than off the bottom of the window */
-.graph-llm-bar .llm-input-row [data-tooltip]:hover::after {
-  top: auto !important;
-  bottom: calc(100% + 8px) !important;
 }
 
 /* Everything but the conversation keeps its natural height */

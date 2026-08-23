@@ -206,12 +206,6 @@
   position: relative;
 }
 
-/* Zoom controls tooltips appear above (bottom of screen) */
-.zoom-controls [data-tooltip]:hover::after {
-  top: auto !important;
-  bottom: calc(100% + 8px) !important;
-}
-
 .zoom-controls button svg {
   flex-shrink: 0;
 }

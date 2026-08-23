@@ -6,7 +6,34 @@
  * The right edge steps deeper (graph -> storyline overview -> reader), the
  * left edge steps back, the bottom edge opens the timelines sheet and the top
  * edge closes it; the caller decides what each step does.
+ *
+ * Each edge listens only over a handle centred on it, not along its full
+ * length: in a window that does not fill the screen the pointer crosses a
+ * border constantly, and an edge live end to end fires on ordinary travel
+ * (PRODUCT_DESIGN.md > Edge handles).
  */
+
+/** Share of an edge the handle spans, before the bounds below are applied */
+const HANDLE_RATIO = 0.3
+/** Small enough to aim at, large enough to hit on a small window */
+const HANDLE_MIN = 120
+const HANDLE_MAX = 320
+
+/**
+ * Where an edge listens, along an edge of the given length. The single
+ * definition of the handle: the gesture and the drawn marker both read it, so a
+ * handle can never be drawn where the gesture is not listening.
+ */
+export function edgeHandleRange(length: number): { start: number; end: number; size: number } {
+  const size = Math.min(Math.max(length * HANDLE_RATIO, HANDLE_MIN), HANDLE_MAX, length)
+  const start = (length - size) / 2
+  return { start, end: start + size, size }
+}
+
+function withinHandle(position: number, length: number): boolean {
+  const { start, end } = edgeHandleRange(length)
+  return position >= start && position <= end
+}
 export interface EdgeStepperOptions {
   /** Edge band width in px */
   threshold: number
@@ -44,8 +71,13 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
   let topArmed = true
   let bottomTimer: ReturnType<typeof setTimeout> | null = null
 
-  function onPointerX(x: number, windowWidth: number): void {
-    if (x >= windowWidth - rightThreshold()) {
+  function onPointerX(x: number, y: number, windowWidth: number, windowHeight: number): void {
+    // Outside the handle the edge is inert, but the arming state still has to
+    // follow the pointer: otherwise leaving through a dead stretch would leave
+    // the edge disarmed for the next real push
+    const aimed = withinHandle(y, windowHeight)
+
+    if (aimed && x >= windowWidth - rightThreshold()) {
       if (rightArmed) {
         rightArmed = false
         stepRight()
@@ -54,7 +86,7 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
       rightArmed = true
     }
 
-    if (x <= leftThreshold()) {
+    if (aimed && x <= leftThreshold()) {
       if (leftArmed) {
         leftArmed = false
         stepLeft()
@@ -65,11 +97,13 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
   }
 
   function onPointer(x: number, y: number, windowWidth: number, windowHeight: number): void {
-    onPointerX(x, windowWidth)
+    onPointerX(x, y, windowWidth, windowHeight)
+
+    const aimedVertically = withinHandle(x, windowWidth)
 
     if (stepTop) {
       const topBand = topThreshold()
-      if (topBand > 0 && y <= topBand) {
+      if (aimedVertically && topBand > 0 && y <= topBand) {
         if (topArmed) {
           topArmed = false
           stepTop()
@@ -80,7 +114,7 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
     }
 
     if (!stepBottom) return
-    if (y >= windowHeight - bottomThreshold()) {
+    if (aimedVertically && y >= windowHeight - bottomThreshold()) {
       if (!bottomArmed) return
       if (bottomDwellMs <= 0) {
         bottomArmed = false
@@ -115,7 +149,13 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
    * gesture, while the top band exists only to catch the title-bar exit.
    */
   function onPointerLeave(x: number, y: number, windowWidth: number, windowHeight: number): void {
-    void windowHeight
+    // Reaching for another window drags the pointer out through a border; only
+    // an exit through a handle was aimed at the gesture
+    if (x >= windowWidth - SIDE_LEAVE_BAND || x <= SIDE_LEAVE_BAND) {
+      if (!withinHandle(y, windowHeight)) return
+    } else if (!withinHandle(x, windowWidth)) {
+      return
+    }
 
     if (x >= windowWidth - SIDE_LEAVE_BAND) {
       if (rightArmed) {
@@ -141,5 +181,5 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
     }
   }
 
-  return { onPointerX, onPointer, onPointerLeave }
+  return { onPointer, onPointerLeave }
 }

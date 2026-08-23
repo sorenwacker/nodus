@@ -18,15 +18,6 @@
   z-index: 100;
 }
 
-/* Toolbar tooltips appear BELOW buttons (into canvas area) */
-.toolbar [data-tooltip]:hover::after {
-  top: calc(100% + 8px) !important;
-  bottom: auto !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  z-index: 10000 !important;
-}
-
 .toolbar-left {
   display: flex;
   align-items: center;
@@ -436,7 +427,6 @@
   background: white;
   opacity: 0.9;
 }
-
 
 /* Reader mode: canvas shrinks, reader slides in */
 .main-content .with-reader {

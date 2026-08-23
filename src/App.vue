@@ -16,6 +16,8 @@ import UpdateNotice from './components/UpdateNotice.vue'
 import { useUpdateCheck } from './composables/useUpdateCheck'
 import OnboardingFlow from './components/OnboardingFlow.vue'
 import GestureCoach from './components/GestureCoach.vue'
+import EdgeHandles from './components/EdgeHandles.vue'
+import TooltipLayer from './components/TooltipLayer.vue'
 import { useGestureCoach } from './composables/useGestureCoach'
 import StorylinePanel from './components/StorylinePanel.vue'
 import StorylineReader from './components/StorylineReader.vue'
@@ -1175,6 +1177,10 @@ async function openFolderDialog() {
 
     <!-- Onboarding Flow -->
     <OnboardingFlow @complete="onOnboardingComplete" />
+
+    <EdgeHandles :top-active="showTimelines" />
+
+    <TooltipLayer />
 
     <GestureCoach
       :lesson="gestureCoach.lesson.value"

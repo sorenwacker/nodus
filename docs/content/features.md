@@ -151,6 +151,8 @@ To see it again, open Settings > General and choose "Replay gesture tour".
 ### Storyline Panel
 Moving between graph and storylines works in steps along the screen edges: each push of the pointer against the right edge goes one step deeper into storylines, each push against the left edge steps back toward the graph.
 
+Each edge is active only at a handle in the middle of that edge, marked on screen. Pushing the border anywhere else - reaching for another window, the dock or the desktop - does nothing, so panels open when you aim for them and not while you work.
+
 - Push right once: the storyline overview slides open on the right
 - Push right again: the reader opens at half the window, keeping the graph visible, with the last-read storyline (the first storyline initially)
 - Push right a third time: the reader expands to the full window

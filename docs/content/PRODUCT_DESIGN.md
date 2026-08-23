@@ -331,6 +331,22 @@ The integral is: $ integral_a^b f(x) dif x $
 ```
 ```
 
+### Provider status
+
+**Required behavior:** The status light beside a provider must report whether the application can get an answer from it, because that is the only thing the user consults it for. Probing a different endpoint from the one the work uses - a model listing rather than a completion - reports a route that can succeed while every real request fails on authorisation, gateway routing or timeout, and a green light next to a failing provider is worse than no light at all.
+
+- Availability is tested with a minimal request of the same kind the application makes: the completions endpoint, one token.
+- A provider that answers is online. A provider that refuses, times out, or cannot be reached is offline, whatever its model listing does.
+- The reason a check failed is kept and shown, since "cannot be reached" and "refused the key" call for different fixes from the user.
+
+### Reading files the user dropped
+
+**Required behavior:** Commands that read a file refuse paths outside a workspace vault, so that a path invented by an agent or arriving over the MCP connection cannot read arbitrary disk. A file the user drags onto the window is the opposite case: they chose it themselves, and the files worth dropping - a paper in Downloads, a PDF in Zotero's storage - are almost never inside a vault.
+
+- A path the user dropped on the window is readable for the rest of the session, whether or not it lies in a vault.
+- The grant comes from the operating system's drop event as the backend receives it, never from a path handed over by the interface. A caller that can name a path could otherwise grant itself access to it, which is the check this guard exists to make.
+- Everything else is unchanged: a path that was neither dropped nor inside a vault is still refused.
+
 ### PDF highlights as nodes
 
 **Required behavior:** A researcher's reading already happened somewhere else. The highlights in a PDF are the parts they judged worth keeping, so re-typing them onto the canvas is work they have already done once.
@@ -438,7 +454,13 @@ level.
 
 **Panel sizing (required behavior):** Every panel the user can resize uses one composable, so the drag behaviour, clamping and persistence cannot drift between them: the storyline overview (width), the agent panel (width) and the timelines sheet (height). Each grows in the direction that points away from its edge - a right-hand panel widens as its separator is dragged left, a bottom sheet grows taller as it is dragged up - within a clamped range, and the chosen size is stored per panel and restored on the next launch. The timelines sheet keeps sizing itself to its lane count until the user drags it, after which their height wins. While a separator is being dragged the panel's own slide transition is suspended, for the same reason the canvas overlays suspend theirs: a transition lags behind the pointer.
 
-**Tooltip placement (required behavior):** Tooltips default to below the element and centred on it, which is only safe away from a window edge. Every container holding controls against an edge declares the direction that keeps its labels on screen: the top-right toolbar aligns them to the button's right edge, bottom-anchored clusters (zoom controls, edge filters, timelines sheet, the agent panel's input row) open upward, and right-side storyline layers align right. Tooltip text always comes from the locale files - a literal string cannot be translated. Both rules are enforced by a gate test that names the edge-anchored containers and fails on any hardcoded tooltip text.
+**Tooltip placement (required behavior):** A tooltip is placed by measuring, never by a rule written per container. The previous approach - a default direction plus an override for each edge-anchored container - required whoever added a control to predict whether its label would fit, and every container that nobody thought about clipped its tooltips at the window edge. That is a defect the mechanism produces, not one its users forget to prevent.
+
+- One tooltip element for the whole application, positioned from the trigger's measured rectangle and its own measured size.
+- The preferred side is below the trigger; when the tooltip would leave the viewport it flips to the opposite side, and if neither side fits it is clamped to stay fully inside. Placement therefore cannot depend on which container the trigger happens to sit in.
+- An element may request a preferred side, but the request is honoured only when the result stays on screen. A preference that would clip is overruled.
+- Tooltip text always comes from the locale files - a literal string cannot be translated.
+- Gate tests hold both rules: the placement function must return a rectangle inside the viewport for a trigger at any position including every corner, and no stylesheet may position a tooltip through a `[data-tooltip]` pseudo-element again.
 
 ### Canvas Features
 
@@ -1107,6 +1129,16 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 | Entity node types | One node each: citation (with DOI), comment, character, location, term, item |
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
+
+### Edge handles
+
+**Required behavior:** An edge that is live along its whole length fires during ordinary mouse travel. In a window that does not fill the screen the pointer crosses a border constantly - reaching for another application, the dock, the desktop - and every crossing opened a panel the user did not ask for. The gesture has to be aimed to count.
+
+- Each edge is active only over a handle centred on that edge, not along its full length. A push registers when the pointer is inside the edge band *and* within the handle's span.
+- The handle spans a fraction of the edge, bounded so it stays aimable on a small window and does not become an entire edge on a large one.
+- Handles are drawn on screen. A gesture that requires aim must show where to aim, and a visible handle answers the discoverability problem the first-run coach addresses in words.
+- The handle geometry has one definition, used by both the gesture and the drawing. A handle drawn anywhere other than where the gesture listens is worse than no handle at all.
+- Handles never take pointer events. They mark a region; the canvas underneath stays fully interactive.
 
 ### First-run gesture coach
 
