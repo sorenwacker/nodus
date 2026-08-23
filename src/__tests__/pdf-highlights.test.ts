@@ -163,3 +163,28 @@ describe('pdf import resilience', () => {
     expect(body).toContain('return preprocessed')
   })
 })
+
+describe('pdf cleanup sections', () => {
+  it('sends sections short enough to survive a gateway idle timeout', () => {
+    // A 15k-character section asks for thousands of output tokens: minutes of
+    // generation, which gateways cut mid-response
+    // (PRODUCT_DESIGN.md > PDF text cleanup)
+    const source = readFileSync(
+      resolve(__dirname, '../canvas/composables/util/usePdfDrop.ts'),
+      'utf-8'
+    )
+    const declared = source.match(/const MAX_CLEANUP_SIZE = (\d+)/)
+
+    expect(declared, 'MAX_CLEANUP_SIZE is not declared').toBeTruthy()
+    expect(Number(declared![1])).toBeLessThanOrEqual(6000)
+  })
+
+  it('counts the sections that fell back so the node can say so', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../canvas/composables/util/usePdfDrop.ts'),
+      'utf-8'
+    )
+
+    expect(source).toContain('cleanupFailures')
+  })
+})

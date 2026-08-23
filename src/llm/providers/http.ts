@@ -86,3 +86,31 @@ export async function httpFetch(
   // Fallback to browser fetch (for dev without Tauri)
   return fetch(url, options)
 }
+
+/**
+ * Make a streaming request, feeding each chunk to `onChunk` as it arrives.
+ *
+ * Streaming keeps the connection demonstrably active, so a long generation is
+ * not cut as an idle connection (PRODUCT_DESIGN.md > Streaming responses).
+ */
+export async function httpStreamFetch(
+  url: string,
+  options: FetchOptions & { onChunk: (chunk: string) => void }
+): Promise<number> {
+  const { Channel } = await import('@tauri-apps/api/core')
+  const headers: Record<string, string> = {}
+  if (options.headers) Object.assign(headers, options.headers)
+
+  const channel = new Channel<string>()
+  channel.onmessage = options.onChunk
+
+  const input: HttpRequestInput = {
+    url,
+    method: options.method || 'POST',
+    headers,
+    body: options.body as string | undefined,
+    timeout_ms: options.connectTimeout || 60000,
+  }
+
+  return invoke<number>('http_stream_request', { input, onChunk: channel })
+}

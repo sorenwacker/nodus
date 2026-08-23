@@ -331,6 +331,14 @@ The integral is: $ integral_a^b f(x) dif x $
 ```
 ```
 
+### Streaming responses
+
+**Required behavior:** A response that arrives as one buffered body is indistinguishable from a stalled connection while the model is still generating, and gateways cut it. Streaming keeps bytes flowing.
+
+- Generation requests ask the provider to stream, and the backend forwards each chunk to the interface as it arrives rather than accumulating the whole body.
+- A provider or endpoint that does not stream still works: the response is read whole, as before.
+- A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
+
 ### Provider status
 
 **Required behavior:** The status light beside a provider must report whether the application can get an answer from it, because that is the only thing the user consults it for. Probing a different endpoint from the one the work uses - a model listing rather than a completion - reports a route that can succeed while every real request fails on authorisation, gateway routing or timeout, and a green light next to a failing provider is worse than no light at all.
@@ -338,6 +346,15 @@ The integral is: $ integral_a^b f(x) dif x $
 - Availability is tested with a minimal request of the same kind the application makes: the completions endpoint, one token.
 - A provider that answers is online. A provider that refuses, times out, or cannot be reached is offline, whatever its model listing does.
 - The reason a check failed is kept and shown, since "cannot be reached" and "refused the key" call for different fixes from the user.
+
+### PDF text cleanup
+
+**Required behavior:** Cleaning up extracted PDF text is a long generation - the model rewrites everything it is sent - and a request whose response takes minutes is cut by the idle timeout of any gateway between the application and the model. The failure looks like an unreachable endpoint while the endpoint is answering other requests in milliseconds.
+
+- Responses are streamed. Tokens arriving continuously keep the connection active, so a generation of any length cannot be mistaken for an idle connection and cut. This is the fix; section size only limits how much is lost when something else fails.
+- Text is cleaned in sections small enough that a lost section costs little, rather than in the largest sections the context window allows.
+- A section the model does not return is imported as extracted; the sections around it keep their cleanup. Cleanup improves the text, so losing it must never cost the text itself.
+- The node says how many sections were imported as extracted, and why, so the result is not silently worse than it looks.
 
 ### Reading files the user dropped
 

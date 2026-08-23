@@ -3,7 +3,8 @@
  * Works with any OpenAI-compatible API (LM Studio, LocalAI, vLLM, text-generation-webui, etc.)
  */
 
-import { httpFetch } from './http'
+import { httpFetch, httpStreamFetch } from './http'
+import { createSseAccumulator } from './sse'
 import type {
   ILLMProvider,
   GenerateOptions,
@@ -144,25 +145,33 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     }
     messages.push({ role: 'user', content: options.prompt })
 
-    const response = await httpFetch(`${this.baseUrl}/chat/completions`, {
+    // Streamed: a long generation arriving in one buffered body looks like a
+    // stalled connection to anything in between, and gets cut
+    // (PRODUCT_DESIGN.md > Streaming responses)
+    const sse = createSseAccumulator()
+    const status = await httpStreamFetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
         model: this.model,
         messages,
         max_tokens: options.maxTokens,
+        stream: true,
       }),
       connectTimeout: this.timeout,
+      onChunk: chunk => sse.push(chunk),
     })
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}))
-      const errorMsg = error.error?.message || error.message || error.detail || JSON.stringify(error)
-      throw new Error(`API error ${response.status}: ${errorMsg}`)
+    if (status < 200 || status >= 300) {
+      throw new Error(`API error ${status}: ${sse.error() || sse.text().slice(0, 300)}`)
     }
+    const streamError = sse.error()
+    if (streamError) throw new Error(`API error: ${streamError}`)
+    // A stream that stopped early would otherwise pass off a truncated
+    // generation as a complete answer
+    if (!sse.done()) throw new Error('The response ended before it was complete')
 
-    const data = await response.json()
-    return { content: data.choices?.[0]?.message?.content || '' }
+    return { content: sse.text() }
   }
 
   async chat(options: ChatOptions): Promise<ChatResult> {

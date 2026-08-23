@@ -278,6 +278,7 @@ fn main() {
             commands::read_file_content,
             commands::http_request,
             commands::write_export_file,
+            commands::http_stream_request,
             commands::extract_pdf_text,
             commands::extract_pdf_annotations,
             commands::refresh_workspace,

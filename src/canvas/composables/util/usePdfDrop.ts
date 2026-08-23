@@ -35,7 +35,11 @@ export interface PendingBibImport {
   y: number
 }
 
-const MAX_CLEANUP_SIZE = 15000 // Max characters to send to LLM for cleanup
+// Characters per cleanup request. The model rewrites everything it is sent, so
+// a large section means a response of thousands of tokens - minutes of
+// generation, which any gateway between here and the model cuts as an idle
+// connection (PRODUCT_DESIGN.md > PDF text cleanup)
+const MAX_CLEANUP_SIZE = 4000
 
 interface Frame {
   id: string
@@ -120,6 +124,9 @@ export function usePdfDrop(options: UsePdfDropOptions) {
   // Set when the LLM could not be reached, so the import can say the text was
   // imported as extracted instead of failing outright
   let cleanupFailure: string | null = null
+  // Sections that fell back, so the node can say how much is uncleaned
+  let cleanupFailures = 0
+  let cleanupSections = 0
 
   // Pending bib import (for modal confirmation)
   const pendingBibImport = ref<PendingBibImport | null>(null)
@@ -163,6 +170,7 @@ ${preprocessed}`
       return await llm.simpleGenerate(prompt, undefined, onProgress)
     } catch (error) {
       cleanupFailure = error instanceof Error ? error.message : String(error)
+      cleanupFailures++
       return preprocessed
     }
   }
@@ -175,6 +183,8 @@ ${preprocessed}`
     aborted = false
     lastImportNodeIds = []
     cleanupFailure = null
+    cleanupFailures = 0
+    cleanupSections = 0
     isProcessing.value = true
     processingStatus.value = 'Extracting text...'
 
@@ -213,6 +223,7 @@ ${preprocessed}`
 
       // Split into chunks at natural boundaries
       const textChunks = splitIntoChunks(rawText, MAX_CLEANUP_SIZE)
+      cleanupSections = textChunks.length
       const cleanedChunks: string[] = []
 
       // Stream the accumulating document into the node as the model produces
@@ -255,8 +266,10 @@ ${preprocessed}`
       const title = headingMatch ? headingMatch[1] : filename
 
       // Add source reference with PDF filename at the top
+      // Sections around a failed one keep their cleanup, so say how much of
+      // the text is uncleaned rather than implying all of it is
       const notice = cleanupFailure
-        ? `\n>\n> _Imported as extracted: the language model could not be reached (${cleanupFailure})_`
+        ? `\n>\n> _${cleanupFailures} of ${cleanupSections} sections imported as extracted: ${cleanupFailure}_`
         : ''
       const contentWithSource = `> Source: ${filename}.pdf${notice}\n\n${cleanedText}`
 

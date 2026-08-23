@@ -128,6 +128,55 @@ pub async fn http_request(input: HttpRequestInput) -> Result<HttpResponse, Strin
     Ok(HttpResponse { status, body })
 }
 
+/// Make a streaming HTTP request, forwarding each chunk as it arrives.
+///
+/// A buffered response is indistinguishable from a stalled connection while the
+/// model is still generating, and gateways cut it. Forwarding chunks keeps the
+/// connection demonstrably alive and lets the interface show progress
+/// (PRODUCT_DESIGN.md > Streaming responses).
+#[tauri::command]
+pub async fn http_stream_request(
+    input: HttpRequestInput,
+    on_chunk: tauri::ipc::Channel<String>,
+) -> Result<u16, String> {
+    use futures_util::StreamExt;
+
+    validate_outbound_url(&input.url)?;
+    let client = reqwest::Client::new();
+    let timeout = std::time::Duration::from_millis(input.timeout_ms.unwrap_or(60000));
+
+    let mut request = match input.method.to_uppercase().as_str() {
+        "POST" => client.post(&input.url),
+        "GET" => client.get(&input.url),
+        method => return Err(format!("Unsupported method for streaming: {}", method)),
+    };
+    request = request.timeout(timeout);
+    for (key, value) in input.headers {
+        request = request.header(&key, &value);
+    }
+    if let Some(body) = input.body {
+        request = request.body(body);
+    }
+
+    let response = request
+        .send()
+        .await
+        .map_err(|e| describe_request_error(&e, timeout))?;
+    let status = response.status().as_u16();
+
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.map_err(|e| describe_request_error(&e, timeout))?;
+        // Lossy on purpose: a multi-byte character split across chunks must not
+        // abort a response that is otherwise fine
+        on_chunk
+            .send(String::from_utf8_lossy(&bytes).into_owned())
+            .map_err(|e| format!("Failed to forward chunk: {}", e))?;
+    }
+
+    Ok(status)
+}
+
 #[cfg(test)]
 mod tests {
     use super::validate_outbound_url;
