@@ -84,6 +84,7 @@ function confirm() {
             <p v-else class="highlight-text muted">{{ t('highlights.noText') }}</p>
             <span class="highlight-meta">
               {{ t('highlights.page', { page: entry.page }) }}
+              <template v-if="entry.annotation.author"> · {{ entry.annotation.author }}</template>
               <template v-if="entry.alreadyImported"> · {{ t('highlights.alreadyImported') }}</template>
             </span>
           </div>

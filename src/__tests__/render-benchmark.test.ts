@@ -226,3 +226,64 @@ describe('where the rendering cost actually is', () => {
     expect(fastMs).toBeLessThan(interactiveMs * 1.5)
   })
 })
+
+/** Mount cards, then pan and zoom them the way the canvas does, per frame */
+async function panZoomSweep(count: number, frames = 60) {
+  const nodes = Array.from({ length: count }, (_, i) => node(i))
+  const scale = ref(1)
+  const offsetX = ref(0)
+
+  const wrapper = mount(
+    {
+      setup() {
+        return () =>
+          nodes.map(n =>
+            h(CanvasNodeCard, {
+              key: n.id,
+              ...cardProps(n, scale.value),
+              // Card position is computed per node from pan and zoom, exactly
+              // as the canvas does: the node layer sits outside the
+              // transformed container
+              style: {
+                transform: `translate(${n.canvas_x * scale.value + offsetX.value}px, ${n.canvas_y * scale.value}px) scale(${scale.value})`,
+              },
+            })
+          )
+      },
+    },
+    { global: { plugins: [i18n, createPinia()] } }
+  )
+
+  const timings: number[] = []
+  for (let f = 0; f < frames; f++) {
+    const start = performance.now()
+    offsetX.value += 4
+    scale.value = 1 - (f / frames) * 0.4
+    // Vue batches; the patch only happens on flush, which is the work a frame
+    // actually does
+    await wrapper.vm.$nextTick()
+    timings.push(performance.now() - start)
+  }
+
+  wrapper.unmount()
+  const total = timings.reduce((a, b) => a + b, 0)
+  return { avgMs: total / frames, maxMs: Math.max(...timings) }
+}
+
+describe('cost of a pan or zoom frame', () => {
+  it('reports what one frame of panning costs at the target size', async () => {
+    // Every visible card recomputes its screen position when pan or zoom
+    // changes, because the node layer is positioned in screen coordinates
+    // rather than inside one transformed container
+    const small = await panZoomSweep(100)
+    const target = await panZoomSweep(500)
+
+    console.log(
+      `pan/zoom frame: 100 cards ${small.avgMs.toFixed(2)}ms avg, ` +
+        `500 cards ${target.avgMs.toFixed(2)}ms avg (max ${target.maxMs.toFixed(2)}ms). ` +
+        `Frame budget is 16.67ms.`
+    )
+
+    expect(target.avgMs).toBeGreaterThan(0)
+  })
+})

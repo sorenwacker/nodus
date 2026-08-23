@@ -29,6 +29,7 @@ function annotation(partial: Partial<PdfAnnotation> = {}): PdfAnnotation {
     page: 3,
     color: '#ffe533',
     created_at: null,
+    author: null,
     ...partial,
   }
 }
@@ -186,5 +187,19 @@ describe('pdf cleanup sections', () => {
     )
 
     expect(source).toContain('cleanupFailures')
+  })
+})
+
+describe('the annotation author', () => {
+  it('is never treated as the highlighted text', () => {
+    // Every highlight in a file carries the same author name
+    const [entry] = toHighlightImports(
+      [annotation({ content: '', comment: null, author: 'sdrwacker' })],
+      'paper.pdf',
+      []
+    )
+
+    expect(entry.available).toBe(false)
+    expect(entry.text).not.toContain('sdrwacker')
   })
 })

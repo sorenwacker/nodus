@@ -13,7 +13,7 @@
  * given for deleting it was fiction; the deletion itself was harmless.
  */
 import { describe, it, expect } from 'vitest'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useViewportCulling } from '../canvas/composables/rendering/useViewportCulling'
 import type { Node } from '../types'
 
@@ -35,7 +35,8 @@ function zoomSweep(nodeCount: number, steps = 60) {
   const scale = ref(1)
   const offsetX = ref(0)
   const offsetY = ref(0)
-  const displayNodes = ref(graph(nodeCount))
+  const nodes = graph(nodeCount)
+  const displayNodes = computed(() => nodes)
   const selectedNodeIds = ref<string[]>([])
 
   const { visibleNodes } = useViewportCulling({

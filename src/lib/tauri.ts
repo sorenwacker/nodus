@@ -89,6 +89,8 @@ export interface PdfAnnotation {
   page: number
   color: string | null
   created_at: string | null
+  /** Who made the annotation; never its text */
+  author: string | null
 }
 
 export async function extractPdfAnnotations(path: string): Promise<PdfAnnotation[]> {

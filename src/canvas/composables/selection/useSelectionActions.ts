@@ -57,15 +57,28 @@ export function useSelectionActions(ctx: UseSelectionActionsContext): UseSelecti
     const ids = nodeIds ?? [...store.selectedNodeIds]
     if (ids.length === 0) return
 
+    // Group the edges by the nodes being deleted in one pass. Filtering every
+    // edge once per node made the wait grow with the size of the workspace
+    // rather than with the size of the selection
+    const deleting = new Set(ids)
+    const edgesByNode = new Map<string, Edge[]>()
+    for (const edge of store.filteredEdges) {
+      for (const endpoint of [edge.source_node_id, edge.target_node_id]) {
+        if (!deleting.has(endpoint)) continue
+        const existing = edgesByNode.get(endpoint)
+        if (existing) existing.push(edge)
+        else edgesByNode.set(endpoint, [edge])
+        // A self-edge belongs to the node once, not twice
+        if (edge.source_node_id === edge.target_node_id) break
+      }
+    }
+
     // Collect all nodes and edges for undo before deletion
     const undoData: Array<{ node: Node; edges: Edge[] }> = []
     for (const id of ids) {
       const node = store.getNode(id)
       if (node) {
-        const connectedEdges = store.filteredEdges.filter(
-          e => e.source_node_id === id || e.target_node_id === id
-        )
-        undoData.push({ node, edges: connectedEdges })
+        undoData.push({ node, edges: edgesByNode.get(id) ?? [] })
       }
     }
 

@@ -20,6 +20,8 @@ pub struct PdfAnnotation {
     pub color: Option<String>,
     /// Creation date (if available)
     pub created_at: Option<String>,
+    /// Who made the annotation (the PDF `T` field), never its text
+    pub author: Option<String>,
 }
 
 /// Extract all text markup annotations from a PDF
@@ -130,6 +132,8 @@ fn parse_annotation(doc: &Document, obj: &Object, page_num: u32) -> Option<PdfAn
     // highlight the reader can see in their PDF viewer
     // (PRODUCT_DESIGN.md > PDF highlights as nodes)
 
+    let author = dict.get(b"T").ok().and_then(|obj| get_string(doc, obj));
+
     Some(PdfAnnotation {
         annotation_type: annotation_type.to_string(),
         content,
@@ -137,6 +141,7 @@ fn parse_annotation(doc: &Document, obj: &Object, page_num: u32) -> Option<PdfAn
         page: page_num,
         color,
         created_at,
+        author,
     })
 }
 
@@ -164,13 +169,10 @@ fn extract_marked_content(doc: &Document, annot_dict: &lopdf::Dictionary) -> Str
         }
     }
 
-    // Try T field (title/subject)
-    if let Ok(t_obj) = annot_dict.get(b"T") {
-        if let Some(text) = get_string(doc, t_obj) {
-            return text;
-        }
-    }
-
+    // The T field is the annotation's author, not its text. Returning it here
+    // gave every highlight in a file the same "content" - the person's name -
+    // and made highlights carrying no text look importable
+    // (PRODUCT_DESIGN.md > PDF highlights as nodes)
     String::new()
 }
 
@@ -340,6 +342,46 @@ mod tests {
         assert!(annotations
             .iter()
             .any(|a| a.content.is_empty() && a.comment.is_none()));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn never_reports_the_author_as_the_highlighted_text() {
+        // Every highlight in a file carries the same author, so returning it as
+        // content made them all identical and hid the fact that the file stores
+        // no text for them
+        use lopdf::dictionary;
+
+        let path = std::env::temp_dir().join("nodus-highlight-author.pdf");
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let annot = doc.add_object(dictionary! {
+            "Type" => "Annot",
+            "Subtype" => "Highlight",
+            "T" => Object::string_literal("sdrwacker"),
+        });
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Annots" => vec![annot.into()],
+        });
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        doc.trailer.set("Root", catalog_id);
+        doc.save(&path).unwrap();
+
+        let annotations = extract_annotations(&path).unwrap();
+        let found = &annotations[0];
+
+        assert_eq!(found.content, "", "author must never be used as content");
+        assert_eq!(found.author.as_deref(), Some("sdrwacker"));
         std::fs::remove_file(&path).ok();
     }
 }
