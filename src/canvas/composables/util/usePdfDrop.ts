@@ -4,6 +4,7 @@
  */
 import { ref } from 'vue'
 import { extractPdfText, extractPdfAnnotations, readTextFile } from '../../../lib/tauri'
+import { dropPositionToLogical } from '../../../lib/pdfGraph'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { parseReferences, citationToMarkdown, type BibEntry } from '../../../lib/bibtex'
@@ -620,17 +621,16 @@ ${preprocessed}`
       if (event.payload.type === 'drop') {
         const paths = event.payload.paths
         // Get drop position from event, fallback to viewport center.
-        // The payload position is in physical pixels, but screenToCanvas works
-        // in logical (CSS) pixels; convert with the window scale factor so
-        // drops land at the cursor on HiDPI displays instead of at 2x offset.
+        // The canvas works in logical (CSS) pixels; the event's pixel space
+        // differs per platform, so the conversion is platform-aware
+        // (PRODUCT_DESIGN.md > Drop position).
         const position = event.payload.position
         let canvasPos: { x: number; y: number }
         if (position) {
           const scaleFactor = await getCurrentWindow().scaleFactor()
-          canvasPos = viewState.screenToCanvas(
-            position.x / scaleFactor,
-            position.y / scaleFactor
-          )
+          const platform = navigator.userAgent.includes('Mac') ? 'macos' : 'linux'
+          const logical = dropPositionToLogical(position, scaleFactor, platform)
+          canvasPos = viewState.screenToCanvas(logical.x, logical.y)
         } else {
           canvasPos = viewState.getViewportCenter()
         }

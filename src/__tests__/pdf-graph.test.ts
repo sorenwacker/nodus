@@ -15,6 +15,7 @@ import {
   verificationFromLookup,
   planGraphImport,
   withVerification,
+  dropPositionToLogical,
 } from '../lib/pdfGraph'
 
 const PAPER = `# LCDB 2.0: Hyperparameter Learning Landscapes
@@ -225,5 +226,23 @@ describe('section depth', () => {
     expect(methods.content).toContain('A.1 Details')
     expect(methods.content).toContain('Fine print.')
     expect(methods.content).toContain('Finest.')
+  })
+})
+
+describe('drop position', () => {
+  // The drop event reports physical pixels on Windows and Linux but logical
+  // pixels on macOS; the canvas works in logical pixels throughout
+  // (PRODUCT_DESIGN.md > Drop position)
+  it('leaves macOS positions unscaled', () => {
+    expect(dropPositionToLogical({ x: 700, y: 400 }, 2, 'macos')).toEqual({ x: 700, y: 400 })
+  })
+
+  it('descales physical positions on Windows and Linux', () => {
+    expect(dropPositionToLogical({ x: 1400, y: 800 }, 2, 'windows')).toEqual({ x: 700, y: 400 })
+    expect(dropPositionToLogical({ x: 1400, y: 800 }, 2, 'linux')).toEqual({ x: 700, y: 400 })
+  })
+
+  it('is a no-op at scale factor 1 everywhere', () => {
+    expect(dropPositionToLogical({ x: 500, y: 300 }, 1, 'linux')).toEqual({ x: 500, y: 300 })
   })
 })

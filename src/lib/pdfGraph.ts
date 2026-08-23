@@ -278,3 +278,20 @@ export function withVerification(content: string, verification: Verification): s
     verification.state + (verification.detail ? ` (${verification.detail.slice(0, 120)})` : '')
   return upsertFrontmatterField(content, 'verification', value)
 }
+
+/**
+ * Convert a drag-drop position to the logical pixels the canvas works in.
+ *
+ * The drop event reports physical pixels on Windows and Linux but logical
+ * pixels on macOS; dividing unconditionally halves macOS coordinates on any
+ * HiDPI display and drops the node up-left of the cursor
+ * (PRODUCT_DESIGN.md > Drop position).
+ */
+export function dropPositionToLogical(
+  position: { x: number; y: number },
+  scaleFactor: number,
+  platform: 'macos' | 'windows' | 'linux'
+): { x: number; y: number } {
+  if (platform === 'macos') return { x: position.x, y: position.y }
+  return { x: position.x / scaleFactor, y: position.y / scaleFactor }
+}

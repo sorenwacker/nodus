@@ -364,6 +364,10 @@ The integral is: $ integral_a^b f(x) dif x $
 - The grant comes from the operating system's drop event as the backend receives it, never from a path handed over by the interface. A caller that can name a path could otherwise grant itself access to it, which is the check this guard exists to make.
 - Everything else is unchanged: a path that was neither dropped nor inside a vault is still refused.
 
+### Drop position
+
+**Required behavior:** A file dropped on the canvas lands where the cursor released it. The drop event's position arrives in physical pixels on Windows and Linux but in logical pixels on macOS, while the canvas works in logical pixels throughout. Dividing by the display scale factor on macOS therefore halves the coordinates and places the node up and left of the cursor on any HiDPI display. The conversion is platform-aware and covered by unit tests per platform.
+
 ### PDF as a graph
 
 **Required behavior:** A paper is already a structure - sections, an argument, a bibliography - and flattening it into one node discards exactly what a graph tool is for. Dropping a PDF offers a choice of how it lands:
