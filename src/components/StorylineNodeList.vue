@@ -295,6 +295,7 @@ function onDragLeave() {
               <Icon name="close" :size="compact ? 8 : 10" />
             </button>
           </div>
+          <slot name="after-item" :node="node" :index="index" />
           <!-- Expanded content (shows when clicked to expand) - not in compact mode -->
           <div v-if="!compact && isExpanded(node.id)" class="node-content-preview">
             <div class="content-text">{{ node.markdown_content || t('storyline.noContent') }}</div>

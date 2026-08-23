@@ -65,8 +65,9 @@ describe('deleting a selection', () => {
       `delete 200 nodes: 500 edges ${smallMs.toFixed(1)}ms, 8000 edges ${largeMs.toFixed(1)}ms`
     )
 
-    // 16x the edges must not cost anything like 16x the time
-    expect(largeMs).toBeLessThan(Math.max(smallMs, 1) * 4)
+    // 16x the edges must not cost anything like 16x the time. The floor keeps
+    // timer noise from failing the ratio when the small case rounds to ~0
+    expect(largeMs).toBeLessThan(Math.max(smallMs, 3) * 4)
   })
 
   it('deletes a large selection quickly', async () => {

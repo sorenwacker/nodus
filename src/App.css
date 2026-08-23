@@ -351,14 +351,29 @@
   transform: translateY(0);
 }
 
-.reader-slide-enter-active,
-.reader-slide-leave-active {
+/* Reader: kept mounted, revealed by transform like the other panels */
+.reader-reveal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  z-index: 62;
+  pointer-events: none;
+  transform: translateX(100%);
   transition: transform var(--step-duration) var(--step-ease);
+  will-change: transform;
 }
 
-.reader-slide-enter-from,
-.reader-slide-leave-to {
-  transform: translateX(100%);
+.reader-reveal.open {
+  transform: translateX(0);
+}
+
+/* The wrapper spans the canvas so the slide has a track, but only the reader
+   itself takes clicks - the graph beside a half-width reader stays usable */
+.reader-reveal.open :deep(.reader-overlay),
+.reader-reveal.open .reader-overlay {
+  pointer-events: auto;
 }
 
 /* Storyline panel reveal: slides in over the canvas from the right */
@@ -429,6 +444,15 @@
 }
 
 /* Reader mode: canvas shrinks, reader slides in */
+/* Reading is a different mode: graph navigation chrome fades out rather than
+   following the inset to mid-screen (PRODUCT_DESIGN.md > Reader opening) */
+.with-reader .minimap,
+.with-reader .zoom-controls {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--step-duration) var(--step-ease);
+}
+
 .main-content .with-reader {
   flex: 1;
   min-width: 0;

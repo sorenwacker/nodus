@@ -19,9 +19,16 @@ export function useStorylineNavigation(options: UseStorylineNavigationOptions) {
     activeNodeIndex.value = index
     nextTick(() => {
       const section = document.getElementById(`node-${index}`)
-      if (section) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
+      const container = contentRef.value
+      if (!section || !container) return
+      // Scroll the content pane only. scrollIntoView walks every scroll
+      // container up the tree - the reader body and overlay among them - and
+      // nudging those shifts the header bar out of view
+      const top =
+        section.getBoundingClientRect().top -
+        container.getBoundingClientRect().top +
+        container.scrollTop
+      container.scrollTo({ top, behavior: 'smooth' })
     })
   }
 

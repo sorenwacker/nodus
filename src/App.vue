@@ -49,6 +49,10 @@ const search = useAppSearch({
 const { searchQuery, showSearch, searchResults, toggleSearch, closeSearch, selectResult: selectSearchResult } = search
 const currentTheme = computed(() => themesStore.currentThemeName)
 const readerStorylineId = ref<string | null>(null)
+// Mounted on first open and kept: a panel that mounts fresh on every open
+// paints during its own entrance (PRODUCT_DESIGN.md > Reader opening and
+// switching). Visibility is the reveal class, not the mount.
+const readerEverOpened = ref(false)
 
 // Storyline panel: opens on a right-edge push and stays open until a
 // left-edge push steps back (or the toolbar book button closes it) - steps,
@@ -107,6 +111,7 @@ const canvasBottomInset = computed(() =>
 )
 
 function openReader(id: string) {
+  readerEverOpened.value = true
   readerStorylineId.value = id
   lastReadStorylineId.value = id
   readerFullWidth.value = false
@@ -118,6 +123,7 @@ watch(
   () => displayStore.readingNodeId,
   id => {
     if (!id) return
+    readerEverOpened.value = true
     readerNodeId.value = id
     readerStorylineId.value = null
     // A single node is read at full width, where its anchored nodes expand
@@ -961,16 +967,19 @@ async function openFolderDialog() {
         />
       </div>
       <!-- Reader slides in from the right; sits above an open timelines sheet -->
-      <Transition name="reader-slide">
+      <div
+        v-if="readerEverOpened"
+        class="reader-reveal"
+        :class="{ open: readerStorylineId || readerNodeId }"
+        :style="{ bottom: showTimelines ? timelinesSheetHeight : '0px' }"
+      >
         <StorylineReader
-          v-if="readerStorylineId || readerNodeId"
-          :storyline-id="readerStorylineId || ''"
+          :storyline-id="readerStorylineId || lastReadStorylineId || ''"
           :single-node-id="readerNodeId || undefined"
           :full-width="readerFullWidth"
-          :style="{ bottom: showTimelines ? timelinesSheetHeight : '0px' }"
           @close="readerStorylineId = null; readerNodeId = null"
         />
-      </Transition>
+      </div>
     </main>
 
     <!-- Import Dialog -->

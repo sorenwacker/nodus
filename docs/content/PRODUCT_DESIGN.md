@@ -1168,6 +1168,14 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
 
+### Contents sidebar
+
+**Required behavior:** The contents sidebar is a table of contents, not just a node list. Sections imported from a paper carry their subsections inside their markdown, and a contents list that hides them makes a chapter opaque.
+
+- Under each node entry, the markdown headings inside that node's content are listed, indented by heading level.
+- Clicking a subheading scrolls the reader to that heading within its section, exactly as clicking a node entry scrolls to the section.
+- Headings inside fenced code blocks are not headings and never appear.
+
 ### Editing in the reader
 
 **Required behavior:** Reading is where the gaps show, so the reader is where the fix should happen. Leaving the reader to edit a paragraph and coming back loses the place and the flow.
@@ -1181,6 +1189,8 @@ Resetting the default workspace also removes its previous frames and storylines 
 
 **Required behavior:** The reader's slide animation and its content rendering compete for the same main thread. Rendering every node's markdown in one synchronous pass during the slide starves the animation frames, so the panel judders exactly when the user is watching it most closely.
 
+- The reader stays mounted after its first open and slides with a transform, exactly as the storyline overview, the chat panel and the timelines sheet do. A panel that mounts fresh on every open loads and paints during its own entrance; a mounted panel slides as one already-painted surface, and its scroll position and sidebar state survive closing.
+- While the reader is open, the minimap and zoom controls fade out instead of following the right inset to mid-screen. The inset keeps overlays beside a panel the user works alongside; the reader is a panel the user works *in*, and graph navigation chrome floating at the centre of the window during reading is noise, not navigation.
 - The first screenful of content renders before the slide begins, in one pass small enough not to delay it. The remaining sections wait until the slide has settled, then fill in batch by batch with an animation frame between batches - below the fold, where filling in is invisible. Content that pops in while the panel is moving reads as flicker, which is the artifact this ordering exists to prevent.
 - Switching to another storyline while the reader is open keeps the current content visible until the new storyline's nodes have loaded. The loading state appears only when the reader has nothing to show; replacing readable content with a spinner is a flash, not feedback.
 

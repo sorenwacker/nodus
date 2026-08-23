@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdownRendering'
 import { createPinia, setActivePinia } from 'pinia'
+import { extractHeadings } from '../lib/contentParser'
 import type { Node } from '../types'
 
 function node(i: number): Node {
@@ -37,12 +38,11 @@ describe('batched content rendering', () => {
 
     // All rendered in the end
     expect(rendering.getRenderedContent('n11')).toContain('Paragraph for node 11')
-    // The first batch covers a screenful and lands immediately
+    // The first batch covers a screenful; the rest waits out the settle
+    // delay. Relative order only: absolute wall-clock budgets flake under
+    // full-suite load
     expect(batches[0].size).toBeGreaterThanOrEqual(6)
-    expect(batches[0].at).toBeLessThan(40)
-    // The rest waits for the slide to settle: content that pops in while the
-    // panel is moving reads as flicker
-    expect(batches[1].at).toBeGreaterThanOrEqual(35)
+    expect(batches[1].at - batches[0].at).toBeGreaterThanOrEqual(35)
   })
 
   it('renders a small storyline in a single pass', async () => {
@@ -97,5 +97,91 @@ describe('editing in the reader', () => {
     const fn = reader.slice(reader.indexOf('async function saveSectionEdit'))
     expect(fn).toContain('updateNodeContent')
     expect(fn).toContain('releaseEditLock')
+  })
+})
+
+describe('reader mounting', () => {
+  it('stays mounted and slides with a transform, like the other panels', () => {
+    // A panel that mounts fresh on every open paints during its own entrance
+    // (PRODUCT_DESIGN.md > Reader opening and switching)
+    const app = readFileSync(resolve(__dirname, '../App.vue'), 'utf-8')
+
+    // Mounted once, then kept: the v-if guards first use, not each open
+    expect(app).toContain('readerEverOpened')
+    expect(app).toContain('reader-reveal')
+    expect(app).not.toContain('Transition name="reader-slide"')
+
+    const css = readFileSync(resolve(__dirname, '../App.css'), 'utf-8')
+    const reveal = css.slice(css.indexOf('.reader-reveal'))
+    expect(reveal.slice(0, 600)).toContain('transform')
+    expect(reveal.slice(0, 600)).toContain('var(--step-duration)')
+  })
+})
+
+describe('graph chrome while reading', () => {
+  it('fades the minimap and zoom controls out instead of centring them', () => {
+    // The right inset keeps overlays beside a panel the user works alongside;
+    // the reader is worked in, and a minimap at mid-screen is noise
+    const css = readFileSync(resolve(__dirname, '../App.css'), 'utf-8')
+    const rule = css.slice(css.indexOf('.with-reader .minimap'))
+    expect(rule.slice(0, 300)).toContain('opacity: 0')
+    expect(rule.slice(0, 300)).toContain('pointer-events: none')
+  })
+})
+
+describe('contents sidebar headings', () => {
+  it('extracts headings with their levels', () => {
+    const headings = extractHeadings(
+      '# Top\n\nProse.\n\n## Sub A\n\nMore.\n\n### Deep\n\n## Sub B\n'
+    )
+    expect(headings).toEqual([
+      { level: 1, text: 'Top' },
+      { level: 2, text: 'Sub A' },
+      { level: 3, text: 'Deep' },
+      { level: 2, text: 'Sub B' },
+    ])
+  })
+
+  it('ignores headings inside fenced code blocks', () => {
+    const headings = extractHeadings('## Real\n\n```\n# not a heading\n```\n')
+    expect(headings.map(h => h.text)).toEqual(['Real'])
+  })
+
+  it('ignores frontmatter and empty input', () => {
+    expect(extractHeadings('---\ntitle: x\n---\n\n## Only\n')).toEqual([
+      { level: 2, text: 'Only' },
+    ])
+    expect(extractHeadings('')).toEqual([])
+  })
+
+  it('is shown in the reader contents, indented under each node', () => {
+    const reader = readFileSync(
+      resolve(__dirname, '../components/StorylineReader.vue'),
+      'utf-8'
+    )
+    expect(reader).toContain('#after-item')
+    expect(reader).toContain('toc-subheading')
+
+    const list = readFileSync(
+      resolve(__dirname, '../components/StorylineNodeList.vue'),
+      'utf-8'
+    )
+    expect(list).toContain('name="after-item"')
+  })
+})
+
+describe('reader header', () => {
+  it('truncates a long title instead of pushing the buttons off screen', () => {
+    // An imported paper's title is long; the contents toggle disappeared
+    // behind it
+    const header = readFileSync(
+      resolve(__dirname, '../components/StorylineReaderHeader.vue'),
+      'utf-8'
+    )
+    const title = header.slice(header.indexOf('.reader-title {'))
+    expect(title.slice(0, 300)).toContain('text-overflow: ellipsis')
+
+    const right = header.slice(header.indexOf('.header-right {'))
+    expect(right.slice(0, 200)).toContain('flex-shrink: 0')
   })
 })

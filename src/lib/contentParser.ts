@@ -117,3 +117,29 @@ export function withDateFields(
   }
   return result
 }
+
+/** A markdown heading, for the contents sidebar */
+export interface MarkdownHeading {
+  level: number
+  text: string
+}
+
+/**
+ * List the headings in a markdown body, in order, skipping frontmatter and
+ * fenced code blocks - a `#` inside a code fence is a comment, not a heading
+ * (PRODUCT_DESIGN.md > Contents sidebar).
+ */
+export function extractHeadings(content: string): MarkdownHeading[] {
+  const headings: MarkdownHeading[] = []
+  let inFence = false
+  for (const line of stripFrontmatter(content || '').split('\n')) {
+    if (/^(```|~~~)/.test(line.trim())) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    const match = line.match(/^(#{1,6})\s+(.+)$/)
+    if (match) headings.push({ level: match[1].length, text: match[2].trim() })
+  }
+  return headings
+}

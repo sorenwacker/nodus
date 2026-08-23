@@ -93,6 +93,9 @@ defineEmits<{
   display: flex;
   align-items: center;
   gap: 12px;
+  /* A long title truncates; it must never push the buttons out of the header */
+  min-width: 0;
+  flex: 1;
 }
 
 .toc-toggle {
@@ -118,12 +121,16 @@ defineEmits<{
   font-weight: 600;
   color: var(--text-main);
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-shrink: 0;
 }
 
 .page-indicator {

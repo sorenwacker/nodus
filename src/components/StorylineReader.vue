@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick, inject }
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import { acquireEditLock, releaseEditLock } from '../lib/tauri'
+import { extractHeadings } from '../lib/contentParser'
 import { uiStorage } from '../lib/storage'
 import { usePanelReveal } from '../composables/usePanelReveal'
 import type { StorylineService } from '../services/storylineService'
@@ -67,6 +68,25 @@ const showEntitySidebar = ref(false)
 const showReferencesSidebar = ref(false) // Hidden by default - optional
 
 // Open detail modal for editing a node
+// Contents sidebar: subheadings under each node, indented as a table of
+// contents (PRODUCT_DESIGN.md > Contents sidebar)
+function nodeHeadings(node: Node) {
+  return extractHeadings(node.markdown_content || '')
+}
+
+function goToHeading(sectionIndex: number, headingIndex: number) {
+  const section = document.querySelector(`#node-${sectionIndex} .section-content`)
+  const heading = section?.querySelectorAll('h1, h2, h3, h4, h5, h6')[headingIndex]
+  const container = contentRef.value
+  if (!heading || !container) return
+  // Scroll the content pane only; see goToNode for why not scrollIntoView
+  const top =
+    heading.getBoundingClientRect().top -
+    container.getBoundingClientRect().top +
+    container.scrollTop
+  container.scrollTo({ top: top - 12, behavior: 'smooth' })
+}
+
 // Inline section editing (PRODUCT_DESIGN.md > Editing in the reader)
 const editingSectionId = ref<string | null>(null)
 const editingText = ref('')
@@ -441,7 +461,20 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
               @add="handleNodeAdd"
               @create="handleNodeCreate"
               @create-comment="handleCommentCreate"
-            />
+            >
+              <template #after-item="{ node: tocNode, index: tocIndex }">
+                <ul v-if="nodeHeadings(tocNode).length" class="toc-subheadings">
+                  <li
+                    v-for="(heading, hIndex) in nodeHeadings(tocNode)"
+                    :key="hIndex"
+                    class="toc-subheading"
+                    :style="{ paddingLeft: `${8 + (heading.level - 1) * 10}px` }"
+                  >
+                    <button @click="goToHeading(tocIndex, hIndex)">{{ heading.text }}</button>
+                  </li>
+                </ul>
+              </template>
+            </StorylineNodeList>
           </nav>
         </aside>
 
@@ -587,6 +620,34 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
 </template>
 
 <style scoped>
+.toc-subheadings {
+  margin: 0 0 2px;
+  padding: 0 0 0 26px;
+  list-style: none;
+}
+
+.toc-subheading button {
+  display: block;
+  width: 100%;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toc-subheading button:hover {
+  color: var(--text-main);
+  background: var(--bg-surface-alt);
+}
+
 .section-editor {
   width: 100%;
   min-height: 180px;
