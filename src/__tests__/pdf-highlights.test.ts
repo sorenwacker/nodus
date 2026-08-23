@@ -147,3 +147,19 @@ describe('highlight import reachability', () => {
     expect(canvas).toContain('PdfHighlightPicker')
   })
 })
+
+describe('pdf import resilience', () => {
+  it('keeps the extracted text when the language model cannot be reached', () => {
+    // Extraction is the import; cleanup only makes it nicer. A failed request
+    // must not discard text that was read successfully
+    const source = readFileSync(
+      resolve(__dirname, '../canvas/composables/util/usePdfDrop.ts'),
+      'utf-8'
+    )
+    const cleanup = source.slice(source.indexOf('async function cleanupChunk'))
+    const body = cleanup.slice(0, cleanup.indexOf('\n  }'))
+
+    expect(body).toContain('catch')
+    expect(body).toContain('return preprocessed')
+  })
+})

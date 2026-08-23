@@ -111,6 +111,9 @@ export function usePdfDrop(options: UsePdfDropOptions) {
   const processingStatus = ref('')
   let aborted = false
   let lastImportNodeIds: string[] = []
+  // Set when the LLM could not be reached, so the import can say the text was
+  // imported as extracted instead of failing outright
+  let cleanupFailure: string | null = null
 
   // Pending bib import (for modal confirmation)
   const pendingBibImport = ref<PendingBibImport | null>(null)
@@ -123,6 +126,11 @@ export function usePdfDrop(options: UsePdfDropOptions) {
     processingStatus.value = ''
   }
 
+  /**
+   * Tidy one chunk with the LLM, falling back to the pre-processed text when
+   * the model is unreachable. The text extracted from the PDF is the import;
+   * cleanup only makes it nicer, so a failed request must not discard it.
+   */
   async function cleanupChunk(rawText: string, isFirstChunk: boolean): Promise<string> {
     // Pre-process to merge broken lines
     const preprocessed = preProcessPdfText(rawText)
@@ -141,7 +149,12 @@ Instructions:
 Text to clean:
 ${preprocessed}`
 
-    return llm.simpleGenerate(prompt)
+    try {
+      return await llm.simpleGenerate(prompt)
+    } catch (error) {
+      cleanupFailure = error instanceof Error ? error.message : String(error)
+      return preprocessed
+    }
   }
 
   async function processPdfDrop(filePath: string, x: number, y: number) {
@@ -151,6 +164,7 @@ ${preprocessed}`
     // Reset state
     aborted = false
     lastImportNodeIds = []
+    cleanupFailure = null
     isProcessing.value = true
     processingStatus.value = 'Extracting text...'
 
@@ -208,7 +222,10 @@ ${preprocessed}`
       const title = headingMatch ? headingMatch[1] : filename
 
       // Add source reference with PDF filename at the top
-      const contentWithSource = `> Source: ${filename}.pdf\n\n${cleanedText}`
+      const notice = cleanupFailure
+        ? `\n>\n> _Imported as extracted: the language model could not be reached (${cleanupFailure})_`
+        : ''
+      const contentWithSource = `> Source: ${filename}.pdf${notice}\n\n${cleanedText}`
 
       await store.updateNodeTitle(loadingNode.id, title)
       await store.updateNodeContent(loadingNode.id, contentWithSource)
