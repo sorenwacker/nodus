@@ -117,6 +117,12 @@ pub(crate) fn future_dir_is_within_vaults(
 /// Validate that a file path is within a workspace vault
 /// Returns an error if the path is outside all workspace vaults (security check)
 pub(crate) async fn validate_path_in_workspace(path: &std::path::Path) -> Result<(), String> {
+    // A file the user dragged onto the window is their own choice, and the
+    // papers worth dropping rarely live in a vault
+    // (PRODUCT_DESIGN.md > Reading files the user dropped)
+    if crate::dropped_paths::is_granted(path) {
+        return Ok(());
+    }
     path_is_within_vaults(path, &workspace_vaults().await?)
 }
 

@@ -3,6 +3,7 @@
 mod checksum;
 mod commands;
 mod database;
+mod dropped_paths;
 mod import_helpers;
 mod layout_config;
 mod mcp_websocket;
@@ -107,6 +108,15 @@ fn main() {
             std::collections::HashMap::new(),
         )))
         .manage(McpState(Arc::new(mcp_websocket::McpServerState::new())))
+        // The drop event as the system delivers it is the only trustworthy
+        // record of what the user chose: a path supplied by the interface could
+        // be one a caller invented
+        // (PRODUCT_DESIGN.md > Reading files the user dropped)
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                dropped_paths::grant(paths);
+            }
+        })
         .setup(|app| {
             // Initialize database - must complete before app starts. A failure
             // here must abort startup: without a database every command fails
