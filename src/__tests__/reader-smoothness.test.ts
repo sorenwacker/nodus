@@ -22,21 +22,27 @@ function node(i: number): Node {
 }
 
 describe('batched content rendering', () => {
-  it('renders every node, spread across animation frames', async () => {
+  it('renders the first screenful at once and the rest after the slide', async () => {
     setActivePinia(createPinia())
     const rendering = useStorylineMarkdownRendering()
     const nodes = Array.from({ length: 12 }, (_, i) => node(i))
 
-    const frames: number[] = []
+    const batches: Array<{ size: number; at: number }> = []
+    const start = performance.now()
     await rendering.renderAllNodes(nodes, {
-      onBatch: () => frames.push(rendering.renderedContent.value.size),
+      settleMs: 40,
+      onBatch: () =>
+        batches.push({ size: rendering.renderedContent.value.size, at: performance.now() - start }),
     })
 
     // All rendered in the end
     expect(rendering.getRenderedContent('n11')).toContain('Paragraph for node 11')
-    // But not in one pass: at least one intermediate state existed
-    expect(frames.length).toBeGreaterThan(1)
-    expect(frames[0]).toBeLessThan(12)
+    // The first batch covers a screenful and lands immediately
+    expect(batches[0].size).toBeGreaterThanOrEqual(6)
+    expect(batches[0].at).toBeLessThan(40)
+    // The rest waits for the slide to settle: content that pops in while the
+    // panel is moving reads as flicker
+    expect(batches[1].at).toBeGreaterThanOrEqual(35)
   })
 
   it('renders a small storyline in a single pass', async () => {

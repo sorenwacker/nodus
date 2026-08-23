@@ -65,28 +65,25 @@ export function useStorylineMarkdownRendering() {
   /**
    * Phase 1: Render all nodes to HTML with placeholders (sync)
    */
-  /** Nodes rendered per animation frame while the reader is sliding open */
+  /** Sections that cover the first screenful, rendered before the slide */
+  const FIRST_SCREENFUL = 6
+  /** Nodes rendered per animation frame once the slide has settled */
   const RENDER_BATCH = 4
+  /** How long the reader's slide takes; matches --step-duration */
+  const SLIDE_SETTLE_MS = 320
 
   async function renderAllNodes(
     nodes: Node[],
-    options?: { onBatch?: () => void }
+    options?: { onBatch?: () => void; settleMs?: number }
   ): Promise<void> {
-    // Batched with an animation frame between batches: one synchronous pass
-    // over every node starves the slide animation of exactly the frames the
-    // user is watching (PRODUCT_DESIGN.md > Reader opening and switching)
+    // The first screenful renders in one pass before the slide begins; the
+    // rest waits until the slide has settled and fills in below the fold.
+    // Content that pops in while the panel is moving reads as flicker
+    // (PRODUCT_DESIGN.md > Reader opening and switching)
     const pending = nodes.filter(n => !renderedContent.value.has(n.id))
+    if (pending.length === 0) return
 
-    for (let i = 0; i < pending.length; i += RENDER_BATCH) {
-      if (i > 0) {
-        await new Promise<void>(resolve =>
-          typeof requestAnimationFrame === 'function'
-            ? requestAnimationFrame(() => resolve())
-            : setTimeout(resolve, 16)
-        )
-      }
-
-      const batch = pending.slice(i, i + RENDER_BATCH)
+    const renderBatch = (batch: Node[]) => {
       const newContent = new Map(renderedContent.value)
       for (const node of batch) {
         const html = node.markdown_content
@@ -99,6 +96,24 @@ export function useStorylineMarkdownRendering() {
       }
       renderedContent.value = newContent
       options?.onBatch?.()
+    }
+
+    renderBatch(pending.slice(0, FIRST_SCREENFUL))
+    if (pending.length <= FIRST_SCREENFUL) return
+
+    await new Promise<void>(resolve =>
+      setTimeout(resolve, options?.settleMs ?? SLIDE_SETTLE_MS)
+    )
+
+    for (let i = FIRST_SCREENFUL; i < pending.length; i += RENDER_BATCH) {
+      if (i > FIRST_SCREENFUL) {
+        await new Promise<void>(resolve =>
+          typeof requestAnimationFrame === 'function'
+            ? requestAnimationFrame(() => resolve())
+            : setTimeout(resolve, 16)
+        )
+      }
+      renderBatch(pending.slice(i, i + RENDER_BATCH))
     }
   }
 

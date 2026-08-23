@@ -1181,7 +1181,7 @@ Resetting the default workspace also removes its previous frames and storylines 
 
 **Required behavior:** The reader's slide animation and its content rendering compete for the same main thread. Rendering every node's markdown in one synchronous pass during the slide starves the animation frames, so the panel judders exactly when the user is watching it most closely.
 
-- Content renders in small batches with an animation frame between batches, so the slide keeps its frame budget while the content fills in.
+- The first screenful of content renders before the slide begins, in one pass small enough not to delay it. The remaining sections wait until the slide has settled, then fill in batch by batch with an animation frame between batches - below the fold, where filling in is invisible. Content that pops in while the panel is moving reads as flicker, which is the artifact this ordering exists to prevent.
 - Switching to another storyline while the reader is open keeps the current content visible until the new storyline's nodes have loaded. The loading state appears only when the reader has nothing to show; replacing readable content with a spinner is a flash, not feedback.
 
 ### Anchored nodes
