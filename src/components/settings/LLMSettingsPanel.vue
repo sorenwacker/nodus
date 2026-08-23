@@ -20,6 +20,7 @@ const llmStreaming = ref(llmStorage.getLLMStreaming())
 const providers = providerRegistry.getProviders()
 const selectedProvider = ref(llmStorage.getProvider())
 const providerStatus = ref<'checking' | 'online' | 'offline'>('checking')
+const providerError = ref<string | null>(null)
 
 // Provider-specific settings
 const providerConfigs = ref<Record<string, Record<string, unknown>>>({})
@@ -162,6 +163,10 @@ async function fetchModels() {
   try {
     const isAvailable = await provider.isAvailable()
     providerStatus.value = isAvailable ? 'online' : 'offline'
+    // "cannot be reached" and "refused the key" call for different fixes
+    providerError.value = isAvailable
+      ? null
+      : ((provider as { lastAvailabilityError?: string | null }).lastAvailabilityError ?? null)
 
     if (isAvailable) {
       const models = await provider.listModels()
@@ -169,8 +174,9 @@ async function fetchModels() {
     } else {
       availableModels.value = []
     }
-  } catch {
+  } catch (error) {
     providerStatus.value = 'offline'
+    providerError.value = error instanceof Error ? error.message : String(error)
     availableModels.value = []
   }
 
@@ -327,6 +333,7 @@ onMounted(() => {
           :title="providerStatus === 'online' ? t('llm.status.connected') : providerStatus === 'offline' ? t('llm.status.notConnected') : t('llm.status.checking')"
         />
       </div>
+      <p v-if="providerError" class="provider-error">{{ providerError }}</p>
     </div>
 
     <!-- Cost Warning -->
@@ -580,6 +587,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.provider-error {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--danger-color, #dc2626);
+  word-break: break-word;
+}
+
 /* Styles are inherited from parent SettingsModal.vue */
 .settings-section {
   display: flex;

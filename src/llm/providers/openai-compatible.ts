@@ -71,15 +71,41 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     return headers
   }
 
+  /**
+   * Why the last availability check failed, so the interface can say whether
+   * the endpoint refused the key or could not be reached at all
+   */
+  lastAvailabilityError: string | null = null
+
+  /**
+   * Whether the application can get an answer from this provider.
+   *
+   * Tested with a one-token completion rather than a model listing: the listing
+   * can answer while completions fail on authorisation, gateway routing or
+   * timeout, and a green light beside a failing provider is worse than none
+   * (PRODUCT_DESIGN.md > Provider status).
+   */
   async isAvailable(): Promise<boolean> {
     try {
-      const response = await httpFetch(`${this.baseUrl}/models`, {
-        method: 'GET',
+      const response = await httpFetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
         headers: this.getHeaders(),
+        body: JSON.stringify({
+          model: this.model || undefined,
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 1,
+        }),
         connectTimeout: 5000,
       })
-      return response.ok
-    } catch {
+      if (!response.ok) {
+        const detail = typeof response.text === 'function' ? await response.text() : ''
+        this.lastAvailabilityError = `HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`
+        return false
+      }
+      this.lastAvailabilityError = null
+      return true
+    } catch (error) {
+      this.lastAvailabilityError = error instanceof Error ? error.message : String(error)
       return false
     }
   }
