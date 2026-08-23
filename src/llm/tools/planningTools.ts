@@ -39,7 +39,7 @@ export function registerPlanningTools(): void {
       required: ['tasks'],
     },
     async (_args, _ctx) => {
-      // Return unhandled so PixiCanvas.vue handles it with task state
+      // Return unhandled so GraphCanvas.vue handles it with task state
       return `__UNHANDLED__:plan`
     },
     { category: 'planning' }
@@ -57,7 +57,7 @@ export function registerPlanningTools(): void {
       required: ['task_index', 'status'],
     },
     async (_args, _ctx) => {
-      // Return unhandled so PixiCanvas.vue handles it with task state
+      // Return unhandled so GraphCanvas.vue handles it with task state
       return `__UNHANDLED__:update_task`
     },
     { category: 'planning' }
@@ -74,7 +74,7 @@ export function registerPlanningTools(): void {
       required: ['message'],
     },
     async (_args, _ctx) => {
-      // Return unhandled so PixiCanvas.vue handles it with memory state
+      // Return unhandled so GraphCanvas.vue handles it with memory state
       return `__UNHANDLED__:remember`
     },
     { category: 'planning' }

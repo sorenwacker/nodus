@@ -95,7 +95,10 @@ describe('Canvas Performance', () => {
       const mockNodes = generateMockNodes(500)
       store.nodes.push(...mockNodes)
 
-      const iterations = 60 // Simulate 1 second of 60fps updates
+      // Position mutation only: no component renders here, so this is a lower
+      // bound on the store's contribution to a frame, not a frame time. The
+      // render benchmark measures the rendering (render-benchmark.test.ts)
+      const iterations = 60
       const timings: number[] = []
 
       for (let frame = 0; frame < iterations; frame++) {
@@ -111,7 +114,7 @@ describe('Canvas Performance', () => {
       const avgTime = timings.reduce((a, b) => a + b, 0) / timings.length
       const maxTime = Math.max(...timings)
 
-      // Average update should be under 16.67ms (60fps threshold)
+      // Position updates alone must stay a small fraction of a 16.67ms frame
       expect(avgTime).toBeLessThan(16.67 * SLACK)
       // No single frame should exceed 50ms (20fps minimum, allows for CI/test variance)
       expect(maxTime).toBeLessThan(50 * SLACK)

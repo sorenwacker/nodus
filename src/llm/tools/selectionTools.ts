@@ -4,7 +4,7 @@
  * Tools that operate on currently selected nodes. When nodes are selected,
  * they become both context AND targets for AI operations.
  *
- * These tools return markers that are handled by the agent in PixiCanvas.
+ * These tools return markers that are handled by the agent in GraphCanvas.
  */
 
 import { defineTool, type ToolContext } from '../registry'

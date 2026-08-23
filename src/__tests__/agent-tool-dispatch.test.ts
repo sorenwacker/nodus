@@ -3,7 +3,7 @@ import { toolRegistry, type ToolContext } from '../llm/registry'
 import { registerCoreTools } from '../llm/tools'
 import { cleanContent } from '../llm/utils'
 
-// The canvas dispatcher (PixiCanvas.executeAgentTool) only falls through to
+// The canvas dispatcher (GraphCanvas.executeAgentTool) only falls through to
 // the real LLM-powered implementations in useLLMTools when the registry
 // returns `__UNHANDLED__:<name>`. Any other sentinel (like the former
 // `__SMART_MOVE__:` markers) is returned to the model verbatim, silently

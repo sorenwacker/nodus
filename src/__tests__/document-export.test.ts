@@ -120,7 +120,7 @@ describe('export reachability', () => {
     // Both entry points documented in features.md > Exporting a document. A
     // generator no interface calls is dead code, however correct it is
     expect(read('components/StorylineReader.vue')).toContain('ExportDialog')
-    expect(read('canvas/PixiCanvas.vue')).toContain('ExportDialog')
+    expect(read('canvas/GraphCanvas.vue')).toContain('ExportDialog')
   })
 
   it('exports a storyline in its own order', () => {

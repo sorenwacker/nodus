@@ -19,7 +19,7 @@ export function registerThemeTools(): void {
       required: ['name', 'description'],
     },
     async (_args, _ctx) => {
-      // Return unhandled so PixiCanvas.vue switch handles it with LLM access
+      // Return unhandled so GraphCanvas.vue switch handles it with LLM access
       return `__UNHANDLED__:create_theme`
     },
     { category: 'theme' }
@@ -37,7 +37,7 @@ export function registerThemeTools(): void {
       required: ['name', 'changes'],
     },
     async (_args, _ctx) => {
-      // Return unhandled so PixiCanvas.vue switch handles it with LLM access
+      // Return unhandled so GraphCanvas.vue switch handles it with LLM access
       return `__UNHANDLED__:update_theme`
     },
     { category: 'theme' }
@@ -54,7 +54,7 @@ export function registerThemeTools(): void {
       required: ['name'],
     },
     async (_args, _ctx) => {
-      // Return unhandled so PixiCanvas.vue switch handles it
+      // Return unhandled so GraphCanvas.vue switch handles it
       return `__UNHANDLED__:apply_theme`
     },
     { category: 'theme' }
@@ -69,7 +69,7 @@ export function registerThemeTools(): void {
       required: [],
     },
     async (_args, _ctx) => {
-      // Return unhandled so PixiCanvas.vue switch handles it
+      // Return unhandled so GraphCanvas.vue switch handles it
       return `__UNHANDLED__:list_themes`
     },
     { category: 'theme' }

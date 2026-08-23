@@ -9,7 +9,7 @@ import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNotifications } from './composables/useNotifications'
 import { usePanelReveal } from './composables/usePanelReveal'
 import { createEdgeStepper } from './lib/edgeGesture'
-import PixiCanvas from './canvas/PixiCanvas.vue'
+import GraphCanvas from './canvas/GraphCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import UpdateNotice from './components/UpdateNotice.vue'
@@ -229,8 +229,8 @@ import { useMcpServer } from './composables/useMcpServer'
 import { useEdgesStore } from './stores/edges'
 import { useStorylinesStore } from './stores/storylines'
 
-// PixiCanvas ref for MCP viewport integration
-const pixiCanvasRef = ref<ComponentPublicInstance<{ focusNode: (id: string) => void; getViewport: () => { x: number; y: number; zoom: number } }> | null>(null)
+// GraphCanvas ref for MCP viewport integration
+const graphCanvasRef = ref<ComponentPublicInstance<{ focusNode: (id: string) => void; getViewport: () => { x: number; y: number; zoom: number } }> | null>(null)
 
 const syncingFiles = ref(false)
 const exportingOkf = ref(false)
@@ -382,8 +382,8 @@ const mcpServer = useMcpServer({
     reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
   },
   viewport: {
-    getViewport: () => pixiCanvasRef.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
-    focusNode: (id: string) => pixiCanvasRef.value?.focusNode(id),
+    getViewport: () => graphCanvasRef.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
+    focusNode: (id: string) => graphCanvasRef.value?.focusNode(id),
   },
   undo: {
     pushPositionUndo,
@@ -921,7 +921,7 @@ async function openFolderDialog() {
       }"
     >
       <!-- Canvas always visible beneath the storyline layers -->
-      <PixiCanvas ref="pixiCanvasRef" :class="{ 'with-reader': readerStorylineId }" />
+      <GraphCanvas ref="graphCanvasRef" :class="{ 'with-reader': readerStorylineId }" />
       <!-- Storyline panel slides in from the right; collapsed (but kept
            mounted, so accordion state survives) while the reader is open -->
       <div

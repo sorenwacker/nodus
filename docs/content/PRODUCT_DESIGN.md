@@ -1322,7 +1322,7 @@ tools:
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
 | Frontend | Vue 3, TypeScript | Proven, ecosystem |
-| Canvas | **PixiJS + DOM hybrid** | PixiJS for performance, DOM for text editing |
+| Canvas | **DOM + SVG + Canvas 2D** | DOM cards for text and editing, SVG edges, a 2D canvas above the LOD threshold |
 | Desktop | **Tauri v2** | Small binary (~10MB), Rust security, native WebView |
 | Database | **SQLite** via `sqlx` | Embedded, WAL mode, no server to run |
 | Content | **.md files** | Text content in Markdown files, NOT in SQLite |
@@ -1354,28 +1354,26 @@ OneNote creates duplicates because it syncs at file/section level. Nodus avoids 
 3. **File locking:** Rust acquires lock on .md when open in Nodus.
 4. **Checksum detection:** SHA-256 detects external changes.
 
-### Canvas Rendering: Hybrid (PixiJS + DOM)
+### Canvas rendering
 
-**Problem:** Editable text inside WebGL is difficult.
-
-**Solution: Layer separation**
+**As built.** The canvas is drawn with DOM, SVG and a 2D canvas. There is no WebGL renderer, and no GPU rasterisation of nodes or edges.
 
 | Layer | Technology | What it renders |
 |-------|------------|-----------------|
-| Background + edges | PixiJS (WebGL) | Grid, connections, node outlines |
-| Text editing | HTML DOM overlay | Actual editable text |
-| Zoomed out | PixiJS texture | Hide DOM, render text as sprite |
+| Node cards | DOM components | Text, math, editing affordances |
+| Edges | SVG | Connections, arrowheads, hit areas |
+| Dense mode (over the LOD threshold) | Canvas 2D | Nodes collapsed to circles |
+| Pan and zoom | CSS transform on the viewport layer | Composited by the GPU |
 
-**Use PixiJS (WebGL) for:**
-- Handles thousands of nodes at 60fps
-- DOM/SVG chokes on too many elements
-- SVG only for node *contents* (like Typst formulas)
-- Render SVG as PixiJS Sprite for performance
+**Why DOM rather than WebGL:** editable text, text selection, accessibility and the existing math rendering all come free in the DOM and would have to be rebuilt against a WebGL renderer. The cost is that layout and paint run on the main thread, so the work scales with the number of *visible* elements.
 
-**Rendering strategy:**
-1. Canvas background + pan/zoom: PixiJS (WebGL)
-2. Node content (text, math): SVG rendered to texture
-3. Connections/arrows: PixiJS Graphics
+**How it scales instead of using the GPU:**
+
+1. Viewport culling keeps off-screen nodes out of the DOM entirely.
+2. Above the LOD threshold (500 visible nodes by default) node cards are replaced by circles drawn into a single 2D context.
+3. Edges have a single-path fast mode, and a user-configurable threshold that hides them entirely.
+
+**Required behavior:** this section describes what exists. An earlier version of it specified a PixiJS/WebGL renderer that was never built, while the main canvas component was named after it - and a real zoom optimisation was removed in the belief that the absent renderer made it unnecessary. Documentation that describes an intention as an implementation is worse than no documentation: every later decision reasons from it. A gate test fails if the source claims a WebGL or PixiJS renderer again.
 
 ---
 
@@ -1388,7 +1386,7 @@ Given the priority on data integrity (no OneNote-style conflicts), but also need
 | Week | Focus | Deliverable |
 |------|-------|-------------|
 | 1 | Rust backend | File watcher, checksum logic, SQLite writes |
-| 2 | Canvas MVP | PixiJS canvas with mock nodes (hardcoded JSON) |
+| 2 | Canvas MVP | Canvas with mock nodes (hardcoded JSON) |
 | 3 | Integration | Canvas reads from SQLite, displays real nodes |
 | 4 | Editing | Inline text editing in nodes |
 | 5 | Connections | Draw edges between nodes |
@@ -1400,7 +1398,7 @@ Given the priority on data integrity (no OneNote-style conflicts), but also need
 |------|------|----------------|
 | 01 | Initialize Tauri v2 + Vue project | App opens in <0.5s |
 | 02 | Implement Rust file-watcher for test folder | Adding `.md` file triggers console log |
-| 03 | Basic PixiJS canvas with draggable nodes | 100 nodes drag at 60fps |
+| 03 | Basic canvas with draggable nodes | 100 nodes drag at 60fps |
 | 04 | Integrate Typst WASM for math node | `$a^2 + b^2 = c^2$` renders instantly |
 | 05 | Build Obsidian link parser | `[[Link]]` creates edge on canvas |
 | 06 | Implement checksum-based sync | External file edit updates node |
@@ -1414,7 +1412,7 @@ Given the priority on data integrity (no OneNote-style conflicts), but also need
 | Sync method (planned) | Local SQLite + a CRDT layer | Granular merge of positions, no file-level conflicts |
 | Data locality | Local-first | Instant editing, internet only for sync |
 | File handling | Rust notify + locking | Prevents corruption when Obsidian open |
-| Canvas renderer | PixiJS (WebGL) | 60fps with 1000+ nodes |
+| Canvas renderer | DOM + SVG, Canvas 2D above the LOD threshold | Frame time measured by the render benchmark |
 | Math renderer | Typst WASM + SVG cache | Sub-second, cached for performance |
 
 ### Project Scaffolding
@@ -1426,9 +1424,9 @@ npm create tauri-app@latest nodus
 
 # Project structure:
 nodus/
-├── src/                    # Frontend (Vue + PixiJS)
+├── src/                    # Frontend (Vue)
 │   ├── components/
-│   ├── canvas/             # PixiJS canvas logic
+│   ├── canvas/             # Canvas logic
 │   ├── stores/             # Pinia state
 │   └── App.vue
 ├── src-tauri/              # Rust backend
@@ -1476,7 +1474,7 @@ User saves → Write to .md → Release lock
 
 **Important:** Do NOT lock during initial import checksum scan — only during active editing.
 
-### CRDT to PixiJS Integration (planned)
+### CRDT to canvas integration (planned)
 
 The sync layer below is a design, not shipped code. Since it would sync canvas
 positions only (never text):
@@ -1493,7 +1491,7 @@ Rust updates SQLite nodes table
 Vue Frontend receives event
     │
     ↓
-PixiJS updates Container.position.x/y
+The canvas layer updates node positions
 ```
 
 ### Hybrid Rendering Workflow
@@ -1502,7 +1500,7 @@ PixiJS updates Container.position.x/y
 ┌─────────────────────────────────────────────┐
 │                 CANVAS                      │
 │  ┌─────────────────────────────────────┐   │
-│  │ PixiJS Layer (WebGL)                │   │
+│  │ Canvas layer (DOM + SVG)                │   │
 │  │ - Background grid                   │   │
 │  │ - Edges/connections                 │   │
 │  │ - Node containers (rectangles)      │   │
@@ -1511,24 +1509,23 @@ PixiJS updates Container.position.x/y
 │  │ DOM Layer (HTML overlay)            │   │
 │  │ - <textarea> for editing            │   │
 │  │ - Positioned via CSS transform      │   │
-│  │ - Maps PixiJS coords → CSS top/left │   │
+│  │ - Maps canvas coords -> CSS top/left │   │
 │  └─────────────────────────────────────┘   │
 └─────────────────────────────────────────────┘
 
 Zoom threshold:
   zoom > 0.5 → Show DOM text elements
-  zoom < 0.5 → Hide DOM, render text as PixiJS texture
+  zoom < 0.5 -> cards collapse to circles (2D canvas)
 ```
 
-### Coordinate Mapping (PixiJS → DOM)
+### Coordinate mapping (canvas -> DOM)
 
 ```typescript
-function syncDOMToPixi(nodeId: string, pixi: PIXI.Container) {
+function syncDOMToCanvas(nodeId: string, position: { x: number; y: number }) {
   const domElement = document.getElementById(`node-${nodeId}`);
-  const globalPos = pixi.toGlobal(new PIXI.Point(0, 0));
+  const screen = canvasToScreen(position, viewport);
 
-  domElement.style.transform = `translate(${globalPos.x}px, ${globalPos.y}px)`;
-  domElement.style.width = `${pixi.width * currentZoom}px`;
+  domElement.style.transform = `translate(${screen.x}px, ${screen.y}px)`;
 }
 ```
 
@@ -1666,32 +1663,9 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 
 **Also:** Obsidian uses folder structure; Nodus canvas is flat. Auto-map folders → Frames on import.
 
-#### 3. Text Editing in WebGL
+#### 3. Text editing
 
-**Problem:** Editable text inside PixiJS/WebGL canvas is difficult.
-
-**Mitigation: Hybrid Rendering**
-
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| Background, edges, outlines | PixiJS (WebGL) | Performance |
-| Text editing | HTML DOM overlay | Native input |
-| Zoomed out | PixiJS texture | Hide DOM, render as sprite |
-
-**Rule:** Never compile Typst while panning. Compile on text change only, cache SVG.
-
-### The "Empty Canvas" Problem
-
-**Critical risk:** New users hate a blank screen. If they import 1,000 notes and see a messy pile, they quit.
-
-**Mitigations:**
-1. Auto-layout that actually looks good
-2. "Suggested layouts" based on vault structure
-3. Quick-start templates
-4. Guided onboarding for first nodes
-5. "Import 10 notes first" recommendation
-
----
+Editable text, selection and accessibility come from the DOM, which is why the canvas renders node cards as DOM elements rather than into a WebGL context. The cost is that layout and paint run on the main thread and scale with the number of visible cards; viewport culling and the LOD threshold are what keep that bounded.
 
 ## Success Metrics
 
@@ -1737,7 +1711,7 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 3. [x] Set up LibSQL database with schema
 4. [x] Implement Rust file-watcher (notify crate)
 5. [x] Write checksum function (SHA-256)
-6. [x] PixiJS canvas with hybrid rendering (WebGL + DOM overlay)
+6. [x] Canvas with DOM cards, SVG edges and a 2D canvas above the LOD threshold
 7. [x] DOM overlay for text editing
 8. [x] Draggable nodes at 60fps
 9. [x] Connect canvas to SQLite
@@ -1782,7 +1756,6 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 ## Appendix: Key References
 
 - **Tauri v2:** https://v2.tauri.app
-- **PixiJS:** https://pixijs.com (WebGL canvas)
 - **Typst:** https://typst.app
 - **typst.ts:** https://github.com/myriaddreamin/typst.ts (WASM)
 - **Yjs:** https://yjs.dev (CRDT library considered for the planned sync layer)

@@ -143,7 +143,7 @@ describe('highlight import reachability', () => {
     )
     expect(drop).toContain('extractPdfAnnotations')
 
-    const canvas = readFileSync(resolve(__dirname, '../canvas/PixiCanvas.vue'), 'utf-8')
+    const canvas = readFileSync(resolve(__dirname, '../canvas/GraphCanvas.vue'), 'utf-8')
     expect(canvas).toContain('PdfHighlightPicker')
   })
 })

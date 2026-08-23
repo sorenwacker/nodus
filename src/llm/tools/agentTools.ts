@@ -44,7 +44,7 @@ export function registerAgentTools(): void {
       required: ['title', 'steps'],
     },
     async (args, _ctx) => {
-      // Return marker for PixiCanvas to handle with plan state
+      // Return marker for GraphCanvas to handle with plan state
       return `__CREATE_PLAN__:${JSON.stringify(args)}`
     },
     { category: 'agent' }
@@ -62,7 +62,7 @@ export function registerAgentTools(): void {
       required: [],
     },
     async (args, _ctx) => {
-      // Return marker for PixiCanvas to handle - pauses agent loop
+      // Return marker for GraphCanvas to handle - pauses agent loop
       return `__REQUEST_APPROVAL__:${JSON.stringify(args)}`
     },
     { category: 'agent' }
@@ -84,7 +84,7 @@ export function registerAgentTools(): void {
       required: ['query'],
     },
     async (args, _ctx) => {
-      // Return marker for PixiCanvas to handle with research module
+      // Return marker for GraphCanvas to handle with research module
       return `__RESEARCH__:${JSON.stringify(args)}`
     },
     { category: 'agent' }

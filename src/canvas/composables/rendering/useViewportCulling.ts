@@ -44,7 +44,10 @@ export function useViewportCulling(ctx: UseViewportCullingContext): UseViewportC
   const viewportWidth = ref(window.innerWidth)
   const viewportHeight = ref(window.innerHeight)
 
-  // Note: Zoom deferral caching removed - PixiJS GPU rendering handles zoom performance
+  // Zoom deferral caching was removed here on the grounds that a GPU renderer
+  // made it unnecessary. No such renderer exists: nodes are DOM, edges SVG
+  // (PRODUCT_DESIGN.md > Canvas rendering). Whether deferral is worth
+  // restoring is a question for the render benchmark, not for assumption.
 
   // Spatial index for large graphs
   const spatialGrid = new SpatialGrid({ cellSize: SPATIAL_GRID_CELL_SIZE })
