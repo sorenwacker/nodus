@@ -401,7 +401,9 @@
     "timelineFrom": "da (500 BC)",
     "timelineTo": "a (2000)",
     "unassigned": "Non assegnato",
-    "resizeTimelines": "Trascina per ridimensionare le cronologie"
+    "resizeTimelines": "Trascina per ridimensionare le cronologie",
+    "editHint": "Doppio clic per modificare",
+    "locked": "Questo file è in modifica altrove: {error}"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",

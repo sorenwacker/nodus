@@ -405,7 +405,9 @@
     "timelineFrom": "from (500 BC)",
     "timelineTo": "to (2000)",
     "unassigned": "Unassigned",
-    "resizeTimelines": "Drag to resize the timelines"
+    "resizeTimelines": "Drag to resize the timelines",
+    "editHint": "Double-click to edit",
+    "locked": "This file is being edited elsewhere: {error}"
   },
   "nodePicker": {
     "newNode": "New node",

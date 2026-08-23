@@ -401,7 +401,9 @@
     "timelineFrom": "von (500 BC)",
     "timelineTo": "bis (2000)",
     "unassigned": "Nicht zugeordnet",
-    "resizeTimelines": "Ziehen, um die Zeitleisten zu skalieren"
+    "resizeTimelines": "Ziehen, um die Zeitleisten zu skalieren",
+    "editHint": "Zum Bearbeiten doppelklicken",
+    "locked": "Diese Datei wird woanders bearbeitet: {error}"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",

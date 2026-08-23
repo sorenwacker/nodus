@@ -65,3 +65,31 @@ describe('switching storylines', () => {
     expect(load).not.toMatch(/loading\.value = true\n/)
   })
 })
+
+describe('editing in the reader', () => {
+  const reader = readFileSync(
+    resolve(__dirname, '../components/StorylineReader.vue'),
+    'utf-8'
+  )
+
+  it('starts from a double-click on the section text', () => {
+    // PRODUCT_DESIGN.md > Editing in the reader
+    expect(reader).toContain('@dblclick')
+    expect(reader).toContain('startSectionEdit')
+  })
+
+  it('acquires the file lock before the textarea appears', () => {
+    // A locked file must never be silently forked
+    const fn = reader.slice(reader.indexOf('async function startSectionEdit'))
+    const lock = fn.indexOf('acquireEditLock')
+    const editing = fn.indexOf('editingSectionId.value = node.id')
+    expect(lock).toBeGreaterThan(-1)
+    expect(lock).toBeLessThan(editing)
+  })
+
+  it('saves through the store path the canvas uses', () => {
+    const fn = reader.slice(reader.indexOf('async function saveSectionEdit'))
+    expect(fn).toContain('updateNodeContent')
+    expect(fn).toContain('releaseEditLock')
+  })
+})

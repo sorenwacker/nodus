@@ -1164,6 +1164,15 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
 
+### Editing in the reader
+
+**Required behavior:** Reading is where the gaps show, so the reader is where the fix should happen. Leaving the reader to edit a paragraph and coming back loses the place and the flow.
+
+- Double-click a section's text to edit that node's markdown in place. Save with **Cmd/Ctrl+Enter** or by clicking away; cancel with **Escape**.
+- Saving writes through the same store path as canvas editing, so file sync, undo and the anchored-wikilink rendering behave identically. The section re-renders on save.
+- Editing acquires the node's file lock first, exactly as the canvas does. If the file is locked by another program, the reader says so and the text stays read-only; it must never silently fork a locked file.
+- One section edits at a time. Starting an edit in another section saves the current one first.
+
 ### Reader opening and switching
 
 **Required behavior:** The reader's slide animation and its content rendering compete for the same main thread. Rendering every node's markdown in one synchronous pass during the slide starves the animation frames, so the panel judders exactly when the user is watching it most closely.

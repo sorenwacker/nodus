@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
+import { acquireEditLock, releaseEditLock } from '../lib/tauri'
 import { uiStorage } from '../lib/storage'
 import { usePanelReveal } from '../composables/usePanelReveal'
 import type { StorylineService } from '../services/storylineService'
@@ -66,6 +67,62 @@ const showEntitySidebar = ref(false)
 const showReferencesSidebar = ref(false) // Hidden by default - optional
 
 // Open detail modal for editing a node
+// Inline section editing (PRODUCT_DESIGN.md > Editing in the reader)
+const editingSectionId = ref<string | null>(null)
+const editingText = ref('')
+const editingLockError = ref<string | null>(null)
+
+async function startSectionEdit(node: Node) {
+  if (editingSectionId.value === node.id) return
+  // One section edits at a time; starting another saves the current one
+  if (editingSectionId.value) await saveSectionEdit()
+
+  editingLockError.value = null
+  try {
+    // The lock comes first: a locked file must never be silently forked
+    await acquireEditLock(node.id)
+  } catch (e) {
+    editingLockError.value = e instanceof Error ? e.message : String(e)
+    return
+  }
+  editingText.value = node.markdown_content || ''
+  editingSectionId.value = node.id
+  await nextTick()
+  document.querySelector<HTMLTextAreaElement>('.section-editor')?.focus()
+}
+
+async function saveSectionEdit() {
+  const id = editingSectionId.value
+  if (!id) return
+  editingSectionId.value = null
+  try {
+    await store.updateNodeContent(id, editingText.value)
+    const node = nodes.value.find(n => n.id === id)
+    if (node) {
+      node.markdown_content = editingText.value
+      renderNodeContent(node)
+    }
+  } finally {
+    await releaseEditLock(id).catch(() => {})
+  }
+}
+
+async function cancelSectionEdit() {
+  const id = editingSectionId.value
+  editingSectionId.value = null
+  if (id) await releaseEditLock(id).catch(() => {})
+}
+
+function onEditorKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    void cancelSectionEdit()
+  } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault()
+    void saveSectionEdit()
+  }
+}
+
 function openNodeDetail(nodeId: string) {
   window.dispatchEvent(new CustomEvent('open-node-detail', { detail: { nodeId } }))
 }
@@ -461,8 +518,28 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
                   </span>
                   <h2 class="section-title">{{ node.title }}</h2>
                 </header>
-                <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="section-content" @click="handleContentClick" v-html="getRenderedContent(node.id) || ''"></div>
+                <!-- eslint-disable vue/no-v-html -- content is sanitized by the render service -->
+                <textarea
+                  v-if="editingSectionId === node.id"
+                  v-model="editingText"
+                  class="section-editor"
+                  :spellcheck="false"
+                  @blur="saveSectionEdit"
+                  @keydown="onEditorKeydown"
+                ></textarea>
+                <template v-else>
+                  <div
+                    class="section-content"
+                    :title="t('storyline.editHint')"
+                    @click="handleContentClick"
+                    @dblclick="startSectionEdit(node)"
+                    v-html="getRenderedContent(node.id) || ''"
+                  ></div>
+                  <p v-if="editingLockError" class="section-lock-error">
+                    {{ t('storyline.locked', { error: editingLockError }) }}
+                  </p>
+                </template>
+                <!-- eslint-enable vue/no-v-html -->
               </article>
             </template>
           </template>
@@ -510,6 +587,26 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
 </template>
 
 <style scoped>
+.section-editor {
+  width: 100%;
+  min-height: 180px;
+  padding: 12px;
+  border: 1px solid var(--primary-color);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.section-lock-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--danger-color, #dc2626);
+}
+
 /* Anchored nodes read like comments, at the point in the text that links them
    (PRODUCT_DESIGN.md > Anchored nodes) */
 :deep(.anchored-node) {
