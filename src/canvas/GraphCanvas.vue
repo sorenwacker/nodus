@@ -1887,9 +1887,6 @@ const { selectAllNodes, deleteSelectedNodes } = useSelectionActions({
 
 // Node styling composable - handles node background and style computation
 const nodeStyle = useCanvasNodeStyle({
-  scale,
-  offsetX,
-  offsetY,
   resizingNode,
   resizePreview,
   nodeZOrder,
@@ -2198,9 +2195,10 @@ defineExpose({
         <!-- LOD Mode circles are rendered via Canvas 2D in CanvasLODCanvas above -->
       </div>
 
-      <!-- Node cards layer - outside canvas-content for crisp text rendering -->
-      <!-- Nodes are positioned in screen coordinates directly -->
-      <div class="nodes-layer">
+      <!-- Node cards layer: carries the same pan/zoom transform as
+           canvas-content, so a pan frame patches this one style and cards
+           never restyle (PRODUCT_DESIGN.md > Canvas rendering) -->
+      <div class="nodes-layer" :style="{ transform }">
         <CanvasNodeCard
           v-for="node in lodCardNodes"
           :key="node.id"

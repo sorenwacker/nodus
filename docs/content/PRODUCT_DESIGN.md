@@ -1410,9 +1410,11 @@ OneNote creates duplicates because it syncs at file/section level. Nodus avoids 
 | Node cards | DOM components | Text, math, editing affordances |
 | Edges | SVG | Connections, arrowheads, hit areas |
 | Dense mode (over the LOD threshold) | Canvas 2D | Nodes collapsed to circles |
-| Pan and zoom | CSS transform on the viewport layer | Composited by the GPU |
+| Pan and zoom | One CSS transform on each layer, node cards included | Composited by the GPU; per-frame JavaScript is zero |
 
 **Why DOM rather than WebGL:** editable text, text selection, accessibility and the existing math rendering all come free in the DOM and would have to be rebuilt against a WebGL renderer. The cost is that layout and paint run on the main thread, so the work scales with the number of *visible* elements.
+
+**Pan and zoom (required behavior):** Every layer - frames, edges, and the node cards - lives inside a container that carries the single pan-and-zoom transform. A card's own style depends only on its canvas coordinates, never on the current scale or offset, so panning and zooming update one container style and composite on the GPU. The previous arrangement positioned each card in screen coordinates, which recomputed and patched every visible card's style on every frame: 24 ms per frame at 500 nodes, measured, against a 16.7 ms budget. Text crispness is unchanged: cards already applied `scale()` in their own transform, which rasterizes identically to a parent transform. A test holds the invariant that a card's style is independent of scale and offset.
 
 **How it scales instead of using the GPU:**
 

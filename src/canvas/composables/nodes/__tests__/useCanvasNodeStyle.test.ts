@@ -4,9 +4,6 @@ import { useCanvasNodeStyle, type UseCanvasNodeStyleContext } from '../useCanvas
 
 function makeContext(scale: number): UseCanvasNodeStyleContext {
   return {
-    scale: ref(scale),
-    offsetX: ref(0),
-    offsetY: ref(0),
     resizingNode: ref(null),
     resizePreview: ref({ x: 0, y: 0, width: 0, height: 0 }),
     nodeZOrder: ref(new Map()),
@@ -17,29 +14,24 @@ function makeContext(scale: number): UseCanvasNodeStyleContext {
   }
 }
 
-describe('useCanvasNodeStyle.getNodeStyle (anti-wiggle scaling)', () => {
-  it('renders the card at logical size and scales it with a single transform', () => {
+describe('useCanvasNodeStyle.getNodeStyle (container-transform scaling)', () => {
+  it('renders the card at logical size in canvas coordinates', () => {
     const { getNodeStyle } = useCanvasNodeStyle(makeContext(2))
     const style = getNodeStyle({ id: 'n1', canvas_x: 10, canvas_y: 20, width: 180, height: 90 })
 
-    // Box stays at logical size; the transform supplies the zoom, so text and
-    // box scale as one unit instead of via independent --zoom-scale rounding.
+    // Box stays at logical size; the nodes-layer container supplies pan and
+    // zoom, so the card's style never changes during either
+    // (PRODUCT_DESIGN.md > Canvas rendering)
     expect(style.width).toBe('180px')
     expect(style.height).toBe('90px')
     expect(style['--zoom-scale']).toBe('1')
-    expect(style.transform).toContain('scale(2)')
+    expect(style.transform).toBe('translate(10px, 20px)')
     expect(style.transformOrigin).toBe('0 0')
   })
 
-  it('positions the top-left corner in screen space (translate before scale)', () => {
-    const { getNodeStyle } = useCanvasNodeStyle(makeContext(2))
-    const style = getNodeStyle({ id: 'n1', canvas_x: 10, canvas_y: 20, width: 180, height: 90 })
-    // screen corner = canvas * scale + offset = 20, 40
-    expect(style.transform).toBe('translate(20px, 40px) scale(2)')
-  })
-
   it('keeps a constant 2px on-screen border across zoom levels', () => {
-    // logical border * scale (applied by transform) reproduces the old constant width
+    // logical border * scale (applied by the container transform) reproduces
+    // the constant on-screen width
     for (const scale of [0.5, 1, 2]) {
       const { getNodeStyle } = useCanvasNodeStyle(makeContext(scale))
       const style = getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width: 180, height: 90 })

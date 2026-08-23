@@ -227,7 +227,7 @@ describe('where the rendering cost actually is', () => {
   })
 })
 
-/** Mount cards, then pan and zoom them the way the canvas does, per frame */
+/** Mount cards the way the canvas does, then pan and zoom the container */
 async function panZoomSweep(count: number, frames = 60) {
   const nodes = Array.from({ length: count }, (_, i) => node(i))
   const scale = ref(1)
@@ -236,18 +236,23 @@ async function panZoomSweep(count: number, frames = 60) {
   const wrapper = mount(
     {
       setup() {
+        // Cards hold canvas coordinates; the container carries the one
+        // pan/zoom transform, as GraphCanvas does
         return () =>
-          nodes.map(n =>
-            h(CanvasNodeCard, {
-              key: n.id,
-              ...cardProps(n, scale.value),
-              // Card position is computed per node from pan and zoom, exactly
-              // as the canvas does: the node layer sits outside the
-              // transformed container
+          h(
+            'div',
+            {
               style: {
-                transform: `translate(${n.canvas_x * scale.value + offsetX.value}px, ${n.canvas_y * scale.value}px) scale(${scale.value})`,
+                transform: `translate(${offsetX.value}px, 0) scale(${scale.value})`,
               },
-            })
+            },
+            nodes.map(n =>
+              h(CanvasNodeCard, {
+                key: n.id,
+                ...cardProps(n, 1),
+                style: { transform: `translate(${n.canvas_x}px, ${n.canvas_y}px)` },
+              })
+            )
           )
       },
     },
@@ -259,8 +264,6 @@ async function panZoomSweep(count: number, frames = 60) {
     const start = performance.now()
     offsetX.value += 4
     scale.value = 1 - (f / frames) * 0.4
-    // Vue batches; the patch only happens on flush, which is the work a frame
-    // actually does
     await wrapper.vm.$nextTick()
     timings.push(performance.now() - start)
   }
@@ -271,19 +274,50 @@ async function panZoomSweep(count: number, frames = 60) {
 }
 
 describe('cost of a pan or zoom frame', () => {
-  it('reports what one frame of panning costs at the target size', async () => {
-    // Every visible card recomputes its screen position when pan or zoom
-    // changes, because the node layer is positioned in screen coordinates
-    // rather than inside one transformed container
+  it('is flat in the number of cards, because only the container restyles', async () => {
+    // Before the container transform, this was 24ms per frame at 500 nodes -
+    // 1.5x the 16.67ms budget - because every card's style was recomputed
+    // (PRODUCT_DESIGN.md > Canvas rendering)
     const small = await panZoomSweep(100)
     const target = await panZoomSweep(500)
 
     console.log(
       `pan/zoom frame: 100 cards ${small.avgMs.toFixed(2)}ms avg, ` +
-        `500 cards ${target.avgMs.toFixed(2)}ms avg (max ${target.maxMs.toFixed(2)}ms). ` +
-        `Frame budget is 16.67ms.`
+        `500 cards ${target.avgMs.toFixed(2)}ms avg (max ${target.maxMs.toFixed(2)}ms)`
     )
 
-    expect(target.avgMs).toBeGreaterThan(0)
+    // Vue still diffs the child vnodes, so the cost is not perfectly flat -
+    // but the DOM patch is one container style, and the frame must stay far
+    // inside the 16.67ms budget where the old mechanism was 1.5x over it
+    expect(target.avgMs).toBeLessThan(16.67 * SLACK)
+    expect(target.avgMs).toBeLessThan(Math.max(small.avgMs, 0.2) * 6)
+  })
+})
+
+describe('card style is viewport-independent', () => {
+  // The property that makes pan and zoom free: a card's style depends only on
+  // its canvas coordinates, so a frame updates one container transform instead
+  // of restyling every visible card (PRODUCT_DESIGN.md > Canvas rendering)
+  it('returns the same style at any scale and offset', async () => {
+    const { useCanvasNodeStyle } = await import(
+      '../canvas/composables/nodes/useCanvasNodeStyle'
+    )
+    const style = useCanvasNodeStyle({
+      resizingNode: ref(null),
+      resizePreview: ref({ x: 0, y: 0, width: 0, height: 0 }),
+      nodeZOrder: ref(new Map()),
+      nodeBorderWidth: ref(2),
+      isSemanticZoomCollapsed: ref(false),
+      selectedNodeIds: ref([]),
+      currentTheme: ref('light'),
+    } as never)
+
+    const sample = { id: 'n1', canvas_x: 120, canvas_y: 80, width: 240, height: 140, node_type: 'note' }
+    const before = style.getNodeStyle(sample as never)
+
+    // The interface no longer admits scale or offset at all - the style
+    // cannot depend on the viewport by construction
+    expect(before.transform).toContain('translate(120px, 80px)')
+    expect(before.transform).not.toContain('scale')
   })
 })

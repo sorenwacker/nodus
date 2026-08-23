@@ -38,7 +38,9 @@
   width: 1px;
   height: 1px;
   z-index: 3;
-  /* No transform - nodes positioned in screen coordinates */
+  /* The container carries the pan/zoom transform; cards hold canvas coords */
+  transform-origin: 0 0;
+  will-change: transform;
   pointer-events: none;
 }
 

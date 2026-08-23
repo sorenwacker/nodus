@@ -35,12 +35,6 @@ export interface ResizePreview {
  * Context required for node styling
  */
 export interface UseCanvasNodeStyleContext {
-  /** Current zoom scale */
-  scale: Ref<number>
-  /** Current X offset */
-  offsetX: Ref<number>
-  /** Current Y offset */
-  offsetY: Ref<number>
   /** Currently resizing node ID (or null) */
   resizingNode: Ref<string | null>
   /** Preview state during resize */
@@ -80,9 +74,6 @@ export interface UseCanvasNodeStyleReturn {
  */
 export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNodeStyleReturn {
   const {
-    scale,
-    offsetX,
-    offsetY,
     resizingNode,
     resizePreview,
     nodeZOrder,
@@ -104,7 +95,7 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
    *
    * Handles:
    * - Resize preview state
-   * - Screen position transform (scaled + offset)
+   * - Canvas position transform (the container applies pan and zoom)
    * - Tag node sizing (fit-content)
    * - Border width scaling
    * - Z-order from radial layout
@@ -119,23 +110,19 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     const width = isResizing ? resizePreview.value.width : node.width || NODE_DEFAULTS.WIDTH
     const height = isResizing ? resizePreview.value.height : node.height || NODE_DEFAULTS.HEIGHT
 
-    // Calculate screen position of the card's top-left corner (node layer is
-    // outside the canvas-content scale transform, so apply pan/zoom here).
-    const screenX = x * scale.value + offsetX.value
-    const screenY = y * scale.value + offsetY.value
-
-    // Render the card at its logical (unscaled) size and apply zoom as a single
-    // transform. Scaling each CSS dimension independently (the old --zoom-scale
-    // approach) rounded box and text separately, so text drifted against the box
-    // during zoom ("wiggle"). One transform scales box, text, and chrome as a
-    // single unit, eliminating the drift. --zoom-scale is pinned to 1 so the
-    // existing calc(... * var(--zoom-scale)) rules resolve to their base sizes.
+    // Canvas coordinates only: the node layer's container carries the single
+    // pan-and-zoom transform, so this style never depends on scale or offset
+    // and a pan frame patches one container instead of every visible card
+    // (PRODUCT_DESIGN.md > Canvas rendering). The container scale rasterizes
+    // text exactly as the per-card scale() it replaces did.
+    // --zoom-scale is pinned to 1 so calc(... * var(--zoom-scale)) rules
+    // resolve to their base sizes; the container transform applies the zoom.
     const logicalWidth = isTagNode ? 'fit-content' : width + 'px'
     const logicalHeight = isTagNode ? 'fit-content' : height + 'px'
 
     const style: Record<string, string> = {
       '--zoom-scale': '1',
-      transform: `translate(${screenX}px, ${screenY}px) scale(${scale.value})`,
+      transform: `translate(${x}px, ${y}px)`,
       transformOrigin: '0 0',
       width: logicalWidth,
       height: logicalHeight,
