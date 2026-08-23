@@ -54,6 +54,43 @@ pub(crate) fn validate_outbound_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Describe a failed request in terms the user can act on.
+///
+/// `reqwest::Error`'s own message is a wrapper - "error sending request for
+/// url (...)" - and the cause that says whether the request timed out, failed
+/// DNS, or was refused lives in its source chain. Reporting only the wrapper
+/// tells the user their endpoint is broken without saying how, which is what
+/// "cannot be reached" looked like for a host that was answering fine.
+fn describe_request_error(err: &reqwest::Error, timeout: std::time::Duration) -> String {
+    let kind = if err.is_timeout() {
+        format!("timed out after {}s", timeout.as_secs())
+    } else if err.is_connect() {
+        "could not connect".to_string()
+    } else if err.is_redirect() {
+        "too many redirects".to_string()
+    } else if err.is_body() || err.is_decode() {
+        "malformed response".to_string()
+    } else {
+        "request failed".to_string()
+    };
+
+    let mut causes = Vec::new();
+    let mut source = std::error::Error::source(err);
+    while let Some(cause) = source {
+        let text = cause.to_string();
+        if !causes.contains(&text) {
+            causes.push(text);
+        }
+        source = cause.source();
+    }
+
+    if causes.is_empty() {
+        kind
+    } else {
+        format!("{}: {}", kind, causes.join(": "))
+    }
+}
+
 /// Make an HTTP request from Rust (bypasses CORS)
 #[tauri::command]
 pub async fn http_request(input: HttpRequestInput) -> Result<HttpResponse, String> {
@@ -81,7 +118,10 @@ pub async fn http_request(input: HttpRequestInput) -> Result<HttpResponse, Strin
         request = request.body(body);
     }
 
-    let response = request.send().await.map_err(|e| e.to_string())?;
+    let response = request
+        .send()
+        .await
+        .map_err(|e| describe_request_error(&e, timeout))?;
     let status = response.status().as_u16();
     let body = response.text().await.map_err(|e| e.to_string())?;
 
@@ -114,5 +154,51 @@ mod tests {
             validate_outbound_url("http://metadata.google.internal/computeMetadata/v1/").is_err()
         );
         assert!(validate_outbound_url("http://0.0.0.0/").is_err());
+    }
+
+    #[tokio::test]
+    async fn a_timeout_says_so_instead_of_reporting_a_bare_send_failure() {
+        // A host that accepts the connection and never answers: reqwest wraps
+        // the timeout in "error sending request for url", which reads as an
+        // unreachable endpoint even when the endpoint is fine
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let _keep = listener.accept();
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        });
+
+        let result = super::http_request(super::HttpRequestInput {
+            url: format!("http://{}/v1/chat/completions", addr),
+            method: "POST".to_string(),
+            headers: std::collections::HashMap::new(),
+            body: Some("{}".to_string()),
+            timeout_ms: Some(300),
+        })
+        .await;
+
+        let message = result.unwrap_err();
+        assert!(
+            message.contains("timed out"),
+            "expected a timeout to be named, got: {message}"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unresolvable_host_reports_the_dns_failure() {
+        let result = super::http_request(super::HttpRequestInput {
+            url: "https://nodus-no-such-host.invalid/v1/models".to_string(),
+            method: "GET".to_string(),
+            headers: std::collections::HashMap::new(),
+            body: None,
+            timeout_ms: Some(3000),
+        })
+        .await;
+
+        let message = result.unwrap_err();
+        assert!(
+            message.contains("connect") || message.to_lowercase().contains("dns"),
+            "expected the cause to be named, got: {message}"
+        );
     }
 }
