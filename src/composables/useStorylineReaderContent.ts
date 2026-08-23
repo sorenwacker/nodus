@@ -84,8 +84,8 @@ export function useStorylineReaderContent(options: UseStorylineReaderContentOpti
    */
   function setupContentRendering() {
     watch(nodes, async (newNodes) => {
-      // Phase 1: Render markdown with placeholders (sync)
-      renderAllNodes(newNodes)
+      // Phase 1: markdown with placeholders, batched across animation frames
+      await renderAllNodes(newNodes)
       // Phase 2: After DOM update, inject math/mermaid SVGs
       await nextTick()
       // Delay to ensure DOM is fully rendered and contentRef is available

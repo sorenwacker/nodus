@@ -132,7 +132,10 @@ describe('planning the graph', () => {
 
     const titles = plan.nodes.map(n => n.title)
     expect(titles).toContain('1 General Information')
-    expect(titles).toContain('4.1 Summary')
+    // Level-3 subsections fold into their chapter instead of becoming nodes
+    expect(titles).not.toContain('4.1 Summary')
+    const chapter = plan.nodes.find(n => n.title === '4 Scientific case')!
+    expect(chapter.content).toContain('compute-intensive')
     // The references section is not a content node; its entries become citations
     expect(titles).not.toContain('References')
     expect(plan.frameTitle).toContain('LCDB 2.0')
@@ -141,10 +144,10 @@ describe('planning the graph', () => {
   it('follows the document tree with edges', () => {
     const plan = planGraphImport(sections, refs, { x: 0, y: 0 })
 
-    const summary = plan.nodes.find(n => n.title === '4.1 Summary')!
-    const parent = plan.nodes.find(n => n.title === '4 Scientific case')!
+    const root = plan.nodes.find(n => n.title.includes('LCDB 2.0'))!
+    const chapter = plan.nodes.find(n => n.title === '4 Scientific case')!
     expect(plan.edges).toContainEqual(
-      expect.objectContaining({ fromKey: parent.key, toKey: summary.key, linkType: 'related' })
+      expect.objectContaining({ fromKey: root.key, toKey: chapter.key, linkType: 'related' })
     )
   })
 
@@ -199,5 +202,28 @@ describe('graph import reachability', () => {
     const guard = handler.indexOf('choices.zotero')
     expect(guard).toBeGreaterThan(-1)
     expect(guard).toBeLessThan(zoteroCall)
+  })
+})
+
+describe('section depth', () => {
+  it('folds deep subsections into their parent node', () => {
+    // A paper becomes its chapters, not every sub-subsection
+    const deep = splitIntoSections(
+      '# Paper\n\n## A Methods\n\nIntro.\n\n### A.1 Details\n\nFine print.\n\n#### A.1.1 Finer\n\nFinest.\n\n## B Results\n\nFindings.'
+    )
+    const plan = planGraphImport(deep, [], { x: 0, y: 0 })
+
+    const titles = plan.nodes.map(n => n.title)
+    expect(titles).toContain('A Methods')
+    expect(titles).toContain('B Results')
+    expect(titles).not.toContain('A.1 Details')
+    expect(titles).not.toContain('A.1.1 Finer')
+
+    // The folded text is kept, inside the parent, under its own heading
+    const methods = plan.nodes.find(n => n.title === 'A Methods')!
+    expect(methods.content).toContain('Intro.')
+    expect(methods.content).toContain('A.1 Details')
+    expect(methods.content).toContain('Fine print.')
+    expect(methods.content).toContain('Finest.')
   })
 })

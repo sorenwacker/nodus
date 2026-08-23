@@ -177,13 +177,51 @@ const SECTIONS_PER_ROW = 4
  * relative to the drop position. Pure planning - the caller materialises it
  * (PRODUCT_DESIGN.md > PDF as a graph).
  */
+
+/** Heading levels that become their own node; deeper ones fold into the parent */
+const MAX_NODE_DEPTH = 2
+
+/**
+ * Fold sections deeper than MAX_NODE_DEPTH into their nearest kept ancestor,
+ * so a paper becomes its chapters rather than every sub-subsection
+ * (PRODUCT_DESIGN.md > PDF as a graph).
+ */
+export function foldDeepSections(sections: DocumentSection[]): DocumentSection[] {
+  const kept: DocumentSection[] = []
+  const keptIndexByOriginal = new Map<number, number>()
+
+  sections.forEach((section, i) => {
+    if (section.level <= MAX_NODE_DEPTH) {
+      // Remap the parent to its position among the kept sections
+      const parentKept =
+        section.parentIndex !== null ? keptIndexByOriginal.get(section.parentIndex) : null
+      kept.push({ ...section, parentIndex: parentKept ?? null })
+      keptIndexByOriginal.set(i, kept.length - 1)
+      return
+    }
+
+    // Walk up to the nearest kept ancestor and append under its own heading
+    let ancestor = section.parentIndex
+    while (ancestor !== null && !keptIndexByOriginal.has(ancestor)) {
+      ancestor = sections[ancestor].parentIndex
+    }
+    if (ancestor === null) return
+    const target = kept[keptIndexByOriginal.get(ancestor)!]
+    target.content =
+      `${target.content}\n\n${'#'.repeat(section.level)} ${section.title}\n\n${section.content}`.trim()
+  })
+
+  return kept
+}
+
 export function planGraphImport(
   sections: DocumentSection[],
   references: ReferenceEntry[],
   origin: { x: number; y: number }
 ): GraphImportPlan {
   const referencesSection = findReferencesSection(sections)
-  const content = sections.filter(s => s !== referencesSection)
+  const folded = foldDeepSections(sections.filter(s => s !== referencesSection))
+  const content = folded
 
   const root = content[0]
   const frameTitle = root?.title || 'Imported document'
@@ -194,7 +232,7 @@ export function planGraphImport(
 
   content.forEach((section, i) => {
     const key = `s${i}`
-    keyByIndex.set(sections.indexOf(section), key)
+    keyByIndex.set(i, key)
     nodes.push({
       key,
       title: section.title || frameTitle,
@@ -206,8 +244,8 @@ export function planGraphImport(
   })
 
   // Edges follow the document tree
-  content.forEach(section => {
-    const childKey = keyByIndex.get(sections.indexOf(section))!
+  content.forEach((section, i) => {
+    const childKey = keyByIndex.get(i)!
     if (section.parentIndex === null) return
     const parentKey = keyByIndex.get(section.parentIndex)
     if (parentKey && parentKey !== childKey) {
@@ -216,7 +254,7 @@ export function planGraphImport(
   })
 
   // Citations in their own column right of the sections, cited by the root
-  const rootKey = keyByIndex.get(sections.indexOf(root)) ?? 's0'
+  const rootKey = keyByIndex.get(content.indexOf(root)) ?? 's0'
   const citationX = origin.x + SECTIONS_PER_ROW * COLUMN_WIDTH + COLUMN_WIDTH / 2
   references.forEach((ref, i) => {
     const key = `r${i}`

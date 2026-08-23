@@ -161,7 +161,7 @@ watch(
   full => {
     markdownRendering.expandAnchors.value = !!full
     markdownRendering.clearCache()
-    renderAllNodes(nodes.value)
+    void renderAllNodes(nodes.value)
   },
   { immediate: true }
 )
@@ -187,7 +187,10 @@ const entities = useStorylineReaderEntities({
 const { entitiesByType, hasEntities, navigateToEntityNode, panToEntity } = entities
 
 async function loadStoryline() {
-  loading.value = true
+  // Keep the current content visible while switching; the loading state is
+  // for a reader with nothing to show
+  // (PRODUCT_DESIGN.md > Reader opening and switching)
+  loading.value = nodes.value.length === 0
   try {
     if (props.singleNodeId) {
       const node = store.nodes.find(n => n.id === props.singleNodeId)

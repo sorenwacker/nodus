@@ -371,7 +371,7 @@ The integral is: $ integral_a^b f(x) dif x $
 | Mode | What is built | Needs |
 |------|---------------|-------|
 | Single node | The whole document in one node, as before | Nothing |
-| Section graph | One node per heading section, edges following the document tree, all in a frame named after the paper | Nothing - structural, deterministic |
+| Section graph | One node per top-level section - headings deeper than two levels fold into their parent's node, so a paper becomes its chapters, not every sub-subsection - edges following the document tree, all in a frame named after the paper | Nothing - structural, deterministic |
 | + References | Entries in the references section become citation nodes with `cites` edges from the paper | Nothing to parse; a lookup service to verify |
 | + Semantic graph | An LLM pass per section extracts claims and findings as nodes with typed edges (`supports`, `contradicts`, `related`) | The configured language model |
 
@@ -1163,6 +1163,13 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 | Entity node types | One node each: citation (with DOI), comment, character, location, term, item |
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
+
+### Reader opening and switching
+
+**Required behavior:** The reader's slide animation and its content rendering compete for the same main thread. Rendering every node's markdown in one synchronous pass during the slide starves the animation frames, so the panel judders exactly when the user is watching it most closely.
+
+- Content renders in small batches with an animation frame between batches, so the slide keeps its frame budget while the content fills in.
+- Switching to another storyline while the reader is open keeps the current content visible until the new storyline's nodes have loaded. The loading state appears only when the reader has nothing to show; replacing readable content with a spinner is a flash, not feedback.
 
 ### Anchored nodes
 

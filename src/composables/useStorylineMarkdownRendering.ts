@@ -65,11 +65,30 @@ export function useStorylineMarkdownRendering() {
   /**
    * Phase 1: Render all nodes to HTML with placeholders (sync)
    */
-  function renderAllNodes(nodes: Node[]): void {
-    const newContent = new Map(renderedContent.value)
+  /** Nodes rendered per animation frame while the reader is sliding open */
+  const RENDER_BATCH = 4
 
-    for (const node of nodes) {
-      if (!newContent.has(node.id)) {
+  async function renderAllNodes(
+    nodes: Node[],
+    options?: { onBatch?: () => void }
+  ): Promise<void> {
+    // Batched with an animation frame between batches: one synchronous pass
+    // over every node starves the slide animation of exactly the frames the
+    // user is watching (PRODUCT_DESIGN.md > Reader opening and switching)
+    const pending = nodes.filter(n => !renderedContent.value.has(n.id))
+
+    for (let i = 0; i < pending.length; i += RENDER_BATCH) {
+      if (i > 0) {
+        await new Promise<void>(resolve =>
+          typeof requestAnimationFrame === 'function'
+            ? requestAnimationFrame(() => resolve())
+            : setTimeout(resolve, 16)
+        )
+      }
+
+      const batch = pending.slice(i, i + RENDER_BATCH)
+      const newContent = new Map(renderedContent.value)
+      for (const node of batch) {
         const html = node.markdown_content
           ? renderMarkdown(node.markdown_content, {
               wikilinkExists: getWikilinkExists,
@@ -78,9 +97,9 @@ export function useStorylineMarkdownRendering() {
           : ''
         newContent.set(node.id, html)
       }
+      renderedContent.value = newContent
+      options?.onBatch?.()
     }
-
-    renderedContent.value = newContent
   }
 
   /**
