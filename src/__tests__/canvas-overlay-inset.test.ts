@@ -57,39 +57,39 @@ describe('canvas overlay inset contract', () => {
     }
   })
 
-  it('offsets left-anchored overlays by the agent panel width', () => {
-    // The agent panel occupies the canvas's left edge, so overlays anchored
-    // there must clear it; a missed one sits underneath the panel
-    const leftAnchored = [
-      '.node-preview-panel',
-      '.citation-fetch-progress',
-      '.edge-filters',
-      '.hover-tooltip',
-    ]
-    // A selector can be declared in more than one stylesheet; every
-    // declaration that actually anchors to the left must carry the inset
-    const anchoring = new Map<string, number>()
+  it('offsets every left-anchored canvas overlay by the agent panel width', () => {
+    // Previously this named four selectors, so the status bar - which holds the
+    // agent log button - sat underneath the panel unnoticed. The rule is now
+    // derived: any screen-anchored canvas overlay offset from the left edge
+    // must clear the panel, and anything that legitimately does not is named
+    // here with its reason.
+    const exempt = new Map([
+      // Lives inside the transformed canvas content, not anchored to the screen
+      ['.frame-header', 'moves with the viewport, not the window'],
+      // The control that unfolds the panel; it belongs at the window corner
+      ['.agent-toggle-corner', 'is the panel toggle and must stay put'],
+    ])
+
+    const offenders: string[] = []
     for (const file of sourceFiles(SRC)) {
+      if (!file.includes('/canvas/')) continue
       const text = readFileSync(file, 'utf8')
-      for (const selector of leftAnchored) {
-        let at = text.indexOf(`${selector} {`)
-        while (at !== -1) {
-          const block = text.slice(at, text.indexOf('}', at))
-          if (/(^|\n)\s*left:/.test(block)) {
-            anchoring.set(selector, (anchoring.get(selector) ?? 0) + 1)
-            expect(
-              block.includes('var(--canvas-chat-inset'),
-              `${file}: ${selector} anchors left without clearing the agent panel`
-            ).toBe(true)
-          }
-          at = text.indexOf(`${selector} {`, at + 1)
-        }
+      for (const match of text.matchAll(/([.#][\w-]+)\s*\{([^}]*)\}/g)) {
+        const [, selector, body] = match
+        if (!/position:\s*(absolute|fixed)/.test(body)) continue
+        if (!/z-index/.test(body)) continue
+        const left = body.match(/(^|\n)\s*left:\s*([^;]+);/)
+        if (!left) continue
+        const value = left[2].trim()
+        // Full-width layers and centred overlays are not anchored to the edge
+        if (value === '0' || value.startsWith('50%') || value === 'auto') continue
+        if (value.includes('--canvas-chat-inset')) continue
+        if (exempt.has(selector)) continue
+        offenders.push(`${file}: ${selector} (left: ${value})`)
       }
     }
 
-    for (const selector of leftAnchored) {
-      expect(anchoring.get(selector), `${selector} has no left-anchoring rule`).toBeGreaterThan(0)
-    }
+    expect(offenders, 'left-anchored canvas overlays that sit under the agent panel').toEqual([])
   })
 
   it('leaves right-anchored overlays free of the agent panel inset', () => {

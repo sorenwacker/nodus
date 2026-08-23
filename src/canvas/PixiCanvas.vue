@@ -2054,7 +2054,7 @@ defineExpose({
 
     <!-- Standalone agent log panel (when LLM bar is hidden) -->
     <CanvasAgentLogPanel
-      v-if="!showLLMBar && showAgentLogPanel && agentLog.length > 0"
+      v-if="showAgentLogPanel"
       :log="agentLog"
       @clear="agentLog.length = 0"
       @close="showAgentLogPanel = false"
@@ -2308,6 +2308,7 @@ defineExpose({
         :pdf-status="pdfDrop.processingStatus.value"
         :agent-log="agentLog"
         :show-agent-log="showAgentLogPanel"
+        :llm-enabled="llmEnabled"
         @stop-pdf="pdfDrop.stop()"
         @toggle-agent-log="showAgentLogPanel = !showAgentLogPanel"
       />

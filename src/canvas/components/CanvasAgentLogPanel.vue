@@ -79,7 +79,9 @@ async function copyLog() {
 .standalone-agent-log {
   position: absolute;
   top: 56px;
-  left: 16px;
+  /* Clears the agent panel on the canvas's left edge
+     (PRODUCT_DESIGN.md > Chat transcript) */
+  left: calc(16px + var(--canvas-chat-inset, 0px));
   width: 400px;
   max-height: 300px;
   background: var(--bg-surface);

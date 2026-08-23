@@ -114,6 +114,10 @@ Create linear narratives through your knowledge graph:
 - Export storylines as documents
 - Color-code storyline edges
 
+### Agent log
+
+The chat panel shows the conversation; the log shows what the agent did and anything that failed. Open it with the **Log** button in the status bar at the bottom of the canvas, next to the node and edge counts. The button is present whenever the AI is enabled, so errors have a known place to be even before anything goes wrong.
+
 ### Importing PDF highlights
 
 Drop a PDF that you have already annotated and Nodus offers its highlights for import.

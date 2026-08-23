@@ -244,7 +244,9 @@
 .status-bar {
   position: absolute;
   bottom: 16px;
-  left: 16px;
+  /* Clears the agent panel on the canvas's left edge
+     (PRODUCT_DESIGN.md > Chat transcript) */
+  left: calc(16px + var(--canvas-chat-inset, 0px));
   display: flex;
   align-items: center;
   gap: 8px;

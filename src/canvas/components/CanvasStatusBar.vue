@@ -36,6 +36,8 @@ defineProps<{
   agentLog: string[]
   /** Whether agent log panel is visible */
   showAgentLog: boolean
+  /** Whether the agent exists at all; the log button is where its errors go */
+  llmEnabled: boolean
   /** Whether file watcher is active */
   isWatching?: boolean
 }>()
@@ -66,7 +68,7 @@ const emit = defineEmits<{
       </span>
     </template>
     <button
-      v-if="agentLog.length > 0"
+      v-if="llmEnabled"
       class="agent-log-toggle"
       :data-tooltip="showAgentLog ? t('canvas.status.hideAgentLog') : t('canvas.status.showAgentLog')"
       data-tooltip-pos="top"
@@ -83,7 +85,9 @@ const emit = defineEmits<{
 .status-bar {
   position: absolute;
   bottom: 16px;
-  left: 16px;
+  /* Clears the agent panel on the canvas's left edge
+     (PRODUCT_DESIGN.md > Chat transcript) */
+  left: calc(16px + var(--canvas-chat-inset, 0px));
   display: flex;
   align-items: center;
   gap: 8px;
