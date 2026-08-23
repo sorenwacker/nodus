@@ -191,9 +191,10 @@ const edgeStepper = createEdgeStepper({
       storylinePanel.close()
       return
     }
-    // Nothing left to step back through: the left edge reveals the agent
-    // panel, mirroring the right edge revealing the storyline overview
-    displayStore.showAgentPanel()
+    // Nothing left to step back through: the left edge toggles the agent
+    // panel - the push that revealed it also dismisses it, as with the
+    // storyline layers on the right
+    displayStore.toggleAgentPanel()
   },
 })
 

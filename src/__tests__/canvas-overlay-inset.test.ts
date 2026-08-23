@@ -92,6 +92,24 @@ describe('canvas overlay inset contract', () => {
     expect(offenders, 'left-anchored canvas overlays that sit under the agent panel').toEqual([])
   })
 
+  it('animates every chat-inset consumer with the panel', () => {
+    // The panel slides over 0.3s; an overlay that jumps its 380px instantly
+    // reads as a glitch, not an animation
+    const offenders: string[] = []
+    for (const file of sourceFiles(SRC)) {
+      const text = readFileSync(file, 'utf8')
+      for (const block of text.split('}')) {
+        if (!block.includes('var(--canvas-chat-inset')) continue
+        if (!/(^|\n)\s*left:/.test(block)) continue
+        if (!block.includes('var(--chat-inset-duration')) {
+          offenders.push(file)
+        }
+      }
+    }
+
+    expect(offenders, 'left-anchored overlays that teleport when the panel folds').toEqual([])
+  })
+
   it('leaves right-anchored overlays free of the agent panel inset', () => {
     // The panel is on the left; insetting the minimap or zoom controls pushes
     // them away from the edge for no reason

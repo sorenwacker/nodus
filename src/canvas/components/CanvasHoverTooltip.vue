@@ -108,6 +108,7 @@ const displayTitle = computed(() =>
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: left var(--chat-inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease);
 }
 
 @keyframes tooltip-fade-in {

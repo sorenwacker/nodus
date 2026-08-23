@@ -495,6 +495,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: left var(--chat-inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease);
 }
 
 .node-preview-panel.is-editing {
@@ -805,6 +806,7 @@
   left: calc(20px + var(--canvas-chat-inset, 0px));
   z-index: 200;
   pointer-events: auto;
+  transition: left var(--chat-inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease);
 }
 
 .citation-fetch-content {

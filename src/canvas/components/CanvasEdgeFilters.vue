@@ -63,7 +63,8 @@ const store = useNodesStore()
   border-radius: 6px;
   box-shadow: 0 2px 8px var(--shadow-sm);
   z-index: 50;
-  transition: bottom var(--step-duration, 0.3s) var(--step-ease, ease);
+  transition: bottom var(--step-duration, 0.3s) var(--step-ease, ease),
+    left var(--chat-inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease);
 }
 
 .filter-toggle {

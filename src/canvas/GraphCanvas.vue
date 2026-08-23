@@ -2044,6 +2044,7 @@ defineExpose({
     class="canvas-wrapper"
     :style="{
       '--chat-panel-width': agentPanel.size.value + 'px',
+      '--chat-inset-duration': agentPanel.resizing.value ? '0s' : undefined,
       '--canvas-chat-inset':
         showLLMBar && !displayStore.agentPanelCollapsed
           ? agentPanel.size.value + 'px'

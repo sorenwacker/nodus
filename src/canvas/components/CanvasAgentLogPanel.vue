@@ -91,6 +91,7 @@ async function copyLog() {
   z-index: 100;
   display: flex;
   flex-direction: column;
+  transition: left var(--chat-inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease);
 }
 
 .log-header {

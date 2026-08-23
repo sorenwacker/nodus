@@ -99,6 +99,7 @@ const emit = defineEmits<{
   color: var(--text-muted);
   box-shadow: 0 2px 8px var(--shadow-sm);
   z-index: 50;
+  transition: left var(--chat-inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease);
 }
 
 .status-bar .sep {
