@@ -68,14 +68,24 @@ export async function readTextFile(path: string): Promise<string> {
 }
 
 /**
- * Write an exported document to a path the user chose in the save dialog.
+ * Ask the user where to save an exported document, then write it there.
  *
- * Written through the backend rather than a browser download so the file lands
- * where the user pointed, and whole rather than truncated
- * (PRODUCT_DESIGN.md > Document export).
+ * The dialog is owned by the backend, so the chosen path never round-trips
+ * through the interface - a path the interface names is not a path the user
+ * chose (PRODUCT_DESIGN.md > Document export).
+ *
+ * Resolves to the path written, or null when the user cancelled.
  */
-export async function writeExportFile(path: string, data: Uint8Array): Promise<void> {
-  return invoke<void>('write_export_file', { path, data: Array.from(data) })
+export async function saveExportFile(
+  data: Uint8Array,
+  suggestedName: string,
+  extension: string
+): Promise<string | null> {
+  return invoke<string | null>('save_export_file', {
+    data: Array.from(data),
+    suggestedName,
+    extension,
+  })
 }
 
 export async function extractPdfText(path: string): Promise<string> {

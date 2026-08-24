@@ -8,10 +8,9 @@
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { save } from '@tauri-apps/plugin-dialog'
 import { exportToTypst, generateExportFilename } from '../lib/typst-export'
 import { exportToPdf } from '../lib/pdf-export'
-import { writeExportFile } from '../lib/tauri'
+import { saveExportFile } from '../lib/tauri'
 import type { Node, Edge } from '../types'
 
 const props = withDefaults(
@@ -66,22 +65,12 @@ async function runExport() {
         ? await exportToPdf(props.nodes, props.edges, options())
         : new TextEncoder().encode(exportToTypst(props.nodes, props.edges, options()))
 
-    const suggested = generateExportFilename(title.value).replace(
-      /\.typ$/,
-      format.value === 'pdf' ? '.pdf' : '.typ'
-    )
-    const path = await save({
-      defaultPath: suggested,
-      filters: [
-        format.value === 'pdf'
-          ? { name: 'PDF', extensions: ['pdf'] }
-          : { name: 'Typst', extensions: ['typ'] },
-      ],
-    })
-    if (!path) return
+    const extension = format.value === 'pdf' ? 'pdf' : 'typ'
+    const suggested = generateExportFilename(title.value).replace(/\.typ$/, `.${extension}`)
 
-    await writeExportFile(path, bytes)
-    emit('close')
+    // The backend owns the dialog and the write; a null result is a cancel
+    const written = await saveExportFile(bytes, suggested, extension)
+    if (written) emit('close')
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {

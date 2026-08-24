@@ -16,10 +16,9 @@ import { exportToTypst } from '../lib/typst-export'
 import type { Node, Edge } from '../types'
 
 const saveMock = vi.fn()
-const writeMock = vi.fn()
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({ save: (...a: unknown[]) => saveMock(...a) }))
-vi.mock('../lib/tauri', () => ({ writeExportFile: (...a: unknown[]) => writeMock(...a) }))
+// The backend owns the dialog and the write; the interface never names a path
+vi.mock('../lib/tauri', () => ({ saveExportFile: (...a: unknown[]) => saveMock(...a) }))
 vi.mock('../lib/pdf-export', async () => {
   const actual = await vi.importActual<typeof import('../lib/pdf-export')>('../lib/pdf-export')
   return { ...actual, exportToPdf: vi.fn().mockResolvedValue(new Uint8Array([37, 80, 68, 70])) }
@@ -68,7 +67,6 @@ describe('export ordering', () => {
 describe('export dialog', () => {
   beforeEach(() => {
     saveMock.mockReset()
-    writeMock.mockReset()
   })
 
   async function mountDialog(props: Record<string, unknown> = {}) {
@@ -79,24 +77,34 @@ describe('export dialog', () => {
     })
   }
 
-  it('writes the file the user chose', async () => {
+  it('hands the compiled bytes and a suggested name to the backend', async () => {
     saveMock.mockResolvedValue('/tmp/paper.pdf')
 
     const wrapper = await mountDialog()
     await wrapper.find('.export-confirm').trigger('click')
-    await vi.waitFor(() => expect(writeMock).toHaveBeenCalled())
+    await vi.waitFor(() => expect(saveMock).toHaveBeenCalled())
 
-    expect(writeMock.mock.calls[0][0]).toBe('/tmp/paper.pdf')
+    const [bytes, suggested, extension] = saveMock.mock.calls[0]
+    expect(bytes).toBeInstanceOf(Uint8Array)
+    expect(suggested).toMatch(/\.pdf$/)
+    expect(extension).toBe('pdf')
   })
 
-  it('writes nothing when the user cancels the save dialog', async () => {
+  it('stays open when the user cancels the save dialog', async () => {
     saveMock.mockResolvedValue(null)
 
     const wrapper = await mountDialog()
     await wrapper.find('.export-confirm').trigger('click')
     await vi.waitFor(() => expect(saveMock).toHaveBeenCalled())
 
-    expect(writeMock).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  it('never names a path itself', () => {
+    // A path the interface names is not a path the user chose
+    const dialog = readFileSync(resolve(__dirname, '../components/ExportDialog.vue'), 'utf-8')
+    expect(dialog).not.toContain('plugin-dialog')
+    expect(dialog).toContain('saveExportFile')
   })
 
   it('reports a failed compile instead of writing a broken file', async () => {
@@ -109,7 +117,7 @@ describe('export dialog', () => {
     await vi.waitFor(() => expect(wrapper.find('.export-error').exists()).toBe(true))
 
     expect(wrapper.find('.export-error').text()).toContain('unclosed delimiter')
-    expect(writeMock).not.toHaveBeenCalled()
+    expect(saveMock).not.toHaveBeenCalled()
   })
 })
 

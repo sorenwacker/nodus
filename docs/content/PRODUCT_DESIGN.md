@@ -416,7 +416,7 @@ Scope is whatever the user is looking at when they ask:
 - **A storyline** exports in storyline order. The sequence is the argument the user built; reordering it by canvas geometry would destroy the one thing that makes a storyline a document.
 - **A selection** exports in reading order - top to bottom, left to right - because a loose set of nodes has no order of its own.
 
-The export dialog collects title, author, paper size and whether to append the connections between exported nodes, then writes the file to a location chosen through the system save dialog. Compilation failures are reported in the dialog; a PDF that failed to compile must never be written as an empty or partial file.
+The export dialog collects title, author, paper size and whether to append the connections between exported nodes. The backend then opens the save dialog and writes the file, so the chosen path never round-trips through the interface: a path the interface names is not a path the user chose, and only the second may be written to. This mirrors how dropped files are granted for reading - from the operating system's own event rather than a caller-supplied string. Compilation failures are reported in the dialog; a PDF that failed to compile must never be written as an empty or partial file.
 
 ### "Modernize My Math" Import
 
