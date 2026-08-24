@@ -30,6 +30,7 @@ export function resolveWikilink(
     .replace(/&gt;/g, '>')
 
   // Extract path parts
+  // wikilink-target: uses '/' on every platform
   const pathParts = decodedTarget.split('/')
   const targetWithoutPath = pathParts[pathParts.length - 1]
 

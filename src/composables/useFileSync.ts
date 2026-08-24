@@ -2,6 +2,7 @@
  * File sync composable
  * Manages vault file watching and synchronization
  */
+import { fileNameFromPath } from '../lib/pdfGraph'
 import { ref } from 'vue'
 import {
   invoke,
@@ -34,7 +35,7 @@ export interface FileSyncDeps {
 
 // Extract filename from path
 function getFilename(filePath: string): string {
-  return filePath.split('/').pop() || filePath
+  return fileNameFromPath(filePath)
 }
 
 // Extract relative folder path from file path and vault path
@@ -97,6 +98,7 @@ export function useFileSync(deps: FileSyncDeps) {
     if (!frame && folderPath) {
       const frames = deps.getFrames?.() || []
       // Try to match parent folders
+      // path-normalised: getRelativeFolder returns forward slashes
       const parts = folderPath.split('/')
       for (let i = parts.length - 1; i >= 0 && !frame; i--) {
         const parentPath = parts.slice(0, i + 1).join('/')

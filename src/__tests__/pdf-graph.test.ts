@@ -16,6 +16,7 @@ import {
   planGraphImport,
   withVerification,
   dropPositionToLogical,
+  fileNameFromPath,
 } from '../lib/pdfGraph'
 
 const PAPER = `# LCDB 2.0: Hyperparameter Learning Landscapes
@@ -244,5 +245,22 @@ describe('drop position', () => {
 
   it('is a no-op at scale factor 1 everywhere', () => {
     expect(dropPositionToLogical({ x: 500, y: 300 }, 1, 'linux')).toEqual({ x: 500, y: 300 })
+  })
+})
+
+describe('file names across platforms', () => {
+  // Windows separates path components with a backslash
+  // (PRODUCT_DESIGN.md > File paths across platforms)
+  it('reads the file name from a Windows path', () => {
+    expect(fileNameFromPath('C:\\Users\\dana\\Documents\\paper.pdf')).toBe('paper.pdf')
+  })
+
+  it('reads the file name from a POSIX path', () => {
+    expect(fileNameFromPath('/home/dana/documents/paper.pdf')).toBe('paper.pdf')
+  })
+
+  it('handles mixed separators and a bare name', () => {
+    expect(fileNameFromPath('C:/Users\\dana/paper.pdf')).toBe('paper.pdf')
+    expect(fileNameFromPath('paper.pdf')).toBe('paper.pdf')
   })
 })

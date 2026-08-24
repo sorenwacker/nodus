@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fileNameFromPath } from '../lib/pdfGraph'
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
@@ -108,7 +109,7 @@ async function deleteNode() {
 
     <footer class="panel-footer">
       <span v-if="selectedNode.file_path" class="file-path">
-        {{ selectedNode.file_path.split('/').pop() }}
+        {{ fileNameFromPath(selectedNode.file_path) }}
       </span>
       <button class="delete-btn" :data-tooltip="t('nodePanel.deleteNode')" data-tooltip-pos="left" @click="deleteNode">{{ t('common.delete') }}</button>
     </footer>

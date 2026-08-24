@@ -116,6 +116,7 @@ async function updateBacklinksForMovedNode(
 
       // Match by old path
       if (!isMatch && oldPath) {
+        // path-normalised on the same line
         const pathParts = oldPath.replace(/\\/g, '/').split('/')
         const filename = pathParts[pathParts.length - 1].replace(/\.md$/, '')
         if (targetLower === filename.toLowerCase()) {

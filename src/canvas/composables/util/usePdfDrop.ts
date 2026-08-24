@@ -4,7 +4,7 @@
  */
 import { ref } from 'vue'
 import { extractPdfText, extractPdfAnnotations, readTextFile } from '../../../lib/tauri'
-import { dropPositionToLogical } from '../../../lib/pdfGraph'
+import { dropPositionToLogical, fileNameFromPath } from '../../../lib/pdfGraph'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { parseReferences, citationToMarkdown, type BibEntry } from '../../../lib/bibtex'
@@ -189,7 +189,7 @@ ${preprocessed}`
   }
 
   async function processPdfDrop(filePath: string, x: number, y: number) {
-    const rawFilename = filePath.split('/').pop()?.replace(/\.pdf$/i, '') || 'Imported PDF'
+    const rawFilename = fileNameFromPath(filePath)?.replace(/\.pdf$/i, '') || 'Imported PDF'
     const filename = sanitizeFilename(rawFilename)
 
     // Reset state
@@ -383,7 +383,7 @@ ${preprocessed}`
   }
 
   async function processOntologyDrop(filePath: string) {
-    const rawFilename = filePath.split('/').pop() || 'Ontology'
+    const rawFilename = fileNameFromPath(filePath) || 'Ontology'
     const filename = sanitizeFilename(rawFilename)
 
     isProcessing.value = true
@@ -426,7 +426,7 @@ ${preprocessed}`
    * Process a dropped Markdown file - create a note node with its content
    */
   async function processMarkdownDrop(filePath: string, x: number, y: number) {
-    const rawFilename = filePath.split('/').pop()?.replace(/\.(md|markdown)$/i, '') || 'Imported Note'
+    const rawFilename = fileNameFromPath(filePath)?.replace(/\.(md|markdown)$/i, '') || 'Imported Note'
     const filename = sanitizeFilename(rawFilename)
 
     isProcessing.value = true
@@ -483,7 +483,7 @@ ${preprocessed}`
    * Parses the file and prepares the pending import state
    */
   async function previewBibFile(filePath: string, x: number, y: number): Promise<PendingBibImport | null> {
-    const rawFilename = filePath.split('/').pop() || 'Citations'
+    const rawFilename = fileNameFromPath(filePath) || 'Citations'
     const filename = sanitizeFilename(rawFilename)
 
     try {
@@ -549,7 +549,7 @@ ${preprocessed}`
     y: number,
     options?: { createFrame?: boolean }
   ) {
-    const rawFilename = filePath.split('/').pop() || 'Citations'
+    const rawFilename = fileNameFromPath(filePath) || 'Citations'
     const filename = sanitizeFilename(rawFilename)
 
     isProcessing.value = true

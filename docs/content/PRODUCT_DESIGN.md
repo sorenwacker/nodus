@@ -364,6 +364,10 @@ The integral is: $ integral_a^b f(x) dif x $
 - The grant comes from the operating system's drop event as the backend receives it, never from a path handed over by the interface. A caller that can name a path could otherwise grant itself access to it, which is the check this guard exists to make.
 - Everything else is unchanged: a path that was neither dropped nor inside a vault is still refused.
 
+### File paths across platforms
+
+**Required behavior:** Windows separates path components with a backslash, macOS and Linux with a forward slash. Code that splits on `/` alone turns a dropped `C:\\Users\\dana\\paper.pdf` into a node titled with its whole path. One helper extracts the file name, and it accepts both separators. A gate test fails on any source that splits a path on `/` alone, and on any multi-select or modifier check that accepts `metaKey` without `ctrlKey`: the Command key does not exist on Windows or Linux, so a Command-only check is a feature those users cannot reach.
+
 ### Drop position
 
 **Required behavior:** A file dropped on the canvas lands where the cursor released it. The drop event's position arrives in physical pixels on Windows and Linux but in logical pixels on macOS, while the canvas works in logical pixels throughout. Dividing by the display scale factor on macOS therefore halves the coordinates and places the node up and left of the cursor on any HiDPI display. The conversion is platform-aware and covered by unit tests per platform.

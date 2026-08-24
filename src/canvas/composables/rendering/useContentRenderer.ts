@@ -53,6 +53,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       const nodes = getFilteredNodes()
       const frames = getFilteredFrames?.() || []
       const targetLower = target.toLowerCase()
+      // wikilink-target: uses '/' on every platform
       const pathParts = target.split('/')
       const targetWithoutPath = pathParts[pathParts.length - 1]
 

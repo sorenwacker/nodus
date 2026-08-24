@@ -40,6 +40,7 @@ export function useNodeNavigation(deps: NodeNavigationDeps) {
 
     // Fallback: extract filename from path and try matching
     if (!targetNode && title.includes('/')) {
+      // wikilink-target: uses '/' on every platform
       const filename = title.split('/').pop()?.toLowerCase()
       if (filename) {
         targetNode = nodes.find(n => n.title.toLowerCase() === filename)
@@ -49,6 +50,7 @@ export function useNodeNavigation(deps: NodeNavigationDeps) {
     // Fallback: try partial match (filename anywhere in nodes)
     if (!targetNode) {
       const searchTerm = title.includes('/')
+        // wikilink-target: uses '/' on every platform
         ? title.split('/').pop()?.toLowerCase()
         : titleLower
       if (searchTerm) {

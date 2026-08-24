@@ -4,6 +4,7 @@
  * Handles node drag interactions including multi-select dragging
  */
 
+import { fileNameFromPath } from '../../../lib/pdfGraph'
 import { ref, type Ref } from 'vue'
 import type { Node, Frame } from '../../../types'
 
@@ -150,7 +151,8 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     // If node is already selected, don't change selection (allows multi-drag)
     // Only select if not already selected
     if (!store.selectedNodeIds.includes(nodeId)) {
-      store.selectNode(nodeId, e.shiftKey || e.metaKey)
+      // Ctrl is the multi-select modifier on Windows and Linux
+      store.selectNode(nodeId, e.shiftKey || e.metaKey || e.ctrlKey)
     }
     selectedEdge.value = null
 
@@ -380,7 +382,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
                   if (collisionFileName) {
                     // Show dialog and get user's choice
-                    const sourceFileName = node.file_path!.split('/').pop() || 'file.md'
+                    const sourceFileName = fileNameFromPath(node.file_path!) || 'file.md'
                     const dialogResult = await ctx.showCollisionDialog(
                       sourceFileName,
                       targetFolder,

@@ -207,7 +207,9 @@ async function createFramesFromFolders(
 
   // Sort folders to process parent folders first (for nesting)
   const sortedFolders = Array.from(folderToNodeIds.keys()).sort((a, b) => {
+    // path-normalised: folder keys come from getRelativeFolder
     const depthA = a.split('/').length
+    // path-normalised
     const depthB = b.split('/').length
     return depthA - depthB
   })
@@ -246,6 +248,7 @@ async function createFramesFromFolders(
       continue
     }
 
+    // path-normalised: getRelativeFolder returns forward slashes
     const parts = folderPath.split('/')
     const title = parts[parts.length - 1] // Use folder name as frame title
 

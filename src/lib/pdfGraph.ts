@@ -295,3 +295,12 @@ export function dropPositionToLogical(
   if (platform === 'macos') return { x: position.x, y: position.y }
   return { x: position.x / scaleFactor, y: position.y / scaleFactor }
 }
+
+/**
+ * The file name from a path, whichever separator the platform uses. Splitting
+ * on "/" alone turns a Windows path into a node titled with the whole path
+ * (PRODUCT_DESIGN.md > File paths across platforms).
+ */
+export function fileNameFromPath(path: string): string {
+  return path.split(/[\\/]/).pop() || path
+}
