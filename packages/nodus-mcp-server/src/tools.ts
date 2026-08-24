@@ -2,12 +2,30 @@
  * MCP Tool definitions for Nodus
  */
 
-import type { Tool } from '@modelcontextprotocol/sdk/types.js'
+/**
+ * The shape the MCP protocol expects of a tool declaration.
+ *
+ * Declared here rather than imported from the SDK: the root typecheck follows
+ * this file (src/__tests__/tool-surface-parity.test.ts imports NODUS_TOOLS to
+ * compare the two tool surfaces), and CI installs only the root's
+ * dependencies, so an SDK import here fails the typecheck on a machine that
+ * has never built this package. The server itself still uses the SDK types
+ * where it talks to the SDK.
+ */
+export interface McpToolDeclaration {
+  name: string
+  description: string
+  inputSchema: {
+    type: 'object'
+    properties?: Record<string, unknown>
+    required?: string[]
+  }
+}
 
 /**
  * All available MCP tools
  */
-export const NODUS_TOOLS: Tool[] = [
+export const NODUS_TOOLS: McpToolDeclaration[] = [
   // Read operations
   {
     name: 'get_graph_summary',
@@ -1013,6 +1031,6 @@ export const NODUS_TOOLS: Tool[] = [
 /**
  * Get tool by name
  */
-export function getTool(name: string): Tool | undefined {
+export function getTool(name: string): McpToolDeclaration | undefined {
   return NODUS_TOOLS.find((tool) => tool.name === name)
 }

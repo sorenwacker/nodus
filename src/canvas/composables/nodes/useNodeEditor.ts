@@ -46,25 +46,32 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
   let autosaveTitleTimer: ReturnType<typeof setTimeout> | null = null
 
-  // Autosave content on change
+  // Autosave content on change.
+  //
+  // The target node and its frontmatter are captured when the timer is armed,
+  // never read when it fires: resolving editingNodeId at fire time let a save
+  // left over from one node land in the next node opened, writing one
+  // document's text into another.
   watch(editContent, (newContent) => {
-    if (!editingNodeId.value) return
+    const nodeId = editingNodeId.value
+    if (!nodeId) return
+    const frontmatter = editingFrontmatter
     if (autosaveContentTimer) clearTimeout(autosaveContentTimer)
     autosaveContentTimer = setTimeout(() => {
-      if (editingNodeId.value) {
-        store.updateNodeContent(editingNodeId.value, joinFrontmatter(editingFrontmatter, newContent))
-      }
+      autosaveContentTimer = null
+      store.updateNodeContent(nodeId, joinFrontmatter(frontmatter, newContent))
     }, autosaveDelay)
   })
 
   // Autosave title on change
   watch(editTitle, (newTitle) => {
-    if (!editingTitleId.value) return
+    // Captured when armed, for the same reason as the content timer
+    const titleId = editingTitleId.value
+    if (!titleId) return
     if (autosaveTitleTimer) clearTimeout(autosaveTitleTimer)
     autosaveTitleTimer = setTimeout(() => {
-      if (editingTitleId.value) {
-        store.updateNodeTitle(editingTitleId.value, newTitle)
-      }
+      autosaveTitleTimer = null
+      store.updateNodeTitle(titleId, newTitle)
     }, autosaveDelay)
   })
 
@@ -157,6 +164,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
       ) {
         return
       }
+    }
+
+    // An explicit save supersedes any pending autosave
+    if (autosaveContentTimer) {
+      clearTimeout(autosaveContentTimer)
+      autosaveContentTimer = null
     }
 
     const nodeId = editingNodeId.value
