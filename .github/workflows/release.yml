@@ -184,15 +184,11 @@ jobs:
           # below will say so rather than publishing an unusable manifest
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Distribution signing. Unset, macOS reports an unidentified developer
-          # and Windows SmartScreen warns on first run; tauri-action signs and
-          # notarises as soon as these secrets exist, with no workflow change
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Distribution signing is added when the Apple certificate exists.
+          # Declaring the APPLE_* variables while the secrets are unset makes
+          # tauri-action attempt a certificate import and fail the macOS build,
+          # so they are added with the certificate, not ahead of it. See
+          # docs/content/development.md > Release signing.
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Nodus ${{ github.ref_name }}'

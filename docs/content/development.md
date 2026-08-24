@@ -133,10 +133,12 @@ installers only, and the in-app update check stays silent.
 Unsigned builds are the largest avoidable loss of users: macOS reports an
 unidentified developer and Windows SmartScreen warns before the first run.
 
-- **macOS** needs an Apple Developer account. Set `APPLE_CERTIFICATE`,
+- **macOS** needs an Apple Developer account. Add `APPLE_CERTIFICATE`,
   `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
-  `APPLE_PASSWORD` and `APPLE_TEAM_ID` as repository secrets; `tauri-action`
-  signs and notarises when they are present.
+  `APPLE_PASSWORD` and `APPLE_TEAM_ID` as repository secrets, then add the same
+  names to the `env` block of the release job. Add them together: declaring the
+  variables while the secrets are unset makes `tauri-action` attempt a
+  certificate import with an empty value, which fails the macOS build.
 - **Windows** needs a code-signing certificate; set
   `bundle.windows.certificateThumbprint` in `tauri.conf.json`, or supply the
   certificate to the signing step.
