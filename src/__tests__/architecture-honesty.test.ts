@@ -10,7 +10,7 @@
  * made it unnecessary.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
 const ROOT = resolve(__dirname, '../..')
@@ -97,10 +97,12 @@ describe('the rendering description matches the renderer', () => {
   })
 
   it('has no documentation naming one as the technology in use', () => {
+    // .claude/CLAUDE.md is developer-local and untracked, so it is checked
+    // when present rather than assumed
     const docs = [
       join(ROOT, 'docs/content/PRODUCT_DESIGN.md'),
       join(ROOT, '.claude/CLAUDE.md'),
-    ]
+    ].filter(existsSync)
 
     const offenders: string[] = []
     for (const doc of docs) {
