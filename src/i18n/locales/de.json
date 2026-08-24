@@ -444,7 +444,8 @@
     "importFailed": "Vault-Import fehlgeschlagen",
     "syncedFiles": "{count} Dateien synchronisiert",
     "noMissingFiles": "Alle Dateien sind bereits synchronisiert",
-    "okfExported": "{count} Dokumente als OKF-Bundle exportiert"
+    "okfExported": "{count} Dokumente als OKF-Bundle exportiert",
+    "okfBackfilled": "Frontmatter zu {count} Dateien hinzugefügt"
   },
   "settings": {
     "title": "Einstellungen",
@@ -602,7 +603,13 @@
     "okfExporting": "Exportiere...",
     "okfExportHint": "Schreibt ein OKF-v0.2-Bundle (Markdown mit Frontmatter und Index) in einen Ordner Ihrer Wahl. Der Workspace wird nicht verändert.",
     "replayTour": "Gesten-Tour wiederholen",
-    "replayTourHint": "Zeigt die kurze Einführung in die Randgesten erneut."
+    "replayTourHint": "Zeigt die kurze Einführung in die Randgesten erneut.",
+    "okfBackfill": "OKF-Frontmatter",
+    "okfBackfillSurvey": "Dateien prüfen",
+    "okfBackfillHint": "Fügt OKF-Frontmatter zu Vault-Dateien hinzu, denen es fehlt. Inhalte, Wikilinks und Tags bleiben unverändert.",
+    "okfBackfillResult": "{add} Dateien erhielten Frontmatter, {keep} haben es bereits, {none} haben keine Datei.",
+    "okfBackfillApply": "Frontmatter zu {count} Dateien hinzufügen",
+    "okfBackfilling": "Schreibe..."
   },
   "fileMove": {
     "collision": {

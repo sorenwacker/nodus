@@ -19,7 +19,9 @@ FORBIDDEN (never use these):
 - Code fences (\`\`\`) unless actual code
 - YAML/JSON wrappers
 
-FORMAT: Obsidian markdown with [[wikilinks]], #tags, **bold**, lists.
+FORMAT: Open Knowledge Format (OKF v0.2) - Markdown with YAML frontmatter,
+readable by Obsidian. Use [[wikilinks]], #tags, **bold**, lists. Do not write
+the frontmatter block yourself; Nodus adds it.
 
 START YOUR RESPONSE WITH THE ACTUAL CONTENT IMMEDIATELY.`
 
@@ -31,7 +33,9 @@ export const DEFAULT_AGENT_PROMPT = `CONTENT RULES:
 - Title = short label (actual entity/concept name), Content = substance
 - NO preamble ("Here is", "Sure", etc.) - start with actual content
 - NO code fences unless actual code
-- Obsidian style: [[wikilinks]], #tags, **bold**, lists
+- Open Knowledge Format (OKF v0.2): Markdown with YAML frontmatter, Obsidian-readable.
+  Write [[wikilinks]], #tags, **bold** and lists in the body; Nodus writes the
+  frontmatter (type, title, tags, generated) itself - never author it in content
 
 NODE RULES:
 - Only create nodes for REAL entities, concepts, or things

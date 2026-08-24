@@ -448,7 +448,8 @@
     "importFailed": "Failed to import vault",
     "syncedFiles": "Synced {count} files",
     "noMissingFiles": "All files are already synced",
-    "okfExported": "Exported {count} documents as OKF bundle"
+    "okfExported": "Exported {count} documents as OKF bundle",
+    "okfBackfilled": "Added frontmatter to {count} files"
   },
   "settings": {
     "title": "Settings",
@@ -613,7 +614,13 @@
     "okfExporting": "Exporting...",
     "okfExportHint": "Writes an OKF v0.2 bundle (Markdown with frontmatter and an index) to a folder of your choice. The workspace is not modified.",
     "replayTour": "Replay gesture tour",
-    "replayTourHint": "Shows the short walkthrough of the edge gestures again."
+    "replayTourHint": "Shows the short walkthrough of the edge gestures again.",
+    "okfBackfill": "OKF frontmatter",
+    "okfBackfillSurvey": "Check files",
+    "okfBackfillHint": "Adds OKF frontmatter to vault files that lack it. Bodies, wikilinks and tags are never changed.",
+    "okfBackfillResult": "{add} files would gain frontmatter, {keep} already have it, {none} have no file.",
+    "okfBackfillApply": "Add frontmatter to {count} files",
+    "okfBackfilling": "Writing..."
   },
   "fileMove": {
     "collision": {

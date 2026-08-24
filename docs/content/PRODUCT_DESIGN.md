@@ -296,6 +296,8 @@ Nodus interoperates with Google Cloud's Open Knowledge Format (OKF v0.2), the Ma
 
 - **Bundle export:** A workspace exports to an OKF bundle — concept documents with `type`/`title`/`tags`/`generated` frontmatter grouped by node type, a root `index.md` with `okf_version: "0.2"`, and wikilinks rewritten as bundle-relative Markdown links. The source workspace and vault are untouched.
 - **New files:** Note files that Nodus itself creates carry OKF frontmatter, so vaults grown inside Nodus converge toward OKF conformance without rewriting pre-existing user files.
+- **Both agent surfaces state the format.** The in-app agent's prompt and the MCP server's tool documentation name OKF, because a model that does not know the target format writes content that has to be corrected afterwards. Naming it once, in the same words on both surfaces, is what keeps the two from drifting.
+- **Backfill:** existing vault files that lack frontmatter can be brought to OKF in place. The operation adds a frontmatter block and never touches the body, so wikilinks and prose survive unchanged - the Obsidian bridge is a pillar, and OKF is a specification of Markdown with frontmatter, not a replacement for it. A file that already has a frontmatter block is left alone rather than merged into, because merging risks losing fields the user set by hand.
 
 ---
 

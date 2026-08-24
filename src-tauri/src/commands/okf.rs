@@ -96,6 +96,35 @@ pub(crate) fn with_frontmatter(node: &Node) -> String {
     format!("{}\n{}", build_frontmatter(node), content)
 }
 
+/// What a backfill would do to one file, without doing it.
+#[derive(Debug, serde::Serialize, PartialEq)]
+pub enum BackfillOutcome {
+    /// The file already opens with a frontmatter block; left untouched
+    AlreadyHasFrontmatter,
+    /// The file has no frontmatter; a block would be added above the body
+    WouldAddFrontmatter,
+}
+
+/// Decide what a backfill would do to a file's content, without writing.
+///
+/// A file that already carries frontmatter is left alone rather than merged
+/// into: merging risks losing fields the user set by hand
+/// (PRODUCT_DESIGN.md > Open Knowledge Format).
+pub(crate) fn classify_backfill(existing: &str) -> BackfillOutcome {
+    if existing.starts_with("---\n") || existing.starts_with("---\r\n") {
+        BackfillOutcome::AlreadyHasFrontmatter
+    } else {
+        BackfillOutcome::WouldAddFrontmatter
+    }
+}
+
+/// The content a backfill would write: the frontmatter block above the file's
+/// existing body, byte for byte. The body is never rewritten, so wikilinks and
+/// prose survive unchanged.
+pub(crate) fn backfilled_content(node: &Node, existing: &str) -> String {
+    format!("{}\n{}", build_frontmatter(node), existing)
+}
+
 /// Splice new body content under the frontmatter block already present in a
 /// file, so write-backs do not strip metadata. Returns the content to write.
 pub(crate) fn preserve_frontmatter(existing_file: &str, new_content: &str) -> String {
@@ -274,6 +303,103 @@ pub(crate) async fn export_okf_bundle_impl(
     std::fs::write(target_dir.join("index.md"), index).map_err(|e| e.to_string())?;
 
     Ok(entries.len())
+}
+
+/// What a backfill would do across a workspace, per file.
+#[derive(Debug, serde::Serialize)]
+pub struct BackfillReport {
+    pub total_nodes: usize,
+    pub without_file: usize,
+    pub already_conformant: usize,
+    pub would_add: usize,
+    pub unreadable: usize,
+    /// Titles that would gain frontmatter, so the user can see what is affected
+    pub would_add_titles: Vec<String>,
+}
+
+/// Survey what an OKF backfill would change, writing nothing.
+///
+/// A backfill is a data-affecting change, so it is measured before it is run
+/// (PRODUCT_DESIGN.md > Open Knowledge Format).
+#[tauri::command]
+pub async fn survey_okf_backfill(workspace_id: Option<String>) -> Result<BackfillReport, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let nodes = workspace_nodes(pool, workspace_id).await?;
+
+    let mut report = BackfillReport {
+        total_nodes: nodes.len(),
+        without_file: 0,
+        already_conformant: 0,
+        would_add: 0,
+        unreadable: 0,
+        would_add_titles: Vec::new(),
+    };
+
+    for node in &nodes {
+        let Some(path) = node.file_path.as_ref() else {
+            report.without_file += 1;
+            continue;
+        };
+        match std::fs::read_to_string(path) {
+            Ok(existing) => match classify_backfill(&existing) {
+                BackfillOutcome::AlreadyHasFrontmatter => report.already_conformant += 1,
+                BackfillOutcome::WouldAddFrontmatter => {
+                    report.would_add += 1;
+                    report.would_add_titles.push(node.title.clone());
+                }
+            },
+            Err(_) => report.unreadable += 1,
+        }
+    }
+
+    Ok(report)
+}
+
+/// Add OKF frontmatter to workspace files that lack it.
+///
+/// The body is never rewritten, and a file that already has frontmatter is
+/// left untouched. Returns the number of files changed.
+#[tauri::command]
+pub async fn apply_okf_backfill(workspace_id: Option<String>) -> Result<usize, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let nodes = workspace_nodes(pool, workspace_id).await?;
+
+    let mut written = 0;
+    for node in &nodes {
+        let Some(path) = node.file_path.as_ref() else {
+            continue;
+        };
+        let Ok(existing) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        if classify_backfill(&existing) != BackfillOutcome::WouldAddFrontmatter {
+            continue;
+        }
+        let updated = backfilled_content(node, &existing);
+        crate::watcher::write_file_locked(Path::new(path), &updated).map_err(|e| e.to_string())?;
+        written += 1;
+    }
+
+    Ok(written)
+}
+
+async fn workspace_nodes(
+    pool: &database::DbPool,
+    workspace_id: Option<String>,
+) -> Result<Vec<Node>, String> {
+    let all = database::nodes::get_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(match workspace_id {
+        Some(id) => all
+            .into_iter()
+            .filter(|n| n.workspace_id.as_deref() == Some(id.as_str()))
+            .collect(),
+        None => all
+            .into_iter()
+            .filter(|n| n.workspace_id.is_none())
+            .collect(),
+    })
 }
 
 /// Export a workspace as an OKF bundle into `<target_dir>/<workspace-slug>-okf`
@@ -495,5 +621,34 @@ mod tests {
         assert!(index.contains("[Beta](/citations/Beta.md)"));
         assert!(!index.contains("Trashed"));
         assert!(!index.contains("Empty"));
+    }
+
+    #[test]
+    fn leaves_a_file_that_already_has_frontmatter_alone() {
+        // Merging risks losing fields the user set by hand
+        assert_eq!(
+            classify_backfill("---\ntitle: Mine\n---\n\nBody"),
+            BackfillOutcome::AlreadyHasFrontmatter
+        );
+    }
+
+    #[test]
+    fn marks_a_bare_file_for_frontmatter() {
+        assert_eq!(
+            classify_backfill("# Metasploit\n\nA framework."),
+            BackfillOutcome::WouldAddFrontmatter
+        );
+    }
+
+    #[test]
+    fn keeps_the_body_byte_for_byte_including_wikilinks() {
+        let node = make_node("n1", "Metasploit", "note", None);
+        let body = "# Metasploit\n\nSee [[Snellius]] and #security.\n";
+
+        let out = backfilled_content(&node, body);
+
+        assert!(out.starts_with("---\n"));
+        assert!(out.ends_with(body), "the body must survive unchanged");
+        assert!(out.contains("[[Snellius]]"));
     }
 }

@@ -228,7 +228,7 @@ const newWorkspaceName = ref('')
 const editingWorkspace = ref<{ id: string | null; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
-import { invoke, getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
+import { invoke, surveyOkfBackfill, applyOkfBackfill, getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
 import type { Edge } from './types'
 
 // MCP Server
@@ -523,6 +523,34 @@ function clearVaultPath() {
   if (!editingWorkspace.value) return
   editingWorkspace.value.vault_path = null
   editingWorkspace.value.sync_enabled = false
+}
+
+// A backfill is data-affecting, so it is surveyed before it is applied
+// (PRODUCT_DESIGN.md > Open Knowledge Format)
+const okfBackfill = ref<{ would_add: number; already_conformant: number; without_file: number } | null>(null)
+const backfillingOkf = ref(false)
+
+async function surveyWorkspaceBackfill() {
+  if (!editingWorkspace.value) return
+  try {
+    okfBackfill.value = await surveyOkfBackfill(editingWorkspace.value.id)
+  } catch (e) {
+    showToast(`${t('settings.okfBackfill')}: ${e}`, 'error')
+  }
+}
+
+async function applyWorkspaceBackfill() {
+  if (!editingWorkspace.value || !okfBackfill.value) return
+  backfillingOkf.value = true
+  try {
+    const count = await applyOkfBackfill(editingWorkspace.value.id)
+    showToast(t('toasts.okfBackfilled', { count }), 'success')
+    okfBackfill.value = null
+  } catch (e) {
+    showToast(`${t('settings.okfBackfill')}: ${e}`, 'error')
+  } finally {
+    backfillingOkf.value = false
+  }
 }
 
 async function exportWorkspaceAsOkf() {
@@ -1135,6 +1163,33 @@ async function openFolderDialog() {
               {{ exportingOkf ? t('settings.okfExporting') : t('settings.okfExportBtn') }}
             </button>
             <span class="hint">{{ t('settings.okfExportHint') }}</span>
+          </div>
+
+          <!-- OKF frontmatter backfill: surveyed first, applied on request -->
+          <div class="vault-settings">
+            <label>{{ t('settings.okfBackfill') }}:</label>
+            <button class="sync-files-btn" type="button" @click="surveyWorkspaceBackfill">
+              {{ t('settings.okfBackfillSurvey') }}
+            </button>
+            <span class="hint">{{ t('settings.okfBackfillHint') }}</span>
+          </div>
+          <div v-if="okfBackfill" class="vault-settings">
+            <span class="hint">
+              {{ t('settings.okfBackfillResult', {
+                add: okfBackfill.would_add,
+                keep: okfBackfill.already_conformant,
+                none: okfBackfill.without_file,
+              }) }}
+            </span>
+            <button
+              v-if="okfBackfill.would_add > 0"
+              class="sync-files-btn"
+              type="button"
+              :disabled="backfillingOkf"
+              @click="applyWorkspaceBackfill"
+            >
+              {{ backfillingOkf ? t('settings.okfBackfilling') : t('settings.okfBackfillApply', { count: okfBackfill.would_add }) }}
+            </button>
           </div>
 
           <div class="workspace-stats">

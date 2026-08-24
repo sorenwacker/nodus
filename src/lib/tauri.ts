@@ -169,6 +169,27 @@ export async function exportNodesToFiles(workspaceId: string): Promise<number> {
   return invoke<number>('export_nodes_to_files', { workspaceId })
 }
 
+export interface OkfBackfillReport {
+  total_nodes: number
+  without_file: number
+  already_conformant: number
+  would_add: number
+  unreadable: number
+  would_add_titles: string[]
+}
+
+/** Survey what an OKF backfill would change, writing nothing */
+export async function surveyOkfBackfill(
+  workspaceId: string | null
+): Promise<OkfBackfillReport> {
+  return invoke<OkfBackfillReport>('survey_okf_backfill', { workspaceId })
+}
+
+/** Add OKF frontmatter to files that lack it; returns the number changed */
+export async function applyOkfBackfill(workspaceId: string | null): Promise<number> {
+  return invoke<number>('apply_okf_backfill', { workspaceId })
+}
+
 export async function exportOkfBundle(
   workspaceId: string | null,
   targetDir: string

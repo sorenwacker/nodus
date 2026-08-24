@@ -136,6 +136,14 @@ Dropping a PDF creates its node immediately, and the AI cleanup that follows is 
 - The node currently being written carries a **pulsing outline** so it is findable on a busy canvas. The pulse stops and the outline disappears the moment processing ends, whether it finished or was aborted.
 - The status line still names the section being cleaned, which remains the only progress signal for multi-section documents on non-streaming providers.
 
+### Bringing a vault to OKF
+
+Nodus stores notes in Open Knowledge Format (OKF v0.2): Markdown with YAML frontmatter, readable by Obsidian. Files Nodus creates carry that frontmatter already; files that predate Nodus usually do not.
+
+To add it to an existing vault, open **Settings > Workspaces**, select the workspace, and choose **Check files** under OKF frontmatter. Nodus reports how many files would gain frontmatter, how many already have it, and how many nodes have no file, and writes nothing until you confirm.
+
+The backfill only adds a frontmatter block above the existing text. Bodies, `[[wikilinks]]` and `#tags` are untouched, and a file that already has frontmatter is left alone rather than merged into, so fields you set by hand cannot be lost.
+
 ### Expanding a PDF into a graph
 
 When a dropped PDF has structure - several sections or a bibliography - Nodus offers to expand it after the document imports. The single node stays either way; the dialog chooses what is added:

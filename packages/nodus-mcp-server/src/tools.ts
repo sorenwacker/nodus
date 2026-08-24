@@ -216,7 +216,8 @@ export const NODUS_TOOLS: Tool[] = [
         },
         content: {
           type: 'string',
-          description: 'Markdown content',
+          description:
+            'Body content in Open Knowledge Format (OKF v0.2): Markdown with [[wikilinks]], #tags, **bold** and lists. Write the body only - Nodus adds the YAML frontmatter itself.',
         },
         x: {
           type: 'number',

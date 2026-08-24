@@ -45,6 +45,17 @@ class NodusMcpServer {
         capabilities: {
           tools: {},
         },
+        instructions: [
+          'Nodus stores knowledge in Open Knowledge Format (OKF v0.2): Markdown',
+          'with YAML frontmatter, readable by Obsidian.',
+          '',
+          'When writing node content:',
+          '- Write the body only. Nodus adds the frontmatter (type, title, tags,',
+          '  generated); authoring a frontmatter block in content duplicates it.',
+          '- Link concepts with [[wikilinks]] to node titles, not Markdown links.',
+          '- Use #tags, **bold** and lists in the body.',
+          '- A node title is the entity or concept name, not a sentence.',
+        ].join('\n'),
       }
     )
 
