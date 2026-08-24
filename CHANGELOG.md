@@ -2,6 +2,37 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.4.0-rc.1] - 2026-08-24
+
+### Added
+- Documents leave the canvas as documents. A storyline or a canvas selection exports to PDF or Typst source, with title, author, paper size, and an optional list of the connections between exported nodes. A storyline exports in storyline order, because the sequence is the argument; a loose selection exports top to bottom, left to right. The generator and the PDF compiler already existed and no interface reached them
+- Highlights in a dropped PDF become nodes. A picker lists every highlight with its page, colour, and comment, and each chosen one becomes a node holding the passage, coloured to match, linked to the document it came from. Re-dropping the same file offers only what is new. A highlight whose text the file does not store is listed as unavailable rather than imported empty
+- A dropped paper can become a graph rather than one node: sections as nodes connected along the document outline and grouped in a frame, bibliography entries as citation nodes, each reference verified against Semantic Scholar, and an optional model pass that extracts claims as nodes linked to their section. Verification has three states, so an unreachable service reports "not checked" instead of marking a reference missing
+- Notes anchor where they belong. A wikilink in a node's text expands into a callout at that point while reading at full width, and creating a comment writes such a link into the text it comments on. Any node can be opened alone in the reader from the canvas
+- Sections can be edited where they are read. Double-clicking a section's text edits its markdown in place, behind the same file lock the canvas uses
+- The contents sidebar lists the headings inside each node, indented by level, and clicking one scrolls to it
+- Nodus reports when a newer version exists, in a strip that can be dismissed. Installing stays the user's choice, and being offline is silence rather than an error
+- A first-run coach teaches the edge gestures by having the user perform each one, since nothing on screen suggested they existed. Settings > General replays it
+
+### Changed
+- Pan and zoom cost one container transform instead of a restyle of every visible card. A frame took 24 ms at 500 nodes against a 16.67 ms budget; it takes 1.52 ms
+- Each screen edge listens only at a handle in its middle, drawn on screen. A window that does not fill the display crosses its borders constantly, and a fully live edge opened panels during ordinary mouse travel
+- Model responses stream. A long generation arriving as one buffered body is indistinguishable from a stalled connection, and gateways cut it
+- Tooltips are placed by measuring the trigger and the label against the viewport. The previous default-plus-override-per-container scheme clipped labels in every container nobody had written a rule for
+- The rendering documentation describes the renderer that exists: DOM cards, SVG edges, and a 2D canvas above the level-of-detail threshold. The specified PixiJS renderer was never built, and both `pixi.js` and `katex` are removed as unused
+
+### Fixed
+- Files dropped on the canvas land at the cursor on macOS, where drop positions arrive in logical rather than physical pixels
+- Dropped PDFs outside a workspace vault can be read, which is nearly all of them. The path guard now accepts what the operating system reports the user dropped
+- PDF text that extracts cleanly survives an unreachable model; cleanup runs in sections, and a lost section costs only that section
+- An annotation's author is never used as its highlighted text, which gave every highlight in a file the same content
+- A selection layout moves every selected node, including nodes in frames, and frames follow their contents instead of ejecting them
+- Deleting a group of nodes no longer scans every edge in the workspace once per node
+- The status bar, which holds the agent log button, clears the agent panel instead of sitting behind it, and the left-anchored overlays slide with the panel rather than jumping
+- A failed request reports its cause - a timeout, a refused connection, a DNS failure - instead of reading as an unreachable endpoint
+- The provider status light tests the completions endpoint the application uses, not the model listing, and shows why a check failed
+- The reader slides as one painted panel, keeps its content while switching storylines, and scrolls only its own pane
+
 ## [1.3.0] - 2026-08-22
 
 ### Added
