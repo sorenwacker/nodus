@@ -2,6 +2,25 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.4.0-rc.2] - 2026-08-24
+
+### Added
+- An existing vault can be brought to Open Knowledge Format. Settings > Workspaces surveys which files would gain OKF frontmatter and writes nothing until confirmed; the backfill prepends a frontmatter block and never touches the body, so wikilinks, tags and prose survive unchanged, and a file that already has frontmatter is skipped rather than merged into
+- Both agent surfaces state the storage format. The in-app agent's prompts and the MCP server's instructions and tool documentation name OKF v0.2 and tell the model to write the body only, since Nodus writes the frontmatter itself
+
+### Changed
+- A node card renders the first part of its content and marks where the text continues. A node holding an imported paper measured 82ms to render - five dropped frames on one click - against 6.7ms for the capped preview. The fullscreen view and the reader still render the whole document
+- Node content is rendered for the nodes the viewport shows rather than every node in the workspace, which cost 157ms for 300 nodes in one synchronous pass. Cache eviction follows whether a node still exists, not whether it is on screen, so scrolling does not re-render
+- The backend owns the export save dialog, so the path written is one the user chose rather than one the interface named
+- A collapsed node title is clamped to the number of lines its own card can hold, instead of a fixed count that cut long titles mid-line on tall cards
+
+### Fixed
+- A selected node in bubble mode can be dragged again. The circle canvas covers the viewport and omits selected nodes from its hit test, and the card rendered underneath it, so a press on a selected node reached neither
+- The plan approval dialog states an unnamed scope instead of counting steps as nodes. A step described as updating 317 nodes was summarised as editing one, which is the opposite of what an approval dialog is for
+- Every way an agent run can end now says so in the chat. A run that finished in tool calls, paused for approval, was stopped, or hit its iteration limit previously left the panel showing a tool-call count and silence
+- Exporting no longer clobbers a neighbouring file: the temporary name is appended to the file name rather than replacing its extension
+- The macOS release builds again. Declaring the Apple signing variables while their secrets are unset made the bundler attempt a certificate import with an empty value and fail
+
 ## [1.4.0-rc.1] - 2026-08-24
 
 ### Added
