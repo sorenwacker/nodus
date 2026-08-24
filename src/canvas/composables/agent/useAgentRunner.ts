@@ -302,6 +302,11 @@ export function useAgentRunner(ctx: AgentContext) {
       // this loop (isRunning alone is not enough: a restart sets it back to
       // true before the old loop observes the stop)
       if (!ctx.isRunning.value || generation !== runGeneration) {
+        // Only the run the user stopped reports it; a superseded loop is
+        // silent, because its replacement is already answering
+        if (generation === runGeneration) {
+          appendAssistantText(ctx.transcript.value, 'Stopped. Anything already done is on the canvas.')
+        }
         return { status: 'stopped', message: 'Agent stopped by user' }
       }
 
@@ -413,8 +418,14 @@ export function useAgentRunner(ctx: AgentContext) {
             }
 
             if (result.startsWith('__REQUEST_APPROVAL__:')) {
-              // Pause for user approval
+              // Pause for user approval. The transcript has to say so: a run
+              // that stops silently is indistinguishable from a hung one
+              // (PRODUCT_DESIGN.md > Chat transcript)
               ctx.log.value.push('> Waiting for approval...')
+              appendAssistantText(
+                ctx.transcript.value,
+                'I have prepared a plan and am waiting for your approval before making the changes.'
+              )
               isPaused.value = true
               pauseReason.value = 'approval_requested'
               savedMessages = messages
@@ -536,6 +547,7 @@ export function useAgentRunner(ctx: AgentContext) {
 
         if (error.name === 'AbortError' || errorMsg === 'Cancelled') {
           ctx.log.value.push('> Agent stopped')
+          appendAssistantText(ctx.transcript.value, 'Stopped. Anything already done is on the canvas.')
           ctx.isRunning.value = false
           return { status: 'stopped', message: 'Agent stopped by user' }
         }
@@ -565,6 +577,10 @@ export function useAgentRunner(ctx: AgentContext) {
     }
 
     ctx.isRunning.value = false
+    appendAssistantText(
+      ctx.transcript.value,
+      'I reached my step limit for one request. Anything done so far is on the canvas; ask me to continue if there is more to do.'
+    )
     return { status: 'max_iterations', message: 'Agent reached max iterations' }
   }
 

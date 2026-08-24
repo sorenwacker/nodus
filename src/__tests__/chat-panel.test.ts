@@ -125,3 +125,28 @@ describe('agent panel toggle state', () => {
     expect(css).not.toMatch(/\.agent-toggle-corner\.folded\s*\{[^}]*primary-color/)
   })
 })
+
+describe('every run outcome reaches the transcript', () => {
+  // A run that ends in tool calls, pauses, or stops must say so where the
+  // conversation is; otherwise the panel shows a tool-call count and silence
+  // (PRODUCT_DESIGN.md > Chat transcript)
+  const runner = readFileSync(
+    resolve(__dirname, '../canvas/composables/agent/useAgentRunner.ts'),
+    'utf-8'
+  )
+
+  it('says something when pausing for plan approval', () => {
+    const block = runner.slice(runner.indexOf("__REQUEST_APPROVAL__:'"))
+    expect(block.slice(0, 900)).toContain('appendAssistantText')
+  })
+
+  it('says something when the iteration limit is reached', () => {
+    const block = runner.slice(runner.indexOf("status: 'max_iterations'") - 400)
+    expect(block.slice(0, 600)).toContain('appendAssistantText')
+  })
+
+  it('says something when the user stops the run', () => {
+    const block = runner.slice(runner.indexOf("'Agent stopped by user'") - 400)
+    expect(block.slice(0, 600)).toContain('appendAssistantText')
+  })
+})

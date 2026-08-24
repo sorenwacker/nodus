@@ -12,6 +12,8 @@
  * number here is a floor on frame cost, never the whole of it.
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { createPinia } from 'pinia'
@@ -319,5 +321,35 @@ describe('card style is viewport-independent', () => {
     // cannot depend on the viewport by construction
     expect(before.transform).toContain('translate(120px, 80px)')
     expect(before.transform).not.toContain('scale')
+  })
+})
+
+describe('collapsed node titles', () => {
+  // A product name longer than the card was clipped at the border, and three
+  // wrapped lines overflowed the card's height
+  // (PRODUCT_DESIGN.md > Collapsed node titles)
+  const css = readFileSync(
+    resolve(__dirname, '../canvas/styles/node-card.css'),
+    'utf-8'
+  )
+  const rule = css.slice(
+    css.indexOf('.node-card.collapsed .node-header'),
+    css.indexOf('}', css.indexOf('.node-card.collapsed .node-header'))
+  )
+
+  it('breaks a word too long for the card instead of clipping it', () => {
+    expect(rule).toContain('overflow-wrap: break-word')
+    expect(rule).not.toContain('overflow-wrap: normal')
+  })
+
+  it('fits its line limit inside the default card height', () => {
+    const fontSize = Number(rule.match(/font-size: calc\((\d+)px/)?.[1])
+    const lines = Number(rule.match(/line-clamp: (\d+)/)?.[1])
+    const padding = Number(rule.match(/padding: calc\((\d+)px/)?.[1])
+
+    expect(fontSize).toBeGreaterThan(0)
+    // line-height is 1.2, padding applies top and bottom
+    const needed = fontSize * 1.2 * lines + padding * 2
+    expect(needed).toBeLessThanOrEqual(120)
   })
 })
