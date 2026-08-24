@@ -1206,6 +1206,7 @@ Resetting the default workspace also removes its previous frames and storylines 
 
 - The rendering pass covers the nodes the viewport shows, plus any node being edited, and it caches by content so an unchanged node is never rendered twice.
 - A node that scrolls into view renders then. Culling already tracks what is visible, so the set is available without new bookkeeping.
+- **A card renders a preview, not a document.** A node holding an imported paper can carry tens of kilobytes of markdown; rendering 73KB measured at 82ms, five dropped frames for one click, into a card a few hundred pixels tall. Cards render the leading portion of the content, and the card says the text continues. The full document renders where it is read - the fullscreen view and the storyline reader, which render independently - so nothing is lost, only deferred to the surface that shows it.
 
 ### Selected nodes in bubble mode
 

@@ -430,3 +430,80 @@ describe('content rendering is limited to what is shown', () => {
     expect(renderer).toContain('getFilteredNodes().map(n => n.id)')
   })
 })
+
+describe('cost of one very large node', () => {
+  it('reports what a document-sized body costs to render', async () => {
+    const { renderMarkdown } = await import('../services/MarkdownRenderService')
+    // A 20-page PDF imported into one node
+    const huge = Array.from({ length: 400 }, (_, i) =>
+      `## Section ${i}\n\nParagraph with **bold**, [[links]] and #tags. `.repeat(3)
+    ).join('\n\n')
+
+    const start = performance.now()
+    renderMarkdown(huge)
+    const ms = performance.now() - start
+
+    console.log(`renderMarkdown one ${(huge.length / 1024).toFixed(0)}KB node: ${ms.toFixed(1)}ms`)
+    expect(ms).toBeGreaterThan(0)
+  })
+})
+
+describe('card previews are bounded', () => {
+  it('caps a card render so one click cannot cost several frames', async () => {
+    const { previewForCard, CARD_PREVIEW_LIMIT } = await import('../lib/cardPreview')
+    const huge = 'word '.repeat(40000)
+
+    const { text, truncated } = previewForCard(huge)
+
+    expect(text.length).toBeLessThanOrEqual(CARD_PREVIEW_LIMIT + 200)
+    expect(truncated).toBe(true)
+  })
+
+  it('leaves a short node exactly as written', async () => {
+    const { previewForCard } = await import('../lib/cardPreview')
+    const short = '# Title\n\nA short body with [[links]].'
+
+    const { text, truncated } = previewForCard(short)
+
+    expect(text).toBe(short)
+    expect(truncated).toBe(false)
+  })
+
+  it('cuts at a line break so markdown is not severed mid-construct', async () => {
+    const { previewForCard, CARD_PREVIEW_LIMIT } = await import('../lib/cardPreview')
+    const body = Array.from({ length: 2000 }, (_, i) => `- item ${i}`).join('\n')
+
+    const { text } = previewForCard(body)
+
+    expect(text.endsWith('\n') || /item \d+$/.test(text)).toBe(true)
+    expect(text.length).toBeLessThanOrEqual(CARD_PREVIEW_LIMIT + 200)
+  })
+
+  it('renders a capped preview well inside one frame', async () => {
+    const { previewForCard } = await import('../lib/cardPreview')
+    const { renderMarkdown } = await import('../services/MarkdownRenderService')
+    const huge = Array.from({ length: 400 }, (_, i) => `## Section ${i}\n\nText with **bold**.`).join('\n\n')
+
+    const start = performance.now()
+    renderMarkdown(previewForCard(huge).text)
+    const ms = performance.now() - start
+
+    console.log(`capped card render: ${ms.toFixed(1)}ms`)
+    expect(ms).toBeLessThan(16.67 * SLACK)
+  })
+})
+
+describe('every card path is capped', () => {
+  it('caps the single-node render as well as the bulk pass', () => {
+    // Both write into the map the cards read
+    const renderer = readFileSync(
+      resolve(__dirname, '../canvas/composables/rendering/useContentRenderer.ts'),
+      'utf-8'
+    )
+    const single = renderer.slice(renderer.indexOf('function renderSingleNode'))
+    expect(single.slice(0, 400)).toContain('renderCardMarkdown')
+
+    // And nothing writes the uncapped render into that map
+    expect(renderer).not.toMatch(/nodeRenderedContent\.value\s*=\s*\{[^}]*renderMarkdown\(/)
+  })
+})

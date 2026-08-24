@@ -136,6 +136,12 @@ Dropping a PDF creates its node immediately, and the AI cleanup that follows is 
 - The node currently being written carries a **pulsing outline** so it is findable on a busy canvas. The pulse stops and the outline disappears the moment processing ends, whether it finished or was aborted.
 - The status line still names the section being cleaned, which remains the only progress signal for multi-section documents on non-streaming providers.
 
+### Reading a long node
+
+A node card shows the beginning of its content and marks where the text continues. Cards are a few hundred pixels tall, and a node holding an imported paper can carry tens of kilobytes, so rendering all of it into the card would cost several dropped frames on every click.
+
+To read the whole document, open the node: **Cmd/Ctrl+click** for the fullscreen view, or right-click and choose **Read node** for the reader. Both render the full text.
+
 ### Bringing a vault to OKF
 
 Nodus stores notes in Open Knowledge Format (OKF v0.2): Markdown with YAML frontmatter, readable by Obsidian. Files Nodus creates carry that frontmatter already; files that predate Nodus usually do not.

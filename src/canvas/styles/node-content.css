@@ -367,3 +367,11 @@
   margin: 0;
 }
 
+/* The card renders a preview; this marks where the text continues
+   (PRODUCT_DESIGN.md > Rendering node content) */
+.node-content .content-continues {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  letter-spacing: 0.15em;
+}

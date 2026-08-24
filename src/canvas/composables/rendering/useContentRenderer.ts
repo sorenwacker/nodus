@@ -13,6 +13,7 @@ import {
   type RenderOptions,
 } from '../../../services/MarkdownRenderService'
 import type { Node, Frame } from '../../../types'
+import { previewForCard } from '../../../lib/cardPreview'
 
 export interface UseContentRendererOptions {
   getFilteredNodes: () => Node[]
@@ -116,6 +117,17 @@ export function useContentRenderer(options: UseContentRendererOptions) {
   }
 
   /**
+   * Render a card's content: the leading portion only, with a marker when the
+   * text continues. The full document renders in the fullscreen view and the
+   * reader (PRODUCT_DESIGN.md > Rendering node content).
+   */
+  function renderCardMarkdown(content: string | null | undefined): string {
+    const { text, truncated } = previewForCard(content)
+    const html = renderMarkdown(text)
+    return truncated ? `${html}<p class="content-continues">...</p>` : html
+  }
+
+  /**
    * Update rendered content for all visible nodes
    */
   function updateRenderedContent() {
@@ -135,12 +147,12 @@ export function useContentRenderer(options: UseContentRendererOptions) {
 
         // Only re-render if content actually changed
         if (prevHash !== contentKey) {
-          result[node.id] = renderMarkdown(node.markdown_content)
+          result[node.id] = renderCardMarkdown(node.markdown_content)
           nodeContentHashes.set(node.id, contentKey)
           changed = true
         } else if (!result[node.id]) {
           // New node, render it
-          result[node.id] = renderMarkdown(node.markdown_content)
+          result[node.id] = renderCardMarkdown(node.markdown_content)
           nodeContentHashes.set(node.id, contentKey)
           changed = true
         }
@@ -181,7 +193,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
   function renderSingleNode(nodeId: string, content: string | null) {
     nodeRenderedContent.value = {
       ...nodeRenderedContent.value,
-      [nodeId]: renderMarkdown(content),
+      // Same map the cards read, so the same cap applies
+      [nodeId]: renderCardMarkdown(content),
     }
     // Render pending content after DOM updates
     nextTick(async () => {
