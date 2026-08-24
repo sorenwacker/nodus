@@ -44,6 +44,14 @@
   pointer-events: none;
 }
 
+/* In bubble mode only selected and editing nodes render as cards, and the
+   circle canvas above them omits those nodes from its hit test. The cards
+   have to sit above it or a selected node can be pressed by neither
+   (PRODUCT_DESIGN.md > Selected nodes in bubble mode) */
+.nodes-layer.above-lod {
+  z-index: 11;
+}
+
 .canvas-viewport {
   background-color: var(--bg-canvas);
   background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);

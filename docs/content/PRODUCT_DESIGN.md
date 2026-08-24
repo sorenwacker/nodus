@@ -1200,6 +1200,19 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The first screenful of content renders before the slide begins, in one pass small enough not to delay it. The remaining sections wait until the slide has settled, then fill in batch by batch with an animation frame between batches - below the fold, where filling in is invisible. Content that pops in while the panel is moving reads as flicker, which is the artifact this ordering exists to prevent.
 - Switching to another storyline while the reader is open keeps the current content visible until the new storyline's nodes have loaded. The loading state appears only when the reader has nothing to show; replacing readable content with a spinner is a flash, not feedback.
 
+### Rendering node content
+
+**Required behavior:** A node's markdown is rendered when it is on screen, not because it exists. Rendering every node in the workspace in one synchronous pass costs about half a millisecond per node - 157ms measured for 300 nodes - and that time is spent on nodes nobody is looking at, in a burst that blocks the frame.
+
+- The rendering pass covers the nodes the viewport shows, plus any node being edited, and it caches by content so an unchanged node is never rendered twice.
+- A node that scrolls into view renders then. Culling already tracks what is visible, so the set is available without new bookkeeping.
+
+### Selected nodes in bubble mode
+
+**Required behavior:** Above the level-of-detail threshold, nodes are circles on a 2D canvas, except selected ones, which render as real cards so their text is readable. A selected node must stay draggable across that swap.
+
+- The card layer sits above the circle canvas while bubble mode is on. The circle canvas covers the viewport and takes pointer events, and a selected node is deliberately absent from its hit test - so with the card underneath, a press on a selected node reached neither: not the canvas, which no longer knows about the node, and not the card, which was covered. The node became undraggable the moment it was selected.
+
 ### Collapsed node titles
 
 **Required behavior:** A title shown at semantic zoom must fit the card it is drawn in. Two ways it did not: a single word longer than the card - a product name, a surname - could not wrap because word breaks were disallowed, so it was clipped at the border; and three wrapped lines at the collapsed type size were taller than the default card, so the text spilled past its own outline.

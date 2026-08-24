@@ -16,12 +16,20 @@ import type { Node, Frame } from '../../../types'
 
 export interface UseContentRendererOptions {
   getFilteredNodes: () => Node[]
+  /**
+   * Nodes the viewport shows. Rendering markdown for the whole workspace costs
+   * about half a millisecond per node in one synchronous burst, spent on nodes
+   * nobody is looking at (PRODUCT_DESIGN.md > Rendering node content).
+   */
+  getRenderableNodes?: () => Node[]
   getFilteredFrames?: () => Frame[]
   debounceMs?: number
 }
 
 export function useContentRenderer(options: UseContentRendererOptions) {
   const { getFilteredNodes, getFilteredFrames, debounceMs = 50 } = options
+  // Falls back to the whole workspace when no viewport set is supplied
+  const renderableNodes = options.getRenderableNodes ?? getFilteredNodes
 
   // Local markdown cache (content hash -> rendered HTML)
   const markdownCache = new Map<string, string>()
@@ -116,11 +124,12 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       const result = { ...nodeRenderedContent.value }
       let changed = false
 
-      // Track which nodes still exist
-      const currentIds = new Set<string>()
+      // Eviction is keyed to whether a node still exists, not to whether it is
+      // on screen: dropping the cache when a node scrolls away would make it
+      // re-render every time it returns
+      const existingIds = new Set(getFilteredNodes().map(n => n.id))
 
-      for (const node of getFilteredNodes()) {
-        currentIds.add(node.id)
+      for (const node of renderableNodes()) {
         const contentKey = node.markdown_content || ''
         const prevHash = nodeContentHashes.get(node.id)
 
@@ -139,7 +148,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
 
       // Clean up removed nodes
       for (const id of nodeContentHashes.keys()) {
-        if (!currentIds.has(id)) {
+        if (!existingIds.has(id)) {
           nodeContentHashes.delete(id)
           delete result[id]
           changed = true
@@ -188,8 +197,8 @@ export function useContentRenderer(options: UseContentRendererOptions) {
     // Watch for node changes with shallow comparison
     watch(
       () =>
-        getFilteredNodes().length +
-        getFilteredNodes().reduce((sum, n) => sum + (n.markdown_content?.length || 0), 0),
+        renderableNodes().length +
+        renderableNodes().reduce((sum, n) => sum + (n.markdown_content?.length || 0), 0),
       updateRenderedContent,
       { immediate: true }
     )

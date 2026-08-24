@@ -544,6 +544,13 @@ const { copySelectedNodes, pasteNodes } = clipboard
 const contentRenderer = useContentRenderer({
   getFilteredNodes: () => store.filteredNodes,
   getFilteredFrames: () => store.filteredFrames,
+  // Only what the viewport shows, plus whatever is being edited
+  // (PRODUCT_DESIGN.md > Rendering node content)
+  getRenderableNodes: () => {
+    const editing = editingNodeId.value ? store.getNode(editingNodeId.value) : undefined
+    const shown = visibleNodes.value
+    return editing && !shown.some(n => n.id === editing.id) ? [...shown, editing] : shown
+  },
 })
 const {
   nodeRenderedContent,
@@ -2198,7 +2205,11 @@ defineExpose({
       <!-- Node cards layer: carries the same pan/zoom transform as
            canvas-content, so a pan frame patches this one style and cards
            never restyle (PRODUCT_DESIGN.md > Canvas rendering) -->
-      <div class="nodes-layer" :style="{ transform }">
+      <div
+        class="nodes-layer"
+        :class="{ 'above-lod': isLODMode }"
+        :style="{ transform }"
+      >
         <CanvasNodeCard
           v-for="node in lodCardNodes"
           :key="node.id"

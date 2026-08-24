@@ -362,3 +362,71 @@ describe('collapsed node titles', () => {
     expect(cssPadding).toBe(budgetPadding)
   })
 })
+
+describe('selected nodes stay reachable in bubble mode', () => {
+  // The circle canvas covers the viewport and omits selected nodes from its
+  // hit test, so the cards must sit above it
+  // (PRODUCT_DESIGN.md > Selected nodes in bubble mode)
+  it('puts the card layer above the circle canvas while bubble mode is on', () => {
+    const canvasZ = Number(
+      readFileSync(resolve(__dirname, '../canvas/components/CanvasLODCanvas.vue'), 'utf-8')
+        .match(/z-index:\s*(\d+)/)?.[1]
+    )
+    const viewport = readFileSync(
+      resolve(__dirname, '../canvas/styles/canvas-viewport.css'),
+      'utf-8'
+    )
+    const layerRule = viewport.slice(viewport.indexOf('.nodes-layer.above-lod'))
+    const layerZ = Number(layerRule.match(/z-index:\s*(\d+)/)?.[1])
+
+    expect(canvasZ).toBeGreaterThan(0)
+    expect(layerZ).toBeGreaterThan(canvasZ)
+  })
+
+  it('applies that layering exactly while in bubble mode', () => {
+    const canvas = readFileSync(resolve(__dirname, '../canvas/GraphCanvas.vue'), 'utf-8')
+    expect(canvas).toContain("'above-lod': isLODMode")
+  })
+})
+
+describe('cost of rendering node markdown', () => {
+  it('reports what rendering a whole workspace costs', async () => {
+    // useContentRenderer renders every filtered node, not only visible ones
+    const { renderMarkdown } = await import('../services/MarkdownRenderService')
+    const bodies = Array.from({ length: 300 }, (_, i) =>
+      `# Node ${i}\n\nSome prose with **bold**, a [[wikilink]] and #tag.\n\n- one\n- two\n`
+    )
+
+    const start = performance.now()
+    for (const body of bodies) renderMarkdown(body)
+    const ms = performance.now() - start
+
+    console.log(`renderMarkdown x300: ${ms.toFixed(1)}ms total, ${(ms / 300).toFixed(2)}ms each`)
+    expect(ms).toBeGreaterThan(0)
+  })
+})
+
+describe('content rendering is limited to what is shown', () => {
+  it('renders the viewport set, not the whole workspace', () => {
+    // 0.52ms per node measured; a workspace-wide pass spends that on nodes
+    // nobody is looking at (PRODUCT_DESIGN.md > Rendering node content)
+    const canvas = readFileSync(resolve(__dirname, '../canvas/GraphCanvas.vue'), 'utf-8')
+    expect(canvas).toContain('getRenderableNodes')
+
+    const renderer = readFileSync(
+      resolve(__dirname, '../canvas/composables/rendering/useContentRenderer.ts'),
+      'utf-8'
+    )
+    expect(renderer).toContain('renderableNodes()')
+  })
+
+  it('evicts cache by node existence, not by visibility', () => {
+    // Otherwise a node re-renders every time it scrolls back into view
+    const renderer = readFileSync(
+      resolve(__dirname, '../canvas/composables/rendering/useContentRenderer.ts'),
+      'utf-8'
+    )
+    expect(renderer).toContain('existingIds')
+    expect(renderer).toContain('getFilteredNodes().map(n => n.id)')
+  })
+})
