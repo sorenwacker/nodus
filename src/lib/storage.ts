@@ -94,6 +94,19 @@ export const workspaceStorage = {
 /**
  * UI preferences storage
  */
+/**
+ * Earlier versions recorded the panel's fold state from a left-edge push, so
+ * one accidental brush against the edge permanently changed startup. Those
+ * values record an accident rather than an intent, so they are cleared once
+ * (PRODUCT_DESIGN.md > Chat transcript).
+ */
+function clearAccidentalPanelPreference(): void {
+  const MIGRATION_KEY = 'nodus-agent-panel-preference-reset'
+  if (localStorage.getItem(MIGRATION_KEY)) return
+  localStorage.setItem(MIGRATION_KEY, 'true')
+  localStorage.removeItem(KEYS.agentPanelCollapsed)
+}
+
 export const uiStorage = {
   // Reader contents sidebar - shown until the user hides it, and the choice
   // survives folding the storyline layers away and back
@@ -109,6 +122,7 @@ export const uiStorage = {
     // Folded unless the user chose otherwise: an unset preference must not
     // hand the canvas's left edge to a panel nobody opened
     // (PRODUCT_DESIGN.md > Chat transcript)
+    clearAccidentalPanelPreference()
     const stored = localStorage.getItem(KEYS.agentPanelCollapsed)
     return stored === null ? true : stored === 'true'
   },

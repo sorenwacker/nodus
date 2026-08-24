@@ -199,8 +199,9 @@ const edgeStepper = createEdgeStepper({
     }
     // Nothing left to step back through: the left edge toggles the agent
     // panel - the push that revealed it also dismisses it, as with the
-    // storyline layers on the right
-    displayStore.toggleAgentPanel()
+    // storyline layers on the right. The gesture does not record a
+    // preference (PRODUCT_DESIGN.md > Chat transcript)
+    displayStore.toggleAgentPanel({ persist: false })
   },
 })
 

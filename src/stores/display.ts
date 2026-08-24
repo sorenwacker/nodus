@@ -47,12 +47,22 @@ export const useDisplayStore = defineStore('display', () => {
   function showAgentPanel() {
     if (!agentPanelCollapsed.value) return
     agentPanelCollapsed.value = false
-    uiStorage.setAgentPanelCollapsed(false)
   }
 
-  function toggleAgentPanel() {
+  /**
+   * Fold or unfold the panel.
+   *
+   * Only a deliberate control records the choice. An edge push reveals or
+   * dismisses for the session and writes nothing: it fires from ordinary
+   * pointer travel, and recording it meant one accidental brush against the
+   * left edge changed every future startup
+   * (PRODUCT_DESIGN.md > Chat transcript).
+   */
+  function toggleAgentPanel(options?: { persist?: boolean }) {
     agentPanelCollapsed.value = !agentPanelCollapsed.value
-    uiStorage.setAgentPanelCollapsed(agentPanelCollapsed.value)
+    if (options?.persist !== false) {
+      uiStorage.setAgentPanelCollapsed(agentPanelCollapsed.value)
+    }
   }
 
   // Event handler for settings changes

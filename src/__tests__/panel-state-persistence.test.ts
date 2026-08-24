@@ -121,3 +121,53 @@ describe('panel sizes the user chooses persist', () => {
     expect(reopened.size.value).toBe(420)
   })
 })
+
+describe('what records the agent panel preference', () => {
+  it('persists a deliberate toggle', async () => {
+    const { setActivePinia, createPinia } = await import('pinia')
+    setActivePinia(createPinia())
+    const { useDisplayStore } = await import('../stores/display')
+    localStorage.removeItem('nodus-agent-panel-collapsed')
+
+    const store = useDisplayStore()
+    store.toggleAgentPanel()
+
+    expect(localStorage.getItem('nodus-agent-panel-collapsed')).toBe('false')
+  })
+
+  it('does not persist an edge-push reveal', async () => {
+    // An edge push fires from ordinary pointer travel; recording it as a
+    // preference changed every future startup
+    const { setActivePinia, createPinia } = await import('pinia')
+    setActivePinia(createPinia())
+    const { useDisplayStore } = await import('../stores/display')
+    localStorage.removeItem('nodus-agent-panel-collapsed')
+
+    const store = useDisplayStore()
+    store.toggleAgentPanel({ persist: false })
+
+    expect(store.agentPanelCollapsed).toBe(false)
+    expect(localStorage.getItem('nodus-agent-panel-collapsed')).toBeNull()
+  })
+})
+
+describe('clearing the preference the edge push wrote', () => {
+  it('drops a value recorded before the reveal stopped persisting', () => {
+    // That value records an accidental edge brush, not an intent
+    localStorage.clear()
+    localStorage.setItem('nodus-agent-panel-collapsed', 'false')
+
+    expect(uiStorage.getAgentPanelCollapsed()).toBe(true)
+  })
+
+  it('runs once, so a later deliberate choice survives', () => {
+    localStorage.clear()
+    localStorage.setItem('nodus-agent-panel-collapsed', 'false')
+    uiStorage.getAgentPanelCollapsed()
+
+    // The user then chooses to keep it open
+    uiStorage.setAgentPanelCollapsed(false)
+
+    expect(uiStorage.getAgentPanelCollapsed()).toBe(false)
+  })
+})
