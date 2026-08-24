@@ -32,6 +32,14 @@ export interface PlanIntent {
   createTargets: string[]
   /** Distinct node titles the plan will edit. */
   editTargets: string[]
+  /**
+   * Edit steps that name no targets. Their scope is unknown - one node or
+   * every node - so they are reported as unstated rather than counted as one
+   * (PRODUCT_DESIGN.md > Plan approval summary).
+   */
+  unscopedEdits: number
+  /** Delete steps that name no targets; same reasoning as unscopedEdits */
+  unscopedDeletes: number
 }
 
 function dedupe(values: string[]): string[] {
@@ -50,13 +58,26 @@ export function summarizePlanIntent(plan: AgentPlan | null): PlanIntent {
   }
   const createTargets: string[] = []
   const editTargets: string[] = []
+  let unscopedEdits = 0
+  let unscopedDeletes = 0
 
   for (const step of plan?.steps || []) {
     const action = classifyStepAction(step)
     counts[action]++
-    if (action === 'create' && step.targets) createTargets.push(...step.targets)
-    if (action === 'edit' && step.targets) editTargets.push(...step.targets)
+    const named = step.targets?.filter(t => t && t.trim()) ?? []
+    if (action === 'create' && named.length) createTargets.push(...named)
+    if (action === 'edit') {
+      if (named.length) editTargets.push(...named)
+      else unscopedEdits++
+    }
+    if (action === 'delete' && named.length === 0) unscopedDeletes++
   }
 
-  return { counts, createTargets: dedupe(createTargets), editTargets: dedupe(editTargets) }
+  return {
+    counts,
+    createTargets: dedupe(createTargets),
+    editTargets: dedupe(editTargets),
+    unscopedEdits,
+    unscopedDeletes,
+  }
 }

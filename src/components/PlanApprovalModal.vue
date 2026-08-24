@@ -96,11 +96,27 @@ const intent = computed(() => summarizePlanIntent(props.plan))
 const intentSummary = computed<string[]>(() => {
   const c = intent.value
   const parts: string[] = []
+  // A count of nodes is stated only when the plan names them; a step that
+  // names none has an unknown scope and says so
+  // (PRODUCT_DESIGN.md > Plan approval summary)
   const created = c.createTargets.length || c.counts.create
-  const edited = c.editTargets.length || c.counts.edit
   if (created) parts.push(`create ${created} new node${created === 1 ? '' : 's'}`)
-  if (edited) parts.push(`edit ${edited} existing node${edited === 1 ? '' : 's'}`)
-  if (c.counts.delete) parts.push(`delete ${c.counts.delete} node${c.counts.delete === 1 ? '' : 's'}`)
+
+  if (c.editTargets.length) {
+    parts.push(`edit ${c.editTargets.length} named node${c.editTargets.length === 1 ? '' : 's'}`)
+  }
+  if (c.unscopedEdits) {
+    parts.push(
+      `edit an unstated number of nodes (${c.unscopedEdits} step${c.unscopedEdits === 1 ? '' : 's'} names no targets)`
+    )
+  }
+  if (c.unscopedDeletes) {
+    parts.push(
+      `delete an unstated number of nodes (${c.unscopedDeletes} step${c.unscopedDeletes === 1 ? '' : 's'} names no targets)`
+    )
+  } else if (c.counts.delete) {
+    parts.push(`delete ${c.counts.delete} node${c.counts.delete === 1 ? '' : 's'}`)
+  }
   if (c.counts.connect) parts.push('add connections')
   return parts
 })

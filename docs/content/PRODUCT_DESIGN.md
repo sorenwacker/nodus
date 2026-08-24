@@ -1205,6 +1205,14 @@ Resetting the default workspace also removes its previous frames and storylines 
 - A word that cannot fit the card's width breaks rather than being clipped. Breaking mid-word is worse than breaking at a space and better than losing the end of the word.
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 
+### Plan approval summary
+
+**Required behavior:** The approval dialog exists so the user can see a plan's effect on the graph before consenting to it. A summary that understates that effect is worse than none, because it invites consent the user would otherwise withhold.
+
+- A count of nodes is only stated when the plan names them. A step that names its targets contributes those targets; the summary says how many and can list them.
+- A step that names no targets has an unknown scope: it may touch one node or every node in the workspace. The summary says the scope is unstated rather than counting the step as one node - counting steps and labelling them nodes is how a step rewriting 317 nodes was presented as editing one.
+- Counts and scope warnings are derived from the same source the executor uses, so the summary cannot drift from what the plan does.
+
 ### Anchored nodes
 
 **Required behavior:** A note about a passage belongs at that passage. A comment that floats between sections says only which node it concerns, leaving the reader to work out which sentence provoked it - and the position is lost as soon as the text is edited anywhere above it.
