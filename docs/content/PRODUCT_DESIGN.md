@@ -1222,6 +1222,7 @@ Resetting the default workspace also removes its previous frames and storylines 
 
 - A word that cannot fit the card's width breaks rather than being clipped. Breaking mid-word is worse than breaking at a space and better than losing the end of the word.
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
+- The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
 ### Plan approval summary
 

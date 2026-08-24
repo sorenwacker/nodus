@@ -35,6 +35,12 @@ export interface ResizePreview {
  * Context required for node styling
  */
 export interface UseCanvasNodeStyleContext {
+  /**
+   * The user's font scale. The collapsed title renders at the base size times
+   * this, so the line budget must use it or it overestimates
+   * (PRODUCT_DESIGN.md > Collapsed node titles).
+   */
+  fontScale?: Ref<number>
   /** Currently resizing node ID (or null) */
   resizingNode: Ref<string | null>
   /** Preview state during resize */
@@ -74,6 +80,7 @@ export interface UseCanvasNodeStyleReturn {
  */
 export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNodeStyleReturn {
   const {
+    fontScale,
     resizingNode,
     resizePreview,
     nodeZOrder,
@@ -127,11 +134,12 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     const COLLAPSED_FONT = 28
     const COLLAPSED_LINE_HEIGHT = 1.2
     const COLLAPSED_PADDING = 14
+    // The card's own border consumes height the header cannot use
+    const CARD_BORDER = 2
+    const renderedLine = COLLAPSED_FONT * (fontScale?.value ?? 1) * COLLAPSED_LINE_HEIGHT
     const titleLines = Math.max(
       1,
-      Math.floor(
-        (height - COLLAPSED_PADDING * 2) / (COLLAPSED_FONT * COLLAPSED_LINE_HEIGHT)
-      )
+      Math.floor((height - COLLAPSED_PADDING * 2 - CARD_BORDER * 2) / renderedLine)
     )
 
     const style: Record<string, string> = {

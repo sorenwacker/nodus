@@ -360,6 +360,10 @@ describe('collapsed node titles', () => {
 
     expect(cssFont).toBe(budgetFont)
     expect(cssPadding).toBe(budgetPadding)
+    // The budget must also account for the user's font scale, which the
+    // stylesheet applies to the same type size
+    expect(rule).toContain('var(--font-scale')
+    expect(style).toContain('fontScale')
   })
 })
 

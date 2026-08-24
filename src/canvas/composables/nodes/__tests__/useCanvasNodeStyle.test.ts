@@ -72,3 +72,35 @@ describe('collapsed title line budget', () => {
     expect(style['--title-lines']).toBe('1')
   })
 })
+
+describe('line budget accounts for what actually consumes the card', () => {
+  // Assuming the base type size and ignoring the border overestimates the
+  // budget, and the overestimate is a line cut through the middle
+  // (PRODUCT_DESIGN.md > Collapsed node titles)
+  function budgetFor(height: number, fontScale: number): number {
+    const ctx = makeContext(1)
+    const { getNodeStyle } = useCanvasNodeStyle({ ...ctx, fontScale: ref(fontScale) })
+    return Number(
+      getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width: 200, height })['--title-lines']
+    )
+  }
+
+  it('gives fewer lines when the user enlarges the font', () => {
+    expect(budgetFor(200, 1.4)).toBeLessThan(budgetFor(200, 1))
+  })
+
+  it('never budgets more lines than the card can show', () => {
+    const BORDER = 4
+    const PADDING = 28
+    for (const scale of [0.8, 1, 1.25, 1.5]) {
+      for (const height of [80, 120, 160, 240, 400]) {
+        const lines = budgetFor(height, scale)
+        const needed = lines * 28 * scale * 1.2 + PADDING + BORDER
+        // One line is the floor even when nothing fits, so only check above it
+        if (lines > 1) {
+          expect(needed, `h=${height} scale=${scale} lines=${lines}`).toBeLessThanOrEqual(height)
+        }
+      }
+    }
+  })
+})

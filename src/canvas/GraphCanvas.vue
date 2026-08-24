@@ -1894,6 +1894,7 @@ const { selectAllNodes, deleteSelectedNodes } = useSelectionActions({
 
 // Node styling composable - handles node background and style computation
 const nodeStyle = useCanvasNodeStyle({
+  fontScale: computed(() => displayStore.fontScale),
   resizingNode,
   resizePreview,
   nodeZOrder,
