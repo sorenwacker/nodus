@@ -117,9 +117,16 @@ pipeline needs a keypair:
 3. Add the **private** key and its password as the repository secrets
    `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
-Until then the release still builds; it simply publishes no `latest.json`, and
-the workflow logs a warning rather than shipping a manifest the updater would
-reject.
+Until the keypair exists, `bundle.createUpdaterArtifacts` stays `false` and
+`plugins.updater.pubkey` stays empty. A placeholder public key is worse than no
+key: Tauri finds it, demands the matching private key, and fails the build.
+Set both when you add the key:
+
+- `bundle.createUpdaterArtifacts` to `true`
+- `plugins.updater.pubkey` to the generated public key
+
+The release then publishes a signed `latest.json`; without them it publishes
+installers only, and the in-app update check stays silent.
 
 ### Distribution signatures (removes the install warnings)
 

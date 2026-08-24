@@ -57,14 +57,14 @@
         "bundleMediaFramework": false
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "plugins": {
     "updater": {
       "endpoints": [
         "https://pub-99aa2887ef464cdeac1ab7be9b4fa860.r2.dev/nodus/latest.json"
       ],
-      "pubkey": "REPLACE_WITH_TAURI_SIGNER_PUBLIC_KEY",
+      "pubkey": "",
       "windows": {
         "installMode": "passive"
       }

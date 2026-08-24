@@ -5,6 +5,9 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
+import { uiStorage } from '../lib/storage'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import CanvasChatTranscript from '../canvas/components/CanvasChatTranscript.vue'
 import en from '../i18n/locales/en.json'
 import type { ChatTurn } from '../llm/chatTranscript'
@@ -92,5 +95,33 @@ describe('canvas chat transcript', () => {
       global: { plugins: [i18n] },
     })
     expect(wrapper.find('.chat-pending').exists()).toBe(true)
+  })
+})
+
+describe('agent panel default state', () => {
+  it('starts folded when the user has expressed no preference', () => {
+    // The canvas is what the application opens for
+    localStorage.removeItem('nodus-agent-panel-collapsed')
+    expect(uiStorage.getAgentPanelCollapsed()).toBe(true)
+  })
+
+  it('honours a stored choice in both directions', () => {
+    uiStorage.setAgentPanelCollapsed(false)
+    expect(uiStorage.getAgentPanelCollapsed()).toBe(false)
+
+    uiStorage.setAgentPanelCollapsed(true)
+    expect(uiStorage.getAgentPanelCollapsed()).toBe(true)
+  })
+})
+
+describe('agent panel toggle state', () => {
+  it('reads as active while the panel is open, not while it is folded', () => {
+    const css = readFileSync(
+      resolve(__dirname, '../canvas/styles/llm-interface.css'),
+      'utf-8'
+    )
+    // The highlight belongs to the open state
+    expect(css).toContain('.agent-toggle-corner:not(.folded)')
+    expect(css).not.toMatch(/\.agent-toggle-corner\.folded\s*\{[^}]*primary-color/)
   })
 })

@@ -85,7 +85,10 @@
   border-color: var(--primary-color);
 }
 
-.agent-toggle-corner.folded {
+/* Active while the panel is open, inactive while folded: a toggle that
+   highlights when its panel is closed says the opposite of the truth
+   (PRODUCT_DESIGN.md > Chat transcript) */
+.agent-toggle-corner:not(.folded) {
   color: var(--primary-color);
   border-color: var(--primary-color);
 }

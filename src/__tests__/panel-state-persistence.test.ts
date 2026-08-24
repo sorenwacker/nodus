@@ -32,7 +32,14 @@ describe('agent panel folded state', () => {
     localStorage.removeItem('nodus-agent-panel-collapsed')
   })
 
-  it('starts unfolded so the agent is discoverable', () => {
+  it('starts folded, leaving the canvas the space until asked', () => {
+    // The corner toggle and a left-edge push reveal it
+    // (PRODUCT_DESIGN.md > Chat transcript)
+    expect(uiStorage.getAgentPanelCollapsed()).toBe(true)
+  })
+
+  it('remembers being unfolded', () => {
+    uiStorage.setAgentPanelCollapsed(false)
     expect(uiStorage.getAgentPanelCollapsed()).toBe(false)
   })
 
@@ -50,16 +57,16 @@ describe('agent panel toggle is reachable while folded', () => {
     localStorage.removeItem('nodus-agent-panel-collapsed')
 
     const store = useDisplayStore()
-    expect(store.agentPanelCollapsed).toBe(false)
+    expect(store.agentPanelCollapsed).toBe(true)
 
     // The toolbar and the panel share this state, so a folded panel can
     // always be brought back from outside itself
     store.toggleAgentPanel()
-    expect(store.agentPanelCollapsed).toBe(true)
-    expect(localStorage.getItem('nodus-agent-panel-collapsed')).toBe('true')
+    expect(store.agentPanelCollapsed).toBe(false)
+    expect(localStorage.getItem('nodus-agent-panel-collapsed')).toBe('false')
 
     store.toggleAgentPanel()
-    expect(store.agentPanelCollapsed).toBe(false)
+    expect(store.agentPanelCollapsed).toBe(true)
   })
 })
 

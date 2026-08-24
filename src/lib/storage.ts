@@ -106,7 +106,11 @@ export const uiStorage = {
 
   // Agent panel folded state - the panel is open until folded away
   getAgentPanelCollapsed(): boolean {
-    return localStorage.getItem(KEYS.agentPanelCollapsed) === 'true'
+    // Folded unless the user chose otherwise: an unset preference must not
+    // hand the canvas's left edge to a panel nobody opened
+    // (PRODUCT_DESIGN.md > Chat transcript)
+    const stored = localStorage.getItem(KEYS.agentPanelCollapsed)
+    return stored === null ? true : stored === 'true'
   },
   setAgentPanelCollapsed(value: boolean): void {
     localStorage.setItem(KEYS.agentPanelCollapsed, String(value))
