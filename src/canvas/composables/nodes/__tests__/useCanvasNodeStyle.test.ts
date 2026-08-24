@@ -47,3 +47,28 @@ describe('useCanvasNodeStyle.getNodeStyle (container-transform scaling)', () => 
     expect(style.height).toBe('fit-content')
   })
 })
+
+describe('collapsed title line budget', () => {
+  // A fixed line count cuts a long title mid-line on a tall card and wastes
+  // space on a short one (PRODUCT_DESIGN.md > Collapsed node titles)
+  it('gives a default-height card two lines', () => {
+    const { getNodeStyle } = useCanvasNodeStyle(makeContext(1))
+    const style = getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width: 200, height: 120 })
+
+    expect(style['--title-lines']).toBe('2')
+  })
+
+  it('gives a taller card more lines', () => {
+    const { getNodeStyle } = useCanvasNodeStyle(makeContext(1))
+    const style = getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width: 400, height: 300 })
+
+    expect(Number(style['--title-lines'])).toBeGreaterThan(2)
+  })
+
+  it('never drops below one line, however short the card', () => {
+    const { getNodeStyle } = useCanvasNodeStyle(makeContext(1))
+    const style = getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width: 200, height: 30 })
+
+    expect(style['--title-lines']).toBe('1')
+  })
+})

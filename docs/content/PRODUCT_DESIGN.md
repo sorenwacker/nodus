@@ -1203,7 +1203,7 @@ Resetting the default workspace also removes its previous frames and storylines 
 **Required behavior:** A title shown at semantic zoom must fit the card it is drawn in. Two ways it did not: a single word longer than the card - a product name, a surname - could not wrap because word breaks were disallowed, so it was clipped at the border; and three wrapped lines at the collapsed type size were taller than the default card, so the text spilled past its own outline.
 
 - A word that cannot fit the card's width breaks rather than being clipped. Breaking mid-word is worse than breaking at a space and better than losing the end of the word.
-- The type size and line limit together fit the default card height, so a wrapped title stays inside its outline.
+- The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 
 ### Anchored nodes
 

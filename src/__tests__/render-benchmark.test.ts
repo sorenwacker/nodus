@@ -342,14 +342,23 @@ describe('collapsed node titles', () => {
     expect(rule).not.toContain('overflow-wrap: normal')
   })
 
-  it('fits its line limit inside the default card height', () => {
-    const fontSize = Number(rule.match(/font-size: calc\((\d+)px/)?.[1])
-    const lines = Number(rule.match(/line-clamp: (\d+)/)?.[1])
-    const padding = Number(rule.match(/padding: calc\((\d+)px/)?.[1])
+  it('takes its line limit from the card rather than a fixed number', () => {
+    expect(rule).toContain('line-clamp: var(--title-lines')
+  })
 
-    expect(fontSize).toBeGreaterThan(0)
-    // line-height is 1.2, padding applies top and bottom
-    const needed = fontSize * 1.2 * lines + padding * 2
-    expect(needed).toBeLessThanOrEqual(120)
+  it('agrees with the constants the line budget is computed from', () => {
+    // The budget lives in useCanvasNodeStyle; if the stylesheet's type size or
+    // padding drifts from it, the clamp stops matching the space available
+    const style = readFileSync(
+      resolve(__dirname, '../canvas/composables/nodes/useCanvasNodeStyle.ts'),
+      'utf-8'
+    )
+    const cssFont = Number(rule.match(/font-size: calc\((\d+)px/)?.[1])
+    const cssPadding = Number(rule.match(/padding: calc\((\d+)px/)?.[1])
+    const budgetFont = Number(style.match(/COLLAPSED_FONT = (\d+)/)?.[1])
+    const budgetPadding = Number(style.match(/COLLAPSED_PADDING = (\d+)/)?.[1])
+
+    expect(cssFont).toBe(budgetFont)
+    expect(cssPadding).toBe(budgetPadding)
   })
 })

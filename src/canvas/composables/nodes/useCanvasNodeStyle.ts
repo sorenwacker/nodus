@@ -120,8 +120,23 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     const logicalWidth = isTagNode ? 'fit-content' : width + 'px'
     const logicalHeight = isTagNode ? 'fit-content' : height + 'px'
 
+    // How many lines of the collapsed title the card can hold. A fixed count
+    // cuts a long title mid-line on a tall card and wastes space on a short
+    // one (PRODUCT_DESIGN.md > Collapsed node titles). Mirrors the collapsed
+    // header's own type size, line height and padding.
+    const COLLAPSED_FONT = 28
+    const COLLAPSED_LINE_HEIGHT = 1.2
+    const COLLAPSED_PADDING = 14
+    const titleLines = Math.max(
+      1,
+      Math.floor(
+        (height - COLLAPSED_PADDING * 2) / (COLLAPSED_FONT * COLLAPSED_LINE_HEIGHT)
+      )
+    )
+
     const style: Record<string, string> = {
       '--zoom-scale': '1',
+      '--title-lines': String(titleLines),
       transform: `translate(${x}px, ${y}px)`,
       transformOrigin: '0 0',
       width: logicalWidth,

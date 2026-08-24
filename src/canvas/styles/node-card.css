@@ -76,10 +76,10 @@
   line-height: 1.2;
   width: 100%;
   background: transparent;
-  /* Two lines at this size fit the card; three did not */
+  /* The card computes how many lines it can hold from its own height */
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: var(--title-lines, 2);
+  line-clamp: var(--title-lines, 2);
   -webkit-box-orient: vertical;
   overflow: hidden;
   /* Break at spaces by preference, but break a word that cannot fit the
