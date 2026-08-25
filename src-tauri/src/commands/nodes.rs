@@ -407,26 +407,6 @@ pub async fn export_nodes_to_files(workspace_id: String) -> Result<i32, String> 
     Ok(exported_count)
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct UpdateNodeInput {
-    pub id: String,
-    pub title: Option<String>,
-    pub markdown_content: Option<String>,
-    pub node_type: Option<String>,
-    pub tags: Option<Vec<String>>,
-}
-
-#[tauri::command]
-pub async fn update_node(_input: UpdateNodeInput) -> Result<(), String> {
-    let _pool = database::get_pool().map_err(|e| e.to_string())?;
-
-    // TODO: Implement partial update
-    // For now, just update position is implemented
-
-    Ok(())
-}
-
 #[tauri::command]
 pub async fn delete_node(id: String) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;

@@ -571,6 +571,8 @@
     "scanWorkspaces": "Scanner les espaces de travail",
     "scanning": "Analyse en cours...",
     "workspaceStatsHint": "Scannez pour voir le nombre de nœuds par espace de travail et trouver les nœuds manquants.",
+    "logLevel": "Niveau de journalisation",
+    "logLevelHint": "Le niveau de detail enregistre par la console de developpement. Choisissez debug pour reproduire un probleme.",
     "workspace": "Espace de travail",
     "nodes": "Nœuds",
     "switch": "Basculer",

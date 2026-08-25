@@ -231,7 +231,6 @@ fn main() {
             commands::get_nodes,
             commands::get_node,
             commands::create_node,
-            commands::update_node,
             commands::delete_node,
             commands::delete_nodes,
             commands::restore_node,

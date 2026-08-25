@@ -1224,6 +1224,25 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Enforcing the file size limit
+
+The 1000-line limit existed only as prose in the project rules, and seven files had grown past it. A rule with no gate erodes silently, so the limit is enforced as a ratchet: the files already over it are recorded with the line count they had when the gate was added, and the gate fails when any of them grows or when a new file crosses the limit.
+
+- A recorded file may shrink freely; shrinking past 1000 lines removes it from the list.
+- A recorded file that grows fails the gate, so splitting is the only way forward.
+- A file not on the list may not cross 1000 lines at all.
+
+This enforces the limit from where the codebase actually is rather than blocking every commit until seven files are split.
+
+### Log level
+
+Twenty-five call sites called `logger.debug()`. None could ever emit: the threshold was `info` in development and `warn` in release, and nothing could set it lower, so every one of those messages was written and never seen. Detail nobody can turn on is not logging.
+
+- The threshold defaults to `info` in development and `warn` in a release build.
+- **Settings > General > Advanced** selects the threshold, including `debug`.
+- The choice persists across restarts, so a user reproducing a problem is not re-selecting it after every relaunch.
+- Changing the threshold takes effect for subsequent messages without a reload.
+
 ### Persisting animated positions
 
 **Required behavior:** A layout animation moves nodes for the duration of the animation; only where they land needs storing. Writing every intermediate position issued one database write and one IPC call per node per frame - roughly 18,000 for a 600ms animation of 500 nodes, of which 500 mattered. This is the same defect the drag path already solved with `skipPersist`, and the animation must use it too.

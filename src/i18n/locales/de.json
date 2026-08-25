@@ -573,6 +573,8 @@
     "scanWorkspaces": "Arbeitsbereiche scannen",
     "scanning": "Scannen...",
     "workspaceStatsHint": "Scannen, um Knotenzahlen pro Arbeitsbereich zu sehen und fehlende Knoten zu finden.",
+    "logLevel": "Protokollstufe",
+    "logLevelHint": "Wie viele Details die Entwicklerkonsole aufzeichnet. Wahle debug, um ein Problem nachzustellen.",
     "workspace": "Arbeitsbereich",
     "nodes": "Knoten",
     "switch": "Wechseln",

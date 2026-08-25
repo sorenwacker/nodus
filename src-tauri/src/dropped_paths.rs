@@ -55,7 +55,7 @@ mod tests {
         std::fs::write(&paper, b"%PDF").unwrap();
 
         assert!(!is_granted(&paper));
-        grant(&[paper.clone()]);
+        grant(std::slice::from_ref(&paper));
         assert!(is_granted(&paper));
     }
 

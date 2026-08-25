@@ -1,9 +1,12 @@
 /**
- * Simple logger utility
- * Provides structured logging with level control
+ * Namespaced logging with a selectable threshold.
+ *
+ * The threshold is settable and persisted, because detail nobody can turn on
+ * is not logging: 25 `debug` call sites existed while the threshold could never
+ * be lower than `info` (PRODUCT_DESIGN.md > Log level).
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
@@ -12,8 +15,48 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 }
 
-// Default to 'warn' in production, 'info' in development
-const currentLevel: LogLevel = import.meta.env.DEV ? 'info' : 'warn'
+const STORAGE_KEY = 'nodus.logLevel'
+
+function isLogLevel(value: unknown): value is LogLevel {
+  return typeof value === 'string' && value in LOG_LEVELS
+}
+
+/** The threshold when the user has not chosen one */
+export function defaultLogLevel(): LogLevel {
+  return import.meta.env.DEV ? 'info' : 'warn'
+}
+
+/** The user's choice from an earlier run, or null when there is none to honor */
+export function storedLogLevel(): LogLevel | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return isLogLevel(stored) ? stored : null
+  } catch {
+    // Storage can be unavailable; the default threshold still applies
+    return null
+  }
+}
+
+let currentLevel: LogLevel = storedLogLevel() ?? defaultLogLevel()
+
+/** The threshold in effect */
+export function logLevel(): LogLevel {
+  return currentLevel
+}
+
+/**
+ * Select the threshold. It applies to subsequent messages at once and is
+ * restored on the next start, so a user reproducing a problem does not
+ * re-select it after every relaunch.
+ */
+export function setLogLevel(level: LogLevel): void {
+  currentLevel = level
+  try {
+    localStorage.setItem(STORAGE_KEY, level)
+  } catch {
+    // A threshold that cannot be persisted still applies to this session
+  }
+}
 
 function shouldLog(level: LogLevel): boolean {
   return LOG_LEVELS[level] >= LOG_LEVELS[currentLevel]

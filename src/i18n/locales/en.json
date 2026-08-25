@@ -584,6 +584,8 @@
     "scanWorkspaces": "Scan workspaces",
     "scanning": "Scanning...",
     "workspaceStatsHint": "Scan to see node counts per workspace and find missing nodes.",
+    "logLevel": "Log level",
+    "logLevelHint": "How much detail the developer console records. Choose debug when reproducing a problem.",
     "workspace": "Workspace",
     "nodes": "Nodes",
     "switch": "Switch",

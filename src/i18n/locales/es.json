@@ -571,6 +571,8 @@
     "scanWorkspaces": "Escanear espacios de trabajo",
     "scanning": "Escaneando...",
     "workspaceStatsHint": "Escanea para ver el recuento de nodos por espacio de trabajo y encontrar nodos faltantes.",
+    "logLevel": "Nivel de registro",
+    "logLevelHint": "Cuanto detalle registra la consola de desarrollo. Elige debug para reproducir un problema.",
     "workspace": "Espacio de trabajo",
     "nodes": "Nodos",
     "switch": "Cambiar",

@@ -7,6 +7,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../../stores/nodes'
 import { useEdgesStore } from '../../stores/edges'
+import { logLevel, setLogLevel, type LogLevel } from '../../lib/logger'
 
 const { t } = useI18n()
 const nodesStore = useNodesStore()
@@ -105,6 +106,16 @@ async function switchToWorkspace(id: string) {
 const cleaningEdges = ref(false)
 const cleanupResult = ref<string | null>(null)
 
+// Log level. Selectable so the detail behind `debug` is reachable at all
+// (PRODUCT_DESIGN.md > Log level)
+const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error']
+const selectedLogLevel = ref<LogLevel>(logLevel())
+
+function applyLogLevel(level: LogLevel) {
+  selectedLogLevel.value = level
+  setLogLevel(level)
+}
+
 async function cleanupEdges() {
   cleaningEdges.value = true
   cleanupResult.value = null
@@ -185,6 +196,18 @@ async function cleanupEdges() {
     <span class="hint">
       Removes orphan edges (pointing to deleted nodes) and duplicates.
     </span>
+  </div>
+
+  <div class="setting-group">
+    <label for="log-level">{{ t('settings.logLevel') }}</label>
+    <select
+      id="log-level"
+      :value="selectedLogLevel"
+      @change="applyLogLevel(($event.target as HTMLSelectElement).value as LogLevel)"
+    >
+      <option v-for="level in LOG_LEVELS" :key="level" :value="level">{{ level }}</option>
+    </select>
+    <span class="hint">{{ t('settings.logLevelHint') }}</span>
   </div>
 </template>
 
