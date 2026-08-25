@@ -2,6 +2,34 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.4.0-rc.3] - 2026-08-25
+
+This release candidate is the remediation of a full codebase review: 388 files reviewed, 241 findings confirmed by an adversarial verification pass, recorded in `docs/REVIEW.md`. All ten high-severity findings are fixed, each with a gate that fails on the unfixed code.
+
+### Added
+- The log level is selectable in Settings > General > Advanced, and the choice persists across restarts. Twenty-five `logger.debug()` call sites existed while the threshold could never fall below `info`, so none of them could ever emit
+- The agent's log names each tool as it is called, with its arguments, and reports a failed call rather than only its count
+
+### Changed
+- The agent can reach the tools it was told about. Twenty-seven of seventy-one registered tools were exposed to no surface; the frames, storyline and selection tools are now both whitelisted and backed by a store that answers them. Tools with no surface are declared as such rather than left to look available
+- A layout animation stores only where the nodes land. It previously issued one database write and one IPC call per node per frame: about 18,000 writes for a 600ms animation of 500 nodes, of which 500 mattered
+
+### Fixed
+- An edit typed into one node is written to that node. Following a wikilink in the fullscreen view within the 500ms autosave window resolved the pending write against the newly opened node, found nothing to write, and lost the previous node's last keystrokes with nothing reported. The same defect in the canvas editor is fixed alongside it
+- Deleting a merged connection deletes it. The wikilink was removed from the source file only, so the file watcher read the target's surviving link and recreated the edge
+- MCP single-entity lookups are scoped to the open workspace, as the list operations already were
+- A tag matches its node whether or not either carries a `#`, so tagging an existing tag no longer creates a second node beside it
+- Frontmatter is read the same way whatever the line endings, so a CRLF file's metadata is no longer parsed as body text
+- Copying reads the live selection instead of the one present when the canvas was constructed, and pasting prefers copied Nodus nodes over interpreting their text as a citation
+- A cached mermaid diagram renders. The cache returned SVG that sanitization then stripped, blanking every diagram after its first render
+- A collapsed node's title is budgeted against the type size as rendered rather than as declared
+- `update_node` was registered as a command, ignored its input, and reported success. It is removed, and a gate rejects any command that binds none of its parameters
+- The root typecheck passes again, so CI is green on main
+
+### Enforcement
+- The 1000-line file limit is gated as a ratchet: the seven files already over it may shrink but never grow, and no other file may cross it
+- A gate rejects a registered command that binds none of its inputs while reporting success
+
 ## [1.4.0-rc.2] - 2026-08-24
 
 ### Added
