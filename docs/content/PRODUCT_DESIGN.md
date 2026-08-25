@@ -1224,6 +1224,13 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Agent log contents
+
+**Required behavior:** The log is where the user looks to see what the agent actually did, so every tool call appears there: its name, a short summary of its arguments, and whether it succeeded. Recording tool calls only in the chat transcript left the log showing prompts and warnings but never the actions between them.
+
+- One line per call, with arguments summarised rather than dumped, so a run of fifty calls stays readable.
+- A failed call is marked as failed with its error, since a silent line reads as success.
+
 ### Tool reachability
 
 **Required behavior:** A registered tool that no mode exposes is dead code, and a prompt that documents such a tool is worse - it instructs the model to call something the request does not contain. Both existed: 27 of 71 registered tools reached no agent surface, and the system prompt described five of them to the model in detail.

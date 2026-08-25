@@ -37,9 +37,18 @@ function createMockContext(mockLLMResponse?: (prompt: string) => string): LLMToo
     },
     callOllama: vi.fn().mockResolvedValue(''),
     store: {
-      // Partial fixtures: the colour tools only read id, title and content
+      // Partial fixtures: the colour tools only read id, title and content.
+      // The rest satisfy the store contract the registry hands to every tool.
       getFilteredNodes: () => nodes as unknown as Node[],
       getFilteredEdges: () => [],
+      get filteredNodes() {
+        return nodes as unknown as Node[]
+      },
+      filteredEdges: [],
+      createNode: vi.fn().mockResolvedValue({ id: 'new' }),
+      deleteNode: vi.fn().mockResolvedValue(undefined),
+      deleteEdge: vi.fn().mockResolvedValue(undefined),
+      updateNodeTitle: vi.fn().mockResolvedValue(undefined),
       updateNodeContent: vi.fn().mockResolvedValue(undefined),
       updateNodePosition: vi.fn().mockResolvedValue(undefined),
       updateNodeColor: vi.fn().mockImplementation(async (id: string, color: string) => {

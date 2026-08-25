@@ -12,6 +12,7 @@ import { ref, type Ref } from 'vue'
 import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } from '../../../llm/types'
 import { llmQueue } from '../../../llm/queue'
 import { errorLog } from '../../../llm/agentLog'
+import { describeToolCall } from '../../../lib/toolCallSummary'
 import {
   appendUserTurn,
   appendAssistantText,
@@ -390,9 +391,19 @@ export function useAgentRunner(ctx: AgentContext) {
               })
               continue
             }
+            // The log is where the user looks to see what the agent did, so
+            // every call appears there with its arguments summarised
+            // (PRODUCT_DESIGN.md > Agent log contents)
+            ctx.log.value.push(`> ${describeToolCall(tc.function.name, parsedArgs)}`)
+
             const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
             recordAction(ctx.transcript.value, tc.function.name)
+
+            const outcome = String(result ?? '')
+            if (/^error/i.test(outcome.trim())) {
+              ctx.log.value.push(`  failed: ${outcome.trim().slice(0, 160)}`)
+            }
 
             // Log graph state after mutations
             if (['create_node', 'create_nodes_batch', 'create_edge', 'create_edges_batch', 'delete_node', 'delete_matching'].includes(tc.function.name)) {

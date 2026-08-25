@@ -20,6 +20,7 @@ import {
   hasToolHandler,
   type ToolContext,
 } from '../../../llm/tools/handlers'
+import type { INodeStore } from '../../../llm/registry'
 
 /**
  * LLM Queue interface (subset of llmQueue)
@@ -42,20 +43,22 @@ export interface LLMToolsEdge {
  * Node store interface for LLM tools
  * Uses getter functions for reactive data to ensure fresh values
  */
-export interface LLMToolsNodeStore {
+/**
+ * What the agent's tools need from the store.
+ *
+ * Extends INodeStore, which is what the registry hands to every tool handler:
+ * declaring a narrower shape here let the two drift, and a tool whose store
+ * method was absent answered "not available in this context" while appearing
+ * to be wired (PRODUCT_DESIGN.md > Tool reachability).
+ */
+export interface LLMToolsNodeStore extends INodeStore {
   getFilteredNodes: () => Node[]
   getFilteredEdges: () => LLMToolsEdge[]
-  updateNodeContent: (id: string, content: string) => Promise<void>
-  updateNodePosition: (id: string, x: number, y: number) => Promise<void>
-  updateNodeColor: (id: string, color: string) => Promise<void>
-  updateEdgeColor?: (id: string, color: string | null) => Promise<void>
-  createEdge: (data: {
-    source_node_id: string
-    target_node_id: string
-    label?: string
-    color?: string
-  }) => Promise<unknown>
   currentWorkspaceId?: string | null
+  /** Selection-aware tools read this; see selectionTools.ts */
+  selectedNodeIds?: string[]
+  /** Required here: the colour tools this composable dispatches always use it */
+  updateNodeColor: (id: string, color: string) => Promise<void>
 }
 
 /**
