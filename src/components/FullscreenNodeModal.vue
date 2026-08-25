@@ -48,8 +48,20 @@ const hasUnsavedChanges = ref(false)
 // Reading mode (hide editor, show only preview) - default to reading mode
 const readingMode = ref(true)
 
-// Auto-save timer
+// Auto-save timer, and what it was armed to write. The target is captured when
+// the timer is armed rather than resolved when it fires: clicking a wikilink
+// swaps the open node inside the debounce window, and the pending write belongs
+// to the node whose keystrokes armed it
+// (PRODUCT_DESIGN.md > Saving edits when the open node changes)
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
+
+interface PendingSave {
+  nodeId: string
+  title: string
+  content: string
+  frontmatter: string | null
+}
+let pendingSave: PendingSave | null = null
 
 // Load node data when nodeId changes
 const node = computed(() => props.nodeId ? store.getNode(props.nodeId) : null)
@@ -58,6 +70,8 @@ const node = computed(() => props.nodeId ? store.getNode(props.nodeId) : null)
 let editingFrontmatter: string | null = null
 
 watch(() => props.nodeId, (id) => {
+  // Store the previous node's keystrokes before the buffers are replaced
+  void flushPendingSave()
   if (id && node.value) {
     editTitle.value = node.value.title || ''
     const { frontmatter, body } = splitFrontmatter(node.value.markdown_content || '')
@@ -70,15 +84,8 @@ watch(() => props.nodeId, (id) => {
 // Reset state when modal closes
 watch(() => props.visible, async (visible) => {
   if (!visible) {
-    // Save any pending changes
-    if (hasUnsavedChanges.value) {
-      save()
-    }
-    // Clear timers
-    if (saveTimeout) {
-      clearTimeout(saveTimeout)
-      saveTimeout = null
-    }
+    // Store any pending changes rather than dropping them
+    await flushPendingSave()
     showLinkPicker.value = false
   } else {
     // Focus editor when modal opens
@@ -123,27 +130,57 @@ watch(() => previewRef.value, (el) => {
   }
 })
 
-// Schedule auto-save with debounce
+// Schedule auto-save with debounce, recording what to write and where
 function scheduleSave() {
+  if (!props.nodeId) return
   hasUnsavedChanges.value = true
+  pendingSave = {
+    nodeId: props.nodeId,
+    title: editTitle.value,
+    content: editContent.value,
+    frontmatter: editingFrontmatter,
+  }
   if (saveTimeout) clearTimeout(saveTimeout)
-  saveTimeout = setTimeout(save, 500)
+  saveTimeout = setTimeout(() => {
+    void flushPendingSave()
+  }, 500)
 }
 
-// Save changes to store
-async function save() {
-  if (!props.nodeId || !node.value) return
-
-  // Only save if there are actual changes
-  if (editTitle.value !== node.value.title) {
-    await store.updateNodeTitle(props.nodeId, editTitle.value)
+/** Write the pending edit to the node it was armed for, if there is one */
+async function flushPendingSave() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout)
+    saveTimeout = null
   }
-  const fullContent = joinFrontmatter(editingFrontmatter, editContent.value)
-  if (fullContent !== node.value.markdown_content) {
-    await store.updateNodeContent(props.nodeId, fullContent)
+  const target = pendingSave
+  pendingSave = null
+  if (!target) return
+
+  const stored = store.getNode(target.nodeId)
+  if (!stored) return
+
+  // Only write what actually differs from what is stored
+  if (target.title !== stored.title) {
+    await store.updateNodeTitle(target.nodeId, target.title)
+  }
+  const fullContent = joinFrontmatter(target.frontmatter, target.content)
+  if (fullContent !== stored.markdown_content) {
+    await store.updateNodeContent(target.nodeId, fullContent)
   }
 
   hasUnsavedChanges.value = false
+}
+
+/** Write the open node's current buffers at once, for Cmd+S and explicit saves */
+async function save() {
+  if (!props.nodeId) return
+  pendingSave = {
+    nodeId: props.nodeId,
+    title: editTitle.value,
+    content: editContent.value,
+    frontmatter: editingFrontmatter,
+  }
+  await flushPendingSave()
 }
 
 // Handle title change

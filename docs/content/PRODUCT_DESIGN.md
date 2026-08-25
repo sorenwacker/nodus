@@ -1224,6 +1224,16 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Saving edits when the open node changes
+
+Both editors debounce writes, so a write can still be pending when the node being edited changes - clicking a wikilink in the fullscreen view swaps the open node within the debounce window. A pending write belongs to the node whose keystrokes armed it, not to whichever node is open when it fires.
+
+- A scheduled write records the node it was armed for, along with the title and body to store.
+- Changing the open node flushes the pending write first, then loads the new node.
+- Closing the editor flushes rather than drops.
+
+Without this, the write compares the new node's stored text against the previous node's buffer, finds no difference to make, and the previous node's last keystrokes are lost with nothing reported.
+
 ### Enforcing the file size limit
 
 The 1000-line limit existed only as prose in the project rules, and seven files had grown past it. A rule with no gate erodes silently, so the limit is enforced as a ratchet: the files already over it are recorded with the line count they had when the gate was added, and the gate fails when any of them grows or when a new file crosses the limit.
