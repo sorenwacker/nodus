@@ -202,15 +202,24 @@ export function createMcpMessageHandler(
   /** Store view scoped to one workspace, regardless of what the app shows */
   async function scopedStoreFor(workspaceId: string | null): Promise<McpStoreInterface> {
     const edges = await store.loadWorkspaceEdges(workspaceId)
+
+    // Lookups derive from the scoped collections, never from the app's. When
+    // only the list getters were scoped, list_frames returned this
+    // workspace's frames while get_frame on those same ids failed against
+    // whichever workspace the user had open
+    // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
+    const nodesInScope = () =>
+      store.getAllNodes().filter(n => (n.workspace_id ?? null) === workspaceId && !n.deleted_at)
+    const framesInScope = () =>
+      store.getAllFrames().filter(f => (f.workspace_id ?? null) === workspaceId)
+
     return {
       ...store,
-      getFilteredNodes: () =>
-        store
-          .getAllNodes()
-          .filter(n => (n.workspace_id ?? null) === workspaceId && !n.deleted_at),
+      getFilteredNodes: nodesInScope,
       getFilteredEdges: () => edges,
-      getFilteredFrames: () =>
-        store.getAllFrames().filter(f => (f.workspace_id ?? null) === workspaceId),
+      getFilteredFrames: framesInScope,
+      getNode: (id: string) => nodesInScope().find(n => n.id === id),
+      getFrame: (id: string) => framesInScope().find(f => f.id === id),
       createNode: data =>
         store.createNode({ ...data, workspace_id: workspaceId === null ? 'default' : workspaceId }),
       // Edge writes bypass the live edge store, which only holds the open

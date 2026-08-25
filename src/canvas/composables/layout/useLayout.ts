@@ -54,7 +54,14 @@ interface Store {
   getFilteredFrames: () => Frame[]
   getSelectedNodeIds: () => string[]
   getNode: (id: string) => Node | undefined
-  updateNodePosition: (id: string, x: number, y: number) => void
+  updateNodePosition: (
+    id: string,
+    x: number,
+    y: number,
+    options?: { skipPersist?: boolean; skipLayoutTrigger?: boolean }
+  ) => void
+  /** Flush one node's in-memory position to the backend */
+  persistNodePosition?: (id: string) => void | Promise<void>
   updateFramePosition: (id: string, x: number, y: number) => void
   updateFrameSize: (id: string, width: number, height: number) => void
   layoutNodes: (nodeIds?: string[], options?: { centerX: number; centerY: number }) => Promise<void>
@@ -112,9 +119,12 @@ export function useLayout(options: UseLayoutOptions) {
         const node = store.getNodes().find(n => n.id === id)
         return node ? { x: node.canvas_x, y: node.canvas_y } : null
       },
-      store.updateNodePosition,
+      // Frames write memory only; the landing positions are stored once when
+      // the animation ends (PRODUCT_DESIGN.md > Persisting animated positions)
+      (id, x, y) => store.updateNodePosition(id, x, y, { skipPersist: true }),
       animationState,
-      duration
+      duration,
+      store.persistNodePosition
     )
   }
 

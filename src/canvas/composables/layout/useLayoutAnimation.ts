@@ -72,7 +72,13 @@ export function animateToPositions(
   getNodePosition: (id: string) => { x: number; y: number } | null,
   updateNodePosition: (id: string, x: number, y: number) => void,
   state: LayoutAnimationState,
-  duration = 400
+  duration = 400,
+  /**
+   * Store the positions the animation reached. Frames update memory only: one
+   * write per node per frame is ~18,000 writes for 500 nodes over 600ms, of
+   * which 500 matter (PRODUCT_DESIGN.md > Persisting animated positions).
+   */
+  persistNodePosition?: (id: string) => void | Promise<void>
 ): void {
   state.stop()
   state.pending = { targets, update: updateNodePosition }
@@ -106,6 +112,10 @@ export function animateToPositions(
     } else {
       state.animationId = null
       state.pending = null
+      // Where they landed is the only position worth storing
+      if (persistNodePosition) {
+        for (const [id] of targets) void persistNodePosition(id)
+      }
     }
   }
 

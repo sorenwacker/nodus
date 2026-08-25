@@ -1224,6 +1224,28 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Persisting animated positions
+
+**Required behavior:** A layout animation moves nodes for the duration of the animation; only where they land needs storing. Writing every intermediate position issued one database write and one IPC call per node per frame - roughly 18,000 for a 600ms animation of 500 nodes, of which 500 mattered. This is the same defect the drag path already solved with `skipPersist`, and the animation must use it too.
+
+- Frames update in-memory positions only.
+- The final positions are persisted once, when the animation completes.
+- An animation superseded by another persists what it reached, so a position is never left unsaved.
+
+### Workspace scoping for MCP connections
+
+**Required behavior:** A connection scoped to a workspace sees that workspace, consistently. Scoping only the list getters produced a store that contradicted itself: `list_frames` returned the target workspace's frames while `get_frame` on those same ids failed, because it resolved against whichever workspace the user happened to have open.
+
+- Single-entity lookups resolve within the connection's scope, exactly as the list getters do. An id a scoped listing returned must be usable by every operation that takes an id.
+- A scoped store derives its lookups from its own scoped collections rather than from the application's, so the two cannot drift.
+
+### Deleting a merged wikilink edge
+
+**Required behavior:** A merged wikilink edge is undirected because both nodes link to each other; it stands for two wikilinks, one in each file. Deleting it removed the link from the source's content only, so the next wikilink sync saw the surviving link in the other file and recreated the edge - the user deleted it and it came back.
+
+- Deleting an undirected wikilink edge removes the wikilink from both nodes' content.
+- Deleting a directed one removes it from the source only, as before.
+
 ### Agent log contents
 
 **Required behavior:** The log is where the user looks to see what the agent actually did, so every tool call appears there: its name, a short summary of its arguments, and whether it succeeded. Recording tool calls only in the chat transcript left the log showing prompts and warnings but never the actions between them.

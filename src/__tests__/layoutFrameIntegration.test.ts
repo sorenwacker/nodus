@@ -1167,3 +1167,39 @@ describe('Performance considerations', () => {
     expect(duration).toBeLessThan(100)
   })
 })
+
+describe('persisting animated positions', () => {
+  // One write per node per frame was ~18,000 writes for 500 nodes over 600ms,
+  // of which 500 mattered (PRODUCT_DESIGN.md > Persisting animated positions)
+  it('writes memory during frames and stores the landing positions once', async () => {
+    const { animateToPositions } = await import('../canvas/composables/layout/useLayoutAnimation')
+    const persisted: string[] = []
+    const skipPersistFlags: boolean[] = []
+    const state = { animationId: null as number | null, pending: null as unknown, stop: () => {} }
+
+    const targets = new Map([
+      ['a', { x: 100, y: 100 }],
+      ['b', { x: 200, y: 200 }],
+    ])
+
+    animateToPositions(
+      targets,
+      () => ({ x: 0, y: 0 }),
+      () => {
+        skipPersistFlags.push(true)
+      },
+      state as never,
+      10,
+      (id: string) => {
+        persisted.push(id)
+      }
+    )
+
+    await new Promise(resolve => setTimeout(resolve, 120))
+
+    expect(skipPersistFlags.length).toBeGreaterThan(0)
+    expect(persisted.sort()).toEqual(['a', 'b'])
+    // Once each, not once per frame
+    expect(persisted.length).toBe(2)
+  })
+})

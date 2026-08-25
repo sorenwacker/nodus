@@ -993,6 +993,7 @@ const layout = useLayout({
     getSelectedNodeIds: () => [...store.selectedNodeIds],
     getNode: store.getNode,
     updateNodePosition: store.updateNodePosition,
+    persistNodePosition: store.persistNodePosition,
     updateFramePosition: store.updateFramePosition,
     updateFrameSize: store.updateFrameSize,
     layoutNodes: store.layoutNodes,
