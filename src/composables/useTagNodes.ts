@@ -27,13 +27,15 @@ export function useTagNodes(deps: TagNodeDeps) {
    * Tag nodes have node_type: 'tag', small size, and primary color background.
    */
   async function getOrCreateTagNode(tagName: string, nearNodeId?: string): Promise<Node> {
-    // Normalize tag name (lowercase for comparison)
-    const normalizedTag = tagName.toLowerCase()
+    // A tag node's title is stored with its hash, so the comparison has to
+    // strip it from both sides. Comparing the bare name against the stored
+    // title never matched, and every save of the same hashtag created another
+    // tag node and another edge to it.
+    const normalizedTag = tagName.replace(/^#/, '').toLowerCase()
     const nodes = deps.getNodes()
 
-    // Check if tag node already exists
     const existingTagNode = nodes.find(
-      n => n.node_type === 'tag' && n.title.toLowerCase() === normalizedTag
+      n => n.node_type === 'tag' && n.title.replace(/^#/, '').toLowerCase() === normalizedTag
     )
     if (existingTagNode) {
       return existingTagNode

@@ -38,13 +38,24 @@ export function extractHashtags(content: string): string[] {
  * block at the very start is all body.
  */
 export function splitFrontmatter(content: string): { frontmatter: string | null; body: string } {
-  if (!content.startsWith('---\n')) return { frontmatter: null, body: content }
-  const end = content.indexOf('\n---', 4)
-  if (end === -1) return { frontmatter: null, body: content }
-  const rest = content.slice(end + 4)
+  // CRLF files open with "---\r\n". Testing only for "---\n" treated the whole
+  // document as body while extraction.ts read the same block successfully, so
+  // one file had its metadata parsed and its YAML rendered as visible text.
+  const opener = content.startsWith('---\r\n') ? 5 : content.startsWith('---\n') ? 4 : 0
+  if (opener === 0) return { frontmatter: null, body: content }
+
+  // The closing delimiter sits at the start of a line, with either ending
+  const closer = content.slice(opener).search(/\r?\n---[ \t]*\r?(\n|$)/)
+  if (closer === -1) return { frontmatter: null, body: content }
+
+  const afterCloser = content.slice(opener + closer)
+  const closerLength = afterCloser.match(/^\r?\n---[ \t]*\r?\n?/)?.[0].length ?? 0
+  const end = opener + closer + closerLength
+  const rest = content.slice(end)
   const bodyStart = rest.startsWith('\r\n') ? 2 : rest.startsWith('\n') ? 1 : 0
+
   return {
-    frontmatter: content.slice(0, end + 4 + bodyStart),
+    frontmatter: content.slice(0, end + bodyStart),
     body: rest.slice(bodyStart),
   }
 }
@@ -74,8 +85,12 @@ export function upsertFrontmatterField(
   const { frontmatter, body } = splitFrontmatter(content)
   const fieldRe = new RegExp(`^${field}:.*$`)
 
+  // Split on either ending, then drop the opening and closing delimiters and
+  // any trailing blank produced by the split
   const lines = frontmatter
-    ? frontmatter.split('\n').slice(1, -2) // strip delimiters and trailing newline
+    ? frontmatter
+        .split(/\r?\n/)
+        .filter((line, i, all) => i !== 0 && !(line.trim() === '---' && i > 0) && !(i === all.length - 1 && line === ''))
     : []
   const kept = lines.filter(line => !fieldRe.test(line))
   if (value !== null && value.trim() !== '') {

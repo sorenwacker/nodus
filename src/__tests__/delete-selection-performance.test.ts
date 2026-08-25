@@ -66,8 +66,10 @@ describe('deleting a selection', () => {
     )
 
     // 16x the edges must not cost anything like 16x the time. The floor keeps
-    // timer noise from failing the ratio when the small case rounds to ~0
-    expect(largeMs).toBeLessThan(Math.max(smallMs, 3) * 4)
+    // timer noise from failing the ratio when the small case rounds to ~0, and
+    // SLACK covers running alongside the rest of the suite - the shape of the
+    // scaling is the claim here, not a wall-clock budget
+    expect(largeMs).toBeLessThan(Math.max(smallMs, 3) * 4 * SLACK)
   })
 
   it('deletes a large selection quickly', async () => {

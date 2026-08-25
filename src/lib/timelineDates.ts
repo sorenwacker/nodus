@@ -9,7 +9,8 @@
 
 /** Raw value of a field from a leading frontmatter block, if any */
 export function extractFrontmatterField(content: string, field: string): string | null {
-  if (!content.startsWith('---\n')) return null
+  // Either line ending; see splitFrontmatter for why this matters
+  if (!content.startsWith('---\n') && !content.startsWith('---\r\n')) return null
   const end = content.indexOf('\n---', 4)
   if (end === -1) return null
   const block = content.slice(4, end)
