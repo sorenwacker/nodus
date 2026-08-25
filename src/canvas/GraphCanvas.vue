@@ -525,7 +525,7 @@ const { isLassoSelecting, lassoPoints, start: startLasso, update: updateLasso, e
 // Node clipboard composable
 const clipboard = useNodeClipboard({
   store: {
-    selectedNodeIds: store.selectedNodeIds,
+    getSelectedNodeIds: () => store.selectedNodeIds,
     getNode: store.getNode,
     getFilteredEdges: () => store.filteredEdges,
     createNode: store.createNode,

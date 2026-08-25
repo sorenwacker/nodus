@@ -129,7 +129,12 @@ function validateClipboardData(data: unknown): data is ClipboardNodeData {
 
 export interface UseNodeClipboardOptions {
   store: {
-    selectedNodeIds: string[]
+    /**
+     * A function, not an array: the store replaces the selection array rather
+     * than mutating it, so a captured array goes stale the moment the
+     * selection changes and copy silently copies nothing.
+     */
+    getSelectedNodeIds: () => string[]
     getNode: (id: string) => { id: string; title: string; markdown_content: string | null; canvas_x: number; canvas_y: number; width: number; height: number; color_theme: string | null } | undefined
     getFilteredEdges: () => Array<{ id: string; source_node_id: string; target_node_id: string; label: string | null; link_type: string; color?: string | null }>
     createNode: (data: { title: string; markdown_content?: string; canvas_x: number; canvas_y: number; width?: number; height?: number; color_theme?: string | null }) => Promise<{ id: string }>
@@ -145,7 +150,7 @@ export function useNodeClipboard(options: UseNodeClipboardOptions) {
   const { store, screenToCanvas, getViewportSize, showToast } = options
 
   async function copySelectedNodes(): Promise<void> {
-    const selectedNodes = store.selectedNodeIds
+    const selectedNodes = store.getSelectedNodeIds()
       .map(id => store.getNode(id))
       .filter((n): n is NonNullable<typeof n> => n !== undefined)
 
@@ -157,7 +162,7 @@ export function useNodeClipboard(options: UseNodeClipboardOptions) {
 
     // Create index map for edge references
     const nodeIdToIndex = new Map(selectedNodes.map((n, i) => [n.id, i]))
-    const selectedIdSet = new Set(store.selectedNodeIds)
+    const selectedIdSet = new Set(store.getSelectedNodeIds())
 
     // Find edges where both endpoints are in the selection
     const allEdges = store.getFilteredEdges()
@@ -209,32 +214,27 @@ export function useNodeClipboard(options: UseNodeClipboardOptions) {
     try {
       const text = await readClipboard()
 
-      // Check if the clipboard contains a DOI
-      const doi = extractDOI(text)
-      if (doi) {
-        return await pasteFromDOI(doi)
-      }
-
-      // Try to parse as JSON (Nodus clipboard format)
+      // Nodus content is tried first. A citation node's own markdown contains
+      // a DOI, so checking for one first turned a paste of copied nodes into
+      // a paper lookup - and a network call - instead of duplicating them.
       let parsedData: unknown
+
+      // Anything that is not Nodus content: a DOI becomes a paper, other text
+      // becomes a note
+      const pasteForeignText = async (): Promise<string[]> => {
+        const doi = extractDOI(text)
+        if (doi) return await pasteFromDOI(doi)
+        return text.trim() ? await pasteAsTextNode(text) : []
+      }
 
       try {
         parsedData = JSON.parse(text)
       } catch {
-        // Not JSON - create a plain text node
-        if (text.trim()) {
-          return await pasteAsTextNode(text)
-        }
-        return []
+        return await pasteForeignText()
       }
 
-      // Validate clipboard data schema
       if (!validateClipboardData(parsedData)) {
-        // Not Nodus format - create a plain text node
-        if (text.trim()) {
-          return await pasteAsTextNode(text)
-        }
-        return []
+        return await pasteForeignText()
       }
 
       const data = parsedData

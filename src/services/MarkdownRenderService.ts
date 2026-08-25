@@ -117,11 +117,13 @@ export function renderMarkdown(content: string | null, options: RenderOptions = 
     const dark = theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
     const cacheKey = `${dark ? 'dark' : 'light'}:${decoded}`
 
-    if (mermaidCache.has(cacheKey)) {
-      return `<div class="mermaid-wrapper">${mermaidCache.get(cacheKey)}</div>`
-    }
-
-    // Create placeholder for async rendering
+    // Always a placeholder, cache hit or not. Returning the stored SVG here
+    // looked like a fast path, but the whole string then passes through
+    // sanitizeHtml, whose allowlist has no SVG elements - so a cache hit
+    // produced an empty wrapper with nothing for the async pass to fill, and
+    // every cached diagram rendered blank. renderPendingMermaid consults the
+    // same cache, so nothing is re-rendered by dropping the shortcut.
+    void cacheKey
     return `<div class="mermaid-wrapper"><pre class="mermaid">${escapeText(decoded)}</pre></div>`
   })
 
