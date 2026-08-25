@@ -242,13 +242,6 @@ TOOLS:
 - plan(tasks): Create a task list for multi-step operations.
 - update_task(task_index, status): Update task status.
 - remember(message): Store important info for this workspace's memory (long-term facts)
-- set_goal(goal, steps?): Start tracking a new goal with optional steps
-- update_progress(progress, completed_action?): Update goal progress (0-100%)
-- complete_goal(summary): Mark goal complete, clear session
-- push_task(description, priority?, context?): Add task to todo stack (LIFO)
-- pop_task(): Get and remove top task from stack
-- peek_stack(): View stack without removing
-- clear_stack(): Clear all pending tasks
 - done(summary): Call when finished
 
 SELECTION TOOLS (only when nodes are selected):

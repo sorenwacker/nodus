@@ -1224,6 +1224,14 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Tool reachability
+
+**Required behavior:** A registered tool that no mode exposes is dead code, and a prompt that documents such a tool is worse - it instructs the model to call something the request does not contain. Both existed: 27 of 71 registered tools reached no agent surface, and the system prompt described five of them to the model in detail.
+
+- Every registered tool is reachable from at least one agent mode, or is listed as deliberately unexposed with the reason.
+- A tool the system prompt documents must be reachable, without exception: promising a capability that cannot be called is the defect the ledger exists to prevent.
+- A gate compares the registry against the mode whitelists and the ledger, so a tool added without exposure fails the build rather than sitting unused.
+
 ### Plan approval summary
 
 **Required behavior:** The approval dialog exists so the user can see a plan's effect on the graph before consenting to it. A summary that understates that effect is worse than none, because it invites consent the user would otherwise withhold.

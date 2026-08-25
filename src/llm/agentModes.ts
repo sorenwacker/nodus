@@ -60,6 +60,13 @@ const exploreMode: AgentModeConfig = {
     // Thinking
     'think',
     'done',
+    // Reading structure, and the research tools the prompt documents
+    'list_frames',
+    'list_storylines',
+    'research_topic',
+    'build_knowledge_base',
+    'check_progress',
+    'expand_aspect',
   ],
   systemPromptAddition: `
 MODE: EXPLORE (Research & Build)
@@ -138,7 +145,6 @@ const executeMode: AgentModeConfig = {
   description: 'Execute approved plan and make changes',
   maxIterations: 500,
   toolWhitelist: [
-    // All tools available
     'read_graph',
     'create_node',
     'create_edge',
@@ -175,6 +181,32 @@ const executeMode: AgentModeConfig = {
     'apply_theme',
     'list_themes',
     'done',
+    // Structure: frames and storylines. Registered and tested but exposed to
+    // no mode until now, so the agent could not group or sequence anything
+    // (PRODUCT_DESIGN.md > Tool reachability)
+    'create_frame',
+    'assign_node_to_frame',
+    'list_frames',
+    'create_storyline',
+    'add_node_to_storyline',
+    'list_storylines',
+    // Acting on the user's selection
+    'append_to_selected',
+    'color_selected',
+    'connect_selected_to',
+    'delete_selected',
+    'expand_selected',
+    'rename_selected',
+    'summarize_selected',
+    'update_selected_content',
+    // Research and colouring the system prompt documents to the model
+    'research_topic',
+    'build_knowledge_base',
+    'check_progress',
+    'expand_aspect',
+    'color_regex',
+    // Edge editing, which the MCP surface has always had
+    'update_edge',
   ],
   systemPromptAddition: `
 MODE: EXECUTE (Approved)
@@ -219,6 +251,23 @@ export function getAgentMode(mode: AgentMode): AgentModeConfig {
 /**
  * Filter tools based on current mode
  */
+/**
+ * Tools deliberately not exposed to any mode, with the reason.
+ *
+ * The task and goal stack predates create_plan, which covers the same ground
+ * with user approval. They stay registered and tested, but unexposed, until
+ * that overlap is resolved (PRODUCT_DESIGN.md > Tool reachability).
+ */
+export const UNEXPOSED_TOOLS = new Set([
+  'push_task',
+  'pop_task',
+  'peek_stack',
+  'clear_stack',
+  'set_goal',
+  'complete_goal',
+  'update_progress',
+])
+
 export function filterToolsForMode<T extends { function: { name: string } }>(
   tools: T[],
   mode: AgentMode
