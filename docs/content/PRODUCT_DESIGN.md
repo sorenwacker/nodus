@@ -1224,6 +1224,17 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### One schema, however you got there
+
+A database created by a fresh install and one upgraded through every migration must end up with the same schema. Two mechanisms broke that:
+
+- Migration 008 rebuilds the `edges` table with a three-column unique constraint and a `storyline_id` foreign key. Its guard checked only the constraint. A fresh install gets that constraint from 001, which cannot reference `storylines` because 002 creates that table afterwards, so 008 was skipped and the foreign key and `idx_edges_storyline` were never created. The guard now requires both, so 008 runs wherever either is missing.
+- The `frames` table was defined in 001 and again in 007. Only the first definition applies: `CREATE TABLE IF NOT EXISTS` finds the table already there and does nothing. The two disagreed on nullability, default sizes, and the delete behaviour of the workspace foreign key, so 007 described a schema no database has ever had.
+
+A dangling storyline reference follows from the first of those. Without the foreign key, deleting a storyline leaves edges pointing at a row that is gone, and storyline-filtered queries return them.
+
+Two gates hold this: no table may be defined by two migrations, and no migration file may go unapplied.
+
 ### Splitting text into chunks
 
 Long text is split into overlapping chunks for the model, breaking at a paragraph, sentence or word boundary so a chunk does not end mid-thought. Each chunk starts a little before the previous one ended, so context carries across the boundary.

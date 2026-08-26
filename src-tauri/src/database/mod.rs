@@ -84,7 +84,16 @@ async fn run_add_column_migration(pool: &DbPool, sql: &str) -> Result<(), Databa
 /// True if the edges table's unique constraint covers (source, target, link_type),
 /// i.e. migration 008 has been applied (or the table was created with 001 in its
 /// current form).
-async fn edges_has_multi_type_constraint(pool: &DbPool) -> Result<bool, DatabaseError> {
+/// Whether the edges table is already the shape 008 produces.
+///
+/// Both properties must hold. Checking only the unique constraint let a fresh
+/// install skip 008, because 001 creates that constraint but cannot reference
+/// `storylines` - 002 creates that table afterwards. A fresh database was left
+/// with a bare `storyline_id TEXT` and no `idx_edges_storyline`, while an
+/// upgraded one got the foreign key and the index, so the two behaved
+/// differently on storyline deletion and on storyline-filtered queries.
+async fn edges_matches_current_schema(pool: &DbPool) -> Result<bool, DatabaseError> {
+    let mut has_multi_type_constraint = false;
     let unique_indexes: Vec<String> =
         sqlx::query_scalar("SELECT name FROM pragma_index_list('edges') WHERE \"unique\" = 1")
             .fetch_all(pool)
@@ -96,10 +105,20 @@ async fn edges_has_multi_type_constraint(pool: &DbPool) -> Result<bool, Database
                 .fetch_all(pool)
                 .await?;
         if columns == ["source_node_id", "target_node_id", "link_type"] {
-            return Ok(true);
+            has_multi_type_constraint = true;
+            break;
         }
     }
-    Ok(false)
+
+    let ddl: Option<String> =
+        sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='edges'")
+            .fetch_optional(pool)
+            .await?;
+    let references_storylines = ddl
+        .as_deref()
+        .is_some_and(|sql| sql.contains("REFERENCES storylines"));
+
+    Ok(has_multi_type_constraint && references_storylines)
 }
 
 /// Run database migrations
@@ -139,11 +158,6 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     // Seed built-in themes
     themes::seed_builtin_themes(pool).await?;
 
-    // Frames table
-    sqlx::query(include_str!("../../migrations/007_frames.sql"))
-        .execute(pool)
-        .await?;
-
     // Add directed column to edges before the 008 rebuild so its values survive
     run_add_column_migration(
         pool,
@@ -155,7 +169,7 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     // allowing multiple edges with different link_types between the same nodes.
     // SQLite cannot alter constraints in place; the guard must live in Rust
     // because RAISE() is only valid inside triggers.
-    if !edges_has_multi_type_constraint(pool).await? {
+    if !edges_matches_current_schema(pool).await? {
         let mut tx = pool.begin().await?;
         // A leftover edges_new means a previous rebuild was interrupted
         sqlx::query("DROP TABLE IF EXISTS edges_new")
@@ -252,6 +266,147 @@ mod tests {
         let pool = memory_pool().await;
         run_migrations(&pool).await.expect("first run");
         run_migrations(&pool).await.expect("second run");
+    }
+
+    /// A fresh database and an upgraded one must agree on the schema.
+    ///
+    /// 001 creates the 3-column unique constraint, so
+    /// `edges_matches_current_schema` short-circuits 008 on a fresh install
+    /// and the edges table keeps 001's bare `storyline_id TEXT`: no foreign key
+    /// and no `idx_edges_storyline`. An upgraded database runs 008 and gets
+    /// both. `run_migrations_is_idempotent` cannot see this because it only
+    /// runs the fresh path twice.
+    #[tokio::test]
+    async fn a_fresh_database_has_the_same_edges_schema_as_an_upgraded_one() {
+        let fresh = memory_pool().await;
+        run_migrations(&fresh).await.expect("fresh migrations");
+
+        let fresh_sql: String =
+            sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='edges'")
+                .fetch_one(&fresh)
+                .await
+                .expect("edges table exists");
+
+        assert!(
+            fresh_sql.contains("REFERENCES storylines"),
+            "a fresh edges table has no storyline foreign key:\n{}",
+            fresh_sql
+        );
+
+        let indexes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='edges'",
+        )
+        .fetch_all(&fresh)
+        .await
+        .expect("indexes readable");
+
+        assert!(
+            indexes.iter().any(|i| i == "idx_edges_storyline"),
+            "a fresh database is missing idx_edges_storyline, so storyline-filtered \
+             edge queries scan the table. Indexes present: {:?}",
+            indexes
+        );
+    }
+
+    /// Deleting a storyline must not leave edges pointing at it. SQLite
+    /// enforces foreign keys per connection and defaults to off, so a
+    /// declared `ON DELETE SET NULL` proves nothing on its own.
+    /// Requiring the foreign key means 008 now runs against databases that
+    /// previously skipped it, rebuilding their edges table. Every existing
+    /// edge must survive that rebuild.
+    #[tokio::test]
+    async fn upgrading_a_fresh_shaped_database_keeps_its_edges() {
+        let pool = memory_pool().await;
+
+        // A database as 001 alone left it: the 3-column constraint present,
+        // the storyline foreign key absent
+        sqlx::query(include_str!("../../migrations/001_init.sql"))
+            .execute(&pool)
+            .await
+            .expect("001 applied");
+        sqlx::query(include_str!("../../migrations/002_storylines.sql"))
+            .execute(&pool)
+            .await
+            .expect("002 applied");
+        for id in ["n1", "n2"] {
+            sqlx::query(
+                "INSERT INTO nodes (id, title, created_at, updated_at) VALUES (?, 'n', 0, 0)",
+            )
+            .bind(id)
+            .execute(&pool)
+            .await
+            .expect("node inserted");
+        }
+        sqlx::query(
+            "INSERT INTO edges (id, source_node_id, target_node_id, label, link_type, storyline_id, created_at)
+             VALUES ('e1', 'n1', 'n2', 'supports because', 'supports', NULL, 42)",
+        )
+        .execute(&pool)
+        .await
+        .expect("edge inserted");
+
+        assert!(
+            !edges_matches_current_schema(&pool).await.unwrap(),
+            "this fixture is meant to need the upgrade"
+        );
+
+        run_migrations(&pool).await.expect("migrations");
+
+        let (label, link_type, created_at): (String, String, i64) =
+            sqlx::query_as("SELECT label, link_type, created_at FROM edges WHERE id = 'e1'")
+                .fetch_one(&pool)
+                .await
+                .expect("the edge survived the rebuild");
+
+        assert_eq!(label, "supports because");
+        assert_eq!(link_type, "supports");
+        assert_eq!(created_at, 42);
+    }
+
+    #[tokio::test]
+    async fn deleting_a_storyline_clears_the_edges_that_referenced_it() {
+        let pool = memory_pool().await;
+        run_migrations(&pool).await.expect("migrations");
+
+        sqlx::query("INSERT INTO storylines (id, title, created_at, updated_at) VALUES ('s1', 'Argument', 0, 0)")
+            .execute(&pool)
+            .await
+            .expect("storyline inserted");
+        for id in ["n1", "n2"] {
+            sqlx::query(
+                "INSERT INTO nodes (id, title, created_at, updated_at) VALUES (?, 'n', 0, 0)",
+            )
+            .bind(id)
+            .execute(&pool)
+            .await
+            .expect("node inserted");
+        }
+        sqlx::query(
+            "INSERT INTO edges (id, source_node_id, target_node_id, storyline_id, created_at)
+             VALUES ('e1', 'n1', 'n2', 's1', 0)",
+        )
+        .execute(&pool)
+        .await
+        .expect("edge inserted");
+
+        sqlx::query("DELETE FROM storylines WHERE id = 's1'")
+            .execute(&pool)
+            .await
+            .expect("storyline deleted");
+
+        let dangling: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM edges WHERE storyline_id IS NOT NULL
+             AND storyline_id NOT IN (SELECT id FROM storylines)",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("count readable");
+
+        assert_eq!(
+            dangling, 0,
+            "an edge still points at the deleted storyline, so storyline-filtered \
+             queries return edges whose storyline is gone"
+        );
     }
 
     #[tokio::test]

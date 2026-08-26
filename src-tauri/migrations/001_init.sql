@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS workspaces (
 );
 
 -- 2. Frames: Spatial grouping on canvas (must be before nodes)
+-- Frames: canvas grouping. This is the only definition; a second one in a
+-- later migration could never apply, because CREATE TABLE IF NOT EXISTS finds
+-- the table already here and does nothing.
 CREATE TABLE IF NOT EXISTS frames (
     id TEXT PRIMARY KEY,
     workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
