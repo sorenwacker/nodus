@@ -1224,6 +1224,18 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Storyline chain edges
+
+A storyline's sequence is carried by edges belonging to that storyline. Adding a node links it to its neighbours in the sequence, and removing one reconnects the neighbours it sat between.
+
+Whether such an edge already exists is decided by source, target, **and** storyline. Matching source and target alone let any other edge between the two nodes - a wikilink, a `supports` edge the user drew - stand in for the chain edge, so none was created and the sequence had a gap.
+
+### Persisting an interrupted drag
+
+A drag updates positions in memory and stores them once when it ends, so a drag costs one write per node rather than one per frame.
+
+A drag can end without a pointer release: the pointer is cancelled, the window loses focus, or the button comes up unseen. Those paths store the positions reached, the same as a normal release. Clearing the drag state without storing left the node where it was dropped on screen and back at its origin on the next load.
+
 ### Syncing wikilink edges
 
 The backend resolver understands folder path links and `#section` anchors as well as plain titles. The local resolver matches exact titles only, so it is a fallback for running without a backend, never for a backend that failed.

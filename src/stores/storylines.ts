@@ -12,6 +12,28 @@ export interface StorylineStoreDeps {
   deleteEdge: (id: string) => Promise<void>
 }
 
+/**
+ * Whether this storyline already chains the two nodes.
+ *
+ * The check must include the storyline: matching source and target alone let
+ * any existing edge - a wikilink, a `supports` edge the user drew - suppress
+ * the chain edge, leaving a gap in the sequence the reader walks
+ * (PRODUCT_DESIGN.md > Storyline chain edges).
+ */
+function storylineLinks(
+  edges: Edge[],
+  storylineId: string,
+  nodeA: string,
+  nodeB: string
+): boolean {
+  return edges.some(
+    e =>
+      e.storyline_id === storylineId &&
+      ((e.source_node_id === nodeA && e.target_node_id === nodeB) ||
+        (e.source_node_id === nodeB && e.target_node_id === nodeA))
+  )
+}
+
 export const useStorylinesStore = defineStore('storylines', () => {
   // State
   const storylines = ref<Storyline[]>([])
@@ -155,10 +177,7 @@ export const useStorylinesStore = defineStore('storylines', () => {
       if (insertPosition > 0) {
         const prevNodeId = nodeIds[insertPosition - 1]
         if (prevNodeId !== nodeId) {
-          const edgeExists = deps.getEdges().some(
-            e => (e.source_node_id === prevNodeId && e.target_node_id === nodeId) ||
-                 (e.source_node_id === nodeId && e.target_node_id === prevNodeId)
-          )
+          const edgeExists = storylineLinks(deps.getEdges(), storylineId, prevNodeId, nodeId)
           if (!edgeExists) {
             await deps.createEdge({ source_node_id: prevNodeId, target_node_id: nodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
           }
@@ -169,10 +188,7 @@ export const useStorylinesStore = defineStore('storylines', () => {
       if (position !== undefined && position < nodeIds.length) {
         const nextNodeId = nodeIds[position]
         if (nextNodeId !== nodeId) {
-          const edgeExists = deps.getEdges().some(
-            e => (e.source_node_id === nodeId && e.target_node_id === nextNodeId) ||
-                 (e.source_node_id === nextNodeId && e.target_node_id === nodeId)
-          )
+          const edgeExists = storylineLinks(deps.getEdges(), storylineId, nodeId, nextNodeId)
           if (!edgeExists) {
             await deps.createEdge({ source_node_id: nodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
           }
@@ -218,10 +234,7 @@ export const useStorylinesStore = defineStore('storylines', () => {
       if (nodeIndex > 0 && nodeIndex < nodeIds.length - 1) {
         const prevNodeId = nodeIds[nodeIndex - 1]
         const nextNodeId = nodeIds[nodeIndex + 1]
-        const edgeExists = deps.getEdges().some(
-          e => (e.source_node_id === prevNodeId && e.target_node_id === nextNodeId) ||
-               (e.source_node_id === nextNodeId && e.target_node_id === prevNodeId)
-        )
+        const edgeExists = storylineLinks(deps.getEdges(), storylineId, prevNodeId, nextNodeId)
         if (!edgeExists) {
           await deps.createEdge({ source_node_id: prevNodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
         }

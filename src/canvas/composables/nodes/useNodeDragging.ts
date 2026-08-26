@@ -183,6 +183,20 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
   // Cleanup function for when drag is interrupted (blur, pointercancel, etc.)
   function cleanupDrag() {
+    // The drag moved nodes with skipPersist, so the positions it reached exist
+    // only in memory until they are flushed. Clearing without flushing left the
+    // node where it was dropped on screen and back where it started on the next
+    // load (PRODUCT_DESIGN.md > Persisting an interrupted drag)
+    const movedIds =
+      multiDragInitial.value.size > 0
+        ? [...multiDragInitial.value.keys()]
+        : draggingNode.value
+          ? [draggingNode.value]
+          : []
+    for (const id of movedIds) {
+      store.persistNodePosition(id)
+    }
+
     if (pendingDragNode.value) {
       pendingDragNode.value = null
     }
