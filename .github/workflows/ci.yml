@@ -62,7 +62,9 @@ jobs:
         run: cargo fmt --check
 
       - name: Run clippy
-        run: cargo clippy -- -D warnings
+        # --all-targets so test code is linted too: without it a clippy error
+        # in a test file passes every gate and reaches main
+        run: cargo clippy --all-targets -- -D warnings
 
   test-frontend:
     name: Frontend Tests

@@ -90,7 +90,7 @@ fn every_migration_is_applied() {
     let mut unreferenced = Vec::new();
     for entry in fs::read_dir("migrations").expect("migrations directory is readable") {
         let path = entry.expect("readable entry").path();
-        if !path.extension().is_some_and(|e| e == "sql") {
+        if path.extension().is_none_or(|e| e != "sql") {
             continue;
         }
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");

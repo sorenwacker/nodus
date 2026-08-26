@@ -123,7 +123,9 @@ jobs:
           cargo audit --no-fetch
 
       - name: Run Clippy
-        run: cargo clippy -- -D warnings
+        # --all-targets so test code is linted too: without it a clippy error
+        # in a test file passes every gate and reaches main
+        run: cargo clippy --all-targets -- -D warnings
         working-directory: src-tauri
 
       # Extracted here (one Linux runner) rather than per platform, so the
