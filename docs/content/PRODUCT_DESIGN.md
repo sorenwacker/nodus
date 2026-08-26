@@ -1224,6 +1224,18 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Reading frontmatter on either line ending
+
+A file written on Windows, or by any tool that writes CRLF, opens with `---\r\n`. Testing for `---\n` alone read such a file as having no frontmatter, which had two consequences: writing the file back dropped its metadata, and content that carried its own block was given a second one. One function answers "does this open with a frontmatter block", and every caller uses it.
+
+The closing fence is a line that is exactly `---`, so a `---` inside a value does not end the block early.
+
+### Exporting an OKF bundle
+
+An exported document carries exactly one frontmatter block: the one built for the export, from the node's current metadata.
+
+A file-backed node's content already holds a block, because Nodus writes one into the file. Prepending without removing it produced two, and every reader treats the second as body text. The export strips whatever block the content opens with, then writes the block it built.
+
 ### One schema, however you got there
 
 A database created by a fresh install and one upgraded through every migration must end up with the same schema. Two mechanisms broke that:

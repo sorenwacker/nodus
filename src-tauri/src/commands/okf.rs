@@ -90,7 +90,7 @@ pub(crate) fn build_frontmatter(node: &Node) -> String {
 /// node's content, unless the content already carries its own frontmatter.
 pub(crate) fn with_frontmatter(node: &Node) -> String {
     let content = node.markdown_content.clone().unwrap_or_default();
-    if content.starts_with("---\n") {
+    if opens_with_frontmatter(&content) {
         return content;
     }
     format!("{}\n{}", build_frontmatter(node), content)
@@ -111,7 +111,7 @@ pub enum BackfillOutcome {
 /// into: merging risks losing fields the user set by hand
 /// (PRODUCT_DESIGN.md > Open Knowledge Format).
 pub(crate) fn classify_backfill(existing: &str) -> BackfillOutcome {
-    if existing.starts_with("---\n") || existing.starts_with("---\r\n") {
+    if opens_with_frontmatter(existing) {
         BackfillOutcome::AlreadyHasFrontmatter
     } else {
         BackfillOutcome::WouldAddFrontmatter
@@ -128,19 +128,60 @@ pub(crate) fn backfilled_content(node: &Node, existing: &str) -> String {
 /// Splice new body content under the frontmatter block already present in a
 /// file, so write-backs do not strip metadata. Returns the content to write.
 pub(crate) fn preserve_frontmatter(existing_file: &str, new_content: &str) -> String {
-    if new_content.starts_with("---\n") || !existing_file.starts_with("---\n") {
+    if opens_with_frontmatter(new_content) || !opens_with_frontmatter(existing_file) {
         return new_content.to_string();
     }
-    let after_open = &existing_file[4..];
-    match after_open.find("\n---") {
-        Some(pos) => {
-            let block_end = 4 + pos + 4;
-            let block = existing_file[..block_end].trim_end_matches(['\r']);
-            format!("{}\n{}", block, new_content)
+    match frontmatter_block_end(existing_file) {
+        Some(block_end) => {
+            let block = existing_file[..block_end].trim_end();
+            // Join with the line ending the block already uses, so a CRLF file
+            // does not gain a lone newline in the middle
+            let newline = if block.contains("\r\n") { "\r\n" } else { "\n" };
+            format!("{}{}{}", block, newline, new_content)
         }
         // Unterminated frontmatter: treat the file as body-only
         None => new_content.to_string(),
     }
+}
+
+/// Whether text opens with a frontmatter fence, on either line ending.
+///
+/// Matching only `---\n` read a CRLF file as having no frontmatter, which
+/// dropped its metadata on write and gave content that carried its own block a
+/// second one (PRODUCT_DESIGN.md > Reading frontmatter on either line ending).
+fn opens_with_frontmatter(text: &str) -> bool {
+    text.starts_with("---\n") || text.starts_with("---\r\n")
+}
+
+/// The body of a document, without any frontmatter block it opens with.
+///
+/// An unterminated block is treated as body, matching `preserve_frontmatter`.
+pub(crate) fn body_without_frontmatter(text: &str) -> &str {
+    if !opens_with_frontmatter(text) {
+        return text;
+    }
+    match frontmatter_block_end(text) {
+        Some(end) => text[end..].trim_start_matches(['\n', '\r']),
+        None => text,
+    }
+}
+
+/// Byte offset just past the closing fence of an opening frontmatter block.
+///
+/// The closing fence is a line that is exactly `---`, so a `---` appearing
+/// inside a value does not end the block early.
+fn frontmatter_block_end(text: &str) -> Option<usize> {
+    let mut offset = 0usize;
+    for (index, line) in text.split_inclusive('\n').enumerate() {
+        offset += line.len();
+        if index == 0 {
+            continue;
+        }
+        if line.trim_end_matches(['\n', '\r', ' ', '\t']) == "---" {
+            return Some(offset);
+        }
+    }
+    None
 }
 
 /// Sanitize a title into a filename stem, deduplicating against `taken`
@@ -287,7 +328,10 @@ pub(crate) async fn export_okf_bundle_impl(
     let mut entries: Vec<IndexEntry> = Vec::with_capacity(nodes.len());
     for (node, bundle_path) in nodes.iter().zip(&paths) {
         let content = node.markdown_content.as_deref().unwrap_or_default();
-        let body = convert_wikilinks(content, &link_targets);
+        // A file-backed node's content already carries a frontmatter block.
+        // Prepending without removing it produced two blocks, and the second
+        // reads as body text (PRODUCT_DESIGN.md > Exporting an OKF bundle)
+        let body = convert_wikilinks(body_without_frontmatter(content), &link_targets);
         let doc = format!("{}\n{}\n", build_frontmatter(node), body.trim_end());
 
         let relative = bundle_path.trim_start_matches('/');
@@ -618,6 +662,41 @@ mod tests {
         assert_eq!(preserve_frontmatter("---\nbroken", "new body"), "new body");
     }
 
+    /// A file written on Windows, or by a tool that writes CRLF, keeps its
+    /// metadata. `starts_with("---\n")` does not match `---\r\n`, so the
+    /// existing block read as absent and was dropped on the next write.
+    #[test]
+    fn write_back_preserves_a_crlf_frontmatter_block() {
+        let file = "---\r\ntype: note\r\nid: abc\r\n---\r\nold body";
+
+        let result = preserve_frontmatter(file, "new body");
+
+        assert!(
+            result.contains("type: note"),
+            "the metadata was dropped: {:?}",
+            result
+        );
+        assert!(result.contains("id: abc"));
+        assert!(result.ends_with("new body"));
+    }
+
+    /// New content carrying its own CRLF frontmatter must not also be given
+    /// the existing file's block.
+    #[test]
+    fn crlf_content_with_its_own_frontmatter_gets_no_second_block() {
+        let file = "---\ntype: note\n---\nold body";
+
+        let result = preserve_frontmatter(file, "---\r\ntype: paper\r\n---\r\nnew body");
+
+        assert_eq!(
+            result.matches("---").count(),
+            2,
+            "expected one frontmatter block, got: {:?}",
+            result
+        );
+        assert!(result.contains("type: paper"));
+    }
+
     #[test]
     fn description_skips_headings_and_truncates() {
         assert_eq!(
@@ -689,6 +768,37 @@ mod tests {
         assert!(index.contains("[Beta](/citations/Beta.md)"));
         assert!(!index.contains("Trashed"));
         assert!(!index.contains("Empty"));
+    }
+
+    /// A file-backed node's content already carries a frontmatter block,
+    /// because Nodus writes one into the file. Prepending unconditionally gave
+    /// the exported document two blocks, and the second reads as body text.
+    #[tokio::test]
+    async fn an_exported_document_carries_one_frontmatter_block() {
+        let pool = memory_pool().await;
+        let mut node = make_node("a", "Alpha", "note", Some("body text"));
+        node.markdown_content = Some("---\ntype: Note\nid: stale-id\n---\nbody text".to_string());
+        insert_node(&pool, &node).await;
+
+        let dir = tempfile::tempdir().unwrap();
+        export_okf_bundle_impl(&pool, None, dir.path())
+            .await
+            .unwrap();
+
+        let doc = std::fs::read_to_string(dir.path().join("notes/Alpha.md")).unwrap();
+
+        assert_eq!(
+            doc.matches("---").count(),
+            2,
+            "expected one frontmatter block, got:\n{}",
+            doc
+        );
+        assert!(
+            !doc.contains("stale-id"),
+            "the exported block must be the one built for this export:\n{}",
+            doc
+        );
+        assert!(doc.contains("body text"));
     }
 
     #[test]
