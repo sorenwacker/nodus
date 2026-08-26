@@ -349,6 +349,12 @@ The integral is: $ integral_a^b f(x) dif x $
 - A provider that answers is online. A provider that refuses, times out, or cannot be reached is offline, whatever its model listing does.
 - The reason a check failed is kept and shown, since "cannot be reached" and "refused the key" call for different fixes from the user.
 
+Every provider answers the question the same way, through one shared probe:
+
+- The endpoint is the one used for work, with the **configured** model. A model listing answers whenever the server is up, including when the configured model was never pulled or the account cannot reach it. Probing a hardcoded model tests something the user never chose.
+- Any failing status means unavailable. Reading "any status other than 401" as online showed green beside a model that answered nothing.
+- The reason is recorded on the provider and declared on the interface, because "could not be reached", "refused the key" and "no such model" call for different fixes. Reaching into one implementation's field with a cast left the other three reporting nothing.
+
 ### PDF text cleanup
 
 **Required behavior:** Cleaning up extracted PDF text is a long generation - the model rewrites everything it is sent - and a request whose response takes minutes is cut by the idle timeout of any gateway between the application and the model. The failure looks like an unreachable endpoint while the endpoint is answering other requests in milliseconds.

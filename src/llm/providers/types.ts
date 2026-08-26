@@ -74,6 +74,14 @@ export interface ILLMProvider {
   /** Check if provider is available/configured */
   isAvailable(): Promise<boolean>
 
+  /**
+   * Why the last availability check failed, so the interface can say whether
+   * the endpoint refused the key, could not be reached, or does not have the
+   * configured model. Null when the last check succeeded
+   * (PRODUCT_DESIGN.md > Provider status).
+   */
+  lastAvailabilityError: string | null
+
   /** Get list of available models */
   listModels(): Promise<ProviderModel[]>
 

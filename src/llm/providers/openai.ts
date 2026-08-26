@@ -3,6 +3,7 @@
  * OpenAI API (GPT-4, GPT-3.5, etc.)
  */
 
+import { probeProvider } from './availability'
 import { httpFetch } from './http'
 import type {
   ILLMProvider,
@@ -41,20 +42,38 @@ export class OpenAIProvider implements ILLMProvider {
     }
   }
 
+  lastAvailabilityError: string | null = null
+
+  /**
+   * Whether the application can get an answer from this provider.
+   *
+   * Probed with a one-token completion against the configured model. A model
+   * listing can answer while completions fail on authorisation, gateway routing
+   * or a model the account cannot reach
+   * (PRODUCT_DESIGN.md > Provider status).
+   */
   async isAvailable(): Promise<boolean> {
-    if (!this.apiKey) return false
-    try {
-      const response = await httpFetch(`${this.baseUrl}/models`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        connectTimeout: 5000,
-      })
-      return response.ok
-    } catch {
+    if (!this.apiKey) {
+      this.lastAvailabilityError = 'No API key configured'
       return false
     }
+    const { available, reason } = await probeProvider(() =>
+      httpFetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: 1,
+          messages: [{ role: 'user', content: 'hi' }],
+        }),
+        connectTimeout: 10000,
+      })
+    )
+    this.lastAvailabilityError = reason
+    return available
   }
 
   async listModels(): Promise<ProviderModel[]> {

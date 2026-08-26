@@ -163,10 +163,10 @@ async function fetchModels() {
   try {
     const isAvailable = await provider.isAvailable()
     providerStatus.value = isAvailable ? 'online' : 'offline'
-    // "cannot be reached" and "refused the key" call for different fixes
-    providerError.value = isAvailable
-      ? null
-      : ((provider as { lastAvailabilityError?: string | null }).lastAvailabilityError ?? null)
+    // "cannot be reached" and "refused the key" call for different fixes.
+    // Read through the interface: reaching into one implementation's field left
+    // three providers reporting nothing
+    providerError.value = isAvailable ? null : provider.lastAvailabilityError
 
     if (isAvailable) {
       const models = await provider.listModels()

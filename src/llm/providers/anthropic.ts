@@ -3,6 +3,7 @@
  * Claude API
  */
 
+import { probeProvider } from './availability'
 import { httpFetch } from './http'
 import type {
   ILLMProvider,
@@ -44,10 +45,23 @@ export class AnthropicProvider implements ILLMProvider {
     }
   }
 
+  lastAvailabilityError: string | null = null
+
+  /**
+   * Whether the application can get an answer from this provider.
+   *
+   * Probed with a one-token completion against the configured model. Probing a
+   * hardcoded legacy model and reading any status other than 401 as online
+   * showed green beside a model that answered nothing
+   * (PRODUCT_DESIGN.md > Provider status).
+   */
   async isAvailable(): Promise<boolean> {
-    if (!this.apiKey) return false
-    try {
-      const response = await httpFetch(`${this.baseUrl}/v1/messages`, {
+    if (!this.apiKey) {
+      this.lastAvailabilityError = 'No API key configured'
+      return false
+    }
+    const { available, reason } = await probeProvider(() =>
+      httpFetch(`${this.baseUrl}/v1/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,16 +69,15 @@ export class AnthropicProvider implements ILLMProvider {
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
+          model: this.model,
           max_tokens: 1,
           messages: [{ role: 'user', content: 'hi' }],
         }),
         connectTimeout: 10000,
       })
-      return response.status !== 401
-    } catch {
-      return false
-    }
+    )
+    this.lastAvailabilityError = reason
+    return available
   }
 
   async listModels(): Promise<ProviderModel[]> {

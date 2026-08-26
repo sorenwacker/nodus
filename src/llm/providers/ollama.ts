@@ -3,6 +3,7 @@
  * Local LLM inference via Ollama
  */
 
+import { probeProvider } from './availability'
 import type {
   ILLMProvider,
   GenerateOptions,
@@ -40,16 +41,31 @@ export class OllamaProvider implements ILLMProvider {
     }
   }
 
+  lastAvailabilityError: string | null = null
+
+  /**
+   * Whether the application can get an answer from this provider.
+   *
+   * Probed against the chat endpoint with the configured model. `/api/tags`
+   * answers whenever the server is up, including when the configured model was
+   * never pulled (PRODUCT_DESIGN.md > Provider status).
+   */
   async isAvailable(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/tags`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000),
+    const { available, reason } = await probeProvider(() =>
+      fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [{ role: 'user', content: 'hi' }],
+          stream: false,
+          options: { num_predict: 1 },
+        }),
+        signal: AbortSignal.timeout(10000),
       })
-      return response.ok
-    } catch {
-      return false
-    }
+    )
+    this.lastAvailabilityError = reason
+    return available
   }
 
   async listModels(): Promise<ProviderModel[]> {
