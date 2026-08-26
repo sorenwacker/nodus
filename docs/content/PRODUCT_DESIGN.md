@@ -1224,6 +1224,25 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Splitting text into chunks
+
+Long text is split into overlapping chunks for the model, breaking at a paragraph, sentence or word boundary so a chunk does not end mid-thought. Each chunk starts a little before the previous one ended, so context carries across the boundary.
+
+The start of the next chunk must advance by at least one character. An overlap at least as large as the break point resolved to a start of zero, which left the remaining text unchanged and the loop running forever - a hang rather than a slowdown, with no output and no error.
+
+### Validating caller-supplied paths
+
+A path the interface names is not a path the user chose. Commands that act on the filesystem using a path from the webview must check it against the workspace vaults before touching it, using `validate_path_in_workspace` for an existing path or `validate_target_dir_in_workspace` for a directory that may not exist yet.
+
+The rule applies to the path a command *stores* as well as the path it reads: a command that records a node's file path without validation hands an unchecked path to every later command that trusts it.
+
+Three cases are exempt, because the vault path is the thing being chosen:
+
+- Registering, importing or refreshing a vault takes the folder the user picked. Validating it against the vault list it is about to define is circular.
+- These commands are reachable only from a folder dialog.
+
+The exemptions are listed with their reasons in the gate, so a new command cannot join them silently. Everything else fails the gate: a command with a caller-supplied path parameter that performs a filesystem operation must call a validator.
+
 ### Dependency advisories
 
 Dependencies are checked against the RustSec advisory database as a release gate. The dependency bounds already cover day-to-day drift, so a per-push check would spend CI minutes on a constraint that is already enforced statically.

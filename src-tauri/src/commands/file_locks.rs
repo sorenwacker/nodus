@@ -19,6 +19,11 @@ pub async fn check_file_available(path: String) -> Result<bool, String> {
         return Ok(true); // Non-existent files are "available"
     }
 
+    // Probing a lock reveals whether a path exists and whether another process
+    // holds it, so the path must be one the user chose
+    // (PRODUCT_DESIGN.md > Validating caller-supplied paths)
+    super::validate_path_in_workspace(path).await?;
+
     match FileLock::exclusive(path) {
         Ok(_lock) => Ok(true), // Lock acquired and immediately released
         Err(crate::watcher::WatcherError::FileLocked) => Ok(false),

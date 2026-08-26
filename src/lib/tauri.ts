@@ -190,11 +190,9 @@ export async function applyOkfBackfill(workspaceId: string | null): Promise<numb
   return invoke<number>('apply_okf_backfill', { workspaceId })
 }
 
-export async function exportOkfBundle(
-  workspaceId: string | null,
-  targetDir: string
-): Promise<number> {
-  return invoke<number>('export_okf_bundle', { workspaceId, targetDir })
+export async function exportOkfBundle(workspaceId: string | null): Promise<number | null> {
+  // The backend owns the folder dialog; null means the user cancelled
+  return invoke<number | null>('export_okf_bundle', { workspaceId })
 }
 
 // Convert local file path to URL that webview can access

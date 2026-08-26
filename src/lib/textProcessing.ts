@@ -62,8 +62,11 @@ export function splitIntoChunks(
 
     chunks.push(remaining.slice(0, breakPoint).trim())
 
-    // Start next chunk with small overlap for context continuity
-    const overlapStart = Math.max(0, breakPoint - overlap)
+    // Start next chunk with small overlap for context continuity. The start
+    // must advance by at least one character: an overlap at least as large as
+    // the break point resolved to 0, so `remaining` never shrank and the loop
+    // never terminated (PRODUCT_DESIGN.md > Splitting text into chunks)
+    const overlapStart = Math.max(1, breakPoint - overlap)
     remaining = remaining.slice(overlapStart).trim()
   }
 

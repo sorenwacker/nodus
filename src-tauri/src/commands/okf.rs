@@ -156,7 +156,16 @@ pub(crate) fn okf_filename(title: &str, taken: &mut std::collections::HashSet<St
         .split_whitespace()
         .collect::<Vec<_>>()
         .join("-");
-    stem.truncate(100);
+    // Truncate on a character, not a byte: String::truncate panics when the
+    // byte index falls inside a multi-byte character, which any accented or
+    // non-Latin title longer than the cap will do
+    if stem.len() > 100 {
+        let cut = (0..=100)
+            .rev()
+            .find(|&i| stem.is_char_boundary(i))
+            .unwrap_or(0);
+        stem.truncate(cut);
+    }
     let stem = stem.trim_matches(['-', '.']).to_string();
     let base = if stem.is_empty() {
         "untitled".to_string()
@@ -405,11 +414,32 @@ async fn workspace_nodes(
 /// Export a workspace as an OKF bundle into `<target_dir>/<workspace-slug>-okf`
 #[tauri::command]
 pub async fn export_okf_bundle(
+    app: tauri::AppHandle,
     workspace_id: Option<String>,
-    target_dir: String,
-) -> Result<usize, String> {
+) -> Result<Option<usize>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    let base = Path::new(&target_dir);
+
+    // The backend owns the dialog, so the folder written to is one the user
+    // chose rather than one the interface named. An export legitimately lands
+    // outside the vault, so validating against the vault list would be wrong
+    // here; owning the dialog is what makes the path trustworthy
+    // (PRODUCT_DESIGN.md > Validating caller-supplied paths)
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |chosen| {
+        let _ = tx.send(chosen);
+    });
+    let chosen = rx
+        .await
+        .map_err(|_| "The folder dialog closed unexpectedly".to_string())?;
+    let Some(folder) = chosen else {
+        return Ok(None);
+    };
+    let base = folder
+        .into_path()
+        .map_err(|e| format!("Unusable export folder: {}", e))?;
+    let base = base.as_path();
     if !base.is_dir() {
         return Err("Target folder does not exist".to_string());
     }
@@ -423,11 +453,49 @@ pub async fn export_okf_bundle(
     };
     let mut taken = std::collections::HashSet::new();
     let dir_name = format!("{}-okf", okf_filename(&slug, &mut taken).to_lowercase());
-    export_okf_bundle_impl(pool, workspace_id, &base.join(dir_name)).await
+    export_okf_bundle_impl(pool, workspace_id, &base.join(dir_name))
+        .await
+        .map(Some)
 }
 
 #[cfg(test)]
 mod tests {
+    // String::truncate panics when the byte index is not a char boundary, so a
+    // title whose 100th byte falls inside a multi-byte character crashed the
+    // export. Ordinary input: any language with accents or non-Latin script.
+    #[test]
+    fn a_long_non_ascii_title_does_not_panic() {
+        let mut taken = std::collections::HashSet::new();
+        // 'あ' is three bytes and 100 is not a multiple of three, so byte 100
+        // lands inside a character. A two-byte character would land exactly on
+        // the boundary and prove nothing.
+        let title = "あ".repeat(200);
+
+        let name = super::okf_filename(&title, &mut taken);
+
+        assert!(!name.is_empty());
+        assert!(name.len() <= 100);
+    }
+
+    #[test]
+    fn a_mixed_script_title_does_not_panic() {
+        let mut taken = std::collections::HashSet::new();
+        let title = format!("{}{}", "a".repeat(99), "é".repeat(20));
+
+        let name = super::okf_filename(&title, &mut taken);
+
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn a_long_ascii_title_is_still_capped() {
+        let mut taken = std::collections::HashSet::new();
+
+        let name = super::okf_filename(&"a".repeat(300), &mut taken);
+
+        assert_eq!(name.len(), 100);
+    }
+
     use super::*;
     use crate::database::DbPool;
     use sqlx::sqlite::SqlitePoolOptions;

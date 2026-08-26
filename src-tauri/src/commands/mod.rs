@@ -13,6 +13,7 @@ mod ontology;
 mod pdf;
 mod storylines;
 mod themes;
+mod trash;
 mod vault_watcher;
 mod web_search;
 mod wikilinks;

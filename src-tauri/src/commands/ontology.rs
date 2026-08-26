@@ -37,6 +37,11 @@ pub async fn import_ontology(
         return Err("Ontology file/directory does not exist".to_string());
     }
 
+    // The path arrives from the webview, so it is not yet the user's choice.
+    // A file the user dropped is granted separately
+    // (PRODUCT_DESIGN.md > Validating caller-supplied paths)
+    super::validate_path_in_workspace(path).await?;
+
     // Parse the ontology - either a single file or all files in a directory
     let ontology_data = if path.is_dir() {
         // Parse all ontology files in the directory

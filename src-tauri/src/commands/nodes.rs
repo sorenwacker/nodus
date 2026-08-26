@@ -414,24 +414,7 @@ pub async fn delete_node(id: String) -> Result<(), String> {
     // Get the node first to check for file_path
     if let Ok(Some(node)) = database::nodes::get_by_id(pool, &id).await {
         if let Some(file_path) = &node.file_path {
-            let path = std::path::Path::new(file_path);
-            if path.exists() {
-                // Create .nodus-trash directory next to the file
-                if let Some(parent) = path.parent() {
-                    let trash_dir = parent.join(".nodus-trash");
-                    if !trash_dir.exists() {
-                        std::fs::create_dir_all(&trash_dir)
-                            .map_err(|e| format!("Failed to create trash dir: {}", e))?;
-                    }
-
-                    // Move file to trash with original filename
-                    if let Some(filename) = path.file_name() {
-                        let trash_path = trash_dir.join(filename);
-                        std::fs::rename(path, &trash_path)
-                            .map_err(|e| format!("Failed to move file to trash: {}", e))?;
-                    }
-                }
-            }
+            super::trash::move_to_trash(std::path::Path::new(file_path))?;
         }
     }
 
@@ -454,22 +437,12 @@ pub async fn delete_nodes(ids: Vec<String>) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    // Move files to trash (collect errors but don't fail)
+    // Move files to trash. Unlike delete_node, a failure here does not abort:
+    // the two commands disagree on whether a node whose file could not be
+    // moved is still deleted, which is REVIEW.md L44 and is not settled here.
     for node in &nodes {
         if let Some(file_path) = &node.file_path {
-            let path = std::path::Path::new(file_path);
-            if path.exists() {
-                if let Some(parent) = path.parent() {
-                    let trash_dir = parent.join(".nodus-trash");
-                    if !trash_dir.exists() {
-                        let _ = std::fs::create_dir_all(&trash_dir);
-                    }
-                    if let Some(filename) = path.file_name() {
-                        let trash_path = trash_dir.join(filename);
-                        let _ = std::fs::rename(path, &trash_path);
-                    }
-                }
-            }
+            let _ = super::trash::move_to_trash(std::path::Path::new(file_path));
         }
     }
 
@@ -486,16 +459,13 @@ pub async fn restore_node(node: Node) -> Result<(), String> {
     // Restore file from trash if it exists
     if let Some(file_path) = &node.file_path {
         let path = std::path::Path::new(file_path);
+        // The node arrives from the caller, so its file path is not yet the
+        // user's choice, and the rename below would honour whatever it names
+        // (PRODUCT_DESIGN.md > Validating caller-supplied paths)
         if let Some(parent) = path.parent() {
-            let trash_dir = parent.join(".nodus-trash");
-            if let Some(filename) = path.file_name() {
-                let trash_path = trash_dir.join(filename);
-                if trash_path.exists() && !path.exists() {
-                    std::fs::rename(&trash_path, path)
-                        .map_err(|e| format!("Failed to restore file from trash: {}", e))?;
-                }
-            }
+            super::validate_target_dir_in_workspace(parent).await?;
         }
+        super::trash::restore_from_trash(path)?;
     }
 
     database::nodes::restore(pool, &node.id)

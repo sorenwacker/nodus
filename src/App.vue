@@ -557,15 +557,11 @@ async function applyWorkspaceBackfill() {
 async function exportWorkspaceAsOkf() {
   if (!editingWorkspace.value) return
   try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: t('settings.okfExportBtn'),
-    })
-    if (!selected) return
+    // The backend owns the folder dialog, so the path written to is the user's
+    // own choice (PRODUCT_DESIGN.md > Validating caller-supplied paths)
     exportingOkf.value = true
-    const count = await exportOkfBundle(editingWorkspace.value.id, selected as string)
+    const count = await exportOkfBundle(editingWorkspace.value.id)
+    if (count === null) return
     showToast(t('toasts.okfExported', { count }), 'success')
   } catch (e) {
     showToast(`${t('settings.okfExport')}: ${e}`, 'error')
