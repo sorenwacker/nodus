@@ -25,6 +25,16 @@ fn should_exclude_file(path: &Path) -> bool {
 
 /// Collect all markdown files from a vault directory
 /// Returns files and a map of folders to their file counts
+/// Whether a walked entry should be visited.
+///
+/// Hidden files and folders are skipped, but never the root: a vault folder
+/// whose own name starts with a dot - `.notes`, or any vault the user chose to
+/// hide - is still a vault, and pruning at depth 0 made it scan as empty. The
+/// watcher walks with the same rule.
+pub fn is_visible_vault_entry(entry: &walkdir::DirEntry) -> bool {
+    entry.depth() == 0 || !entry.file_name().to_string_lossy().starts_with('.')
+}
+
 pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<String, usize>) {
     let mut files = Vec::new();
     let mut folder_counts: HashMap<String, usize> = HashMap::new();
@@ -32,11 +42,7 @@ pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<
     for entry in walkdir::WalkDir::new(vault_path)
         .follow_links(true)
         .into_iter()
-        .filter_entry(|e| {
-            // Skip all hidden files and directories (starting with .)
-            let name = e.file_name().to_string_lossy();
-            !name.starts_with('.')
-        })
+        .filter_entry(is_visible_vault_entry)
         .filter_map(|e| e.ok())
     {
         let file_path = entry.path();
@@ -135,6 +141,45 @@ pub fn remove_wikilinks_to_target(content: &str, target_title: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A vault folder whose own name starts with a dot is still a vault.
+    ///
+    /// The hidden-entry filter tested every entry including the root, so the
+    /// walk was pruned at depth 0 and the vault scanned as empty. The watcher's
+    /// copy of the same rule already exempted the root.
+    #[test]
+    fn a_vault_in_a_dot_directory_is_not_empty() {
+        let base = std::env::temp_dir().join("nodus-dot-vault-test");
+        let _ = std::fs::remove_dir_all(&base);
+        let vault = base.join(".notes");
+        std::fs::create_dir_all(&vault).unwrap();
+        std::fs::write(vault.join("alpha.md"), "# Alpha").unwrap();
+        std::fs::create_dir_all(vault.join("sub")).unwrap();
+        std::fs::write(vault.join("sub/beta.md"), "# Beta").unwrap();
+        // A genuinely hidden folder inside the vault stays excluded
+        std::fs::create_dir_all(vault.join(".obsidian")).unwrap();
+        std::fs::write(vault.join(".obsidian/config.md"), "hidden").unwrap();
+
+        let (files, _) = collect_markdown_files(&vault);
+
+        let names: Vec<String> = files
+            .iter()
+            .map(|f| f.path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(
+            names.contains(&"alpha.md".to_string()),
+            "the vault scanned as empty: {:?}",
+            names
+        );
+        assert!(names.contains(&"beta.md".to_string()));
+        assert!(
+            !names.contains(&"config.md".to_string()),
+            "a hidden folder inside the vault must stay excluded: {:?}",
+            names
+        );
+
+        std::fs::remove_dir_all(&base).ok();
+    }
 
     #[test]
     fn test_remove_simple_wikilink() {

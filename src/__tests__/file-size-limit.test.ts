@@ -25,7 +25,6 @@ const OVER_LIMIT: Record<string, number> = {
   'src/components/StorylineReader.vue': 1214,
   'src/__tests__/layoutFrameIntegration.test.ts': 1205,
   'src/__tests__/frameCollision.test.ts': 1201,
-  'src-tauri/src/commands/nodes.rs': 1068,
 }
 
 const EXTENSIONS = ['.ts', '.vue', '.rs']

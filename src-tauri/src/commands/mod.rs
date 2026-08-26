@@ -2,6 +2,7 @@
 //!
 //! All commands are async and return Results for proper error handling.
 
+mod deletion;
 mod edges;
 mod exports;
 mod file_locks;
@@ -24,6 +25,7 @@ use crate::watcher::FileLock;
 use std::sync::Mutex;
 
 // Re-export all commands
+pub use deletion::*;
 pub use edges::*;
 pub use exports::*;
 pub use file_locks::*;

@@ -165,11 +165,8 @@ impl VaultWatcher {
         for entry in walkdir::WalkDir::new(&self.watched_path)
             .follow_links(true)
             .into_iter()
-            .filter_entry(|e| {
-                // Skip hidden files and directories (starting with .)
-                // But don't filter the root directory itself (depth 0)
-                e.depth() == 0 || !e.file_name().to_string_lossy().starts_with('.')
-            })
+            // One rule, shared with the import walk, so the two cannot drift
+            .filter_entry(crate::import_helpers::is_visible_vault_entry)
             .filter_map(|e| e.ok())
         {
             let path = entry.path();

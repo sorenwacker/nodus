@@ -1224,6 +1224,24 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Deleting nodes with files
+
+Deleting a node moves its file to the vault's `.nodus-trash` folder, so the delete can be undone and no text is destroyed.
+
+A node is deleted only once its file is in the trash. Deleting the row while the file stays in the vault leaves the file watcher to read it back, and the node returns - the user deletes something and it reappears. A node with no file has nothing to move and is deleted.
+
+Deleting several nodes therefore deletes those whose files moved and reports the rest by title. The interface removes from the view only what the backend deleted; clearing the view on a failure hid nodes that were still stored, and they came back on the next load.
+
+### Redoing a delete or a create
+
+Every action that can be undone can be redone. Undoing a delete puts the delete back on the redo stack, and undoing a create puts the create back.
+
+Neither did. Undo removed the snapshot without recording anything to redo, and redo had no branch for either type, so it popped the snapshot and discarded it. A creation snapshot keeps the nodes themselves rather than only their ids, because an undo soft-deletes them and there is nothing left to look up.
+
+### Walking a vault
+
+Hidden files and folders are skipped when walking a vault, but the vault folder itself is always visited. A vault whose own name starts with a dot is still a vault, and testing every entry including the root pruned the walk at once, so the vault scanned as empty. The import walk and the file watcher share one rule.
+
 ### Storyline chain edges
 
 A storyline's sequence is carried by edges belonging to that storyline. Adding a node links it to its neighbours in the sequence, and removing one reconnects the neighbours it sat between.

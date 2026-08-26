@@ -408,90 +408,6 @@ pub async fn export_nodes_to_files(workspace_id: String) -> Result<i32, String> 
 }
 
 #[tauri::command]
-pub async fn delete_node(id: String) -> Result<(), String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-
-    // Get the node first to check for file_path
-    if let Ok(Some(node)) = database::nodes::get_by_id(pool, &id).await {
-        if let Some(file_path) = &node.file_path {
-            super::trash::move_to_trash(std::path::Path::new(file_path))?;
-        }
-    }
-
-    database::nodes::soft_delete(pool, &id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Batch delete multiple nodes efficiently
-#[tauri::command]
-pub async fn delete_nodes(ids: Vec<String>) -> Result<(), String> {
-    if ids.is_empty() {
-        return Ok(());
-    }
-
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-
-    // Get all nodes with file_paths in one query
-    let nodes = database::nodes::get_many_by_ids(pool, &ids)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Move files to trash. Unlike delete_node, a failure here does not abort:
-    // the two commands disagree on whether a node whose file could not be
-    // moved is still deleted, which is REVIEW.md L44 and is not settled here.
-    for node in &nodes {
-        if let Some(file_path) = &node.file_path {
-            let _ = super::trash::move_to_trash(std::path::Path::new(file_path));
-        }
-    }
-
-    // Batch soft delete all nodes
-    database::nodes::soft_delete_many(pool, &ids)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn restore_node(node: Node) -> Result<(), String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-
-    // Restore file from trash if it exists
-    if let Some(file_path) = &node.file_path {
-        let path = std::path::Path::new(file_path);
-        // The node arrives from the caller, so its file path is not yet the
-        // user's choice, and the rename below would honour whatever it names
-        // (PRODUCT_DESIGN.md > Validating caller-supplied paths)
-        if let Some(parent) = path.parent() {
-            super::validate_target_dir_in_workspace(parent).await?;
-        }
-        super::trash::restore_from_trash(path)?;
-    }
-
-    database::nodes::restore(pool, &node.id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Get all soft-deleted nodes for a workspace
-#[tauri::command]
-pub async fn get_deleted_nodes(workspace_id: String) -> Result<Vec<Node>, String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-    database::nodes::get_deleted(pool, &workspace_id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Restore nodes whose files still exist on disk
-#[tauri::command]
-pub async fn restore_nodes_with_files(workspace_id: String) -> Result<usize, String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-    database::nodes::restore_if_file_exists(pool, &workspace_id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn update_node_position(id: String, x: f64, y: f64) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_position(pool, &id, x, y)
@@ -833,6 +749,7 @@ pub async fn update_node_tags(id: String, tags: Vec<String>) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::database::DbPool;
     use sqlx::sqlite::SqlitePoolOptions;
 

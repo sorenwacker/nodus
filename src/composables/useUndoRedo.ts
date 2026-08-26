@@ -22,7 +22,11 @@ interface DeletionSnapshot {
 
 interface CreationSnapshot {
   type: 'creation'
-  creation: { nodeIds: string[] }
+  creation: {
+    nodeIds: string[]
+    /** The nodes themselves, so a redo can restore what an undo removed */
+    nodes?: Node[]
+  }
 }
 
 interface ColorSnapshot {
@@ -144,9 +148,15 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
 
   function pushCreationUndo(nodeIds: string[]) {
     if (nodeIds.length === 0) return
+    // Keep the nodes, not only their ids: undo soft-deletes them, and a redo
+    // then has nothing to look up (PRODUCT_DESIGN.md > Redoing a delete or a
+    // create)
+    const nodes = nodeIds
+      .map(id => store.getNode(id))
+      .filter((n): n is Node => n !== undefined)
     undoStack.value.push({
       type: 'creation',
-      creation: { nodeIds: [...nodeIds] },
+      creation: { nodeIds: [...nodeIds], nodes },
     })
     if (undoStack.value.length > maxUndo) {
       undoStack.value.shift()
@@ -252,8 +262,10 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         showToast('Undo content', 'info')
       }
     } else if (snapshot.type === 'deletion') {
-      // Restore deleted node
+      // Restore deleted node. The snapshot goes on the redo stack so the delete
+      // can be repeated (PRODUCT_DESIGN.md > Redoing a delete or a create)
       const { node, edges } = snapshot.deletion
+      redoStack.value.push({ type: 'deletion', deletion: { node, edges } })
       await store.restoreNode(node)
       // Restore connected edges
       for (const edge of edges) {
@@ -262,6 +274,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
       showToast('Undo deletion', 'info')
     } else if (snapshot.type === 'creation') {
       // Delete created nodes (e.g., from PDF import)
+      redoStack.value.push({ type: 'creation', creation: snapshot.creation })
       for (const nodeId of snapshot.creation.nodeIds) {
         await store.deleteNode(nodeId)
       }
@@ -383,6 +396,21 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
         showToast('Redo content', 'info')
       }
+    } else if (snapshot.type === 'deletion') {
+      // Redo a delete: remove the node again, and put the snapshot back on the
+      // undo stack so it can be restored once more
+      const { node, edges } = snapshot.deletion
+      undoStack.value.push({ type: 'deletion', deletion: { node, edges } })
+      await store.deleteNode(node.id)
+      showToast('Redo deletion', 'info')
+    } else if (snapshot.type === 'creation') {
+      // Redo a create: bring the nodes back. Restore rather than create, so
+      // the ids the snapshot refers to stay valid for a further undo
+      undoStack.value.push({ type: 'creation', creation: snapshot.creation })
+      for (const node of snapshot.creation.nodes ?? []) {
+        await store.restoreNode(node)
+      }
+      showToast(`Redo: restored ${snapshot.creation.nodeIds.length} nodes`, 'info')
     } else if (snapshot.type === 'color') {
       // Save current colors for undo
       const currentColors = new Map<string, string | null>()

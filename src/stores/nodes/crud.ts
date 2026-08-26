@@ -515,12 +515,19 @@ export async function deleteNodes(
 ): Promise<void> {
   if (ids.length === 0) return
   const { state, edgesStore } = deps
+
+  // Remove from the view only what the backend deleted. Clearing the view on a
+  // failure hid nodes that are still in the database, and they returned on the
+  // next load (PRODUCT_DESIGN.md > Deleting nodes with files)
+  let deleted: string[]
   try {
-    await invoke('delete_nodes', { ids })
+    deleted = (await invoke<string[]>('delete_nodes', { ids })) ?? []
   } catch (e) {
-    console.error('Failed to delete nodes:', e)
+    storeLogger.error(`Failed to delete nodes: ${e}`)
+    throw e
   }
-  const idSet = new Set(ids)
+
+  const idSet = new Set(deleted)
   state.nodes.value = state.nodes.value.filter(n => !idSet.has(n.id))
   // Clear selection for deleted nodes
   state.selectedNodeIds.value = state.selectedNodeIds.value.filter(nid => !idSet.has(nid))
