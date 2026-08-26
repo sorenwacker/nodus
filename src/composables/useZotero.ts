@@ -424,9 +424,23 @@ export function useZotero() {
     let duplicates = 0
     addToZoteroCancelled.value = false
 
-    // Fetch all existing DOIs once (for fast duplicate checking)
+    // Fetch all existing DOIs once (for fast duplicate checking). A library
+    // that cannot be read is not a library without duplicates, so stop rather
+    // than add items that may already be there
+    // (PRODUCT_DESIGN.md > Lookups that cannot be made)
     addToZoteroProgress.value = { current: 0, total: nodes.length, currentItem: 'Loading existing DOIs...' }
-    const existingDOIs = await zoteroApi.getAllDOIs()
+    let existingDOIs: Set<string>
+    try {
+      existingDOIs = await zoteroApi.getAllDOIs()
+    } catch (e) {
+      addToZoteroProgress.value = null
+      errors.push(
+        `Could not read the Zotero library, so duplicates could not be checked: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      )
+      return { added, errors, skipped, duplicates, cancelled: false }
+    }
 
     if (addToZoteroCancelled.value) {
       addToZoteroProgress.value = null

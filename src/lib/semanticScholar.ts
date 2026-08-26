@@ -137,30 +137,30 @@ export class SemanticScholarProvider {
   }
 
   /**
-   * Get paper metadata by DOI
+   * Get paper metadata by DOI.
+   *
+   * `null` means the service answered that there is no such paper. A failure to
+   * ask throws, because a caller that cannot tell the two apart records "no
+   * such paper" for every outage
+   * (PRODUCT_DESIGN.md > Lookups that cannot be made).
    */
   async getPaperByDOI(doi: string): Promise<SemanticScholarPaper | null> {
     const cacheKey = `${this.cachePrefix}doi_${doi}`
     const cached = this.getFromCache<SemanticScholarPaper>(cacheKey)
     if (cached) return cached
 
-    try {
-      const response = await this.rateLimitedFetch(
-        `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(doi)}?fields=paperId,externalIds,title,authors,year,abstract,venue,citationCount,referenceCount`
-      )
+    const response = await this.rateLimitedFetch(
+      `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(doi)}?fields=paperId,externalIds,title,authors,year,abstract,venue,citationCount,referenceCount`
+    )
 
-      if (!response.ok) {
-        if (response.status === 404) return null
-        throw new Error(`Semantic Scholar API error: ${response.status}`)
-      }
-
-      const paper = await response.json() as SemanticScholarPaper
-      this.setCache(cacheKey, paper)
-      return paper
-    } catch (error) {
-      console.error(`Failed to fetch paper by DOI ${doi}:`, error)
-      return null
+    if (!response.ok) {
+      if (response.status === 404) return null
+      throw new Error(`Semantic Scholar API error: ${response.status}`)
     }
+
+    const paper = (await response.json()) as SemanticScholarPaper
+    this.setCache(cacheKey, paper)
+    return paper
   }
 
   /**
@@ -198,69 +198,68 @@ export class SemanticScholarProvider {
   }
 
   /**
-   * Get paper metadata by Semantic Scholar paper ID
+   * Get paper metadata by Semantic Scholar paper ID.
+   *
+   * `null` is the service's answer that no such paper exists. A failure to ask
+   * throws (PRODUCT_DESIGN.md > Lookups that cannot be made).
    */
   async getPaperById(paperId: string): Promise<SemanticScholarPaper | null> {
     const cacheKey = `${this.cachePrefix}paper_${paperId}`
     const cached = this.getFromCache<SemanticScholarPaper>(cacheKey)
     if (cached) return cached
 
-    try {
-      const response = await this.rateLimitedFetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paperId}?fields=paperId,externalIds,title,authors,year,abstract,venue,citationCount,referenceCount`
-      )
+    const response = await this.rateLimitedFetch(
+      `https://api.semanticscholar.org/graph/v1/paper/${paperId}?fields=paperId,externalIds,title,authors,year,abstract,venue,citationCount,referenceCount`
+    )
 
-      if (!response.ok) {
-        if (response.status === 404) return null
-        throw new Error(`Semantic Scholar API error: ${response.status}`)
-      }
-
-      const paper = await response.json() as SemanticScholarPaper
-      this.setCache(cacheKey, paper)
-      return paper
-    } catch (error) {
-      console.error(`Failed to fetch paper by ID ${paperId}:`, error)
-      return null
+    if (!response.ok) {
+      if (response.status === 404) return null
+      throw new Error(`Semantic Scholar API error: ${response.status}`)
     }
+
+    const paper = (await response.json()) as SemanticScholarPaper
+    this.setCache(cacheKey, paper)
+    return paper
   }
 
   /**
-   * Get references (papers this paper cites)
+   * Get references (papers this paper cites).
+   *
+   * An empty list means the service answered that there are none. A failure to
+   * ask throws, so an outage is not read as a paper that cites nothing
+   * (PRODUCT_DESIGN.md > Lookups that cannot be made).
    */
   async getReferences(paperId: string, limit = 100): Promise<SemanticScholarReference[]> {
     const cacheKey = `${this.cachePrefix}refs_${paperId}`
     const cached = this.getFromCache<SemanticScholarReference[]>(cacheKey)
     if (cached) return cached
 
-    try {
-      const response = await this.rateLimitedFetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paperId}/references?fields=paperId,title,authors,year,venue,externalIds&limit=${limit}`
-      )
+    const response = await this.rateLimitedFetch(
+      `https://api.semanticscholar.org/graph/v1/paper/${paperId}/references?fields=paperId,title,authors,year,venue,externalIds&limit=${limit}`
+    )
 
-      if (!response.ok) {
-        if (response.status === 404) return []
-        throw new Error(`Semantic Scholar API error: ${response.status}`)
-      }
+    if (!response.ok) {
+      if (response.status === 404) return []
+      throw new Error(`Semantic Scholar API error: ${response.status}`)
+    }
 
-      const data = await response.json() as { data: Array<{ citedPaper: SemanticScholarReference }> | null }
-      if (!data.data || !Array.isArray(data.data)) {
-        return []
-      }
-      const references = data.data
-        .map(r => r.citedPaper)
-        .filter(r => r && r.paperId)
-
-      this.setCache(cacheKey, references)
-      return references
-    } catch (error) {
-      console.error(`Failed to fetch references for ${paperId}:`, error)
+    const data = (await response.json()) as {
+      data: Array<{ citedPaper: SemanticScholarReference }> | null
+    }
+    if (!data.data || !Array.isArray(data.data)) {
       return []
     }
+    const references = data.data.map(r => r.citedPaper).filter(r => r && r.paperId)
+
+    this.setCache(cacheKey, references)
+    return references
   }
 
   /**
-   * Get citations (papers that cite this paper)
-   * Fetches all citations using pagination
+   * Get citations (papers that cite this paper), across all pages.
+   *
+   * An empty list means the service answered that there are none. A failure to
+   * ask throws (PRODUCT_DESIGN.md > Lookups that cannot be made).
    */
   async getCitations(paperId: string): Promise<SemanticScholarReference[]> {
     const cacheKey = `${this.cachePrefix}cites_${paperId}`
@@ -272,45 +271,43 @@ export class SemanticScholarProvider {
     let offset = 0
     let hasMore = true
 
-    try {
-      while (hasMore) {
-        const response = await this.rateLimitedFetch(
-          `https://api.semanticscholar.org/graph/v1/paper/${paperId}/citations?fields=paperId,title,authors,year,venue,externalIds&limit=${pageSize}&offset=${offset}`
-        )
+    // A page that fails throws rather than returning the pages gathered so far:
+    // a partial list is indistinguishable from a complete one
+    // (PRODUCT_DESIGN.md > Lookups that cannot be made)
+    while (hasMore) {
+      const response = await this.rateLimitedFetch(
+        `https://api.semanticscholar.org/graph/v1/paper/${paperId}/citations?fields=paperId,title,authors,year,venue,externalIds&limit=${pageSize}&offset=${offset}`
+      )
 
-        if (!response.ok) {
-          if (response.status === 404) {
-            hasMore = false
-            continue
-          }
-          throw new Error(`Semantic Scholar API error: ${response.status}`)
-        }
-
-        const data = await response.json() as { data: Array<{ citingPaper: SemanticScholarReference }> | null }
-        if (!data.data || !Array.isArray(data.data)) {
+      if (!response.ok) {
+        if (response.status === 404) {
           hasMore = false
           continue
         }
-        const citations = data.data
-          .map(c => c.citingPaper)
-          .filter(c => c && c.paperId)
-
-        allCitations.push(...citations)
-
-        // If we got fewer than pageSize, we've reached the end
-        if (data.data.length < pageSize) {
-          hasMore = false
-        } else {
-          offset += pageSize
-        }
+        throw new Error(`Semantic Scholar API error: ${response.status}`)
       }
 
-      this.setCache(cacheKey, allCitations)
-      return allCitations
-    } catch (error) {
-      console.error(`Failed to fetch citations for ${paperId}:`, error)
-      return allCitations // Return what we got so far
+      const data = (await response.json()) as {
+        data: Array<{ citingPaper: SemanticScholarReference }> | null
+      }
+      if (!data.data || !Array.isArray(data.data)) {
+        hasMore = false
+        continue
+      }
+      const citations = data.data.map(c => c.citingPaper).filter(c => c && c.paperId)
+
+      allCitations.push(...citations)
+
+      // If we got fewer than pageSize, we've reached the end
+      if (data.data.length < pageSize) {
+        hasMore = false
+      } else {
+        offset += pageSize
+      }
     }
+
+    this.setCache(cacheKey, allCitations)
+    return allCitations
   }
 
   /**
@@ -337,14 +334,16 @@ export class SemanticScholarProvider {
         try {
           const response = await fetch(url, {
             headers: {
-              'Accept': 'application/json',
+              Accept: 'application/json',
             },
           })
 
           // Handle 429 rate limit with retry
           if (response.status === 429 && retryCount < maxRetries) {
             const backoff = BASE_BACKOFF_MS * Math.pow(2, retryCount)
-            console.warn(`[SemanticScholar] Rate limited (429), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`)
+            console.warn(
+              `[SemanticScholar] Rate limited (429), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`
+            )
             this.processQueue()
             this.startCountdown(backoff, 'backoff')
             await this.sleep(backoff)
@@ -361,7 +360,9 @@ export class SemanticScholarProvider {
           // When rate limited, the API returns 429 without CORS headers
           if (retryCount < maxRetries) {
             const backoff = BASE_BACKOFF_MS * Math.pow(2, retryCount)
-            console.warn(`[SemanticScholar] Rate limit hit (CORS blocked), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`)
+            console.warn(
+              `[SemanticScholar] Rate limit hit (CORS blocked), waiting ${backoff / 1000}s before retry ${retryCount + 1}/${maxRetries}...`
+            )
             this.processQueue()
             this.startCountdown(backoff, 'backoff')
             await this.sleep(backoff)

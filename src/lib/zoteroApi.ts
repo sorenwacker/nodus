@@ -192,26 +192,24 @@ export class ZoteroWebApi {
   }
 
   /**
-   * Get all DOIs in the library (for duplicate checking)
-   * Returns a Set of DOIs for fast lookup
+   * Get all DOIs in the library, for duplicate checking.
+   *
+   * Throws when the library could not be read. An empty Set means the library
+   * was read and holds no DOIs, which the caller treats as "nothing is a
+   * duplicate" - so returning it on a failure created duplicates silently
+   * (PRODUCT_DESIGN.md > Lookups that cannot be made).
    */
   async getAllDOIs(): Promise<Set<string>> {
-    try {
-      const dois = new Set<string>()
-      const items = await this.requestAllPages<{ data: ZoteroApiItem }>(
-        '/items/top?itemType=-attachment&format=json'
-      )
-      for (const item of items) {
-        if (item.data?.DOI) {
-          dois.add(item.data.DOI)
-        }
+    const dois = new Set<string>()
+    const items = await this.requestAllPages<{ data: ZoteroApiItem }>(
+      '/items/top?itemType=-attachment&format=json'
+    )
+    for (const item of items) {
+      if (item.data?.DOI) {
+        dois.add(item.data.DOI)
       }
-      console.log(`[Zotero API] Loaded ${dois.size} DOIs from library`)
-      return dois
-    } catch (e) {
-      console.error('[Zotero API] Failed to fetch DOIs:', e)
-      return new Set()
     }
+    return dois
   }
 
   /**

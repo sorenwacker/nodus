@@ -341,6 +341,17 @@ The integral is: $ integral_a^b f(x) dif x $
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
+### Lookups that cannot be made
+
+An outside service that could not be reached has not answered. Every lookup keeps the two apart:
+
+- A negative answer is a value. `null` from a paper lookup means the service says no such paper exists; an empty list means it says there are no references; an empty set of library identifiers means the library was read and holds none.
+- An inability to ask throws. The caller then decides what to do, instead of receiving a value that reads as a successful negative.
+
+Two consequences this prevents. Duplicate checking against a library that could not be read reported "no duplicates" and created them. A citation lookup during an outage recorded a paper as citing nothing, which is a claim about the paper rather than about the network.
+
+A partial result is treated the same way: a paged lookup whose later page fails throws rather than returning the pages gathered so far, because a partial list cannot be told from a complete one.
+
 ### Reporting MCP server failures
 
 Starting the MCP server can fail for an ordinary reason: the port is already in use. The settings panel says so, and the stored "enabled" flag records what the user asked for and got, so a failed start is not retried on the next launch.

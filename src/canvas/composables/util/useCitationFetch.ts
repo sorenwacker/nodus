@@ -114,7 +114,7 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
         queueProcessedPapers.value++
 
         // Use the appropriate fetch function based on direction
-        let result: { papersCreated: number; edgesCreated: number }
+        let result: { papersCreated: number; edgesCreated: number; error?: string }
         if (direction === 'citations') {
           result = await citationGraph.fetchCitationsForNode(nodeId, {
             paperIndex: queueProcessedPapers.value,
@@ -130,6 +130,12 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
             paperIndex: queueProcessedPapers.value,
             paperCount: queueTotalPapers.value,
           })
+        }
+
+        if (result.error) {
+          // Say the lookup could not be made rather than reporting nothing found
+          showToast?.(`Could not look up citations: ${result.error}`, 'error')
+          break
         }
 
         totalPapers += result.papersCreated

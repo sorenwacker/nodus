@@ -261,20 +261,21 @@ describe('SemanticScholarProvider', () => {
       expect(result).toBeNull()
     })
 
-    it('should return null on network error after retries', async () => {
-      // Mock all retry attempts to fail
+    it('should report a network error rather than "no such paper"', async () => {
+      // This test previously asserted null, which is the answer for a paper
+      // that does not exist. A caller cannot act on both meanings of one value
+      // (PRODUCT_DESIGN.md > Lookups that cannot be made)
       mockFetch.mockRejectedValue(new Error('Network error'))
 
-      const promise = provider.getPaperByDOI('10.1234/error')
+      const assertion = expect(provider.getPaperByDOI('10.1234/error')).rejects.toThrow()
 
       // Advance through all retry backoff periods (10s, 20s, 40s)
-      await vi.advanceTimersByTimeAsync(10000) // First retry
-      await vi.advanceTimersByTimeAsync(20000) // Second retry
-      await vi.advanceTimersByTimeAsync(40000) // Third retry
+      await vi.advanceTimersByTimeAsync(10000)
+      await vi.advanceTimersByTimeAsync(20000)
+      await vi.advanceTimersByTimeAsync(40000)
       await vi.runAllTimersAsync()
 
-      const result = await promise
-      expect(result).toBeNull()
+      await assertion
     })
   })
 })

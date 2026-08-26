@@ -174,7 +174,7 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     nodeId: string,
     direction: 'citations' | 'references' | 'both',
     options?: { maxPapers?: number; paperIndex?: number; paperCount?: number }
-  ): Promise<{ edgesCreated: number; papersCreated: number }> {
+  ): Promise<{ edgesCreated: number; papersCreated: number; error?: string }> {
     const maxPapers = options?.maxPapers ?? Infinity
     const batchPaperIndex = options?.paperIndex
     const batchPaperCount = options?.paperCount
@@ -192,21 +192,35 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     isFetchingCitations.value = true
     fetchProgress.value = { current: 0, total: 0, paperTitle: node.title, paperIndex: batchPaperIndex, paperCount: batchPaperCount }
 
-    const paper = await semanticScholar.getPaperByDOI(doi)
-    if (!paper) {
-      return { edgesCreated: 0, papersCreated: 0 }
-    }
-
+    // A lookup that could not be made is reported, not read as a paper with no
+    // references (PRODUCT_DESIGN.md > Lookups that cannot be made)
+    let paper: Awaited<ReturnType<typeof semanticScholar.getPaperByDOI>>
+    let references: Awaited<ReturnType<typeof semanticScholar.getReferences>> = []
+    let citations: Awaited<ReturnType<typeof semanticScholar.getCitations>> = []
     const paperIndex = buildPaperIndex()
     const workspaceId = ctx.getCurrentWorkspaceId()
 
-    // Fetch based on direction
-    const references = (direction === 'references' || direction === 'both')
-      ? await semanticScholar.getReferences(paper.paperId)
-      : []
-    const citations = (direction === 'citations' || direction === 'both')
-      ? await semanticScholar.getCitations(paper.paperId)
-      : []
+    try {
+      paper = await semanticScholar.getPaperByDOI(doi)
+      if (!paper) {
+        return { edgesCreated: 0, papersCreated: 0 }
+      }
+
+      if (direction === 'references' || direction === 'both') {
+        references = await semanticScholar.getReferences(paper.paperId)
+      }
+      if (direction === 'citations' || direction === 'both') {
+        citations = await semanticScholar.getCitations(paper.paperId)
+      }
+    } catch (e) {
+      isFetchingCitations.value = false
+      fetchProgress.value = null
+      return {
+        edgesCreated: 0,
+        papersCreated: 0,
+        error: e instanceof Error ? e.message : String(e),
+      }
+    }
 
     let edgesCreated = 0
     let papersCreated = 0
@@ -324,21 +338,21 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
   async function fetchCitationsForNode(
     nodeId: string,
     options?: { maxCitations?: number; paperIndex?: number; paperCount?: number }
-  ): Promise<{ edgesCreated: number; papersCreated: number }> {
+  ): Promise<{ edgesCreated: number; papersCreated: number; error?: string }> {
     return fetchPapersForNode(nodeId, 'citations', { ...options, maxPapers: options?.maxCitations })
   }
 
   async function fetchReferencesForNode(
     nodeId: string,
     options?: { maxReferences?: number; paperIndex?: number; paperCount?: number }
-  ): Promise<{ edgesCreated: number; papersCreated: number }> {
+  ): Promise<{ edgesCreated: number; papersCreated: number; error?: string }> {
     return fetchPapersForNode(nodeId, 'references', { ...options, maxPapers: options?.maxReferences })
   }
 
   async function fetchBothForNode(
     nodeId: string,
     options?: { maxPapers?: number; paperIndex?: number; paperCount?: number }
-  ): Promise<{ edgesCreated: number; papersCreated: number }> {
+  ): Promise<{ edgesCreated: number; papersCreated: number; error?: string }> {
     return fetchPapersForNode(nodeId, 'both', options)
   }
 
