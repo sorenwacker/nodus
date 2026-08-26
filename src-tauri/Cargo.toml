@@ -1,6 +1,6 @@
 [package]
 name = "nodus"
-version = "1.4.0-rc.3"
+version = "1.4.0"
 description = "Visual knowledge graph for thinking and research"
 authors = ["Nodus Team"]
 edition = "2021"

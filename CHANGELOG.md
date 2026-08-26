@@ -2,6 +2,49 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.4.0] - 2026-08-26
+
+Releases the work of 1.4.0-rc.1 through rc.3. The individual candidate entries below record each change in detail; this entry is the consolidated view for anyone upgrading from 1.3.0.
+
+### Added
+- Documents leave the canvas as documents. A storyline or a canvas selection exports to PDF or Typst source, with title, author, paper size, and an optional list of the connections between exported nodes. A storyline exports in its own order, because the sequence is the argument
+- Highlights in a dropped PDF become nodes, each holding its passage, coloured to match, and linked to the document it came from
+- A dropped paper can become a graph rather than a single node: sections connected along the document outline, bibliography entries as citation nodes verified against Semantic Scholar, and an optional model pass extracting claims. Verification reports "not checked" when the service is unreachable, rather than marking a reference missing
+- A wikilink expands into a callout where it sits while reading at full width, and any node can be opened alone in the reader
+- An existing vault can be brought to Open Knowledge Format. The survey reports what would change and writes nothing until confirmed; the backfill prepends frontmatter and never touches the body
+- Both agent surfaces state the storage format, naming OKF v0.2 and leaving frontmatter to Nodus
+- The log level is selectable in Settings > General > Advanced and persists across restarts
+- The agent's log names each tool as it is called, with its arguments
+
+### Changed
+- Panning and zooming are driven by a single container transform rather than per-node styles: 24ms per frame became 1.52ms
+- A node card renders the leading part of its content and marks where the text continues. An imported paper measured 82ms to render against 6.7ms for the capped preview; the fullscreen view and the reader still render the whole document
+- Content is rendered for the nodes the viewport shows rather than every node in the workspace
+- Deleting a group of nodes went from 16.2ms to 3.1ms
+- A layout animation stores only where the nodes land, instead of one write per node per frame
+- The agent can reach the tools it was told about, and tools with no surface are declared as such
+- The backend owns the export save dialog, so the path written is one the user chose
+
+### Fixed
+- An edit is written to the node it was typed into. Both editors previously resolved a pending autosave against whichever node was open when the timer fired, losing the last keystrokes with nothing reported
+- Deleting a merged connection deletes it, rather than leaving a wikilink for the watcher to read back
+- Frontmatter is read the same way whatever the line endings
+- A tag matches its node with or without a leading `#`, so tagging no longer creates a duplicate
+- Copying reads the live selection, and pasting prefers copied Nodus nodes over reading their text as a citation
+- Cached mermaid diagrams render instead of blanking
+- A selected node in bubble mode can be dragged again
+- The plan approval dialog counts what a step actually affects
+- Every way an agent run can end is reported in the chat
+- Tooltips are placed from measurement, so none is clipped at a screen edge
+- MCP single-entity lookups are scoped to the open workspace, as the list operations already were
+
+### Removed
+- The PixiJS and WebGL dependencies, which were declared and documented but never used. Rendering is DOM cards, SVG edges, and a 2D canvas above the LOD threshold, and the documentation now says so
+
+### Enforcement
+- Gates added for rendering and culling budgets, pan and zoom smoothness, platform portability, version consistency, tool reachability, architecture honesty, and the 1000-line file limit
+- A gate rejects a registered command that binds none of its inputs while reporting success
+
 ## [1.4.0-rc.3] - 2026-08-25
 
 This release candidate is the remediation of a full codebase review: 388 files reviewed, 241 findings confirmed by an adversarial verification pass, recorded in `docs/REVIEW.md`. All ten high-severity findings are fixed, each with a gate that fails on the unfixed code.
