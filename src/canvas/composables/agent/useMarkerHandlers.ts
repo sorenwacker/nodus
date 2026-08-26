@@ -62,12 +62,17 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
    * Returns processed result or null if no marker found
    */
   async function handleMarker(result: string): Promise<string | null> {
-    // Plan creation marker
+    // Plan creation marker. A payload naming an existing plan has already been
+    // created by the tool handler; creating it again from a payload that carries
+    // no steps left a plan of zero steps, which requestApproval refuses, so no
+    // approval dialog ever opened (PRODUCT_DESIGN.md > One creator per plan)
     if (result.startsWith('__CREATE_PLAN__:')) {
       try {
         const data = JSON.parse(result.replace('__CREATE_PLAN__:', ''))
-        const plan = planState.createPlan(data.title || 'Plan', data.steps || [])
-        log(`> Plan created: ${plan.title} (${plan.steps.length} steps)`)
+        if (!data.planId) {
+          const plan = planState.createPlan(data.title || 'Plan', data.steps || [])
+          log(`> Plan created: ${plan.title} (${plan.steps.length} steps)`)
+        }
       } catch (e) {
         console.error('[MarkerHandlers] Failed to parse create_plan:', e)
       }
@@ -76,7 +81,8 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
 
     // Approval request marker
     if (result.startsWith('__REQUEST_APPROVAL__:')) {
-      if (planState.currentPlan.value) {
+      // The tool handler may already have opened the dialog
+      if (planState.currentPlan.value && !planState.showApprovalModal.value) {
         planState.requestApproval()
         log('> Requesting approval...')
       }
