@@ -76,10 +76,15 @@ export function usePlanState() {
         targets: s.targets,
         status: 'pending',
       })),
-      status: 'draft',
+      // A plan exists to be approved, and whether the user sees it must not
+      // depend on the model also calling request_approval
+      // (PRODUCT_DESIGN.md > A created plan is presented)
+      status: steps.length > 0 ? 'pending_approval' : 'draft',
       createdAt: Date.now(),
     }
     currentPlan.value = plan
+    // A plan with no steps has nothing to approve, so it opens no dialog
+    showApprovalModal.value = plan.steps.length > 0
     return plan
   }
 

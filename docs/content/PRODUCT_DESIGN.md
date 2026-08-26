@@ -1224,6 +1224,14 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### A created plan is presented
+
+Whether the user sees a plan must not depend on the model making a second call. The prompt asks for `request_approval()` after `create_plan()`, and when the model skipped it - or called `create_plan` twice and then described the plan in prose - the plan existed in state with no dialog and nothing to approve, so the user was asked "would you like me to proceed?" in chat text they could not edit.
+
+- Creating a plan opens the approval dialog, where its steps can be edited, added to, removed, approved or rejected.
+- `request_approval()` remains for the model to call and opens nothing that is already open.
+- Creating a second plan replaces what the dialog shows rather than opening another.
+
 ### One creator per plan
 
 A plan is created once, by whoever handled the `create_plan` call. The marker processed after the call must not create it again: the second creation replaced the real plan with one holding no steps, `requestApproval` refuses a plan with no steps, and so no approval dialog appeared. The agent reported that it was waiting for approval on a plan the user was never shown, then retried and wrote the plan into the chat as prose instead.

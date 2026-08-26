@@ -72,3 +72,46 @@ describe('plan approval dialog', () => {
     expect(planState.requestApproval()).toBe(true)
   })
 })
+
+describe('a created plan is presented', () => {
+  // The prompt asks for request_approval() after create_plan(), but nothing
+  // guarantees the model makes that call. When it skipped it, the plan existed
+  // in state with no dialog, and the user got prose asking "would you like me
+  // to proceed?" (PRODUCT_DESIGN.md > A created plan is presented)
+  it('opens the dialog on creation, without a separate approval call', () => {
+    const planState = usePlanState()
+
+    planState.createPlan('Risk analysis', STEPS)
+
+    expect(planState.showApprovalModal.value).toBe(true)
+    expect(planState.currentPlan.value?.steps).toHaveLength(3)
+  })
+
+  it('shows the newer plan when a second one is created', () => {
+    const planState = usePlanState()
+
+    planState.createPlan('First attempt', STEPS)
+    planState.createPlan('Second attempt', [STEPS[0]])
+
+    expect(planState.showApprovalModal.value).toBe(true)
+    expect(planState.currentPlan.value?.title).toBe('Second attempt')
+    expect(planState.currentPlan.value?.steps).toHaveLength(1)
+  })
+
+  it('can be approved straight from creation', () => {
+    const planState = usePlanState()
+
+    planState.createPlan('Risk analysis', STEPS)
+
+    expect(planState.approvePlan()).toBe(true)
+  })
+
+  it('opens nothing on a plan with no steps', () => {
+    // There is nothing to approve, and the dialog would be empty
+    const planState = usePlanState()
+
+    planState.createPlan('Empty', [])
+
+    expect(planState.showApprovalModal.value).toBe(false)
+  })
+})
