@@ -249,6 +249,7 @@ fn main() {
             commands::delete_edge,
             commands::update_edge_color,
             commands::update_edge_label,
+            commands::update_edge_link_type,
             commands::update_edge_storyline,
             commands::update_edge_directed,
             commands::restore_edge,

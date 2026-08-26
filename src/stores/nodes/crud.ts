@@ -3,6 +3,7 @@
  */
 
 import type { Ref } from 'vue'
+import { syncWikilinks } from './wikilinkSync'
 import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { generateShortId } from '../../lib/ids'
@@ -202,15 +203,13 @@ export async function updateNodeContent(
     await extractAndPersistHashtags(node, trimmedContent, tagNodesComposable)
 
     // Sync wikilink edges through the backend engine, whose resolver also
-    // handles folder/note path links and #section anchors. The frontend
-    // resolver matches exact titles only and would silently drop such links.
-    try {
-      await invoke<number>('sync_node_wikilinks', { nodeId: id })
-      await edgesStore.loadEdges(deps.workspaceStore.currentWorkspaceId)
-    } catch {
-      // No backend (browser/dev mode): fall back to the local title-only diff
-      await syncWikilinkEdgesLocal(deps, id, trimmedContent, createEdgeFn)
-    }
+    // handles folder/note path links and #section anchors. A backend that
+    // fails leaves the edges alone; only the absence of a backend falls back
+    // to the title-only resolver (PRODUCT_DESIGN.md > Syncing wikilink edges)
+    await syncWikilinks(id, trimmedContent, {
+      reloadEdges: () => edgesStore.loadEdges(deps.workspaceStore.currentWorkspaceId),
+      localFallback: () => syncWikilinkEdgesLocal(deps, id, trimmedContent, createEdgeFn),
+    })
   }
 }
 

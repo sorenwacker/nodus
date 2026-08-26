@@ -30,6 +30,19 @@ vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }))
 
+/**
+ * Declare whether a backend is present. The sync path checks this directly
+ * rather than inferring it from a failed call, so each test says which world
+ * it is in (PRODUCT_DESIGN.md > Syncing wikilink edges).
+ */
+function setBackendPresent(present: boolean) {
+  if (present) {
+    ;(window as unknown as Record<string, unknown>).__TAURI__ = {}
+  } else {
+    delete (window as unknown as Record<string, unknown>).__TAURI__
+  }
+}
+
 function makeNode(id: string, title: string): Node {
   return {
     id,
@@ -59,6 +72,7 @@ describe('updateNodeContent wikilink sync', () => {
     localStorageMock.clear()
     setActivePinia(createPinia())
     invokeMock.mockReset()
+    setBackendPresent(true)
   })
 
   it('delegates wikilink resolution to the backend and reloads edges', async () => {
@@ -159,6 +173,7 @@ describe('updateNodeContent wikilink sync', () => {
   })
 
   it('falls back to title-based resolution without a backend', async () => {
+    setBackendPresent(false)
     invokeMock.mockRejectedValue(new Error('Mock: No backend'))
 
     const store = useNodesStore()

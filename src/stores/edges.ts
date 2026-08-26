@@ -174,11 +174,17 @@ export const useEdgesStore = defineStore('edges', () => {
   /**
    * Update edge link type
    */
-  function updateEdgeLinkType(id: string, linkType: string): void {
-    const idx = edges.value.findIndex((e) => e.id === id)
-    if (idx !== -1) {
-      edges.value = edges.value.map((e) => (e.id === id ? { ...e, link_type: linkType } : e))
-    }
+  /**
+   * Change an edge's link type.
+   *
+   * Stored before it is shown: the unique constraint covers
+   * (source, target, link_type), so this can fail for a real reason, and
+   * showing a change that was not stored is worse than showing none
+   * (PRODUCT_DESIGN.md > Changing an edge's type).
+   */
+  async function updateEdgeLinkType(id: string, linkType: string): Promise<void> {
+    await invoke('update_edge_link_type', { id, linkType })
+    edges.value = edges.value.map((e) => (e.id === id ? { ...e, link_type: linkType } : e))
   }
 
   /**

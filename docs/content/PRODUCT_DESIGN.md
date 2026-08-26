@@ -1224,6 +1224,18 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Syncing wikilink edges
+
+The backend resolver understands folder path links and `#section` anchors as well as plain titles. The local resolver matches exact titles only, so it is a fallback for running without a backend, never for a backend that failed.
+
+Treating any rejection as "no backend" ran the local resolver against edges the backend had created, which it could not see and therefore deleted. A single transient failure destroyed real edges, with nothing reported. Whether a backend exists is checked directly, and a backend that fails leaves the edges exactly as they were.
+
+### Changing an edge's type
+
+An edge's type is stored before the change is shown. The unique constraint covers source, target, and link type together, so setting a type that already connects the same two nodes fails, and the message says so.
+
+Showing the change without storing it left the edge reverting on the next reload.
+
 ### Reading frontmatter on either line ending
 
 A file written on Windows, or by any tool that writes CRLF, opens with `---\r\n`. Testing for `---\n` alone read such a file as having no frontmatter, which had two consequences: writing the file back dropped its metadata, and content that carried its own block was given a second one. One function answers "does this open with a frontmatter block", and every caller uses it.

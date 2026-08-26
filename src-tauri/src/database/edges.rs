@@ -125,6 +125,24 @@ pub async fn update_color(
     Ok(())
 }
 
+/// Change an edge's link type.
+///
+/// The unique constraint is on (source, target, link_type), so a change that
+/// would collide with an existing edge between the same nodes is reported
+/// rather than silently dropped.
+pub async fn update_link_type(
+    pool: &DbPool,
+    id: &str,
+    link_type: &str,
+) -> Result<(), DatabaseError> {
+    sqlx::query("UPDATE edges SET link_type = ? WHERE id = ?")
+        .bind(link_type)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn update_label(
     pool: &DbPool,
     id: &str,

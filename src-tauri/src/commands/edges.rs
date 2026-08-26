@@ -137,6 +137,21 @@ pub async fn update_edge_color(id: String, color: Option<String>) -> Result<(), 
 }
 
 #[tauri::command]
+pub async fn update_edge_link_type(id: String, link_type: String) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::edges::update_link_type(pool, &id, &link_type)
+        .await
+        .map_err(|e| {
+            // The unique constraint covers (source, target, link_type)
+            if e.to_string().contains("UNIQUE") {
+                "An edge of that type already connects these nodes".to_string()
+            } else {
+                e.to_string()
+            }
+        })
+}
+
+#[tauri::command]
 pub async fn update_edge_label(id: String, label: Option<String>) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::edges::update_label(pool, &id, label.as_deref())
