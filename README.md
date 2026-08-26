@@ -3,7 +3,9 @@
 [![Release](https://img.shields.io/github/v/release/sorenwacker/nodus?style=flat-square)](https://github.com/sorenwacker/nodus/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/sorenwacker/nodus/ci.yml?branch=main&style=flat-square)](https://github.com/sorenwacker/nodus/actions)
 
-Visual knowledge graph for thinking and research. A canvas-based tool where research nodes, Typst math, and Obsidian vaults live on a single workspace.
+Nodus puts your notes on a canvas and keeps them as plain Markdown files on your disk.
+
+Notes are stored in [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) - Markdown with a YAML frontmatter block - so the same folder opens in Obsidian, in a text editor, or in anything else that reads Markdown. Nodus adds the canvas: where each note sits, what connects it to what, and the reading order through it.
 
 ## Download
 
@@ -13,15 +15,18 @@ Visual knowledge graph for thinking and research. A canvas-based tool where rese
 | Windows | [Installer (exe)](https://github.com/sorenwacker/nodus/releases/latest) |
 | Linux | [AppImage](https://github.com/sorenwacker/nodus/releases/latest) / [deb](https://github.com/sorenwacker/nodus/releases/latest) |
 
-## Features
+## What it does
 
-- **Single Canvas** - The document and whiteboard are the same thing
-- **Native Typst** - Sub-second math rendering (no LaTeX compile times)
-- **Obsidian Bridge** - Seamless vault compatibility with bi-directional sync
-- **Local-First** - Your data stays on your device
-- **Graph Visualization** - Force-directed layouts, edge routing, semantic zooming
-- **Citation Management** - Zotero integration and BibTeX import
-- **LLM Integration** - Connect local or cloud LLMs for research assistance
+- **One canvas** - The document and the whiteboard are the same surface. Notes are editable where they sit.
+- **Your files** - Markdown in Open Knowledge Format, in a folder you choose. Edits made outside Nodus are picked up; edits made inside are written back.
+- **Typst math** - Math renders through Typst compiled to WebAssembly, with no LaTeX toolchain to install.
+- **Papers as graphs** - A dropped PDF can become one note or a graph of them: sections along the document outline, bibliography entries as citation notes, each reference checked against Semantic Scholar. A reference the service cannot be asked about is reported as unchecked rather than missing.
+- **Highlights** - Highlights in a dropped PDF become notes, coloured to match and linked to the document they came from.
+- **Storylines** - Order a subset of notes into a sequence and read it as a continuous document, or export it as PDF or Typst source.
+- **Citations** - Zotero library sync and BibTeX import.
+- **Language models** - Local models through Ollama, or a cloud provider. The model works through the same tools you do, and asks before changing the graph.
+- **MCP server** - Other AI tools can read and edit the graph over the Model Context Protocol.
+- **Local only** - No account, no sync service. The data is on your disk.
 
 ## Documentation
 
@@ -51,9 +56,12 @@ npm run tauri:dev
 
 | Command | Description |
 |---------|-------------|
-| `npm run tauri:dev` | Start development server |
-| `npm test` | Run tests |
-| `npm run tauri:build` | Build for production |
+| `npm run tauri:dev` | Start the app in development mode |
+| `npm test` | Run the frontend test suite |
+| `npm run typecheck` | Type-check the frontend |
+| `npm run lint` | Lint the frontend |
+| `npm run tauri:build` | Build the installers |
+| `cargo test` | Run the Rust test suite (from `src-tauri`) |
 
 ## Tech Stack
 
@@ -61,7 +69,7 @@ npm run tauri:dev
 |-------|------------|
 | Desktop | Tauri v2 |
 | Frontend | Vue 3 + TypeScript |
-| Canvas | PixiJS + DOM hybrid |
+| Canvas | DOM cards, SVG edges, and a 2D canvas above the level-of-detail threshold |
 | Database | LibSQL (SQLite) |
 | Math | Typst WASM |
 

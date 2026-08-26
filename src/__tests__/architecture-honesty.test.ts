@@ -96,13 +96,41 @@ describe('the rendering description matches the renderer', () => {
     expect(offenders).toEqual([])
   })
 
+  /**
+   * Every Markdown document, found rather than listed.
+   *
+   * A hand-written list of two files left README.md unchecked, so the public
+   * front page named a renderer the project had never used.
+   */
+  function documentationFiles(): string[] {
+    // These record history: what a release changed, and what a review found.
+    // Naming a removed renderer there is accurate, not a claim about today.
+    const HISTORICAL = new Set(['CHANGELOG.md', 'REVIEW.md'])
+    const found: string[] = []
+
+    const walk = (dir: string, recurse: boolean) => {
+      if (!existsSync(dir)) return
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (['node_modules', 'target', 'dist', '.git'].includes(entry.name)) continue
+        const path = join(dir, entry.name)
+        if (entry.isDirectory()) {
+          if (recurse) walk(path, true)
+        } else if (entry.name.endsWith('.md') && !HISTORICAL.has(entry.name)) {
+          found.push(path)
+        }
+      }
+    }
+
+    walk(ROOT, false)
+    walk(join(ROOT, 'docs'), true)
+    // Developer-local and untracked, so checked when present
+    if (existsSync(join(ROOT, '.claude/CLAUDE.md'))) found.push(join(ROOT, '.claude/CLAUDE.md'))
+    return found
+  }
+
   it('has no documentation naming one as the technology in use', () => {
-    // .claude/CLAUDE.md is developer-local and untracked, so it is checked
-    // when present rather than assumed
-    const docs = [
-      join(ROOT, 'docs/content/PRODUCT_DESIGN.md'),
-      join(ROOT, '.claude/CLAUDE.md'),
-    ].filter(existsSync)
+    const docs = documentationFiles()
+    expect(docs.length).toBeGreaterThan(1)
 
     const offenders: string[] = []
     for (const doc of docs) {

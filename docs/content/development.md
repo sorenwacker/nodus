@@ -37,7 +37,7 @@ make dev
 ```
 nodus/
 ├── src/                    # Vue frontend
-│   ├── canvas/             # Canvas rendering (PixiJS + DOM)
+│   ├── canvas/             # Canvas rendering (DOM, SVG, Canvas 2D)
 │   ├── components/         # Vue components
 │   ├── composables/        # Vue composables
 │   ├── stores/             # Pinia state management
@@ -57,7 +57,7 @@ nodus/
 |-------|------------|
 | Desktop | Tauri v2 |
 | Frontend | Vue 3 + TypeScript |
-| Canvas | PixiJS + DOM hybrid |
+| Canvas | DOM cards, SVG edges, and a 2D canvas above the level-of-detail threshold |
 | Database | SQLite via `sqlx` |
 | Math | Typst WASM |
 
