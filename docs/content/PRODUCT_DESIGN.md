@@ -1224,6 +1224,14 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+### Dependency advisories
+
+Dependencies are checked against the RustSec advisory database as a release gate. The dependency bounds already cover day-to-day drift, so a per-push check would spend CI minutes on a constraint that is already enforced statically.
+
+- The gate fails on any advisory that is not listed in `src-tauri/.cargo/audit.toml`.
+- Each accepted advisory records why it cannot be fixed here. An entry kept after its dependency is upgraded hides a real advisory behind a stale exception, so the list is reviewed on upgrade.
+- The advisory database is fetched from an outside service. When the fetch fails the gate reports "not checked" and passes: someone else's downtime is not a finding about this code.
+
 ### A created plan is presented
 
 Whether the user sees a plan must not depend on the model making a second call. The prompt asks for `request_approval()` after `create_plan()`, and when the model skipped it - or called `create_plan` twice and then described the plan in prose - the plan existed in state with no dialog and nothing to approve, so the user was asked "would you like me to proceed?" in chat text they could not edit.

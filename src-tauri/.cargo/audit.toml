@@ -1,0 +1,21 @@
+# Advisories accepted for now, each with the reason it cannot be fixed here.
+#
+# Everything not listed fails the release gate. Review this list whenever the
+# dependency it names is upgraded: an entry that is no longer needed hides a
+# real advisory behind a stale exception.
+
+[advisories]
+ignore = [
+    # No patched version exists. `rsa` is present in Cargo.lock but appears in
+    # no target's dependency tree (`cargo tree --target all -i rsa` prints
+    # nothing), so it is never compiled into the application.
+    "RUSTSEC-2023-0071",
+
+    # quick-xml 0.36 and 0.39 are both pinned by typst 0.12: 0.36 through
+    # citationberg/hayagriva, 0.39 through syntect/plist. Neither can be raised
+    # to the patched 0.41 without upgrading typst, which is the math renderer.
+    # Both advisories are resource-exhaustion on malformed XML, reached only by
+    # typst's own citation and syntax handling.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]

@@ -28,8 +28,8 @@ notify = "6.0"
 fs2 = "0.4"
 
 # PDF extraction
-pdf-extract = "0.7"
-lopdf = "0.33"
+pdf-extract = "0.12"
+lopdf = "0.44"
 
 # RDF/Ontology parsing
 rio_api = "0.8"

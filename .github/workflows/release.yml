@@ -105,6 +105,23 @@ jobs:
         run: cargo fmt --check
         working-directory: src-tauri
 
+      - name: Audit dependencies
+        working-directory: src-tauri
+        run: |
+          # A release gate, not a per-push one: the dependency bounds already
+          # cover day-to-day drift. Accepted advisories and the reason for each
+          # live in src-tauri/.cargo/audit.toml.
+          cargo install cargo-audit --locked --quiet
+
+          # The advisory database is fetched from an outside service. An outage
+          # must report "not checked" rather than fail the release, because
+          # someone else's downtime is not a finding about this code.
+          if ! cargo audit fetch; then
+            echo "::warning::Advisory database unreachable - dependencies not checked"
+            exit 0
+          fi
+          cargo audit --no-fetch
+
       - name: Run Clippy
         run: cargo clippy -- -D warnings
         working-directory: src-tauri
