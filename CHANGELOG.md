@@ -26,6 +26,7 @@ Releases the work of 1.4.0-rc.1 through rc.3. The individual candidate entries b
 - The backend owns the export save dialog, so the path written is one the user chose
 
 ### Fixed
+- The plan the agent asks approval for is the plan it built. Processing the create_plan marker created the plan a second time from a payload carrying no steps, and since approval is refused for a plan with no steps, no approval dialog opened: the agent reported it was waiting on a plan the user was never shown, then retried and wrote the plan into the chat as prose
 - An edit is written to the node it was typed into. Both editors previously resolved a pending autosave against whichever node was open when the timer fired, losing the last keystrokes with nothing reported
 - Deleting a merged connection deletes it, rather than leaving a wikilink for the watcher to read back
 - Frontmatter is read the same way whatever the line endings
