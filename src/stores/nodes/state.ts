@@ -236,21 +236,6 @@ export function getNode(nodes: Node[], id: string): Node | undefined {
 }
 
 /**
- * Get IDs of all nodes directly connected to the given node
- */
-export function getNeighborIds(edges: import('./types').Edge[], nodeId: string): string[] {
-  const neighbors: string[] = []
-  for (const edge of edges) {
-    if (edge.source_node_id === nodeId) {
-      neighbors.push(edge.target_node_id)
-    } else if (edge.target_node_id === nodeId) {
-      neighbors.push(edge.source_node_id)
-    }
-  }
-  return neighbors
-}
-
-/**
  * Find a node by title (case-insensitive)
  */
 export function findNodeByTitle(nodes: Node[], title: string): Node | undefined {

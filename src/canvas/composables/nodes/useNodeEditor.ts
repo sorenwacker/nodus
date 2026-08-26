@@ -183,28 +183,6 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     onSaveComplete?.()
   }
 
-  function onEditorKeydown(e: KeyboardEvent) {
-    // Cmd/Ctrl+F to open in-node search
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {
-      e.preventDefault()
-      openNodeSearch()
-      return
-    }
-    if (e.key === 'Escape') {
-      if (showNodeSearch.value) {
-        closeNodeSearch()
-      } else {
-        saveEditing()
-      }
-      return
-    }
-    // Cmd/Ctrl+Enter to save and exit
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      saveEditing()
-    }
-    // Don't propagate to prevent canvas shortcuts
-    e.stopPropagation()
-  }
 
   function openNodeSearch(nodeId?: string) {
     // Store which node we're searching (for view mode)
@@ -408,7 +386,6 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     saveEditing,
     saveTitleEditing,
     cancelTitleEditing,
-    onEditorKeydown,
     isEditing,
     isEditingTitle,
     clearAutosaveTimers,

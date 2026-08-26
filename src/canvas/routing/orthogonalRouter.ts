@@ -560,7 +560,8 @@ function tryNearlyAlignedRoute(
 /**
  * Check if a path contains any 180-degree turns (reversing direction)
  */
-function has180DegreeTurn(path: Point[]): boolean {
+/** Whether a path doubles back on itself. Shared with the diagonal router. */
+export function has180DegreeTurn(path: Point[]): boolean {
   for (let i = 0; i < path.length - 2; i++) {
     const p1 = path[i]
     const p2 = path[i + 1]

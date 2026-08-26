@@ -48,9 +48,9 @@ export {
   type NodeNavigationDeps,
 } from './useNodeNavigation'
 export {
-  useEntityOperations,
+  useCanvasEntityLinking,
   type UseEntityOperationsOptions,
-} from './useEntityOperations'
+} from './useCanvasEntityLinking'
 export {
   useCanvasNodeStyle,
   type NodeForStyle,

@@ -18,8 +18,6 @@ import { batchUpdatePositions } from '../../layout/fastGrid'
 import { executeAutoLayout, type LayoutType } from './useAutoLayout'
 import { computeRadialLayout } from './useRadialLayout'
 import {
-  getAvailableLayouts,
-  executeStrategy as executeLayoutStrategy,
   fitToContent as fitViewportToContent,
 } from './useLayoutStrategies'
 
@@ -316,23 +314,6 @@ export function useLayout(options: UseLayoutOptions) {
     fitViewportToContent(store, viewState)
   }
 
-  /**
-   * Execute a registered layout strategy by name
-   */
-  async function executeStrategy(
-    strategyName: string,
-    options?: { animate?: boolean; duration?: number }
-  ): Promise<void> {
-    await executeLayoutStrategy(strategyName, {
-      store,
-      viewState,
-      pushUndo,
-      stopAnimation,
-      animateToPositions,
-      applyFrameConstraints,
-    }, options)
-  }
-
   return {
     stopAnimation,
     animateToPositions,
@@ -340,7 +321,5 @@ export function useLayout(options: UseLayoutOptions) {
     radialLayout,
     fitToContent,
     // Strategy pattern methods
-    getAvailableLayouts,
-    executeStrategy,
-  }
+    }
 }

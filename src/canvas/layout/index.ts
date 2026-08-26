@@ -12,16 +12,6 @@ export type {
   LayoutAnimationOptions,
 } from './types'
 
-export { layoutRegistry, LayoutRegistry } from './registry'
-
-// Strategy implementations
-export {
-  ForceLayoutStrategy,
-  HierarchicalLayoutStrategy,
-  GridLayoutStrategy,
-} from './strategies'
-
-// Legacy exports for backwards compatibility
 export {
   applyForceLayout,
   layoutNodesWithForce,
@@ -42,10 +32,3 @@ export {
   type FastGridOptions,
 } from './fastGrid'
 
-// Register default strategies
-import { layoutRegistry } from './registry'
-import { ForceLayoutStrategy, HierarchicalLayoutStrategy, GridLayoutStrategy } from './strategies'
-
-layoutRegistry.register(ForceLayoutStrategy)
-layoutRegistry.register(HierarchicalLayoutStrategy)
-layoutRegistry.register(GridLayoutStrategy)

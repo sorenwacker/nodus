@@ -94,51 +94,6 @@ export async function renderMath(
 }
 
 /**
- * Process markdown content and render math expressions
- * Supports $...$ for inline and $$...$$ for display math
- * @param content - Markdown content
- * @returns Processed HTML with rendered math
- */
-export async function processMarkdownMath(content: string): Promise<string> {
-  if (!content) return content
-
-  // Match display math first ($$...$$)
-  const displayMathRegex = /\$\$([^$]+)\$\$/g
-  // Match inline math ($...$) but not $$
-  const inlineMathRegex = /(?<!\$)\$(?!\$)([^$\n]+)\$(?!\$)/g
-
-  let result = content
-
-  // Process display math
-  const displayMatches = [...content.matchAll(displayMathRegex)]
-  for (const match of displayMatches) {
-    const [fullMatch, mathContent] = match
-    const svg = await renderMath(mathContent.trim(), true)
-    if (svg) {
-      result = result.replace(
-        fullMatch,
-        `<div class="typst-math typst-display">${svg}</div>`
-      )
-    }
-  }
-
-  // Process inline math
-  const inlineMatches = [...result.matchAll(inlineMathRegex)]
-  for (const match of inlineMatches) {
-    const [fullMatch, mathContent] = match
-    const svg = await renderMath(mathContent.trim(), false)
-    if (svg) {
-      result = result.replace(
-        fullMatch,
-        `<span class="typst-math typst-inline">${svg}</span>`
-      )
-    }
-  }
-
-  return result
-}
-
-/**
  * Clear the rendering cache
  */
 export function clearCache(): void {

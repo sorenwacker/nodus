@@ -27,7 +27,6 @@ export {
   createDependencies,
   initializeStore,
   getNode,
-  getNeighborIds,
   findNodeByTitle,
   selectNode,
 } from './state'

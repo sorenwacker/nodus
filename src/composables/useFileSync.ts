@@ -3,6 +3,7 @@
  * Manages vault file watching and synchronization
  */
 import { fileNameFromPath } from '../lib/pdfGraph'
+import { relativeFolder } from '../lib/vaultPaths'
 import { ref } from 'vue'
 import {
   invoke,
@@ -39,18 +40,7 @@ function getFilename(filePath: string): string {
 }
 
 // Extract relative folder path from file path and vault path
-function getRelativeFolder(filePath: string, vaultPath: string | null): string {
-  if (!vaultPath) return ''
-  // Normalize paths
-  const normalizedFile = filePath.replace(/\\/g, '/')
-  const normalizedVault = vaultPath.replace(/\\/g, '/').replace(/\/$/, '')
 
-  if (!normalizedFile.startsWith(normalizedVault)) return ''
-
-  const relativePath = normalizedFile.slice(normalizedVault.length + 1)
-  const lastSlash = relativePath.lastIndexOf('/')
-  return lastSlash > 0 ? relativePath.slice(0, lastSlash) : ''
-}
 
 // Pending deletion for move detection
 interface PendingDeletion {
@@ -87,7 +77,7 @@ export function useFileSync(deps: FileSyncDeps) {
     if (!deps.assignNodeToFrame || !deps.getVaultPath) return
 
     const vaultPath = deps.getVaultPath()
-    const folderPath = getRelativeFolder(filePath, vaultPath)
+    const folderPath = relativeFolder(filePath, vaultPath)
 
     storeLogger.info(`[FileSync] Assigning node to frame - folderPath: "${folderPath}"`)
 

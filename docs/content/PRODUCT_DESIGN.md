@@ -341,6 +341,18 @@ The integral is: $ integral_a^b f(x) dif x $
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
+### One rule, one place
+
+A rule is written once. Where the same rule existed in several places, the defect was always the same: a fix landed in some copies and not others.
+
+- The frontmatter check existed three times, and one copy did not recognise CRLF.
+- The availability probe existed four times, and three asked the wrong endpoint.
+- The trash move existed three times, and the copies disagreed on what a failure means.
+- The hidden-entry filter existed twice, and one did not exempt the vault root.
+- The storyline duplicate guard existed three times, and all three ignored the storyline.
+
+A review reads files one at a time, so it finds instances and not the class: seeing that two functions should be one requires holding both at once. Two gates do that instead. No two functions may share a body, and no exported name may carry more than one implementation - an exported name is a contract, while a local handler may share an ordinary name like `run` or `animate` without meaning anything.
+
 ### Lookups that cannot be made
 
 An outside service that could not be reached has not answered. Every lookup keeps the two apart:

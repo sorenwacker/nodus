@@ -24,10 +24,11 @@ import {
   createDependencies,
   initializeStore,
   getNode as getNodeFn,
-  getNeighborIds as getNeighborIdsFn,
   findNodeByTitle as findNodeByTitleFn,
   selectNode as selectNodeFn,
 } from './nodes/state'
+// One definition of a node's neighbours, shared with the canvas traversal
+import { getNeighborIds as getNeighborIdsFn } from '../canvas/utils/graphTraversal'
 
 import {
   updateNodePosition as updateNodePositionFn,
@@ -222,7 +223,7 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   function getNeighborIds(nodeId: string): string[] {
-    return getNeighborIdsFn(edgesStore.edges, nodeId)
+    return getNeighborIdsFn(nodeId, edgesStore.edges)
   }
 
   function findNodeByTitle(title: string): Node | undefined {

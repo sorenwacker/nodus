@@ -3,6 +3,7 @@
  * Handles vault, citation, and ontology imports
  */
 import { ref } from 'vue'
+import { relativeFolder } from '../lib/vaultPaths'
 import { invoke, readTextFile, refreshWorkspace as refreshWorkspaceApi, setWorkspaceSync } from '../lib/tauri'
 import { parseReferences, citationToMarkdown } from '../lib/bibtex'
 import { storeLogger } from '../lib/logger'
@@ -150,16 +151,7 @@ function calculateFrameSizeForNodes(
 /**
  * Extract relative folder path from a file path and vault path
  */
-function getRelativeFolder(filePath: string, vaultPath: string): string {
-  const normalizedFile = filePath.replace(/\\/g, '/')
-  const normalizedVault = vaultPath.replace(/\\/g, '/').replace(/\/$/, '')
 
-  if (!normalizedFile.startsWith(normalizedVault)) return ''
-
-  const relativePath = normalizedFile.slice(normalizedVault.length + 1)
-  const lastSlash = relativePath.lastIndexOf('/')
-  return lastSlash > 0 ? relativePath.slice(0, lastSlash) : ''
-}
 
 /**
  * Create frames from folder structure based on imported nodes
@@ -196,7 +188,7 @@ async function createFramesFromFolders(
 
   for (const node of nodes) {
     if (!node.file_path) continue
-    const folder = getRelativeFolder(node.file_path, vaultPath)
+    const folder = relativeFolder(node.file_path, vaultPath)
     if (!folder) continue // Skip root-level files
 
     if (!folderToNodeIds.has(folder)) {

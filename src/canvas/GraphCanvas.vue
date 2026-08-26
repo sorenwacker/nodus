@@ -28,7 +28,7 @@ import {
   useLinkPicker,
   useNodeCollision,
   useNodeNavigation,
-  useEntityOperations,
+  useCanvasEntityLinking,
   useCanvasNodeStyle,
   useColorOperations,
 } from './composables/nodes'
@@ -885,7 +885,7 @@ const { showLinkPicker, linkPickerSourceNodeId, openLinkPicker, closeLinkPicker,
   linkPicker
 
 // Entity operations composable
-const entityOperations = useEntityOperations({
+const entityOperations = useCanvasEntityLinking({
   store: {
     filteredNodes: store.filteredNodes,
     selectedNodeIds: store.selectedNodeIds,

@@ -1,5 +1,5 @@
 import { computed, type ComputedRef } from 'vue'
-import type { Node, EntityNodeType } from '../../../types'
+import { ENTITY_NODE_TYPES, type Node, type EntityNodeType } from '../../../types'
 
 export interface UseEntityOperationsOptions {
   store: {
@@ -22,7 +22,15 @@ export interface UseEntityOperationsOptions {
  * Handles entity-related operations on the canvas.
  * Provides functions for linking, creating, and navigating to entities.
  */
-export function useEntityOperations(options: UseEntityOperationsOptions) {
+/**
+ * Linking a node to an entity from the canvas: which entities a node is linked
+ * to, and the menu actions that create or attach one.
+ *
+ * Named apart from the store-level `useEntityOperations`, which answers what
+ * entities exist. Two exported functions of one name is how a fix reaches only
+ * one of them (PRODUCT_DESIGN.md > One rule, one place).
+ */
+export function useCanvasEntityLinking(options: UseEntityOperationsOptions) {
   const { store, contextMenu, showToast } = options
 
   // Memoized linked entities map - computed once and cached
@@ -30,7 +38,8 @@ export function useEntityOperations(options: UseEntityOperationsOptions) {
     const map = new Map<string, Node[]>()
     for (const node of store.filteredNodes) {
       // Only compute for non-entity nodes to avoid unnecessary work
-      if (!['character', 'location', 'citation', 'term', 'item'].includes(node.node_type)) {
+      // The one list of entity types, so adding a type does not need finding
+      if (!(ENTITY_NODE_TYPES as string[]).includes(node.node_type)) {
         map.set(node.id, store.getLinkedEntities(node.id))
       }
     }
