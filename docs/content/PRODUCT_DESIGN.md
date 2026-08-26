@@ -341,6 +341,16 @@ The integral is: $ integral_a^b f(x) dif x $
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
+### Reporting MCP server failures
+
+Starting the MCP server can fail for an ordinary reason: the port is already in use. The settings panel says so, and the stored "enabled" flag records what the user asked for and got, so a failed start is not retried on the next launch.
+
+Three things had to be true before any of that could happen, and none were:
+
+- The panel's `error` was a computed returning `null`, so the error row could never render.
+- `toggleServer` awaited the start with no catch, so a failure surfaced only as an unhandled rejection.
+- The error row sat inside the "server is running" block, which is never true when a start fails.
+
 ### Provider status
 
 **Required behavior:** The status light beside a provider must report whether the application can get an answer from it, because that is the only thing the user consults it for. Probing a different endpoint from the one the work uses - a model listing rather than a completion - reports a route that can succeed while every real request fails on authorisation, gateway routing or timeout, and a green light next to a failing provider is worse than no light at all.

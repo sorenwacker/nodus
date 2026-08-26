@@ -436,6 +436,8 @@ provide('mcpPort', mcpServer.port)
 provide('mcpStartServer', mcpServer.startServer)
 provide('mcpStopServer', mcpServer.stopServer)
 provide('mcpGetStatus', mcpServer.getStatus)
+// Why a start or stop failed, so the settings panel can say so
+provide('mcpError', mcpServer.error)
 
 // Reset all nodes to default size
 async function resetAllNodeSizes() {

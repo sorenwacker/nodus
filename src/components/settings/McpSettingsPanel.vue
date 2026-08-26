@@ -43,7 +43,12 @@ const mcpGetStatus = inject<() => Promise<{ running: boolean; port: number | nul
 const isRunning = computed(() => mcpRunning?.value ?? false)
 const port = computed(() => mcpPort?.value ?? null)
 const activeConnections = computed(() => mcpConnections?.value?.length ?? 0)
-const error = computed(() => null) // TODO: inject error state if needed
+// The reason a start or stop failed. Injected rather than hardcoded: a computed
+// that can never be non-null made the error row unreachable and every failure
+// silent (PRODUCT_DESIGN.md > Reporting MCP server failures)
+const mcpError = inject<Ref<string | null>>('mcpError')
+const localError = ref<string | null>(null)
+const error = computed(() => localError.value ?? mcpError?.value ?? null)
 
 const MCP_ENABLED_KEY = 'nodus-mcp-enabled'
 
@@ -61,16 +66,23 @@ onMounted(async () => {
 })
 
 async function toggleServer() {
-  if (isRunning.value) {
-    if (mcpStopServer) {
-      await mcpStopServer()
-      localStorage.setItem(MCP_ENABLED_KEY, 'false')
+  localError.value = null
+  // The stored flag records what the user asked for AND got: writing "enabled"
+  // after a failed start would try again on the next launch
+  try {
+    if (isRunning.value) {
+      if (mcpStopServer) {
+        await mcpStopServer()
+        localStorage.setItem(MCP_ENABLED_KEY, 'false')
+      }
+    } else {
+      if (mcpStartServer) {
+        await mcpStartServer()
+        localStorage.setItem(MCP_ENABLED_KEY, 'true')
+      }
     }
-  } else {
-    if (mcpStartServer) {
-      await mcpStartServer()
-      localStorage.setItem(MCP_ENABLED_KEY, 'true')
-    }
+  } catch (e) {
+    localError.value = e instanceof Error ? e.message : String(e)
   }
 }
 
@@ -95,6 +107,12 @@ const configSnippet = `{
       <span class="hint">{{ t('mcp.serverHint') }}</span>
     </div>
 
+    <!-- Outside the running block: a start that failed leaves the server
+         stopped, and that is exactly when the reason must be visible -->
+    <div v-if="error" class="error-message">
+      {{ error }}
+    </div>
+
     <div v-if="isRunning" class="server-status">
       <div class="status-row">
         <span class="status-label">{{ t('mcp.status') }}:</span>
@@ -111,10 +129,6 @@ const configSnippet = `{
       <div v-if="activeConnections > 0" class="status-row">
         <span class="status-label">{{ t('mcp.connections') }}:</span>
         <span class="status-value">{{ activeConnections }}</span>
-      </div>
-
-      <div v-if="error" class="error-message">
-        {{ error }}
       </div>
 
       <div class="config-section">
