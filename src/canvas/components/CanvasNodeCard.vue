@@ -3,7 +3,7 @@
  * CanvasNodeCard - Individual node card component
  * Handles rendering of node content, title editing, and resize handles
  */
-import { computed, ref } from 'vue'
+import { computed, ref, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EntityBadge from '../../components/EntityBadge.vue'
 import { useNodesStore } from '../../stores/nodes'
@@ -54,6 +54,11 @@ const props = defineProps<{
   // Linked entities
   linkedEntities?: EntityNode[]
 }>()
+
+/** Supplied by App.vue, so a content write from a card is undoable */
+const pushContentUndo = inject<
+  ((nodeId: string, oldContent: string | null, oldTitle: string) => void) | undefined
+>('pushContentUndo', undefined)
 
 const emit = defineEmits<{
   (e: 'pointerdown', event: PointerEvent): void
@@ -192,6 +197,10 @@ async function saveDate() {
   content = upsertFrontmatterField(content, 'date', dateInput.value || null)
   content = upsertFrontmatterField(content, 'date_end', dateEndInput.value || null)
   showDateEditor.value = false
+  // Record the baseline first, like every other path that writes content.
+  // Without it, setting a date could not be undone
+  // (PRODUCT_DESIGN.md > Recording an undo step)
+  pushContentUndo?.(props.node.id, props.node.markdown_content, props.node.title)
   await nodesStore.updateNodeContent(props.node.id, content)
 }
 

@@ -1005,13 +1005,9 @@ function fitToContent() {
 
 // Frame fitting composable
 const { fitSelectedFrameToContents } = useFrameFitting({
-  store: {
-    get frames() { return store.frames },
-    get filteredNodes() { return store.filteredNodes },
-    get selectedFrameId() { return store.selectedFrameId },
-    updateFramePosition: store.updateFramePosition,
-    updateFrameSize: store.updateFrameSize,
-  },
+  // The frames adapter is a superset of what fitting needs
+  store: framesStoreAdapter(store),
+  pushFrameGeometryUndo: pushFramePositionUndo,
 })
 
 // Auto-fit is per-node (stored on node.auto_fit)

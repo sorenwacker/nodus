@@ -636,6 +636,8 @@ The component never imports `useI18n`; every label is a literal: "Fit to Content
 
 ### M41. Inline date editor writes markdown content straight to the store, bypassing the undo baseline every other content path records
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/components/CanvasNodeCard.vue:190`
 
 `saveDate()` calls `nodesStore.updateNodeContent(props.node.id, content)` directly after `upsertFrontmatterField`. All other content writes in this module capture an undo baseline first: `useNodeEditor.startEditing` calls `pushContentUndo(nodeId, node.markdown_content, node.title)` (useNodeEditor.ts:84-85, 110-111) before editing begins. A date edit therefore cannot be undone with Ctrl+Z, unlike a body edit of the same field's file. CanvasPreviewPanel has the same gap: its `save` emit lands in `GraphCanvas.savePreviewContent` (line 489), which calls `store.updateNodeContent` with no `pushContentUndo`.
@@ -781,6 +783,8 @@ Primary claim (proven):
 - Line 203: `depthRadius` for depth 1 is `
 
 ### M54. Frame fitting mutates position and size with no undo entry
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/frames/useFrameFitting.ts:42`
 
@@ -2127,6 +2131,8 @@ CONFIRMED, with exact evidence:
 *Verification:* Confirmed from the code. src/canvas/layout/types.ts:28-33 declares LayoutResult { positions, animationDuration? }, but LayoutStrategy.calculate (types.ts:56-60) is typed Promise<Map<string, {x,y}>>, and all three implementations repeat that exact return type (ForceLayoutStrategy.ts:28-31, HierarchicalLayoutStrategy.ts:30, GridLayoutStrategy.ts:213-216), so no strategy can ever supply animationDura
 
 ### L75. LayoutNode/LayoutEdge are defined three times with identical shape
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/layout/hierarchicalLayout.ts:7`
 

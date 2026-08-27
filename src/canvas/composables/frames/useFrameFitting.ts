@@ -18,6 +18,12 @@ export interface UseFrameFittingContext {
     updateFramePosition: (id: string, x: number, y: number) => void
     updateFrameSize: (id: string, w: number, h: number) => void
   }
+  /**
+   * Record the frames' geometry before fitting changes it. Fitting moved and
+   * resized a frame with no undo entry at all
+   * (PRODUCT_DESIGN.md > Recording an undo step)
+   */
+  pushFrameGeometryUndo?: () => void
 }
 
 /**
@@ -49,6 +55,9 @@ export function useFrameFitting(ctx: UseFrameFittingContext): UseFrameFittingRet
     // Get nodes assigned to this frame
     const nodesInFrame = store.filteredNodes.filter(n => n.frame_id === frameId)
     if (nodesInFrame.length === 0) return
+
+    // Recorded before anything moves, and only once there is something to do
+    ctx.pushFrameGeometryUndo?.()
 
     // Calculate bounding box of nodes
     const padding = 30

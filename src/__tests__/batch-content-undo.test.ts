@@ -91,3 +91,47 @@ describe('bulk content undo', () => {
     expect(undoRedo.undoStack.value).toHaveLength(0)
   })
 })
+
+describe('frame geometry undo', () => {
+  // Fitting a frame moves AND resizes it. A snapshot holding only position
+  // restored the frame to its old place at its new size
+  // (PRODUCT_DESIGN.md > Recording an undo step).
+  it('restores both where a frame was and how big it was', async () => {
+    const { useUndoRedo } = await import('../composables/useUndoRedo')
+    const frames = [{ id: 'f1', canvas_x: 10, canvas_y: 20, width: 400, height: 300 }]
+    const updateFramePosition = vi.fn((id: string, x: number, y: number) => {
+      const f = frames.find(f => f.id === id)
+      if (f) {
+        f.canvas_x = x
+        f.canvas_y = y
+      }
+    })
+    const updateFrameSize = vi.fn((id: string, width: number, height: number) => {
+      const f = frames.find(f => f.id === id)
+      if (f) {
+        f.width = width
+        f.height = height
+      }
+    })
+
+    const undoRedo = useUndoRedo({
+      store: {
+        getFilteredFrames: () => frames,
+        updateFramePosition,
+        updateFrameSize,
+        getNode: vi.fn(),
+      } as never,
+      showToast: vi.fn(),
+    } as never)
+
+    undoRedo.pushFramePositionUndo()
+    // What fitting does: move and resize
+    frames[0].canvas_x = 999
+    frames[0].width = 50
+
+    await undoRedo.undo()
+
+    expect(frames[0].canvas_x).toBe(10)
+    expect(frames[0].width).toBe(400)
+  })
+})

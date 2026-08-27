@@ -51,9 +51,15 @@ interface SizeSnapshot {
   sizes: Map<string, { width: number; height: number; x: number; y: number }>
 }
 
-interface FramePositionSnapshot {
-  type: 'frame-position'
-  frames: Map<string, { x: number; y: number }>
+/**
+ * A frame's geometry: where it is AND how big it is.
+ *
+ * Position alone left a fitted frame restored to its old place at its new size,
+ * because fitting changes both (PRODUCT_DESIGN.md > Recording an undo step).
+ */
+interface FrameGeometrySnapshot {
+  type: 'frame-geometry'
+  frames: Map<string, { x: number; y: number; width: number; height: number }>
 }
 
 interface FrameAssignmentSnapshot {
@@ -67,7 +73,7 @@ interface StorylineNodesSnapshot {
   nodeIds: string[] // previous order of node IDs
 }
 
-export type UndoSnapshot = PositionSnapshot | ContentSnapshot | ContentsSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot | FrameAssignmentSnapshot | StorylineNodesSnapshot
+export type UndoSnapshot = PositionSnapshot | ContentSnapshot | ContentsSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FrameGeometrySnapshot | FrameAssignmentSnapshot | StorylineNodesSnapshot
 
 export interface UndoRedoStore {
   getNode: (id: string) => Node | undefined
@@ -81,8 +87,15 @@ export interface UndoRedoStore {
   restoreEdge: (edge: Edge) => void
   deleteNode: (id: string) => Promise<void>
   // Frame operations
-  getFilteredFrames?: () => Array<{ id: string; canvas_x: number; canvas_y: number }>
+  getFilteredFrames?: () => Array<{
+    id: string
+    canvas_x: number
+    canvas_y: number
+    width: number
+    height: number
+  }>
   updateFramePosition?: (id: string, x: number, y: number) => void
+  updateFrameSize?: (id: string, width: number, height: number) => void
   assignNodesToFrame?: (nodeIds: string[], frameId: string | null) => void
   // Storyline operations
   getStorylineNodeIds?: (storylineId: string) => string[]
@@ -212,17 +225,22 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     redoStack.value = []
   }
 
-  function captureFramePositionSnapshot(): FramePositionSnapshot | null {
+  function captureFrameGeometrySnapshot(): FrameGeometrySnapshot | null {
     if (!store.getFilteredFrames) return null
-    const frames = new Map<string, { x: number; y: number }>()
+    const frames = new Map<string, { x: number; y: number; width: number; height: number }>()
     for (const frame of store.getFilteredFrames()) {
-      frames.set(frame.id, { x: frame.canvas_x, y: frame.canvas_y })
+      frames.set(frame.id, {
+        x: frame.canvas_x,
+        y: frame.canvas_y,
+        width: frame.width,
+        height: frame.height,
+      })
     }
-    return { type: 'frame-position', frames }
+    return { type: 'frame-geometry', frames }
   }
 
   function pushFramePositionUndo() {
-    const snapshot = captureFramePositionSnapshot()
+    const snapshot = captureFrameGeometrySnapshot()
     if (!snapshot || snapshot.frames.size === 0) return
     undoStack.value.push(snapshot)
     if (undoStack.value.length > maxUndo) {
@@ -352,19 +370,20 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodePosition(id, size.x, size.y)
       }
       showToast('Undo resize', 'info')
-    } else if (snapshot.type === 'frame-position') {
+    } else if (snapshot.type === 'frame-geometry') {
       // Save current frame positions for redo
-      const currentSnapshot = captureFramePositionSnapshot()
+      const currentSnapshot = captureFrameGeometrySnapshot()
       if (currentSnapshot) {
         redoStack.value.push(currentSnapshot)
       }
       // Restore old frame positions
       if (store.updateFramePosition) {
-        for (const [id, pos] of snapshot.frames) {
-          store.updateFramePosition(id, pos.x, pos.y)
+        for (const [id, geometry] of snapshot.frames) {
+          store.updateFramePosition(id, geometry.x, geometry.y)
+          store.updateFrameSize?.(id, geometry.width, geometry.height)
         }
       }
-      showToast('Undo frame position', 'info')
+      showToast('Undo frame geometry', 'info')
     } else if (snapshot.type === 'frame-assignment') {
       // Save current frame assignments for redo
       const currentAssignments = new Map<string, string | null>()
@@ -496,19 +515,20 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodePosition(id, size.x, size.y)
       }
       showToast('Redo resize', 'info')
-    } else if (snapshot.type === 'frame-position') {
+    } else if (snapshot.type === 'frame-geometry') {
       // Save current frame positions for undo
-      const currentSnapshot = captureFramePositionSnapshot()
+      const currentSnapshot = captureFrameGeometrySnapshot()
       if (currentSnapshot) {
         undoStack.value.push(currentSnapshot)
       }
       // Apply redo frame positions
       if (store.updateFramePosition) {
-        for (const [id, pos] of snapshot.frames) {
-          store.updateFramePosition(id, pos.x, pos.y)
+        for (const [id, geometry] of snapshot.frames) {
+          store.updateFramePosition(id, geometry.x, geometry.y)
+          store.updateFrameSize?.(id, geometry.width, geometry.height)
         }
       }
-      showToast('Redo frame position', 'info')
+      showToast('Redo frame geometry', 'info')
     } else if (snapshot.type === 'frame-assignment') {
       // Save current frame assignments for undo
       const currentAssignments = new Map<string, string | null>()

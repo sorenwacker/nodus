@@ -3,28 +3,12 @@
  * Handles frame creation, dragging, resizing, and title editing
  */
 import { ref, nextTick, type Ref } from 'vue'
+import type { Frame, Node } from '../../../types'
 import { NODE_DEFAULTS } from '../../constants'
 
 interface Point {
   x: number
   y: number
-}
-
-interface Node {
-  id: string
-  canvas_x: number
-  canvas_y: number
-  width?: number
-  height?: number
-}
-
-interface Frame {
-  id: string
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-  title: string
 }
 
 interface Store {
