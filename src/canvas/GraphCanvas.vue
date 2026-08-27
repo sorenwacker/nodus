@@ -51,6 +51,7 @@ import { useContentRenderer, useViewportCulling, useGraphMetrics } from './compo
 import { useLayout, useNeighborhoodMode } from './composables/layout'
 import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
 import { framesStoreAdapter } from './composables/frames/framesStoreAdapter'
+import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
 import { usePdfGraphImport } from './composables/util/usePdfGraphImport'
 import {
   useCanvasKeyboardShortcuts,
@@ -107,6 +108,7 @@ import { notifications$ } from '../composables/useNotifications'
 const {
   pushUndo,
   pushContentUndo,
+  pushContentsUndo,
   pushDeletionUndo,
   pushCreationUndo,
   pushColorUndo,
@@ -1217,43 +1219,7 @@ const markerHandlers = useMarkerHandlers({
 const llmTools = useLLMTools({
   llmQueue,
   callOllama,
-  // The agent's tools reach the store through this object, so anything a
-  // tool needs must be here: an exposed tool whose store method is missing
-  // answers "not available in this context", which is exposure without
-  // wiring (PRODUCT_DESIGN.md > Tool reachability)
-  store: {
-    getFilteredNodes: () => store.filteredNodes,
-    getFilteredEdges: () => store.filteredEdges,
-    get filteredNodes() {
-      return store.filteredNodes
-    },
-    get filteredEdges() {
-      return store.filteredEdges
-    },
-    get selectedNodeIds() {
-      return store.selectedNodeIds
-    },
-    createNode: store.createNode,
-    deleteNode: store.deleteNode,
-    deleteEdge: store.deleteEdge,
-    updateNodeContent: store.updateNodeContent,
-    updateNodeTitle: store.updateNodeTitle,
-    updateNodePosition: store.updateNodePosition,
-    updateNodeColor: store.updateNodeColor,
-    updateEdgeColor: store.updateEdgeColor,
-    updateEdgeLabel: store.updateEdgeLabel,
-    createEdge: store.createEdge,
-    // Frames and storylines, for the grouping tools
-    getFrames: () => store.filteredFrames,
-    createFrame: store.createFrame,
-    assignNodesToFrame: store.assignNodesToFrame,
-    getStorylines: () => store.filteredStorylines,
-    createStoryline: (title: string, description?: string) =>
-      store.createStoryline(title, description),
-    addNodeToStoryline: (storylineId: string, nodeId: string) =>
-      store.addNodeToStoryline(storylineId, nodeId),
-    currentWorkspaceId: store.currentWorkspaceId,
-  },
+  store: agentToolStoreAdapter(store),
   themesStore,
   planState,
   tasks: agentTasks,
@@ -1261,6 +1227,7 @@ const llmTools = useLLMTools({
   agentMemoryStorage,
   log: (msg: string) => agentLog.value.push(msg),
   pushContentUndo,
+  pushContentsUndo,
   isRunning: agentRunning,
 })
 

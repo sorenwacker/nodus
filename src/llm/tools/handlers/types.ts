@@ -120,6 +120,10 @@ export interface ToolContext {
   agentMemoryStorage: ToolAgentMemoryStorage
   log: (msg: string) => void
   pushContentUndo: (id: string, content: string | null, title: string) => void
+  /** Record several nodes' content as one undo step, for a batch rewrite */
+  pushContentsUndo?: (
+    entries: Array<{ nodeId: string; content: string | null; title: string }>
+  ) => void
   isCancelled: () => boolean
 }
 

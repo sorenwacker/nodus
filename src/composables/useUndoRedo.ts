@@ -29,6 +29,18 @@ interface CreationSnapshot {
   }
 }
 
+/**
+ * Several nodes' content and titles as one step.
+ *
+ * A batch rewrite is one action to the user. Recording an entry per node would
+ * mean pressing undo once per node to reverse one instruction
+ * (PRODUCT_DESIGN.md > Recording an undo step).
+ */
+interface ContentsSnapshot {
+  type: 'contents'
+  contents: Map<string, { content: string | null; title: string }>
+}
+
 interface ColorSnapshot {
   type: 'color'
   colors: Map<string, string | null>
@@ -55,7 +67,7 @@ interface StorylineNodesSnapshot {
   nodeIds: string[] // previous order of node IDs
 }
 
-export type UndoSnapshot = PositionSnapshot | ContentSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot | FrameAssignmentSnapshot | StorylineNodesSnapshot
+export type UndoSnapshot = PositionSnapshot | ContentSnapshot | ContentsSnapshot | DeletionSnapshot | CreationSnapshot | ColorSnapshot | SizeSnapshot | FramePositionSnapshot | FrameAssignmentSnapshot | StorylineNodesSnapshot
 
 export interface UndoRedoStore {
   getNode: (id: string) => Node | undefined
@@ -158,6 +170,18 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
       type: 'creation',
       creation: { nodeIds: [...nodeIds], nodes },
     })
+    if (undoStack.value.length > maxUndo) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
+  function pushContentsUndo(
+    entries: Array<{ nodeId: string; content: string | null; title: string }>
+  ) {
+    if (entries.length === 0) return
+    const contents = new Map(entries.map(e => [e.nodeId, { content: e.content, title: e.title }]))
+    undoStack.value.push({ type: 'contents', contents })
     if (undoStack.value.length > maxUndo) {
       undoStack.value.shift()
     }
@@ -279,6 +303,19 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.deleteNode(nodeId)
       }
       showToast(`Undo: deleted ${snapshot.creation.nodeIds.length} nodes`, 'info')
+    } else if (snapshot.type === 'contents') {
+      // Current state goes on the redo stack, then the recorded state applies
+      const current = new Map<string, { content: string | null; title: string }>()
+      for (const [id] of snapshot.contents) {
+        const node = store.getNode(id)
+        if (node) current.set(id, { content: node.markdown_content, title: node.title })
+      }
+      redoStack.value.push({ type: 'contents', contents: current })
+      for (const [id, previous] of snapshot.contents) {
+        await store.updateNodeContent(id, previous.content || '')
+        await store.updateNodeTitle(id, previous.title)
+      }
+      showToast(`Undo: restored ${snapshot.contents.size} nodes`, 'info')
     } else if (snapshot.type === 'color') {
       // Save current colors for redo
       const currentColors = new Map<string, string | null>()
@@ -411,6 +448,18 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.restoreNode(node)
       }
       showToast(`Redo: restored ${snapshot.creation.nodeIds.length} nodes`, 'info')
+    } else if (snapshot.type === 'contents') {
+      const current = new Map<string, { content: string | null; title: string }>()
+      for (const [id] of snapshot.contents) {
+        const node = store.getNode(id)
+        if (node) current.set(id, { content: node.markdown_content, title: node.title })
+      }
+      undoStack.value.push({ type: 'contents', contents: current })
+      for (const [id, next] of snapshot.contents) {
+        await store.updateNodeContent(id, next.content || '')
+        await store.updateNodeTitle(id, next.title)
+      }
+      showToast(`Redo: restored ${snapshot.contents.size} nodes`, 'info')
     } else if (snapshot.type === 'color') {
       // Save current colors for undo
       const currentColors = new Map<string, string | null>()
@@ -521,6 +570,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
     pushContentUndo,
     pushDeletionUndo,
     pushCreationUndo,
+    pushContentsUndo,
     pushColorUndo,
     pushSizeUndo,
     pushFramePositionUndo,

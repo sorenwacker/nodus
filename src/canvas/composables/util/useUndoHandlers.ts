@@ -23,6 +23,21 @@ export function useUndoHandlers() {
     }
   }
 
+  const injectedPushContentsUndo = inject<
+    ((entries: Array<{ nodeId: string; content: string | null; title: string }>) => void) | undefined
+  >('pushContentsUndo')
+
+  /** One undo step for a batch rewrite, rather than one per node */
+  const pushContentsUndo = (
+    entries: Array<{ nodeId: string; content: string | null; title: string }>
+  ) => {
+    if (injectedPushContentsUndo) {
+      injectedPushContentsUndo(entries)
+    } else {
+      console.warn('pushContentsUndo not provided - batch content undo will not work')
+    }
+  }
+
   const pushContentUndo = (nodeId: string, oldContent: string | null, oldTitle: string) => {
     if (injectedPushContentUndo) {
       injectedPushContentUndo(nodeId, oldContent, oldTitle)
@@ -82,6 +97,7 @@ export function useUndoHandlers() {
   return {
     pushUndo,
     pushContentUndo,
+    pushContentsUndo,
     pushDeletionUndo,
     pushCreationUndo,
     pushColorUndo,

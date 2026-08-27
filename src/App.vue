@@ -295,7 +295,7 @@ const undoRedo = useUndoRedo({
   showToast,
 })
 
-const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, pushFrameAssignmentUndo, pushStorylineNodesUndo, undo, redo } = undoRedo
+const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushContentsUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, pushFrameAssignmentUndo, pushStorylineNodesUndo, undo, redo } = undoRedo
 
 // NodeService for guaranteed undo on deletions and moves
 const nodeService = new NodeService({
@@ -422,6 +422,7 @@ async function handleMcpReject(connectionId: string) {
 // Expose undo functions to child components
 provide('pushUndo', pushUndo)
 provide('pushContentUndo', pushContentUndo)
+provide('pushContentsUndo', pushContentsUndo)
 provide('pushDeletionUndo', pushDeletionUndo)
 provide('pushCreationUndo', pushCreationUndo)
 provide('pushColorUndo', pushColorUndo)

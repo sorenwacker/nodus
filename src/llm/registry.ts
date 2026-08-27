@@ -42,6 +42,14 @@ export interface ToolContext {
   ollamaContextLength: number
   // Undo support for content changes
   pushContentUndo?: (nodeId: string, oldContent: string | null, oldTitle: string) => void
+  /**
+   * Record several nodes' content as ONE undo step, for a batch rewrite. One
+   * entry per node would mean pressing undo once per node to reverse a single
+   * instruction (PRODUCT_DESIGN.md > Recording an undo step).
+   */
+  pushContentsUndo?: (
+    entries: Array<{ nodeId: string; content: string | null; title: string }>
+  ) => void
   // NodeService for guaranteed undo on deletions and moves
   service?: NodeService
   // Selection state for selection-aware tools

@@ -205,6 +205,7 @@ export function registerBatchTools(): void {
         // All LLM calls go through the queue for retry/cancellation
         const { llmQueue } = await import('../queue')
         let processed = 0
+        const generated: Array<{ nodeId: string; content: string | null; title: string }> = []
 
         for (let i = 0; i < nodes.length; i++) {
           const node = nodes[i]
@@ -241,6 +242,11 @@ export function registerBatchTools(): void {
             )
 
             if (content?.trim()) {
+              generated.push({
+                nodeId: node.id,
+                content: node.markdown_content,
+                title: node.title,
+              })
               await ctx.store.updateNodeContent(node.id, cleanContent(content))
               processed++
             }
@@ -249,10 +255,14 @@ export function registerBatchTools(): void {
           }
         }
 
+        // One step for the whole run
+        ctx.pushContentsUndo?.(generated)
+
         return `Processed ${processed}/${nodes.length} nodes with LLM`
       }
 
       // Template-based actions (set/append)
+      const rewritten: Array<{ nodeId: string; content: string | null; title: string }> = []
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i]
         const n = i + 1
@@ -271,8 +281,12 @@ export function registerBatchTools(): void {
           content = (node.markdown_content || '') + '\n\n' + content
         }
 
+        rewritten.push({ nodeId: node.id, content: node.markdown_content, title: node.title })
         await ctx.store.updateNodeContent(node.id, content)
       }
+
+      // One step for the whole batch, recorded before anything changed
+      ctx.pushContentsUndo?.(rewritten)
 
       return `Updated ${nodes.length} nodes with template`
     },

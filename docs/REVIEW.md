@@ -1086,6 +1086,8 @@ for_each_node is registered here with a full implementation (including the `acti
 
 ### M83. Bulk content rewrites bypass the undo stack that update_node maintains
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/llm/tools/batchTools.ts:274`
 
 `await ctx.store.updateNodeContent(node.id, content)` in for_each_node (line 274, and line 244 in the llm branch) and in create_nodes_batch (line 141) overwrite existing markdown without calling `ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)`. update_node (updateTools.ts:44) and batch_update (updateTools.ts:128) push undo before touching content precisely so the user can revert AI edits. for_each_node with action="set" can destroy the content of every node in the workspace with no undo entry.
@@ -1670,6 +1672,8 @@ UndoSnapshot includes DeletionSnapshot and CreationSnapshot, and undo() handles 
 CONFIRMED core claim. `UndoSnapshot` (line 54) includes `DeletionSnapshot` and `CreationSnapshot`. In `undo()`, the 'deletion' branch (lines 254-262) calls `store.restoreNode`/`store.restoreEdge` and the 'creation' branch (lines 263-268) calls `store.deleteNode` — neither pushes anything onto `redoStack`, u
 
 ### L37. pushOverlappingNodes bypasses its injected updateNodePosition and calls invoke directly
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/composables/useNodeLayout.ts:61`
 

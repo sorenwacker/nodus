@@ -5,7 +5,6 @@
 
 import { applyForceLayout } from '../canvas/layout'
 import { pushOverlappingNodes as pushNodesApart } from '../lib/nodeCollision'
-import { invoke } from '../lib/tauri'
 import type { Node, Edge, Frame } from '../types'
 
 export interface NodeLayoutDeps {
@@ -52,15 +51,11 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
 
     pushNodesApart(collisionNode, {
       nodes: collisionNodes,
+      // Through the injected collaborator, like every other move in this file.
+      // Mutating the node and calling invoke here skipped the store's own path
+      // (PRODUCT_DESIGN.md > Depending on what is supplied)
       updatePosition: (id, x, y) => {
-        const node = deps.getNodes().find(n => n.id === id)
-        if (node) {
-          node.canvas_x = x
-          node.canvas_y = y
-          node.updated_at = Date.now()
-          invoke('update_node_position', { id, x, y })
-            .catch(e => console.error('Failed to update pushed node position:', e))
-        }
+        void deps.updateNodePosition(id, x, y)
       },
     })
   }

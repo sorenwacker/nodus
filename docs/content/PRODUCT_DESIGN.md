@@ -1309,6 +1309,12 @@ An undo step is recorded when something changes, not when a gesture might begin.
 
 Dragging waits for three pixels of movement before recording. Resizing recorded on `pointerdown`, so every click on a handle added a step. Resizing now captures the sizes at `pointerdown` - they are the baseline, and must be read before anything moves - but records the step only once movement passes the same threshold.
 
+A bulk rewrite is one step. Three batch tools rewrote node content with no undo entry at all, while the single-node tool beside them recorded one. An entry per node would be no better: reversing one instruction would mean pressing undo once per node. Colour and size already model this as one entry holding a map of what changed, and content now does the same.
+
+### Depending on what is supplied
+
+A composable moves nodes through the collaborator it was given, not by reaching past it. `pushOverlappingNodes` mutated node objects and called the backend directly, while the same file used its injected `updateNodePosition` two functions away - so coordinate clamping, layout bookkeeping and persistence policy applied to every moved node except a pushed one.
+
 ### Persisting a gesture
 
 A gesture costs one write per thing it moved, not one per event. Dragging or resizing updates positions and sizes in memory while the pointer is down, and the final values are stored once when it ends.

@@ -136,6 +136,10 @@ export interface LLMToolsContext {
   agentMemoryStorage: AgentMemoryStorageInterface
   log: (msg: string) => void
   pushContentUndo: (id: string, content: string | null, title: string) => void
+  /** Record several nodes' content as one undo step, for a batch rewrite */
+  pushContentsUndo?: (
+    entries: Array<{ nodeId: string; content: string | null; title: string }>
+  ) => void
   isRunning?: Ref<boolean>  // Optional: allows tools to check if agent was stopped
 }
 
@@ -143,7 +147,7 @@ export interface LLMToolsContext {
  * LLM Tools composable
  */
 export function useLLMTools(ctx: LLMToolsContext) {
-  const { llmQueue, callOllama, store, themesStore, planState, tasks, memoryStorage, agentMemoryStorage, log, pushContentUndo, isRunning } = ctx
+  const { llmQueue, callOllama, store, themesStore, planState, tasks, memoryStorage, agentMemoryStorage, log, pushContentUndo, pushContentsUndo, isRunning } = ctx
 
   /** Check if agent was stopped */
   function isCancelled(): boolean {
@@ -171,6 +175,7 @@ export function useLLMTools(ctx: LLMToolsContext) {
         agentMemoryStorage,
         log,
         pushContentUndo,
+        pushContentsUndo,
         isCancelled,
       }
       return executeRegisteredTool(name, args, toolCtx)
