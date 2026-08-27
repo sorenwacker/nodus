@@ -749,6 +749,8 @@ Refutation attempt 1 - the most promising one - was routeAroundObstacles, which 
 
 ### M51. Frame resize writes to the backend on every pointermove
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/frames/useFrames.ts:213`
 
 `onResize` calls `store.updateFramePosition(...)` with no options and `store.updateFrameSize(...)` on every pointermove. `updateFramePosition` only skips the backend write when `{ skipPersist: true }` is passed (src/stores/frames.ts:146-164) and `updateFrameSize` has no skip option at all (line 180), so a single resize gesture produces two `invoke` calls per pointer event. This is the same defect that was explicitly fixed for dragging in `onDrag` ("the backend writes ... are flushed once on pointerup in stopDrag"), left unfixed on the resize path. `onResize` also rewrites the position for pure `se`/`s`/`e` resizes where `newX`/`newY` never change.
