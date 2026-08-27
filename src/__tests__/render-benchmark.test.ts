@@ -280,27 +280,23 @@ describe('cost of a pan or zoom frame', () => {
     // Before the container transform, this was 24ms per frame at 500 nodes -
     // 1.5x the 16.67ms budget - because every card's style was recomputed
     // (PRODUCT_DESIGN.md > Canvas rendering)
-    // Best of three per size. A ratio between two independently timed sweeps is
-    // noisy when the suite runs in parallel: contention inflates one sweep and
-    // not the other. Contention only ever adds time, so the fastest sample is
-    // the honest measure of how fast the mechanism is.
-    const bestOfThree = async (count: number) => {
-      const runs = [await panZoomSweep(count), await panZoomSweep(count), await panZoomSweep(count)]
-      return runs.reduce((best, run) => (run.avgMs < best.avgMs ? run : best))
-    }
-    const small = await bestOfThree(100)
-    const target = await bestOfThree(500)
+    const target = await panZoomSweep(500)
 
     console.log(
-      `pan/zoom frame: 100 cards ${small.avgMs.toFixed(2)}ms avg, ` +
-        `500 cards ${target.avgMs.toFixed(2)}ms avg (max ${target.maxMs.toFixed(2)}ms)`
+      `pan/zoom frame: 500 cards ${target.avgMs.toFixed(2)}ms avg ` +
+        `(max ${target.maxMs.toFixed(2)}ms)`
     )
 
-    // Vue still diffs the child vnodes, so the cost is not perfectly flat -
-    // but the DOM patch is one container style, and the frame must stay far
-    // inside the 16.67ms budget where the old mechanism was 1.5x over it
+    // The frame must stay far inside the 16.67ms budget, where the old
+    // per-card mechanism was 1.5x over it.
+    //
+    // There is no assertion here comparing 100 cards against 500. A ratio
+    // between two independently timed sweeps is noise when the suite runs in
+    // parallel - contention inflates one and not the other - and the property
+    // it was reaching for is proved deterministically below: a card's style
+    // contains neither scale nor viewport offset, so panning cannot restyle
+    // cards at any count.
     expect(target.avgMs).toBeLessThan(16.67 * SLACK)
-    expect(target.avgMs).toBeLessThan(Math.max(small.avgMs, 0.2) * 6)
   })
 })
 

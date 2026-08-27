@@ -1303,6 +1303,12 @@ A storyline's sequence is carried by edges belonging to that storyline. Adding a
 
 Whether such an edge already exists is decided by source, target, **and** storyline. Matching source and target alone let any other edge between the two nodes - a wikilink, a `supports` edge the user drew - stand in for the chain edge, so none was created and the sequence had a gap.
 
+### Recording an undo step
+
+An undo step is recorded when something changes, not when a gesture might begin. A press on a node or a resize handle that never moves has changed nothing, and an entry for it means the next undo does nothing visible while the step the user wanted stays buried.
+
+Dragging waits for three pixels of movement before recording. Resizing recorded on `pointerdown`, so every click on a handle added a step. Resizing now captures the sizes at `pointerdown` - they are the baseline, and must be read before anything moves - but records the step only once movement passes the same threshold.
+
 ### Persisting a gesture
 
 A gesture costs one write per thing it moved, not one per event. Dragging or resizing updates positions and sizes in memory while the pointer is down, and the final values are stored once when it ends.

@@ -254,6 +254,8 @@ Repo-wide grep for each component name outside its own file returns no import or
 
 ### M9. Storyline colour picker writes to the database on every input event
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/components/StorylineSection.vue:82`
 
 `updateColor` is bound to `@input` on `<input type="color">` (line 166) and performs two awaited persistence calls per event: `store.updateStoryline(...)` and `store.updateStorylineEdgeColors(...)`. Failure scenario: dragging inside the native colour picker emits dozens of `input` events per second, each firing two overlapping async writes plus an edge-colour rewrite for every edge of the storyline — the last write to land, not the last colour chosen, is what persists. Neighbouring inputs in this module debounce (FullscreenNodeModal `scheduleSave`, NodePanel's 500 ms debounce).
@@ -831,6 +833,8 @@ Grepping the whole tree for `useNodeVisibility` finds only the two barrels (`src
 *Verification:* Confirmed from the code. useNodeEditor.ts:61-69 debounces `store.updateNodeTitle(editingTitleId.value, newTitle)` at autosaveDelay=1000 (default set at line 24), and src/stores/nodes/crud.ts:349-365 shows updateNodeTitle mutates the reactive node.title AND persists via invoke('update_node_title'), so the debounced write is a real commit. cancelTitleEditing (lines 144-147) only nulls editingTitleId
 
 ### M60. Resize pushes undo on pointerdown without a movement threshold, unlike dragging
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/nodes/useNodeResizing.ts:90`
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import Icon from './Icon.vue'
@@ -78,6 +78,18 @@ async function deleteStoryline() {
     console.error('Failed to delete storyline:', e)
   }
 }
+
+/**
+ * The colour shown while the picker is open. Kept apart from the stored colour
+ * so the swatch follows the pointer without a write per movement.
+ */
+const previewColor = ref(props.storyline.color || '#94a3b8')
+watch(
+  () => props.storyline.color,
+  color => {
+    previewColor.value = color || '#94a3b8'
+  }
+)
 
 async function updateColor(event: Event) {
   const color = (event.target as HTMLInputElement).value
@@ -158,12 +170,17 @@ function toggleExpandNode(nodeId: string) {
         <label class="color-picker" :data-tooltip="t('storyline.edgeColor')">
           <span
             class="color-swatch"
-            :style="{ backgroundColor: storyline.color || '#94a3b8' }"
+            :style="{ backgroundColor: previewColor }"
           ></span>
+          <!-- `change` fires when the choice is made; `input` fires continuously
+               while the pointer moves through the picker, and each event wrote
+               the storyline and every edge colour belonging to it
+               (PRODUCT_DESIGN.md > Persisting a gesture) -->
           <input
             type="color"
-            :value="storyline.color || '#94a3b8'"
-            @input="updateColor($event)"
+            :value="previewColor"
+            @input="previewColor = ($event.target as HTMLInputElement).value"
+            @change="updateColor($event)"
           />
         </label>
         <button class="icon-btn" :data-tooltip="t('storyline.rename')" @click="startEditing">

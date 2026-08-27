@@ -76,6 +76,13 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     Map<string, { width: number; height: number; x: number; y: number }>
   >(new Map())
 
+  /** Pixels of movement before a press counts as a resize, matching dragging */
+  const RESIZE_THRESHOLD = 3
+
+  /** Sizes captured on pointerdown, pushed once movement passes the threshold */
+  let pendingSizeUndo: Map<string, { width: number; height: number; x: number; y: number }> | null =
+    null
+
   function onResizePointerDown(e: PointerEvent, nodeId: string, direction: string = 'se') {
     e.stopPropagation()
     e.preventDefault()
@@ -111,7 +118,11 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
           y: node.canvas_y,
         })
       }
-      pushSizeUndo(oldSizes)
+      // Held, not pushed: a press on a resize handle that never moves is not a
+      // resize, and pushing here filled the undo stack with entries that
+      // change nothing. Dragging already waits for movement
+      // (PRODUCT_DESIGN.md > Recording an undo step)
+      pendingSizeUndo = oldSizes
     }
 
     resizingNode.value = nodeId
@@ -153,6 +164,14 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
   }
 
   function onResizeMove(e: PointerEvent) {
+    // The first movement past the threshold is where the resize begins
+    if (pendingSizeUndo) {
+      const moved = Math.hypot(e.clientX - resizeStart.value.x, e.clientY - resizeStart.value.y)
+      if (moved < RESIZE_THRESHOLD) return
+      pushSizeUndo?.(pendingSizeUndo)
+      pendingSizeUndo = null
+    }
+
     if (!resizingNode.value) return
 
     const dx = (e.clientX - resizeStart.value.x) / scale.value
@@ -220,6 +239,8 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
   }
 
   function stopResize() {
+    // A press that never passed the threshold recorded no undo step
+    pendingSizeUndo = null
     if (resizingNode.value) {
       const nodeId = resizingNode.value
       const { width, height, x, y } = resizePreview.value
