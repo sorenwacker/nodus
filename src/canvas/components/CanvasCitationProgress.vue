@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineProps<{
   visible: boolean
   fetchProgress: {
@@ -16,6 +18,8 @@ defineProps<{
   } | null
 }>()
 
+const { t } = useI18n()
+
 const emit = defineEmits<{
   cancel: []
 }>()
@@ -25,7 +29,7 @@ const emit = defineEmits<{
   <div v-if="visible" class="citation-fetch-progress">
     <div class="citation-fetch-content">
       <div class="citation-fetch-header">
-        <span class="citation-fetch-title">Fetching Citations</span>
+        <span class="citation-fetch-title">{{ t('citations.fetching') }}</span>
         <span v-if="queueSize > 0" class="citation-fetch-queue">({{ queueSize }} queued)</span>
         <button class="citation-fetch-cancel" @click="emit('cancel')">
           Cancel

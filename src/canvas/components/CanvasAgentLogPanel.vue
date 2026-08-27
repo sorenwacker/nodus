@@ -4,10 +4,13 @@
  * Shows agent activity log when LLM bar is hidden
  */
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   log: string[]
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'clear'): void
@@ -30,7 +33,7 @@ async function copyLog() {
     <div class="log-header">
       <span>Agent Log ({{ log.length }})</span>
       <div class="log-buttons">
-        <button class="log-btn" title="Copy log" @click="copyLog">
+        <button class="log-btn" :title="t('agentLog.copy')" @click="copyLog">
           <svg
             width="12"
             height="12"
@@ -43,7 +46,7 @@ async function copyLog() {
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
         </button>
-        <button class="log-btn" title="Clear log" @click="emit('clear')">
+        <button class="log-btn" :title="t('agentLog.clear')" @click="emit('clear')">
           <svg
             width="12"
             height="12"
@@ -55,7 +58,7 @@ async function copyLog() {
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
         </button>
-        <button class="log-btn" title="Close" @click="emit('close')">
+        <button class="log-btn" :title="t('common.close')" @click="emit('close')">
           <svg
             width="12"
             height="12"

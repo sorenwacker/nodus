@@ -59,7 +59,8 @@
       "insertNode": "Insérer un nœud",
       "insertNodeTooltip": "Insérer un nœud sur cette arête",
       "deleteEdge": "Supprimer l'arête",
-      "deleteEdgeTooltip": "Supprimer cette arête"
+      "deleteEdgeTooltip": "Supprimer cette arête",
+      "labelSaved": "Étiquette du lien enregistrée"
     },
     "frame": {
       "delete": "Supprimer le cadre",
@@ -114,7 +115,9 @@
       "storyline": "Aretes de recit",
       "wikilink": "Aretes wikilink",
       "tags": "Noeuds et aretes de tags"
-    }
+    },
+    "emptyTitle": "Aucun nœud pour le moment",
+    "emptyHint": "Double-cliquez n’importe où pour créer un nœud"
   },
   "llm": {
     "provider": "Fournisseur",
@@ -356,7 +359,8 @@
       "rateLimited": "Limite atteinte, nouvelle tentative dans",
       "nextRequest": "Prochaine requête dans",
       "seconds": "{count}s"
-    }
+    },
+    "fetching": "Récupération des citations"
   },
   "common": {
     "close": "Fermer",
@@ -403,7 +407,13 @@
     "unassigned": "Non assigné",
     "resizeTimelines": "Faites glisser pour redimensionner les chronologies",
     "editHint": "Double-cliquez pour modifier",
-    "locked": "Ce fichier est en cours de modification ailleurs : {error}"
+    "locked": "Ce fichier est en cours de modification ailleurs : {error}",
+    "collapseNode": "Replier le contenu",
+    "expandNode": "Déplier le contenu",
+    "noContent": "Aucun contenu",
+    "noNodesYet": "Aucun nœud pour le moment",
+    "dropHere": "Déposez ici pour ajouter",
+    "addFirstNode": "Ajouter le premier nœud"
   },
   "nodePicker": {
     "newNode": "Nouveau nœud",
@@ -536,7 +546,8 @@
         "exporting": "Enregistrement...",
         "success": "Enregistré dans Zotero",
         "error": "Échec de l'enregistrement dans Zotero"
-      }
+      },
+      "importAll": "Importer tous les éléments"
     },
     "language": "Langue",
     "llmEnabled": "Fonctionnalités IA",
@@ -611,7 +622,13 @@
     "okfBackfillHint": "Ajoute le frontmatter OKF aux fichiers du vault qui n'en ont pas. Le contenu, les wikilinks et les tags restent inchangés.",
     "okfBackfillResult": "{add} fichiers recevraient un frontmatter, {keep} en ont déjà un, {none} sans fichier.",
     "okfBackfillApply": "Ajouter le frontmatter à {count} fichiers",
-    "okfBackfilling": "Écriture..."
+    "okfBackfilling": "Écriture...",
+    "edgeLabelSize": "Taille des étiquettes de lien",
+    "edgeLabelSizeHint": "Taille de police des étiquettes de lien (8-12 pixels)",
+    "hideStorylineEdges": "Masquer les liens de récit",
+    "hideStorylineEdgesHint": "Masque les liens entre nœuds d’un récit",
+    "hideWikilinkEdges": "Masquer les liens [[wikilink]]",
+    "hideWikilinkEdgesHint": "Masque les liens générés depuis les [[liens]] du contenu"
   },
   "fileMove": {
     "collision": {
@@ -698,5 +715,61 @@
     "confirm": "Construire le graphe",
     "built": "{count} nœuds construits depuis le document",
     "semanticSkipped": "{count} sections ignorées par la passe IA"
+  },
+  "mcp": {
+    "approve": "Autoriser",
+    "configHint": "Ajoutez ceci à la configuration de Claude Desktop :",
+    "connectionId": "Identifiant de connexion",
+    "connectionRequest": "Demande de connexion MCP",
+    "connectionRequestMessage": "Un outil d’IA demande l’accès à votre espace de travail. Il pourra lire et modifier vos nœuds.",
+    "connections": "connexions",
+    "enableServer": "Activer le serveur MCP",
+    "forgetTrusted": "Tout oublier",
+    "port": "Port",
+    "reject": "Refuser",
+    "running": "En cours d’exécution",
+    "server": "Serveur MCP",
+    "serverHint": "Permet à des outils d’IA comme Claude Desktop de se connecter à Nodus via le protocole MCP.",
+    "status": "État",
+    "stopped": "Arrêté",
+    "trustedClients": "Clients approuvés",
+    "trustedHint": "Les connexions autorisées sont mémorisées et se reconnectent sans confirmation. Les oublier révoque toutes les autorisations enregistrées.",
+    "warningMessage": "N’autorisez que les outils auxquels vous faites confiance. L’outil connecté pourra lire, créer, modifier et supprimer des nœuds."
+  },
+  "contextMenu": {
+    "fitToContent": "Ajuster au contenu",
+    "findOnCanvas": "Trouver sur le canevas",
+    "linkTo": "Lier à...",
+    "linkToEntity": "Lier à une entité",
+    "createNew": "Créer",
+    "fetchCitations": "Récupérer les citations",
+    "fetchReferences": "Récupérer les références",
+    "fetchBoth": "Récupérer les deux",
+    "addToZotero": "Ajouter à Zotero",
+    "addToStoryline": "Ajouter au récit",
+    "newStoryline": "Nouveau récit...",
+    "sendToWorkspace": "Envoyer vers l’espace de travail",
+    "noOtherWorkspaces": "Aucun autre espace de travail",
+    "readNode": "Lire le nœud",
+    "exportSelection": "Exporter la sélection...",
+    "defaultWorkspace": "Par défaut"
+  },
+  "reader": {
+    "pageNavigation": "Navigation des pages",
+    "previousSection": "Aller à la section précédente",
+    "nextSection": "Aller à la section suivante",
+    "sectionNavigation": "Navigation des sections",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "skipToContent": "Aller au contenu",
+    "inThisScene": "Dans cette scène",
+    "noEntities": "Aucune entité dans cette scène",
+    "previousAppearance": "Apparition précédente",
+    "nextAppearance": "Apparition suivante",
+    "goToEntity": "Aller à l’entité sur le canevas"
+  },
+  "agentLog": {
+    "copy": "Copier le journal",
+    "clear": "Effacer le journal"
   }
 }

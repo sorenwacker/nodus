@@ -205,12 +205,12 @@ function onDragLeave() {
   <div class="node-list" :class="{ compact }">
     <!-- Empty state -->
     <div v-if="nodes.length === 0" class="empty-state" :class="{ 'external-drop-target': externalDropIndex === 0 }">
-      <p v-if="externalDropIndex !== 0">No nodes yet</p>
-      <p v-else class="drop-text">Drop here to add</p>
+      <p v-if="externalDropIndex !== 0">{{ t('storyline.noNodesYet') }}</p>
+      <p v-else class="drop-text">{{ t('storyline.dropHere') }}</p>
       <div v-if="externalDropIndex !== 0" class="add-first-wrapper">
         <button class="add-first-btn" @click="toggleInsertPicker(0)">
           <Icon name="plus" :size="14" />
-          <span>Add first node</span>
+          <span>{{ t('storyline.addFirstNode') }}</span>
         </button>
         <NodePicker
           v-if="showingInsertPicker === 0"

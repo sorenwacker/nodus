@@ -59,7 +59,8 @@
       "insertNode": "Knoten einfügen",
       "insertNodeTooltip": "Einen Knoten auf dieser Kante einfügen",
       "deleteEdge": "Kante löschen",
-      "deleteEdgeTooltip": "Diese Kante löschen"
+      "deleteEdgeTooltip": "Diese Kante löschen",
+      "labelSaved": "Kantenbeschriftung gespeichert"
     },
     "hover": {
       "incoming": "Eingehende Kanten (zitiert von)",
@@ -114,7 +115,9 @@
       "storyline": "Storyline-Kanten",
       "wikilink": "Wikilink-Kanten",
       "tags": "Tag-Knoten und -Kanten"
-    }
+    },
+    "emptyTitle": "Noch keine Knoten",
+    "emptyHint": "Doppelklicken Sie irgendwo, um einen Knoten zu erstellen"
   },
   "llm": {
     "provider": "Anbieter",
@@ -356,7 +359,8 @@
       "rateLimited": "Ratenlimit erreicht, Wiederholung in",
       "nextRequest": "Nächste Anfrage in",
       "seconds": "{count}s"
-    }
+    },
+    "fetching": "Zitierungen werden abgerufen"
   },
   "common": {
     "close": "Schließen",
@@ -403,7 +407,13 @@
     "unassigned": "Nicht zugeordnet",
     "resizeTimelines": "Ziehen, um die Zeitleisten zu skalieren",
     "editHint": "Zum Bearbeiten doppelklicken",
-    "locked": "Diese Datei wird woanders bearbeitet: {error}"
+    "locked": "Diese Datei wird woanders bearbeitet: {error}",
+    "collapseNode": "Inhalt einklappen",
+    "expandNode": "Inhalt ausklappen",
+    "noContent": "Kein Inhalt",
+    "noNodesYet": "Noch keine Knoten",
+    "dropHere": "Hier ablegen zum Hinzufügen",
+    "addFirstNode": "Ersten Knoten hinzufügen"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",
@@ -536,7 +546,8 @@
         "exporting": "Speichere...",
         "success": "In Zotero gespeichert",
         "error": "Speichern in Zotero fehlgeschlagen"
-      }
+      },
+      "importAll": "Alle Einträge importieren"
     },
     "language": "Sprache",
     "llmEnabled": "KI-Funktionen",
@@ -611,7 +622,13 @@
     "okfBackfillHint": "Fügt OKF-Frontmatter zu Vault-Dateien hinzu, denen es fehlt. Inhalte, Wikilinks und Tags bleiben unverändert.",
     "okfBackfillResult": "{add} Dateien erhielten Frontmatter, {keep} haben es bereits, {none} haben keine Datei.",
     "okfBackfillApply": "Frontmatter zu {count} Dateien hinzufügen",
-    "okfBackfilling": "Schreibe..."
+    "okfBackfilling": "Schreibe...",
+    "edgeLabelSize": "Schriftgröße der Kantenbeschriftung",
+    "edgeLabelSizeHint": "Schriftgröße für Kantenbeschriftungen (8-12 Pixel)",
+    "hideStorylineEdges": "Storyline-Kanten ausblenden",
+    "hideStorylineEdgesHint": "Kanten ausblenden, die Knoten in Storylines verbinden",
+    "hideWikilinkEdges": "[[Wikilink]]-Kanten ausblenden",
+    "hideWikilinkEdgesHint": "Kanten ausblenden, die automatisch aus [[Links]] im Knoteninhalt entstehen"
   },
   "fileMove": {
     "collision": {
@@ -698,5 +715,61 @@
     "confirm": "Graph erstellen",
     "built": "{count} Knoten aus dem Dokument erstellt",
     "semanticSkipped": "{count} Abschnitte im KI-Durchlauf übersprungen"
+  },
+  "mcp": {
+    "approve": "Zulassen",
+    "configHint": "Fügen Sie dies zur Konfiguration von Claude Desktop hinzu:",
+    "connectionId": "Verbindungs-ID",
+    "connectionRequest": "MCP-Verbindungsanfrage",
+    "connectionRequestMessage": "Ein KI-Werkzeug fordert Zugriff auf Ihren Arbeitsbereich an. Damit kann es Ihre Knoten lesen und ändern.",
+    "connections": "Verbindungen",
+    "enableServer": "MCP-Server aktivieren",
+    "forgetTrusted": "Alle entfernen",
+    "port": "Port",
+    "reject": "Ablehnen",
+    "running": "Läuft",
+    "server": "MCP-Server",
+    "serverHint": "Erlaubt KI-Werkzeugen wie Claude Desktop, sich über das MCP-Protokoll mit Nodus zu verbinden.",
+    "status": "Status",
+    "stopped": "Angehalten",
+    "trustedClients": "Vertraute Programme",
+    "trustedHint": "Zugelassene Verbindungen werden gespeichert und verbinden sich ohne Rückfrage erneut. Entfernen widerruft alle gespeicherten Freigaben.",
+    "warningMessage": "Lassen Sie nur Verbindungen von Werkzeugen zu, denen Sie vertrauen. Das verbundene Werkzeug kann Knoten lesen, erstellen, ändern und löschen."
+  },
+  "contextMenu": {
+    "fitToContent": "An Inhalt anpassen",
+    "findOnCanvas": "Auf der Leinwand finden",
+    "linkTo": "Verknüpfen mit ...",
+    "linkToEntity": "Mit Entität verknüpfen",
+    "createNew": "Neu erstellen",
+    "fetchCitations": "Zitierungen abrufen",
+    "fetchReferences": "Literaturangaben abrufen",
+    "fetchBoth": "Beides abrufen",
+    "addToZotero": "Zu Zotero hinzufügen",
+    "addToStoryline": "Zur Storyline hinzufügen",
+    "newStoryline": "Neue Storyline ...",
+    "sendToWorkspace": "An Arbeitsbereich senden",
+    "noOtherWorkspaces": "Keine weiteren Arbeitsbereiche",
+    "readNode": "Knoten lesen",
+    "exportSelection": "Auswahl exportieren ...",
+    "defaultWorkspace": "Standard"
+  },
+  "reader": {
+    "pageNavigation": "Seitennavigation",
+    "previousSection": "Zum vorherigen Abschnitt",
+    "nextSection": "Zum nächsten Abschnitt",
+    "sectionNavigation": "Abschnittsnavigation",
+    "previous": "Zurück",
+    "next": "Weiter",
+    "skipToContent": "Zum Inhalt springen",
+    "inThisScene": "In dieser Szene",
+    "noEntities": "Keine Entitäten in dieser Szene",
+    "previousAppearance": "Vorheriges Auftreten",
+    "nextAppearance": "Nächstes Auftreten",
+    "goToEntity": "Zur Entität auf der Leinwand"
+  },
+  "agentLog": {
+    "copy": "Protokoll kopieren",
+    "clear": "Protokoll leeren"
   }
 }

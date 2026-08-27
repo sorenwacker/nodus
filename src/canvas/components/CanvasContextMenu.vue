@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Storyline, Workspace, Node, EntityNodeType } from '../../types'
 import { ENTITY_NODE_TYPES } from '../../types'
 
@@ -18,6 +19,8 @@ const props = defineProps<{
   hasDOI?: boolean
   doiCount?: number // Number of selected nodes with DOIs
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -173,7 +176,7 @@ function handleCreateEntity(type: EntityNodeType) {
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
       </svg>
-      <span>Fit to Content</span>
+      <span>{{ t('contextMenu.fitToContent') }}</span>
     </div>
 
     <div class="context-menu-item" @click="handleZoomToNode">
@@ -181,7 +184,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <circle cx="11" cy="11" r="8"/>
         <path d="M21 21l-4.35-4.35"/>
       </svg>
-      <span>Find on Canvas</span>
+      <span>{{ t('contextMenu.findOnCanvas') }}</span>
     </div>
 
     <div class="context-menu-item" @click="handleOpenLinkPicker">
@@ -189,7 +192,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
       </svg>
-      <span>Link to...</span>
+      <span>{{ t('contextMenu.linkTo') }}</span>
     </div>
 
     <!-- Link to Entity submenu -->
@@ -202,7 +205,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
         <circle cx="12" cy="7" r="4"/>
       </svg>
-      <span>Link to Entity{{ nodeCount > 1 ? ` (${nodeCount})` : '' }}</span>
+      <span>{{ t('contextMenu.linkToEntity') }}{{ nodeCount > 1 ? ` (${nodeCount})` : '' }}</span>
       <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="9 18 15 12 9 6"/>
       </svg>
@@ -230,7 +233,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <div v-if="entityTypesWithContent.length > 0" class="context-menu-divider"></div>
 
         <!-- Create new entity options -->
-        <div class="submenu-section-header">Create New</div>
+        <div class="submenu-section-header">{{ t('contextMenu.createNew') }}</div>
         <div
           v-for="type in ENTITY_NODE_TYPES"
           :key="type"
@@ -252,19 +255,19 @@ function handleCreateEntity(type: EntityNodeType) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 19V5M5 12l7-7 7 7"/>
         </svg>
-        <span>Fetch Citations{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+        <span>{{ t('contextMenu.fetchCitations') }}{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
       </div>
       <div class="context-menu-item" @click="handleFetchReferences">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 5v14M5 12l7 7 7-7"/>
         </svg>
-        <span>Fetch References{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+        <span>{{ t('contextMenu.fetchReferences') }}{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
       </div>
       <div class="context-menu-item" @click="handleFetchBoth">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2v20M5 5l7 7 7-7M5 19l7-7 7 7"/>
         </svg>
-        <span>Fetch Both{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+        <span>{{ t('contextMenu.fetchBoth') }}{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
       </div>
       <div class="context-menu-item" @click="handleAddToZotero">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -273,7 +276,7 @@ function handleCreateEntity(type: EntityNodeType) {
           <line x1="12" y1="6" x2="12" y2="14"/>
           <line x1="8" y1="10" x2="16" y2="10"/>
         </svg>
-        <span>Add to Zotero{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
+        <span>{{ t('contextMenu.addToZotero') }}{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
       </div>
     </template>
 
@@ -288,7 +291,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
       </svg>
-      <span>Add to Storyline{{ nodeCount > 1 ? ` (${nodeCount})` : '' }}</span>
+      <span>{{ t('contextMenu.addToStoryline') }}{{ nodeCount > 1 ? ` (${nodeCount})` : '' }}</span>
       <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="9 18 15 12 9 6"/>
       </svg>
@@ -315,7 +318,7 @@ function handleCreateEntity(type: EntityNodeType) {
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          <span>New Storyline...</span>
+          <span>{{ t('contextMenu.newStoryline') }}</span>
         </div>
       </div>
     </div>
@@ -329,7 +332,7 @@ function handleCreateEntity(type: EntityNodeType) {
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>
-      <span>Send to Workspace{{ nodeCount > 1 ? ` (${nodeCount})` : '' }}</span>
+      <span>{{ t('contextMenu.sendToWorkspace') }}{{ nodeCount > 1 ? ` (${nodeCount})` : '' }}</span>
       <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="9 18 15 12 9 6"/>
       </svg>
@@ -347,7 +350,7 @@ function handleCreateEntity(type: EntityNodeType) {
           class="context-menu-item"
           @click="handleMoveToWorkspace(null)"
         >
-          <span>Default</span>
+          <span>{{ t('contextMenu.defaultWorkspace') }}</span>
         </div>
         <div
           v-for="workspace in otherWorkspaces"
@@ -358,7 +361,7 @@ function handleCreateEntity(type: EntityNodeType) {
           <span>{{ workspace.name }}</span>
         </div>
         <div v-if="otherWorkspaces.length === 0 && currentWorkspaceId === null" class="context-menu-item disabled">
-          <span>No other workspaces</span>
+          <span>{{ t('contextMenu.noOtherWorkspaces') }}</span>
         </div>
       </div>
     </div>
@@ -370,7 +373,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
       </svg>
-      <span>Read node</span>
+      <span>{{ t('contextMenu.readNode') }}</span>
     </div>
 
     <div class="context-menu-item" @click="handleExportSelection">
@@ -378,7 +381,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
         <polyline points="14 2 14 8 20 8"/>
       </svg>
-      <span>Export selection...</span>
+      <span>{{ t('contextMenu.exportSelection') }}</span>
     </div>
 
     <div class="context-menu-divider"></div>
@@ -388,7 +391,7 @@ function handleCreateEntity(type: EntityNodeType) {
         <polyline points="3 6 5 6 21 6"/>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
       </svg>
-      <span>Delete</span>
+      <span>{{ t('common.delete') }}</span>
     </div>
   </div>
 

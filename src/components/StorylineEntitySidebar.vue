@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Icon from './Icon.vue'
+import { useI18n } from 'vue-i18n'
 import type { Node, EntityNodeType } from '../types'
 import { ENTITY_NODE_TYPES } from '../types'
 
@@ -7,6 +8,8 @@ defineProps<{
   entitiesByType: Record<EntityNodeType, Node[]>
   hasEntities: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'navigate', entityId: string, direction: 'prev' | 'next'): void
@@ -26,7 +29,7 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
 <template>
   <aside class="entity-sidebar">
     <div class="entity-sidebar-header">
-      <h3 class="entity-sidebar-title">In this scene</h3>
+      <h3 class="entity-sidebar-title">{{ t('reader.inThisScene') }}</h3>
     </div>
     <div class="entity-sidebar-content">
       <template v-for="type in ENTITY_NODE_TYPES" :key="type">
@@ -45,21 +48,21 @@ const entityTypeLabels: Record<EntityNodeType, string> = {
             <div class="entity-nav-btns">
               <button
                 class="entity-nav-btn"
-                title="Previous appearance"
+                :title="t('reader.previousAppearance')"
                 @click="emit('navigate', entity.id, 'prev')"
               >
                 <Icon name="back" :size="10" />
               </button>
               <button
                 class="entity-nav-btn"
-                title="Next appearance"
+                :title="t('reader.nextAppearance')"
                 @click="emit('navigate', entity.id, 'next')"
               >
                 <Icon name="forward" :size="10" />
               </button>
               <button
                 class="entity-nav-btn"
-                title="Go to entity on canvas"
+                :title="t('reader.goToEntity')"
                 @click="emit('pan-to-entity', entity.id)"
               >
                 <Icon name="link" :size="10" />

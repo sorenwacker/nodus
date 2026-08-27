@@ -341,6 +341,14 @@ The integral is: $ integral_a^b f(x) dif x $
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
+### Localisation
+
+The application ships five locales. Every user-facing string comes from a locale file, and every locale carries every key.
+
+Two failures were possible and both happened. A key added only to `en.json` falls back to English silently, so 29 strings - the whole MCP settings panel among them - appeared in English to anyone using another locale with nothing to indicate a translation was missing. And a component with no `useI18n` at all cannot be translated whatever the locale files contain: the canvas context menu, the reader footer, the entity sidebar and four more were written entirely in literal English.
+
+A gate holds the first: every locale has every key English has, no locale carries a key English lacks, and no translation is an empty string. Product names and language names in a picker stay untranslated, because that is what they are called in every locale.
+
 ### Removing dead code
 
 Nothing is exported that nobody imports. Two shapes count as dead: a value referenced from nowhere at all, and a value exported while only its own file uses it. Both make a reader believe an interface exists, and both are how a fix comes to be applied to something nothing reaches.

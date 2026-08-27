@@ -115,7 +115,9 @@
       "storyline": "Storyline edges",
       "wikilink": "Wikilink edges",
       "tags": "Tag nodes and edges"
-    }
+    },
+    "emptyTitle": "No nodes yet",
+    "emptyHint": "Double-click anywhere to create a node"
   },
   "llm": {
     "provider": "Provider",
@@ -357,7 +359,8 @@
       "rateLimited": "Rate limited, retrying in",
       "nextRequest": "Next request in",
       "seconds": "{count}s"
-    }
+    },
+    "fetching": "Fetching Citations"
   },
   "common": {
     "close": "Close",
@@ -407,7 +410,10 @@
     "unassigned": "Unassigned",
     "resizeTimelines": "Drag to resize the timelines",
     "editHint": "Double-click to edit",
-    "locked": "This file is being edited elsewhere: {error}"
+    "locked": "This file is being edited elsewhere: {error}",
+    "noNodesYet": "No nodes yet",
+    "dropHere": "Drop here to add",
+    "addFirstNode": "Add first node"
   },
   "nodePicker": {
     "newNode": "New node",
@@ -729,5 +735,41 @@
     "confirm": "Build graph",
     "built": "Built {count} nodes from the document",
     "semanticSkipped": "{count} sections skipped by the AI pass"
+  },
+  "contextMenu": {
+    "fitToContent": "Fit to Content",
+    "findOnCanvas": "Find on Canvas",
+    "linkTo": "Link to...",
+    "linkToEntity": "Link to Entity",
+    "createNew": "Create New",
+    "fetchCitations": "Fetch Citations",
+    "fetchReferences": "Fetch References",
+    "fetchBoth": "Fetch Both",
+    "addToZotero": "Add to Zotero",
+    "addToStoryline": "Add to Storyline",
+    "newStoryline": "New Storyline...",
+    "sendToWorkspace": "Send to Workspace",
+    "noOtherWorkspaces": "No other workspaces",
+    "readNode": "Read node",
+    "exportSelection": "Export selection...",
+    "defaultWorkspace": "Default"
+  },
+  "reader": {
+    "pageNavigation": "Page navigation",
+    "previousSection": "Go to previous section",
+    "nextSection": "Go to next section",
+    "sectionNavigation": "Section navigation",
+    "previous": "Previous",
+    "next": "Next",
+    "skipToContent": "Skip to content",
+    "inThisScene": "In this scene",
+    "noEntities": "No entities in this scene",
+    "previousAppearance": "Previous appearance",
+    "nextAppearance": "Next appearance",
+    "goToEntity": "Go to entity on canvas"
+  },
+  "agentLog": {
+    "copy": "Copy log",
+    "clear": "Clear log"
   }
 }

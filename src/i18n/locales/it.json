@@ -59,7 +59,8 @@
       "insertNode": "Inserisci nodo",
       "insertNodeTooltip": "Inserisci un nodo su questo arco",
       "deleteEdge": "Elimina arco",
-      "deleteEdgeTooltip": "Elimina questo arco"
+      "deleteEdgeTooltip": "Elimina questo arco",
+      "labelSaved": "Etichetta del collegamento salvata"
     },
     "frame": {
       "delete": "Elimina cornice",
@@ -114,7 +115,9 @@
       "storyline": "Archi della storia",
       "wikilink": "Archi wikilink",
       "tags": "Nodi e archi dei tag"
-    }
+    },
+    "emptyTitle": "Ancora nessun nodo",
+    "emptyHint": "Fai doppio clic in un punto qualsiasi per creare un nodo"
   },
   "llm": {
     "provider": "Provider",
@@ -356,7 +359,8 @@
       "rateLimited": "Limite raggiunto, nuovo tentativo tra",
       "nextRequest": "Prossima richiesta tra",
       "seconds": "{count}s"
-    }
+    },
+    "fetching": "Recupero delle citazioni"
   },
   "common": {
     "close": "Chiudi",
@@ -403,7 +407,13 @@
     "unassigned": "Non assegnato",
     "resizeTimelines": "Trascina per ridimensionare le cronologie",
     "editHint": "Doppio clic per modificare",
-    "locked": "Questo file è in modifica altrove: {error}"
+    "locked": "Questo file è in modifica altrove: {error}",
+    "collapseNode": "Comprimi il contenuto",
+    "expandNode": "Espandi il contenuto",
+    "noContent": "Nessun contenuto",
+    "noNodesYet": "Ancora nessun nodo",
+    "dropHere": "Rilascia qui per aggiungere",
+    "addFirstNode": "Aggiungi il primo nodo"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",
@@ -536,7 +546,8 @@
         "exporting": "Salvataggio...",
         "success": "Salvato in Zotero",
         "error": "Salvataggio in Zotero fallito"
-      }
+      },
+      "importAll": "Importa tutti gli elementi"
     },
     "language": "Lingua",
     "llmEnabled": "Funzionalità IA",
@@ -611,7 +622,13 @@
     "okfBackfillHint": "Aggiunge il frontmatter OKF ai file del vault che non ce l'hanno. Corpo, wikilink e tag restano invariati.",
     "okfBackfillResult": "{add} file riceverebbero il frontmatter, {keep} lo hanno già, {none} senza file.",
     "okfBackfillApply": "Aggiungi il frontmatter a {count} file",
-    "okfBackfilling": "Scrittura..."
+    "okfBackfilling": "Scrittura...",
+    "edgeLabelSize": "Dimensione etichetta collegamento",
+    "edgeLabelSizeHint": "Dimensione del carattere delle etichette (8-12 pixel)",
+    "hideStorylineEdges": "Nascondi collegamenti della narrazione",
+    "hideStorylineEdgesHint": "Nascondi i collegamenti tra i nodi di una narrazione",
+    "hideWikilinkEdges": "Nascondi collegamenti [[wikilink]]",
+    "hideWikilinkEdgesHint": "Nascondi i collegamenti generati dai [[link]] nel contenuto"
   },
   "fileMove": {
     "collision": {
@@ -698,5 +715,61 @@
     "confirm": "Costruisci grafo",
     "built": "{count} nodi costruiti dal documento",
     "semanticSkipped": "{count} sezioni saltate dal passaggio IA"
+  },
+  "mcp": {
+    "approve": "Approva",
+    "configHint": "Aggiungi questo alla configurazione di Claude Desktop:",
+    "connectionId": "ID connessione",
+    "connectionRequest": "Richiesta di connessione MCP",
+    "connectionRequestMessage": "Uno strumento di IA richiede l’accesso al tuo spazio di lavoro. Potrà leggere e modificare i tuoi nodi.",
+    "connections": "connessioni",
+    "enableServer": "Attiva il server MCP",
+    "forgetTrusted": "Dimentica tutto",
+    "port": "Porta",
+    "reject": "Rifiuta",
+    "running": "In esecuzione",
+    "server": "Server MCP",
+    "serverHint": "Consente a strumenti di IA come Claude Desktop di connettersi a Nodus tramite il protocollo MCP.",
+    "status": "Stato",
+    "stopped": "Arrestato",
+    "trustedClients": "Client attendibili",
+    "trustedHint": "Le connessioni approvate vengono ricordate e si riconnettono senza chiedere. Dimenticarle revoca tutte le autorizzazioni salvate.",
+    "warningMessage": "Approva solo connessioni da strumenti di cui ti fidi. Lo strumento connesso potrà leggere, creare, aggiornare ed eliminare nodi."
+  },
+  "contextMenu": {
+    "fitToContent": "Adatta al contenuto",
+    "findOnCanvas": "Trova sulla tela",
+    "linkTo": "Collega a...",
+    "linkToEntity": "Collega a entità",
+    "createNew": "Crea nuovo",
+    "fetchCitations": "Recupera citazioni",
+    "fetchReferences": "Recupera riferimenti",
+    "fetchBoth": "Recupera entrambi",
+    "addToZotero": "Aggiungi a Zotero",
+    "addToStoryline": "Aggiungi alla narrazione",
+    "newStoryline": "Nuova narrazione...",
+    "sendToWorkspace": "Invia allo spazio di lavoro",
+    "noOtherWorkspaces": "Nessun altro spazio di lavoro",
+    "readNode": "Leggi il nodo",
+    "exportSelection": "Esporta selezione...",
+    "defaultWorkspace": "Predefinito"
+  },
+  "reader": {
+    "pageNavigation": "Navigazione pagine",
+    "previousSection": "Vai alla sezione precedente",
+    "nextSection": "Vai alla sezione successiva",
+    "sectionNavigation": "Navigazione sezioni",
+    "previous": "Precedente",
+    "next": "Successivo",
+    "skipToContent": "Vai al contenuto",
+    "inThisScene": "In questa scena",
+    "noEntities": "Nessuna entità in questa scena",
+    "previousAppearance": "Comparsa precedente",
+    "nextAppearance": "Comparsa successiva",
+    "goToEntity": "Vai all’entità sulla tela"
+  },
+  "agentLog": {
+    "copy": "Copia il registro",
+    "clear": "Svuota il registro"
   }
 }

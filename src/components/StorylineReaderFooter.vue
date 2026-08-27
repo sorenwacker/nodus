@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import Icon from './Icon.vue'
+import { useI18n } from 'vue-i18n'
 
 defineProps<{
   activeIndex: number
   totalNodes: number
 }>()
+
+const { t } = useI18n()
 
 defineEmits<{
   (e: 'previous'): void
@@ -14,18 +17,18 @@ defineEmits<{
 </script>
 
 <template>
-  <footer class="reader-footer" role="navigation" aria-label="Page navigation">
+  <footer class="reader-footer" role="navigation" :aria-label="t('reader.pageNavigation')">
     <button
       class="nav-btn prev"
       :disabled="activeIndex === 0"
-      aria-label="Go to previous section"
+      :aria-label="t('reader.previousSection')"
       @click="$emit('previous')"
     >
       <Icon name="back" :size="16" />
-      <span>Previous</span>
+      <span>{{ t('reader.previous') }}</span>
     </button>
 
-    <div class="nav-dots" role="tablist" aria-label="Section navigation">
+    <div class="nav-dots" role="tablist" :aria-label="t('reader.sectionNavigation')">
       <button
         v-for="index in totalNodes"
         :key="index - 1"
@@ -41,10 +44,10 @@ defineEmits<{
     <button
       class="nav-btn next"
       :disabled="activeIndex === totalNodes - 1"
-      aria-label="Go to next section"
+      :aria-label="t('reader.nextSection')"
       @click="$emit('next')"
     >
-      <span>Next</span>
+      <span>{{ t('reader.next') }}</span>
       <Icon name="forward" :size="16" />
     </button>
   </footer>
