@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { getVersion } from '@tauri-apps/api/app'
 import { llmStorage } from '../lib/storage'
 import { useThemesStore } from '../stores/themes'
-import { setLocale, getLocale, loadLocale } from '../i18n'
+import { setLocale, getLocale } from '../i18n'
 import AppearanceSettingsPanel from './settings/AppearanceSettingsPanel.vue'
 import CanvasSettingsPanel from './settings/CanvasSettingsPanel.vue'
 import LLMSettingsPanel from './settings/LLMSettingsPanel.vue'
@@ -45,7 +45,6 @@ const showAdvanced = ref(false)
 const showAbout = ref(false)
 
 watch(selectedLanguage, async (locale) => {
-  await loadLocale(locale)
   setLocale(locale)
 })
 

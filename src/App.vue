@@ -1012,7 +1012,7 @@ async function openFolderDialog() {
     <!-- Import Dialog -->
     <div v-if="showImportDialog" class="dialog-overlay" @click.self="showImportDialog = false">
       <div class="dialog">
-        <h2>Import Obsidian Vault</h2>
+        <h2>{{ t('import.vaultTitle') }}</h2>
         <div class="dialog-content">
           <label>
             Vault Path:
@@ -1023,14 +1023,14 @@ async function openFolderDialog() {
                 :placeholder="t('workspace.pathPlaceholder')"
                 class="path-input"
               />
-              <button class="browse-btn" @click="openFolderDialog">Browse</button>
+              <button class="browse-btn" @click="openFolderDialog">{{ t('import.browse') }}</button>
             </div>
           </label>
 
           <div class="import-target-section">
             <label class="radio-label">
               <input v-model="importTarget" type="radio" value="new" />
-              <span>Create new workspace</span>
+              <span>{{ t('import.createWorkspace') }}</span>
             </label>
             <input
               v-if="importTarget === 'new'"
@@ -1042,14 +1042,14 @@ async function openFolderDialog() {
 
             <label class="radio-label">
               <input v-model="importTarget" type="radio" value="current" />
-              <span>Import into current workspace</span>
+              <span>{{ t('import.intoCurrent') }}</span>
             </label>
           </div>
 
           <div class="import-options-section">
             <label class="checkbox-label">
               <input v-model="deleteOriginalFiles" type="checkbox" />
-              <span>Delete original files after import</span>
+              <span>{{ t('import.deleteOriginals') }}</span>
             </label>
             <p v-if="deleteOriginalFiles" class="warning-text">
               Warning: Original files will be deleted after import
@@ -1057,12 +1057,12 @@ async function openFolderDialog() {
           </div>
         </div>
         <div class="dialog-actions">
-          <button class="cancel-btn" @click="showImportDialog = false">Cancel</button>
+          <button class="cancel-btn" @click="showImportDialog = false">{{ t('common.cancel') }}</button>
           <button
             class="import-btn"
             :disabled="!vaultPath.trim() || (importTarget === 'new' && !importWorkspaceName.trim())"
             @click="importVault"
-          >Import</button>
+          >{{ t('import.confirm') }}</button>
         </div>
       </div>
     </div>

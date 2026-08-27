@@ -49,16 +49,7 @@ export function getLocale(): SupportedLocale {
   return i18n.global.locale.value as SupportedLocale
 }
 
-// Lazy load additional locales
-export async function loadLocale(locale: SupportedLocale): Promise<void> {
-  if (i18n.global.availableLocales.includes(locale)) {
-    return // Already loaded
-  }
-
-  try {
-    const messages = await import(`./locales/${locale}.json`)
-    i18n.global.setLocaleMessage(locale, messages.default)
-  } catch {
-    console.warn(`Failed to load locale: ${locale}`)
-  }
-}
+// Every locale is bundled and registered when the instance is created, so
+// there is nothing to load on demand. A `loadLocale` used to live here whose
+// dynamic import could never run, because availableLocales already held every
+// supported locale (PRODUCT_DESIGN.md > Localisation).

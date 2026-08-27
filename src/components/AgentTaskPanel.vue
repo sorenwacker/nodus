@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAgentTasksStore, type AgentTaskItem } from '../stores/agentTasks'
 
 // A Boolean prop with no default resolves to `false` when the parent omits it
@@ -11,6 +12,8 @@ const props = withDefaults(
   }>(),
   { visible: true }
 )
+
+const { t } = useI18n()
 
 const tasksStore = useAgentTasksStore()
 
@@ -48,7 +51,7 @@ const shouldShow = computed(() =>
 <template>
   <div v-if="shouldShow" class="task-panel">
     <header class="task-panel-header">
-      <span class="task-panel-title">Tasks</span>
+      <span class="task-panel-title">{{ t('agent.tasks') }}</span>
       <span class="task-panel-progress">
         {{ tasksStore.completedTasks }}/{{ tasksStore.totalTasks }}
       </span>

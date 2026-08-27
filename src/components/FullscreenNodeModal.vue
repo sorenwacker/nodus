@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
@@ -15,6 +16,8 @@ const props = defineProps<{
   nodeId: string | null
   visible: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -407,7 +410,7 @@ onUnmounted(() => {
             <input
               v-model="editTitle"
               class="fullscreen-title-input"
-              placeholder="Untitled"
+              :placeholder="t('fullscreen.untitled')"
               :spellcheck="spellcheckEnabled"
               :autocorrect="spellcheckEnabled ? 'on' : 'off'"
               :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
@@ -415,8 +418,8 @@ onUnmounted(() => {
               @keydown.enter.prevent="editorRef?.focus()"
             />
             <div class="fullscreen-header-actions">
-              <span v-if="hasUnsavedChanges" class="unsaved-indicator">Unsaved</span>
-              <button class="fullscreen-close-btn" aria-label="Close" @click="handleClose">
+              <span v-if="hasUnsavedChanges" class="unsaved-indicator">{{ t('fullscreen.unsaved') }}</span>
+              <button class="fullscreen-close-btn" :aria-label="t('common.close')" @click="handleClose">
                 &times;
               </button>
             </div>
@@ -426,12 +429,12 @@ onUnmounted(() => {
           <div class="fullscreen-modal-body" :class="{ 'reading-mode': readingMode }">
             <!-- Editor pane -->
             <div v-if="!readingMode" class="editor-pane">
-              <div class="pane-header">Editor (Markdown)</div>
+              <div class="pane-header">{{ t('fullscreen.editor') }}</div>
               <textarea
                 ref="editorRef"
                 v-model="editContent"
                 class="fullscreen-editor"
-                placeholder="Write your content here..."
+                :placeholder="t('fullscreen.contentPlaceholder')"
                 :spellcheck="spellcheckEnabled"
                 :autocorrect="spellcheckEnabled ? 'on' : 'off'"
                 :autocapitalize="spellcheckEnabled ? 'sentences' : 'off'"
@@ -454,7 +457,7 @@ onUnmounted(() => {
 
             <!-- Preview pane -->
             <div class="preview-pane">
-              <div class="pane-header">Preview</div>
+              <div class="pane-header">{{ t('fullscreen.preview') }}</div>
               <!-- Safe: renderMarkdown returns sanitizeHtml() output, so this
                    markup has already been through DOMPurify -->
               <!-- eslint-disable vue/no-v-html -->
@@ -473,14 +476,14 @@ onUnmounted(() => {
           <div class="fullscreen-modal-footer">
             <div class="footer-left">
               <button class="fullscreen-btn-secondary" @click="handleZoomToNode">
-                Zoom to Node
+                {{ t('fullscreen.zoomToNode') }}
               </button>
               <button
                 class="fullscreen-btn-secondary mode-toggle"
                 :class="{ active: readingMode }"
                 @click="readingMode = !readingMode"
               >
-                {{ readingMode ? 'Edit Mode' : 'Reading Mode' }}
+                {{ readingMode ? t('fullscreen.editMode') : t('fullscreen.readingMode') }}
               </button>
             </div>
             <div class="footer-hint">

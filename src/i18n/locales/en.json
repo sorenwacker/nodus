@@ -340,7 +340,13 @@
       "layoutGrid": "Grid",
       "layoutForce": "Force-directed",
       "importButton": "Import {count} citation | Import {count} citations"
-    }
+    },
+    "vaultTitle": "Import Obsidian Vault",
+    "browse": "Browse",
+    "intoCurrent": "Import into current workspace",
+    "createWorkspace": "Create new workspace",
+    "deleteOriginals": "Delete original files after import",
+    "confirm": "Import"
   },
   "node": {
     "untitled": "Untitled",
@@ -413,7 +419,11 @@
     "locked": "This file is being edited elsewhere: {error}",
     "noNodesYet": "No nodes yet",
     "dropHere": "Drop here to add",
-    "addFirstNode": "Add first node"
+    "addFirstNode": "Add first node",
+    "titlePlaceholder": "Storyline title...",
+    "create": "Create",
+    "createFirst": "Create a storyline first",
+    "noneYet": "No storylines yet"
   },
   "nodePicker": {
     "newNode": "New node",
@@ -766,10 +776,29 @@
     "noEntities": "No entities in this scene",
     "previousAppearance": "Previous appearance",
     "nextAppearance": "Next appearance",
-    "goToEntity": "Go to entity on canvas"
+    "goToEntity": "Go to entity on canvas",
+    "noNodes": "This storyline has no nodes yet.",
+    "addFromCanvas": "Add nodes from the canvas to build your narrative.",
+    "entitySidebar": "Entity sidebar",
+    "content": "Storyline content",
+    "tableOfContents": "Table of Contents",
+    "clickToEdit": "Click to edit"
   },
   "agentLog": {
     "copy": "Copy log",
     "clear": "Clear log"
+  },
+  "fullscreen": {
+    "preview": "Preview",
+    "unsaved": "Unsaved",
+    "untitled": "Untitled",
+    "contentPlaceholder": "Write your content here...",
+    "editor": "Editor (Markdown)",
+    "readingMode": "Reading Mode",
+    "editMode": "Edit Mode",
+    "zoomToNode": "Zoom to Node"
+  },
+  "agent": {
+    "tasks": "Tasks"
   }
 }

@@ -340,7 +340,13 @@
       "layoutGrid": "Grille",
       "layoutForce": "Force",
       "importButton": "Importer {count} citation | Importer {count} citations"
-    }
+    },
+    "vaultTitle": "Importer un coffre Obsidian",
+    "browse": "Parcourir",
+    "intoCurrent": "Importer dans l’espace de travail actuel",
+    "createWorkspace": "Créer un espace de travail",
+    "deleteOriginals": "Supprimer les fichiers d’origine après l’import",
+    "confirm": "Importer"
   },
   "node": {
     "untitled": "Sans titre",
@@ -413,7 +419,11 @@
     "noContent": "Aucun contenu",
     "noNodesYet": "Aucun nœud pour le moment",
     "dropHere": "Déposez ici pour ajouter",
-    "addFirstNode": "Ajouter le premier nœud"
+    "addFirstNode": "Ajouter le premier nœud",
+    "titlePlaceholder": "Titre du récit...",
+    "create": "Créer",
+    "createFirst": "Créez d’abord un récit",
+    "noneYet": "Aucun récit pour le moment"
   },
   "nodePicker": {
     "newNode": "Nouveau nœud",
@@ -766,10 +776,29 @@
     "noEntities": "Aucune entité dans cette scène",
     "previousAppearance": "Apparition précédente",
     "nextAppearance": "Apparition suivante",
-    "goToEntity": "Aller à l’entité sur le canevas"
+    "goToEntity": "Aller à l’entité sur le canevas",
+    "noNodes": "Ce récit ne contient encore aucun nœud.",
+    "addFromCanvas": "Ajoutez des nœuds depuis le canevas pour construire votre récit.",
+    "entitySidebar": "Panneau des entités",
+    "content": "Contenu du récit",
+    "tableOfContents": "Table des matières",
+    "clickToEdit": "Cliquez pour modifier"
   },
   "agentLog": {
     "copy": "Copier le journal",
     "clear": "Effacer le journal"
+  },
+  "fullscreen": {
+    "preview": "Aperçu",
+    "unsaved": "Non enregistré",
+    "untitled": "Sans titre",
+    "contentPlaceholder": "Écrivez votre contenu ici...",
+    "editor": "Éditeur (Markdown)",
+    "readingMode": "Mode lecture",
+    "editMode": "Mode édition",
+    "zoomToNode": "Zoomer sur le nœud"
+  },
+  "agent": {
+    "tasks": "Tâches"
   }
 }

@@ -411,7 +411,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
     ></div>
 
     <!-- Skip link for accessibility -->
-    <a href="#reader-main-content" class="skip-link">Skip to content</a>
+    <a href="#reader-main-content" class="skip-link">{{ t('reader.skipToContent') }}</a>
 
     <!-- Reading progress bar -->
     <div class="reading-progress" :style="{ width: `${readingProgress}%` }"></div>
@@ -445,7 +445,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
 
       <div class="reader-body">
         <!-- Table of Contents Sidebar -->
-        <aside v-if="showToc" class="toc-sidebar" role="navigation" aria-label="Table of Contents">
+        <aside v-if="showToc" class="toc-sidebar" role="navigation" :aria-label="t('reader.tableOfContents')">
           <div class="toc-header">
             <h2 class="toc-title">{{ t('storyline.contents') }}</h2>
           </div>
@@ -485,17 +485,17 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
           class="reader-content"
           :class="{ 'full-width': !showToc }"
           role="region"
-          aria-label="Storyline content"
+          :aria-label="t('reader.content')"
           @scroll="handleScroll"
         >
           <div v-if="loading" class="loading-state">
             <div class="spinner"></div>
-            <span>Loading...</span>
+            <span>{{ t('common.loading') }}</span>
           </div>
 
           <div v-else-if="nodes.length === 0" class="empty-state">
-            <p>This storyline has no nodes yet.</p>
-            <p class="hint">Add nodes from the canvas to build your narrative.</p>
+            <p>{{ t('reader.noNodes') }}</p>
+            <p class="hint">{{ t('reader.addFromCanvas') }}</p>
           </div>
 
           <template v-else>
@@ -543,7 +543,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
                 <header class="section-header">
                   <span
                     class="section-number clickable"
-                    title="Click to edit"
+                    :title="t('reader.clickToEdit')"
                     @click="openNodeDetail(node.id)"
                   >
                     <span class="section-num-text">{{ index + 1 }}</span>
@@ -582,7 +582,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
         <aside
           v-if="showEntitySidebar && hasEntities"
           role="complementary"
-          aria-label="Entity sidebar"
+          :aria-label="t('reader.entitySidebar')"
         >
           <StorylineEntitySidebar
             :entities-by-type="entitiesByType"

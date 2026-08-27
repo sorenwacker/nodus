@@ -203,25 +203,25 @@ watch(() => store.currentWorkspaceId, () => {
       <input
         v-model="newStorylineTitle"
         type="text"
-        placeholder="Storyline title..."
+        :placeholder="t('storyline.titlePlaceholder')"
         class="storyline-input"
         @keydown.enter="createStoryline"
         @keydown.escape="isCreating = false"
       />
       <div class="new-storyline-actions">
-        <button class="action-btn cancel" @click="isCreating = false">Cancel</button>
+        <button class="action-btn cancel" @click="isCreating = false">{{ t('common.cancel') }}</button>
         <button
           class="action-btn create"
           :disabled="!newStorylineTitle.trim()"
           @click="createStoryline"
-        >Create</button>
+        >{{ t('storyline.create') }}</button>
       </div>
     </div>
 
     <!-- Drop hint when dragging with no storyline to receive the nodes -->
     <div v-if="isDropTarget && storylines.length === 0" class="drop-hint">
       <Icon name="plus" :size="24" />
-      <span>Create a storyline first</span>
+      <span>{{ t('storyline.createFirst') }}</span>
     </div>
 
     <!-- Accordion of storyline sections -->
@@ -245,7 +245,7 @@ watch(() => store.currentWorkspaceId, () => {
       />
 
       <div v-if="!storylines.length && !isCreating" class="empty-panel">
-        <p>No storylines yet</p>
+        <p>{{ t('storyline.noneYet') }}</p>
         <button class="create-first-btn" @click="isCreating = true">
           Create your first storyline
         </button>

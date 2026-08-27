@@ -340,7 +340,13 @@
       "layoutGrid": "Griglia",
       "layoutForce": "Forza",
       "importButton": "Importa {count} citazione | Importa {count} citazioni"
-    }
+    },
+    "vaultTitle": "Importa un vault di Obsidian",
+    "browse": "Sfoglia",
+    "intoCurrent": "Importa nello spazio di lavoro corrente",
+    "createWorkspace": "Crea un nuovo spazio di lavoro",
+    "deleteOriginals": "Elimina i file originali dopo l’importazione",
+    "confirm": "Importa"
   },
   "node": {
     "untitled": "Senza titolo",
@@ -413,7 +419,11 @@
     "noContent": "Nessun contenuto",
     "noNodesYet": "Ancora nessun nodo",
     "dropHere": "Rilascia qui per aggiungere",
-    "addFirstNode": "Aggiungi il primo nodo"
+    "addFirstNode": "Aggiungi il primo nodo",
+    "titlePlaceholder": "Titolo della narrazione...",
+    "create": "Crea",
+    "createFirst": "Crea prima una narrazione",
+    "noneYet": "Ancora nessuna narrazione"
   },
   "nodePicker": {
     "newNode": "Nuovo nodo",
@@ -766,10 +776,29 @@
     "noEntities": "Nessuna entità in questa scena",
     "previousAppearance": "Comparsa precedente",
     "nextAppearance": "Comparsa successiva",
-    "goToEntity": "Vai all’entità sulla tela"
+    "goToEntity": "Vai all’entità sulla tela",
+    "noNodes": "Questa narrazione non ha ancora nodi.",
+    "addFromCanvas": "Aggiungi nodi dalla tela per costruire la tua narrazione.",
+    "entitySidebar": "Barra laterale delle entità",
+    "content": "Contenuto della narrazione",
+    "tableOfContents": "Indice",
+    "clickToEdit": "Fai clic per modificare"
   },
   "agentLog": {
     "copy": "Copia il registro",
     "clear": "Svuota il registro"
+  },
+  "fullscreen": {
+    "preview": "Anteprima",
+    "unsaved": "Non salvato",
+    "untitled": "Senza titolo",
+    "contentPlaceholder": "Scrivi qui il tuo contenuto...",
+    "editor": "Editor (Markdown)",
+    "readingMode": "Modalità lettura",
+    "editMode": "Modalità modifica",
+    "zoomToNode": "Ingrandisci sul nodo"
+  },
+  "agent": {
+    "tasks": "Attività"
   }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { setLocale, getLocale, loadLocale } from '../i18n'
+import { setLocale, getLocale } from '../i18n'
 import type { SupportedLocale } from '../lib/templates'
 
 const { t } = useI18n()
@@ -20,7 +20,6 @@ const languages: Array<{ code: SupportedLocale; name: string }> = [
 
 async function selectLanguage(code: SupportedLocale) {
   selectedLanguage.value = code
-  await loadLocale(code)
   setLocale(code)
 }
 

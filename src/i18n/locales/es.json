@@ -340,7 +340,13 @@
       "layoutGrid": "Cuadrícula",
       "layoutForce": "Fuerza",
       "importButton": "Importar {count} cita | Importar {count} citas"
-    }
+    },
+    "vaultTitle": "Importar un vault de Obsidian",
+    "browse": "Examinar",
+    "intoCurrent": "Importar al espacio de trabajo actual",
+    "createWorkspace": "Crear un espacio de trabajo",
+    "deleteOriginals": "Eliminar los archivos originales tras la importación",
+    "confirm": "Importar"
   },
   "node": {
     "untitled": "Sin título",
@@ -413,7 +419,11 @@
     "noContent": "Sin contenido",
     "noNodesYet": "Aún no hay nodos",
     "dropHere": "Suelta aquí para añadir",
-    "addFirstNode": "Añadir el primer nodo"
+    "addFirstNode": "Añadir el primer nodo",
+    "titlePlaceholder": "Título de la narrativa...",
+    "create": "Crear",
+    "createFirst": "Crea primero una narrativa",
+    "noneYet": "Aún no hay narrativas"
   },
   "nodePicker": {
     "newNode": "Nuevo nodo",
@@ -766,10 +776,29 @@
     "noEntities": "No hay entidades en esta escena",
     "previousAppearance": "Aparición anterior",
     "nextAppearance": "Aparición siguiente",
-    "goToEntity": "Ir a la entidad en el lienzo"
+    "goToEntity": "Ir a la entidad en el lienzo",
+    "noNodes": "Esta narrativa aún no tiene nodos.",
+    "addFromCanvas": "Añade nodos desde el lienzo para construir tu narrativa.",
+    "entitySidebar": "Barra lateral de entidades",
+    "content": "Contenido de la narrativa",
+    "tableOfContents": "Índice",
+    "clickToEdit": "Haz clic para editar"
   },
   "agentLog": {
     "copy": "Copiar el registro",
     "clear": "Borrar el registro"
+  },
+  "fullscreen": {
+    "preview": "Previsualización",
+    "unsaved": "Sin guardar",
+    "untitled": "Sin título",
+    "contentPlaceholder": "Escribe tu contenido aquí...",
+    "editor": "Editor (Markdown)",
+    "readingMode": "Modo de lectura",
+    "editMode": "Modo de edición",
+    "zoomToNode": "Ampliar hasta el nodo"
+  },
+  "agent": {
+    "tasks": "Tareas"
   }
 }

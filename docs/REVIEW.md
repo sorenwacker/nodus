@@ -236,6 +236,8 @@ Code proof of the two key sources:
 
 ### M7. Whole component is un-localised while its siblings use vue-i18n
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/components/FullscreenNodeModal.vue:392`
 
 FullscreenNodeModal does not import `useI18n` at all; every user-visible string is a literal: "Editor (Markdown)" (392), "Preview" (420), "Write your content here..." (397), "Untitled" (373), "Unsaved" (381), "Zoom to Node" (439), "Edit Mode"/"Reading Mode" (446), "Esc to close / Cmd+S to save" (450), `aria-label="Close"` (382). The same pattern recurs in StorylineReaderFooter.vue:25-47 ("Previous"/"Next", all aria-labels), AgentTaskPanel.vue:51-87 ("Tasks", "Error", "All tasks completed"), StorylinePanel.vue:206-251 ("Storyline title...", "Cancel", "Create", "No storylines yet", plus the toast texts at 108/112), StorylineNodeList.vue:208-214, StorylineReader.vue:414/494/497-498/521/546, NodePicker.vue:34-38 and 211, StorylineEntitySidebar.vue:17-29/48-73, StorylineReaderHeader.vue:45/54, KeyboardShortcutsModal.vue:42 and WorkspaceDiagnosticsSection.vue:176-187 — files that otherwise call `t()` in adjacent lines. The project rule is that user-facing text comes from the locale files.
@@ -418,6 +420,8 @@ Unlike the undo/redo branches above it, this one does not test e.metaKey/e.ctrlK
 The strongest corroboration is the sibling handler: src/canva
 
 ### M24. User-facing strings hardcoded in composables while the app ships five locales
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/composables/useUndoRedo.ts:226`
 
@@ -620,6 +624,8 @@ Verified:
 
 ### M40. The entire context menu is hardcoded English, with no i18n at all
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/components/CanvasContextMenu.vue:176`
 
 The component never imports `useI18n`; every label is a literal: "Fit to Content" (176), "Find on Canvas" (184), "Link to..." (192), "Link to Entity" (205), "Fetch Citations/References/Both" (255-267), "Add to Zotero" (276), "Add to Storyline" (291), "New Storyline..." (318), "Send to Workspace" (332), "Default" (350), "No other workspaces" (361), "Read node" (373), "Export selection..." (381), "Delete" (391), "Create New" (233). Project rule: "User-facing text must come from the locale files; hardcoded strings are defects." Every sibling in this folder (CanvasControls, CanvasEdgePanel, CanvasStatusBar) uses `t()`, and `src/i18n/locales/en.json` has no `canvas.contextMenu.*` namespace at all, so no locale carries these labels.
@@ -635,6 +641,8 @@ The component never imports `useI18n`; every label is a literal: "Fit to Content
 *Verification:* Confirmed from the code, not inferred. CanvasNodeCard.vue:190-196 `saveDate()` calls `nodesStore.updateNodeContent(props.node.id, content)` directly; the component neither injects `pushContentUndo` (no `inject` call in the file) nor emits a content-save event (its emit list only has `save-editing`/`save-title`). The store path does not compensate: stores/nodes.ts:261 delegates to stores/nodes/crud
 
 ### M42. Panel mixes t() with hardcoded English for buttons, notifications and the untitled fallback
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/components/CanvasPreviewPanel.vue:431`
 
@@ -897,6 +905,8 @@ The composable augments `Window` with `__storylinePanelDropTarget` (lines 13-17)
 *Verification:* Every code claim checks out. useStorylineDropTarget.ts:13-17 declares `Window.__storylinePanelDropTarget` (the only `declare global` in src/), line 62 writes it on pointermove, lines 70-72 clear it in a setTimeout(0). useNodeDragging.ts:258 reads it back via a structural cast with a comment naming StorylinePanel. The two live in sibling components under App.vue (GraphCanvas.vue:1655 and StorylineP
 
 ### M69. User-facing toast text is hardcoded English while the project uses vue-i18n
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/util/useStorylines.ts:67`
 
@@ -1255,6 +1265,8 @@ B's container is never rendered. Since the file's own consumers pass distinct sc
 
 ### M98. 29 keys exist only in en.json; four locales silently fall back to English with no gate
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/i18n/locales/en.json`
 
 Key counts: en 571, de/fr/es/it 542 each. The identical 29-key gap in all four non-English locales is:
@@ -1266,6 +1278,8 @@ canvas.edge.labelSaved, mcp.approve, mcp.configHint, mcp.connectionId, mcp.conne
 *Verification:* Reproduced directly from the files. Flattening the five locale JSONs in src/i18n/locales/ gives en=571 keys and de/fr/es/it=542 each, with the identical 29-key gap the finding lists and zero extra keys in any locale. The missing keys are live UI, not dead strings: McpSettingsPanel.vue uses mcp.serverHint and mcp.trustedClients, McpApprovalModal.vue and App.vue:414 use mcp.approve, CanvasSettingsPa
 
 ### M99. Import Obsidian Vault dialog and two toasts are hardcoded English, bypassing the locale files
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/App.vue:1017`
 
@@ -1441,6 +1455,8 @@ fetchModels() does:
 
 ### L17. Edge-cleanup section uses hardcoded English strings instead of locale keys
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/components/settings/WorkspaceDiagnosticsSection.vue:176`
 
 The second `setting-group` is entirely untranslated: `<label>Edge Database Cleanup</label>` (line 176), `cleaningEdges ? 'Cleaning...' : 'Clean Up Edges'` (line 182), and 'Removes orphan edges (pointing to deleted nodes) and duplicates.' (line 186). The result string is built in script too: `cleanupResult.value = `Removed ${orphansRemoved} orphan edges, ${dupsRemoved} duplicates`` and `Error: ${e}` (lines 118, 123). The first section in the same file uses `t(...)` throughout, and the project rule states user-facing text must come from the locale files.
@@ -1448,6 +1464,8 @@ The second `setting-group` is entirely untranslated: `<label>Edge Database Clean
 *Verification:* Confirmed directly from source; I could not refute it. In src/components/settings/WorkspaceDiagnosticsSection.vue the second setting-group is entirely untranslated: line 176 `<label>Edge Database Cleanup</label>`, line 182 `{{ cleaningEdges ? 'Cleaning...' : 'Clean Up Edges' }}`, line 186 the hint 'Removes orphan edges (pointing to deleted nodes) and duplicates.', plus script-built strings at line
 
 ### L18. Hardcoded English strings in the cloud import path
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/components/settings/ZoteroSettingsPanel.vue:138`
 
@@ -1938,6 +1956,8 @@ The BFS marks `visited.insert(id)` on pop and skips any node already in `visited
 
 ### L58. Toast text hardcoded in English although the locale key already exists and is unused
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/GraphCanvas.vue:682`
 
 `function onEdgeLabelSave() { notifications$.success('Edge label saved') }`. `src/i18n/locales/en.json` already contains `canvas.edge.labelSaved: "Edge label saved"`, and grep shows that key has zero usages anywhere in src/ — so the file hardcodes the exact string the locale file was written for. Every other user-visible string in this file goes through `t()` (e.g. lines 806, 1159, 2067).
@@ -1981,6 +2001,8 @@ Line 711 destructures `fontScale` from `useCanvasDisplay` (its own `ref(uiStorag
 *Verification:* Confirmed from the code. Two independent refs hold the font scale: useCanvasDisplay.ts:62 (`ref(uiStorage.getFontScale())`) and stores/display.ts:17 (its own `ref(uiStorage.getFontScale())`). GraphCanvas.vue:711 wires the composable's ref into the keyboard shortcuts (line 2000) and the initial `--font-scale` CSS variable (line 200), while GraphCanvas.vue:1897 wires `computed(() => displayStore.fon
 
 ### L63. In-node search bar strings hardcoded while the rest of the file is translated
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/components/CanvasNodeCard.vue:272`
 
@@ -2200,6 +2222,8 @@ Grepping each identifier inside useNodeDragging.ts shows these context members a
 *Verification:* Confirmed from the code. In src/canvas/composables/nodes/useNodeResizing.ts, UseNodeResizingContext declares pushOverlappingNodesAway (line 24), isSemanticZoomCollapsed (line 29) and isLODMode (line 30), but the destructure in useNodeResizing (lines 56-68) omits all three, and `grep -n "ctx\." useNodeResizing.ts` returns zero hits, so there is no indirect access path — the declarations are the onl
 
 ### L86. Hardcoded user-facing strings although locale keys exist
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/selection/useContextMenu.ts:85`
 
@@ -2702,6 +2726,8 @@ Evidence:
 3. The drift
 
 ### L130. loadLocale() can never load anything — the dynamic import is unreachable and the name is aspirational
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/i18n/index.ts:53`
 

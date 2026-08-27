@@ -340,7 +340,13 @@
       "layoutGrid": "Raster",
       "layoutForce": "Kraftbasiert",
       "importButton": "{count} Zitat importieren | {count} Zitate importieren"
-    }
+    },
+    "vaultTitle": "Obsidian-Vault importieren",
+    "browse": "Durchsuchen",
+    "intoCurrent": "In aktuellen Arbeitsbereich importieren",
+    "createWorkspace": "Neuen Arbeitsbereich erstellen",
+    "deleteOriginals": "Originaldateien nach dem Import löschen",
+    "confirm": "Importieren"
   },
   "node": {
     "untitled": "Ohne Titel",
@@ -413,7 +419,11 @@
     "noContent": "Kein Inhalt",
     "noNodesYet": "Noch keine Knoten",
     "dropHere": "Hier ablegen zum Hinzufügen",
-    "addFirstNode": "Ersten Knoten hinzufügen"
+    "addFirstNode": "Ersten Knoten hinzufügen",
+    "titlePlaceholder": "Titel der Storyline ...",
+    "create": "Erstellen",
+    "createFirst": "Erstellen Sie zuerst eine Storyline",
+    "noneYet": "Noch keine Storylines"
   },
   "nodePicker": {
     "newNode": "Neuer Knoten",
@@ -766,10 +776,29 @@
     "noEntities": "Keine Entitäten in dieser Szene",
     "previousAppearance": "Vorheriges Auftreten",
     "nextAppearance": "Nächstes Auftreten",
-    "goToEntity": "Zur Entität auf der Leinwand"
+    "goToEntity": "Zur Entität auf der Leinwand",
+    "noNodes": "Diese Storyline hat noch keine Knoten.",
+    "addFromCanvas": "Fügen Sie Knoten von der Leinwand hinzu, um Ihre Erzählung aufzubauen.",
+    "entitySidebar": "Seitenleiste für Entitäten",
+    "content": "Inhalt der Storyline",
+    "tableOfContents": "Inhaltsverzeichnis",
+    "clickToEdit": "Zum Bearbeiten klicken"
   },
   "agentLog": {
     "copy": "Protokoll kopieren",
     "clear": "Protokoll leeren"
+  },
+  "fullscreen": {
+    "preview": "Vorschau",
+    "unsaved": "Nicht gespeichert",
+    "untitled": "Ohne Titel",
+    "contentPlaceholder": "Schreiben Sie hier Ihren Inhalt ...",
+    "editor": "Editor (Markdown)",
+    "readingMode": "Lesemodus",
+    "editMode": "Bearbeitungsmodus",
+    "zoomToNode": "Auf Knoten zoomen"
+  },
+  "agent": {
+    "tasks": "Aufgaben"
   }
 }
