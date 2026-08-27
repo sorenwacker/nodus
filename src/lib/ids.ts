@@ -27,16 +27,3 @@ export function generateShortId(): string {
   return result
 }
 
-/**
- * Check if a string looks like a short ID (8 alphanumeric chars)
- */
-export function isShortId(id: string): boolean {
-  return /^[A-Za-z0-9]{8}$/.test(id)
-}
-
-/**
- * Check if a string looks like a UUID
- */
-export function isUUID(id: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-}

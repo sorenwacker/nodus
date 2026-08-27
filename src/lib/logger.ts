@@ -95,7 +95,5 @@ export function createLogger(namespace: string) {
 }
 
 // Pre-configured loggers for common namespaces
-export const appLogger = createLogger('Nodus')
 export const storeLogger = createLogger('Store')
-export const canvasLogger = createLogger('Canvas')
 export const agentLogger = createLogger('Agent')

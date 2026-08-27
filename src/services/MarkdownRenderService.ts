@@ -383,16 +383,3 @@ export function reinitializeMermaid(container?: Element): void {
   setTimeout(() => renderPendingMermaid(container), 50)
 }
 
-/**
- * Get the math cache for inspection/debugging.
- */
-export function getMathCache(): Map<string, string> {
-  return mathCache
-}
-
-/**
- * Get the mermaid cache for inspection/debugging.
- */
-export function getMermaidCache(): Map<string, string> {
-  return mermaidCache
-}

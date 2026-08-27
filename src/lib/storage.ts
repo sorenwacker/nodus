@@ -61,19 +61,6 @@ function parseJson<T>(value: string | null, fallback: T): T {
 }
 
 /**
- * Theme storage (simplified - only stores theme name)
- * Full theme management is handled by the themes store
- */
-export const themeStorage = {
-  get(): string {
-    return localStorage.getItem(KEYS.theme) || 'light'
-  },
-  set(value: string): void {
-    localStorage.setItem(KEYS.theme, value)
-  },
-}
-
-/**
  * Workspace storage
  */
 export const workspaceStorage = {
@@ -603,9 +590,3 @@ export const agentMemoryStorage = {
   },
 }
 
-/**
- * Clear all Nodus data from localStorage
- */
-export function clearAllStorage(): void {
-  Object.values(KEYS).forEach(key => localStorage.removeItem(key))
-}

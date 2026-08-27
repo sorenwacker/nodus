@@ -6,22 +6,6 @@
  */
 
 /**
- * Safely parse JSON with a fallback value
- *
- * @param value - String to parse (or null/undefined)
- * @param fallback - Value to return if parsing fails
- * @returns Parsed value or fallback
- */
-export function parseJSON<T>(value: string | null | undefined, fallback: T): T {
-  if (!value) return fallback
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return fallback
-  }
-}
-
-/**
  * Parse tool arguments that may be a string or object
  * Handles the common pattern where LLM tools receive args as string or object
  *
@@ -76,23 +60,6 @@ export function getNumberArg(
 }
 
 /**
- * Get a boolean argument with optional default
- */
-export function getBooleanArg(
-  args: unknown,
-  key: string,
-  defaultValue = false
-): boolean {
-  const parsed = parseToolArgs(args)
-  const value = parsed[key]
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'string') {
-    return value.toLowerCase() === 'true' || value === '1'
-  }
-  return defaultValue
-}
-
-/**
  * Get an array argument with optional default
  */
 export function getArrayArg<T = unknown>(
@@ -122,31 +89,6 @@ export function extractJSONArray<T = unknown>(text: string): T[] | null {
   try {
     const parsed = JSON.parse(match[0])
     return Array.isArray(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-/**
- * Extract JSON object from a string that may contain markdown or other text
- *
- * @param text - Text potentially containing JSON object
- * @returns Parsed object or null if not found
- */
-export function extractJSONObject<T = Record<string, unknown>>(
-  text: string
-): T | null {
-  if (!text) return null
-
-  // Try to find object pattern (handle nested braces)
-  const match = text.match(/\{[\s\S]*\}/)
-  if (!match) return null
-
-  try {
-    const parsed = JSON.parse(match[0])
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? (parsed as T)
-      : null
   } catch {
     return null
   }

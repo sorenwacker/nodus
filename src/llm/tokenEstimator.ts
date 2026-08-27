@@ -44,7 +44,7 @@ export interface TokenEstimate {
 /**
  * Estimate tokens for a given text
  */
-export function estimateTokens(text: string): number {
+function estimateTokens(text: string): number {
   if (!text) return 0
   return Math.ceil(text.length / CHARS_PER_TOKEN)
 }
@@ -106,42 +106,6 @@ export function estimateAgentTokens(
     usagePercent,
     warning,
   }
-}
-
-/**
- * Estimate tokens for batch node classification
- * Used by smart_color, smart_move, etc.
- */
-export function estimateBatchClassificationTokens(
-  nodes: Array<{ title: string }>,
-  categories: string[],
-  contextLimit: number
-): { batchSize: number; totalBatches: number } {
-  // Each node in a batch needs: prompt overhead + title + category list
-  const categoryListTokens = estimateTokens(categories.join(', '))
-  const promptOverhead = 50 // "Classify each:" + formatting
-
-  // Response tokens: node title + category for each
-  const responseTokensPerNode = 10
-
-  // Total tokens per node in a batch
-  const tokensPerNode = estimateTokens('') + responseTokensPerNode + 5
-
-  // Reserve tokens for prompt structure
-  const reservedTokens = promptOverhead + categoryListTokens + 100
-
-  // Available tokens for node data
-  const availableTokens = Math.floor(contextLimit * 0.5) - reservedTokens
-
-  // Calculate optimal batch size
-  const avgTitleTokens = nodes.reduce((sum, n) => sum + estimateTokens(n.title), 0) / nodes.length
-  const batchSize = Math.max(1, Math.floor(availableTokens / (avgTitleTokens + tokensPerNode)))
-
-  // Cap batch size for reliability
-  const effectiveBatchSize = Math.min(batchSize, 20)
-  const totalBatches = Math.ceil(nodes.length / effectiveBatchSize)
-
-  return { batchSize: effectiveBatchSize, totalBatches }
 }
 
 /**

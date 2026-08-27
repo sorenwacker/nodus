@@ -40,7 +40,7 @@ const DEFAULT_OPTIONS: RetryOptions = {
 /**
  * Check if an error is retryable
  */
-export function isRetryableError(error: Error, retryablePatterns: string[]): boolean {
+function isRetryableError(error: Error, retryablePatterns: string[]): boolean {
   const errorStr = error.message.toLowerCase()
   return retryablePatterns.some(pattern =>
     errorStr.includes(pattern.toLowerCase())
@@ -50,7 +50,7 @@ export function isRetryableError(error: Error, retryablePatterns: string[]): boo
 /**
  * Calculate delay for exponential backoff with jitter
  */
-export function calculateBackoff(
+function calculateBackoff(
   attempt: number,
   initialDelayMs: number,
   maxDelayMs: number,

@@ -28,7 +28,7 @@ export const PORT_SPACING = 25
  * optimizePortAssignments and the crossing-reduction pass all use it so their
  * conventions cannot drift apart.
  */
-export function portOrderKey(
+function portOrderKey(
   side: Side,
   nodeCx: number,
   nodeCy: number,

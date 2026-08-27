@@ -186,7 +186,7 @@ const MAX_NODE_DEPTH = 2
  * so a paper becomes its chapters rather than every sub-subsection
  * (PRODUCT_DESIGN.md > PDF as a graph).
  */
-export function foldDeepSections(sections: DocumentSection[]): DocumentSection[] {
+function foldDeepSections(sections: DocumentSection[]): DocumentSection[] {
   const kept: DocumentSection[] = []
   const keptIndexByOriginal = new Map<number, number>()
 

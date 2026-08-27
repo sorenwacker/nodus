@@ -321,28 +321,6 @@ export function organizeFrameNodes(
   return result
 }
 
-/**
- * Check if a node is fully inside a frame (with padding)
- */
-export function isNodeFullyInsideFrame(
-  nodeX: number,
-  nodeY: number,
-  nodeWidth: number,
-  nodeHeight: number,
-  frame: FrameRect,
-  padding = 0
-): boolean {
-  const nodeRight = nodeX + nodeWidth
-  const nodeBottom = nodeY + nodeHeight
-
-  return (
-    nodeX >= frame.canvas_x + padding &&
-    nodeRight <= frame.canvas_x + frame.width - padding &&
-    nodeY >= frame.canvas_y + padding &&
-    nodeBottom <= frame.canvas_y + frame.height - padding
-  )
-}
-
 // ============================================================================
 // Frame-to-Frame Collision Detection and Resolution
 // ============================================================================
@@ -378,7 +356,7 @@ export function doFramesOverlap(
  * Returns { dx, dy } representing the minimum displacement to eliminate overlap.
  * Push direction is determined by the dominant axis (horizontal or vertical).
  */
-export function calculateFrameSeparation(
+function calculateFrameSeparation(
   frame1: FrameRect,
   frame2: FrameRect,
   gap = 40

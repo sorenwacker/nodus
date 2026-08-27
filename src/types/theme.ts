@@ -92,31 +92,3 @@ export interface UpdateThemeInput {
   display_name: string
 }
 
-/**
- * Convert snake_case CSS variable names to kebab-case
- */
-export function variableNameToCSS(name: string): string {
-  return `--${name.replace(/_/g, '-')}`
-}
-
-/**
- * Get all CSS variable names from ThemeVariables
- */
-export const THEME_CSS_VARIABLES = [
-  'bg-canvas',
-  'bg-surface',
-  'bg-surface-alt',
-  'bg-elevated',
-  'text-main',
-  'text-secondary',
-  'text-muted',
-  'border-default',
-  'border-subtle',
-  'primary-color',
-  'danger-color',
-  'danger-bg',
-  'danger-border',
-  'dot-color',
-  'shadow-sm',
-  'shadow-md',
-] as const

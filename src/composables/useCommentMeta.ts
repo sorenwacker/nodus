@@ -45,7 +45,7 @@ export function parseCommentMeta(content: string | null): { meta: CommentMeta; t
 /**
  * Serialize comment metadata and text into markdown content
  */
-export function serializeCommentMeta(meta: CommentMeta, text: string): string {
+function serializeCommentMeta(meta: CommentMeta, text: string): string {
   const metaJson = JSON.stringify(meta)
   return `<!--comment-meta:${metaJson}-->\n${text}`
 }

@@ -515,6 +515,8 @@ Only LF is recognised. A vault file written by an editor using CRLF starts with 
 
 ### M30. Two frame query helpers are dead and marked `#[allow(dead_code)]`
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src-tauri/src/database/models.rs:728`
 
 `frames::update_folder_path` (line 729) and `frames::get_by_folder_path_and_workspace` (line 745) both carry `#[allow(dead_code)]`. I grepped all of `src-tauri/` — the only occurrences are the definitions themselves. Folder-frame sync resolves frames by title instead (`get_by_title_and_workspace`, used in vault_watcher.rs:396), so the folder_path lookup path was written and never connected.
@@ -691,6 +693,8 @@ Geometry proof of the inversion (/Users/sdrwacker/workspace/nodus/src/canvas/rou
 
 ### M47. detectCrossings, CrossingReport, segmentsIntersect and optimizePortAssignments are never called
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/routing/portAssignment.ts:223`
 
 `detectCrossings` (223-328), its helper `segmentsIntersect` (333-357), the `CrossingReport` interface (207-216) and `optimizePortAssignments` (363-430) — roughly 150 lines — have no references anywhere in `src` or `src/__tests__`. They are re-exported from `routing/index.ts:12`, which is the only mention. `routeAllEdges` does its own crossing reduction with the inline sort at index.ts:250 and never calls `optimizePortAssignments`, so the re-sort pass (which duplicates the `portOrderKey` sort already done inside `assignPorts`) can never fire.
@@ -792,6 +796,8 @@ The live drag calls `store.updateNodePosition(..., { skipLayoutTrigger: true, sk
 
 ### M57. useNodeVisibility is an unused fork of useGraphMetrics + useViewportCulling
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/nodes/useNodeVisibility.ts`
 
 Grepping the whole tree for `useNodeVisibility` finds only the two barrels (`src/canvas/composables/index.ts:32`, `src/canvas/composables/nodes/index.ts:32`) and the file itself — no component, composable or test calls it. `GraphCanvas.vue` instead uses `useGraphMetrics` (rendering/useGraphMetrics.ts) and `useViewportCulling`, which re-implement the same thing with different numbers: `isLargeGraph`/`isHugeGraph`/`isMassiveGraph`/`isSemanticZoomCollapsed`/`isTextHidden`/`isLODMode`/`nodeDegree`/`getLODRadius` all exist in both, and `visibleNodes` exists in both (useViewportCulling adds a spatial grid and a margin cap that this file lacks). 170 lines of a second, silently diverging implementation of viewport culling and LOD thresholds.
@@ -833,6 +839,8 @@ Grepping the whole tree for `useNodeVisibility` finds only the two barrels (`src
 *Verification:* Confirmed literally and functionally. useNodeVisibility.ts:34-38 declares HUGE_GRAPH_NODES = 1000 and MASSIVE_GRAPH_NODES = 800, with isHugeGraph = nodes > 1000 (line 98) and isMassiveGraph = nodes > 800 || edges > 2000 (lines 100-102), so the "massive" tier fires strictly before "huge". useGraphMetrics.ts:62-72 repeats the same inverted 800/1000 pair as inline literals, and that is the copy actua
 
 ### M62. `case 'for_each_node'` is unreachable and forks the library implementation
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/agent/useLLMTools.ts:178`
 
@@ -1052,6 +1060,8 @@ Undo (real):
 
 ### M82. for_each_node is implemented twice; the second implementation is unreachable
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/llm/tools/batchTools.ts:174`
 
 for_each_node is registered here with a full implementation (including the `action === 'llm'` path via llmQueue), and implemented again in src/canvas/composables/agent/useLLMTools.ts:178-233. GraphCanvas.executeAgentTool (GraphCanvas.vue:1303-1320) calls executeTool() first and only falls through to executeLLMTool() when the result starts with `__UNHANDLED__:`. Because this handler always returns a real result, the useLLMTools copy can never run — two divergent implementations of the same tool, one of them dead, and a change to either silently affects nothing or everything depending on which one a reader edits.
@@ -1100,6 +1110,8 @@ Grepping the whole tree, the only writer of this store is `usePlanHandlers.ts:40
 
 ### M86. Eight exported frame-store members have no callers
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/stores/frames.ts:222`
 
 Grepped across src/ (including __tests__) excluding frames.ts itself: `updateFrameParent` (222), `getChildFrames` (235), `getFramePath` (242), `findFrameAtPoint` (298), `findFrameByFolderPath` (306), `isPointInFrame` (284), `getFramesForWorkspace` (46) and the `selectedFrame` computed (20) are referenced nowhere. `isPointInFrame` and `getFramesForWorkspace` are reachable only from the other dead functions, so the whole cluster is unreachable. `updateFrameParent` is notable: nested frames (`parent_frame_id`, migration 011) can be created but never re-parented, so the nesting feature has no UI surface.
@@ -1107,6 +1119,8 @@ Grepped across src/ (including __tests__) excluding frames.ts itself: `updateFra
 *Verification:* Confirmed from the code. All eight members are at the exact cited lines of /Users/sdrwacker/workspace/nodus/src/stores/frames.ts and are exported in the return block (lines 314-341); a repo-wide grep across all file types (excluding node_modules/target/.git) finds them referenced nowhere except frames.ts itself and the pre-existing docs/REVIEW.md write-up. Specifics: `selectedFrame\b` matches only
 
 ### M87. Unused theme-store members, while consumers re-derive dark-mode from hardcoded name lists
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/stores/themes.ts:164`
 
@@ -1463,6 +1477,8 @@ The file is 1254 lines (measured with wc -l). CLAUDE.md states 'No file should e
 
 ### L21. clearAllStorage does not clear all storage, and has no callers
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/lib/storage.ts:609`
 
 `Object.values(KEYS).forEach(key => localStorage.removeItem(key))` only removes the fixed base keys. This same module writes many dynamically-suffixed keys that survive: every workspace-scoped canvas setting (`canvasStorage._key` → `${base}_${workspaceId}`, line 303), `nodus_memories_${workspaceId}` (line 420), `nodus-storyline-position-${storylineId}` (line 471), `nodus_agent_session_${workspaceId}` and `nodus_agent_stack_${workspaceId}` (lines 500-503), and the migration flag `nodus-agent-panel-preference-reset` (line 104). Grep across src/, src-tauri/ and the tests finds no caller at all, so the function is both dead and misnamed.
@@ -1470,6 +1486,8 @@ The file is 1254 lines (measured with wc -l). CLAUDE.md states 'No file should e
 *Verification:* Verified directly in src/lib/storage.ts. Lines 609-611 are exactly as reported: `export function clearAllStorage(): void { Object.values(KEYS).forEach(key => localStorage.removeItem(key)) }`. KEYS (lines 8-56) is a fixed `as const` map of base keys only, so the loop provably cannot reach the dynamically-suffixed keys the same module writes, all of which I confirmed: canvasStorage._key at line 303 
 
 ### L22. addToCollection is never called and reads the wrong response shape
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/lib/zoteroApi.ts:245`
 
@@ -1493,6 +1511,8 @@ Evidence:
 
 ### L24. downloadPdf and exportSelectedToPdf have no callers
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/lib/pdf-export.ts:83`
 
 Grep across src/ shows the app reaches this module only through src/components/ExportDialog.vue:12, which imports `exportToPdf`. `downloadTypst` is referenced only by src/__tests__/pdf-export.test.ts:12; `downloadPdf` (line 83) and `exportSelectedToPdf` (line 145) are referenced nowhere at all. `downloadPdf` and `downloadTypst` also duplicate the same blob/anchor/revoke boilerplate, and the file bypasses `createLogger` (used by its sibling src/lib/typst.ts:7) in favour of raw `console.log`/`console.error` at lines 25, 27 and 72.
@@ -1500,6 +1520,8 @@ Grep across src/ shows the app reaches this module only through src/components/E
 *Verification:* Verified against the code. A repo-wide grep (all file types, excluding node_modules/.git) for `downloadPdf` and `exportSelectedToPdf` returns ONLY their definitions at src/lib/pdf-export.ts:83 and :145, plus a prose mention in docs/REVIEW.md:1109. No `src/lib/index.ts` barrel exists and package.json declares no `main`/`exports`, so there is no public-API path that could justify keeping them. They 
 
 ### L25. parseJSON, getBooleanArg and extractJSONObject are never used
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/lib/parsing.ts:15`
 
@@ -1515,6 +1537,8 @@ Evidence:
 
 ### L26. removeExtension, extractPreview and normalizeWhitespace are never used
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/lib/textProcessing.ts:179`
 
 Grep across src/, src-tauri/ and the tests finds no reference to `removeExtension` (line 179), `extractPreview` (line 200) or `normalizeWhitespace` (line 208) outside this file. `extractPreview` also overlaps in intent with src/lib/cardPreview.ts::previewForCard, which is the one actually wired to the card renderer.
@@ -1522,6 +1546,8 @@ Grep across src/, src-tauri/ and the tests finds no reference to `removeExtensio
 *Verification:* Confirmed from the code. src/lib/textProcessing.ts has exactly one importer in the entire repo — src/canvas/composables/util/usePdfDrop.ts lines 18-22 — which imports only splitIntoChunks, preProcessPdfText and sanitizeFilename. A repo-wide grep across src/, src-tauri/, packages/, tests and config for removeExtension (line 179), extractPreview (line 200) and normalizeWhitespace (line 208) returns 
 
 ### L27. The convertFileSrc mechanism and createFileForNode are unreachable
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/lib/tauri.ts:203`
 
@@ -1531,6 +1557,8 @@ Grep across src/, src-tauri/ and the tests finds no caller of `getConvertFileSrc
 
 ### L28. Eight 'legacy exports for backwards compatibility' have no consumers
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/lib/templates.ts:1246`
 
 Lines 1247-1254 export `TYPST_MATH_REFERENCE`, `GETTING_STARTED`, `IMPORTING_FILES`, `MERMAID_DEMO`, `RESEARCH_IDEA`, `QUICK_NOTE`, `COUNTERPOINT` and `EVIDENCE`. Grep across src/, src-tauri/ and the tests finds zero references outside this file. 'Backwards compatibility' has no meaning inside a single application bundle with no external consumers. The exported type `StarterTitleKey` (line 888) is likewise never referenced.
@@ -1538,6 +1566,8 @@ Lines 1247-1254 export `TYPST_MATH_REFERENCE`, `GETTING_STARTED`, `IMPORTING_FIL
 *Verification:* Verified directly in the code. src/lib/templates.ts:1246 is the comment `// Legacy exports for backwards compatibility`, and 1247-1254 are the eight const aliases named in the finding (each just `templates.en.<field>`). A full-repo grep excluding node_modules/dist/target/.git finds zero references to any of the eight names outside their own definition lines; the only other hit is docs/REVIEW.md:11
 
 ### L29. extractFrontmatter is never called
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/lib/extraction.ts:164`
 
@@ -1556,6 +1586,8 @@ Lines 14-17 read 'Generate a short random ID (10 alphanumeric characters)' and '
 *Verification:* Confirmed directly from /Users/sdrwacker/workspace/nodus/src/lib/ids.ts. Line 11 is `const ID_LENGTH = 8`, and the loop on lines 19-25 appends exactly ID_LENGTH characters, so generateShortId() returns an 8-character string. Yet the JSDoc immediately above it reads "Generate a short random ID (10 alphanumeric characters)" (line 14) and "@returns A 10-character alphanumeric string" (line 16). Every
 
 ### L31. isShortId is never called
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/lib/ids.ts:33`
 
@@ -1590,6 +1622,8 @@ Lines 174-179 document 'Plan the nodes and edges of a section graph ... Pure pla
 *Verification:* The factual core is verifiable and correct. src/lib/sanitize.ts:83 and :97 contain the identical statement `DOMPurify.sanitize(svg, svgConfig as Parameters<typeof DOMPurify.sanitize>[1])`, referencing the same module-level `svgConfig` object, with no other logic in either function. DOMPurify does not mutate the config it is handed, so the two exports are behaviourally indistinguishable for every i
 
 ### L35. addToZotero / addToZoteroViaApi and three more exports are never called
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/composables/useZotero.ts:357`
 
@@ -2052,6 +2086,8 @@ CONFIRMED, with exact evidence:
 
 ### L74. LayoutResult and LayoutAnimationOptions are declared, exported, and never used
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/layout/types.ts:28`
 
 `LayoutResult` (28-33, with `positions` and `animationDuration`) is aspirational: `LayoutStrategy.calculate` is declared to return `Promise<Map<string, {x, y}>>`, not `Promise<LayoutResult>`, so no strategy can ever supply `animationDuration`. `LayoutAnimationOptions` (75-84) has no reference anywhere in `src` or the tests either — animation is driven by `animateToPositions` in the composables with its own inline options. Both are re-exported from `layout/index.ts:11-12`, which is their only other mention.
@@ -2118,6 +2154,8 @@ The docstring says "Nodes 50%+ inside get pulled fully inside / Nodes just overl
 *Verification:* Confirmed from the code. useFrameOperations.ts:89-93 documents organizeFrame as "Nodes 50%+ inside get pulled fully inside / Nodes just overlapping (<50%) get pushed out". The function's entire behaviour is delegated to organizeFrameNodes (line 119), which at useFrameCollision.ts:299 uses isNodeTouchingFrame(..., frame, 0) — a plain AABB intersection (lines 56-65), documented at lines 44-47 as "AN
 
 ### L81. isNodeFullyInsideFrame is never referenced anywhere
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/layout/useFrameCollision.ts:327`
 
@@ -2278,6 +2316,8 @@ The field is assigned `isBidirectional: !showArrow` (line 581) where `showArrow 
 
 ### L99. Seven of the composable's returned members have no consumer
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/edges/useEdgeStyling.ts:386`
 
 GraphCanvas.vue:1731-1743 destructures only edgeStyleMap, globalEdgeStyle, edgeStrokeWidth, edgeColorPalette, highlightColor, selectedColor, nodeColors, cycleEdgeStyle, getEdgeColor, getEdgeHighlightColor, changeEdgeColor. Grepping src and src/__tests__ finds zero other references to `edgeStyles`, `highlightedStrokeMultiplier`, `allMarkerColors` (a non-trivial computed that unions six palettes), `frameColors`, `getEdgeStyle`, `setEdgeStyle`, `getArrowMarkerId`. `allMarkerColors` in particular was superseded by CanvasEdgesSVG.vue's `markerColors`, which derives markers from the edges actually on screen. `getEdgeStyle` also disagrees with the rest of the module by falling back to `'diagonal'` where useEdgeRouting falls back to `globalEdgeStyle` (useEdgeRouting.ts:426).
@@ -2285,6 +2325,8 @@ GraphCanvas.vue:1731-1743 destructures only edgeStyleMap, globalEdgeStyle, edgeS
 *Verification:* Confirmed from the code. `/Users/sdrwacker/workspace/nodus/src/canvas/composables/edges/useEdgeStyling.ts:386-406` returns 18 members. The composable's single call site is `/Users/sdrwacker/workspace/nodus/src/canvas/GraphCanvas.vue:1721` (`const edgeStyling = useEdgeStyling({...})`), and the destructure at lines 1731-1743 takes exactly the 11 members the finding names. `grep -rn "edgeStyling" src
 
 ### L100. isTextHidden / nodeDegree / getLODRadius are forked in useNodeVisibility with a different threshold
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/rendering/useGraphMetrics.ts`
 
@@ -2302,6 +2344,8 @@ GraphCanvas.vue:1731-1743 destructures only edgeStyleMap, globalEdgeStyle, edgeS
 
 ### L102. renderSingleNode and clearCaches are never called
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/rendering/useContentRenderer.ts:193`
 
 Grepping src and src/__tests__ finds no call site for either: GraphCanvas.vue:555-562 destructures only nodeRenderedContent, renderMarkdown, renderTypstMath, renderMermaidDiagrams, setupWatchers and reinitializeMermaid. The single reference to `renderSingleNode` is render-benchmark.test.ts:507, which reads the composable's *source text* and asserts it mentions `renderCardMarkdown` - a gate over a function no interface reaches.
@@ -2309,6 +2353,8 @@ Grepping src and src/__tests__ finds no call site for either: GraphCanvas.vue:55
 *Verification:* Confirmed from the code. useContentRenderer.ts defines clearCaches (line 184) and renderSingleNode (line 193) and returns both (lines 268-269), but a repo-wide grep over all extensions (excluding node_modules) finds no invocation of either. The composable has exactly one consumer: GraphCanvas.vue:544 creates `contentRenderer`, and its only other reference is the destructure at 555-562, which takes
 
 ### L103. Three of five exported traversal helpers have no callers
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/utils/graphTraversal.ts:73`
 
@@ -2485,6 +2531,8 @@ Confirmed facts:
 
 ### L116. Barrel file is never imported and has drifted out of sync
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/stores/nodes/index.ts`
 
 Nothing imports `src/stores/nodes/index.ts`. Every consumer writes `from '../stores/nodes'`, which resolves to the sibling file `src/stores/nodes.ts` (a file wins over a directory in Vite/TS resolution), and nodes.ts itself imports the submodules by explicit path (`'./nodes/state'`, `'./nodes/crud'`, …). The only other direct submodule import is `src/__tests__/starter-content.test.ts:14` → `'../stores/nodes/advanced'`. Evidence it is unmaintained: it omits `updateEdgeLabel` (edges.ts) and `persistFramePosition` (frames.ts) which both exist in the submodules.
@@ -2495,6 +2543,8 @@ Nothing imports `src/stores/nodes/index.ts`. Every consumer writes `from '../sto
 
 ### L117. stores/index.ts barrel has no importers
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/stores/index.ts`
 
 No file in src/ imports from `'../stores'`, `'./stores'`, or any depth of it — every component imports the concrete store module directly. The barrel is also incomplete: it re-exports nodes/themes/workspaces/edges/frames but not `useStorylinesStore`, `useDisplayStore`, or `useAgentTasksStore`, so it could not serve as the canonical entry point even if adopted.
@@ -2502,6 +2552,8 @@ No file in src/ imports from `'../stores'`, `'./stores'`, or any depth of it —
 *Verification:* Both claims are verifiable from the code. (1) Zero importers: repo-wide grep (excluding node_modules) for `from '...stores'`, `require('...stores')`, and `stores/index` returns no code matches — the only hit is a prose mention in docs/REVIEW.md:1336. Every real consumer imports the concrete module instead: src/App.vue:4-6 and :237-238 use './stores/nodes', './stores/themes', './stores/display', '.
 
 ### L118. Six exported edge-store members have no callers
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/stores/edges.ts:207`
 
@@ -2529,6 +2581,8 @@ It matches any edge between the pair, regardless of `storyline_id` or `link_type
 *Verification:* Confirmed in code. storylines.ts:158-161, 172-175 and 221-224 test only for any edge between the node pair (either direction, any link_type), with no storyline_id/link_type predicate, while the sibling checks in the same file (145, 210, 264, 331, 345) all filter on storyline_id — so the inconsistency the finding describes is exactly as written. Consequence chain also verified: nodes/state.ts:96-10
 
 ### L120. getOrphanedWorkspaceIds is dead through three wrapper layers
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/stores/workspaces.ts:226`
 

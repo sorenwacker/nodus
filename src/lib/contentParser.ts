@@ -3,8 +3,8 @@
  */
 
 // Hashtag extraction limits
-export const MAX_HASHTAG_COUNT = 50
-export const MAX_HASHTAG_LENGTH = 50
+const MAX_HASHTAG_COUNT = 50
+const MAX_HASHTAG_LENGTH = 50
 
 /**
  * Extract hashtags from content

@@ -341,6 +341,14 @@ The integral is: $ integral_a^b f(x) dif x $
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
+### Removing dead code
+
+Nothing is exported that nobody imports. Two shapes count as dead: a value referenced from nowhere at all, and a value exported while only its own file uses it. Both make a reader believe an interface exists, and both are how a fix comes to be applied to something nothing reaches.
+
+Types are exempt. An exported type describes a module's shape and is worth declaring whether or not another file names it.
+
+A function that only a test names is not dead: testing a unit directly through its export is how it should be tested, and forcing the test through a wrapper to satisfy this rule would be worse. The gate checks references from any file, tests included.
+
 ### One rule, one place
 
 A rule is written once. Where the same rule existed in several places, the defect was always the same: a fix landed in some copies and not others.

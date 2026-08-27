@@ -159,29 +159,10 @@ export function extractFrontmatterTags(content: string | null): string[] | null 
 }
 
 /**
- * Extract all frontmatter metadata at once
- */
-export function extractFrontmatter(content: string | null): {
-  title: string | null
-  tags: string[] | null
-  doi: string | null
-  zoteroKey: string | null
-  semanticScholarId: string | null
-} {
-  return {
-    title: extractFrontmatterTitle(content),
-    tags: extractFrontmatterTags(content),
-    doi: extractDOI(content),
-    zoteroKey: extractZoteroKey(content),
-    semanticScholarId: extractSemanticScholarId(content),
-  }
-}
-
-/**
  * Parse raw YAML frontmatter into key-value pairs
  * Returns null if no frontmatter found
  */
-export function parseFrontmatterRaw(content: string | null): Record<string, string> | null {
+function parseFrontmatterRaw(content: string | null): Record<string, string> | null {
   if (!content) return null
 
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)

@@ -75,38 +75,6 @@ export async function exportToPdf(
 }
 
 /**
- * Export nodes to PDF and trigger download
- * @param nodes - Nodes to export
- * @param edges - Edges between nodes
- * @param options - Export options
- */
-export async function downloadPdf(
-  nodes: Node[],
-  edges: Edge[],
-  options: Partial<PdfExportOptions> = {}
-): Promise<void> {
-  const pdf = await exportToPdf(nodes, edges, options)
-
-  // Generate filename
-  const filename = options.filename
-    ? `${options.filename}.pdf`
-    : `nodus-export-${new Date().toISOString().split('T')[0]}.pdf`
-
-  // Create blob and download
-  const blob = new Blob([pdf as BlobPart], { type: 'application/pdf' })
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-
-  URL.revokeObjectURL(url)
-}
-
-/**
  * Export Typst source code and trigger download
  * @param nodes - Nodes to export
  * @param edges - Edges between nodes
@@ -138,23 +106,3 @@ export function downloadTypst(
   URL.revokeObjectURL(url)
 }
 
-/**
- * Export selected nodes as PDF
- * Convenience function for exporting a subset of nodes
- */
-export async function exportSelectedToPdf(
-  allNodes: Node[],
-  allEdges: Edge[],
-  selectedIds: string[],
-  options: Partial<PdfExportOptions> = {}
-): Promise<Uint8Array> {
-  // Filter to selected nodes
-  const selectedNodes = allNodes.filter(n => selectedIds.includes(n.id))
-
-  // Filter edges to only those between selected nodes
-  const selectedEdges = allEdges.filter(
-    e => selectedIds.includes(e.source_node_id) && selectedIds.includes(e.target_node_id)
-  )
-
-  return exportToPdf(selectedNodes, selectedEdges, options)
-}

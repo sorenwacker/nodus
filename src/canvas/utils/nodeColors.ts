@@ -105,14 +105,14 @@ const legacyColorMap: Record<string, string> = {
 /**
  * Normalize legacy color values to current format
  */
-export function normalizeLegacyColor(color: string): string {
+function normalizeLegacyColor(color: string): string {
   return legacyColorMap[color] || color
 }
 
 /**
  * Check if a theme is dark
  */
-export function isDarkTheme(theme: string): boolean {
+function isDarkTheme(theme: string): boolean {
   return theme === 'dark' || theme === 'pitch-black' || theme === 'cyber'
 }
 
@@ -120,7 +120,7 @@ export function isDarkTheme(theme: string): boolean {
  * Convert a color to the appropriate palette for the current theme
  * This ensures colors look consistent when switching themes
  */
-export function convertColorForTheme(color: string, currentTheme: string): string {
+function convertColorForTheme(color: string, currentTheme: string): string {
   const isDark = isDarkTheme(currentTheme)
 
   // First normalize legacy colors

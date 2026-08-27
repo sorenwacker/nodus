@@ -177,17 +177,6 @@ export function sanitizeFilename(
 }
 
 /**
- * Remove file extension from a filename
- */
-export function removeExtension(filename: string): string {
-  const lastDot = filename.lastIndexOf('.')
-  if (lastDot > 0) {
-    return filename.slice(0, lastDot)
-  }
-  return filename
-}
-
-/**
  * Truncate text to a maximum length, adding ellipsis if truncated
  */
 export function truncateText(text: string, maxLength: number): string {
@@ -197,22 +186,3 @@ export function truncateText(text: string, maxLength: number): string {
   return text.slice(0, maxLength - 3) + '...'
 }
 
-/**
- * Extract the first N characters or first paragraph, whichever is shorter
- */
-export function extractPreview(text: string, maxLength: number = 200): string {
-  const firstParagraph = text.split(/\n\n/)[0] || text
-  return truncateText(firstParagraph.trim(), maxLength)
-}
-
-/**
- * Normalize whitespace in text (collapse multiple spaces/newlines)
- */
-export function normalizeWhitespace(text: string): string {
-  return text
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}

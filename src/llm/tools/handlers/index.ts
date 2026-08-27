@@ -65,24 +65,10 @@ toolRegistry.set('color_regex', colorRegexHandler)
 toolRegistry.set('reset_edge_colors', resetEdgeColorsHandler)
 
 /**
- * Get a registered tool handler by name
- */
-export function getToolHandler(name: string): ToolHandler | undefined {
-  return toolRegistry.get(name)
-}
-
-/**
  * Check if a tool is registered
  */
 export function hasToolHandler(name: string): boolean {
   return toolRegistry.has(name)
-}
-
-/**
- * Get all registered tool names
- */
-export function getRegisteredTools(): string[] {
-  return Array.from(toolRegistry.keys())
 }
 
 /**

@@ -699,7 +699,7 @@ export async function deepResearch(
 /**
  * Format research results for display
  */
-export function formatResearchResults(results: ResearchResult[]): string {
+function formatResearchResults(results: ResearchResult[]): string {
   if (results.length === 0) return 'No results found.'
 
   const bySource = new Map<string, ResearchResult[]>()

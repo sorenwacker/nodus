@@ -1244,11 +1244,3 @@ export function getStarterEdgeConfigs(): StarterEdgeConfig[] {
 }
 
 // Legacy exports for backwards compatibility
-export const TYPST_MATH_REFERENCE = templates.en.mathReference
-export const GETTING_STARTED = templates.en.gettingStarted
-export const IMPORTING_FILES = templates.en.importingFiles
-export const MERMAID_DEMO = templates.en.mermaidDemo
-export const RESEARCH_IDEA = templates.en.researchIdea
-export const QUICK_NOTE = templates.en.quickNote
-export const COUNTERPOINT = templates.en.counterpoint
-export const EVIDENCE = templates.en.evidence
