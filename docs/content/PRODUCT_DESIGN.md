@@ -1311,6 +1311,26 @@ Dragging waits for three pixels of movement before recording. Resizing recorded 
 
 A bulk rewrite is one step. Three batch tools rewrote node content with no undo entry at all, while the single-node tool beside them recorded one. An entry per node would be no better: reversing one instruction would mean pressing undo once per node. Colour and size already model this as one entry holding a map of what changed, and content now does the same.
 
+### Graph size tiers
+
+Three tiers change how the canvas renders as a graph grows: large, huge, massive, in that order. Each threshold is named once and the tiers ascend.
+
+They were inline literals with "massive" at 800 nodes and "huge" at 1000, so a 900-node graph was massive but not huge, and the names carried no information about which came first.
+
+### Arrowheads above the LOD threshold
+
+An undirected edge has no arrowhead at any zoom level. Above the level-of-detail threshold the arrowhead-suppression flag was hardcoded to false, so an edge with `directed === false` drew no arrow at normal zoom and grew one as soon as the graph crossed the threshold.
+
+A marker id is derived from a colour by removing everything that is not a letter or digit. Stripping only `#` assumed hex, and an `rgba(...)` colour produced an id whose spaces, commas and parentheses are invalid in both an `id` and a `url(#...)` reference, so arrowheads vanished while hovering a colour-tinted node. The marker definition and the reference derive the id from the same function, because they must agree.
+
+### Rendering queued diagrams
+
+A diagram render that arrives while another is in flight is queued with the container it asked for. Replaying the in-flight call's own container rendered that view twice and left the queued caller's diagrams unrendered.
+
+### Reading a single node
+
+Opening a storyline in the reader clears any single node being read. It was cleared only by the reader's close button, so reading one node and then opening a storyline showed that node again instead of the storyline.
+
 ### Depending on what is supplied
 
 A composable moves nodes through the collaborator it was given, not by reaching past it. `pushOverlappingNodes` mutated node objects and called the backend directly, while the same file used its injected `updateNodePosition` two functions away - so coordinate clamping, layout bookkeeping and persistence policy applied to every moved node except a pushed one.

@@ -29,7 +29,6 @@ export {
   useNodeEditor,
   useNodeHover,
   useNodeResizing,
-  useNodeVisibility,
   type ClipboardNodeData,
   type UseNodeClipboardOptions,
   type UseNodeClipboardReturn,
@@ -41,9 +40,6 @@ export {
   type UseNodeHoverReturn,
   type UseNodeResizingContext,
   type UseNodeResizingReturn,
-  type VisibilityNode,
-  type UseNodeVisibilityOptions,
-  type UseNodeVisibilityReturn,
 } from './nodes'
 
 // Edges: routing, styling, visibility, manipulation

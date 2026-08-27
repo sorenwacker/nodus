@@ -184,7 +184,11 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
             color: edge.color,
             label: edge.label,
             storyline_id: edge.storyline_id,
-            isBidirectional: false,
+            // This field suppresses the arrowhead, so it must answer the same
+            // question the full-routing branch answers: an undirected edge has
+            // no arrow at any zoom level
+            // (PRODUCT_DESIGN.md > Arrowheads above the LOD threshold)
+            isBidirectional: edge.directed === false,
             isShortEdge: Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) < 50,
             debugInfo: undefined,
           }

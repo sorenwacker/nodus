@@ -29,12 +29,6 @@ export {
   type UseNodeResizingReturn,
 } from './useNodeResizing'
 export {
-  useNodeVisibility,
-  type VisibilityNode,
-  type UseNodeVisibilityOptions,
-  type UseNodeVisibilityReturn,
-} from './useNodeVisibility'
-export {
   useLinkPicker,
   type LinkPickerDeps,
 } from './useLinkPicker'

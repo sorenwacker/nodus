@@ -850,6 +850,8 @@ Grepping the whole tree for `useNodeVisibility` finds only the two barrels (`src
 
 ### M61. MASSIVE threshold (800) is lower than HUGE (1000)
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/nodes/useNodeVisibility.ts:37`
 
 `HUGE_GRAPH_NODES = 1000` but `MASSIVE_GRAPH_NODES = 800`, so `isMassiveGraph` fires before `isHugeGraph`: a 900-node graph is "massive" but not "huge". The tier names do not reflect their ordering. (`rendering/useGraphMetrics.ts:62-71` repeats the same inverted 800/1000 pair as inline literals.) Note this was already reported in docs/REVIEW.md:1232 and is still present.
@@ -927,6 +929,8 @@ These composables build every user-visible message as a literal: useStorylines.t
 EXACT CODE PROVING IT: src/canvas/composables/util/useStorylines.ts:67 is `showToast?.(`Added ${nodeIds.length} node(s) to storyline`, 'success')`, with lines 71, 90, 94, 107, 111 likewise literal English. Spot-checked and confirmed verbatim: useCanvasZotero.ts:61-74, useStorylineDropTarget.ts:81/98-100/104, useGraphExport.ts:108/111, useCitation
 
 ### M70. LOD/massive-graph edges always draw arrowheads, even for undirected edges
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/edges/useEdgeRouting.ts:187`
 
@@ -1239,6 +1243,8 @@ Description: 'Move multiple nodes at once. Can set absolute positions or apply r
 
 ### M96. openReader() never clears readerNodeId, so single-node reading hijacks every subsequent storyline read
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/App.vue:113`
 
 `readerNodeId` is set by the watcher on `displayStore.readingNodeId` (line 122-133) and is cleared in exactly one place: the reader's `@close` handler (line 1009). `openReader()` does not touch it:
@@ -1259,6 +1265,8 @@ The same blind spot exists in the edge-step handlers: `stepLeft` (line 185) and 
 *Verification:* Confirmed from the code. In src/App.vue, `readerNodeId` (declared line 121) is assigned in only two places: the `displayStore.readingNodeId` watcher (line 127) and the reader's `@close` handler (line 1009, `readerStorylineId = null; readerNodeId = null`); a repo-wide grep finds no other writer. `openReader()` (lines 113-118) sets `readerStorylineId`, `lastReadStorylineId` and `readerFullWidth` but
 
 ### M97. Queued mermaid re-render replays the in-flight call's container, dropping the queued caller's container
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/services/MarkdownRenderService.ts:332`
 
@@ -2345,6 +2353,8 @@ The field is assigned `isBidirectional: !showArrow` (line 581) where `showArrow 
 *Verification:* Confirmed from the code. useEdgeRouting.ts:45 declares EdgeLine.isBidirectional; line 581 assigns `isBidirectional: !showArrow` with the self-incriminating comment "Hide arrow if non-directional or bidirectional", where showArrow (line 406) = `edge.directed !== false && !isBidirectional` and the local isBidirectional (line 401) is genuine reverse-partner detection from the set built at 238-249. `d
 
 ### L98. arrowMarkerId built from colors that may be rgba(), producing an invalid SVG id/url()
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/edges/useEdgeVisibility.ts:211`
 

@@ -59,16 +59,33 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   // Graph size thresholds - use displayNodes count so neighborhood mode gets proper routing
   // In neighborhood mode, always use full routing since we have few nodes
   // Thresholds increased for modern hardware - most devices handle 500+ nodes fine
-  const isLargeGraph = computed(() =>
-    !neighborhoodMode.value && (displayNodes.value.length > 500 || filteredEdges.value.length > 1500)
+  // One definition per tier, in ascending order. The thresholds were inline
+  // literals with "massive" at 800 below "huge" at 1000, so a 900-node graph
+  // was massive but not huge and the names said nothing true about ordering
+  // (PRODUCT_DESIGN.md > Graph size tiers)
+  const LARGE_NODES = 500
+  const LARGE_EDGES = 1500
+  const HUGE_NODES = 1000
+  const HUGE_EDGES = 2000
+  const MASSIVE_NODES = 2000
+  const MASSIVE_EDGES = 4000
+
+  const isLargeGraph = computed(
+    () =>
+      !neighborhoodMode.value &&
+      (displayNodes.value.length > LARGE_NODES || filteredEdges.value.length > LARGE_EDGES)
   )
 
-  const isHugeGraph = computed(() =>
-    !neighborhoodMode.value && displayNodes.value.length > 1000
+  const isHugeGraph = computed(
+    () =>
+      !neighborhoodMode.value &&
+      (displayNodes.value.length > HUGE_NODES || filteredEdges.value.length > HUGE_EDGES)
   )
 
-  const isMassiveGraph = computed(() =>
-    !neighborhoodMode.value && (displayNodes.value.length > 800 || filteredEdges.value.length > 2000)
+  const isMassiveGraph = computed(
+    () =>
+      !neighborhoodMode.value &&
+      (displayNodes.value.length > MASSIVE_NODES || filteredEdges.value.length > MASSIVE_EDGES)
   )
 
   // Semantic zoom collapse - show title only when zoomed out

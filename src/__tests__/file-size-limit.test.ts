@@ -20,7 +20,7 @@ const LIMIT = 1000
  */
 const OVER_LIMIT: Record<string, number> = {
   'src/canvas/GraphCanvas.vue': 2489,
-  'src/App.vue': 1294,
+  'src/App.vue': 1292,
   'src/lib/templates.ts': 1254,
   'src/components/StorylineReader.vue': 1214,
   'src/__tests__/layoutFrameIntegration.test.ts': 1205,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, provide, type ComponentPublicInstance, watch } from 'vue'
+import { provideUndoHandlers } from './composables/provideUndoHandlers'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from './stores/nodes'
 import { useThemesStore } from './stores/themes'
@@ -115,6 +116,10 @@ function openReader(id: string) {
   readerStorylineId.value = id
   lastReadStorylineId.value = id
   readerFullWidth.value = false
+  // A single node being read is cleared here, not only by the close button:
+  // leaving it set made every later storyline open show that one node instead
+  // (PRODUCT_DESIGN.md > Reading a single node)
+  readerNodeId.value = null
 }
 
 // A node asked to be read on its own (PRODUCT_DESIGN.md > Reading a single node)
@@ -295,7 +300,9 @@ const undoRedo = useUndoRedo({
   showToast,
 })
 
-const { undoStack, redoStack, pushUndo, pushPositionUndo, pushContentUndo, pushContentsUndo, pushDeletionUndo, pushCreationUndo, pushColorUndo, pushSizeUndo, pushFramePositionUndo, pushFrameAssignmentUndo, pushStorylineNodesUndo, undo, redo } = undoRedo
+// The recorders reach components through provideUndoHandlers; only what this
+// component uses directly is destructured
+const { undoStack, redoStack, pushPositionUndo, pushDeletionUndo, pushCreationUndo, pushStorylineNodesUndo, undo, redo } = undoRedo
 
 // NodeService for guaranteed undo on deletions and moves
 const nodeService = new NodeService({
@@ -420,15 +427,7 @@ async function handleMcpReject(connectionId: string) {
 }
 
 // Expose undo functions to child components
-provide('pushUndo', pushUndo)
-provide('pushContentUndo', pushContentUndo)
-provide('pushContentsUndo', pushContentsUndo)
-provide('pushDeletionUndo', pushDeletionUndo)
-provide('pushCreationUndo', pushCreationUndo)
-provide('pushColorUndo', pushColorUndo)
-provide('pushSizeUndo', pushSizeUndo)
-provide('pushFramePositionUndo', pushFramePositionUndo)
-provide('pushFrameAssignmentUndo', pushFrameAssignmentUndo)
+provideUndoHandlers(provide, undoRedo)
 
 // Expose MCP status and controls to child components
 provide('mcpRunning', mcpServer.isRunning)

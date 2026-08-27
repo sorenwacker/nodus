@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+// The definition and the reference must agree on the id, so both use the one
+// function (PRODUCT_DESIGN.md > One rule, one place)
+import { arrowMarkerIdFor as getArrowMarkerId } from '../composables/edges/useEdgeVisibility'
 import type { VisibleEdgeLine } from '../composables/edges'
 
 const props = defineProps<{
@@ -50,10 +53,7 @@ const markerColors = computed(() => {
   return Array.from(colors)
 })
 
-// Simple marker ID generation - just remove # from color
-function getArrowMarkerId(color: string): string {
-  return `arrow-${color.replace('#', '')}`
-}
+
 </script>
 
 <template>

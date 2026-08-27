@@ -47,6 +47,18 @@ export interface UseEdgeVisibilityReturn {
 // Threshold for filtering edges by viewport visibility
 const EDGE_VIEWPORT_FILTER_THRESHOLD = 500
 
+/**
+ * A marker id for a colour, safe to use in an `id` and in `url(#...)`.
+ *
+ * Stripping only `#` assumed hex. An rgba colour produced ids such as
+ * `arrow-rgba(239, 68, 68, 0.28)`, whose spaces, commas and parentheses make
+ * both the id and the fragment reference invalid, so arrowheads vanished while
+ * hovering a colour-tinted node.
+ */
+export function arrowMarkerIdFor(color: string): string {
+  return `arrow-${color.replace(/[^a-zA-Z0-9]/g, '')}`
+}
+
 export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibilityReturn {
   const {
     edgeLines,
@@ -208,7 +220,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         edgeHighlightColor,
         renderStrokeWidth,
         glowStrokeWidth: renderStrokeWidth * 4,
-        arrowMarkerId: isHighlighted ? `arrow-${edgeHighlightColor.replace('#', '')}` : `arrow-${color.replace('#', '')}`,
+        arrowMarkerId: arrowMarkerIdFor(isHighlighted ? edgeHighlightColor : color),
       }
     })
     // Sort so highlighted edges render last (on top in SVG)

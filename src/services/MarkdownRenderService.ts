@@ -40,6 +40,8 @@ let mermaidLoaded = false
 let mermaidApi: any = null
 let mermaidRenderPending = false
 let mermaidRenderQueued = false
+/** The container the queued caller asked for, not the one mid-render */
+let mermaidQueuedContainer: Element | undefined
 
 // ============================================================================
 // Phase 1: Synchronous markdown rendering (creates placeholders)
@@ -240,9 +242,13 @@ export async function renderPendingMath(container?: Element): Promise<void> {
  * @param container - Optional container element to search within (defaults to document)
  */
 export async function renderPendingMermaid(container?: Element): Promise<void> {
-  // If already rendering, queue another render for when it's done
+  // If already rendering, queue another render for when it's done. The queued
+  // container is remembered, because replaying the in-flight call's own
+  // container rendered the wrong view and left the caller's diagrams pending
+  // (PRODUCT_DESIGN.md > Rendering queued diagrams)
   if (mermaidRenderPending) {
     mermaidRenderQueued = true
+    mermaidQueuedContainer = container
     return
   }
   mermaidRenderPending = true
@@ -333,7 +339,9 @@ export async function renderPendingMermaid(container?: Element): Promise<void> {
 
   if (mermaidRenderQueued) {
     mermaidRenderQueued = false
-    setTimeout(() => renderPendingMermaid(container), 50)
+    const queued = mermaidQueuedContainer
+    mermaidQueuedContainer = undefined
+    setTimeout(() => renderPendingMermaid(queued), 50)
   }
 }
 
