@@ -223,6 +223,12 @@ watch(
     () => props.selectedNodeIds,
     () => props.draggingNodeId,
     () => props.hoveredNodeId,
+    // drawNode reads this for the highlight ring, the radius multiplier and the
+    // layer split. It is derived from edges as well as nodes, so it changes
+    // when an edge is added while the selection stands still - and without it
+    // listed here, no repaint was scheduled and the canvas kept drawing the
+    // previous highlight set (PRODUCT_DESIGN.md > Repainting above the LOD threshold)
+    () => props.highlightedNodeIds,
   ],
   () => {
     if (animationId) cancelAnimationFrame(animationId)

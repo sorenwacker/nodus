@@ -940,6 +940,8 @@ In the LOD/massive-graph branch the returned edge line hardcodes `isBidirectiona
 
 ### M71. isDeferringRouting never defers; the documented drag/zoom fast path does the opposite
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/edges/useEdgeRouting.ts:96`
 
 `UseEdgeRoutingContext.isDragging`/`isZooming` are documented as "When true, skip complex routing and use cached edges" (lines 69-72), and line 294 repeats "Skip complex routing during drag for performance - use cached or simple lines". The actual condition is `if (routingKey !== lastRoutingKey.value || isDeferringRouting())` (line 312) with the comment "Always recalculate routing for live updates during drag" - i.e. while dragging or zooming, full `routeAllEdges()` runs on *every* recompute, which is the most expensive possible behaviour, and the cache branch (line 327) is only reachable when *not* deferring. The function name `isDeferringRouting` describes an intent the code does not implement.
@@ -948,6 +950,8 @@ In the LOD/massive-graph branch the returned edge line hardcodes `isBidirectiona
 
 ### M72. Hover-only edge mode is gated on an unrelated setting, making edgeHoverThreshold inert by default
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/edges/useEdgeVisibility.ts:133`
 
 `const showAllEdges = hideThreshold === 0` and `if (!showAllEdges && edges.length > displayEdgeThreshold.value)` (lines 133-134). `edgeHideThreshold` defaults to 0 (storage.ts:362), so the whole hover-only path - the only consumer of the display store's `edgeHoverThreshold` (default 1500, storage.ts:194) - can never run in a default install. Conversely, a user who sets "hide all edges above 5000" silently also turns on hover-only rendering above 1500 edges, a behaviour that setting does not describe.
@@ -955,6 +959,8 @@ In the LOD/massive-graph branch the returned edge line hardcodes `isBidirectiona
 *Verification:* Confirmed from the code. useEdgeVisibility.ts:133-134 gates the hover-only rendering path on `hideThreshold === 0` (i.e. it only runs when edgeHideThreshold is non-zero), and storage.ts:360-363 defaults getEdgeHideThreshold to 0, so in a default install showAllEdges is true and the block is unreachable. Line 134 is the only read of the display store's edgeHoverThreshold (default 1500, storage.ts:1
 
 ### M73. Semantic-zoom collapse ignores changes to the threshold setting
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/composables/rendering/useGraphMetrics.ts:80`
 
@@ -2039,6 +2045,8 @@ Exact proof in /Users/sdrwacker/workspace/nodus/src/canvas/components/CanvasNode
 - line 283: `<button cl
 
 ### L64. Render watcher omits highlightedNodeIds, so neighbour highlight rings go stale in LOD mode
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/components/CanvasLODCanvas.vue:217`
 

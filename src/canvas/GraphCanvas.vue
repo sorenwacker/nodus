@@ -1726,7 +1726,6 @@ const { edgeLines } = useEdgeRouting({
   edgeStyleMap,
   getNodeHeight,
   isDragging: isDraggingRef,
-  isZooming,
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties

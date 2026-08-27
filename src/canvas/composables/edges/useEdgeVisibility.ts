@@ -139,11 +139,15 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       }
     }
 
-    // For very large visible edge counts, only show edges on hover/select
-    // Also include neighbor's edges (2nd hop) for context
-    // BUT: if user set hideThreshold to 0, they want all edges visible - skip this logic
-    const showAllEdges = hideThreshold === 0
-    if (!showAllEdges && edges.length > displayEdgeThreshold.value) {
+    // Above its own threshold, show only the edges around what is hovered or
+    // selected, plus one hop for context.
+    //
+    // This was gated on `hideThreshold === 0`, an unrelated setting that
+    // defaults to 0 - so the whole path could never run in a default install,
+    // and a user who set "hide edges above 5000" silently also turned on
+    // hover-only rendering above 1500, which that setting does not describe
+    // (PRODUCT_DESIGN.md > Showing edges only around the focus)
+    if (edges.length > displayEdgeThreshold.value) {
       if (hovered || selectedNodes.length > 0) {
         edges = edges.filter(e => {
           // Direct edges to hovered/selected nodes

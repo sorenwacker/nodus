@@ -1311,6 +1311,28 @@ Dragging waits for three pixels of movement before recording. Resizing recorded 
 
 A bulk rewrite is one step. Three batch tools rewrote node content with no undo entry at all, while the single-node tool beside them recorded one. An entry per node would be no better: reversing one instruction would mean pressing undo once per node. Colour and size already model this as one entry holding a map of what changed, and content now does the same.
 
+### Re-routing edges during an interaction
+
+Edges are re-routed when the graph changes, and live while a node is dragged, because the edges attached to it must follow. A cached path cannot do that.
+
+Zooming is not such a case. Pan and zoom are one container transform, so edge geometry in canvas coordinates does not change and the cache stays correct. Counting zoom as a reason to re-route ran the most expensive path on every recompute while zooming.
+
+### Showing edges only around the focus
+
+Above its own threshold, the canvas draws only the edges touching what is hovered or selected, plus one hop for context.
+
+This was gated on the unrelated "hide all edges above N" setting, which defaults to 0 - so the path could never run in a default install, and a user who set that setting to 5000 silently also enabled hover-only rendering above 1500, which is not what the setting says.
+
+### Semantic zoom collapse
+
+Cards collapse to titles below a threshold the user can set. The collapse state is re-evaluated when the scale changes **and** when the threshold changes; watching only the scale left cards collapsed or expanded until the user happened to zoom, disagreeing with every other view of the same setting.
+
+### Repainting above the LOD threshold
+
+The canvas repaints when anything it draws changes. The repaint watcher must therefore list every prop the draw function reads.
+
+It omitted the highlighted-node set, which is derived from edges as well as nodes. Adding an edge while the selection stood still changed what should be drawn without scheduling a frame, so the canvas kept drawing the previous highlight set until an unrelated pan or zoom.
+
 ### Graph size tiers
 
 Three tiers change how the canvas renders as a graph grows: large, huge, massive, in that order. Each threshold is named once and the tiers ascend.

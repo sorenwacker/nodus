@@ -93,8 +93,11 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   const SEMANTIC_ZOOM_HYSTERESIS = 0.05 // 5% hysteresis band
   const semanticZoomCollapsed = ref(scale.value < semanticZoomThreshold.value)
 
-  // Watch scale changes and apply hysteresis
-  watch(scale, (s) => {
+  // Watching the threshold as well as the scale: the threshold is a setting the
+  // user can change, and re-evaluating only on zoom left cards collapsed or
+  // expanded until they happened to zoom, disagreeing with every other view of
+  // the same setting (PRODUCT_DESIGN.md > Semantic zoom collapse)
+  watch([scale, semanticZoomThreshold], ([s]) => {
     const threshold = semanticZoomThreshold.value
     const massiveThreshold = threshold + 0.2
 

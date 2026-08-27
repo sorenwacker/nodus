@@ -66,10 +66,12 @@ export interface UseEdgeRoutingContext {
     node: { height?: number; markdown_content: string | null },
     respectCollapse?: boolean
   ) => number
-  /** When true, skip complex routing and use cached edges (for drag performance) */
+  /**
+   * A node is being dragged. Its edges must be re-routed on every recompute so
+   * they follow it, which the routing cache cannot do
+   * (PRODUCT_DESIGN.md > Re-routing edges during an interaction).
+   */
   isDragging?: Ref<boolean>
-  /** When true, skip complex routing and use cached edges (for zoom performance) */
-  isZooming?: Ref<boolean>
 }
 
 export interface UseEdgeRoutingReturn {
@@ -89,11 +91,19 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     edgeStyleMap,
     getNodeHeight,
     isDragging,
-    isZooming,
   } = ctx
 
   // Combined flag for deferring expensive routing
-  const isDeferringRouting = () => isDragging?.value || isZooming?.value
+  /**
+   * Whether edges must be re-routed on this recompute regardless of the cache.
+   *
+   * Only a drag needs it. The previous name, `isDeferringRouting`, described
+   * deferring while the code forced the most expensive path. It also counted
+   * zooming, which cannot change edge geometry: pan and zoom are one container
+   * transform, so the cache stays correct
+   * (PRODUCT_DESIGN.md > Re-routing edges during an interaction).
+   */
+  const mustRerouteLive = () => isDragging?.value === true
 
   // Cache for routed edges - only recalculate when not dragging
   const cachedRoutedEdges = ref<Map<
@@ -312,8 +322,8 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     const edgeKey = edges.map(e => `${e.id}:${e.source_node_id}>${e.target_node_id}`).join(',')
     const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}-${edgeKey}`
 
-    // Always recalculate routing for live updates during drag
-    if (routingKey !== lastRoutingKey.value || isDeferringRouting()) {
+    // Re-route when the graph changed, or live while a node is dragged
+    if (routingKey !== lastRoutingKey.value || mustRerouteLive()) {
       const spatialIndex = new SpatialIndex()
       spatialIndex.build(nodeMap)
       setRoutingSpatialIndex(spatialIndex)
@@ -321,7 +331,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       try {
         routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
         cachedRoutedEdges.value = routedEdges
-        if (!isDeferringRouting()) {
+        if (!mustRerouteLive()) {
           lastRoutingKey.value = routingKey
         }
       } finally {
@@ -437,7 +447,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         } else if (routed?.svgPath) {
           // Prefer cached routed paths - this handles both normal rendering and zoom/drag with cache
           path = routed.svgPath
-        } else if (isDeferringRouting()) {
+        } else if (mustRerouteLive()) {
           // During drag/zoom without cache, use simple paths that match the edge style
           if (edgeStyle === 'straight') {
             path = `M${startPort.x},${startPort.y} L${endEdge.x},${endEdge.y}`
@@ -521,7 +531,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
               labelY = (pts[0].y + pts[pts.length - 1].y) / 2
             }
           }
-        } else if (isDeferringRouting() || !routed) {
+        } else if (mustRerouteLive() || !routed) {
           // Calculate label position based on edge style to match visual path
           if (edgeStyle === 'straight' || isHugeGraph.value) {
             labelX = (startPort.x + endEdge.x) / 2
