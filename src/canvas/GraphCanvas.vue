@@ -50,6 +50,7 @@ import {
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
 import { useLayout, useNeighborhoodMode } from './composables/layout'
 import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
+import { framesStoreAdapter } from './composables/frames/framesStoreAdapter'
 import { usePdfGraphImport } from './composables/util/usePdfGraphImport'
 import {
   useCanvasKeyboardShortcuts,
@@ -932,31 +933,7 @@ const { resolveFrameCollisions, organizeFrame } = useFrameOperations({
 
 // Frame operations composable
 const frames = useFrames({
-  store: {
-    get frames() {
-      return store.frames
-    },
-    get filteredNodes() {
-      return store.filteredNodes
-    },
-    get selectedNodeIds() {
-      return store.selectedNodeIds
-    },
-    get selectedFrameId() {
-      return store.selectedFrameId
-    },
-    selectFrame: store.selectFrame,
-    selectNode: store.selectNode,
-    createFrame: store.createFrame,
-    deleteFrame: store.deleteFrame,
-    updateFramePosition: store.updateFramePosition,
-    persistFramePosition: store.persistFramePosition,
-    updateFrameSize: store.updateFrameSize,
-    updateFrameTitle: store.updateFrameTitle,
-    updateNodePosition: store.updateNodePosition,
-    persistNodePosition: store.persistNodePosition,
-    assignNodesToFrame: store.assignNodesToFrame,
-  },
+  store: framesStoreAdapter(store),
   viewState: {
     scale,
     offsetX,

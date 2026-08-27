@@ -1303,6 +1303,12 @@ A storyline's sequence is carried by edges belonging to that storyline. Adding a
 
 Whether such an edge already exists is decided by source, target, **and** storyline. Matching source and target alone let any other edge between the two nodes - a wikilink, a `supports` edge the user drew - stand in for the chain edge, so none was created and the sequence had a gap.
 
+### Persisting a gesture
+
+A gesture costs one write per thing it moved, not one per event. Dragging or resizing updates positions and sizes in memory while the pointer is down, and the final values are stored once when it ends.
+
+Frame resizing wrote both position and size on every `pointermove`, so dragging a corner across the canvas issued hundreds of backend calls for one resize. The node drag path already had the mechanism - `skipPersist` on the update, a flush at the end - and the resize path did not use it.
+
 ### Persisting an interrupted drag
 
 A drag updates positions in memory and stores them once when it ends, so a drag costs one write per node rather than one per frame.

@@ -53,9 +53,18 @@ export function updateFrameSize(
   framesStore: NodeStoreDependencies['framesStore'],
   id: string,
   width: number,
-  height: number
+  height: number,
+  options?: { skipPersist?: boolean }
 ): void {
-  framesStore.updateFrameSize(id, width, height)
+  framesStore.updateFrameSize(id, width, height, options)
+}
+
+/** Persist a frame's current in-memory size - forwarded to frames store */
+export function persistFrameSize(
+  framesStore: NodeStoreDependencies['framesStore'],
+  id: string
+): void {
+  framesStore.persistFrameSize(id)
 }
 
 /**

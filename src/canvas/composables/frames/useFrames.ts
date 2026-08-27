@@ -38,7 +38,8 @@ interface Store {
   deleteFrame: (id: string) => void
   updateFramePosition: (id: string, x: number, y: number, options?: { skipPersist?: boolean }) => void
   persistFramePosition: (id: string) => void
-  updateFrameSize: (id: string, w: number, h: number) => void
+  updateFrameSize: (id: string, w: number, h: number, options?: { skipPersist?: boolean }) => void
+  persistFrameSize: (id: string) => void
   updateFrameTitle: (id: string, title: string) => void
   updateNodePosition: (id: string, x: number, y: number, options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }) => void
   persistNodePosition: (id: string) => void
@@ -210,13 +211,20 @@ export function useFrames(options: UseFramesOptions) {
       newY = frameResizeStart.value.frameY + heightChange
     }
 
-    store.updateFramePosition(resizingFrame.value, newX, newY)
-    store.updateFrameSize(resizingFrame.value, newWidth, newHeight)
+    // Memory only during the gesture; both are flushed once on pointerup
+    // (PRODUCT_DESIGN.md > Persisting a gesture)
+    store.updateFramePosition(resizingFrame.value, newX, newY, { skipPersist: true })
+    store.updateFrameSize(resizingFrame.value, newWidth, newHeight, { skipPersist: true })
   }
 
   function stopResize() {
     const frameId = resizingFrame.value
     resizingFrame.value = null
+    // Store where the resize landed, since the gesture wrote memory only
+    if (frameId) {
+      store.persistFramePosition(frameId)
+      store.persistFrameSize(frameId)
+    }
     document.removeEventListener('pointermove', onResize)
     document.removeEventListener('pointerup', stopResize)
     // Resolve frame-to-frame collisions after resize ends

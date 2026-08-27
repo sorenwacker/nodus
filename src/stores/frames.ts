@@ -175,19 +175,40 @@ export const useFramesStore = defineStore('frames', () => {
   }
 
   /**
-   * Update frame size
+   * Update frame size.
+   *
+   * `skipPersist` updates memory only, for a live resize: writing on every
+   * pointermove issued one backend call per event
+   * (PRODUCT_DESIGN.md > Persisting a gesture).
    */
-  function updateFrameSize(id: string, width: number, height: number): void {
+  function updateFrameSize(
+    id: string,
+    width: number,
+    height: number,
+    options?: { skipPersist?: boolean }
+  ): void {
     const frame = frames.value.find((f) => f.id === id)
     if (frame) {
       const clampedWidth = clampFrameSize(width)
       const clampedHeight = clampFrameSize(height)
       frame.width = clampedWidth
       frame.height = clampedHeight
+      if (options?.skipPersist) return
       invoke('update_frame_size', { id, width: clampedWidth, height: clampedHeight }).catch((e) =>
         storeLogger.error('Failed to update frame size:', e)
       )
     }
+  }
+
+  /** Persist a frame's current in-memory size to the backend */
+  function persistFrameSize(id: string): void {
+    const frame = frames.value.find((f) => f.id === id)
+    if (!frame) return
+    invoke('update_frame_size', {
+      id,
+      width: frame.width,
+      height: frame.height,
+    }).catch((e) => storeLogger.error('Failed to persist frame size:', e))
   }
 
   /**
@@ -326,6 +347,7 @@ export const useFramesStore = defineStore('frames', () => {
     createFrameAsync,
     updateFramePosition,
     persistFramePosition,
+    persistFrameSize,
     updateFrameSize,
     updateFrameTitle,
     updateFrameColor,
