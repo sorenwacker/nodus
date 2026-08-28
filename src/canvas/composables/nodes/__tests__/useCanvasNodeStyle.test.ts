@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { ref, computed } from 'vue'
 import { useCanvasNodeStyle, type UseCanvasNodeStyleContext } from '../useCanvasNodeStyle'
 
@@ -102,5 +104,40 @@ describe('line budget accounts for what actually consumes the card', () => {
         }
       }
     }
+  })
+})
+
+describe('the collapsed title never shows part of a line', () => {
+  // The line clamp bounds how many lines render, but leaves the box free to be
+  // a fraction of a line taller than its content. The card's overflow then
+  // showed the top of a line that was never meant to be visible: half-height
+  // letters along the bottom edge (PRODUCT_DESIGN.md > Collapsed node titles).
+  //
+  // Text layout cannot be measured in jsdom, so this asserts the property that
+  // makes the defect impossible: the header is bounded to whole line boxes.
+  it('bounds the collapsed header to a whole number of line boxes', () => {
+    const css = readFileSync(resolve(__dirname, '../../../styles/node-card.css'), 'utf-8')
+    const collapsed = css.slice(
+      css.indexOf('.node-card.collapsed .node-header'),
+      css.indexOf('}', css.indexOf('.node-card.collapsed .node-header'))
+    )
+
+    expect(collapsed).toMatch(/max-height:\s*calc\(var\(--title-lines[^)]*\)\s*\*\s*1\.2em\)/)
+    // The multiplier must equal the line-height, or the bound cuts mid-line
+    expect(collapsed).toMatch(/line-height:\s*1\.2/)
+  })
+
+  it('leaves room for an ordinary word at the collapsed type size', () => {
+    // 28px bold needs the width: 24px of side padding each side left about
+    // 150px for text in a default card, less than one long word
+    const css = readFileSync(resolve(__dirname, '../../../styles/node-card.css'), 'utf-8')
+    const collapsed = css.slice(
+      css.indexOf('.node-card.collapsed .node-header'),
+      css.indexOf('}', css.indexOf('.node-card.collapsed .node-header'))
+    )
+
+    const padding = collapsed.match(/padding:[^;]*calc\((\d+)px \* var\(--zoom-scale, 1\)\)\s*;/)
+    expect(padding, 'collapsed header sets side padding').toBeTruthy()
+    expect(Number(padding![1])).toBeLessThanOrEqual(12)
   })
 })

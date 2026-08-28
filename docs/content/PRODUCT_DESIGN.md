@@ -1279,6 +1279,10 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The line limit follows the card's height rather than being a fixed number. A count chosen for the default card cuts a long title mid-line on a taller one and wastes space on a shorter one, so the card computes how many lines of the collapsed type size it can hold and clamps to that.
 - The computation uses the type size as rendered, which includes the user's font scale, and subtracts the card's border as well as its padding. Assuming the base size and ignoring the border overestimates the budget, and the overestimate shows up as a line cut through the middle - the very artifact the budget exists to prevent.
 
+A truncated title ends at a whole line. The line clamp bounds how many lines render but leaves the box free to be a fraction of a line taller than its content, and the card's own overflow then showed the top of a line that was never meant to be visible - half-height letters along the bottom edge. The header is bounded to exactly its line count times the line height.
+
+Side padding is narrow at this type size. With 24px each side, a default card left about 150px for text - less than one long word at 28px bold - so words broke mid-character.
+
 ### Deleting nodes with files
 
 Deleting a node moves its file to the vault's `.nodus-trash` folder, so the delete can be undone and no text is destroyed.
