@@ -202,23 +202,39 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
     const minRadius = lastUsedRadius + ringDistance
     const depthRadius = Math.max(depth === 1 ? firstRingRadius : depth * baseRadius, minRadius)
 
-    // Calculate how many nodes can fit at the max radius
-    const maxNodesPerRing = Math.floor((2 * Math.PI * maxRadius) / minNodeSpacing)
-    const nodeCount = nodesAtDepth.length
+    // How many nodes fit on a ring is a property of THAT ring's radius.
+    //
+    // This used maxRadius - the outermost radius the layout permits - while the
+    // split branch placed those nodes at depthRadius, which for depth 1 is a
+    // small fraction of it. The branch meant to relieve crowding therefore put
+    // over a thousand nodes on a circle with room for a dozen, overlapping them
+    // completely: worse than the single-ring branch it replaced
+    // (PRODUCT_DESIGN.md > Radial rings).
+    const capacityAt = (radius: number) =>
+      Math.max(1, Math.floor((2 * Math.PI * radius) / minNodeSpacing))
 
-    if (nodeCount > maxNodesPerRing) {
-      // Split into multiple rings
-      const numRings = Math.ceil(nodeCount / maxNodesPerRing)
+    // Only nodes that are actually placed count towards the rings
+    const placeable = nodesAtDepth.filter(id => nodeIdsToLayout.has(id))
+    const nodeCount = placeable.length
+
+    if (nodeCount > capacityAt(depthRadius)) {
+      // Split into multiple rings, each sized for its own radius
+      let numRings = 0
+      let remaining = nodeCount
+      while (remaining > 0 && numRings < 100) {
+        remaining -= capacityAt(depthRadius + numRings * ringSpacing)
+        numRings++
+      }
       let nodeIndex = 0
 
       for (let ring = 0; ring < numRings; ring++) {
         const ringRadius = depthRadius + ring * ringSpacing
-        const nodesInThisRing = Math.min(maxNodesPerRing, nodeCount - nodeIndex)
+        const nodesInThisRing = Math.min(capacityAt(ringRadius), nodeCount - nodeIndex)
         const angleStep = (2 * Math.PI) / nodesInThisRing
         const startAngle = -Math.PI / 2 + (ring * 0.1) // Slight offset for each ring
 
         for (let i = 0; i < nodesInThisRing && nodeIndex < nodeCount; i++, nodeIndex++) {
-          const nodeId = nodesAtDepth[nodeIndex]
+          const nodeId = placeable[nodeIndex]
           const node = allNodes.find(n => n.id === nodeId)
           if (!node) continue
 

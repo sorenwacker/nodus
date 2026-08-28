@@ -773,6 +773,8 @@ Refutation attempt 1 - the most promising one - was routeAroundObstacles, which 
 
 ### M53. Radial multi-ring split stacks nodes because ring capacity and ring radius use different radii
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/layout/useRadialLayout.ts:206`
 
 `maxNodesPerRing = Math.floor((2 * Math.PI * maxRadius) / minNodeSpacing)` is derived from `maxRadius = 50000` (about 1121 nodes for the spacious style), while the split branch places those nodes at `ringRadius = depthRadius + ring * ringSpacing`, where `depthRadius` for depth 1 is only 500. So the branch that is supposed to relieve crowding puts up to ~1121 nodes on a circle of radius 500 (circumference about 3141 px for 1121 nodes at 280 px spacing), producing total overlap — strictly worse than the single-ring branch it replaces, which would have expanded the radius via `requiredCircumference / (2 * Math.PI)`. Also, `nodeCount` includes nodes that are skipped by `if (!nodeIdsToLayout.has(nodeId)) continue`, so rings are sized for nodes that are never placed.

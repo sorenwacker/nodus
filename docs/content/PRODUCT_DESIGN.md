@@ -1350,6 +1350,12 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Radial rings
+
+A radial layout places each depth on a ring. When a depth holds more nodes than its ring can seat, it splits across several rings, and each ring seats as many as its own circumference allows.
+
+Capacity was computed from the outermost radius the layout permits, while the nodes were placed at the ring's own radius - a small fraction of it at shallow depths. The branch meant to relieve crowding therefore put over a thousand nodes on a circle with room for a dozen, overlapping them completely: worse than the single ring it replaced. Rings were also sized for nodes the layout then skipped.
+
 ### Placing an edge label
 
 A label sits on the curve it belongs to, computed from the four points that define the curve.
