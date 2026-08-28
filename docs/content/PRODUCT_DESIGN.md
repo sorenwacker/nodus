@@ -1350,6 +1350,20 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Placing an edge label
+
+A label sits on the curve it belongs to, computed from the four points that define the curve.
+
+`curved` returns exactly those four points. `hyperbolic` returns six - port, standoff, two control points, standoff, port - and its curve is the middle four. Matching only a four-entry path meant hyperbolic edges fell through to the polyline calculation, which treats the control points as places the line passes through, so the label drifted further from the curve the further those points reached.
+
+### Showing an edge's colour
+
+The colour swatch shown as active is the edge's own colour, and only falls back to the colour its link type implies. Passing just the link type meant a recoloured edge highlighted the swatch for its type instead of its colour.
+
+### Searching inside a node
+
+Match positions come from the text that is displayed. In view mode the highlight walks the rendered text nodes, so offsets taken from the raw markdown were shifted by the frontmatter block and by every syntax character, and the highlight landed on unrelated words. Edit mode was already correct, because the editor holds the body with its frontmatter removed.
+
 ### Reducing edge crossings
 
 Ports are spread along a node's side, and the order matters: where a side's port order does not match the direction its edges leave in, those edges cross each other for nothing.

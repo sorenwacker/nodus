@@ -41,7 +41,14 @@ const currentLabel = computed(() => selectedEdgeData.value?.label || '')
 
 const currentColor = computed(() => {
   if (!selectedEdgeData.value) return ''
-  return props.getEdgeColor({ link_type: selectedEdgeData.value.link_type })
+  // An edge's own colour wins over the one its type implies. Passing only the
+  // link type made the active swatch show the palette entry for the type, so a
+  // recoloured edge highlighted the wrong swatch
+  // (PRODUCT_DESIGN.md > Showing an edge's colour)
+  return (
+    selectedEdgeData.value.color ||
+    props.getEdgeColor({ link_type: selectedEdgeData.value.link_type })
+  )
 })
 
 const isDirected = computed(() => {

@@ -826,6 +826,8 @@ Grepping the whole tree for `useNodeVisibility` finds only the two barrels (`src
 
 ### M58. View-mode in-node search matches raw markdown offsets against rendered DOM text
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/nodes/useNodeEditor.ts:248`
 
 `updateNodeSearch` builds match offsets from `node.markdown_content` (line 249) for view mode, but `selectMatch` walks the rendered `.node-content` text nodes and calls `range.setStart(node, pos - currentPos)` with those offsets. The rendered text is produced by `MarkdownRenderService.ts:75`, which applies `stripFrontmatter`, and markdown syntax characters are absent from the rendered output. Offsets are therefore shifted by at least the frontmatter length, and the highlight/selection lands on unrelated text. Edit mode is correct because `editContent` is the frontmatter-stripped body.
@@ -2064,6 +2066,8 @@ Exact proof in /Users/sdrwacker/workspace/nodus/src/canvas/components/CanvasNode
 
 ### L65. currentColor drops the edge's explicit color, so the active swatch shows the wrong palette entry
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/components/CanvasEdgePanel.vue:42`
 
 ```
@@ -2085,6 +2089,8 @@ Evidence:
 - /Users/sdrwacker/workspace/nodus/src/canvas/components/CanvasFrames.vue line 12 declares `frameBorderWidth: number` in `defineProps<{...}>()`. The full 288-line file was read: the identifier `frameBorderWidth` appears exactly once (the declaration). The `<script setup>` block (lines 1-25) does not ref
 
 ### L67. Hyperbolic path interleaves bezier control points into a 6-point array, breaking label placement
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/canvas/routing/index.ts:522`
 

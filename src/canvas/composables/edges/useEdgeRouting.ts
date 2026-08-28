@@ -497,13 +497,29 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         }
 
         if (routed?.path && routed.path.length >= 2) {
-          // For curved/hyperbolic with 4 control points, compute actual Bezier midpoint
-          if ((edgeStyle === 'curved' || edgeStyle === 'hyperbolic') && routed.path.length === 4) {
+          // The label sits on the curve, so it must be computed from the four
+          // points that define it - not from the path as a polyline, which
+          // treats the control points as places the line passes through.
+          //
+          // `curved` returns exactly those four. `hyperbolic` returns six -
+          // port, standoff, cp1, cp2, standoff, port - and the curve is
+          // entries 1 to 4. Matching only a length of four meant hyperbolic
+          // never took this branch, and its label drifted further from the
+          // curve the further the control points reached
+          // (PRODUCT_DESIGN.md > Placing an edge label)
+          const curvePoints =
+            edgeStyle === 'curved' && routed.path.length === 4
+              ? routed.path.slice(0, 4)
+              : edgeStyle === 'hyperbolic' && routed.path.length === 6
+                ? routed.path.slice(1, 5)
+                : null
+
+          if (curvePoints) {
             const mid = bezierMidpoint(
-              routed.path[0],
-              routed.path[1],
-              routed.path[2],
-              routed.path[3]
+              curvePoints[0],
+              curvePoints[1],
+              curvePoints[2],
+              curvePoints[3]
             )
             labelX = mid.x
             labelY = mid.y

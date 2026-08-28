@@ -227,8 +227,13 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     if (editingNodeId.value) {
       content = editContent.value.toLowerCase()
     } else if (searchNodeId.value) {
+      // View mode highlights by walking the RENDERED text, so offsets must come
+      // from what is rendered. Taken from the raw markdown they were shifted by
+      // the frontmatter block and by every syntax character, and the highlight
+      // landed on unrelated words
+      // (PRODUCT_DESIGN.md > Searching inside a node)
       const node = store.getNode(searchNodeId.value)
-      content = (node?.markdown_content || '').toLowerCase()
+      content = renderedTextOf(searchNodeId.value, node?.markdown_content || '').toLowerCase()
     }
     if (!content) {
       nodeSearchMatches.value = []
@@ -249,6 +254,19 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     if (matches.length > 0) {
       selectMatch(0, true)
     }
+  }
+
+  /**
+   * The text the reader can see for a node, as the DOM has it.
+   *
+   * Falls back to the body with its frontmatter removed when the element is not
+   * mounted - still closer to the rendered text than the raw markdown, because
+   * the frontmatter shift is the largest part of the error.
+   */
+  function renderedTextOf(nodeId: string, markdown: string): string {
+    const element = document.querySelector(`[data-node-id="${nodeId}"] .node-content`)
+    if (element?.textContent) return element.textContent
+    return splitFrontmatter(markdown).body
   }
 
   function selectMatch(index: number, refocusSearch = false) {
