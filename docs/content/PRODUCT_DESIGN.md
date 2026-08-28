@@ -1356,6 +1356,14 @@ Releasing a drag over the storyline panel adds the node to a storyline instead o
 
 That was passed through a property on `window`. Neither side declared a dependency on the other, so no boundary test could express the contract, and the ordering held only because the panel cleared the flag in a deferred callback that happened to run after the drag ended - reordering either handler would have dropped the node on the canvas instead, silently. It is now a named module both sides import.
 
+### Deciding an agent run has ended
+
+A run ends when the model calls `done`, or when it asks the user a question the loop cannot answer. It is never decided by reading the wording of a reply.
+
+The wording was read: a reply matching "created", "done", "finished" or "successfully" ended the run. So a message describing what the model was *about to* create ended it with the work undone, and a completion phrased any other way was missed and the loop carried on. This is the pattern the project rules forbid - regex over natural language is fragile and fails on varied phrasing.
+
+A reply with no tool call gets one request to act or to declare itself finished. A model that answers with prose twice has stopped working, whatever the prose says, and the run ends saying so rather than claiming the model reported completion.
+
 ### Superseding an agent run
 
 Starting a run while one is in progress supersedes it. The superseded loop is still awaiting its request, so it must not write the new run's state when that request finally rejects.

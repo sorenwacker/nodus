@@ -268,6 +268,8 @@ DO NOT call node_done() without first calling update_content(). Your response wi
     }
     const generation = ++runGeneration
     const isCurrent = () => generation === runGeneration
+    // Whether the model has already been asked to act rather than describe
+    let hasBeenNudged = false
 
     isRunning.value = true
     const providerId = llmStorage.getProvider()
@@ -441,14 +443,24 @@ After update_content succeeds, then you may call node_done().`
             messages.push({ role: 'tool', content: result, tool_call_id: toolCallId })
           }
         } else if (msg.content) {
-          // Check for completion signals
-          if (/done|complete|finished/i.test(msg.content) && msg.content.length < 100) {
-            if (isCurrent()) log.value.push(`> Complete`)
+          // Whether the model has finished is what `node_done` is for. Matching
+          // words like "done" ended the run on a message merely mentioning
+          // them, and missed completions phrased any other way; the project
+          // rule says not to read natural language with patterns
+          // (PRODUCT_DESIGN.md > Deciding an agent run has ended).
+          //
+          // Ask once, then stop: a model that replies with prose twice has
+          // stopped working, whatever the prose says.
+          if (hasBeenNudged) {
+            if (isCurrent()) log.value.push('> Ended without calling node_done')
             if (isCurrent()) isRunning.value = false
             return msg.content
           }
-          // Prompt to use tools
-          messages.push({ role: 'user', content: 'Use tools. Call node_done() when finished.' })
+          hasBeenNudged = true
+          messages.push({
+            role: 'user',
+            content: 'Use a tool to carry out the next step. Call node_done() when finished.',
+          })
         }
       } catch (e: unknown) {
         const errorMsg = e instanceof Error ? e.message : String(e)

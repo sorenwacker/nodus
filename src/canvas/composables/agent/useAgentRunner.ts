@@ -296,6 +296,9 @@ export function useAgentRunner(ctx: AgentContext) {
     pruneEvery: number,
     generation: number
   ): Promise<AgentRunResult> {
+    // Whether the model has already been asked to act rather than describe
+    let hasBeenNudged = false
+
     for (let i = startIteration; i < maxIterations; i++) {
       // Get tools for current mode (refresh each iteration in case mode changed)
       const tools = getFilteredTools()
@@ -537,16 +540,35 @@ export function useAgentRunner(ctx: AgentContext) {
             } catch { /* Not valid tool JSON */ }
           }
 
-          // No tool JSON found: apply the done/question heuristics. A question
-          // only counts when the whole message is short - a '?' buried in a
-          // longer answer is not a question to the user.
+          // No tool call in this reply. Whether the model has finished is not
+          // something to infer from its wording: matching words like "created"
+          // or "done" ended the run on a message describing what the model was
+          // ABOUT to do, and missed completions phrased any other way. The
+          // project rule says as much - no regex over natural language
+          // (PRODUCT_DESIGN.md > Deciding an agent run has ended).
+          //
+          // A question to the user ends the run, because the model is waiting
+          // for an answer that this loop cannot supply.
           const asksQuestion = msg.content.includes('?') && msg.content.length < 200
-          const looksComplete =
-            /now shows|complete|finished|created|done|successfully|empty/i.test(msg.content)
-          if (asksQuestion || looksComplete) {
+          if (asksQuestion) {
             ctx.isRunning.value = false
             return { status: 'done', message: msg.content.slice(0, 200) }
           }
+
+          // Otherwise ask it once to act or to say it is finished. A model that
+          // replies with prose twice has stopped working, whatever it says.
+          if (!hasBeenNudged) {
+            hasBeenNudged = true
+            messages.push({
+              role: 'user',
+              content:
+                'Call a tool to carry out the next step, or call done if the work is complete.',
+            })
+            continue
+          }
+
+          ctx.isRunning.value = false
+          return { status: 'done', message: msg.content.slice(0, 200) }
 
           // Prompt to continue
           messages.push({ role: 'user', content: 'Use tools only. Call done() when finished.' })

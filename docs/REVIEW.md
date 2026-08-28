@@ -918,6 +918,8 @@ All three tools are registered in src/llm/tools/agentTools.ts and return markers
 
 ### M67. Regex heuristics over natural language decide when the agent run ends
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/agent/useAgentRunner.ts:533`
 
 `const looksComplete = /now shows|complete|finished|created|done|successfully|empty/i.test(msg.content)` (line 534) combined with `asksQuestion` (line 532) terminates the run and reports `status: 'done'`. Any assistant message containing the substring 'created' or 'done' — including an explanation of what it is *about to* create — ends the run with work unfinished. `.claude/CLAUDE.md` states this explicitly under LLM Agent Rules: 'No regex for natural language. Use LLM to extract semantic meaning from user instructions. Regex is fragile and fails on varied phrasing.' The same anti-pattern appears at useNodeAgent.ts:435 (`/done|complete|finished/i` with a `< 100` length gate).
