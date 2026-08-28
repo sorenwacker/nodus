@@ -1074,6 +1074,8 @@ The HTTP layer confirms the semantics rather than leaving them to framework gues
 
 ### M79. batch_update reports a node count that is neither nodes nor updates
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/llm/tools/updateTools.ts:158`
 
 `results` receives one entry per not-found node (line 122), one per title change (line 132) and one per position change (line 143), but nothing for a content-only change (line 134-136). The return is `Updated ${results.length} nodes`. A batch that renames and moves one node reports "Updated 2 nodes"; a batch that only sets content on five nodes reports "Updated 0 nodes"; a batch where every title is missing reports them all as updated. The model sees this string as ground truth for what it just did.
@@ -1186,6 +1188,8 @@ External consumers (App.vue, GraphCanvas.vue, SettingsModal.vue, AppearanceSetti
 
 ### M89. get_nodes_by_color compares raw input against stored hex, so colour names never match
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/mcp/handlers/nodeHandlers.ts:479`
 
 Writes normalise colour names to hex before storing (`handleSetNodeColor`/`handleBatchSetNodeColors` call `normalizeColor`, and `updateNodeColor` writes that value straight into `node.color_theme`). The read path does not:
@@ -1251,6 +1255,8 @@ The failure path logs 'Will continue and retry connection when tools are called.
 
 ### M94. get_nodes_by_color documents colour names, but stored colours are hex — a name query always returns nothing
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `packages/nodus-mcp-server/src/tools.ts:145`
 
 The tool tells the model to pass 'Color name: red, orange, yellow, green, blue, purple, pink'. Writes go through handleSetNodeColor (src/mcp/handlers/nodeHandlers.ts:767), which stores `normalizeColor(color)` — COLOR_NAME_MAP turns 'blue' into a hex value. The read handler, handleGetNodesByColor (same file, line ~475), compares raw: `node.color_theme === params.color`. So the documented input can never match a colour this same API set, and the tool silently returns an empty array (indistinguishable from 'no such nodes'). No test covers get_nodes_by_color anywhere in src/__tests__.
@@ -1258,6 +1264,8 @@ The tool tells the model to pass 'Color name: red, orange, yellow, green, blue, 
 *Verification:* Confirmed from the code. tools.ts:138-149 documents get_nodes_by_color's `color` as a colour name (red/orange/.../pink). The write side normalizes: nodeHandlers.ts:767 handleSetNodeColor and :776 handleBatchSetNodeColors both call normalizeColor(params.color), and COLOR_NAME_MAP (nodeHandlers.ts:70-80) maps 'blue' -> '#3b82f6'; stores/nodes/crud.ts:377 assigns that value verbatim to node.color_the
 
 ### M95. batch_move_nodes claims relative offsets it neither accepts nor implements
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `packages/nodus-mcp-server/src/tools.ts:347`
 
@@ -2704,6 +2712,8 @@ The `McpError` class as written is therefore half-dead: its `code` field can nev
 *Verification:* The code facts are verifiable exactly as described. src/mcp/messageHandler.ts:239-254 derives the JSON-RPC code from `message.includes('not found')` and never inspects the thrown error's code; `grep -rn "instanceof McpError" src/` returns zero hits, so the `code` field on `class McpError extends Error { code: number }` (src/mcp/handlers/nodeHandlers.ts:128-136), written at ~30 throw sites, is read
 
 ### L123. fit_frame_to_contents always reports resized: true, including when nothing was resized
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/mcp/handlers/frameHandlers.ts:410`
 

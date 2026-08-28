@@ -1350,6 +1350,16 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Finding nodes by colour
+
+A colour name and its hex value are the same colour. Writes normalise a name before storing it, so reads normalise too - comparing the raw input meant every query by name, which is how the tool documents itself, matched nothing.
+
+### Reporting what a batch did
+
+What a tool reports is what it did. The model reads these strings as the record of the action it just took, so an inaccurate one teaches it something false about the graph.
+
+Three were inaccurate. A batch update counted lines of output rather than nodes, so a node both renamed and moved counted twice, a node whose content changed counted not at all, and titles that matched nothing were counted as updated - it now counts nodes and names what it could not find. Fitting a frame always reported `resized: true`, including when nothing changed. And `batch_move_nodes` offered relative offsets that its schema does not accept and its handler does not implement, so a model taking the description at its word would send deltas and move nodes to the wrong place.
+
 ### What belongs to a frame
 
 A node belongs to a frame when its `frame_id` says so. There is no spatial fallback, because overlap makes membership depend on where things happen to be rather than on what the user put where.

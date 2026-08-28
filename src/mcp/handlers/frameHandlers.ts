@@ -408,8 +408,16 @@ export async function handleFitFrameToContents(
     )
   }
 
+  const before = { width: frame.width, height: frame.height }
   await fitFrameToNodesAndResolveOverlaps(store, params.frame_id)
-  return { success: true, resized: true }
+
+  // Whether it actually changed, rather than always claiming it did. A caller
+  // that reads `resized` has no other way to tell
+  // (PRODUCT_DESIGN.md > Reporting what a batch did)
+  const after = store.getFrame(params.frame_id)
+  const resized =
+    !!after && (after.width !== before.width || after.height !== before.height)
+  return { success: true, resized }
 }
 
 export async function handleFitAllFrames(store: McpStoreInterface): Promise<{ success: boolean; count: number }> {

@@ -115,22 +115,32 @@ export function registerUpdateTools(): void {
       const positionMoves: Array<{ id: string; x: number; y: number }> = []
 
       const results: string[] = []
+      // Counted per NODE, and separately from the nodes that were not found.
+      //
+      // `results` gathered one line per change, so a node that was renamed and
+      // moved counted twice, a node whose content changed counted not at all,
+      // and a batch whose titles all failed to match reported them as updated.
+      // The model reads this string as what it just did
+      // (PRODUCT_DESIGN.md > Reporting what a batch did)
+      const updatedTitles = new Set<string>()
+      const notFound: string[] = []
+
       for (const upd of updates) {
         const node = findNodeByTitle(ctx.store.filteredNodes, upd.title)
         if (!node) {
-          results.push(`${upd.title}: not found`)
+          notFound.push(upd.title)
           continue
         }
 
-        if (upd.set_title || upd.set_content !== undefined) {
-          // Push to undo stack before modifying content or title
-        }
         if (upd.set_title) {
           await ctx.store.updateNodeTitle(node.id, upd.set_title)
           results.push(`${upd.title} → ${upd.set_title}`)
+          updatedTitles.add(upd.title)
         }
         if (upd.set_content !== undefined) {
           await ctx.store.updateNodeContent(node.id, upd.set_content)
+          results.push(`${upd.title}: content`)
+          updatedTitles.add(upd.title)
         }
         const newX = upd.x
         const newY = upd.y
@@ -139,6 +149,7 @@ export function registerUpdateTools(): void {
           const y = newY !== undefined ? Number(newY) : node.canvas_y
           positionMoves.push({ id: node.id, x, y })
           results.push(`${upd.title} → (${x},${y})`)
+          updatedTitles.add(upd.title)
         }
       }
 
@@ -153,7 +164,10 @@ export function registerUpdateTools(): void {
         }
       }
 
-      return `Updated ${results.length} nodes`
+      const summary = `Updated ${updatedTitles.size} node(s)`
+      return notFound.length > 0
+        ? `${summary}. Not found: ${notFound.join(', ')}`
+        : summary
     },
     { category: 'update' }
   )

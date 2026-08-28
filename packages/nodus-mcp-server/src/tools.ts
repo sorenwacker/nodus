@@ -371,7 +371,8 @@ export const NODUS_TOOLS: McpToolDeclaration[] = [
   },
   {
     name: 'batch_move_nodes',
-    description: 'Move multiple nodes at once. Can set absolute positions or apply relative offsets.',
+    description:
+      'Move multiple nodes at once. Positions are absolute canvas coordinates, not offsets from where a node is now.',
     inputSchema: {
       type: 'object',
       properties: {

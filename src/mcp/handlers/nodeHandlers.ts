@@ -476,9 +476,15 @@ export function handleGetNodesByColor(
   store: McpStoreInterface,
   params: { color: string }
 ): Array<{ id: string; title: string }> {
-  return store.getFilteredNodes()
-    .filter((node) => node.color_theme === params.color)
-    .map((node) => ({ id: node.id, title: node.title }))
+  // Writes normalise a colour name to hex before storing it, so a read must
+  // normalise too. Comparing the raw input meant every query by name - the
+  // names the tool documents - matched nothing
+  // (PRODUCT_DESIGN.md > Finding nodes by colour)
+  const wanted = normalizeColor(params.color)
+  return store
+    .getFilteredNodes()
+    .filter(node => node.color_theme === wanted)
+    .map(node => ({ id: node.id, title: node.title }))
 }
 
 export async function handleCreateNode(
