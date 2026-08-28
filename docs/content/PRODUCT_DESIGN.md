@@ -1350,6 +1350,12 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Reducing edge crossings
+
+Ports are spread along a node's side, and the order matters: where a side's port order does not match the direction its edges leave in, those edges cross each other for nothing.
+
+After ports are assigned, they are reordered so neighbouring ports lead to neighbouring nodes. That pass existed, complete and tested, and nothing called it - so no graph ever had its crossings reduced.
+
 ### Routing edges around nodes
 
 An edge routes around a node rather than through it. The three-segment router checks each segment for obstructions and inserts a detour perpendicular to that segment: a horizontal segment detours vertically, and a vertical one horizontally.

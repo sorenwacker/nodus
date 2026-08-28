@@ -9,6 +9,7 @@ import { NODE_DEFAULTS } from '../../constants'
 import {
   routeAllEdges,
   assignPorts,
+  optimizePortAssignments,
   calculatePortOffset,
   getSide,
   getPortPoint,
@@ -303,6 +304,12 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     }
 
     const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
+
+    // Reorder each side's ports so neighbouring ports lead to neighbouring
+    // nodes. assignPorts spreads edges in the order it meets them, which leaves
+    // them crossing for no reason; this pass existed and nothing called it, so
+    // no graph ever benefited (PRODUCT_DESIGN.md > Reducing edge crossings)
+    optimizePortAssignments(edgeInfos, sourceAssignments, targetAssignments)
 
     // Build spatial index and route edges
     // Skip complex routing during drag for performance - use cached or simple lines

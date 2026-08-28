@@ -2225,6 +2225,8 @@ The docstring says "Nodes 50%+ inside get pulled fully inside / Nodes just overl
 
 ### L82. Edge stats are computed for the hovered canvas node while the tooltip shows the external node
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/nodes/useNodeHover.ts:86`
 
 `hoveredNode` prefers `externalHoveredNode` (line 63), but `hoveredNodeEdgeStats` keys off `hoveredNodeId` only and returns `null` when it is unset. `GraphCanvas.vue:2373-2376` feeds the tooltip `:node="hoveredNode"` together with `:edge-stats="hoveredNodeEdgeStats"`, so hovering a node in the storyline panel (`setExternalHover`, GraphCanvas:244) shows that node's title and content with no edge stats — or, if the pointer is simultaneously over a canvas node, with a *different* node's incoming/outgoing counts.
