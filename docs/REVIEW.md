@@ -1219,6 +1219,8 @@ This contradicts two siblings in the same module group: the single-item `handleC
 
 ### M92. Four server-routed MCP methods are advertised by no tool, so no client can reach them
 
+**Status:** partly fixed - `get_connected_components` is now exposed on both surfaces. The other three routed methods remain.
+
 `packages/nodus-mcp-server/src/tools.ts`
 
 Comparing the 56 tool names in NODUS_TOOLS with the `case '...'` methods routed in src/mcp/messageHandler.ts: every advertised tool is routed, but `batch_update_nodes`, `get_connected_components`, `get_duplicate_edges` and `cleanup_duplicate_edges` are routed and implemented (handleBatchUpdateNodes, handleGetConnectedComponents, handleGetDuplicateEdges, handleCleanupDuplicateEdges) with no tool definition here. Grepping the whole frontend outside src/mcp/ finds zero other references, so the in-app agent does not expose them either — they are reachable only by hand-crafted JSON-RPC. That is precisely the 'code that is written but never reached' the project rules forbid. The existing tool-surface-parity gate does not catch it because it only compares MCP tool names against in-app agent tool names, never against the methods the server routes.
@@ -2701,6 +2703,8 @@ Facts verified in /Users/sdrwacker/workspace/nodus/src/mcp/handlers/frameHandler
 - Line 38-39: `const frame = store.getFrame(frameId); if (!frame) return`
 
 ### L124. Four routed methods are exposed by no interface: batch_update_nodes, get_connected_components, get_duplicate_edges, cleanup_duplicate_edges
+
+**Status:** partly fixed - `get_connected_components` is now exposed on both surfaces. The other three routed methods remain.
 
 `src/mcp/messageHandler.ts:390`
 

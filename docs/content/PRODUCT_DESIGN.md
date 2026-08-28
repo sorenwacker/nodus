@@ -1083,6 +1083,7 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 | Tool | Description |
 |------|-------------|
 | `read_graph(mode, include_content, max_content_length)` | Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full" |
+| `get_connected_components()` | How many separate groups the graph falls into, and which nodes are in each. Without it, a claim that the graph is connected can only be a guess |
 | `query_nodes(filter)` | Query nodes from database. Returns list of {title, content} for planning |
 | `for_each_node(filter, action, template)` | Process nodes: set/append content with templates, or use LLM to generate/transform content |
 | `check_completeness(topic, findings)` | Assess if research on a topic is complete. Returns coverage score and suggests follow-up queries if gaps exist |
@@ -1322,6 +1323,12 @@ Every content write passes through the store, so the store records it. A caller 
 **One action is one step.** Tool execution is wrapped in a group, so a tool that rewrites three hundred nodes produces one entry rather than three hundred, and a tool author does nothing to make their tool undoable. Within a group the first recording for a node wins, because that is the state undo must return to.
 
 The recorder is connected by the same call that provides the undo handlers, so wiring cannot be done by halves: an unconnected recorder would make every change unundoable, silently.
+
+### Claims the agent can check
+
+The agent said "the graph is now fully connected" when it was not. It had no way to know: connectivity was computed for MCP clients and no tool exposed it to the in-app agent, so the answer could only be a guess.
+
+`get_connected_components` reports how many separate groups the graph falls into and which nodes are in each, and both surfaces offer it. A claim about the graph's shape is one the agent can check before making it.
 
 ### Showing agent progress
 

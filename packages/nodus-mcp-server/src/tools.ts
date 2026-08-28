@@ -124,6 +124,15 @@ export const NODUS_TOOLS: McpToolDeclaration[] = [
     },
   },
   {
+    name: 'get_connected_components',
+    description:
+      'Report how many separate groups the graph falls into, and which nodes are in each. Call this before claiming the graph is connected.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'get_leaf_nodes',
     description: 'Find leaf nodes (nodes with no outgoing edges/children). These are endpoints in the graph.',
     inputSchema: {

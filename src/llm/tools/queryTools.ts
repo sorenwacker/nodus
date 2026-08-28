@@ -1,12 +1,40 @@
 /**
  * Query tool registrations
  *
- * Handles: read_graph, query_nodes
+ * Handles: read_graph, query_nodes, get_connected_components
  */
 
 import { defineTool } from '../registry'
+import { handleGetConnectedComponents } from '../../mcp/handlers/nodeHandlers'
 
 export function registerQueryTools(): void {
+  defineTool<Record<string, never>>(
+    'get_connected_components',
+    'Report how many separate groups the graph falls into, and which nodes are in each. Call this before claiming the graph is connected: without it the answer can only be a guess.',
+    { type: 'object', properties: {}, required: [] },
+    async (_args, ctx) => {
+      // The same computation MCP clients get, rather than a second one here
+      // (PRODUCT_DESIGN.md > One rule, one place)
+      const result = handleGetConnectedComponents({
+        getFilteredNodes: () => ctx.store.filteredNodes,
+        getFilteredEdges: () => ctx.store.filteredEdges,
+      } as never)
+
+      if (result.component_count === 1) {
+        return 'The graph is one connected group.'
+      }
+
+      const groups = result.components
+        .map((c, i) => {
+          const sample = (c.nodes ?? c.sample_nodes ?? []).map(n => n.title).join(', ')
+          return `  ${i + 1}. ${c.size} node(s): ${sample}`
+        })
+        .join('\n')
+      return `The graph falls into ${result.component_count} separate groups:\n${groups}`
+    },
+    { category: 'query' }
+  )
+
   defineTool<{ mode?: string; include_content?: boolean; max_content_length?: number }>(
     'read_graph',
     'Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full".',

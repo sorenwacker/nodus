@@ -101,6 +101,7 @@ const planMode: AgentModeConfig = {
   toolWhitelist: [
     // Reading
     'read_graph',
+    'get_connected_components',
     'query_nodes',
     // Research (read-only)
     'web_search',
@@ -146,6 +147,7 @@ const executeMode: AgentModeConfig = {
   maxIterations: 500,
   toolWhitelist: [
     'read_graph',
+    'get_connected_components',
     'create_node',
     'create_edge',
     'create_edges_batch',
