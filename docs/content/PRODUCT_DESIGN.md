@@ -1350,6 +1350,14 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Reconnecting to Nodus
+
+The MCP server outlives any one Nodus session, so it reconnects. A tool call attempts a connection when there is none - which the startup message already promised and nothing implemented - and a successful connection restores the retry budget, because a counter that never reset ended reconnection for good after ten drops across a long session.
+
+### Queueing citation fetches
+
+Each queued paper carries the direction it was queued for. The direction used to be read once when the run began, from a value a later request overwrote: papers queued mid-run were fetched in whichever direction the run started with, and papers already queued could have their direction changed under them.
+
 ### Reporting MCP errors
 
 A failure says what went wrong, and its code says what kind of failure it was.

@@ -29,7 +29,16 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
   const { store, getAffectedNodeIds, contextMenuNodeId, showToast } = options
 
   // Paper queue for sequential processing
-  const paperQueue = ref<string[]>([])
+  /**
+   * Papers waiting to be fetched, each with the direction it was queued for.
+   *
+   * The direction used to be read once when the run started, from a shared ref
+   * that a later request overwrote - so papers queued mid-run were fetched in
+   * whichever direction the run began with, and papers already queued could
+   * have their direction changed under them
+   * (PRODUCT_DESIGN.md > Queueing citation fetches).
+   */
+  const paperQueue = ref<Array<{ nodeId: string; direction: 'citations' | 'references' | 'both' }>>([])
   const isProcessingQueue = ref(false)
   const queueTotalPapers = ref(0)
   const queueProcessedPapers = ref(0)
@@ -99,7 +108,6 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
 
     let totalPapers = 0
     let totalEdges = 0
-    const direction = currentFetchDirection.value
 
     try {
       while (paperQueue.value.length > 0) {
@@ -110,7 +118,7 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
           break
         }
 
-        const nodeId = paperQueue.value[0]
+        const { nodeId, direction } = paperQueue.value[0]
         queueProcessedPapers.value++
 
         // Use the appropriate fetch function based on direction
@@ -160,8 +168,8 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
           if (totalEdges > 0) parts.push(`${totalEdges} edge(s)`)
           showToast?.(`Created ${parts.join(' and ')}`, 'success')
         } else {
-          const directionLabel = direction === 'citations' ? 'citations' : direction === 'references' ? 'references' : 'papers'
-          showToast?.(`No new ${directionLabel} found`, 'info')
+          // The run may have mixed directions, so the summary does not name one
+          showToast?.('No new papers found', 'info')
         }
       }
     } catch (error) {
@@ -191,7 +199,7 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
       const doi = node ? extractDOI(node.markdown_content) : null
       if (node && doi) {
         // Only add if not already in queue
-        if (!paperQueue.value.includes(id)) {
+        if (!paperQueue.value.some(item => item.nodeId === id)) {
           nodeIds.push(id)
         }
       }
@@ -210,7 +218,7 @@ export function useCitationFetch(options: UseCitationFetchOptions) {
     currentFetchDirection.value = direction
 
     // Add to queue
-    paperQueue.value.push(...nodeIds)
+    paperQueue.value.push(...nodeIds.map(nodeId => ({ nodeId, direction })))
     queueTotalPapers.value = paperQueue.value.length + queueProcessedPapers.value
 
     const directionLabel = direction === 'citations' ? 'citations' : direction === 'references' ? 'references' : 'citations & references'

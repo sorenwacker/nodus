@@ -90,6 +90,16 @@ class NodusMcpServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params
 
+      // Startup says the server retries when a tool is called, so it does
+      // (PRODUCT_DESIGN.md > Reconnecting to Nodus)
+      if (!this.wsClient.isConnected()) {
+        try {
+          await this.wsClient.ensureConnected()
+        } catch {
+          // Fall through to the message below, which says which state applies
+        }
+      }
+
       // "Not connected" covered three different situations, and the advice
       // suited only one of them: Nodus not running, the MCP server switched
       // off, and a connection waiting for the user to approve it. Say which

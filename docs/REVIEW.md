@@ -898,6 +898,8 @@ All three tools are registered in src/llm/tools/agentTools.ts and return markers
 
 ### M65. Papers queued while a fetch is running are fetched with the previous direction
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/util/useCitationFetch.ts:102`
 
 `processQueue` captures `const direction = currentFetchDirection.value` once (line 102) and uses that captured value for every node in the `while` loop (lines 118-133). `addToFetchQueue` sets `currentFetchDirection.value = direction` (line 204) and appends to `paperQueue`, but only starts `processQueue` if it is not already running (line 214). So if the user runs 'Fetch citations' and then, while it is still processing, runs 'Fetch references' on other nodes, those nodes are appended to the live queue and fetched as *citations*. The composable's own doc comment (lines 6, 176-177) advertises exactly this scenario as supported: 'Uses a queue to allow adding papers while fetching is in progress.'
@@ -1244,6 +1246,8 @@ Comparing the 56 tool names in NODUS_TOOLS with the `case '...'` methods routed 
 *Verification:* Confirmed from the code. Diffing the 56 unique `name: '...'` entries in packages/nodus-mcp-server/src/tools.ts against the `case '...'` labels in src/mcp/messageHandler.ts yields exactly the four claimed methods as routed-but-unadvertised (batch_update_nodes, cleanup_duplicate_edges, get_connected_components, get_duplicate_edges), and zero advertised-but-unrouted tools. The handlers are real imple
 
 ### M93. Startup logs a retry-on-tool-call behaviour that does not exist, and reconnection stops permanently after 10 attempts
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `packages/nodus-mcp-server/src/index.ts:139`
 

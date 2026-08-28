@@ -112,6 +112,10 @@ export class NodusWebSocketClient {
         this.reconnectAttempts = 0
         this.authenticate()
         this.everConnected = true
+        // A fresh budget after every successful connection: the counter never
+        // reset, so ten drops over a long session ended reconnection for good
+        // (PRODUCT_DESIGN.md > Reconnecting to Nodus)
+        this.reconnectAttempts = 0
         this.options.onConnected?.()
         resolve()
       })
@@ -154,6 +158,19 @@ export class NodusWebSocketClient {
    */
   isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN && this.isApproved
+  }
+
+  /**
+   * Connect if not connected, for a caller about to need the link.
+   *
+   * Startup says the server will retry when tools are called, and it did not:
+   * after the initial failure nothing tried again
+   * (PRODUCT_DESIGN.md > Reconnecting to Nodus).
+   */
+  async ensureConnected(): Promise<void> {
+    if (this.isConnected()) return
+    this.reconnectAttempts = 0
+    await this.connect()
   }
 
   /**
