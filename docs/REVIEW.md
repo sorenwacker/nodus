@@ -747,6 +747,8 @@ Refutation attempt 1 - the most promising one - was routeAroundObstacles, which 
 
 ### M50. Force/hierarchical layout of a selection silently discards the computed positions of framed nodes
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/layout/useLayoutFrameAware.ts:210`
 
 `useAutoLayout` deliberately includes framed nodes in `virtualNodes` when there is a selection (`const laidOutBySelection = selectedIds.length > 0`, useAutoLayout.ts:186-202) with a comment citing PRODUCT_DESIGN.md > Layout of a selection: "every selected node takes part ... Excluding them left part of the selection sitting exactly where it was". But those nodes are also pushed into `frameNodes` (lines 191-197), and in `processFrameAwareLayoutResults` the global branch overwrites their targets: `nodeTargets.set(node.id, { x: finalPos.x + offset.dx, y: finalPos.y + offset.dy })` using the offsets captured before the layout ran. So for `force` and `hierarchical` a selected framed node is put back at exactly its previous frame-relative position — the precise symptom the selection fix was meant to remove — while the grid/horizontal/vertical path (which uses `targets` directly) does lay it out. The gate tests never catch this because src/__tests__/layout-frame-invariants.test.ts always stubs `getSelectedNodeIds: () => []`.

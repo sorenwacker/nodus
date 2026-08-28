@@ -205,9 +205,17 @@ export function processFrameAwareLayoutResults(
       }
 
       // Member node targets come from the offsets captured at snapshot time,
-      // never from the node's current (possibly mid-animation) position
+      // never from the node's current (possibly mid-animation) position.
+      //
+      // A node the layout positioned in its own right keeps that position. When
+      // there is a selection, framed nodes take part in the layout and receive
+      // real positions; moving them rigidly with their frame put them back
+      // exactly where they started - the symptom including them was meant to
+      // remove. Nodes that did not take part still travel with the frame
+      // (PRODUCT_DESIGN.md > Layout of a selection).
       const nodesInFrame = frameNodes.get(frame.id) || []
       for (const node of nodesInFrame) {
+        if (positions.has(node.id)) continue
         const offset = nodeFrameOffsets.get(node.id)
         if (offset) {
           nodeTargets.set(node.id, { x: finalPos.x + offset.dx, y: finalPos.y + offset.dy })

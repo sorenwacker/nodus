@@ -1636,6 +1636,8 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 - Without a selection, the whole graph is laid out and frame contents are handled by the frame-aware path as before.
 - Re-fitting a frame to its contents has one implementation, shared by the layout and the agent's frame tools; a second copy would let the two drift.
 
+A selected node inside a frame keeps the position the layout computed for it. Frames otherwise move as rigid units, carrying their members by the offsets captured before the layout ran - and that rigid move used to overwrite the computed positions too, so a selected framed node was put back exactly where it started. Grid and vertical layouts used the computed targets directly and did move it, so the two disagreed about the same action.
+
 ### Edge handles
 
 **Required behavior:** An edge that is live along its whole length fires during ordinary mouse travel. In a window that does not fill the screen the pointer crosses a border constantly - reaching for another application, the dock, the desktop - and every crossing opened a panel the user did not ask for. The gesture has to be aimed to count.
