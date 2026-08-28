@@ -247,20 +247,16 @@ export function createMcpMessageHandler(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
-      // Check for specific error types
-      if (message.includes('not found')) {
-        return createErrorResponse(
-          request.id,
-          JsonRpcErrorCodes.INVALID_PARAMS,
-          message
-        )
+      // A handler that raised McpError already chose its code. Discarding it
+      // and guessing from the message text meant the code depended on the
+      // wording: any message containing "not found" became INVALID_PARAMS,
+      // and every other deliberate code became INTERNAL_ERROR
+      // (PRODUCT_DESIGN.md > Reporting MCP errors)
+      if (error instanceof McpError) {
+        return createErrorResponse(request.id, error.code, message)
       }
 
-      return createErrorResponse(
-        request.id,
-        JsonRpcErrorCodes.INTERNAL_ERROR,
-        message
-      )
+      return createErrorResponse(request.id, JsonRpcErrorCodes.INTERNAL_ERROR, message)
     }
   }
 

@@ -1350,6 +1350,15 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Reporting MCP errors
+
+A failure says what went wrong, and its code says what kind of failure it was.
+
+- The code a handler chose is the code returned. It used to be discarded and guessed from the message text, so any message containing "not found" became an invalid-parameters error and every other deliberate code became an internal error.
+- A request the user rejected is told apart from one still waiting. Both carry the same code, and treating them alike reported a refusal as "waiting for approval" while the caller's promise never settled.
+- Requests still in flight when the socket closes are rejected. A promise nobody will settle looks to the caller like a request still running.
+- "Not connected" covers three situations - never reached, dropped, and waiting for approval - and each says which, because the advice differs.
+
 ### Finding nodes by colour
 
 A colour name and its hex value are the same colour. Writes normalise a name before storing it, so reads normalise too - comparing the raw input meant every query by name, which is how the tool documents itself, matched nothing.

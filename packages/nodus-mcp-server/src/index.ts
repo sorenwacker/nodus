@@ -90,13 +90,20 @@ class NodusMcpServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params
 
-      // Check connection
+      // "Not connected" covered three different situations, and the advice
+      // suited only one of them: Nodus not running, the MCP server switched
+      // off, and a connection waiting for the user to approve it. Say which
+      // (PRODUCT_DESIGN.md > Reporting MCP errors)
       if (!this.wsClient.isConnected()) {
         return {
           content: [
             {
               type: 'text',
-              text: 'Error: Not connected to Nodus. Make sure Nodus is running and the MCP server is enabled in settings.',
+              text: this.wsClient.isAwaitingApproval()
+                ? 'Error: Waiting for this connection to be approved in Nodus. Approve it in the prompt Nodus is showing.'
+                : this.wsClient.hasEverConnected()
+                  ? 'Error: The connection to Nodus dropped. Nodus may have closed, or the MCP server may have been switched off in Settings > Integrations.'
+                  : 'Error: Could not reach Nodus. Check that Nodus is running and that the MCP server is enabled in Settings > Integrations.',
             },
           ],
           isError: true,

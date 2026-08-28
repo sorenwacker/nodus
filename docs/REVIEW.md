@@ -2690,6 +2690,8 @@ It matches any edge between the pair, regardless of `storyline_id` or `link_type
 
 ### L122. McpError.code is discarded; JSON-RPC error codes are guessed from the message text
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/mcp/messageHandler.ts:242`
 
 `handleRequest` catches every error and derives the JSON-RPC code from a substring test:
@@ -2758,6 +2760,8 @@ Because `update_node`/`batch_move_nodes` clamp with the 10/50 box while `assign_
 
 ### L126. Every -32001 error is reported as 'waiting for approval', including an explicit rejection, and the pending request is never rejected
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `packages/nodus-mcp-server/src/websocket-client.ts:216`
 
 `if (message.error?.code === -32001) { console.error('[MCP Client] Waiting for user approval...'); return }` swallows the response before the pendingRequests lookup and discards `message.error.message`. The Rust server (src-tauri/src/mcp_websocket.rs) uses NOT_APPROVED = -32001 for two different states: 'Connection pending approval' (sent with the request's id, when an unapproved connection issues a tool call) and 'Connection rejected by user' (sent on rejection, deliberately without closing the socket so the client does not reconnect-storm). So a user who clicks Reject sees the client log 'Waiting for user approval...' forever, and any in-flight tool call that receives -32001 is never rejected — it sits in pendingRequests until the 30s timer fires and surfaces the unrelated message 'Request timeout'.
@@ -2768,6 +2772,8 @@ CONFIRMED: websocket-client.ts:216-219 is verbatim `if (message.error?.code === 
 
 ### L127. In-flight requests are not rejected when the socket closes
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `packages/nodus-mcp-server/src/websocket-client.ts:108`
 
 The 'close' handler resets isApproved, notifies, and reconnects, but never touches `pendingRequests`. Any request in flight when Nodus quits or the socket drops stays in the map until its individual 30s timer fires, so the MCP client blocks for 30 seconds and then reports 'Request timeout' rather than the true cause (connection lost). The entries also survive across the reconnect, and since `requestId` is not reset the stale ids can never be matched again.
@@ -2775,6 +2781,8 @@ The 'close' handler resets isApproved, notifies, and reconnects, but never touch
 *Verification:* Confirmed from the code. websocket-client.ts:108-113 shows the 'close' handler doing only isApproved=false, options.onDisconnected?.(), attemptReconnect() — it never touches pendingRequests. A grep for `pendingRequests` across the package returns mutations in exactly two places: handleMessage (lines 223-225) and the per-request 30s setTimeout (lines 165-170). disconnect() at line 126 also does not
 
 ### L128. 'Not connected' error text conflates three distinct states and misdirects the user
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `packages/nodus-mcp-server/src/index.ts:94`
 

@@ -72,9 +72,23 @@ export class NodusWebSocketClient {
   private port: number
   private host: string
   private pendingRequests = new Map<string | number, PendingRequest>()
+
+  /**
+   * Fail every request still waiting for a reply.
+   *
+   * A promise nobody will ever settle looks to the caller like a request still
+   * in progress (PRODUCT_DESIGN.md > Reporting MCP errors).
+   */
+  private rejectAllPending(reason: string): void {
+    for (const [, pending] of this.pendingRequests) {
+      pending.reject(new Error(reason))
+    }
+    this.pendingRequests.clear()
+  }
   private requestId = 0
   private reconnectAttempts = 0
   private isApproved = false
+  private everConnected = false
   private options: WebSocketClientOptions
 
   constructor(options: WebSocketClientOptions = {}) {
@@ -97,6 +111,7 @@ export class NodusWebSocketClient {
         console.error('[MCP Client] Connected')
         this.reconnectAttempts = 0
         this.authenticate()
+        this.everConnected = true
         this.options.onConnected?.()
         resolve()
       })
@@ -108,6 +123,10 @@ export class NodusWebSocketClient {
       this.ws.on('close', () => {
         console.error('[MCP Client] Disconnected')
         this.isApproved = false
+        // Every request still waiting will never be answered, so reject them
+        // rather than leaving their promises pending for ever
+        // (PRODUCT_DESIGN.md > Reporting MCP errors)
+        this.rejectAllPending('Disconnected from Nodus before a reply arrived')
         this.options.onDisconnected?.()
         this.attemptReconnect()
       })
@@ -135,6 +154,20 @@ export class NodusWebSocketClient {
    */
   isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN && this.isApproved
+  }
+
+  /**
+   * Whether a connection was ever established, so a failure can say whether
+   * Nodus was never reachable or the link dropped
+   * (PRODUCT_DESIGN.md > Reporting MCP errors).
+   */
+  hasEverConnected(): boolean {
+    return this.everConnected
+  }
+
+  /** Whether the socket is open but still waiting for the user to approve it */
+  isAwaitingApproval(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN && !this.isApproved
   }
 
   /**
@@ -212,9 +245,25 @@ export class NodusWebSocketClient {
         }
       }
 
-      // Handle error response for pending approval
+      // -32001 means the request is waiting for the user. A rejection carries
+      // the same code, and swallowing both left the caller's promise pending
+      // for ever after the user said no
+      // (PRODUCT_DESIGN.md > Reporting MCP errors)
       if (message.error?.code === -32001) {
-        console.error('[MCP Client] Waiting for user approval...')
+        const text = message.error.message || ''
+        const wasRejected = /reject|denied|declined/i.test(text)
+        if (!wasRejected) {
+          console.error('[MCP Client] Waiting for user approval...')
+          return
+        }
+        console.error(`[MCP Client] Request rejected: ${text}`)
+        if (message.id !== undefined && message.id !== null) {
+          const pending = this.pendingRequests.get(message.id)
+          if (pending) {
+            this.pendingRequests.delete(message.id)
+            pending.reject(new Error(text || 'The user rejected this request'))
+          }
+        }
         return
       }
 
