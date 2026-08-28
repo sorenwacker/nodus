@@ -180,6 +180,10 @@ const executeMode: AgentModeConfig = {
     'update_theme',
     'apply_theme',
     'list_themes',
+    // Reporting progress, so the task panel advances as work is done
+    // (PRODUCT_DESIGN.md > Showing agent progress)
+    'set_tasks',
+    'update_task_status',
     'done',
     // Structure: frames and storylines. Registered and tested but exposed to
     // no mode until now, so the agent could not group or sequence anything

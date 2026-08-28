@@ -1323,6 +1323,18 @@ Every content write passes through the store, so the store records it. A caller 
 
 The recorder is connected by the same call that provides the undo handlers, so wiring cannot be done by halves: an unconnected recorder would make every change unundoable, silently.
 
+### Showing agent progress
+
+The task panel shows the steps of an approved plan and how far the agent has got. It can be dismissed, and it sits clear of the canvas toolbar.
+
+Progress never advanced, for two reasons at once. There were two task lists - a ref the tools wrote and the store the panel read - so a plan filled one and the tools the other. And the tools that report progress appeared in no mode's whitelist, so the model could never call them. Both are fixed: the tools write the list the panel reads, and they are offered in execute mode.
+
+### Rendering the conversation
+
+The model writes markdown, and the transcript renders it. Interpolating the text showed `**emphasis**` and list markers literally.
+
+The reply passes through the same renderer the canvas uses, so it crosses the sanitisation boundary: a model's output is untrusted text like any other.
+
 ### What the agent acts on
 
 A run acts on the nodes that were selected when the user asked. The selection is captured when the run starts and released when it ends.

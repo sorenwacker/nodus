@@ -7,6 +7,7 @@
 import { ref, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ChatTurn } from '../../llm/chatTranscript'
+import { renderMarkdown } from '../../services/MarkdownRenderService'
 
 const props = defineProps<{
   turns: ChatTurn[]
@@ -14,6 +15,19 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+
+/**
+ * The turn's text as HTML.
+ *
+ * The model writes markdown, and plain interpolation showed it raw: a reply
+ * full of `**emphasis**` and `- ` list markers. Rendered through the same
+ * service the canvas uses, so the output passes the sanitisation boundary and
+ * the same syntax works in both places
+ * (PRODUCT_DESIGN.md > Rendering the conversation).
+ */
+function renderedTurn(text: string): string {
+  return renderMarkdown(text)
+}
 
 // A plain template ref, not useTemplateRef: that API needs Vue 3.5 while the
 // declared bound allows 3.4
@@ -53,7 +67,8 @@ watch(
       <span class="chat-role">{{
         turn.role === 'user' ? t('canvas.agent.chatYou') : t('canvas.agent.chatAgent')
       }}</span>
-      <div class="chat-text">{{ turn.text }}</div>
+      <!-- eslint-disable-next-line vue/no-v-html -- sanitised by renderMarkdown -->
+      <div class="chat-text" v-html="renderedTurn(turn.text)"></div>
       <template v-if="turn.actions.length > 0">
         <button class="chat-actions-toggle" @click="toggleActions(turn.id)">
           {{ expanded.has(turn.id) ? '&#9662;' : '&#9656;' }}

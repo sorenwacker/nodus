@@ -1212,7 +1212,6 @@ const markerHandlers = useMarkerHandlers({
 })
 
 // LLM tools composable for handling LLM-dependent tools
-// Declared before the tools, which read runSelection
 const { sendPrompt: sendGraphPrompt, runSelection } = useAgentPrompt({
   prompt: graphPrompt,
   isLoading: isGraphLLMLoading,
@@ -1229,6 +1228,7 @@ const llmTools = useLLMTools({
   themesStore,
   planState,
   tasks: agentTasks,
+  agentTasksStore,
   memoryStorage,
   agentMemoryStorage,
   log: (msg: string) => agentLog.value.push(msg),

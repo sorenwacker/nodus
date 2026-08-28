@@ -133,6 +133,14 @@ export interface LLMToolsContext {
   themesStore: ThemesStoreInterface
   planState: PlanStateInterface
   tasks: Ref<AgentTask[]>
+  /**
+   * The task list the panel shows. The tools update this so progress is
+   * visible; the ref above remains for the prompt context the model sees.
+   */
+  agentTasksStore?: {
+    setTasks: (tasks: Array<{ description: string; details?: string }>) => void
+    updateTaskStatus: (index: number, status: 'pending' | 'in_progress' | 'done' | 'error') => boolean
+  }
   memoryStorage: MemoryStorageInterface
   agentMemoryStorage: AgentMemoryStorageInterface
   log: (msg: string) => void
@@ -148,7 +156,7 @@ export interface LLMToolsContext {
  * LLM Tools composable
  */
 export function useLLMTools(ctx: LLMToolsContext) {
-  const { llmQueue, callOllama, store, themesStore, planState, tasks, memoryStorage, agentMemoryStorage, log, pushContentUndo, pushContentsUndo, isRunning } = ctx
+  const { llmQueue, callOllama, store, themesStore, planState, tasks, agentTasksStore, memoryStorage, agentMemoryStorage, log, pushContentUndo, pushContentsUndo, isRunning } = ctx
 
   /** Check if agent was stopped */
   function isCancelled(): boolean {
@@ -371,6 +379,11 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const taskList = (parsedArgs.tasks as string[]) || []
         if (!Array.isArray(taskList) || taskList.length === 0) return 'No tasks provided'
 
+        // Written to the store the task panel reads. Two lists existed - this
+        // ref and the store - so a plan set one and these tools the other, and
+        // the panel showed a list that never moved
+        // (PRODUCT_DESIGN.md > Showing agent progress)
+        agentTasksStore?.setTasks(taskList.map((t: string) => ({ description: t })))
         tasks.value = taskList.map((t: string, i: number) => ({
           id: `task-${i}`,
           description: t,
@@ -405,6 +418,12 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const task = tasks.value[taskIndex]
         const oldStatus = task.status
         task.status = status === 'done' ? 'done' : status === 'failed' ? 'error' : 'running'
+
+        // Same change in the store the panel reads, so progress is visible
+        agentTasksStore?.updateTaskStatus(
+          taskIndex,
+          status === 'done' ? 'done' : status === 'failed' ? 'error' : 'in_progress'
+        )
 
         const statusIcon = status === 'done' ? '[x]' : status === 'failed' ? '[!]' : '[>]'
         log(`${statusIcon} Task ${taskIndex + 1}: ${task.description} -> ${status}`)
