@@ -908,6 +908,8 @@ All three tools are registered in src/llm/tools/agentTools.ts and return markers
 
 ### M66. No run-generation guard: a superseded node-agent loop keeps writing shared state
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/agent/useNodeAgent.ts:257`
 
 `run()` handles a restart with only `llmQueue.cancelCurrent()` (lines 258-260) and then proceeds. The previous invocation's `for` loop is still awaiting; when its `llmQueue.chat` rejects with 'Cancelled' it takes the catch at line 446 and executes `isRunning.value = false` (line 448) — flipping the *new* run's flag off — after having pushed '> Stopped' into `log`, which line 266 has already reset for the new run. Between the cancel and the rejection the old loop can also still run `ctx.updateContent` from an in-flight tool call and overwrite `currentContent`. useAgentRunner solved precisely this with `runGeneration` and documents why (lines 129-131, 301-311); useNodeAgent has no equivalent.

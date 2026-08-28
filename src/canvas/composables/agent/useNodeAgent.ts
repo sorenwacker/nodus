@@ -254,10 +254,20 @@ Example workflow:
 DO NOT call node_done() without first calling update_content(). Your response will be lost.`
   }
 
+  let runGeneration = 0
+
   async function run(prompt: string, ctx: NodeAgentContext): Promise<string> {
+    // A restart supersedes the previous loop, which is still awaiting its
+    // request. When that request rejects, the old loop must not write the new
+    // run's state: it used to clear the new run's isRunning flag, push into the
+    // log the new run had just reset, and let an in-flight tool call overwrite
+    // the new content. useAgentRunner solves this with the same token
+    // (PRODUCT_DESIGN.md > Superseding an agent run)
     if (isRunning.value) {
       llmQueue.cancelCurrent()
     }
+    const generation = ++runGeneration
+    const isCurrent = () => generation === runGeneration
 
     isRunning.value = true
     const providerId = llmStorage.getProvider()
@@ -271,7 +281,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
     // Warn if content will be truncated
     const maxContentChars = llmStorage.getChainContextLimit() - 4000
     if (ctx.nodeContent && ctx.nodeContent.length > maxContentChars) {
-      log.value.push(`> Warning: Content truncated (${ctx.nodeContent.length} chars > ${maxContentChars} limit)`)
+      if (isCurrent()) log.value.push(`> Warning: Content truncated (${ctx.nodeContent.length} chars > ${maxContentChars} limit)`)
     }
 
     currentContent.value = ctx.nodeContent
@@ -305,20 +315,20 @@ DO NOT call node_done() without first calling update_content(). Your response wi
               args = {}
             }
 
-            log.value.push(`> ${name}`)
+            if (isCurrent()) log.value.push(`> ${name}`)
             let result = ''
 
             // Handle tool execution based on name
             // Tools return markers, but we execute the actual logic here
             switch (name) {
               case 'web_search':
-                log.value.push(`  Searching: ${args.query}`)
+                if (isCurrent()) log.value.push(`  Searching: ${args.query}`)
                 try {
                   result = await executeWebSearch(args.query as string)
-                  log.value.push(`  Found results`)
+                  if (isCurrent()) log.value.push(`  Found results`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Search failed'
-                  log.value.push(errorLog(errorMsg))
+                  if (isCurrent()) log.value.push(errorLog(errorMsg))
                   notifications$.error('Web search failed', errorMsg)
                   result = `Error: ${errorMsg}`
                 }
@@ -326,11 +336,11 @@ DO NOT call node_done() without first calling update_content(). Your response wi
 
               case 'fetch_url': {
                 const urlToFetch = args.url as string
-                log.value.push(`  Fetching: ${urlToFetch}`)
+                if (isCurrent()) log.value.push(`  Fetching: ${urlToFetch}`)
                 // Validate URL before fetching
                 if (!isValidFetchUrl(urlToFetch)) {
                   const errorMsg = 'Invalid URL: only http/https URLs to public hosts are allowed'
-                  log.value.push(errorLog(errorMsg))
+                  if (isCurrent()) log.value.push(errorLog(errorMsg))
                   result = `Error: ${errorMsg}`
                   break
                 }
@@ -338,10 +348,10 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                   // Calculate current context size for smart truncation
                   const currentContextChars = messages.reduce((sum, m) => sum + (m.content?.length || 0), 0)
                   result = await executeFetchUrl(urlToFetch, currentContextChars)
-                  log.value.push(`  Got content (${result.length} chars)`)
+                  if (isCurrent()) log.value.push(`  Got content (${result.length} chars)`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Fetch failed'
-                  log.value.push(errorLog(errorMsg))
+                  if (isCurrent()) log.value.push(errorLog(errorMsg))
                   notifications$.error('URL fetch failed', errorMsg)
                   result = `Error: ${errorMsg}`
                 }
@@ -349,13 +359,13 @@ DO NOT call node_done() without first calling update_content(). Your response wi
               }
 
               case 'wikipedia_search':
-                log.value.push(`  Wikipedia: ${args.query}`)
+                if (isCurrent()) log.value.push(`  Wikipedia: ${args.query}`)
                 try {
                   result = await executeWikipediaSearch(args.query as string)
-                  log.value.push(`  Found results`)
+                  if (isCurrent()) log.value.push(`  Found results`)
                 } catch (e) {
                   const errorMsg = e instanceof Error ? e.message : 'Search failed'
-                  log.value.push(errorLog(errorMsg))
+                  if (isCurrent()) log.value.push(errorLog(errorMsg))
                   notifications$.error('Wikipedia search failed', errorMsg)
                   result = `Error: ${errorMsg}`
                 }
@@ -363,11 +373,11 @@ DO NOT call node_done() without first calling update_content(). Your response wi
 
               case 'update_content': {
                 const rawContent = args.content as string
-                currentContent.value = rawContent
+                if (isCurrent()) currentContent.value = rawContent
                 await ctx.updateContent(rawContent)
                 contentWasUpdated = true
                 result = 'Content updated and saved'
-                log.value.push(`  Updated content (${rawContent.length} chars)`)
+                if (isCurrent()) log.value.push(`  Updated content (${rawContent.length} chars)`)
                 break
               }
 
@@ -377,32 +387,32 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                 await ctx.updateContent(currentContent.value)
                 contentWasUpdated = true
                 result = 'Text appended and saved'
-                log.value.push(`  Appended text`)
+                if (isCurrent()) log.value.push(`  Appended text`)
                 break
               }
 
               case 'update_title':
                 await ctx.updateTitle(args.title as string)
                 result = `Title changed to "${args.title}"`
-                log.value.push(`  Title: ${args.title}`)
+                if (isCurrent()) log.value.push(`  Title: ${args.title}`)
                 break
 
               case 'format_math': {
                 // Reformat math to Typst syntax via the model (see llm/typstFormat.ts)
                 const originalContent = currentContent.value
-                log.value.push(`  Formatting math to Typst...`)
+                if (isCurrent()) log.value.push(`  Formatting math to Typst...`)
                 const formatted = await formatMathToTypst(originalContent, (p, s) =>
                   llmQueue.generate(p, s)
                 )
                 if (formatted !== originalContent) {
-                  currentContent.value = formatted
+                  if (isCurrent()) currentContent.value = formatted
                   await ctx.updateContent(formatted)
                   contentWasUpdated = true
                   result = 'Math reformatted to Typst and saved'
-                  log.value.push(`  Formatted math to Typst (${formatted.length} chars)`)
+                  if (isCurrent()) log.value.push(`  Formatted math to Typst (${formatted.length} chars)`)
                 } else {
                   result = 'Math already in Typst format (content unchanged)'
-                  log.value.push(`  Math already in Typst format`)
+                  if (isCurrent()) log.value.push(`  Math already in Typst format`)
                 }
                 break
               }
@@ -410,7 +420,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
               case 'node_done':
                 // Check if content was actually updated
                 if (!contentWasUpdated) {
-                  log.value.push(`  WARNING: No content saved yet!`)
+                  if (isCurrent()) log.value.push(`  WARNING: No content saved yet!`)
                   result = `REJECTED: You cannot call node_done() yet because you have not saved any content to the note.
 
 YOUR NEXT STEP: Call update_content with your answer. Example:
@@ -419,12 +429,12 @@ update_content("# Pi\\n\\nPi (\\u03c0) is a mathematical constant equal to appro
 After update_content succeeds, then you may call node_done().`
                   break
                 }
-                log.value.push(`> Done: ${args.summary}`)
-                isRunning.value = false
+                if (isCurrent()) log.value.push(`> Done: ${args.summary}`)
+                if (isCurrent()) isRunning.value = false
                 return args.summary as string
 
               default:
-                log.value.push(`  Unknown tool: ${name}`)
+                if (isCurrent()) log.value.push(`  Unknown tool: ${name}`)
                 result = `Error: Unknown tool "${name}". Available tools: web_search, fetch_url, wikipedia_search, update_content, append_content, update_title, node_done`
             }
 
@@ -433,8 +443,8 @@ After update_content succeeds, then you may call node_done().`
         } else if (msg.content) {
           // Check for completion signals
           if (/done|complete|finished/i.test(msg.content) && msg.content.length < 100) {
-            log.value.push(`> Complete`)
-            isRunning.value = false
+            if (isCurrent()) log.value.push(`> Complete`)
+            if (isCurrent()) isRunning.value = false
             return msg.content
           }
           // Prompt to use tools
@@ -444,13 +454,13 @@ After update_content succeeds, then you may call node_done().`
         const errorMsg = e instanceof Error ? e.message : String(e)
 
         if (errorMsg === 'Cancelled' || errorMsg.includes('AbortError')) {
-          log.value.push('> Stopped')
-          isRunning.value = false
+          if (isCurrent()) log.value.push('> Stopped')
+          if (isCurrent()) isRunning.value = false
           return 'Stopped by user'
         }
 
         // Show specific error to user
-        log.value.push(errorLog(errorMsg))
+        if (isCurrent()) log.value.push(errorLog(errorMsg))
 
         if (errorMsg.includes('400')) {
           notifications$.error('LLM does not support tools', 'This model may not support function calling. Try a different model (e.g., GPT-4, Claude, or a local model with tool support).')
@@ -466,23 +476,26 @@ After update_content succeeds, then you may call node_done().`
           notifications$.error('Agent error', errorMsg)
         }
 
-        isRunning.value = false
+        if (isCurrent()) isRunning.value = false
         return `Error: ${errorMsg}`
       }
     }
 
-    isRunning.value = false
+    if (isCurrent()) isRunning.value = false
     if (!contentWasUpdated) {
-      log.value.push('> Failed: Agent did not save any content')
+      if (isCurrent()) log.value.push('> Failed: Agent did not save any content')
       notifications$.error('Agent failed', 'The AI model failed to use update_content(). Try a different model or rephrase your request.')
     } else {
-      log.value.push('> Max iterations reached')
+      if (isCurrent()) log.value.push('> Max iterations reached')
       notifications$.warning('Agent stopped', 'Maximum iterations reached.')
     }
     return 'Max iterations reached'
   }
 
   function stop() {
+    // Stopping supersedes whatever is running, so it advances the generation:
+    // the loop it cancelled must not then write over this state
+    runGeneration++
     llmQueue.cancelCurrent()
     isRunning.value = false
     log.value.push('> Stopped')

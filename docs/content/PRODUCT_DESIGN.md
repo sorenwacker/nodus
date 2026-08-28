@@ -1350,6 +1350,12 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Superseding an agent run
+
+Starting a run while one is in progress supersedes it. The superseded loop is still awaiting its request, so it must not write the new run's state when that request finally rejects.
+
+Each run takes a generation number, and every write to shared state - the running flag, the log, the node's content - happens only while that generation is still current. Without it, the old loop cleared the new run's running flag, pushed into the log the new run had just reset, and could overwrite the new content from a tool call already in flight. Stopping advances the generation for the same reason.
+
 ### Reconnecting to Nodus
 
 The MCP server outlives any one Nodus session, so it reconnects. A tool call attempts a connection when there is none - which the startup message already promised and nothing implemented - and a successful connection restores the retry budget, because a counter that never reset ended reconnection for good after ten drops across a long session.
