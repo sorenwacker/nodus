@@ -796,6 +796,8 @@ Primary claim (proven):
 
 ### M55. A plain click on a multi-selected node runs the frame-reassignment and file-move path
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/nodes/useNodeDragging.ts:250`
 
 `multiDragInitial` is filled in `onNodePointerDown` (line 169) before any movement, while `draggingNode` is only promoted after DRAG_THRESHOLD. In `stopNodeDrag`, `draggedNodeIds` is derived as `multiDragInitial.value.size > 0 ? [...keys] : draggedNodeId ? [draggedNodeId] : []`, so on a pointerup that never became a drag (a plain click while several nodes are selected) `draggedNodeIds` is the whole selection. The loop then re-evaluates frame membership with the 70%/20% hysteresis, pushes a frame-assignment undo, calls `store.assignNodesToFrame`, and can start `handleFileMove()` — moving .md files on disk and possibly opening the collision dialog — for a click with zero movement. Single-selection clicks take the empty-array branch, so the behaviour is also asymmetric.

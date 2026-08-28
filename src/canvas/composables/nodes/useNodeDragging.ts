@@ -261,12 +261,19 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     }
 
     const draggedNodeId = draggingNode.value
-    const draggedNodeIds =
-      multiDragInitial.value.size > 0
+    // Nothing was dragged unless the pointer passed the threshold.
+    //
+    // `multiDragInitial` is filled on pointerdown, before any movement, while
+    // `draggingNode` is only set once the drag begins. Deriving the list from
+    // multiDragInitial alone meant a plain click with several nodes selected
+    // re-evaluated frame membership, pushed an undo entry, and could move .md
+    // files on disk - for a click that moved nothing
+    // (PRODUCT_DESIGN.md > Telling a click from a drag)
+    const draggedNodeIds = !draggedNodeId
+      ? []
+      : multiDragInitial.value.size > 0
         ? [...multiDragInitial.value.keys()]
-        : draggedNodeId
-          ? [draggedNodeId]
-          : []
+        : [draggedNodeId]
 
     // Check if drag ended over storyline panel (using global state set by StorylinePanel)
     const isOverStorylinePanel = (window as { __storylinePanelDropTarget?: boolean }).__storylinePanelDropTarget

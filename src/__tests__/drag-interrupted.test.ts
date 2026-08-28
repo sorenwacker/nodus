@@ -29,58 +29,60 @@ function makeNode(id: string): Node {
   } as Node
 }
 
-describe('an interrupted drag', () => {
-  let persistNodePosition: ReturnType<typeof vi.fn>
-  let nodes: Node[]
-
-  function context() {
-    nodes = [makeNode('a'), makeNode('b')]
-    persistNodePosition = vi.fn()
-    return {
-      store: {
-        getNode: (id: string) => nodes.find(n => n.id === id),
-        updateNodePosition: (id: string, x: number, y: number) => {
-          const node = nodes.find(n => n.id === id)
-          if (node) {
-            node.canvas_x = x
-            node.canvas_y = y
-          }
-        },
-        persistNodePosition,
-        triggerLayoutUpdate: vi.fn(),
-        selectNode: vi.fn(),
-        selectedNodeIds: [] as string[],
-        filteredNodes: nodes,
-        filteredEdges: [],
-        frames: [],
-        assignNodesToFrame: vi.fn(),
-        refreshNodeFromFile: vi.fn(),
-        nodeLayoutVersion: 0,
+function context() {
+  nodes = [makeNode('a'), makeNode('b')]
+  persistNodePosition = vi.fn()
+  return {
+    store: {
+      getNode: (id: string) => nodes.find(n => n.id === id),
+      updateNodePosition: (id: string, x: number, y: number) => {
+        const node = nodes.find(n => n.id === id)
+        if (node) {
+          node.canvas_x = x
+          node.canvas_y = y
+        }
       },
-      scale: ref(1),
-      offset: ref({ x: 0, y: 0 }),
-      canvasRef: ref(null),
-      gridLockEnabled: ref(false),
-      snapToGrid: (v: number) => v,
-      neighborhoodMode: ref(false),
-      focusNodeId: ref(null),
-      isLODMode: ref(false),
-      isSemanticZoomCollapsed: ref(false),
-      editingNodeId: ref(null),
-      editingTitleId: ref(null),
-      selectedEdge: ref(null),
-      isCreatingEdge: ref(false),
-      edgeStartNode: ref(null),
-      edgePreviewEnd: ref({ x: 0, y: 0 }),
-      layoutNeighborhood: vi.fn(),
-      pushOverlappingNodesAway: vi.fn(),
-      pushUndo: vi.fn(),
-      pushFrameAssignmentUndo: vi.fn(),
-      screenToCanvas: (x: number, y: number) => ({ x, y }),
-      zoomToNode: vi.fn(),
-      onEdgePreviewMove: vi.fn(),
-    } as never
-  }
+      persistNodePosition,
+      triggerLayoutUpdate: vi.fn(),
+      selectNode: vi.fn(),
+      selectedNodeIds: [] as string[],
+      filteredNodes: nodes,
+      filteredEdges: [],
+      frames: [],
+      assignNodesToFrame: vi.fn(),
+      refreshNodeFromFile: vi.fn(),
+      nodeLayoutVersion: 0,
+    },
+    scale: ref(1),
+    offset: ref({ x: 0, y: 0 }),
+    canvasRef: ref(null),
+    gridLockEnabled: ref(false),
+    snapToGrid: (v: number) => v,
+    neighborhoodMode: ref(false),
+    focusNodeId: ref(null),
+    isLODMode: ref(false),
+    isSemanticZoomCollapsed: ref(false),
+    editingNodeId: ref(null),
+    editingTitleId: ref(null),
+    selectedEdge: ref(null),
+    isCreatingEdge: ref(false),
+    edgeStartNode: ref(null),
+    edgePreviewEnd: ref({ x: 0, y: 0 }),
+    layoutNeighborhood: vi.fn(),
+    pushOverlappingNodesAway: vi.fn(),
+    pushUndo: vi.fn(),
+    pushFrameAssignmentUndo: vi.fn(),
+    screenToCanvas: (x: number, y: number) => ({ x, y }),
+    zoomToNode: vi.fn(),
+    onEdgePreviewMove: vi.fn(),
+    setLastDragEndTime: vi.fn(),
+  } as never
+}
+
+let persistNodePosition: ReturnType<typeof vi.fn>
+let nodes: Node[]
+
+describe('an interrupted drag', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks()
@@ -135,5 +137,38 @@ describe('an interrupted drag', () => {
     document.dispatchEvent(new PointerEvent('pointercancel'))
 
     expect(persistNodePosition).not.toHaveBeenCalled()
+  })
+})
+
+describe('a click is not a drag', () => {
+  // multiDragInitial is filled on pointerdown, before any movement. Deriving
+  // the dragged set from it alone meant a plain click with several nodes
+  // selected re-evaluated frame membership, pushed an undo entry, and could
+  // move .md files on disk (PRODUCT_DESIGN.md > Telling a click from a drag).
+  it('reassigns no frames when the pointer never moved', async () => {
+    const { useNodeDragging } = await import('../canvas/composables/nodes/useNodeDragging')
+    const ctx = context()
+    ;(ctx as { store: { selectedNodeIds: string[] } }).store.selectedNodeIds = ['a', 'b']
+    const assignNodesToFrame = vi.fn()
+    ;(ctx as { store: { assignNodesToFrame: unknown } }).store.assignNodesToFrame =
+      assignNodesToFrame
+    const pushFrameAssignmentUndo = vi.fn()
+    ;(ctx as { pushFrameAssignmentUndo: unknown }).pushFrameAssignmentUndo =
+      pushFrameAssignmentUndo
+    // A frame the nodes sit inside, so the assignment path has something to do
+    ;(ctx as { store: { frames: unknown[] } }).store.frames = [
+      { id: 'f1', canvas_x: -50, canvas_y: -50, width: 600, height: 600, title: 'Frame' },
+    ]
+    const dragging = useNodeDragging(ctx)
+
+    dragging.onNodePointerDown(
+      new PointerEvent('pointerdown', { clientX: 10, clientY: 10, button: 0 }),
+      'a'
+    )
+    // Released without moving
+    document.dispatchEvent(new PointerEvent('pointerup', { clientX: 10, clientY: 10 }))
+
+    expect(assignNodesToFrame).not.toHaveBeenCalled()
+    expect(pushFrameAssignmentUndo).not.toHaveBeenCalled()
   })
 })

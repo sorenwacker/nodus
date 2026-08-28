@@ -1414,6 +1414,12 @@ A gesture costs one write per thing it moved, not one per event. Dragging or res
 
 Frame resizing wrote both position and size on every `pointermove`, so dragging a corner across the canvas issued hundreds of backend calls for one resize. The node drag path already had the mechanism - `skipPersist` on the update, a flush at the end - and the resize path did not use it.
 
+### Telling a click from a drag
+
+A click is not a drag. Frame membership is re-evaluated, an undo step recorded, and a file possibly moved on disk only when the pointer actually moved a node.
+
+The set of dragged nodes was derived from the multi-drag baseline, which is captured on `pointerdown` before any movement. So a plain click with several nodes selected ran the whole drop path: hysteresis on frame membership, a frame-assignment undo entry, and a file move that could raise a collision dialog - for a gesture that moved nothing. A single-selection click took a different branch, so the two behaved differently as well.
+
 ### Persisting an interrupted drag
 
 A drag updates positions in memory and stores them once when it ends, so a drag costs one write per node rather than one per frame.
