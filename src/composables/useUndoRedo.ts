@@ -80,7 +80,11 @@ export interface UndoRedoStore {
   getFilteredNodes: () => Node[]
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
   updateNodeSize: (id: string, width: number, height: number) => Promise<void>
-  updateNodeContent: (id: string, content: string) => Promise<void>
+  updateNodeContent: (
+    id: string,
+    content: string,
+    options?: { skipUndo?: boolean }
+  ) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
   updateNodeColor: (id: string, color: string | null) => Promise<void>
   restoreNode: (node: Node) => Promise<void>
@@ -299,7 +303,9 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
           },
         })
         // Restore old content
-        await store.updateNodeContent(node.id, snapshot.content.oldContent || '')
+        await store.updateNodeContent(node.id, snapshot.content.oldContent || '', {
+          skipUndo: true,
+        })
         await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
         showToast('Undo content', 'info')
       }
@@ -330,7 +336,8 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
       }
       redoStack.value.push({ type: 'contents', contents: current })
       for (const [id, previous] of snapshot.contents) {
-        await store.updateNodeContent(id, previous.content || '')
+        // skipUndo: replaying a step must not record a new one
+        await store.updateNodeContent(id, previous.content || '', { skipUndo: true })
         await store.updateNodeTitle(id, previous.title)
       }
       showToast(`Undo: restored ${snapshot.contents.size} nodes`, 'info')
@@ -448,7 +455,9 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
           },
         })
         // Apply redo content
-        await store.updateNodeContent(node.id, snapshot.content.oldContent || '')
+        await store.updateNodeContent(node.id, snapshot.content.oldContent || '', {
+          skipUndo: true,
+        })
         await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
         showToast('Redo content', 'info')
       }
@@ -475,7 +484,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
       }
       undoStack.value.push({ type: 'contents', contents: current })
       for (const [id, next] of snapshot.contents) {
-        await store.updateNodeContent(id, next.content || '')
+        await store.updateNodeContent(id, next.content || '', { skipUndo: true })
         await store.updateNodeTitle(id, next.title)
       }
       showToast(`Redo: restored ${snapshot.contents.size} nodes`, 'info')

@@ -260,8 +260,12 @@ export const useNodesStore = defineStore('nodes', () => {
     return refreshNodeFromFileFn(nodes, id)
   }
 
-  async function updateNodeContent(id: string, content: string) {
-    await updateNodeContentFn(deps, id, content, tagNodesComposable, createEdge)
+  async function updateNodeContent(
+    id: string,
+    content: string,
+    options?: { skipUndo?: boolean }
+  ) {
+    await updateNodeContentFn(deps, id, content, tagNodesComposable, createEdge, options)
   }
 
   async function updateNodeTitle(id: string, title: string) {

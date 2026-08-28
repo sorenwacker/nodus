@@ -17,11 +17,10 @@ export interface UseNodeEditorOptions {
   onAfterSave?: (nodeId: string) => void
   onSaveComplete?: () => void
   autosaveDelay?: number
-  pushContentUndo?: (nodeId: string, oldContent: string | null, oldTitle: string) => void
 }
 
 export function useNodeEditor(options: UseNodeEditorOptions) {
-  const { store, onAfterSave, onSaveComplete, autosaveDelay = 1000, pushContentUndo } = options
+  const { store, onAfterSave, onSaveComplete, autosaveDelay = 1000 } = options
 
   // Content editing state
   const editingNodeId = ref<string | null>(null)
@@ -87,10 +86,6 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     const node = store.getNode(nodeId)
     if (!node) return
 
-    // Capture undo state before editing starts
-    if (pushContentUndo) {
-      pushContentUndo(nodeId, node.markdown_content, node.title)
-    }
 
     editingNodeId.value = nodeId
     // The editor shows only the body; a metadata header stays out of sight
@@ -113,10 +108,6 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     const node = store.getNode(nodeId)
     if (!node) return
 
-    // Capture undo state before editing starts
-    if (pushContentUndo) {
-      pushContentUndo(nodeId, node.markdown_content, node.title)
-    }
 
     editingTitleId.value = nodeId
     editTitle.value = node.title || ''

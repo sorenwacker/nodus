@@ -1315,6 +1315,14 @@ Dragging waits for three pixels of movement before recording. Resizing recorded 
 
 A bulk rewrite is one step. Three batch tools rewrote node content with no undo entry at all, while the single-node tool beside them recorded one. An entry per node would be no better: reversing one instruction would mean pressing undo once per node. Colour and size already model this as one entry holding a map of what changed, and content now does the same.
 
+**Recording belongs to the store, not to the caller.** It used to be opt-in at each call site: every writer had to remember to record before changing content. Writers kept forgetting - the batch tools recorded nothing, the inline date editor recorded nothing, an agent rewriting a node recorded nothing - and each omission surfaced only when a user pressed undo and nothing happened. Fixing them one at a time never ends, because the next writer has the same chance to forget.
+
+Every content write passes through the store, so the store records it. A caller cannot opt in, and therefore cannot forget. Undo and redo pass `skipUndo` when replaying, because a replay must not record a new step.
+
+**One action is one step.** Tool execution is wrapped in a group, so a tool that rewrites three hundred nodes produces one entry rather than three hundred, and a tool author does nothing to make their tool undoable. Within a group the first recording for a node wins, because that is the state undo must return to.
+
+The recorder is connected by the same call that provides the undo handlers, so wiring cannot be done by halves: an unconnected recorder would make every change unundoable, silently.
+
 ### Re-routing edges during an interaction
 
 Edges are re-routed when the graph changes, and live while a node is dragged, because the edges attached to it must follow. A cached path cannot do that.

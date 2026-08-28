@@ -6,6 +6,7 @@
  */
 
 import type { ToolHandler, ToolContext } from './types'
+import { asOneUndoStep } from '../../../stores/nodes/undoRecorder'
 
 // Re-export types
 export * from './types'
@@ -82,5 +83,9 @@ export async function executeRegisteredTool(
 ): Promise<string | null> {
   const handler = toolRegistry.get(name)
   if (!handler) return null
-  return handler(args, ctx)
+  // One tool call is one undo step, whether it writes one node or three
+  // hundred. The store records each write; grouping here means a tool author
+  // need do nothing to make their tool undoable, and cannot produce a stack of
+  // one entry per node (PRODUCT_DESIGN.md > Recording an undo step)
+  return asOneUndoStep(() => handler(args, ctx))
 }

@@ -6,6 +6,7 @@
  */
 
 import type { Ref } from 'vue'
+import { asOneUndoStep } from '../../../stores/nodes/undoRecorder'
 import { invoke } from '@tauri-apps/api/core'
 import type { Node } from '../../../types'
 import type { AgentTask, AgentPlan } from '../../../llm/types'
@@ -158,7 +159,21 @@ export function useLLMTools(ctx: LLMToolsContext) {
    * Execute an LLM-dependent tool
    * Returns result string or null if tool not handled
    */
+  /**
+   * Execute an LLM-dependent tool.
+   *
+   * One tool call is one undo step: the store records each content write, and
+   * grouping here means a tool need do nothing to be undoable
+   * (PRODUCT_DESIGN.md > Recording an undo step).
+   */
   async function executeLLMTool(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<string | null> {
+    return asOneUndoStep(() => executeLLMToolInner(name, args))
+  }
+
+  async function executeLLMToolInner(
     name: string,
     args: Record<string, unknown>
   ): Promise<string | null> {
@@ -209,11 +224,9 @@ export function useLLMTools(ctx: LLMToolsContext) {
             .replace(/\{([^}]+)\}/g, (_: string, expr: string) => evalMathExpr(expr, num))
 
           if (args.action === 'set') {
-            pushContentUndo(node.id, node.markdown_content, node.title)
             await store.updateNodeContent(node.id, query)
             results.push(`${node.title}: set`)
           } else if (args.action === 'append') {
-            pushContentUndo(node.id, node.markdown_content, node.title)
             await store.updateNodeContent(node.id, (node.markdown_content || '') + '\n\n' + query)
             results.push(`${node.title}: appended`)
           } else if (args.action === 'llm') {
@@ -221,7 +234,6 @@ export function useLLMTools(ctx: LLMToolsContext) {
               results.push(`${node.title}: skipped (empty)`)
               continue
             }
-            pushContentUndo(node.id, node.markdown_content, node.title)
             try {
               const prompt = `${query}\n\nContent to process:\n${node.markdown_content}`
               const system =

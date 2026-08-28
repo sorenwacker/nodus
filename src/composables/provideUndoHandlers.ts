@@ -8,6 +8,7 @@
  * content undo came to be missing.
  */
 import type { InjectionKey } from 'vue'
+import { setUndoSink, type ContentEntry } from '../stores/nodes/undoRecorder'
 
 /** The recorders a component may ask for by name. */
 const HANDLER_NAMES = [
@@ -36,4 +37,14 @@ export function provideUndoHandlers(
     const handler = undoRedo[name]
     if (handler) provide(name, handler)
   }
+
+  // The store records every content change itself, and needs the stack to
+  // record into. Connected here rather than at the call site so wiring the
+  // handlers and wiring the recorder cannot be done by halves - an unconnected
+  // recorder makes undo silently do nothing
+  // (PRODUCT_DESIGN.md > Recording an undo step)
+  const pushContentsUndo = undoRedo.pushContentsUndo as
+    | ((entries: ContentEntry[]) => void)
+    | undefined
+  setUndoSink(pushContentsUndo ? { pushContentsUndo } : null)
 }

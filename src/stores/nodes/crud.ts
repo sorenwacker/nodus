@@ -6,6 +6,7 @@ import type { Ref } from 'vue'
 import { syncWikilinks } from './wikilinkSync'
 import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
+import { recordContentBefore } from './undoRecorder'
 import { generateShortId } from '../../lib/ids'
 import { extractHashtags, extractWikilinks } from '../../lib/contentParser'
 import { tagStorage } from '../../lib/storage'
@@ -176,7 +177,11 @@ export async function updateNodeContent(
   id: string,
   content: string,
   tagNodesComposable?: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> },
-  createEdgeFn?: (data: CreateEdgeInput) => Promise<Edge>
+  createEdgeFn?: (data: CreateEdgeInput) => Promise<Edge>,
+  options?: {
+    /** Set only by undo and redo, which must not record their own replay */
+    skipUndo?: boolean
+  }
 ): Promise<void> {
   const { state, edgesStore } = deps
 
@@ -188,6 +193,16 @@ export async function updateNodeContent(
     .trim()
   const node = state.nodes.value.find(n => n.id === id)
   if (node) {
+    // Recorded here, not by the caller. Every write reaches this function, so a
+    // writer cannot forget (PRODUCT_DESIGN.md > Recording an undo step)
+    if (!options?.skipUndo && node.markdown_content !== trimmedContent) {
+      recordContentBefore({
+        nodeId: node.id,
+        content: node.markdown_content,
+        title: node.title,
+      })
+    }
+
     node.markdown_content = trimmedContent
     node.updated_at = Date.now()
     try {

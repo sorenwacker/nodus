@@ -41,7 +41,6 @@ export function registerUpdateTools(): void {
 
       if (changingContent) {
         // Push to undo stack before modifying
-        ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)
         // Dates are frontmatter on the existing content, so an update that
         // only sets a date must not erase the body
         const base =
@@ -125,7 +124,6 @@ export function registerUpdateTools(): void {
 
         if (upd.set_title || upd.set_content !== undefined) {
           // Push to undo stack before modifying content or title
-          ctx.pushContentUndo?.(node.id, node.markdown_content, node.title)
         }
         if (upd.set_title) {
           await ctx.store.updateNodeTitle(node.id, upd.set_title)
