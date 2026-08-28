@@ -45,7 +45,9 @@ export function usePlanHandlers(ctx: UsePlanHandlersContext): UsePlanHandlersRet
         )
         // Start execution
         planState.startExecution()
-        // Resume agent with approval
+        // Resume agent with approval. The selection captured when the run
+        // started is still held, so execution acts on the nodes the user had
+        // selected when they asked (PRODUCT_DESIGN.md > What the agent acts on)
         await agentRunner.resume({ approved: true })
       }
     }

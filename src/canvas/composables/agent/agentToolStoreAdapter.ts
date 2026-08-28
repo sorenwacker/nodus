@@ -12,7 +12,16 @@ import type { LLMToolsNodeStore } from './useLLMTools'
 
 type NodesStore = ReturnType<typeof useNodesStore>
 
-export function agentToolStoreAdapter(store: NodesStore): LLMToolsNodeStore {
+export function agentToolStoreAdapter(
+  store: NodesStore,
+  /**
+   * The selection an agent run started with, or null when no run is in
+   * progress. A run must act on what was selected when the user asked: reading
+   * the live selection let a click during the run redirect the change to a node
+   * the user never named (PRODUCT_DESIGN.md > What the agent acts on).
+   */
+  runSelection?: () => string[] | null
+): LLMToolsNodeStore {
   return {
     getFilteredNodes: () => store.filteredNodes,
     getFilteredEdges: () => store.filteredEdges,
@@ -23,7 +32,7 @@ export function agentToolStoreAdapter(store: NodesStore): LLMToolsNodeStore {
       return store.filteredEdges
     },
     get selectedNodeIds() {
-      return store.selectedNodeIds
+      return runSelection?.() ?? store.selectedNodeIds
     },
     createNode: store.createNode,
     deleteNode: store.deleteNode,

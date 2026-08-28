@@ -52,6 +52,7 @@ import { useLayout, useNeighborhoodMode } from './composables/layout'
 import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
 import { framesStoreAdapter } from './composables/frames/framesStoreAdapter'
 import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
+import { useAgentPrompt } from './composables/agent/useAgentPrompt'
 import { usePdfGraphImport } from './composables/util/usePdfGraphImport'
 import {
   useCanvasKeyboardShortcuts,
@@ -1211,10 +1212,20 @@ const markerHandlers = useMarkerHandlers({
 })
 
 // LLM tools composable for handling LLM-dependent tools
+// Declared before the tools, which read runSelection
+const { sendPrompt: sendGraphPrompt, runSelection } = useAgentPrompt({
+  prompt: graphPrompt,
+  isLoading: isGraphLLMLoading,
+  getSelectedNodeIds: () => store.selectedNodeIds,
+  savePromptToHistory,
+  run: prompt => agentRunner.run(prompt),
+  reportError: message => alert(message),
+})
+
 const llmTools = useLLMTools({
   llmQueue,
   callOllama,
-  store: agentToolStoreAdapter(store),
+  store: agentToolStoreAdapter(store, () => runSelection.value),
   themesStore,
   planState,
   tasks: agentTasks,
@@ -1358,23 +1369,6 @@ const {
   handlePlanRemoveStep,
   closePlanModal,
 } = planHandlers
-
-async function sendGraphPrompt() {
-  if (!graphPrompt.value.trim() || isGraphLLMLoading.value) return
-
-  const prompt = graphPrompt.value.trim()
-  savePromptToHistory(prompt)
-
-  isGraphLLMLoading.value = true
-  try {
-    await agentRunner.run(prompt)
-    graphPrompt.value = ''
-  } catch (e) {
-    alert(e instanceof Error ? e.message : 'Unknown error')
-  } finally {
-    isGraphLLMLoading.value = false
-  }
-}
 
 // Collapsed height constant for semantic zoom
 // Height to accommodate 2 lines of title text + padding

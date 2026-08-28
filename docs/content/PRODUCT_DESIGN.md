@@ -1323,6 +1323,14 @@ Every content write passes through the store, so the store records it. A caller 
 
 The recorder is connected by the same call that provides the undo handlers, so wiring cannot be done by halves: an unconnected recorder would make every change unundoable, silently.
 
+### What the agent acts on
+
+A run acts on the nodes that were selected when the user asked. The selection is captured when the run starts and released when it ends.
+
+Reading the live selection instead meant a click made while the model was still thinking redirected the change: a user who asked for one node to be rewritten, then selected another to look at it, had the second node overwritten with the first one's new text. Nothing said so, and before the store took over undo recording, nothing could reverse it.
+
+A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
+
 ### Routing edges around nodes
 
 An edge routes around a node rather than through it. The three-segment router checks each segment for obstructions and inserts a detour perpendicular to that segment: a horizontal segment detours vertically, and a vertical one horizontally.
