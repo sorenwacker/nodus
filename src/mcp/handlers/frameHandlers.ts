@@ -44,17 +44,19 @@ async function fitFrameToNodesAndResolveOverlaps(
   if (nodesInFrame.length === 0) return
 
   // Calculate bounding box of all nodes
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  let maxX = -Infinity, maxY = -Infinity
   for (const node of nodesInFrame) {
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
     maxX = Math.max(maxX, node.canvas_x + node.width)
     maxY = Math.max(maxY, node.canvas_y + node.height)
   }
 
-  // Calculate required frame size with padding
-  const requiredWidth = maxX - minX + padding * 2
-  const requiredHeight = maxY - minY + padding * 2 + titleHeight
+  // Measured from the frame's own origin, because that is where the frame
+  // starts. `maxX - minX` is the nodes' extent, which is smaller than the span
+  // the frame has to cover whenever the nodes sit to the right of or below the
+  // frame's corner - so the frame was resized to something that still did not
+  // contain them (PRODUCT_DESIGN.md > Fitting a frame to its contents)
+  const requiredWidth = maxX + padding - frame.canvas_x
+  const requiredHeight = maxY + padding - frame.canvas_y + titleHeight
 
   // Only resize if needed (frame too small)
   const newWidth = Math.max(frame.width, requiredWidth)

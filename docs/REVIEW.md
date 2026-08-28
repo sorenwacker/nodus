@@ -765,6 +765,8 @@ Refutation attempt 1 - the most promising one - was routeAroundObstacles, which 
 
 ### M52. Frame drag decides membership by spatial overlap, contradicting the frame_id-only rule
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/frames/useFrames.ts:110`
 
 `onPointerDown` inlines a 50%-overlap area test to decide which nodes travel with the frame. Two problems. First, it duplicates `isNodeInFrame` from ../layout/useFrameCollision byte-for-byte in behaviour; that exported helper is referenced only from src/__tests__/frameCollision.test.ts, so the tested implementation is not the one that runs. Second, every other frame-aware path in this module group states and enforces the opposite rule — "frame_id is the ONLY source of truth for frame membership; NO spatial fallback - that creates non-deterministic behaviour" (useAutoLayout.ts:189-191, useRadialLayout.ts:81, useFrameOperations.ts:82 which filters by `n.frame_id === frame.id`). As a result dragging a frame carries unrelated nodes that merely happen to sit on top of it and leaves behind member nodes that were moved outside its bounds.
@@ -1198,6 +1200,8 @@ The advertised tool schema for `get_nodes_by_color` says `description: 'Color na
 Write path: /Users/sdrwacker/workspace/nodus/src/mcp/handlers/nodeHandlers.ts:767 and :776 (handleSetNodeColor / handleBatchSetNodeColors) both do `const color = normalizeColor(params.color)` before `store.updateNodeColor(...)`. normalizeColor (same file, line 85) maps names through COLOR_NAME_MAP (line 70
 
 ### M90. fitFrameToNodesAndResolveOverlaps sizes the frame from the node extent, not from the frame origin, so it does not fit
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/mcp/handlers/frameHandlers.ts:56`
 

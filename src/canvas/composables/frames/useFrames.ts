@@ -84,21 +84,18 @@ export function useFrames(options: UseFramesOptions) {
       frameY: frame.canvas_y,
     }
 
-    // Find nodes inside the frame and store their initial positions
+    // The nodes that travel with the frame are its members, by frame_id.
+    //
+    // This decided membership by spatial overlap instead, so dragging a frame
+    // carried unrelated nodes that merely sat on top of it and left behind
+    // members that had been moved outside its bounds. Every other frame-aware
+    // path in this module group states the opposite rule: frame_id is the only
+    // source of truth, with no spatial fallback, because overlap makes
+    // membership depend on where things happen to be
+    // (PRODUCT_DESIGN.md > What belongs to a frame)
     frameContainedNodes.value.clear()
     for (const node of store.filteredNodes) {
-      const nodeRight = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH)
-      const nodeBottom = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT)
-      const frameRight = frame.canvas_x + frame.width
-      const frameBottom = frame.canvas_y + frame.height
-
-      // Check if node overlaps with frame (at least 50% inside)
-      const overlapX = Math.max(0, Math.min(nodeRight, frameRight) - Math.max(node.canvas_x, frame.canvas_x))
-      const overlapY = Math.max(0, Math.min(nodeBottom, frameBottom) - Math.max(node.canvas_y, frame.canvas_y))
-      const nodeArea = (node.width || NODE_DEFAULTS.WIDTH) * (node.height || NODE_DEFAULTS.HEIGHT)
-      const overlapArea = overlapX * overlapY
-
-      if (overlapArea > nodeArea * 0.5) {
+      if (node.frame_id === frame.id) {
         frameContainedNodes.value.set(node.id, { x: node.canvas_x, y: node.canvas_y })
       }
     }

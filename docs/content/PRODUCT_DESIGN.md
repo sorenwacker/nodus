@@ -1350,6 +1350,18 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### What belongs to a frame
+
+A node belongs to a frame when its `frame_id` says so. There is no spatial fallback, because overlap makes membership depend on where things happen to be rather than on what the user put where.
+
+Dragging a frame decided membership by 50% overlap instead, so it carried unrelated nodes that merely sat on top of it and left behind members that had been moved outside its bounds. Every other frame-aware path already stated the frame_id rule.
+
+### Fitting a frame to its contents
+
+A fitted frame contains its nodes: its size is measured from its own origin to the furthest node edge, plus padding.
+
+The required size was the nodes' own extent instead. That is smaller than the span the frame has to cover whenever the nodes sit to the right of or below the frame's corner, so the frame was resized to something that still did not contain them.
+
 ### Radial rings
 
 A radial layout places each depth on a ring. When a depth holds more nodes than its ring can seat, it splits across several rings, and each ring seats as many as its own circumference allows.
