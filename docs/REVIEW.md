@@ -926,6 +926,8 @@ All three tools are registered in src/llm/tools/agentTools.ts and return markers
 
 ### M68. Cross-module coordination through a `window.__storylinePanelDropTarget` global
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/composables/util/useStorylineDropTarget.ts:13`
 
 The composable augments `Window` with `__storylinePanelDropTarget` (lines 13-17), writes it on every pointermove (line 62) and clears it via `setTimeout(..., 0)` (lines 70-72). src/canvas/composables/nodes/useNodeDragging.ts:258 reads it back with a structural cast: `(window as { __storylinePanelDropTarget?: boolean }).__storylinePanelDropTarget`. Neither side declares a dependency on the other, so no boundary test can express the contract and the ordering is enforced only by the `setTimeout(0)` — if the drag-end handler is ever reordered relative to the drop dispatch, the flag reads stale and the node is dropped on the canvas instead of the storyline, silently.

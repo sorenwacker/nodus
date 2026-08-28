@@ -5,6 +5,7 @@
  */
 
 import { fileNameFromPath } from '../../../lib/pdfGraph'
+import { isOverStorylinePanel as overStorylinePanel } from '../util/dragDropTarget'
 import { ref, type Ref } from 'vue'
 import type { Node, Frame } from '../../../types'
 
@@ -276,7 +277,10 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         : [draggedNodeId]
 
     // Check if drag ended over storyline panel (using global state set by StorylinePanel)
-    const isOverStorylinePanel = (window as { __storylinePanelDropTarget?: boolean }).__storylinePanelDropTarget
+    // Read through the module the panel writes, rather than a structural cast
+    // over a window property (PRODUCT_DESIGN.md > Dropping a node on the
+    // storyline panel)
+    const isOverStorylinePanel = overStorylinePanel.value
     if (isOverStorylinePanel && draggedNodeIds.length > 0) {
       // Reset nodes to original positions (don't move them on canvas)
       if (multiDragInitial.value.size > 0) {

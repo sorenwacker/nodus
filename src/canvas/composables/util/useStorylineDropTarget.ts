@@ -5,16 +5,11 @@
  * storyline section (and insertion position) the pointer is over.
  */
 import { ref, onMounted, onUnmounted, type Ref } from 'vue'
+import { setOverStorylinePanel } from './dragDropTarget'
 import type { StorylineService } from '../../../services/storylineService'
 import type { useNodesStore } from '../../../stores/nodes'
 
 type NodesStore = ReturnType<typeof useNodesStore>
-
-declare global {
-  interface Window {
-    __storylinePanelDropTarget?: boolean
-  }
-}
 
 export interface StorylineDropTarget {
   storylineId: string
@@ -59,7 +54,7 @@ export function useStorylineDropTarget(
     if (document.body.classList.contains('node-dragging')) {
       const over = checkIfOverPanel(e.clientX, e.clientY)
       isDropTarget.value = over
-      window.__storylinePanelDropTarget = over
+      setOverStorylinePanel(over)
       dropPreview.value = over ? resolveDropTarget(e.clientX, e.clientY) : null
     }
   }
@@ -67,8 +62,12 @@ export function useStorylineDropTarget(
   function onDragEnd() {
     isDropTarget.value = false
     dropPreview.value = null
+    // Cleared after the drag-end handlers have read it. The ordering used to
+    // be the only thing keeping this correct; it is still deferred, but the
+    // value is now a named module both sides import
+    // (PRODUCT_DESIGN.md > Dropping a node on the storyline panel)
     setTimeout(() => {
-      window.__storylinePanelDropTarget = false
+      setOverStorylinePanel(false)
     }, 0)
   }
 

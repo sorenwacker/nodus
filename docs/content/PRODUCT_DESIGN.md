@@ -1350,6 +1350,12 @@ Reading the live selection instead meant a click made while the model was still 
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### Dropping a node on the storyline panel
+
+Releasing a drag over the storyline panel adds the node to a storyline instead of moving it on the canvas. The drag handler has to know whether the pointer is over the panel, and the panel is what knows.
+
+That was passed through a property on `window`. Neither side declared a dependency on the other, so no boundary test could express the contract, and the ordering held only because the panel cleared the flag in a deferred callback that happened to run after the drag ended - reordering either handler would have dropped the node on the canvas instead, silently. It is now a named module both sides import.
+
 ### Superseding an agent run
 
 Starting a run while one is in progress supersedes it. The superseded loop is still awaiting its request, so it must not write the new run's state when that request finally rejects.
