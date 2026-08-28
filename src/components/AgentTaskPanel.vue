@@ -55,6 +55,14 @@ const shouldShow = computed(() =>
       <span class="task-panel-progress">
         {{ tasksStore.completedTasks }}/{{ tasksStore.totalTasks }}
       </span>
+      <button
+        class="task-panel-close"
+        :aria-label="t('common.close')"
+        :title="t('common.close')"
+        @click="tasksStore.clearTasks()"
+      >
+        &times;
+      </button>
     </header>
 
     <div class="progress-bar-container">
@@ -109,6 +117,23 @@ const shouldShow = computed(() =>
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.task-panel-close {
+  margin-left: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.task-panel-close:hover {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.15));
+  color: var(--text-main);
 }
 
 .task-panel-title {

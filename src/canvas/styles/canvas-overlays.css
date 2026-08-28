@@ -472,12 +472,18 @@
   stroke: var(--text-muted) !important;
 }
 
-/* Agent task panel container - fixed position bottom right */
+/* Agent task panel - above the zoom controls, not on top of them.
+   Pinned to the same corner at a higher z-index, it covered the toolbar
+   entirely (PRODUCT_DESIGN.md > Showing agent progress). The offsets track the
+   same insets the toolbar uses, so both move together with the storyline
+   panel and the timelines sheet. */
 .agent-task-panel-container {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 9000;
+  bottom: calc(68px + var(--canvas-bottom-inset, 0px));
+  right: calc(16px + var(--canvas-right-inset, 0px));
+  transition: right var(--inset-duration, var(--step-duration, 0.3s)) var(--step-ease, ease),
+    bottom var(--step-duration, 0.3s) var(--step-ease, ease);
+  z-index: 40;
 }
 
 /* Node Preview Panel - shown when zoomed out */
