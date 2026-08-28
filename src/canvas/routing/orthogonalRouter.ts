@@ -491,11 +491,19 @@ function routeThreeSegment(
     }
   }
 
-  // Check each segment for obstacles and add waypoints as needed
+  // Check each segment for obstacles and add waypoints as needed.
+  //
+  // `primaryAxis === 'x'` means the mid points differ from the standoffs in x,
+  // so segment 1 runs horizontally, segment 2 vertically, and segment 3
+  // horizontally again. Every one of these three calls used to pass the
+  // negation, which offered a horizontal segment a horizontal detour - a detour
+  // that cannot clear anything - so obstacle avoidance never produced a
+  // waypoint and edges ran straight through nodes
+  // (PRODUCT_DESIGN.md > Routing edges around nodes)
   const isFirstSegHorizontal = primaryAxis === 'x'
-  const seg1Extra = routeSegmentAroundObstacles(startStandoff, mid1, !isFirstSegHorizontal, nodes, excludeIds)
-  const seg2Extra = routeSegmentAroundObstacles(mid1, mid2, isFirstSegHorizontal, nodes, excludeIds)
-  const seg3Extra = routeSegmentAroundObstacles(mid2, endStandoff, !isFirstSegHorizontal, nodes, excludeIds)
+  const seg1Extra = routeSegmentAroundObstacles(startStandoff, mid1, isFirstSegHorizontal, nodes, excludeIds)
+  const seg2Extra = routeSegmentAroundObstacles(mid1, mid2, !isFirstSegHorizontal, nodes, excludeIds)
+  const seg3Extra = routeSegmentAroundObstacles(mid2, endStandoff, isFirstSegHorizontal, nodes, excludeIds)
 
   usedDetour = seg1Extra.length > 0 || seg2Extra.length > 0 || seg3Extra.length > 0
 

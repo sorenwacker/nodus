@@ -664,6 +664,8 @@ This component toggles `store.showWikilinkEdges` / `store.showStorylineEdges`, w
 
 ### M44. Inverted isHorizontal flags make the 3-segment obstacle avoidance inert
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/canvas/routing/orthogonalRouter.ts:496`
 
 `isFirstSegHorizontal = primaryAxis === 'x'` is correct (primaryAxis 'x' means the first segment moves along x, i.e. is horizontal), but all three calls pass the negation:
@@ -1133,6 +1135,8 @@ The comment asserts the only cause is a missing backend, but a locked DB, a pani
 *Verification:* Confirmed from the code. src/stores/nodes/crud.ts:207-213 wraps invoke('sync_node_wikilinks') in a bare `catch {}` whose comment asserts "no backend", but nothing distinguishes the wrapper's `Tauri not available: <cmd>` error (src/lib/tauri.ts:15-17) from a genuine command failure. sync_node_wikilinks (src-tauri/src/commands/wikilinks.rs:8-26) returns Err on get_pool failure ("Database not initial
 
 ### M85. Agent task lifecycle API is never connected — progress can never advance
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/stores/agentTasks.ts:83`
 

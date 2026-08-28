@@ -1323,6 +1323,12 @@ Every content write passes through the store, so the store records it. A caller 
 
 The recorder is connected by the same call that provides the undo handlers, so wiring cannot be done by halves: an unconnected recorder would make every change unundoable, silently.
 
+### Routing edges around nodes
+
+An edge routes around a node rather than through it. The three-segment router checks each segment for obstructions and inserts a detour perpendicular to that segment: a horizontal segment detours vertically, and a vertical one horizontally.
+
+Each of the three calls passed the opposite of the segment's own orientation, so a horizontal segment was offered a horizontal detour - which cannot clear a horizontal obstruction. Obstacle avoidance therefore never produced a waypoint, and edges ran straight through nodes at every zoom level.
+
 ### Re-routing edges during an interaction
 
 Edges are re-routed when the graph changes, and live while a node is dragged, because the edges attached to it must follow. A cached path cannot do that.
