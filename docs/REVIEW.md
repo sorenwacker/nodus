@@ -2574,6 +2574,8 @@ Every handler here returns a marker (`__UPDATE_CONTENT__`, `__APPEND_CONTENT__`,
 
 ### L112. push_task silently discards the `context` argument declared as an object
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/llm/tools/handlers/memoryHandlers.ts:110`
 
 The tool schema declares `context: { type: 'object' }` and the TS parameter type is `context?: Record<string, unknown>` (planningTools.ts:224-233), but the handler reads it with `const contextStr = getStringArg(parsed, 'context', '')`. getStringArg (src/lib/parsing.ts:49-57) returns the default unless the value is `typeof value === 'string'`, so a schema-compliant object argument yields '' and the `if (contextStr)` block never runs — context is dropped for every well-formed call. It is only preserved when the model violates the schema and sends a JSON string. Related: popTaskHandler:155 and peekStackHandler:170 interpolate the object directly (`Context: ${task.context}`), which renders as "[object Object]". The inner `const parsed = JSON.parse(contextStr)` at line 124 also shadows the outer `parsed`.
@@ -2586,6 +2588,8 @@ The tool schema declares `context: { type: 'object' }` and the TS parameter type
 
 ### L113. smart_color reports an LLM outage as a parse failure
 
+**Status:** fixed, with a gate that fails on the unfixed code.
+
 `src/llm/tools/handlers/colorHandlers.ts:43`
 
 ```
@@ -2597,6 +2601,8 @@ A provider timeout, cancelled request or connection error is swallowed and repor
 *Verification:* Confirmed from the code. In src/llm/tools/handlers/colorHandlers.ts:34-47 the try block wraps `const response = await ctx.llmQueue.generate(prompt)` and the catch is bare and empty (`catch { /* ignore LLM errors */ }`); the only exit for an empty mapping list is `return 'Could not parse color instruction'` at line 47. The rejection path is real, not theoretical: src/llm/queue.ts `processNext()` ca
 
 ### L114. Array tool parameters declared without `items`
+
+**Status:** fixed, with a gate that fails on the unfixed code.
 
 `src/llm/tools/nodeTools.ts:42`
 

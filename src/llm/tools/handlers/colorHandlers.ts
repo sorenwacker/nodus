@@ -40,8 +40,14 @@ Output ONLY the JSON array:`
 
     const response = await ctx.llmQueue.generate(prompt)
     colorMappings = extractJSONArray<ColorMapping>(response || '') || []
-  } catch {
-    /* ignore LLM errors */
+  } catch (e) {
+    // A model that could not be reached has not given an unparseable answer.
+    // Reporting the outage as a parse failure sent the model back to rephrase
+    // an instruction that was never the problem
+    // (PRODUCT_DESIGN.md > Lookups that cannot be made)
+    return `Could not reach the model to interpret the colour instruction: ${
+      e instanceof Error ? e.message : String(e)
+    }`
   }
 
   if (colorMappings.length === 0) return 'Could not parse color instruction'

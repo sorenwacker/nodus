@@ -107,7 +107,10 @@ export const pushTaskHandler: ToolHandler = async (
   const parsed = parseToolArgs(args)
   const description = getStringArg(parsed, 'description', '')
   const priorityStr = getStringArg(parsed, 'priority', 'medium')
-  const contextStr = getStringArg(parsed, 'context', '')
+  // Declared as an object in the schema, so it arrives as one. Reading it with
+  // getStringArg returned '' for every object the model sent, and the context
+  // was dropped without a word (PRODUCT_DESIGN.md > Reporting what a batch did)
+  const rawContext = parsed.context
 
   if (!description) return 'Task description required'
 
@@ -117,12 +120,14 @@ export const pushTaskHandler: ToolHandler = async (
     ? (priorityStr as 'low' | 'medium' | 'high')
     : 'medium'
 
-  // Parse context if provided
+  // Accept it as an object, or as JSON text from a model that sent a string
   let context: Record<string, unknown> | undefined
-  if (contextStr) {
+  if (rawContext && typeof rawContext === 'object' && !Array.isArray(rawContext)) {
+    context = rawContext as Record<string, unknown>
+  } else if (typeof rawContext === 'string' && rawContext) {
     try {
-      const parsed = JSON.parse(contextStr)
-      context = typeof parsed === 'object' && parsed !== null ? parsed : undefined
+      const decoded = JSON.parse(rawContext)
+      context = typeof decoded === 'object' && decoded !== null ? decoded : undefined
     } catch {
       context = undefined
     }

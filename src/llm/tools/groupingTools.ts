@@ -44,6 +44,7 @@ export function registerGroupingTools(): void {
         title: { type: 'string', description: 'Frame title' },
         node_titles: {
           type: 'array',
+          items: { type: 'string' },
           description: 'Titles of nodes to enclose; the frame is sized around them and they join it',
         },
       },
@@ -82,7 +83,7 @@ export function registerGroupingTools(): void {
       type: 'object',
       properties: {
         frame_title: { type: 'string', description: 'Title of the target frame' },
-        node_titles: { type: 'array', description: 'Titles of the nodes to move into it' },
+        node_titles: { type: 'array', items: { type: 'string' }, description: 'Titles of the nodes to move into it' },
       },
       required: ['frame_title', 'node_titles'],
     },
@@ -132,7 +133,7 @@ export function registerGroupingTools(): void {
       properties: {
         title: { type: 'string', description: 'Storyline title' },
         description: { type: 'string', description: 'What the storyline covers (optional)' },
-        node_titles: { type: 'array', description: 'Titles of nodes to add, in reading order' },
+        node_titles: { type: 'array', items: { type: 'string' }, description: 'Titles of nodes to add, in reading order' },
       },
       required: ['title'],
     },
@@ -161,7 +162,7 @@ export function registerGroupingTools(): void {
       type: 'object',
       properties: {
         storyline_title: { type: 'string', description: 'Title of the target storyline' },
-        node_titles: { type: 'array', description: 'Titles of nodes to append, in order' },
+        node_titles: { type: 'array', items: { type: 'string' }, description: 'Titles of nodes to append, in order' },
       },
       required: ['storyline_title', 'node_titles'],
     },

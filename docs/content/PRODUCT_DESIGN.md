@@ -1356,6 +1356,12 @@ Releasing a drag over the storyline panel adds the node to a storyline instead o
 
 That was passed through a property on `window`. Neither side declared a dependency on the other, so no boundary test could express the contract, and the ordering held only because the panel cleared the flag in a deferred callback that happened to run after the drag ended - reordering either handler would have dropped the node on the canvas instead, silently. It is now a named module both sides import.
 
+### Declaring a tool's parameters
+
+A tool's schema says enough for a model to call it without guessing. An array declares what its elements are; eight did not, so nothing told the model whether to send strings, objects, or something else, and a wrong guess arrives as an argument the handler cannot use.
+
+A parameter declared as an object is read as one. `push_task` declared `context` as an object and read it as a string, so every object a model sent was dropped without a word.
+
 ### Deciding an agent run has ended
 
 A run ends when the model calls `done`, or when it asks the user a question the loop cannot answer. It is never decided by reading the wording of a reply.

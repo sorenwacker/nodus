@@ -39,7 +39,7 @@ export function registerNodeTools(): void {
           description: 'Point in time for the timeline, e.g. "1969-07-20", "1500", "20 BC"',
         },
         date_end: { type: 'string', description: 'End of a date range (optional)' },
-        tags: { type: 'array', description: 'Tags for the node (optional)' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags for the node (optional)' },
       },
       required: ['title'],
     },

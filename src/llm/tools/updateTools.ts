@@ -28,7 +28,7 @@ export function registerUpdateTools(): void {
           description: 'Point in time for the timeline, e.g. "1969-07-20", "1500", "20 BC". Empty string clears it',
         },
         date_end: { type: 'string', description: 'End of a date range; empty string clears it' },
-        tags: { type: 'array', description: 'Replace the node tags' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Replace the node tags' },
       },
       required: ['title'],
     },
@@ -101,6 +101,7 @@ export function registerUpdateTools(): void {
       type: 'object',
       properties: {
         updates: { type: 'array', description: '[{title: "Node 1", set_title?: "Lion", set_content?: "...", x?: 100, y?: 200}]' },
+        items: { type: 'string' },
       },
       required: ['updates'],
     },

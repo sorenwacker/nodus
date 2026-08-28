@@ -84,6 +84,7 @@ export function registerBatchTools(): void {
       properties: {
         nodes: {
           type: 'array',
+          items: { type: 'string' },
           description: 'Array of {title, content, mode?} objects. mode="append" adds to existing content.',
         },
       },
