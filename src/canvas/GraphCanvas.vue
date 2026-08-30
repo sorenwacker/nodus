@@ -780,6 +780,7 @@ const nodeHover = useNodeHover({
   filteredEdges: storeFilteredEdges,
   getNode: store.getNode,
   hoverTooltipEnabled: toRef(displayStore, 'hoverTooltipEnabled'),
+  isPanning,
 })
 const {
   hoveredNodeId,
