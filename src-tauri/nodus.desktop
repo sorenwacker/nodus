@@ -6,4 +6,21 @@ Icon=nodus
 Terminal=false
 Type=Application
 Categories=Office;Education;
-StartupWMClass=Nodus
+# Must equal the window's app_id, or the running window cannot be matched back
+# to this entry and the dock shows a generic icon while the app menu still
+# looks right (the menu finds this file by name; the dock has to find it from
+# the window).
+#
+# The app_id here is "nodus", lowercase: tao leaves the GTK application id
+# unset - the process registers no application id on the session bus - so GTK
+# falls back to g_get_prgname(), the executable name, which comes from the
+# Cargo package name. The deb bundler meanwhile names this file after
+# productName, giving "Nodus.desktop". That single capital letter was the bug.
+#
+# Rename the Cargo package and this value stops matching. The alternative is
+# app.enableGTKAppId in tauri.conf.json, which pins the app_id to the bundle
+# identifier - but a GtkApplication constructed with an id is also a
+# single-instance application, so that swap needs its own thought about a
+# second launch sharing one SQLite database, not a drive-by change here.
+StartupWMClass=nodus
+StartupNotify=true
