@@ -483,7 +483,7 @@ const contextMenuVisibleRef = ref(false)
 // Preview panel composable - auto-shows when single node selected while zoomed out
 const previewPanel = usePreviewPanel({
   selectedNodeIds: computed(() => store.selectedNodeIds),
-  isSemanticZoomCollapsed,
+  isSemanticZoomCollapsed: computed(() => (isSemanticZoomCollapsed.value || isLODMode.value) && !neighborhoodMode.value),
   contextMenuVisible: contextMenuVisibleRef,
   getNode: store.getNode,
   zoomToNode,

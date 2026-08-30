@@ -7,6 +7,12 @@ import type { Node } from '../../../types'
 
 export interface UsePreviewPanelContext {
   selectedNodeIds: Ref<string[]>
+  /**
+   * Whether the node's own content is unreadable on the canvas, so the preview
+   * is what shows it. True when semantic zoom has collapsed the cards - and
+   * also in bubble mode, where a node is a circle at every zoom level and
+   * zooming in reveals nothing (GraphCanvas.vue).
+   */
   isSemanticZoomCollapsed: ComputedRef<boolean>
   contextMenuVisible: Ref<boolean>
   getNode: (id: string) => Node | undefined
