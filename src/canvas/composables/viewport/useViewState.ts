@@ -2,7 +2,7 @@
  * View state composable
  * Manages canvas scale, offset, persistence, and centering
  */
-import { ref, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 
 const VIEW_STORAGE_KEY = 'nodus-canvas-view'
 
@@ -107,6 +107,30 @@ export function useViewState(options: UseViewStateOptions) {
     }, 150)
   }
 
+  /** Dot spacing of the background grid, in screen px. Matches `background-size`
+   *  on `.canvas-grid` (canvas-viewport.css). */
+  const GRID_SIZE = 24
+
+  // The single pan-and-zoom transform. Both the content layer and the node card
+  // layer carry it, so a pan frame patches two styles rather than restyling
+  // every node and edge (PRODUCT_DESIGN.md > Canvas rendering). 2D on purpose:
+  // a 3D transform reintroduces z-axis artefacts when zoomed in.
+  const transform = computed(
+    () => `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`
+  )
+
+  // The grid is screen-space and periodic, so it only ever has to move within
+  // one cell: translating by the offset modulo GRID_SIZE shows the same dots as
+  // translating by the whole offset, and keeps the layer's transform bounded.
+  // This replaces a `background-position` binding, which invalidated paint for
+  // the entire viewport on every pan frame - the one surface that cannot be
+  // composited away (canvas-viewport.css > .canvas-grid).
+  const gridTransform = computed(() => {
+    const x = ((offsetX.value % GRID_SIZE) + GRID_SIZE) % GRID_SIZE
+    const y = ((offsetY.value % GRID_SIZE) + GRID_SIZE) % GRID_SIZE
+    return `translate(${x}px, ${y}px)`
+  })
+
   // Screen to canvas coordinate conversion
   function screenToCanvas(screenX: number, screenY: number) {
     const rect = getCanvasRect()
@@ -150,6 +174,10 @@ export function useViewState(options: UseViewStateOptions) {
     offsetY,
     isZooming,
     hasSavedView: savedView !== null,
+
+    // Derived transforms
+    transform,
+    gridTransform,
 
     // Methods
     saveViewState,

@@ -60,6 +60,26 @@
 
 .canvas-viewport {
   background-color: var(--bg-canvas);
+}
+
+/* The dot grid, on its own layer.
+   It used to live on .canvas-viewport with background-position bound to the
+   pan offset. Moving a background invalidates paint for the whole element, so
+   every pan frame repainted the entire window on the main thread - the one
+   surface that cannot be composited away, competing with the node and edge
+   layers for the same frame.
+   The grid is periodic with GRID_SIZE, so translating by (offset mod
+   GRID_SIZE) is pixel-identical to offsetting the background by the full
+   amount, and a transform on a promoted layer moves on the GPU without
+   repainting. The negative inset supplies the bleed that the translation
+   uncovers (GraphCanvas.vue > gridTransform). */
+.canvas-grid {
+  position: absolute;
+  inset: -24px;
+  z-index: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform;
   background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
   background-size: 24px 24px;
 }

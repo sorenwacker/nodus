@@ -191,6 +191,8 @@ const {
   centerGrid,
   screenToCanvas,
   startZooming,
+  transform,
+  gridTransform,
 } = viewState
 
 onMounted(() => {
@@ -1394,12 +1396,6 @@ function getNodeHeight(
   return Math.max(120, Math.min(600, contentHeight + 80))
 }
 
-// Transform for the canvas content
-// Use 2D transform to avoid z-axis issues when zooming in
-const transform = computed(() => {
-  return `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`
-})
-
 // Pan with pointer drag on empty canvas space (supports mouse, touch, pen)
 function onCanvasPointerDown(e: PointerEvent) {
   // A pinch takes the viewport outright; nothing else may act on this press.
@@ -2070,7 +2066,6 @@ defineExpose({
       ref="canvasRef"
       class="canvas-viewport"
       :class="{ panning: isPanning, 'frame-placement': frames.pendingFramePlacement.value }"
-      :style="{ backgroundPosition: offsetX + 'px ' + offsetY + 'px' }"
       @wheel="onWheel"
       @pointerdown="onCanvasPointerDown"
       @pointermove="onCanvasPointerMove"
@@ -2079,6 +2074,10 @@ defineExpose({
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
     >
+      <!-- Background dot grid. Its own layer so a pan translates it on the GPU
+           instead of repainting the whole viewport (canvas-viewport.css) -->
+      <div class="canvas-grid" :style="{ transform: gridTransform }"></div>
+
       <!-- Floating color bar (shown when nodes or frame is selected) -->
       <CanvasColorBar
         v-if="store.selectedNodeIds.length > 0 || store.selectedFrameId"
