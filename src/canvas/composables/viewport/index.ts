@@ -8,6 +8,8 @@ export {
   type UseCanvasDisplayReturn,
 } from './useCanvasDisplay'
 export { useCanvasPan, type UseCanvasPanOptions } from './useCanvasPan'
+export { useCanvasPinch, type UseCanvasPinchContext } from './useCanvasPinch'
+export { useCanvasInput, type UseCanvasInputContext } from './useCanvasInput'
 export {
   useCanvasZoom,
   type UseCanvasZoomContext,

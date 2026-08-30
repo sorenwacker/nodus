@@ -14,7 +14,7 @@ import { memoryStorage, agentMemoryStorage } from '../lib/storage'
 import {
   useMinimap,
   useViewState,
-  useCanvasPan,
+  useCanvasInput,
   useCanvasZoom,
   useCanvasDisplay,
   usePreviewPanel,
@@ -686,7 +686,7 @@ function onEdgeLabelSave() {
 }
 
 // Canvas zoom composable - handles wheel zoom/pan
-const canvasZoom = useCanvasZoom({
+const { onWheel, onCanvasPointerMove, onCanvasPointerEnter, onCanvasPointerLeave } = useCanvasZoom({
   canvasRef,
   scale,
   offsetX,
@@ -695,12 +695,6 @@ const canvasZoom = useCanvasZoom({
   startZooming,
   scheduleSaveViewState,
 })
-const {
-  onWheel,
-  onCanvasPointerMove,
-  onCanvasPointerEnter,
-  onCanvasPointerLeave,
-} = canvasZoom
 
 // Canvas display composable - handles thumbnails, font scale
 const canvasDisplay = useCanvasDisplay({
@@ -759,17 +753,19 @@ function onMinimapClick(e: MouseEvent) {
 }
 
 // Canvas panning composable
-const canvasPan = useCanvasPan({
-  getOffset: () => ({ x: offsetX.value, y: offsetY.value }),
-  setOffset: (x, y) => {
-    offsetX.value = x
-    offsetY.value = y
-  },
+// Drag to pan, two contacts to pinch-zoom; see useCanvasInput for why they
+// are composed together rather than wired separately here.
+const { isPanning, startPan, beginContact } = useCanvasInput({
+  canvasRef,
+  scale,
+  offsetX,
+  offsetY,
+  startZooming,
+  scheduleSaveViewState,
   onPanEnd: () => {
     lastDragEndTime = Date.now()
   },
 })
-const { isPanning, startPan } = canvasPan
 
 // Get reactive refs from store for the hover composable
 const { selectedNodeIds: storeSelectedNodeIds, filteredEdges: storeFilteredEdges } =
@@ -1406,6 +1402,9 @@ const transform = computed(() => {
 
 // Pan with pointer drag on empty canvas space (supports mouse, touch, pen)
 function onCanvasPointerDown(e: PointerEvent) {
+  // A pinch takes the viewport outright; nothing else may act on this press.
+  if (beginContact(e)) return
+
   // Handle frame placement mode
   if (frames.pendingFramePlacement.value && e.button === 0) {
     e.preventDefault()

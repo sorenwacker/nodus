@@ -6,6 +6,12 @@
   overflow: hidden;
   background: var(--bg-canvas);
   cursor: default;
+  /* The canvas interprets touch and pen itself: one contact pans, two pinch
+     to zoom (useCanvasPinch). Without this the browser claims those gestures
+     first for its own scrolling and zooming, and withdraws the pointer events
+     mid-gesture with pointercancel - so a drag on a touchscreen would stop
+     partway through and a pinch would never be seen at all. */
+  touch-action: none;
 }
 
 .canvas-viewport.panning {
