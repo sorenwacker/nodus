@@ -91,6 +91,12 @@
      visible - half-height letters along the bottom edge. 1.2em is exactly one
      line, because line-height is 1.2 (PRODUCT_DESIGN.md > Collapsed node titles) */
   max-height: calc(var(--title-lines, 2) * 1.2em);
+  /* The application-wide border-box reset makes that max-height include this
+     element's own vertical padding, so the box that was meant to hold N whole
+     lines held N lines minus the padding - and the last line was cut through
+     the middle, which is the very thing the bound exists to prevent. The limit
+     is about the text, so it is measured against the content box. */
+  box-sizing: content-box;
   /* Break at spaces by preference, but break a word that cannot fit the
      card rather than clipping the end of it */
   white-space: normal;
