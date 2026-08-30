@@ -131,3 +131,66 @@ earlier pass concluded it was absent. Two exist:
 
 `make dev` needs one exported first:
 `export PATH="$HOME/.nvm/versions/node/v20.20.2/bin:$PATH"`.
+
+---
+
+# The OOM crash (30 Aug 2026, later)
+
+User report: the app eats all memory and the machine dies — "Claude also
+crashes", i.e. the whole session, not just Nodus. Worse when the window is
+maximised.
+
+## Two numbers in the section above are wrong
+
+Both came from an estimate, not from the data. Read out of the workspace DB:
+
+- Layout extent is **41,337 x 49,920 canvas px**, not 6,200 x 6,830.
+- The workspace is 215 nodes, and the view that matters is not the saved
+  zoom 0.089 but the **fit**, which lands near the 0.01 floor.
+
+The rest of that section stands; the three fixes in it are real and were kept.
+
+## What the crash actually is
+
+`journalctl -k` on the earlier crash: a global OOM with
+`shmem: 12,708,580 kB` — 12.1 GB of the machine's 15.7 GB in shared memory,
+attributed to no process's RSS. That is graphics memory (i915 GEM / memfd
+surfaces), not the JS heap. The WebProcess's 90 GB `total-vm` is a red
+herring: JSC's gigacage reserves that address space on every page.
+
+Reproduced under `systemd-run --scope -p MemoryMax=…` so it could not take the
+machine down again. Every run: flat at ~340 MB until the graph renders, then
+1.5–3 GB/s of shmem, main thread wedged, dead inside 15 s. **It happens at
+HEAD too** — it is not a regression from the uncommitted work.
+
+## Bisected
+
+Instrumenting the DOM every 100 ms showed the last live frame before the wedge:
+`cards=215`. Viewport culling had culled nothing, because the fit puts the whole
+41,000 x 50,000 layout on screen — the exact case the table above describes for
+edges, now for nodes.
+
+| Rendered cards | Peak shmem |
+|---|---|
+| 4, at the four corners of the layout (maximal extent) | 217 MB — flat |
+| 15 | 217 MB — flat |
+| 60 | 5,899 MB — killed |
+| 215 (unmodified) | 6,137 MB — killed |
+| 215, with the edge layer emptied | 6,191 MB — killed |
+
+So it is neither the edges nor the extent of the layer: it is the **number of
+node cards composited at once**, and it saturates by 60. A card is ~60 DOM
+elements with a border, a radius and two shadows; the compositor backs each one
+whatever its size on screen, so at a zoom where a card is a few pixels wide the
+whole cost is paid to draw nothing.
+
+## Fixed
+
+`isLODMode` now also turns on when a default-width card would render under
+30 screen px, with a floor of 20 visible nodes (`useGraphMetrics`). Same shape
+as `useSimpleEdges` in the pass above: **a zoom tier alongside the count tier**,
+because the count tier can never fire here — 215 nodes never crosses 500, no
+matter how far out you zoom.
+
+Fitting the Portfolio workspace, measured the same way: **476 MB peak, stable,
+app alive** — against 6.1 GB and an OOM kill before.

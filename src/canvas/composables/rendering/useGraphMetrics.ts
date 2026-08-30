@@ -9,6 +9,7 @@ import { storeToRefs } from 'pinia'
 import type { Node, Edge } from '../../../types'
 import { useDisplayStore } from '../../../stores/display'
 import { canvasStorage } from '../../../lib/storage'
+import { NODE_DEFAULTS } from '../../constants'
 
 export interface UseGraphMetricsContext {
   displayNodes: ComputedRef<Node[]>
@@ -124,9 +125,34 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   // Hide text completely when zoomed out below 10% - text is unreadable at this scale
   const isTextHidden = computed(() => scale.value < 0.10)
 
+  /** Narrowest a card may render on screen before its DOM form buys nothing. */
+  const CARD_MIN_SCREEN_PX = 30
+
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
-  // Also activates when user manually toggles bubble mode
-  const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > lodThreshold.value)
+  // Also activates when user manually toggles bubble mode.
+  //
+  // Zoom decides it as well as count, for the same reason it decides the edge
+  // form below. A card is a composited DOM subtree of some sixty elements; the
+  // compositor backs each one whatever its size on screen, so a few dozen of
+  // them at a zoom where each is a few pixels wide cost gigabytes of graphics
+  // memory to draw nothing legible. Fitting a workspace whose layout spans tens
+  // of thousands of canvas px puts every node on screen at once at a zoom near
+  // the floor - the count tier cannot catch that, because the count never
+  // changes - and the process is killed by the kernel before the view appears.
+  // Measured on the Portfolio workspace (215 nodes, layout 41,000 x 50,000 px,
+  // fitted zoom ~0.02): 6 GB of shared graphics memory and an OOM kill as DOM
+  // cards, 0.7 GB and a live canvas as circles (PERF_NOTES.md).
+  //
+  // The floor keeps a handful of nodes as cards: a sparse workspace zoomed out
+  // costs nothing to draw properly, and turning it into bubbles would only take
+  // detail away.
+  const isLODMode = computed(
+    () =>
+      forceLODMode.value ||
+      visibleNodes.value.length > lodThreshold.value ||
+      (visibleNodes.value.length > 20 &&
+        scale.value < CARD_MIN_SCREEN_PX / NODE_DEFAULTS.WIDTH)
+  )
 
   /** Stroke width of an edge's invisible hit path, in canvas px (CanvasEdgesSVG). */
   const EDGE_HIT_STROKE = 12
