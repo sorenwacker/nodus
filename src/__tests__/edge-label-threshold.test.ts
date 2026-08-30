@@ -43,7 +43,7 @@ function mountEdges(zoom: number, edgeLabelZoomThreshold: number) {
   return mount(CanvasEdgesSVG, {
     props: {
       edges: [makeEdge()],
-      isLargeGraph: false,
+      simplified: false,
       edgeStrokeWidth: 2,
       edgeLabelSize: 12,
       zoom,

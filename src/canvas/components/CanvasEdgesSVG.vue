@@ -7,7 +7,12 @@ import type { VisibleEdgeLine } from '../composables/edges'
 
 const props = defineProps<{
   edges: VisibleEdgeLine[]
-  isLargeGraph: boolean
+  /**
+   * Draw each edge as a single path, dropping the per-edge hit area, glow and
+   * label. Set for a graph large enough to need it and for any zoom at which
+   * those extras cannot be seen or clicked (useGraphMetrics > useSimpleEdges).
+   */
+  simplified: boolean
   edgeStrokeWidth: number
   edgeLabelSize: number
   /** Current viewport zoom, used to keep labels a constant on-screen size */
@@ -87,7 +92,7 @@ const markerColors = computed(() => {
     </defs>
 
     <!-- Existing edges (simplified for large graphs) -->
-    <template v-if="isLargeGraph">
+    <template v-if="simplified">
       <!-- Fast rendering: paths without hit areas, markers only for highlighted -->
       <g v-for="(group, groupIndex) in edgeGroups" :key="groupIndex">
       <path

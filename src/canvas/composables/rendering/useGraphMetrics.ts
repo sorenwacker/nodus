@@ -27,6 +27,7 @@ export interface UseGraphMetricsReturn {
   isSemanticZoomCollapsed: ComputedRef<boolean>
   isTextHidden: ComputedRef<boolean>
   isLODMode: ComputedRef<boolean>
+  useSimpleEdges: ComputedRef<boolean>
   isBubbleModeForced: ComputedRef<boolean>
   nodeDegree: ComputedRef<Record<string, number>>
   getLODRadius: (nodeId: string) => number
@@ -127,6 +128,26 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   // Also activates when user manually toggles bubble mode
   const isLODMode = computed(() => forceLODMode.value || visibleNodes.value.length > lodThreshold.value)
 
+  /** Stroke width of an edge's invisible hit path, in canvas px (CanvasEdgesSVG). */
+  const EDGE_HIT_STROKE = 12
+  /** Narrowest a hit target may render on screen and still be reliably clickable. */
+  const EDGE_HIT_MIN_SCREEN_PX = 4
+
+  // Whether to draw each edge as a single path instead of the full form.
+  //
+  // The full form is a <g> holding an invisible hit path, the visible path and
+  // (above the label zoom threshold) a label - three to four elements per edge
+  // against one. On a 1,200-edge graph that is ~3,600 SVG elements against
+  // ~1,200, plus a pointer-events hit region per edge to test.
+  //
+  // Zoom decides it, not only graph size. Below the zoom at which the 12px hit
+  // path renders thinner than a comfortable click target, the extra elements
+  // are paid for on every frame and can never be used. The size tiers above
+  // still force the simple form on their own account.
+  const useSimpleEdges = computed(
+    () => isLargeGraph.value || scale.value < EDGE_HIT_MIN_SCREEN_PX / EDGE_HIT_STROKE
+  )
+
   // Toggle bubble mode manually
   function toggleBubbleMode() {
     forceLODMode.value = !forceLODMode.value
@@ -160,6 +181,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     isSemanticZoomCollapsed,
     isTextHidden,
     isLODMode,
+    useSimpleEdges,
     isBubbleModeForced: computed(() => forceLODMode.value),
     nodeDegree,
     getLODRadius,

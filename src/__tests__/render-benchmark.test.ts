@@ -163,14 +163,14 @@ function edgeLines(count: number) {
   }))
 }
 
-function mountEdges(count: number, isLargeGraph: boolean) {
+function mountEdges(count: number, simplified: boolean) {
   const edges = edgeLines(count)
 
   const start = performance.now()
   const wrapper = mount(CanvasEdgesSVG, {
     props: {
       edges,
-      isLargeGraph,
+      simplified,
       edgeStrokeWidth: 2,
       edgeLabelSize: 12,
       zoom: 1,

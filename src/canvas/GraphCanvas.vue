@@ -384,6 +384,7 @@ const graphMetrics = useGraphMetrics({
 })
 const {
   isLargeGraph,
+  useSimpleEdges,
   isHugeGraph,
   isMassiveGraph,
   isSemanticZoomCollapsed,
@@ -2136,7 +2137,7 @@ defineExpose({
         <!-- SVG for edges (above frames) -->
         <CanvasEdgesSVG
           :edges="visibleEdgeLines"
-          :is-large-graph="isLargeGraph"
+          :simplified="useSimpleEdges"
           :edge-stroke-width="edgeStrokeWidth"
           :edge-label-size="edgeLabelSize"
           :zoom="scale"
