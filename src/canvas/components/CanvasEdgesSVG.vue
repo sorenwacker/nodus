@@ -42,6 +42,16 @@ defineEmits<{
 
 // Derive marker colors dynamically from visible edges
 // This automatically creates markers for any edge color in use
+// Plain edges first, highlighted second. SVG paints in document order, so this
+// gives the same z-order the old `.sort()` in useEdgeVisibility produced - but
+// as two independent keyed lists. Re-sorting one list made Vue move hundreds of
+// SVG elements on every hover; with two lists an edge that changes state is one
+// removal and one insertion, and nothing else in the tree is touched.
+const edgeGroups = computed(() => [
+  props.edges.filter(e => !e.isHighlighted),
+  props.edges.filter(e => e.isHighlighted),
+])
+
 const markerColors = computed(() => {
   const colors = new Set<string>()
   // Also add highlight color for edge preview
@@ -79,8 +89,9 @@ const markerColors = computed(() => {
     <!-- Existing edges (simplified for large graphs) -->
     <template v-if="isLargeGraph">
       <!-- Fast rendering: paths without hit areas, markers only for highlighted -->
+      <g v-for="(group, groupIndex) in edgeGroups" :key="groupIndex">
       <path
-        v-for="edge in edges"
+        v-for="edge in group"
         :key="edge.id"
         :d="edge.path"
         :stroke="edge.isHighlighted ? edge.edgeHighlightColor : (edge.color ?? undefined)"
@@ -91,9 +102,11 @@ const markerColors = computed(() => {
         class="edge-line-fast"
         :class="{ 'edge-highlighted': edge.isHighlighted, 'edge-tagged': edge.link_type === 'tagged', 'edge-neighbor': edge.isNeighborEdge }"
       />
+      </g>
     </template>
     <template v-else>
-      <g v-for="edge in edges" :key="edge.id">
+      <g v-for="(group, groupIndex) in edgeGroups" :key="groupIndex">
+      <g v-for="edge in group" :key="edge.id">
         <!-- Invisible wider hit area -->
         <path
           :d="edge.path"
@@ -135,6 +148,7 @@ const markerColors = computed(() => {
           class="edge-label"
           :style="{ fontSize: renderedLabelSize + 'px' }"
         >{{ edge.label }}</text>
+      </g>
       </g>
     </template>
 

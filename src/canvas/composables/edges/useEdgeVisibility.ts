@@ -227,8 +227,15 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         arrowMarkerId: arrowMarkerIdFor(isHighlighted ? edgeHighlightColor : color),
       }
     })
-    // Sort so highlighted edges render last (on top in SVG)
-    .sort((a, b) => (a.isHighlighted ? 1 : 0) - (b.isHighlighted ? 1 : 0))
+    // Deliberately unsorted. This used to end with
+    //   .sort((a, b) => (a.isHighlighted ? 1 : 0) - (b.isHighlighted ? 1 : 0))
+    // to paint highlighted edges last. The array feeds a keyed v-for over every
+    // edge, so re-sorting on each hover made Vue reorder hundreds of SVG
+    // elements - an insertBefore per move, each invalidating layout - and
+    // panning re-triggers it every frame as nodes pass under the pointer.
+    // CanvasEdgesSVG now draws the highlighted ones in a second group instead:
+    // SVG paints in document order, so the z-order is identical and no element
+    // ever moves (PRODUCT_DESIGN.md > Showing edges only around the focus).
   })
 
   return {
