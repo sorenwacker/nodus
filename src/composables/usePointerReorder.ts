@@ -58,17 +58,38 @@ export function usePointerReorder(options: PointerReorderOptions) {
     pointerStartY = e.clientY
     isDragging = false
 
-    document.body.classList.add('storyline-dragging')
-
     document.addEventListener('pointermove', onPointerMove)
     document.addEventListener('pointerup', onPointerUp)
+    // Touch and pen gestures are often torn down with pointercancel rather than
+    // pointerup - the browser reclaiming the gesture, a palm landing, the
+    // window losing focus. Listening only for pointerup left the body class
+    // below applied for the rest of the session, and it suppresses text
+    // selection across the whole application with !important: no selecting in
+    // the reader, none in the fullscreen editor, until a reload.
+    document.addEventListener('pointercancel', endDrag)
+  }
+
+  /** Suppress selection only once this is really a drag, not on every press. */
+  function beginDragging() {
+    isDragging = true
+    document.body.classList.add('storyline-dragging')
+  }
+
+  function endDrag() {
+    document.removeEventListener('pointermove', onPointerMove)
+    document.removeEventListener('pointerup', onPointerUp)
+    document.removeEventListener('pointercancel', endDrag)
+    document.body.classList.remove('storyline-dragging')
+    draggingIndex.value = null
+    dragOverIndex.value = null
+    isDragging = false
   }
 
   function onPointerMove(e: PointerEvent) {
     if (draggingIndex.value === null) return
 
     if (Math.abs(e.clientY - pointerStartY) > 5) {
-      isDragging = true
+      beginDragging()
     }
     if (!isDragging) return
 
@@ -83,21 +104,15 @@ export function usePointerReorder(options: PointerReorderOptions) {
   }
 
   function onPointerUp() {
-    document.removeEventListener('pointermove', onPointerMove)
-    document.removeEventListener('pointerup', onPointerUp)
-    document.body.classList.remove('storyline-dragging')
-
-    if (draggingIndex.value === null) return
-
     const fromIndex = draggingIndex.value
     const toIndex = dragOverIndex.value
-    if (isDragging && toIndex !== null && toIndex !== fromIndex) {
+    const wasDragging = isDragging
+    endDrag()
+
+    if (fromIndex === null) return
+    if (wasDragging && toIndex !== null && toIndex !== fromIndex) {
       onReorder(fromIndex, toIndex)
     }
-
-    draggingIndex.value = null
-    dragOverIndex.value = null
-    isDragging = false
   }
 
   return {
