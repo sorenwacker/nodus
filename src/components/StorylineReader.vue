@@ -87,7 +87,8 @@ function goToHeading(sectionIndex: number, headingIndex: number) {
   container.scrollTo({ top: top - 12, behavior: 'smooth' })
 }
 
-// Inline section editing (PRODUCT_DESIGN.md > Editing in the reader)
+// Inline section editing, from a double-click on a section title - not on the
+// body, where that gesture selects a word (PRODUCT_DESIGN.md > Editing)
 const editingSectionId = ref<string | null>(null)
 const editingText = ref('')
 const editingLockError = ref<string | null>(null)
@@ -549,7 +550,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
                     <span class="section-num-text">{{ index + 1 }}</span>
                     <Icon name="edit" :size="12" class="edit-hint" />
                   </span>
-                  <h2 class="section-title">{{ node.title }}</h2>
+                  <h2 class="section-title" :title="t('storyline.editHint')" @dblclick="startSectionEdit(node)">{{ node.title }}</h2>
                 </header>
                 <!-- eslint-disable vue/no-v-html -- content is sanitized by the render service -->
                 <textarea
@@ -565,7 +566,6 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
                     class="section-content"
                     :title="t('storyline.editHint')"
                     @click="handleContentClick"
-                    @dblclick="startSectionEdit(node)"
                     v-html="getRenderedContent(node.id) || ''"
                   ></div>
                   <p v-if="editingLockError" class="section-lock-error">

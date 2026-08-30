@@ -101,6 +101,15 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       return
     }
 
+    // Reading surfaces are not the canvas. Ctrl+A here means select this text,
+    // not select every node - and preventDefault on the canvas shortcut left no
+    // way to select anything in the reader at all. Checked on the target only,
+    // since the reader stays mounted once opened and its mere presence must not
+    // disable the canvas shortcuts (PRODUCT_DESIGN.md > Editing in the reader)
+    if (target.closest('.reader-overlay, .storyline-panel, .preview-panel')) {
+      return
+    }
+
     // Skip shortcuts if a modal is open (allow native copy/paste in modal content)
     // Check both if target is inside modal AND if any modal exists in DOM
     const modalSelectors = '.modal-content, .modal-overlay, .modal-backdrop, .settings-modal, ' +
