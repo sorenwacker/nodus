@@ -4,12 +4,16 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
-import { splitFrontmatter, joinFrontmatter } from '../lib/contentParser'
+import { splitFrontmatter, joinFrontmatter, upsertFrontmatterField } from '../lib/contentParser'
+import { extractFrontmatterField } from '../lib/timelineDates'
 import { openExternal } from '../lib/tauri'
+import Icon from './Icon.vue'
 import {
   renderMarkdown,
   renderPendingContent,
 } from '../services/MarkdownRenderService'
+import { COMMENT_STYLES } from '../types'
+import { parseCommentMeta } from '../composables/useCommentMeta'
 import NodePicker from './NodePicker.vue'
 
 const props = defineProps<{
@@ -69,6 +73,18 @@ let pendingSave: PendingSave | null = null
 // Load node data when nodeId changes
 const node = computed(() => props.nodeId ? store.getNode(props.nodeId) : null)
 
+/**
+ * The node's point in time, which lives in the frontmatter.
+ *
+ * The only way to set it was the chip on a canvas card, and that chip needs a
+ * card: it is hidden once semantic zoom collapses them and does not exist at
+ * all in bubble mode, so a date could not be set from the very views a
+ * timeline is built from. Editing it here writes the same frontmatter fields
+ * through the same save path (canvas > CanvasNodeCard).
+ */
+const dateInput = ref('')
+const dateEndInput = ref('')
+
 // Metadata header of the loaded node: hidden from the editor, kept on save
 let editingFrontmatter: string | null = null
 
@@ -79,6 +95,9 @@ watch(() => props.nodeId, (id) => {
     editTitle.value = node.value.title || ''
     const { frontmatter, body } = splitFrontmatter(node.value.markdown_content || '')
     editingFrontmatter = frontmatter
+    const stored = node.value.markdown_content || ''
+    dateInput.value = extractFrontmatterField(stored, 'date') || ''
+    dateEndInput.value = extractFrontmatterField(stored, 'date_end') || ''
     editContent.value = body
     hasUnsavedChanges.value = false
   }
@@ -104,6 +123,32 @@ function wikilinkExists(target: string): boolean {
   return store.filteredNodes.some(
     n => n.title.toLowerCase() === target.toLowerCase()
   )
+}
+
+/**
+ * Comment nodes anchored in this node's text.
+ *
+ * A comment is a node of its own, tied to the text it annotates by a wikilink
+ * written at that point (PRODUCT_DESIGN.md > Anchored nodes). The reader shows
+ * them because it walks a storyline and meets them in sequence; this view has
+ * only the one node, so it resolves the anchors itself - otherwise a note
+ * written against this text is invisible in the very place it is being edited.
+ */
+const anchoredComments = computed(() => {
+  const content = editContent.value
+  if (!content) return []
+  const linked = new Set<string>()
+  for (const match of content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)) {
+    linked.add(match[1].trim().toLowerCase())
+  }
+  if (linked.size === 0) return []
+  return store.filteredNodes.filter(
+    n => n.node_type === 'comment' && linked.has(n.title.toLowerCase())
+  )
+})
+
+function renderedCommentHtml(node: { markdown_content?: string | null }): string {
+  return renderMarkdown(node.markdown_content || '', { wikilinkExists })
 }
 
 // Live preview - render markdown using unified service
@@ -132,6 +177,17 @@ watch(() => previewRef.value, (el) => {
     triggerRender()
   }
 })
+
+function applyDate() {
+  const full = joinFrontmatter(editingFrontmatter, editContent.value)
+  const withDates = upsertFrontmatterField(
+    upsertFrontmatterField(full, 'date', dateInput.value || null),
+    'date_end',
+    dateEndInput.value || null
+  )
+  editingFrontmatter = splitFrontmatter(withDates).frontmatter
+  scheduleSave()
+}
 
 // Schedule auto-save with debounce, recording what to write and where
 function scheduleSave() {
@@ -418,6 +474,20 @@ onUnmounted(() => {
               @keydown.enter.prevent="editorRef?.focus()"
             />
             <div class="fullscreen-header-actions">
+              <input
+                v-model.trim="dateInput"
+                type="text"
+                class="fullscreen-date-input"
+                :placeholder="t('canvas.node.datePlaceholder')"
+                @change="applyDate"
+              />
+              <input
+                v-model.trim="dateEndInput"
+                type="text"
+                class="fullscreen-date-input"
+                :placeholder="t('canvas.node.dateEndPlaceholder')"
+                @change="applyDate"
+              />
               <span v-if="hasUnsavedChanges" class="unsaved-indicator">{{ t('fullscreen.unsaved') }}</span>
               <button class="fullscreen-close-btn" :aria-label="t('common.close')" @click="handleClose">
                 &times;
@@ -468,6 +538,18 @@ onUnmounted(() => {
                 @click="handlePreviewClick"
                 v-html="renderedContent"
               ></div>
+              <!-- Comments written against this text, resolved from its
+                   wikilink anchors (PRODUCT_DESIGN.md > Anchored nodes) -->
+              <aside
+                v-for="comment in anchoredComments"
+                :key="comment.id"
+                class="fullscreen-comment"
+                :style="{ '--comment-color': COMMENT_STYLES[parseCommentMeta(comment.markdown_content).meta.type].color }"
+              >
+                <Icon :name="COMMENT_STYLES[parseCommentMeta(comment.markdown_content).meta.type].icon" :size="14" />
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div class="fullscreen-comment-text" v-html="renderedCommentHtml(comment)"></div>
+              </aside>
               <!-- eslint-enable vue/no-v-html -->
             </div>
           </div>
@@ -635,6 +717,32 @@ onUnmounted(() => {
   -webkit-user-select: text;
   cursor: text;
   min-height: 0;
+}
+
+.fullscreen-date-input {
+  width: 150px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-input, var(--bg-surface));
+  color: var(--text-main);
+  font-size: calc(12px * var(--font-scale, 1));
+}
+
+.fullscreen-comment {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 24px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--comment-color, var(--border-default));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--comment-color, transparent) 10%, transparent);
+  font-size: calc(13px * var(--font-scale, 1));
+}
+
+.fullscreen-comment-text {
+  min-width: 0;
 }
 
 /* Mermaid diagram text visibility */
