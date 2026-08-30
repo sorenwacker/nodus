@@ -669,10 +669,6 @@
       "title": "Storylines finden",
       "instruction": "Bewegen Sie den Zeiger an den rechten Fensterrand, um die Storyline-Übersicht einzublenden."
     },
-    "bottom": {
-      "title": "Zeitachse ansehen",
-      "instruction": "Halten Sie den Zeiger einen Moment am unteren Rand. Die Zeitachsen-Ansicht fährt hoch."
-    },
     "left": {
       "title": "Den Agenten fragen",
       "instruction": "Bewegen Sie den Zeiger an den linken Fensterrand, um das Agenten-Panel einzublenden."

@@ -3,15 +3,19 @@
  *
  * Edge-step gestures carry the canvas's navigation and are invisible: nothing on
  * screen suggests that pushing the pointer against an edge reveals the
- * storylines, timelines or agent. This walks a new user through them one at a
- * time, advancing only when the gesture is actually performed, because reading
- * about a gesture is not learning it.
+ * storylines or the agent. This walks a new user through them one at a time,
+ * advancing only when the gesture is actually performed, because reading about
+ * a gesture is not learning it.
+ *
+ * The timelines sheet is not taught here: it opens from the toolbar button, not
+ * from an edge. A lesson for a gesture that no longer exists could never be
+ * performed, and the tour would stall on it forever.
  *
  * See PRODUCT_DESIGN.md > First-run gesture coach.
  */
 import { computed, ref } from 'vue'
 
-export const GESTURE_LESSONS = ['right', 'bottom', 'left'] as const
+export const GESTURE_LESSONS = ['right', 'left'] as const
 
 export type GestureLesson = (typeof GESTURE_LESSONS)[number]
 

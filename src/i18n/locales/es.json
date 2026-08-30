@@ -669,10 +669,6 @@
       "title": "Encontrar tus storylines",
       "instruction": "Lleva el puntero al borde derecho de la ventana para mostrar el resumen de storylines."
     },
-    "bottom": {
-      "title": "Ver la línea de tiempo",
-      "instruction": "Mantén el puntero un momento en el borde inferior. El panel de líneas de tiempo sube."
-    },
     "left": {
       "title": "Preguntar al agente",
       "instruction": "Lleva el puntero al borde izquierdo para mostrar el panel del agente."

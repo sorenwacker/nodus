@@ -72,122 +72,6 @@ describe('createEdgeStepper', () => {
     expect(stepRight).toHaveBeenCalledTimes(2)
   })
 
-  it('fires one bottom step per push against the bottom edge', () => {
-    const stepBottom = vi.fn()
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      stepRight: vi.fn(),
-      stepLeft: vi.fn(),
-      stepBottom,
-    })
-    stepper.onPointer(500, 995, WIDTH, 1000)
-    stepper.onPointer(500, 999, WIDTH, 1000) // held at the edge: no re-fire
-    expect(stepBottom).toHaveBeenCalledTimes(1)
-    stepper.onPointer(500, 500, WIDTH, 1000) // pull away re-arms
-    stepper.onPointer(500, 996, WIDTH, 1000)
-    expect(stepBottom).toHaveBeenCalledTimes(2)
-  })
-
-  it('waits out the bottom dwell time and cancels when the pointer leaves', () => {
-    vi.useFakeTimers()
-    const stepBottom = vi.fn()
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      bottomDwellMs: 1000,
-      stepRight: vi.fn(),
-      stepLeft: vi.fn(),
-      stepBottom,
-    })
-
-    // Passing through the edge briefly fires nothing
-    stepper.onPointer(500, 995, WIDTH, 1000)
-    vi.advanceTimersByTime(400)
-    stepper.onPointer(500, 500, WIDTH, 1000)
-    vi.advanceTimersByTime(2000)
-    expect(stepBottom).not.toHaveBeenCalled()
-
-    // Dwelling the full second fires once
-    stepper.onPointer(500, 995, WIDTH, 1000)
-    vi.advanceTimersByTime(1000)
-    expect(stepBottom).toHaveBeenCalledTimes(1)
-    vi.useRealTimers()
-  })
-
-  it('fires one top step per push against the top edge', () => {
-    const stepTop = vi.fn()
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      stepRight: vi.fn(),
-      stepLeft: vi.fn(),
-      stepTop,
-    })
-    stepper.onPointer(500, 5, WIDTH, 1000)
-    stepper.onPointer(500, 2, WIDTH, 1000) // held at the edge: no re-fire
-    expect(stepTop).toHaveBeenCalledTimes(1)
-    stepper.onPointer(500, 500, WIDTH, 1000) // pull away re-arms
-    stepper.onPointer(500, 3, WIDTH, 1000)
-    expect(stepTop).toHaveBeenCalledTimes(2)
-  })
-
-  it('uses the dynamic top threshold per event', () => {
-    let band = 0
-    const stepTop = vi.fn()
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      topThreshold: () => band,
-      stepRight: vi.fn(),
-      stepLeft: vi.fn(),
-      stepTop,
-    })
-    stepper.onPointer(500, 5, WIDTH, 1000) // band 0: top edge disabled
-    expect(stepTop).not.toHaveBeenCalled()
-    band = 12
-    stepper.onPointer(500, 5, WIDTH, 1000)
-    expect(stepTop).toHaveBeenCalledTimes(1)
-  })
-
-  it('fires the top step when the pointer leaves the window through the top region', () => {
-    const stepTop = vi.fn()
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      stepRight: vi.fn(),
-      stepLeft: vi.fn(),
-      stepTop,
-    })
-    stepper.onPointerLeave(500, 40, WIDTH, 1000) // exits upward, mid-width
-    expect(stepTop).toHaveBeenCalledTimes(1)
-  })
-
-  it('ignores a window leave below the top region or while the top edge is disabled', () => {
-    const stepTop = vi.fn()
-    let band = 12
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      topThreshold: () => band,
-      stepRight: vi.fn(),
-      stepLeft: vi.fn(),
-      stepTop,
-    })
-    stepper.onPointerLeave(500, 500, WIDTH, 1000) // left mid-window, not the top
-    expect(stepTop).not.toHaveBeenCalled()
-    band = 0 // top edge disabled (sheet closed)
-    stepper.onPointerLeave(500, 40, WIDTH, 1000)
-    expect(stepTop).not.toHaveBeenCalled()
-  })
-
-  it('does not double-fire when an in-band push is followed by a window leave', () => {
-    const stepTop = vi.fn()
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      stepRight: vi.fn(),
-      stepLeft: vi.fn(),
-      stepTop,
-    })
-    stepper.onPointer(500, 5, WIDTH, 1000) // in-band fire
-    stepper.onPointerLeave(500, 3, WIDTH, 1000) // cursor continues out
-    expect(stepTop).toHaveBeenCalledTimes(1)
-  })
-
   it('fires the right step when the pointer leaves through the right region', () => {
     // A fast flick can jump past the narrow edge band without a pointermove
     // landing inside it; the window leave is the only evidence left
@@ -241,17 +125,8 @@ describe('edge handles', () => {
   function handleStepper() {
     const stepRight = vi.fn()
     const stepLeft = vi.fn()
-    const stepBottom = vi.fn()
-    const stepTop = vi.fn()
-    const stepper = createEdgeStepper({
-      threshold: 12,
-      topThreshold: () => 12,
-      stepRight,
-      stepLeft,
-      stepBottom,
-      stepTop,
-    })
-    return { stepper, stepRight, stepLeft, stepBottom, stepTop }
+    const stepper = createEdgeStepper({ threshold: 12, stepRight, stepLeft })
+    return { stepper, stepRight, stepLeft }
   }
 
   it('centres the handle on its edge', () => {
@@ -283,17 +158,6 @@ describe('edge handles', () => {
     const { stepper, stepRight } = handleStepper()
     stepper.onPointer(999, MID, WIDTH, HEIGHT)
     expect(stepRight).toHaveBeenCalledTimes(1)
-  })
-
-  it('ignores a vertical push left or right of the handle', () => {
-    const { stepper, stepBottom, stepTop } = handleStepper()
-    const leftOf = edgeHandleRange(WIDTH).start - 20
-
-    stepper.onPointer(leftOf, 999, WIDTH, HEIGHT)
-    stepper.onPointer(leftOf, 1, WIDTH, HEIGHT)
-
-    expect(stepBottom).not.toHaveBeenCalled()
-    expect(stepTop).not.toHaveBeenCalled()
   })
 
   it('does not treat a window exit outside the handle as a push', () => {

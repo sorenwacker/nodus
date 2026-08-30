@@ -2,7 +2,7 @@
  * First-run gesture coach (PRODUCT_DESIGN.md > First-run gesture coach).
  *
  * The edge-step gestures are invisible: nothing on screen suggests that pushing
- * the pointer against an edge reveals the storylines, timelines or agent. A user
+ * the pointer against an edge reveals the storylines or the agent. A user
  * who never discovers them never finds those features, so the coach teaches each
  * one by having the user perform it.
  */
@@ -19,7 +19,7 @@ describe('gesture coach', () => {
   })
 
   it('teaches the gestures in the order a new user needs them', () => {
-    expect(GESTURE_LESSONS).toEqual(['right', 'bottom', 'left'])
+    expect(GESTURE_LESSONS).toEqual(['right', 'left'])
   })
 
   it('starts on the first lesson', () => {
@@ -29,7 +29,7 @@ describe('gesture coach', () => {
     expect(coach.active.value).toBe(true)
     expect(coach.lesson.value).toBe('right')
     expect(coach.step.value).toBe(1)
-    expect(coach.total).toBe(3)
+    expect(coach.total).toBe(2)
   })
 
   it('advances only when the taught gesture is performed', () => {
@@ -39,11 +39,10 @@ describe('gesture coach', () => {
     // Any other edge is not the lesson: a user pushing the wrong edge has not
     // learned this one
     coach.recordGesture('left')
-    coach.recordGesture('bottom')
     expect(coach.lesson.value).toBe('right')
 
     coach.recordGesture('right')
-    expect(coach.lesson.value).toBe('bottom')
+    expect(coach.lesson.value).toBe('left')
   })
 
   it('ignores gestures before it is started', () => {

@@ -669,10 +669,6 @@
       "title": "Trova le tue storyline",
       "instruction": "Porta il puntatore contro il bordo destro della finestra per mostrare la panoramica delle storyline."
     },
-    "bottom": {
-      "title": "Vedi la linea temporale",
-      "instruction": "Tieni il puntatore per un momento sul bordo inferiore. Il pannello delle linee temporali sale."
-    },
     "left": {
       "title": "Chiedi all'agente",
       "instruction": "Porta il puntatore contro il bordo sinistro per mostrare il pannello dell'agente."

@@ -689,10 +689,6 @@
       "title": "Find your storylines",
       "instruction": "Push the pointer against the right edge of the window to reveal the storyline overview."
     },
-    "bottom": {
-      "title": "See the timeline",
-      "instruction": "Rest the pointer at the bottom edge for a moment. The timelines sheet slides up."
-    },
     "left": {
       "title": "Ask the agent",
       "instruction": "Push the pointer against the left edge to reveal the agent panel."

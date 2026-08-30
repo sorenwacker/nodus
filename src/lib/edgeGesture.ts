@@ -3,9 +3,14 @@
  * step per push. Holding the pointer at the edge fires nothing further; the
  * edge re-arms when the pointer leaves its band.
  *
- * The right edge steps deeper (graph -> storyline overview -> reader), the
- * left edge steps back, the bottom edge opens the timelines sheet and the top
- * edge closes it; the caller decides what each step does.
+ * The right edge steps deeper (graph -> storyline overview -> reader) and the
+ * left edge steps back; the caller decides what each step does.
+ *
+ * Only these two edges exist. The bottom edge used to raise the timelines
+ * sheet after a dwell and the top edge closed it, but a dwell fires from
+ * ordinary pointer travel - panning the canvas towards the bottom of the
+ * window rested the pointer in the band and the sheet unfolded on its own.
+ * That moved to a toolbar button (PRODUCT_DESIGN.md > Edge handles).
  *
  * Each edge listens only over a handle centred on it, not along its full
  * length: in a window that does not fill the screen the pointer crosses a
@@ -45,33 +50,18 @@ export interface EdgeStepperOptions {
   rightThreshold?: () => number
   /** Dynamic band for the left edge; same purpose as rightThreshold */
   leftThreshold?: () => number
-  /** Dynamic band for the bottom edge; same purpose as rightThreshold */
-  bottomThreshold?: () => number
-  /** Dynamic band for the top edge; returning 0 disables the edge */
-  topThreshold?: () => number
-  /** Dwell time in ms the pointer must stay at the bottom edge before it fires */
-  bottomDwellMs?: number
   stepRight: () => void
   stepLeft: () => void
-  /** Optional bottom-edge push (e.g. opening the timelines sheet) */
-  stepBottom?: () => void
-  /** Optional top-edge push (e.g. closing the timelines sheet) */
-  stepTop?: () => void
 }
 
 export function createEdgeStepper(options: EdgeStepperOptions) {
-  const { threshold, stepRight, stepLeft, stepBottom, stepTop, bottomDwellMs = 0 } = options
+  const { threshold, stepRight, stepLeft } = options
   const rightThreshold = options.rightThreshold ?? (() => threshold)
   const leftThreshold = options.leftThreshold ?? (() => threshold)
-  const bottomThreshold = options.bottomThreshold ?? (() => threshold)
-  const topThreshold = options.topThreshold ?? (() => threshold)
   let rightArmed = true
   let leftArmed = true
-  let bottomArmed = true
-  let topArmed = true
-  let bottomTimer: ReturnType<typeof setTimeout> | null = null
 
-  function onPointerX(x: number, y: number, windowWidth: number, windowHeight: number): void {
+  function onPointer(x: number, y: number, windowWidth: number, windowHeight: number): void {
     // Outside the handle the edge is inert, but the arming state still has to
     // follow the pointer: otherwise leaving through a dead stretch would leave
     // the edge disarmed for the next real push
@@ -96,58 +86,13 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
     }
   }
 
-  function onPointer(x: number, y: number, windowWidth: number, windowHeight: number): void {
-    onPointerX(x, y, windowWidth, windowHeight)
-
-    const aimedVertically = withinHandle(x, windowWidth)
-
-    if (stepTop) {
-      const topBand = topThreshold()
-      if (aimedVertically && topBand > 0 && y <= topBand) {
-        if (topArmed) {
-          topArmed = false
-          stepTop()
-        }
-      } else {
-        topArmed = true
-      }
-    }
-
-    if (!stepBottom) return
-    if (aimedVertically && y >= windowHeight - bottomThreshold()) {
-      if (!bottomArmed) return
-      if (bottomDwellMs <= 0) {
-        bottomArmed = false
-        stepBottom()
-      } else if (bottomTimer === null) {
-        // The pointer must dwell at the edge; leaving cancels the push
-        bottomTimer = setTimeout(() => {
-          bottomTimer = null
-          bottomArmed = false
-          stepBottom()
-        }, bottomDwellMs)
-      }
-    } else {
-      if (bottomTimer !== null) {
-        clearTimeout(bottomTimer)
-        bottomTimer = null
-      }
-      bottomArmed = true
-    }
-  }
-
   // A fast motion exits the window before any pointermove lands inside the
   // narrow edge band, so a window leave through these wider regions counts as
   // a push on the edge it left through. Without this, a quick flick at the
   // edge does nothing and the gesture feels unreliable.
-  const TOP_LEAVE_BAND = 80
   const SIDE_LEAVE_BAND = 40
 
-  /**
-   * The pointer left the window at (x, y). Horizontal exits win over vertical
-   * ones: leaving through a corner is a side push, which is the deliberate
-   * gesture, while the top band exists only to catch the title-bar exit.
-   */
+  /** The pointer left the window at (x, y). */
   function onPointerLeave(x: number, y: number, windowWidth: number, windowHeight: number): void {
     // Reaching for another window drags the pointer out through a border; only
     // an exit through a handle was aimed at the gesture
@@ -170,14 +115,6 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
         leftArmed = false
         stepLeft()
       }
-      return
-    }
-
-    if (!stepTop) return
-    if (topThreshold() <= 0) return
-    if (y <= TOP_LEAVE_BAND && topArmed) {
-      topArmed = false
-      stepTop()
     }
   }
 
