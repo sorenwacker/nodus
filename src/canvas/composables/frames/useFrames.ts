@@ -53,9 +53,22 @@ export interface UseFramesOptions {
 export function useFrames(options: UseFramesOptions) {
   const { store, viewState, screenToCanvas, snapToGrid, resolveFrameCollisions, pushFramePositionUndo, organizeFrameNodes } = options
 
+  // A press has to travel this far, in screen pixels, before it counts as a
+  // drag rather than a click. Panning applies the same 3px rule in
+  // useCanvasPan; without it here, selecting a frame moved it, and a pen or
+  // touch contact - which never holds perfectly still - moved it every time.
+  const FRAME_DRAG_THRESHOLD_PX = 3
+
   // State
   const draggingFrame = ref<string | null>(null)
+  /**
+   * The frame under an armed press that has not yet passed the threshold.
+   * It becomes draggingFrame on the first qualifying move.
+   */
+  const pendingDragFrame = ref<string | null>(null)
   const frameDragStart = ref({ x: 0, y: 0, frameX: 0, frameY: 0 })
+  /** Screen coords of the press, for the threshold test */
+  const frameDragOrigin = ref({ x: 0, y: 0 })
   const frameContainedNodes = ref<Map<string, { x: number; y: number }>>(new Map())
   const resizingFrame = ref<string | null>(null)
   const resizeDirection = ref<string>('se')
@@ -72,10 +85,15 @@ export function useFrames(options: UseFramesOptions) {
     const frame = store.frames.find(f => f.id === frameId)
     if (!frame) return
 
-    // Capture frame positions for undo before starting drag
-    pushFramePositionUndo?.()
-
-    draggingFrame.value = frameId
+    // Arm the drag; it only starts once the pointer clears the threshold.
+    //
+    // The undo snapshot is deliberately not taken here. Taking it on every
+    // press pushed a frame-geometry entry for plain selection clicks too, so
+    // the stack filled with snapshots identical to the current state and undo
+    // appeared to do nothing - it was restoring geometry that had never
+    // changed. It is captured in beginDrag instead, once a move is real.
+    pendingDragFrame.value = frameId
+    frameDragOrigin.value = { x: e.clientX, y: e.clientY }
     const pos = screenToCanvas(e.clientX, e.clientY)
     frameDragStart.value = {
       x: pos.x,
@@ -104,7 +122,25 @@ export function useFrames(options: UseFramesOptions) {
     document.addEventListener('pointerup', stopDrag)
   }
 
+  /** Promote an armed press to a real drag, recording undo at that moment. */
+  function beginDrag(frameId: string) {
+    pushFramePositionUndo?.()
+    pendingDragFrame.value = null
+    draggingFrame.value = frameId
+  }
+
   function onDrag(e: PointerEvent) {
+    if (pendingDragFrame.value) {
+      const dxScreen = e.clientX - frameDragOrigin.value.x
+      const dyScreen = e.clientY - frameDragOrigin.value.y
+      if (
+        Math.abs(dxScreen) <= FRAME_DRAG_THRESHOLD_PX &&
+        Math.abs(dyScreen) <= FRAME_DRAG_THRESHOLD_PX
+      ) {
+        return
+      }
+      beginDrag(pendingDragFrame.value)
+    }
     if (!draggingFrame.value) return
     const pos = screenToCanvas(e.clientX, e.clientY)
     const dx = pos.x - frameDragStart.value.x
@@ -133,12 +169,16 @@ export function useFrames(options: UseFramesOptions) {
         store.persistNodePosition(nodeId)
       }
     }
+    const dragged = frameId !== null
     draggingFrame.value = null
+    pendingDragFrame.value = null
     frameContainedNodes.value.clear()
     document.removeEventListener('pointermove', onDrag)
     document.removeEventListener('pointerup', stopDrag)
-    // Resolve frame-to-frame collisions after drag ends
-    resolveFrameCollisions?.()
+    // Only after a real drag. A press that never cleared the threshold moved
+    // nothing, so resolving collisions would shift frames the user did not
+    // touch - and would do it with no undo entry behind it.
+    if (dragged) resolveFrameCollisions?.()
   }
 
   function startResize(e: PointerEvent, frameId: string, direction = 'se') {
