@@ -10,6 +10,7 @@ import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNotifications } from './composables/useNotifications'
 import { usePanelReveal } from './composables/usePanelReveal'
 import { createEdgeStepper } from './lib/edgeGesture'
+import { isEdgeGesturePointer } from './composables/edgeGesturePointer'
 import GraphCanvas from './canvas/GraphCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
@@ -70,9 +71,7 @@ const storylinePanel = usePanelReveal({
 const lastReadStorylineId = ref<string | null>(null)
 const readerFullWidth = ref(false)
 const showTimelines = ref(false)
-const panelVisible = computed(
-  () => storylinePanel.isOpen.value && !readerStorylineId.value
-)
+const panelVisible = computed(() => storylinePanel.isOpen.value && !readerStorylineId.value)
 
 // Overlays animate with the layer steps, but must track the pointer exactly
 // while the panel separator is dragged - a transition would lag behind it
@@ -107,9 +106,7 @@ const timelinesSheetHeight = computed(() => {
 })
 
 // Bottom overlays (zoom controls) shift up over the timelines sheet
-const canvasBottomInset = computed(() =>
-  showTimelines.value ? timelinesSheetHeight.value : '0px'
-)
+const canvasBottomInset = computed(() => (showTimelines.value ? timelinesSheetHeight.value : '0px'))
 
 function openReader(id: string) {
   readerEverOpened.value = true
@@ -211,12 +208,14 @@ const edgeStepper = createEdgeStepper({
 })
 
 function onEdgePointerMove(e: PointerEvent) {
+  if (!isEdgeGesturePointer(e)) return
   edgeStepper.onPointer(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
 }
 
 // A fast motion exits the window before any pointermove lands in the narrow
 // edge band, so a leave counts as a push on the edge it left through
 function onEdgePointerOut(e: PointerEvent) {
+  if (!isEdgeGesturePointer(e)) return
   if (e.relatedTarget === null) {
     edgeStepper.onPointerLeave(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
   }
