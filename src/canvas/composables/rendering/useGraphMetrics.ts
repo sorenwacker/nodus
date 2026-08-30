@@ -167,11 +167,14 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     return degree
   })
 
-  // Calculate LOD circle radius based on degree (min 8px, max 40px)
+  // Circle radius from degree. Log scale, so a hub with sixty edges does not
+  // dwarf everything: a lower floor and a steeper slope than the original
+  // 8 + log2(d+1) * 6, which spent most of its range on the low degrees and
+  // clipped the hubs against its own cap - the nodes worth spotting were the
+  // ones it flattened together.
   function getLODRadius(nodeId: string): number {
     const deg = nodeDegree.value[nodeId] || 0
-    // Log scale for better distribution: radius = 8 + log2(degree + 1) * 6
-    return Math.min(40, 8 + Math.log2(deg + 1) * 6)
+    return Math.min(60, 5 + Math.log2(deg + 1) * 9)
   }
 
   return {

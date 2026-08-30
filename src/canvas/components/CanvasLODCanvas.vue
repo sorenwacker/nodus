@@ -7,8 +7,37 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import type { Node } from '../../types'
 import { NODE_DEFAULTS } from '../constants'
 
+/** Just what drawing a straight edge needs; avoids importing the edge module. */
+export interface LODEdge {
+  id: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  color: string
+}
+
 const props = defineProps<{
   nodes: Node[]
+  /**
+   * Edges to draw beneath the circles.
+   *
+   * They are painted here rather than left to the SVG layer so that nodes and
+   * edges are produced by one pass over one view state. As two layers - a
+   * canvas drawn in JavaScript and an SVG moved by a CSS transform - they
+   * updated at different moments and visibly came apart while panning and
+   * zooming, and no amount of synchronising two mechanisms makes that
+   * reliable. It also keeps ~1,000 SVG elements out of the document, which is
+   * what WebKitGTK struggles with (PRODUCT_DESIGN.md > Canvas rendering).
+   *
+   * Geometry and colour only. Which edges are lit is read from
+   * highlightedEdgeIds at draw time, so hovering repaints without rebuilding
+   * the list (useEdgeVisibility > canvasEdges).
+   */
+  edges: LODEdge[]
+  highlightedEdgeIds: Set<string>
+  edgeStrokeWidth: number
+  highlightColor: string
   scale: number
   offsetX: number
   offsetY: number
@@ -32,6 +61,9 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 let animationId: number | null = null
+
+/** Smallest radius, in screen pixels, that a node may be pressed at. */
+const MIN_HIT_RADIUS_PX = 9
 
 const selectedSet = computed(() => new Set(props.selectedNodeIds))
 
@@ -64,6 +96,30 @@ function render() {
   ctx.scale(dpr, dpr)
   ctx.translate(props.offsetX, props.offsetY)
   ctx.scale(props.scale, props.scale)
+
+  // Edges first: the circles sit on top of them
+  if (props.edges.length > 0) {
+    const lit = props.highlightedEdgeIds
+    const width = props.edgeStrokeWidth
+    const anyLit = lit.size > 0
+    ctx.lineCap = 'round'
+    // Highlighting has to win on more than hue: the highlight colour is a
+    // neon cyan and the edges are already teal, so a lit edge read as just
+    // another line in the mesh. The contrast comes from the rest receding -
+    // and only while something is actually lit, so the ordinary view keeps
+    // its normal weight.
+    for (const edge of props.edges) {
+      const isLit = lit.has(edge.id)
+      ctx.globalAlpha = isLit ? 1 : anyLit ? 0.12 : 0.35
+      ctx.strokeStyle = isLit ? props.highlightColor : edge.color
+      ctx.lineWidth = isLit ? width * 2.2 : width
+      ctx.beginPath()
+      ctx.moveTo(edge.x1, edge.y1)
+      ctx.lineTo(edge.x2, edge.y2)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
+  }
 
   // Separate nodes into layers for proper z-ordering
   const regularNodes: Node[] = []
@@ -153,12 +209,20 @@ function hitTest(e: PointerEvent): string | null {
   const x = (e.clientX - rect.left - props.offsetX) / props.scale
   const y = (e.clientY - rect.top - props.offsetY) / props.scale
 
+  // A circle's radius is in canvas units, so zooming out shrinks the target
+  // with the drawing: at 16% a radius-8 node is about a pixel and a quarter
+  // across, and pressing it means landing inside that - which is why nodes
+  // stopped being selectable when zoomed out. The target never falls below a
+  // clickable size on screen, whatever the drawing does.
+  const minRadius = MIN_HIT_RADIUS_PX / props.scale
+
   // Check nodes in reverse order (top-most first)
   for (let i = nodePositions.value.length - 1; i >= 0; i--) {
     const pos = nodePositions.value[i]
     const dx = x - pos.cx
     const dy = y - pos.cy
-    if (dx * dx + dy * dy <= pos.r * pos.r) {
+    const r = Math.max(pos.r, minRadius)
+    if (dx * dx + dy * dy <= r * r) {
       return pos.id
     }
   }
@@ -213,13 +277,49 @@ function onContextMenu(e: MouseEvent) {
   }
 }
 
-// Render on any prop change
+/**
+ * Repaint in the same frame the view changed, not a frame later.
+ *
+ * Scheduling through requestAnimationFrame put this a frame behind the CSS
+ * transform that moves everything else, so the nodes trailed their own edges.
+ * Carrying the bitmap on a CSS transform instead and repainting once the view
+ * settled fixed the drift but left the canvas - which is only viewport-sized -
+ * showing blank where the pan had just revealed new ground.
+ *
+ * Neither is needed now that the edges are drawn here too: a few hundred
+ * circles and a thousand lines cost a couple of milliseconds, so the honest
+ * thing is to draw them, in the same frame, every frame. Nothing can lag
+ * behind anything else because it is all one pass.
+ */
+let paintedThisFrame = false
+
+function renderNow() {
+  if (paintedThisFrame) return
+  paintedThisFrame = true
+  render()
+  requestAnimationFrame(() => {
+    paintedThisFrame = false
+  })
+}
+
+// The view moved. Post flush, not sync: one pan writes offsetX and then
+// offsetY, and one zoom writes both plus scale, as separate reactive updates.
+// A sync watcher runs between them and paints a view that is half old - the
+// new x against the previous y - and the once-per-frame guard then suppressed
+// the corrected paint, so the canvas jittered against every other layer.
+// Post runs once, after the whole change has landed, still inside the frame.
+watch(
+  [() => props.scale, () => props.offsetX, () => props.offsetY],
+  renderNow,
+  { flush: 'post' }
+)
+
+// The content changed: nothing about it is an affine move, so repaint.
 watch(
   [
     () => props.nodes,
-    () => props.scale,
-    () => props.offsetX,
-    () => props.offsetY,
+    () => props.edges,
+    () => props.highlightedEdgeIds,
     () => props.selectedNodeIds,
     () => props.draggingNodeId,
     () => props.hoveredNodeId,

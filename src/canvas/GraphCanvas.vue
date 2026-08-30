@@ -428,13 +428,11 @@ watch(
 // Pre-computed LOD node lists to avoid double filtering in template
 const lodCircleNodes = computed(() => {
   if (!isLODMode.value) return []
-  const selectedSet = new Set(store.selectedNodeIds)
-  return visibleNodes.value.filter(n => !selectedSet.has(n.id) && n.id !== editingNodeId.value)
+  return visibleNodes.value.filter(n => n.id !== editingNodeId.value)
 })
 const lodCardNodes = computed(() => {
   if (!isLODMode.value) return visibleNodes.value
-  const selectedSet = new Set(store.selectedNodeIds)
-  return visibleNodes.value.filter(n => selectedSet.has(n.id) || n.id === editingNodeId.value)
+  return visibleNodes.value.filter(n => n.id === editingNodeId.value)
 })
 
 // Expose functions with original names for compatibility
@@ -1718,7 +1716,7 @@ const { edgeLines } = useEdgeRouting({
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties
-const { visibleEdgeLines } = useEdgeVisibility({
+const { visibleEdgeLines, canvasEdges } = useEdgeVisibility({
   edgeLines,
   totalEdgeCount: computed(() => store.filteredEdges.length),
   visibleNodeIds,
@@ -2098,6 +2096,8 @@ defineExpose({
       <CanvasLODCanvas
         v-if="isLODMode"
         :nodes="lodCircleNodes"
+        :edges="canvasEdges" :highlighted-edge-ids="highlightedEdgeIds"
+        :edge-stroke-width="edgeStrokeWidth" :highlight-color="highlightColor"
         :scale="scale"
         :offset-x="offsetX"
         :offset-y="offsetY"
@@ -2136,7 +2136,7 @@ defineExpose({
 
         <!-- SVG for edges (above frames) -->
         <CanvasEdgesSVG
-          :edges="visibleEdgeLines"
+          :edges="isLODMode ? [] : visibleEdgeLines"
           :simplified="useSimpleEdges"
           :edge-stroke-width="edgeStrokeWidth"
           :edge-label-size="edgeLabelSize"

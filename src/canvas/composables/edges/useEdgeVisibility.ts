@@ -40,8 +40,19 @@ export interface UseEdgeVisibilityContext {
   getNode: (id: string) => { color_theme?: string | null } | undefined
 }
 
+/** Edge geometry with its colour resolved, and nothing about what is hovered. */
+export interface CanvasEdge {
+  id: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  color: string
+}
+
 export interface UseEdgeVisibilityReturn {
   visibleEdgeLines: ComputedRef<VisibleEdgeLine[]>
+  canvasEdges: ComputedRef<CanvasEdge[]>
 }
 
 // Threshold for filtering edges by viewport visibility
@@ -238,7 +249,30 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     // ever moves (PRODUCT_DESIGN.md > Showing edges only around the focus).
   })
 
+  /**
+   * The same edges for the canvas renderer, carrying geometry and colour only.
+   *
+   * visibleEdgeLines bakes hover and selection into every edge, so pointing at
+   * one node rebuilt all ~1,200 objects and invalidated the whole render even
+   * though not a single edge had moved. Highlighting is a painting question,
+   * not a data one: this list changes only when the edges or the node layout
+   * do, and the renderer reads the highlighted set at draw time. A hover then
+   * costs one repaint and no allocation
+   * (PRODUCT_DESIGN.md > Showing edges only around the focus).
+   */
+  const canvasEdges = computed((): CanvasEdge[] =>
+    edgeLines.value.map(e => ({
+      id: e.id,
+      x1: e.x1,
+      y1: e.y1,
+      x2: e.x2,
+      y2: e.y2,
+      color: getEdgeColor({ link_type: e.link_type || '', color: e.color }),
+    }))
+  )
+
   return {
     visibleEdgeLines,
+    canvasEdges,
   }
 }
