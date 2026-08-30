@@ -9,6 +9,7 @@ import { useAppSearch } from './composables/useAppSearch'
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNotifications } from './composables/useNotifications'
 import { usePanelReveal } from './composables/usePanelReveal'
+import { useWebviewZoomGuard } from './composables/useWebviewZoomGuard'
 import { createEdgeStepper } from './lib/edgeGesture'
 import { isEdgeGesturePointer } from './composables/edgeGesturePointer'
 import GraphCanvas from './canvas/GraphCanvas.vue'
@@ -148,6 +149,8 @@ const gestureCoach = useGestureCoach()
 // Steps: graph -> overview -> half-screen reader -> full-screen reader.
 // The timelines view opens from the overview's button and sits in the
 // half-screen slot; stepping right from it enters the reader.
+useWebviewZoomGuard()
+
 const edgeStepper = createEdgeStepper({
   threshold: 12,
   // Once a storyline layer occupies the edge, stepping deeper needs a push
