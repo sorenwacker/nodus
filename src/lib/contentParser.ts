@@ -101,14 +101,53 @@ export function upsertFrontmatterField(
   return `---\n${kept.join('\n')}\n---\n${body}`
 }
 
-export function extractWikilinks(content: string): Set<string> {
-  const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
-  const links = new Set<string>()
-  let match
-  while ((match = wikilinkRegex.exec(content)) !== null) {
-    links.add(match[1].trim().toLowerCase())
+/** One wikilink found in a body of text. */
+export interface WikilinkMatch {
+  /** The link target, trimmed. */
+  target: string
+  /** The display text after a pipe, or null when the link carries none. */
+  alias: string | null
+  /** The literal `[[...]]` text, for a caller rewriting the source. */
+  text: string
+  /** Offset of the match in the content, for a caller rewriting the source. */
+  index: number
+}
+
+/**
+ * A fresh matcher for wikilink syntax: `[[target]]` or `[[target|alias]]`.
+ *
+ * The one definition of the syntax. It existed as five separate literals - in
+ * the frontmatter parser, the markdown renderer, the file-rename path, the
+ * references sidebar and the fullscreen editor - and they had already drifted:
+ * one accepted an empty alias (`[[Foo|]]`) where the rest rejected it, so the
+ * same text was a link in one view and plain prose in another
+ * (PRODUCT_DESIGN.md > One rule, one place).
+ *
+ * Returned from a function rather than exported as a constant because a global
+ * regex carries `lastIndex`, and a shared instance would have callers resuming
+ * from each other's position.
+ */
+export function wikilinkPattern(): RegExp {
+  return /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
+}
+
+/** Every wikilink in `content`, in the order it appears. */
+export function matchWikilinks(content: string): WikilinkMatch[] {
+  const found: WikilinkMatch[] = []
+  for (const match of content.matchAll(wikilinkPattern())) {
+    found.push({
+      target: match[1].trim(),
+      alias: match[2] || null,
+      text: match[0],
+      index: match.index ?? 0,
+    })
   }
-  return links
+  return found
+}
+
+/** Link targets in `content`, lowercased, for matching against node titles. */
+export function extractWikilinks(content: string): Set<string> {
+  return new Set(matchWikilinks(content).map((link) => link.target.toLowerCase()))
 }
 
 /**

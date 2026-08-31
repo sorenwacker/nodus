@@ -4,7 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useDisplayStore } from '../stores/display'
-import { splitFrontmatter, joinFrontmatter, upsertFrontmatterField } from '../lib/contentParser'
+import {
+  splitFrontmatter,
+  joinFrontmatter,
+  upsertFrontmatterField,
+  extractWikilinks,
+} from '../lib/contentParser'
 import { extractFrontmatterField } from '../lib/timelineDates'
 import { openExternal } from '../lib/tauri'
 import Icon from './Icon.vue'
@@ -137,10 +142,9 @@ function wikilinkExists(target: string): boolean {
 const anchoredComments = computed(() => {
   const content = editContent.value
   if (!content) return []
-  const linked = new Set<string>()
-  for (const match of content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)) {
-    linked.add(match[1].trim().toLowerCase())
-  }
+  // Through the shared parser, not a second copy of the pattern: an inline copy
+  // here already disagreed with it about an empty alias
+  const linked = extractWikilinks(content)
   if (linked.size === 0) return []
   return store.filteredNodes.filter(
     n => n.node_type === 'comment' && linked.has(n.title.toLowerCase())

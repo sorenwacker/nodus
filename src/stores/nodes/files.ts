@@ -4,6 +4,7 @@
 
 import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
+import { matchWikilinks } from '../../lib/contentParser'
 import type { Node, NodeStoreDependencies } from './types'
 
 /**
@@ -84,22 +85,12 @@ async function updateBacklinksForMovedNode(
   for (const node of state.nodes.value) {
     if (node.id === nodeId || !node.markdown_content) continue
 
-    // Check if this node has wikilinks that might reference the moved node
-    const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-    let match
     let updatedContent = node.markdown_content
     let hasChanges = false
 
-    // Collect all matches first to avoid issues with index shifting
-    const matches: Array<{ target: string; display: string | null; fullMatch: string; index: number }> = []
-    while ((match = wikilinkRegex.exec(node.markdown_content)) !== null) {
-      matches.push({
-        target: match[1],
-        display: match[2] || null,
-        fullMatch: match[0],
-        index: match.index,
-      })
-    }
+    // Collected first, then rewritten in reverse, so an earlier replacement
+    // cannot shift the offsets of the ones after it
+    const matches = matchWikilinks(node.markdown_content)
 
     // Process matches in reverse order to preserve indices
     for (let i = matches.length - 1; i >= 0; i--) {
@@ -132,11 +123,11 @@ async function updateBacklinksForMovedNode(
       }
 
       if (isMatch && m.target !== newTarget) {
-        const newWikilink = m.display ? `[[${newTarget}|${m.display}]]` : `[[${newTarget}]]`
+        const newWikilink = m.alias ? `[[${newTarget}|${m.alias}]]` : `[[${newTarget}]]`
         updatedContent =
           updatedContent.slice(0, m.index) +
           newWikilink +
-          updatedContent.slice(m.index + m.fullMatch.length)
+          updatedContent.slice(m.index + m.text.length)
         hasChanges = true
       }
     }

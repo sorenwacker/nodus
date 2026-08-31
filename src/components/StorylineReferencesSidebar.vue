@@ -6,6 +6,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
+import { matchWikilinks } from '../lib/contentParser'
 import Icon from './Icon.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import type { Node } from '../types'
@@ -20,17 +21,7 @@ interface WikilinkMatch {
  * Extract wikilinks with their position in the content
  */
 function extractWikilinksWithPosition(content: string, nodeIndex: number): WikilinkMatch[] {
-  const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
-  const links: WikilinkMatch[] = []
-  let match
-  while ((match = wikilinkRegex.exec(content)) !== null) {
-    links.push({
-      target: match[1].trim(),
-      index: match.index,
-      nodeIndex,
-    })
-  }
-  return links
+  return matchWikilinks(content).map(({ target, index }) => ({ target, index, nodeIndex }))
 }
 
 const props = defineProps<{
