@@ -230,22 +230,22 @@ fn main() {
                             if let Some(pinch) = event.downcast_ref::<gdk::EventTouchpadPinch>() {
                                 let (x, y) = pinch.position();
                                 let scale = pinch.scale();
-                                let (rx, ry) = pinch.root();
-                                eprintln!(
-                                    "[pinch] scale={scale:.4} pos=({x:.1},{y:.1}) root=({rx:.1},{ry:.1}) fingers={}",
-                                    pinch.n_fingers()
-                                );
-                                let _ = for_eval.eval(&format!(
-                                    "window.__NODUS_PINCH_ZOOM&&window.__NODUS_PINCH_ZOOM({scale},{x},{y})"
-                                ));
+                                // Every value is interpolated into JavaScript
+                                // source, and Rust writes a non-finite float as
+                                // `inf` - not a JavaScript literal but an
+                                // undefined identifier, so the whole call would
+                                // throw a ReferenceError instead of zooming.
+                                if scale.is_finite() && x.is_finite() && y.is_finite() {
+                                    let _ = for_eval.eval(format!(
+                                        "window.__NODUS_PINCH_ZOOM&&window.__NODUS_PINCH_ZOOM({scale},{x},{y})"
+                                    ));
+                                }
                             }
                             glib::Propagation::Stop
                         });
                     });
                     if let Err(e) = attached {
                         eprintln!("[pinch] guard failed to attach: {e}");
-                    } else {
-                        eprintln!("[pinch] guard attached");
                     }
                 }
             }
