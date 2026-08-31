@@ -7,7 +7,7 @@ import { useDisplayStore } from '../stores/display'
 import {
   splitFrontmatter,
   joinFrontmatter,
-  upsertFrontmatterField,
+  withDateFields,
   extractWikilinks,
 } from '../lib/contentParser'
 import { extractFrontmatterField } from '../lib/timelineDates'
@@ -183,12 +183,10 @@ watch(() => previewRef.value, (el) => {
 })
 
 function applyDate() {
+  // Through withDateFields, which the MCP handlers and the agent tools also
+  // use: a third way of writing a date would let the three surfaces disagree
   const full = joinFrontmatter(editingFrontmatter, editContent.value)
-  const withDates = upsertFrontmatterField(
-    upsertFrontmatterField(full, 'date', dateInput.value || null),
-    'date_end',
-    dateEndInput.value || null
-  )
+  const withDates = withDateFields(full, dateInput.value, dateEndInput.value)
   editingFrontmatter = splitFrontmatter(withDates).frontmatter
   scheduleSave()
 }

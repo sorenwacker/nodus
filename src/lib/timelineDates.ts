@@ -6,16 +6,21 @@
  * number (BC negative, fractional for month/day precision) for positioning
  * on a shared time axis.
  */
+import { splitFrontmatter } from './contentParser'
 
 /** Raw value of a field from a leading frontmatter block, if any */
 export function extractFrontmatterField(content: string, field: string): string | null {
-  // Either line ending; see splitFrontmatter for why this matters
-  if (!content.startsWith('---\n') && !content.startsWith('---\r\n')) return null
-  const end = content.indexOf('\n---', 4)
-  if (end === -1) return null
-  const block = content.slice(4, end)
+  // The block boundary comes from splitFrontmatter rather than a second copy of
+  // the rule. Compared case by case, the two agree everywhere except one: a
+  // line opening with `---` but carrying other text, which the copy accepted as
+  // the closing delimiter and splitFrontmatter does not. Such a file has no
+  // frontmatter as far as every other view of it is concerned, so the field now
+  // reads as absent there too (PRODUCT_DESIGN.md > One rule, one place)
+  const { frontmatter } = splitFrontmatter(content)
+  if (!frontmatter) return null
+
   const re = new RegExp(`^${field}:\\s*["']?(.+?)["']?\\s*$`)
-  for (const line of block.split('\n')) {
+  for (const line of frontmatter.split(/\r?\n/)) {
     const match = line.match(re)
     if (match) return match[1]
   }
