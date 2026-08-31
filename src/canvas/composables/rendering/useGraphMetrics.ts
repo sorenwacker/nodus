@@ -19,6 +19,14 @@ export interface UseGraphMetricsContext {
   neighborhoodMode: Ref<boolean>
   scale: Ref<number>
   workspaceId: ComputedRef<string | null>
+  /**
+   * True while a zoom or pan gesture is being performed. While it is, the
+   * zoom tier holds whatever renderer is showing: crossing the band swaps DOM
+   * cards for canvas circles, which costs seconds, and paying that repeatedly
+   * inside one gesture is the stutter it caused. The tier settles once, when
+   * the gesture ends. Optional: without it every change settles immediately.
+   */
+  gestureActive?: Ref<boolean>
 }
 
 export interface UseGraphMetricsReturn {
@@ -44,6 +52,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     neighborhoodMode,
     scale,
     workspaceId,
+    gestureActive,
   } = ctx
 
   // Get reactive refs from display store
@@ -160,9 +169,15 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   // legible again, so no single wheel notch can cross both edges of the band.
   const zoomForcesLOD = ref(false)
 
+  // gestureActive is a watch source as well as a guard: while it is true the
+  // tier does nothing, and its falling edge re-runs this watcher so the tier
+  // settles exactly once, on the state the gesture ended at. Programmatic
+  // scale changes (the startup fit, zoom-to-node) have no gesture and settle
+  // immediately, as before.
   watch(
-    [scale, () => visibleNodes.value.length],
-    ([s, count]) => {
+    [scale, () => visibleNodes.value.length, () => gestureActive?.value ?? false],
+    ([s, count, gesturing]) => {
+      if (gesturing) return
       if (zoomForcesLOD.value) {
         if (s >= CARD_RESTORE_SCREEN_PX / NODE_DEFAULTS.WIDTH || count < LOD_COUNT_LEAVE) {
           zoomForcesLOD.value = false

@@ -19,7 +19,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import type { Node, Edge } from '../types'
 import { NODE_DEFAULTS } from '../canvas/constants'
 
@@ -33,6 +33,7 @@ async function metricsAt(opts: {
   scale: number
   edgeCount?: number
   neighborhood?: boolean
+  gestureActive?: boolean
 }) {
   const { useGraphMetrics } = await import(
     '../canvas/composables/rendering/useGraphMetrics'
@@ -42,15 +43,19 @@ async function metricsAt(opts: {
     { length: opts.edgeCount ?? 0 },
     (_, i) => ({ id: `e${i}`, source_node_id: 'n0', target_node_id: 'n1' }) as Edge
   )
-  return useGraphMetrics({
+  const scale = ref(opts.scale)
+  const gestureActive = ref(opts.gestureActive ?? false)
+  const metrics = useGraphMetrics({
     displayNodes: computed(() => nodes),
     visibleNodes: computed(() => nodes),
     filteredNodes: computed(() => nodes),
     filteredEdges: computed(() => edges),
     neighborhoodMode: ref(opts.neighborhood ?? false),
-    scale: ref(opts.scale),
+    scale,
     workspaceId: computed(() => null),
+    gestureActive,
   })
+  return { ...metrics, scale, gestureActive }
 }
 
 /** The zoom at which a default-width card renders exactly 30 screen px. */
@@ -88,6 +93,50 @@ describe('bubble mode from rendered card size', () => {
 
   it('still turns on from node count alone at a readable zoom', async () => {
     const m = await metricsAt({ nodeCount: 600, scale: 1 })
+    expect(m.isLODMode.value).toBe(true)
+  })
+})
+
+describe('holding the renderer during a gesture', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
+
+  // The flip swaps the entire renderer and costs seconds; paying it inside a
+  // live gesture is the stutter it caused. It settles once, on gesture end.
+  it('does not flip while the gesture is live, then settles on its end', async () => {
+    const m = await metricsAt({ nodeCount: 215, scale: 1, gestureActive: true })
+    expect(m.isLODMode.value).toBe(false)
+
+    m.scale.value = 0.02
+    await nextTick()
+    expect(m.isLODMode.value).toBe(false)
+
+    m.gestureActive.value = false
+    await nextTick()
+    expect(m.isLODMode.value).toBe(true)
+  })
+
+  it('holds bubbles just as it holds cards', async () => {
+    const m = await metricsAt({ nodeCount: 215, scale: 0.02 })
+    expect(m.isLODMode.value).toBe(true)
+
+    m.gestureActive.value = true
+    m.scale.value = 1
+    await nextTick()
+    expect(m.isLODMode.value).toBe(true)
+
+    m.gestureActive.value = false
+    await nextTick()
+    expect(m.isLODMode.value).toBe(false)
+  })
+
+  it('settles immediately when no gesture is involved', async () => {
+    // The startup fit and zoom-to-node set the scale programmatically
+    const m = await metricsAt({ nodeCount: 215, scale: 1 })
+    m.scale.value = 0.02
+    await nextTick()
     expect(m.isLODMode.value).toBe(true)
   })
 })

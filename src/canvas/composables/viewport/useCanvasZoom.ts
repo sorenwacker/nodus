@@ -177,6 +177,11 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
         return
       }
 
+      // Momentum is still the zoom gesture: keep isZooming alive for its
+      // whole run, or it reports the gesture over 150ms in while the scale is
+      // still changing - and anything deferred to the gesture's end (the
+      // renderer switch in useGraphMetrics) would fire mid-flight
+      startZooming()
       applyZoomAtPoint(pinchVelocity, lastPinchMouseX, lastPinchMouseY, 0.008)
       pinchVelocity *= friction
 
