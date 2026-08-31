@@ -127,6 +127,11 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
 
   /** Narrowest a card may render on screen before its DOM form buys nothing. */
   const CARD_MIN_SCREEN_PX = 30
+  /** How wide it must get again before cards come back - the hysteresis band. */
+  const CARD_RESTORE_SCREEN_PX = 40
+  /** Visible-node counts that turn the zoom tier on and off, banded likewise. */
+  const LOD_COUNT_ENTER = 20
+  const LOD_COUNT_LEAVE = 12
 
   // LOD (Level of Detail) mode - render nodes as circles when many visible in viewport
   // Also activates when user manually toggles bubble mode.
@@ -146,12 +151,31 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
   // The floor keeps a handful of nodes as cards: a sparse workspace zoomed out
   // costs nothing to draw properly, and turning it into bubbles would only take
   // detail away.
+  //
+  // Hysteresis, for the reason semanticZoomCollapsed above has it: a bare
+  // comparison flickers when the zoom sits on the boundary, and this boundary
+  // swaps the entire renderer - DOM cards for canvas circles - so a flicker
+  // here is a far louder one than a collapsing card. Bubbles arrive when a card
+  // is narrower than CARD_MIN_SCREEN_PX and leave only once it is comfortably
+  // legible again, so no single wheel notch can cross both edges of the band.
+  const zoomForcesLOD = ref(false)
+
+  watch(
+    [scale, () => visibleNodes.value.length],
+    ([s, count]) => {
+      if (zoomForcesLOD.value) {
+        if (s >= CARD_RESTORE_SCREEN_PX / NODE_DEFAULTS.WIDTH || count < LOD_COUNT_LEAVE) {
+          zoomForcesLOD.value = false
+        }
+      } else if (s < CARD_MIN_SCREEN_PX / NODE_DEFAULTS.WIDTH && count > LOD_COUNT_ENTER) {
+        zoomForcesLOD.value = true
+      }
+    },
+    { immediate: true }
+  )
+
   const isLODMode = computed(
-    () =>
-      forceLODMode.value ||
-      visibleNodes.value.length > lodThreshold.value ||
-      (visibleNodes.value.length > 20 &&
-        scale.value < CARD_MIN_SCREEN_PX / NODE_DEFAULTS.WIDTH)
+    () => forceLODMode.value || visibleNodes.value.length > lodThreshold.value || zoomForcesLOD.value
   )
 
   /** Stroke width of an edge's invisible hit path, in canvas px (CanvasEdgesSVG). */
