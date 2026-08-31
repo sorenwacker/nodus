@@ -27,6 +27,9 @@ export interface UseGraphMetricsContext {
    * the gesture ends. Optional: without it every change settles immediately.
    */
   gestureActive?: Ref<boolean>
+  /** The node being edited keeps its card even in bubble mode. Lazy: the
+   *  editor composable is constructed after this one. */
+  getEditingNodeId?: () => string | null
 }
 
 export interface UseGraphMetricsReturn {
@@ -36,6 +39,9 @@ export interface UseGraphMetricsReturn {
   isSemanticZoomCollapsed: ComputedRef<boolean>
   isTextHidden: ComputedRef<boolean>
   isLODMode: ComputedRef<boolean>
+  /** Nodes drawn as circles / kept as cards while bubble mode is on. */
+  lodCircleNodes: ComputedRef<Node[]>
+  lodCardNodes: ComputedRef<Node[]>
   useSimpleEdges: ComputedRef<boolean>
   isBubbleModeForced: ComputedRef<boolean>
   nodeDegree: ComputedRef<Record<string, number>>
@@ -53,6 +59,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     scale,
     workspaceId,
     gestureActive,
+    getEditingNodeId,
   } = ctx
 
   // Get reactive refs from display store
@@ -193,6 +200,18 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     () => forceLODMode.value || visibleNodes.value.length > lodThreshold.value || zoomForcesLOD.value
   )
 
+  // Pre-computed LOD node lists so the template does not filter twice
+  const lodCircleNodes = computed(() => {
+    if (!isLODMode.value) return []
+    const editing = getEditingNodeId?.() ?? null
+    return visibleNodes.value.filter(n => n.id !== editing)
+  })
+  const lodCardNodes = computed(() => {
+    if (!isLODMode.value) return visibleNodes.value
+    const editing = getEditingNodeId?.() ?? null
+    return visibleNodes.value.filter(n => n.id === editing)
+  })
+
   /** Stroke width of an edge's invisible hit path, in canvas px (CanvasEdgesSVG). */
   const EDGE_HIT_STROKE = 12
   /** Narrowest a hit target may render on screen and still be reliably clickable. */
@@ -249,6 +268,8 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     isSemanticZoomCollapsed,
     isTextHidden,
     isLODMode,
+    lodCircleNodes,
+    lodCardNodes,
     useSimpleEdges,
     isBubbleModeForced: computed(() => forceLODMode.value),
     nodeDegree,

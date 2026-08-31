@@ -10,6 +10,7 @@
 
 import { ref, onMounted, onUnmounted, type Ref } from 'vue'
 import { canvasStorage } from '../../../lib/storage'
+import { ZOOM_LIMITS } from '../../constants'
 
 export interface UseCanvasZoomContext {
   canvasRef: Ref<HTMLElement | null>
@@ -70,7 +71,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
     const zoomIntensity = 0.003
     const delta = Math.exp(-deltaY * zoomIntensity)
-    const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
+    const newScale = Math.min(Math.max(scale.value * delta, ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
@@ -82,7 +83,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
   function applyZoomAtPoint(deltaY: number, mouseX: number, mouseY: number, intensity: number) {
     const delta = Math.exp(-deltaY * intensity)
-    const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
+    const newScale = Math.min(Math.max(scale.value * delta, ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
@@ -96,7 +97,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
    */
   function zoomByRatio(ratio: number, mouseX: number, mouseY: number) {
     if (!(ratio > 0)) return
-    const newScale = Math.min(Math.max(scale.value * ratio, 0.01), 3)
+    const newScale = Math.min(Math.max(scale.value * ratio, ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange

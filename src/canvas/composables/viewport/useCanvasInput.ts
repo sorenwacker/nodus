@@ -8,7 +8,7 @@
  * on the offset in the same frame and the canvas jitters between them.
  */
 
-import type { Ref } from 'vue'
+import { watchEffect, type Ref } from 'vue'
 import { useCanvasPan } from './useCanvasPan'
 import { useCanvasPinch } from './useCanvasPinch'
 
@@ -17,13 +17,23 @@ export interface UseCanvasInputContext {
   scale: Ref<number>
   offsetX: Ref<number>
   offsetY: Ref<number>
+  /** The wheel-zoom activity signal (150ms settle timer, useViewState). */
+  isZooming?: Ref<boolean>
   startZooming: () => void
   scheduleSaveViewState: () => void
   onPanEnd?: () => void
+  /**
+   * Kept true while any viewport gesture is live - wheel zoom, pinch or pan.
+   * A plain ref owned by the caller: whoever needs the signal (the renderer
+   * switch in useGraphMetrics) is constructed long before this composable, so
+   * it cannot be handed a computed built here. isZooming is timer-settled and
+   * held through momentum; pinch and pan end exactly on pointerup.
+   */
+  gestureActive?: Ref<boolean>
 }
 
 export function useCanvasInput(ctx: UseCanvasInputContext) {
-  const { canvasRef, scale, offsetX, offsetY, startZooming, scheduleSaveViewState, onPanEnd } = ctx
+  const { canvasRef, scale, offsetX, offsetY, isZooming, startZooming, scheduleSaveViewState, onPanEnd, gestureActive } = ctx
 
   const pan = useCanvasPan({
     getOffset: () => ({ x: offsetX.value, y: offsetY.value }),
@@ -43,6 +53,13 @@ export function useCanvasInput(ctx: UseCanvasInputContext) {
     scheduleSaveViewState,
     onPinchStart: () => pan.stopPan(),
   })
+
+  if (gestureActive) {
+    watchEffect(() => {
+      gestureActive.value =
+        (isZooming?.value ?? false) || pinch.isPinching.value || pan.isPanning.value
+    })
+  }
 
   /**
    * Offer a press to the gesture handlers before anything else reads it.

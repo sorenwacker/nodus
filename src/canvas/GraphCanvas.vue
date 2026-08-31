@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick, inject, toRef } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject, toRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { useThemesStore } from '../stores/themes'
@@ -191,6 +191,8 @@ const {
   centerGrid,
   screenToCanvas,
   startZooming,
+  zoomIn,
+  zoomOut,
   transform,
   gridTransform,
 } = viewState
@@ -372,10 +374,7 @@ const viewportCulling = useViewportCulling({
 })
 const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
-// True while a zoom or pan gesture is live. useGraphMetrics needs it but is
-// constructed long before useCanvasInput (which owns pinch and pan), so it is
-// a plain ref kept current by a watchEffect below rather than a computed here.
-const gestureActive = ref(false)
+const gestureActive = ref(false) // live while any viewport gesture is (useCanvasInput)
 
 // Graph metrics composable - computes graph size thresholds and LOD mode
 const graphMetrics = useGraphMetrics({
@@ -387,6 +386,7 @@ const graphMetrics = useGraphMetrics({
   scale,
   workspaceId: computed(() => store.currentWorkspaceId),
   gestureActive,
+  getEditingNodeId: () => editingNodeId.value,
 })
 const {
   isLargeGraph,
@@ -396,6 +396,8 @@ const {
   isSemanticZoomCollapsed,
   isTextHidden,
   isLODMode,
+  lodCircleNodes,
+  lodCardNodes,
   isBubbleModeForced,
   getLODRadius,
   toggleBubbleMode,
@@ -431,15 +433,6 @@ watch(
   }
 )
 
-// Pre-computed LOD node lists to avoid double filtering in template
-const lodCircleNodes = computed(() => {
-  if (!isLODMode.value) return []
-  return visibleNodes.value.filter(n => n.id !== editingNodeId.value)
-})
-const lodCardNodes = computed(() => {
-  if (!isLODMode.value) return visibleNodes.value
-  return visibleNodes.value.filter(n => n.id === editingNodeId.value)
-})
 
 // Expose functions with original names for compatibility
 function toggleNeighborhoodMode(nodeId?: string) {
@@ -762,23 +755,18 @@ function onMinimapClick(e: MouseEvent) {
 // Canvas panning composable
 // Drag to pan, two contacts to pinch-zoom; see useCanvasInput for why they
 // are composed together rather than wired separately here.
-const { isPanning, isPinching, startPan, beginContact } = useCanvasInput({
+const { isPanning, startPan, beginContact } = useCanvasInput({
   canvasRef,
   scale,
   offsetX,
   offsetY,
+  isZooming,
   startZooming,
   scheduleSaveViewState,
   onPanEnd: () => {
     lastDragEndTime = Date.now()
   },
-})
-
-// The three gesture signals live in three composables; useGraphMetrics wants
-// one. isZooming is timer-settled (150ms after the last wheel/pinch event,
-// held through momentum); isPinching and isPanning end exactly on pointerup.
-watchEffect(() => {
-  gestureActive.value = isZooming.value || isPinching.value || isPanning.value
+  gestureActive,
 })
 
 // Get reactive refs from store for the hover composable
@@ -2284,8 +2272,7 @@ defineExpose({
         :pending-frame-placement="frames.pendingFramePlacement.value"
         :highlight-all-edges="highlightAllEdges"
         :bubble-mode-active="isBubbleModeForced"
-        @zoom-in="scale = Math.min(scale * 1.25, 3)"
-        @zoom-out="scale = Math.max(scale * 0.8, 0.01)"
+        @zoom-in="zoomIn" @zoom-out="zoomOut"
         @fit-to-content="fitToContent"
         @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
         @layout="autoLayoutNodes"

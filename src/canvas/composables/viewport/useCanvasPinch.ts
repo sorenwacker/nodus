@@ -11,9 +11,11 @@
 
 import { ref, type Ref } from 'vue'
 
-/** Matches the wheel path in useCanvasZoom, so both routes agree. */
-const MIN_SCALE = 0.01
-const MAX_SCALE = 3
+import { ZOOM_LIMITS } from '../../constants'
+
+/** One definition for every zoom route (canvas/constants.ts). */
+const MIN_SCALE = ZOOM_LIMITS.MIN
+const MAX_SCALE = ZOOM_LIMITS.MAX
 
 export interface UseCanvasPinchContext {
   canvasRef: Ref<HTMLElement | null>

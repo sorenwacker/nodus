@@ -3,6 +3,7 @@
  * Manages canvas scale, offset, persistence, and centering
  */
 import { ref, computed, onUnmounted } from 'vue'
+import { ZOOM_LIMITS } from '../../constants'
 
 const VIEW_STORAGE_KEY = 'nodus-canvas-view'
 
@@ -84,17 +85,17 @@ export function useViewState(options: UseViewStateOptions) {
 
   // Zoom controls
   function zoomIn() {
-    scale.value = Math.min(scale.value * 1.25, 3)
+    scale.value = Math.min(scale.value * 1.25, ZOOM_LIMITS.MAX)
     scheduleSaveViewState()
   }
 
   function zoomOut() {
-    scale.value = Math.max(scale.value * 0.8, 0.01)
+    scale.value = Math.max(scale.value * 0.8, ZOOM_LIMITS.MIN)
     scheduleSaveViewState()
   }
 
   function setScale(newScale: number) {
-    scale.value = Math.max(0.01, Math.min(3, newScale))
+    scale.value = Math.max(ZOOM_LIMITS.MIN, Math.min(ZOOM_LIMITS.MAX, newScale))
     scheduleSaveViewState()
   }
 
