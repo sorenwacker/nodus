@@ -118,6 +118,20 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
   > | null>(null)
   const lastRoutingKey = ref('')
 
+  // Memo of the computed's full product, not only the routing. The routing
+  // cache below spares routeAllEdges, but every recompute still re-ran the
+  // whole O(edges) pipeline around it - dedup, bidirectional merge, node map,
+  // port assignment, the sort, the geometry map - at 65-88ms for ~1,000 edges,
+  // four to five dropped frames per invalidation. When nothing that shapes an
+  // edge has changed, the previous array is returned by identity, which also
+  // lets every downstream computed (visibleEdgeLines, canvasEdges) keep its
+  // own cache. Geometry changes are represented by nodeLayoutVersion, which
+  // the store bumps on every position and size write - the same contract the
+  // routing cache already relies on.
+  let memoEdgeLines: EdgeLine[] | null = null
+  let memoKey = ''
+  let memoStyleMap: Record<string, string> | null = null
+
   // Recalculate routing when drag ends
   watch(
     () => isDragging?.value,
@@ -125,6 +139,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       if (wasDragging && !dragging) {
         // Drag ended - invalidate cache to trigger re-routing
         lastRoutingKey.value = ''
+        memoKey = ''
       }
     }
   )
@@ -207,6 +222,22 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         .filter((e): e is NonNullable<typeof e> => e !== null) as EdgeLine[]
     }
 
+    const style = globalEdgeStyle.value
+
+    // Everything below is a pure function of the edge list, the node layout
+    // version, and the style inputs keyed here. Same key, same product.
+    const fullKey =
+      `${edges.length}|${style}|${isHugeGraph.value}|${store.nodeLayoutVersion}|` +
+      edges.map(e => `${e.id}:${e.source_node_id}>${e.target_node_id}`).join(',')
+    if (
+      memoEdgeLines &&
+      fullKey === memoKey &&
+      memoStyleMap === edgeStyleMap.value &&
+      !mustRerouteLive()
+    ) {
+      return memoEdgeLines
+    }
+
     // Build node map for efficient lookup
     const nodeMap = new Map<string, NodeRect>()
     for (const node of displayNodes.value) {
@@ -262,8 +293,6 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       }
       seenDirectionalPairs.set(forwardKey, linkType)
     }
-
-    const style = globalEdgeStyle.value
 
     // Convert edges to EdgeDef format for routing
     const edgeDefs = edges.map(e => ({
@@ -365,7 +394,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       return midAx - midBx
     })
 
-    return sortedEdges
+    const result = sortedEdges
       .map(edge => {
         const source = nodeMap.get(edge.source_node_id)
         const target = nodeMap.get(edge.target_node_id)
@@ -621,6 +650,15 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         }
       })
       .filter((e): e is NonNullable<typeof e> => e !== null) as EdgeLine[]
+
+    // A drag reroutes live with geometry the key cannot see, so its product
+    // must not be served to a later recompute
+    if (!mustRerouteLive()) {
+      memoEdgeLines = result
+      memoKey = fullKey
+      memoStyleMap = edgeStyleMap.value
+    }
+    return result
   })
 
   return {

@@ -116,6 +116,16 @@ export async function updateNodeSize(
   if (node) {
     const clampedWidth = clampNodeSize(width)
     const clampedHeight = clampNodeSize(height)
+    // Measurement paths call this with the size the node already has. Writing
+    // it anyway bumped nodeLayoutVersion, and that version is the signal every
+    // edge-routing cache keys on - so a no-op "resize" re-routed ~1,000 edges
+    // and re-saved the node for a change of nothing.
+    if (
+      Math.abs((node.width ?? 0) - clampedWidth) < 0.5 &&
+      Math.abs((node.height ?? 0) - clampedHeight) < 0.5
+    ) {
+      return
+    }
     node.width = clampedWidth
     node.height = clampedHeight
     node.updated_at = Date.now()
