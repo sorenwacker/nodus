@@ -1488,6 +1488,17 @@ The floor keeps a sparse workspace as cards: a handful of nodes costs nothing to
 
 Without the zoom tier the count tier could never fire for the case that needs it most. Fitting a workspace whose layout spans tens of thousands of canvas px puts every node on screen at once at a zoom near the floor, so viewport culling culls nothing and the node count never changes. A card is a composited DOM subtree of some sixty elements, and the compositor backs each one whatever its size on screen. Measured on a 215-node workspace with a 41,000 x 50,000 px layout: 6 GB of shared graphics memory and a kernel out-of-memory kill as cards, against 476 MB and a live application as circles. Card cost saturates by about 60 rendered cards, so the tier has to be reachable well below any node-count threshold.
 
+### Keeping the webview at 100%
+
+The webview stays at 100% zoom. Only the canvas zooms, and it has its own controls.
+
+WebKitGTK zooms the whole page on Ctrl+wheel from inside the widget, which cannot be prevented from the page: the DOM event's default action is not what performs the zoom, so `preventDefault` has no effect on it. Scaling the interface up put the toolbar and the zoom controls outside the window with no way back, because Ctrl+0 and Ctrl+plus/minus are already the canvas font scale, and once the chrome has scaled away no non-canvas surface is left to Ctrl+wheel over. WKWebView has no such gesture, so this is a Linux problem in practice.
+
+Since the zoom cannot be prevented, it is undone: after any gesture that could have zoomed, the zoom level is set back to 1. Two properties make that workable.
+
+- **Every route is caught, not only the ones the guard can name.** A page zoom changes the viewport, so the webview reports a resize; listening for the resize covers the wheel gesture, the hotkeys, and anything the platform does natively that never reaches the DOM.
+- **Resets are coalesced to one per frame.** A wheel burst is dozens of events, and one reset per event would be one IPC call per event.
+
 ### Arrowheads above the LOD threshold
 
 An undirected edge has no arrowhead at any zoom level. Above the level-of-detail threshold the arrowhead-suppression flag was hardcoded to false, so an edge with `directed === false` drew no arrow at normal zoom and grew one as soon as the graph crossed the threshold.
