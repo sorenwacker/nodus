@@ -1475,6 +1475,19 @@ Three tiers change how the canvas renders as a graph grows: large, huge, massive
 
 They were inline literals with "massive" at 800 nodes and "huge" at 1000, so a 900-node graph was massive but not huge, and the names carried no information about which came first.
 
+### Detail also drops by zoom
+
+A count tier alone cannot decide how much detail to draw, because a small graph can be drawn at a zoom where none of that detail is legible. Two mechanisms therefore have a zoom tier alongside their count tier, and either one turning on is enough:
+
+| Mechanism | Count tier | Zoom tier |
+|---|---|---|
+| Bubble mode (`isLODMode`) | more visible nodes than the LOD threshold | a default-width card would render under 30 screen px, with a floor of 20 visible nodes |
+| Single-path edges (`useSimpleEdges`) | the large-graph tier | the 12px edge hit stroke would render under 4 screen px |
+
+The floor keeps a sparse workspace as cards: a handful of nodes costs nothing to draw properly, and bubbling them would only take detail away.
+
+Without the zoom tier the count tier could never fire for the case that needs it most. Fitting a workspace whose layout spans tens of thousands of canvas px puts every node on screen at once at a zoom near the floor, so viewport culling culls nothing and the node count never changes. A card is a composited DOM subtree of some sixty elements, and the compositor backs each one whatever its size on screen. Measured on a 215-node workspace with a 41,000 x 50,000 px layout: 6 GB of shared graphics memory and a kernel out-of-memory kill as cards, against 476 MB and a live application as circles. Card cost saturates by about 60 rendered cards, so the tier has to be reachable well below any node-count threshold.
+
 ### Arrowheads above the LOD threshold
 
 An undirected edge has no arrowhead at any zoom level. Above the level-of-detail threshold the arrowhead-suppression flag was hardcoded to false, so an edge with `directed === false` drew no arrow at normal zoom and grew one as soon as the graph crossed the threshold.

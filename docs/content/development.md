@@ -92,6 +92,20 @@ storeLogger.warn('Warning message')           // Always shown
 storeLogger.error('Error occurred', error)    // Always shown
 ```
 
+## Measuring canvas performance
+
+Canvas cost on a large workspace is dominated by graphics memory, not by the JS heap, so the browser devtools memory panel does not show it. The build carries the `devtools` feature: press Ctrl+Shift+I, open **Performance**, record about five seconds of panning, and compare Paint against Style/Layout and against JS.
+
+On Linux, watch shared memory rather than resident size. A runaway canvas shows as `shmem` growth in `journalctl -k` after an out-of-memory kill, attributed to no process's RSS, because the surfaces belong to the i915 GEM allocator. The WebProcess's very large `total-vm` is not evidence of a leak: JSC's gigacage reserves that address space on every page.
+
+To reproduce a suspected out-of-memory condition without taking the machine down, cap the process:
+
+```bash
+systemd-run --scope -p MemoryMax=4G -- ./nodus
+```
+
+Two levers already reduce cost by zoom rather than by graph size; see "Detail also drops by zoom" in the product design document. One known lever remains untried: the edge SVG is `width:100%;height:100%` inside a 1px by 1px parent with `overflow: visible`, which gives the browser no real viewport to cull paint against. Sizing it to the graph's bounding box is worth testing if more is needed.
+
 ## Known dependency advisory
 
 `glib` 0.18 carries a medium-severity unsoundness advisory (`VariantStrIter`). It
