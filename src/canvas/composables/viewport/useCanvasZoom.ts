@@ -18,6 +18,8 @@ export interface UseCanvasZoomContext {
   offsetX: Ref<number>
   offsetY: Ref<number>
   isZooming: Ref<boolean>
+  /** Dynamic zoom-out floor, from content extent (useViewState > minZoom) */
+  minZoom?: () => number
   startZooming: () => void
   scheduleSaveViewState: () => void
 }
@@ -42,6 +44,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     offsetX,
     offsetY,
     isZooming,
+    minZoom,
     startZooming,
     scheduleSaveViewState,
   } = ctx
@@ -71,7 +74,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
     const zoomIntensity = 0.003
     const delta = Math.exp(-deltaY * zoomIntensity)
-    const newScale = Math.min(Math.max(scale.value * delta, ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
+    const newScale = Math.min(Math.max(scale.value * delta, minZoom?.() ?? ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
@@ -83,7 +86,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
   function applyZoomAtPoint(deltaY: number, mouseX: number, mouseY: number, intensity: number) {
     const delta = Math.exp(-deltaY * intensity)
-    const newScale = Math.min(Math.max(scale.value * delta, ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
+    const newScale = Math.min(Math.max(scale.value * delta, minZoom?.() ?? ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
@@ -97,7 +100,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
    */
   function zoomByRatio(ratio: number, mouseX: number, mouseY: number) {
     if (!(ratio > 0)) return
-    const newScale = Math.min(Math.max(scale.value * ratio, ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
+    const newScale = Math.min(Math.max(scale.value * ratio, minZoom?.() ?? ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange

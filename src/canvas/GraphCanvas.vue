@@ -74,6 +74,7 @@ import PdfHighlightPicker from '../components/PdfHighlightPicker.vue'
 import PdfGraphDialog from '../components/PdfGraphDialog.vue'
 import type { HighlightImport } from '../lib/pdfHighlights'
 import { NODE_DEFAULTS } from './constants'
+import { contentSpan } from './utils/contentBounds'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
 import CanvasEdgeFilters from './components/CanvasEdgeFilters.vue'
@@ -180,6 +181,7 @@ const canvasRef = ref<HTMLElement | null>(null)
 // View state composable - handles scale, offset, persistence
 const viewState = useViewState({
   getCanvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
+  getContentSpan: () => contentSpan(store.filteredNodes),
 })
 const {
   scale,
@@ -191,10 +193,8 @@ const {
   centerGrid,
   screenToCanvas,
   startZooming,
-  zoomIn,
-  zoomOut,
-  transform,
-  gridTransform,
+  zoomIn, zoomOut, minZoom,
+  transform, gridTransform,
 } = viewState
 
 onMounted(() => {
@@ -691,7 +691,7 @@ const { onWheel, onCanvasPointerMove, onCanvasPointerEnter, onCanvasPointerLeave
   scale,
   offsetX,
   offsetY,
-  isZooming,
+  isZooming, minZoom,
   startZooming,
   scheduleSaveViewState,
 })
@@ -760,7 +760,7 @@ const { isPanning, startPan, beginContact } = useCanvasInput({
   scale,
   offsetX,
   offsetY,
-  isZooming,
+  isZooming, minZoom,
   startZooming,
   scheduleSaveViewState,
   onPanEnd: () => {

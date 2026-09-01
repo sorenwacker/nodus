@@ -2,8 +2,8 @@
  * Fitting the viewport to the content on the canvas.
  */
 import { type Ref } from 'vue'
-import { NODE_DEFAULTS } from '../../constants'
 import { ZOOM_LIMITS } from '../../constants'
+import { contentSpan } from '../../utils/contentBounds'
 
 export interface Node {
   id: string
@@ -54,23 +54,17 @@ export function fitToContent(
   store: LayoutStrategyStore,
   viewState: ViewState
 ): void {
-  const nodes = store.getFilteredNodes()
-  if (nodes.length === 0) return
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const node of nodes) {
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH))
-    maxY = Math.max(maxY, node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT))
-  }
+  const span = contentSpan(store.getFilteredNodes())
+  if (!span) return
 
   const rect = viewState.canvasRect()
   if (!rect) return
 
   const padding = 50
-  const contentWidth = maxX - minX + padding * 2
-  const contentHeight = maxY - minY + padding * 2
+  const minX = span.minX
+  const minY = span.minY
+  const contentWidth = span.width + padding * 2
+  const contentHeight = span.height + padding * 2
 
   const scaleX = rect.width / contentWidth
   const scaleY = rect.height / contentHeight

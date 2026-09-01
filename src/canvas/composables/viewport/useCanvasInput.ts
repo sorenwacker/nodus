@@ -19,6 +19,8 @@ export interface UseCanvasInputContext {
   offsetY: Ref<number>
   /** The wheel-zoom activity signal (150ms settle timer, useViewState). */
   isZooming?: Ref<boolean>
+  /** Dynamic zoom-out floor, from content extent (useViewState > minZoom) */
+  minZoom?: () => number
   startZooming: () => void
   scheduleSaveViewState: () => void
   onPanEnd?: () => void
@@ -33,7 +35,7 @@ export interface UseCanvasInputContext {
 }
 
 export function useCanvasInput(ctx: UseCanvasInputContext) {
-  const { canvasRef, scale, offsetX, offsetY, isZooming, startZooming, scheduleSaveViewState, onPanEnd, gestureActive } = ctx
+  const { canvasRef, scale, offsetX, offsetY, isZooming, minZoom, startZooming, scheduleSaveViewState, onPanEnd, gestureActive } = ctx
 
   const pan = useCanvasPan({
     getOffset: () => ({ x: offsetX.value, y: offsetY.value }),
@@ -45,6 +47,7 @@ export function useCanvasInput(ctx: UseCanvasInputContext) {
   })
 
   const pinch = useCanvasPinch({
+    minZoom,
     canvasRef,
     scale,
     offsetX,

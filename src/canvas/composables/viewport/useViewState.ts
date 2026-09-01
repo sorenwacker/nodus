@@ -16,12 +16,14 @@ export interface ViewState {
 export interface UseViewStateOptions {
   /** Get canvas element bounding rect */
   getCanvasRect: () => DOMRect | null
+  /** Get the span of the current content, for the dynamic zoom-out floor */
+  getContentSpan?: () => { width: number; height: number } | null
   /** Default scale if no saved state */
   defaultScale?: number
 }
 
 export function useViewState(options: UseViewStateOptions) {
-  const { getCanvasRect, defaultScale = 1 } = options
+  const { getCanvasRect, getContentSpan, defaultScale = 1 } = options
 
   // Load saved view state from localStorage
   function loadViewState(): ViewState | null {
@@ -83,6 +85,26 @@ export function useViewState(options: UseViewStateOptions) {
     }
   }
 
+  /**
+   * The deepest zoom-out the user may reach, from the content itself.
+   *
+   * A fixed floor serves every workspace the same, and the same number that
+   * lets a 69,000px layout fit lets an 11,000px one shrink to a smudge and
+   * the pointer travel two hundred canvas px per mouse px - the view ends up
+   * megapixels from the graph with nothing on screen to navigate back by.
+   * The floor is therefore the fit scale with margin: the whole graph plus
+   * ~40% of breathing room is as far out as out goes. ZOOM_LIMITS.MIN remains
+   * the absolute bound (content unknown, or vast), and the 0.5 cap keeps a
+   * tiny two-node workspace zoomable-out enough to plan around.
+   */
+  function minZoom(): number {
+    const span = getContentSpan?.()
+    const rect = getCanvasRect()
+    if (!span || !rect || span.width <= 0 || span.height <= 0) return ZOOM_LIMITS.MIN
+    const fit = Math.min(rect.width / (span.width + 100), rect.height / (span.height + 100))
+    return Math.min(0.5, Math.max(ZOOM_LIMITS.MIN, fit * 0.7))
+  }
+
   // Zoom controls
   function zoomIn() {
     scale.value = Math.min(scale.value * 1.25, ZOOM_LIMITS.MAX)
@@ -90,12 +112,12 @@ export function useViewState(options: UseViewStateOptions) {
   }
 
   function zoomOut() {
-    scale.value = Math.max(scale.value * 0.8, ZOOM_LIMITS.MIN)
+    scale.value = Math.max(scale.value * 0.8, minZoom())
     scheduleSaveViewState()
   }
 
   function setScale(newScale: number) {
-    scale.value = Math.max(ZOOM_LIMITS.MIN, Math.min(ZOOM_LIMITS.MAX, newScale))
+    scale.value = Math.max(minZoom(), Math.min(ZOOM_LIMITS.MAX, newScale))
     scheduleSaveViewState()
   }
 
@@ -186,6 +208,7 @@ export function useViewState(options: UseViewStateOptions) {
     centerGrid,
     zoomIn,
     zoomOut,
+    minZoom,
     setScale,
     startZooming,
     screenToCanvas,
