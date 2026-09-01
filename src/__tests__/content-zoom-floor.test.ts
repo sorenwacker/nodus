@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest'
 import { useViewState } from '../canvas/composables/viewport/useViewState'
 import { ZOOM_LIMITS } from '../canvas/constants'
 import { contentSpan } from '../canvas/utils/contentBounds'
+import { applyForceLayout } from '../canvas/layout'
 
 const RECT = { width: 1536, height: 652 } as DOMRect
 
@@ -74,5 +75,27 @@ describe('contentSpan', () => {
     ])
     expect(span).toEqual({ minX: 0, minY: 0, width: 1400, height: 880 })
     expect(contentSpan([])).toBeNull()
+  })
+})
+
+describe('force layout spacing follows card size', () => {
+  it('spaces two large linked cards further apart than the flat pad did', async () => {
+    const big = { width: 400, height: 380 }
+    const nodes = [
+      { id: 'a', x: 0, y: 0, ...big },
+      { id: 'b', x: 10, y: 10, ...big },
+    ]
+    const positions = await applyForceLayout(nodes, [{ source: 'a', target: 'b' }], {
+      centerX: 0,
+      centerY: 0,
+      iterations: 300,
+    })
+    const a = positions.get('a')!
+    const b = positions.get('b')!
+    const dist = Math.hypot(a.x - b.x, a.y - b.y)
+    const diagonal = Math.hypot(400, 380)
+    // Collision demands r_a + r_b = diagonal + 2 * max(80, diagonal / 4);
+    // allow d3 a little unresolved slack
+    expect(dist).toBeGreaterThan((diagonal + 2 * (diagonal / 4)) * 0.9)
   })
 })
