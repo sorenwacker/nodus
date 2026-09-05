@@ -703,9 +703,9 @@ Focus view that isolates a node and its connected neighbors:
 
 - **Depth control:** Configurable 1-5 hops (edges away from focus node)
 - **BFS traversal:** Finds all nodes within specified depth
-- **Layout modes:**
-  - Depth 1: Hierarchical layout (parents above, children below, siblings aside)
-  - Depth 2+: Concentric ring layout around focus node
+- **Layout:** The subgraph is arranged by the same layout algorithms the canvas uses, not by a placement of its own. Entering the mode arranges it radially around the focus node, which suits a focus view and keeps a hub with many neighbours on screen: the radius grows with the neighbour count rather than a row growing with it.
+- **Changing the layout:** While the mode is active, the grid, force, hierarchical and radial controls apply to the visible subgraph rather than the whole canvas.
+- **Positions are not stored:** Every arrangement computed in this mode is an ephemeral overlay. Stored coordinates are untouched, so leaving the mode restores the canvas exactly as it was.
 - **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
 
 ### Edge Routing (PCB-Style)
