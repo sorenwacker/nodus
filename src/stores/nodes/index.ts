@@ -103,7 +103,6 @@ export {
   repairStorylineEdges,
   updateStorylineEdgeColors,
   syncAllTagNodes,
-  removeAllTagNodes,
   getEntities,
   getEntitiesByType,
   getLinkedEntities,

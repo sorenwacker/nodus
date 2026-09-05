@@ -15,6 +15,7 @@ import { useNodeEditLocking } from '../composables/useNodeEditLocking'
 import { useNodeLayout } from '../composables/useNodeLayout'
 import { useEntityOperations } from '../composables/useEntityOperations'
 import { storeLogger } from '../lib/logger'
+import { planTagEdgeRemoval } from '../lib/tagSync'
 
 // Import from submodules
 import {
@@ -100,7 +101,6 @@ import {
   repairStorylineEdges as repairStorylineEdgesFn,
   updateStorylineEdgeColors as updateStorylineEdgeColorsFn,
   syncAllTagNodes as syncAllTagNodesFn,
-  removeAllTagNodes as removeAllTagNodesFn,
   getEntities as getEntitiesFn,
   getEntitiesByType as getEntitiesByTypeFn,
   getLinkedEntities as getLinkedEntitiesFn,
@@ -217,6 +217,22 @@ export const useNodesStore = defineStore('nodes', () => {
 
   async function initialize() {
     await initializeStore(deps, createNode)
+    // Tags can arrive without their edges: the load-time body scan writes them,
+    // and an agent can set a node's tags over MCP. Both leave a node tagged and
+    // unconnected, and nothing else puts that right - the whole-vault sync used
+    // to run only when the setting was toggled
+    // (docs/content/features.md > Tags).
+    syncTagEdgesIfEnabled()
+  }
+
+  /**
+   * Connect any node whose tags have no edges, when tag nodes are switched on.
+   *
+   * createTagEdges skips a connection that already exists, so this is safe to
+   * run on every load and costs nothing on a vault that is already connected.
+   */
+  function syncTagEdgesIfEnabled() {
+    syncAllTagNodes().catch(e => storeLogger.error('[Tags] Edge sync failed:', e))
   }
 
   function getNode(id: string): Node | undefined {
@@ -265,7 +281,23 @@ export const useNodesStore = defineStore('nodes', () => {
     content: string,
     options?: { skipUndo?: boolean }
   ) {
-    await updateNodeContentFn(deps, id, content, tagNodesComposable, createEdge, options)
+    await updateNodeContentFn(deps, id, content, tagNodesComposable, createEdge, options, removeTagEdges)
+  }
+
+  /**
+   * Withdraw the edges of tags a node no longer carries.
+   *
+   * A tag node is shared, so it only goes once the last note using it lets go
+   * (docs/content/features.md > Tags).
+   */
+  async function removeTagEdges(nodeId: string, removedTags: string[]) {
+    const plan = planTagEdgeRemoval(nodeId, removedTags, nodes.value, edgesStore.edges)
+    for (const edgeId of plan.edgeIds) {
+      await edgesStore.deleteEdge(edgeId)
+    }
+    for (const tagNodeId of plan.orphanTagNodeIds) {
+      await deleteNode(tagNodeId)
+    }
   }
 
   async function updateNodeTitle(id: string, title: string) {
@@ -405,10 +437,6 @@ export const useNodesStore = defineStore('nodes', () => {
     await syncAllTagNodesFn(nodes.value, tagNodesComposable)
   }
 
-  async function removeAllTagNodes() {
-    await removeAllTagNodesFn(deps, deleteNode)
-  }
-
   // Initialize composables that depend on functions defined above
   importComposable = useImport({
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
@@ -490,15 +518,19 @@ export const useNodesStore = defineStore('nodes', () => {
   const getTagNodes = () => tagNodesComposable.getTagNodes()
 
   // Listen for tag nodes setting change
-  const handleTagNodesChange = async (e: Event) => {
-    const enabled = (e as CustomEvent).detail
-    if (enabled) {
-      await syncAllTagNodes()
-    } else {
-      await removeAllTagNodes()
-    }
+  /**
+   * The tag setting is a view preference: it shows or hides tag nodes, and
+   * never creates or destroys them. It used to delete every tag node when
+   * switched off, which made a control that reads as "show" silently
+   * destructive (docs/content/features.md > Tags).
+   */
+  const handleTagNodesChange = (e: Event) => {
+    showTagEdges.value = Boolean((e as CustomEvent).detail)
   }
   window.addEventListener('nodus-tag-nodes-change', handleTagNodesChange)
+  // The load-time body scan finishes after initialize returns; when it has
+  // written tags, those nodes still need their edges
+  window.addEventListener('nodus-tags-backfilled', () => syncTagEdgesIfEnabled())
 
   // Entity forwarding
   const getEntities = () => getEntitiesFn(entityOpsComposable)
@@ -666,7 +698,6 @@ export const useNodesStore = defineStore('nodes', () => {
     createTagEdges,
     getTagNodes,
     syncAllTagNodes,
-    removeAllTagNodes,
     // Entity management
     getEntities,
     getEntitiesByType,

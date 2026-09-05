@@ -638,7 +638,11 @@
     "hideStorylineEdges": "Masquer les liens de récit",
     "hideStorylineEdgesHint": "Masque les liens entre nœuds d’un récit",
     "hideWikilinkEdges": "Masquer les liens [[wikilink]]",
-    "hideWikilinkEdgesHint": "Masque les liens générés depuis les [[liens]] du contenu"
+    "hideWikilinkEdgesHint": "Masque les liens générés depuis les [[liens]] du contenu",
+    "repairTagNodes": "Réparer les nœuds d'étiquette",
+    "repairTagNodesHint": "Fusionner les nœuds d'étiquette en double et restaurer le préfixe # manquant",
+    "repairTagNodesNone": "Les nœuds d'étiquette sont déjà cohérents",
+    "repairTagNodesResult": "{merged} fusionnés, {renamed} renommés, {edges} arêtes ajustées"
   },
   "fileMove": {
     "collision": {

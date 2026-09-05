@@ -8,6 +8,7 @@ import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { canvasStorage, tagStorage } from '../../lib/storage'
 import { useNodesStore } from '../../stores/nodes'
+import { planTagNodeRepair, runTagNodeRepair } from '../../composables/tagNodeRepair'
 
 const { t } = useI18n()
 const store = useNodesStore()
@@ -47,6 +48,43 @@ function saveCanvasSettings() {
   window.dispatchEvent(new CustomEvent('nodus-edge-label-size-change', { detail: edgeLabelSize.value }))
   window.dispatchEvent(new CustomEvent('nodus-hide-wikilink-edges-change', { detail: hideWikilinkEdges.value }))
   window.dispatchEvent(new CustomEvent('nodus-hide-storyline-edges-change', { detail: hideStorylineEdges.value }))
+}
+
+/**
+ * Merge tag nodes that duplicate each other and give back any missing hash.
+ *
+ * Surveys before it writes, and says so when there is nothing to do, because a
+ * repair that silently rewrites rows is worse than no repair
+ * (docs/content/features.md > Tags).
+ */
+const repairState = ref<'idle' | 'running'>('idle')
+const repairReport = ref('')
+
+async function repairTagNodes() {
+  repairState.value = 'running'
+  repairReport.value = ''
+  try {
+    const plan = planTagNodeRepair(store.nodes, store.edges)
+    if (plan.merges.length === 0 && plan.renames.length === 0) {
+      repairReport.value = t('settings.repairTagNodesNone')
+      return
+    }
+    const result = await runTagNodeRepair(plan, {
+      createTaggedEdge: async (sourceNodeId, targetNodeId) => {
+        await store.createEdge({ source_node_id: sourceNodeId, target_node_id: targetNodeId, link_type: 'tagged' })
+      },
+      deleteEdge: id => store.deleteEdge(id),
+      deleteNode: id => store.deleteNode(id),
+      renameNode: (id, title) => store.updateNodeTitle(id, title),
+    })
+    repairReport.value = t('settings.repairTagNodesResult', {
+      merged: result.merged,
+      renamed: result.renamed,
+      edges: result.edgesRepointed + result.edgesDeleted,
+    })
+  } finally {
+    repairState.value = 'idle'
+  }
 }
 
 // Save Tag settings
@@ -225,6 +263,13 @@ watch(workspaceId, (newId) => {
         {{ t('settings.showTagNodes') }}
       </label>
       <span class="hint">{{ t('settings.showTagNodesHint') }}</span>
+    </div>
+
+    <div class="setting-group">
+      <button type="button" :disabled="repairState === 'running'" @click="repairTagNodes">
+        {{ t('settings.repairTagNodes') }}
+      </button>
+      <span class="hint">{{ repairReport || t('settings.repairTagNodesHint') }}</span>
     </div>
   </div>
 </template>

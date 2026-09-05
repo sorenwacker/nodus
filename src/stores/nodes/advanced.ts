@@ -381,19 +381,6 @@ export async function syncAllTagNodes(
   }
 }
 
-/**
- * Remove all tag nodes
- */
-export async function removeAllTagNodes(
-  deps: NodeStoreDependencies,
-  deleteNodeFn: (id: string) => Promise<void>
-): Promise<void> {
-  const tagNodes = deps.state.nodes.value.filter(n => n.node_type === 'tag')
-  for (const tagNode of tagNodes) {
-    await deleteNodeFn(tagNode.id)
-  }
-}
-
 // ============================================================================
 // Entity Operations (forwarded to entity operations composable)
 // ============================================================================
