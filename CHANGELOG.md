@@ -2,6 +2,23 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.1] - 2026-09-05
+
+### Added
+- A `#tag` in a node's text always creates its tag node and the edge to it. Creation was gated on a setting named for display, so typing a tag produced no edge unless that setting was on
+- Loading a workspace scans every node's body for tags, so content that predates tag extraction, or that another editor wrote into the vault, is tagged like anything else. Measured on a 12,853-node vault: 1,193 nodes held tags the graph did not know about
+- Loading a workspace also connects any node whose tags have no edges, whatever wrote them - the body scan, or an agent setting tags over MCP. An existing connection is never duplicated, so a connected workspace costs nothing
+- Settings > Canvas > Repair Tag Nodes merges tag nodes that duplicate each other and restores a missing hash prefix, left by an earlier lookup that compared a bare name against a title stored with its hash
+
+### Changed
+- Neighbourhood mode arranges its subgraph with the canvas layout algorithms instead of a placement of its own, and the layout controls act on the subgraph while it is open. Depth-1 neighbours were sorted into a family tree - parents in a row above, children below, siblings in two columns - which put every neighbour of a hub in one row: 13,650px across for forty neighbours, against a bounded ring. Nothing is persisted and no undo step is pushed, so leaving the mode restores the canvas exactly as it was
+- Deleting a `#tag` from the text withdraws it: the tag leaves the node, its edge is deleted, and the tag node goes once the last note using it lets go. Only a tag the previous body carried and the new one does not is taken away, so a tag added by hand from a card's chips survives an edit
+- The tag setting is a view preference. It no longer decides whether tag nodes exist, and switching it off no longer deletes every tag node - a control that reads as "show" must not destroy data
+
+### Fixed
+- A context menu opens where it fits rather than where the pointer was. Right-clicking a node near the bottom of the canvas ran the menu past the window with most of its items unreachable; it now flips to the other side of the pointer, clamps when neither side has room, and pins to the top-left when larger than the window
+- Selecting a node highlights the borders of its neighbours, not only their edges. The collapsed-card dimming wrote a border colour inline, which outranks any stylesheet whatever its specificity, and light-theme card rules outweighed the highlight in the cascade
+
 ## [1.5.0] - 2026-09-05
 
 A canvas pass: the viewport survives large graphs without an out-of-memory kill, and a graph too dense to read as cards is drawn as circles instead.
