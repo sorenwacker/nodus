@@ -638,7 +638,11 @@
     "hideStorylineEdges": "Ocultar conexiones de narrativa",
     "hideStorylineEdgesHint": "Oculta las conexiones entre nodos de una narrativa",
     "hideWikilinkEdges": "Ocultar conexiones de [[wikilink]]",
-    "hideWikilinkEdgesHint": "Oculta las conexiones generadas a partir de [[enlaces]] en el contenido"
+    "hideWikilinkEdgesHint": "Oculta las conexiones generadas a partir de [[enlaces]] en el contenido",
+    "repairTagNodes": "Reparar nodos de etiqueta",
+    "repairTagNodesHint": "Fusionar nodos de etiqueta duplicados y restaurar el prefijo # que falte",
+    "repairTagNodesNone": "Los nodos de etiqueta ya son coherentes",
+    "repairTagNodesResult": "{merged} fusionados, {renamed} renombrados, {edges} aristas ajustadas"
   },
   "fileMove": {
     "collision": {

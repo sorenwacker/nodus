@@ -15,6 +15,7 @@ import { useNodeEditLocking } from '../composables/useNodeEditLocking'
 import { useNodeLayout } from '../composables/useNodeLayout'
 import { useEntityOperations } from '../composables/useEntityOperations'
 import { storeLogger } from '../lib/logger'
+import { tagStorage } from '../lib/storage'
 
 // Import from submodules
 import {
@@ -217,6 +218,23 @@ export const useNodesStore = defineStore('nodes', () => {
 
   async function initialize() {
     await initializeStore(deps, createNode)
+    // Tags can arrive without their edges: the load-time body scan writes them,
+    // and an agent can set a node's tags over MCP. Both leave a node tagged and
+    // unconnected, and nothing else puts that right - the whole-vault sync used
+    // to run only when the setting was toggled
+    // (docs/content/features.md > Tags).
+    syncTagEdgesIfEnabled()
+  }
+
+  /**
+   * Connect any node whose tags have no edges, when tag nodes are switched on.
+   *
+   * createTagEdges skips a connection that already exists, so this is safe to
+   * run on every load and costs nothing on a vault that is already connected.
+   */
+  function syncTagEdgesIfEnabled() {
+    if (!tagStorage.getShowTagNodes()) return
+    syncAllTagNodes().catch(e => storeLogger.error('[Tags] Edge sync failed:', e))
   }
 
   function getNode(id: string): Node | undefined {
@@ -499,6 +517,9 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
   window.addEventListener('nodus-tag-nodes-change', handleTagNodesChange)
+  // The load-time body scan finishes after initialize returns; when it has
+  // written tags, those nodes still need their edges
+  window.addEventListener('nodus-tags-backfilled', () => syncTagEdgesIfEnabled())
 
   // Entity forwarding
   const getEntities = () => getEntitiesFn(entityOpsComposable)

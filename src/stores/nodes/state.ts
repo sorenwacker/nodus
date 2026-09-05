@@ -206,7 +206,12 @@ export async function initializeStore(
       invoke('update_node_tags', { id, tags })
     )
       .then(written => {
-        if (written > 0) storeLogger.debug(`[Nodes] Backfilled tags on ${written} nodes`)
+        if (written > 0) {
+          storeLogger.debug(`[Nodes] Backfilled tags on ${written} nodes`)
+          // Those nodes are tagged but not yet connected; the store owns the
+          // tag-node composable, so it does the connecting
+          window.dispatchEvent(new CustomEvent('nodus-tags-backfilled', { detail: written }))
+        }
       })
       .catch(e => storeLogger.error('[Nodes] Tag backfill failed:', e))
     const workspaceIds = [...new Set(fetchedNodes.map(n => n.workspace_id))]

@@ -33,6 +33,8 @@ Hashtags in node content become node tags:
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
 - With tag nodes enabled in settings, each tag becomes a tag node connected to the notes that use it
+- Loading a workspace connects any node whose tags have no edges, so tags that arrived without them - from the body scan, or from an agent setting a node's tags over MCP - are shown like any other. An existing connection is never duplicated, so a connected workspace costs nothing
+- Settings > Canvas > Repair Tag Nodes merges tag nodes that duplicate each other and restores a missing # prefix, left behind by an earlier lookup that compared a bare name against a title stored with its hash
 
 YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treated as structured node metadata, never as text:
 

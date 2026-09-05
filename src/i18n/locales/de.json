@@ -638,7 +638,11 @@
     "hideStorylineEdges": "Storyline-Kanten ausblenden",
     "hideStorylineEdgesHint": "Kanten ausblenden, die Knoten in Storylines verbinden",
     "hideWikilinkEdges": "[[Wikilink]]-Kanten ausblenden",
-    "hideWikilinkEdgesHint": "Kanten ausblenden, die automatisch aus [[Links]] im Knoteninhalt entstehen"
+    "hideWikilinkEdgesHint": "Kanten ausblenden, die automatisch aus [[Links]] im Knoteninhalt entstehen",
+    "repairTagNodes": "Tag-Knoten reparieren",
+    "repairTagNodesHint": "Doppelte Tag-Knoten zusammenführen und fehlendes #-Präfix wiederherstellen",
+    "repairTagNodesNone": "Tag-Knoten sind bereits konsistent",
+    "repairTagNodesResult": "{merged} zusammengeführt, {renamed} umbenannt, {edges} Kanten angepasst"
   },
   "fileMove": {
     "collision": {

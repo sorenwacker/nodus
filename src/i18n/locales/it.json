@@ -638,7 +638,11 @@
     "hideStorylineEdges": "Nascondi collegamenti della narrazione",
     "hideStorylineEdgesHint": "Nascondi i collegamenti tra i nodi di una narrazione",
     "hideWikilinkEdges": "Nascondi collegamenti [[wikilink]]",
-    "hideWikilinkEdgesHint": "Nascondi i collegamenti generati dai [[link]] nel contenuto"
+    "hideWikilinkEdgesHint": "Nascondi i collegamenti generati dai [[link]] nel contenuto",
+    "repairTagNodes": "Ripara i nodi tag",
+    "repairTagNodesHint": "Unisci i nodi tag duplicati e ripristina il prefisso # mancante",
+    "repairTagNodesNone": "I nodi tag sono già coerenti",
+    "repairTagNodesResult": "{merged} uniti, {renamed} rinominati, {edges} archi adattati"
   },
   "fileMove": {
     "collision": {

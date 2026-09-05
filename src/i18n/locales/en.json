@@ -638,7 +638,11 @@
     "okfBackfillHint": "Adds OKF frontmatter to vault files that lack it. Bodies, wikilinks and tags are never changed.",
     "okfBackfillResult": "{add} files would gain frontmatter, {keep} already have it, {none} have no file.",
     "okfBackfillApply": "Add frontmatter to {count} files",
-    "okfBackfilling": "Writing..."
+    "okfBackfilling": "Writing...",
+    "repairTagNodes": "Repair Tag Nodes",
+    "repairTagNodesHint": "Merge tag nodes that duplicate each other and restore a missing # prefix",
+    "repairTagNodesNone": "Tag nodes are already consistent",
+    "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted"
   },
   "fileMove": {
     "collision": {
