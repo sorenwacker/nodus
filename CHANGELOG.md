@@ -30,6 +30,7 @@ A canvas pass: the viewport survives large graphs without an out-of-memory kill,
 
 ### Fixed
 - The zoom tiers that keep the canvas out of an out-of-memory kill are gated by tests, and the webview zoom guard applies on every route into a page zoom
+- Selecting a node highlights its neighbours again. The highlight sets a border colour and a glow; the collapsed-card dimming wrote a border colour inline, which outranks any stylesheet, and light-theme card rules outweighed it in the cascade. Only the border was lost, so the glow still showed and the frames did not
 - A wikilink is read through one parser and a frontmatter block is found one way, so the timeline sees what other views see
 - A node is deleted only once its file is in the trash
 - Wikilink edges survive a backend failure, and an edge type change is stored
