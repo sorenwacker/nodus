@@ -142,6 +142,18 @@
   transition: box-shadow 0.15s ease-out;
 }
 
+/* A collapsed card in a light theme is bordered and shadowed by a rule carrying
+   :root and three :not() theme guards (node-card.css > Semantic zoom), which
+   outweighs the highlight above and painted over it: the selected node kept its
+   ring, because a .collapsed.selected rule restores it, while its neighbours
+   showed nothing. Restate the highlight at that weight rather than lowering the
+   collapsed rules, which every light-theme card depends on. */
+:root:not([data-theme='dark']):not([data-theme='pitch-black']):not([data-theme='cyber'])
+  .node-card.collapsed.neighbor-highlighted:not(.selected) {
+  border-color: var(--neighbor-highlight);
+  box-shadow: 0 0 12px var(--neighbor-glow), 0 0 24px var(--neighbor-glow), 0 0 36px var(--neighbor-glow);
+}
+
 [data-theme='cyber'] .edge-line-visible,
 [data-theme='cyber'] .edge-line-fast {
   filter: drop-shadow(0 0 4px currentColor);

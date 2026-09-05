@@ -95,7 +95,7 @@ Multiple routing styles for visual clarity:
 - **Hyperbolic** - Smooth curves avoiding nodes
 
 ### Neighbor Highlighting
-When selecting a node, connected neighbors are highlighted for context.
+When selecting a node, connected neighbors are highlighted for context. The highlight holds in every theme and at every zoom level, including the collapsed cards shown when zoomed out; above the LOD threshold, where cards are drawn as circles, neighbors carry the same highlight as a ring.
 
 ### Neighborhood View
 Focus on a specific node and its connections:
