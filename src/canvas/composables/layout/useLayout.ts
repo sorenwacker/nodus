@@ -72,14 +72,34 @@ interface ViewState {
   canvasRect: () => DOMRect | null
 }
 
+/**
+ * An ephemeral surface that a layout run should arrange instead of the canvas.
+ *
+ * Neighbourhood mode shows a subgraph at positions it overlays on the stored
+ * ones. While it is open, the layout controls belong to what is on screen, so a
+ * run is scoped to those nodes and handed back rather than persisted - the
+ * stored coordinates stay as they are and leaving the mode restores the canvas
+ * (PRODUCT_DESIGN.md > Neighborhood Mode).
+ */
+export interface LayoutOverlay {
+  /** The nodes on screen. Anything outside this set is not laid out. */
+  nodeIds: Set<string>
+  /** The node a radial run centres on, when the overlay has one. */
+  centerId: string | null
+  /** Receives the computed positions in place of the store. */
+  apply: (positions: Map<string, { x: number; y: number }>) => void
+}
+
 export interface UseLayoutOptions {
   store: Store
   viewState: ViewState
   pushUndo: () => void
+  /** The active overlay, if a mode is showing one. */
+  getOverlay?: () => LayoutOverlay | null
 }
 
 export function useLayout(options: UseLayoutOptions) {
-  const { store, viewState, pushUndo } = options
+  const { store, viewState, pushUndo, getOverlay } = options
 
   // Animation state
   const animationState = createLayoutAnimator()
@@ -276,6 +296,53 @@ export function useLayout(options: UseLayoutOptions) {
     window.dispatchEvent(new CustomEvent('nodus-radial-z-order', { detail: zOrder }))
   }
 
+  /**
+   * Run a layout against an overlay rather than the canvas.
+   *
+   * Every layout algorithm already reads its graph through injected accessors
+   * and writes through an injected sink, so scoping a run to the overlay is a
+   * matter of narrowing both. Nothing is persisted and no undo entry is pushed:
+   * an overlay position was never stored, so there is nothing to undo to.
+   */
+  async function layoutOverlay(layout: LayoutType, overlay: LayoutOverlay): Promise<void> {
+    const nodes = store.getFilteredNodes().filter(n => overlay.nodeIds.has(n.id))
+    const edges = store
+      .getFilteredEdges()
+      .filter(e => overlay.nodeIds.has(e.source_node_id) && overlay.nodeIds.has(e.target_node_id))
+
+    const scopedStore = {
+      ...store,
+      getFilteredNodes: () => nodes,
+      getFilteredEdges: () => edges,
+      // The overlay draws no frames, so nothing in it may be constrained to one
+      getFilteredFrames: () => [],
+      getSelectedNodeIds: () =>
+        overlay.centerId ? [overlay.centerId] : store.getSelectedNodeIds().filter(id => overlay.nodeIds.has(id)),
+    }
+
+    if (layout === 'radial') {
+      const result = computeRadialLayout({
+        getSelectedNodeIds: scopedStore.getSelectedNodeIds,
+        getNode: store.getNode,
+        getFilteredNodes: () => nodes,
+        getFilteredEdges: () => edges,
+        getFilteredFrames: () => [],
+        applyFrameConstraints: positions => positions,
+      })
+      if (result) overlay.apply(result.targets)
+      return
+    }
+
+    await executeAutoLayout(layout, undefined, {
+      store: scopedStore,
+      animateToPositions: targets => overlay.apply(targets),
+      applyFrameConstraints: positions => positions,
+      pushOutOfFrames: positions => positions,
+      expandFramesToFitNodes: async () => {},
+      scheduleExpandFrames: () => {},
+    })
+  }
+
   async function autoLayout(layout: LayoutType = 'grid', frameId?: string) {
     // Prevent concurrent layout operations (rapid clicking)
     if (isLayoutInProgress) {
@@ -285,6 +352,12 @@ export function useLayout(options: UseLayoutOptions) {
     isLayoutInProgress = true
 
     try {
+      const overlay = getOverlay?.() ?? null
+      if (overlay) {
+        await layoutOverlay(layout, overlay)
+        return
+      }
+
       // Radial layout is handled separately
       if (layout === 'radial') {
         await radialLayout()

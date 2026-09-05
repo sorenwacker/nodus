@@ -5,6 +5,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import { computeRadialLayout } from './useRadialLayout'
+import type { LayoutOverlay } from './useLayout'
 import type { Node } from '../../../types'
 
 interface Edge {
@@ -215,6 +216,25 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     return true
   }
 
+  /**
+   * The overlay a layout run should target while this mode is open, or null.
+   *
+   * Handing this to useLayout is what makes the layout controls act on what is
+   * on screen instead of the whole canvas, without either side reaching into the
+   * other (PRODUCT_DESIGN.md > Neighborhood Mode).
+   */
+  function getLayoutOverlay(): LayoutOverlay | null {
+    const ids = neighborhoodNodeIds.value
+    if (!neighborhoodMode.value || !ids) return null
+    return {
+      nodeIds: ids,
+      centerId: focusNodeId.value,
+      apply: positions => {
+        neighborhoodPositions.value = positions
+      },
+    }
+  }
+
   // Navigate to a different node in neighborhood mode
   function navigateTo(nodeId: string) {
     if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
@@ -243,6 +263,7 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     focusNodeId,
     neighborhoodPositions,
     neighborhoodNodeIds,
+    getLayoutOverlay,
     neighborhoodDepth,
     displayNodes,
 

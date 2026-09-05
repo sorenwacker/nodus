@@ -982,7 +982,7 @@ const layout = useLayout({
     offsetY,
     canvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
   },
-  pushUndo,
+  pushUndo, getOverlay: () => neighborhood.getLayoutOverlay(),
 })
 const isLayouting = ref(false)
 
