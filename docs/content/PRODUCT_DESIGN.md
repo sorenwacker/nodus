@@ -695,6 +695,8 @@ Right-click on a node to access:
 
 Multi-selection: All context menu actions work on multiple selected nodes.
 
+**Placement:** The menu opens at the pointer and is kept inside the window. When it does not fit below or to the right of the pointer it opens above or to the left instead, so a right-click on a node near the bottom or right edge shows the whole menu rather than running off screen. A menu taller than the window is pinned to the top edge, because the first item must be reachable.
+
 ### Neighborhood Mode
 
 Focus view that isolates a node and its connected neighbors:
