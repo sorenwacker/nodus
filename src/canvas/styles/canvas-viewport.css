@@ -60,6 +60,26 @@
 
 .canvas-viewport {
   background-color: var(--bg-canvas);
+}
+
+/* The dot grid, on its own layer.
+   It used to live on .canvas-viewport with background-position bound to the
+   pan offset. Moving a background invalidates paint for the whole element, so
+   every pan frame repainted the entire window on the main thread - the one
+   surface that cannot be composited away, competing with the node and edge
+   layers for the same frame.
+   The grid is periodic with GRID_SIZE, so translating by (offset mod
+   GRID_SIZE) is pixel-identical to offsetting the background by the full
+   amount, and a transform on a promoted layer moves on the GPU without
+   repainting. The negative inset supplies the bleed that the translation
+   uncovers (GraphCanvas.vue > gridTransform). */
+.canvas-grid {
+  position: absolute;
+  inset: -24px;
+  z-index: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform;
   background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
   background-size: 24px 24px;
 }
@@ -113,15 +133,14 @@
   filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.8));
 }
 
-.edge-line-visible:not(.edge-highlighted) {
-  opacity: 1;
-  transition: opacity 0.15s ease;
-}
-
-/* Dim non-highlighted edges when a node is hovered/selected */
-.edges-layer:has(.edge-highlighted) .edge-line-visible:not(.edge-highlighted) {
-  opacity: 0.5;
-}
+/* Dimming non-highlighted edges is done per edge in useEdgeVisibility, which
+   already gives each path a stroke-opacity of 1.0 highlighted, 0.3 plain or
+   0.2 for a second-hop neighbour. A `:has()` rule dimmed them a second time on
+   top of that (0.3 x 0.5 = 0.15), and made every style recalc in the layer
+   re-evaluate `:has()` across all ~1,200 edges; the transition then animated
+   opacity on all of them at once for 150ms on any hover. One rule, one place:
+   the per-edge stroke-opacity is the dimming
+   (PRODUCT_DESIGN.md > Showing edges only around the focus). */
 
 /* LOD (Level of Detail) mode - circles for large graphs */
 .node-circle {

@@ -2,7 +2,8 @@
  * View state composable
  * Manages canvas scale, offset, persistence, and centering
  */
-import { ref, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
+import { ZOOM_LIMITS } from '../../constants'
 
 const VIEW_STORAGE_KEY = 'nodus-canvas-view'
 
@@ -15,12 +16,14 @@ export interface ViewState {
 export interface UseViewStateOptions {
   /** Get canvas element bounding rect */
   getCanvasRect: () => DOMRect | null
+  /** Get the span of the current content, for the dynamic zoom-out floor */
+  getContentSpan?: () => { width: number; height: number } | null
   /** Default scale if no saved state */
   defaultScale?: number
 }
 
 export function useViewState(options: UseViewStateOptions) {
-  const { getCanvasRect, defaultScale = 1 } = options
+  const { getCanvasRect, getContentSpan, defaultScale = 1 } = options
 
   // Load saved view state from localStorage
   function loadViewState(): ViewState | null {
@@ -82,19 +85,39 @@ export function useViewState(options: UseViewStateOptions) {
     }
   }
 
+  /**
+   * The deepest zoom-out the user may reach, from the content itself.
+   *
+   * A fixed floor serves every workspace the same, and the same number that
+   * lets a 69,000px layout fit lets an 11,000px one shrink to a smudge and
+   * the pointer travel two hundred canvas px per mouse px - the view ends up
+   * megapixels from the graph with nothing on screen to navigate back by.
+   * The floor is therefore the fit scale with margin: the whole graph plus
+   * ~40% of breathing room is as far out as out goes. ZOOM_LIMITS.MIN remains
+   * the absolute bound (content unknown, or vast), and the 0.5 cap keeps a
+   * tiny two-node workspace zoomable-out enough to plan around.
+   */
+  function minZoom(): number {
+    const span = getContentSpan?.()
+    const rect = getCanvasRect()
+    if (!span || !rect || span.width <= 0 || span.height <= 0) return ZOOM_LIMITS.MIN
+    const fit = Math.min(rect.width / (span.width + 100), rect.height / (span.height + 100))
+    return Math.min(0.5, Math.max(ZOOM_LIMITS.MIN, fit * 0.7))
+  }
+
   // Zoom controls
   function zoomIn() {
-    scale.value = Math.min(scale.value * 1.25, 3)
+    scale.value = Math.min(scale.value * 1.25, ZOOM_LIMITS.MAX)
     scheduleSaveViewState()
   }
 
   function zoomOut() {
-    scale.value = Math.max(scale.value * 0.8, 0.01)
+    scale.value = Math.max(scale.value * 0.8, minZoom())
     scheduleSaveViewState()
   }
 
   function setScale(newScale: number) {
-    scale.value = Math.max(0.01, Math.min(3, newScale))
+    scale.value = Math.max(minZoom(), Math.min(ZOOM_LIMITS.MAX, newScale))
     scheduleSaveViewState()
   }
 
@@ -106,6 +129,30 @@ export function useViewState(options: UseViewStateOptions) {
       isZooming.value = false
     }, 150)
   }
+
+  /** Dot spacing of the background grid, in screen px. Matches `background-size`
+   *  on `.canvas-grid` (canvas-viewport.css). */
+  const GRID_SIZE = 24
+
+  // The single pan-and-zoom transform. Both the content layer and the node card
+  // layer carry it, so a pan frame patches two styles rather than restyling
+  // every node and edge (PRODUCT_DESIGN.md > Canvas rendering). 2D on purpose:
+  // a 3D transform reintroduces z-axis artefacts when zoomed in.
+  const transform = computed(
+    () => `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`
+  )
+
+  // The grid is screen-space and periodic, so it only ever has to move within
+  // one cell: translating by the offset modulo GRID_SIZE shows the same dots as
+  // translating by the whole offset, and keeps the layer's transform bounded.
+  // This replaces a `background-position` binding, which invalidated paint for
+  // the entire viewport on every pan frame - the one surface that cannot be
+  // composited away (canvas-viewport.css > .canvas-grid).
+  const gridTransform = computed(() => {
+    const x = ((offsetX.value % GRID_SIZE) + GRID_SIZE) % GRID_SIZE
+    const y = ((offsetY.value % GRID_SIZE) + GRID_SIZE) % GRID_SIZE
+    return `translate(${x}px, ${y}px)`
+  })
 
   // Screen to canvas coordinate conversion
   function screenToCanvas(screenX: number, screenY: number) {
@@ -151,12 +198,17 @@ export function useViewState(options: UseViewStateOptions) {
     isZooming,
     hasSavedView: savedView !== null,
 
+    // Derived transforms
+    transform,
+    gridTransform,
+
     // Methods
     saveViewState,
     scheduleSaveViewState,
     centerGrid,
     zoomIn,
     zoomOut,
+    minZoom,
     setScale,
     startZooming,
     screenToCanvas,

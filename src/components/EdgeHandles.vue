@@ -5,20 +5,17 @@
  * The handle geometry comes from the same function the gesture uses, so a
  * handle can never be drawn somewhere the gesture is not listening
  * (PRODUCT_DESIGN.md > Edge handles).
+ *
+ * Left and right only. The bottom edge no longer opens the timelines sheet and
+ * the top no longer closes it - that moved to a toolbar button - so drawing
+ * either would mark an edge that does nothing (App.vue > edgeStepper).
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { edgeHandleRange } from '../lib/edgeGesture'
 
-const props = defineProps<{
-  /** The top handle only exists while the timelines sheet is open */
-  topActive: boolean
-}>()
-
-const width = ref(window.innerWidth)
 const height = ref(window.innerHeight)
 
 function measure() {
-  width.value = window.innerWidth
   height.value = window.innerHeight
 }
 
@@ -29,19 +26,12 @@ const vertical = computed(() => {
   const { start, size } = edgeHandleRange(height.value)
   return { top: `${start}px`, height: `${size}px` }
 })
-
-const horizontal = computed(() => {
-  const { start, size } = edgeHandleRange(width.value)
-  return { left: `${start}px`, width: `${size}px` }
-})
 </script>
 
 <template>
   <div class="edge-handles" aria-hidden="true">
     <span class="edge-handle left" :style="vertical"></span>
     <span class="edge-handle right" :style="vertical"></span>
-    <span class="edge-handle bottom" :style="horizontal"></span>
-    <span v-if="props.topActive" class="edge-handle top" :style="horizontal"></span>
   </div>
 </template>
 
@@ -73,19 +63,6 @@ const horizontal = computed(() => {
 
 .edge-handle.right {
   right: 0;
-}
-
-.edge-handle.top,
-.edge-handle.bottom {
-  height: 3px;
-}
-
-.edge-handle.top {
-  top: 0;
-}
-
-.edge-handle.bottom {
-  bottom: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

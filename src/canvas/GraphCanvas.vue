@@ -74,6 +74,7 @@ import PdfHighlightPicker from '../components/PdfHighlightPicker.vue'
 import PdfGraphDialog from '../components/PdfGraphDialog.vue'
 import type { HighlightImport } from '../lib/pdfHighlights'
 import { NODE_DEFAULTS } from './constants'
+import { contentSpan } from './utils/contentBounds'
 import CanvasStatusBar from './components/CanvasStatusBar.vue'
 import CanvasControls from './components/CanvasControls.vue'
 import CanvasEdgeFilters from './components/CanvasEdgeFilters.vue'
@@ -180,6 +181,7 @@ const canvasRef = ref<HTMLElement | null>(null)
 // View state composable - handles scale, offset, persistence
 const viewState = useViewState({
   getCanvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
+  getContentSpan: () => contentSpan(store.filteredNodes),
 })
 const {
   scale,
@@ -191,6 +193,8 @@ const {
   centerGrid,
   screenToCanvas,
   startZooming,
+  zoomIn, zoomOut, minZoom,
+  transform, gridTransform,
 } = viewState
 
 onMounted(() => {
@@ -370,6 +374,8 @@ const viewportCulling = useViewportCulling({
 })
 const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
+const gestureActive = ref(false) // live while any viewport gesture is (useCanvasInput)
+
 // Graph metrics composable - computes graph size thresholds and LOD mode
 const graphMetrics = useGraphMetrics({
   displayNodes,
@@ -379,14 +385,19 @@ const graphMetrics = useGraphMetrics({
   neighborhoodMode,
   scale,
   workspaceId: computed(() => store.currentWorkspaceId),
+  gestureActive,
+  getEditingNodeId: () => editingNodeId.value,
 })
 const {
   isLargeGraph,
+  useSimpleEdges,
   isHugeGraph,
   isMassiveGraph,
   isSemanticZoomCollapsed,
   isTextHidden,
   isLODMode,
+  lodCircleNodes,
+  lodCardNodes,
   isBubbleModeForced,
   getLODRadius,
   toggleBubbleMode,
@@ -422,17 +433,6 @@ watch(
   }
 )
 
-// Pre-computed LOD node lists to avoid double filtering in template
-const lodCircleNodes = computed(() => {
-  if (!isLODMode.value) return []
-  const selectedSet = new Set(store.selectedNodeIds)
-  return visibleNodes.value.filter(n => !selectedSet.has(n.id) && n.id !== editingNodeId.value)
-})
-const lodCardNodes = computed(() => {
-  if (!isLODMode.value) return visibleNodes.value
-  const selectedSet = new Set(store.selectedNodeIds)
-  return visibleNodes.value.filter(n => selectedSet.has(n.id) || n.id === editingNodeId.value)
-})
 
 // Expose functions with original names for compatibility
 function toggleNeighborhoodMode(nodeId?: string) {
@@ -482,7 +482,7 @@ const contextMenuVisibleRef = ref(false)
 // Preview panel composable - auto-shows when single node selected while zoomed out
 const previewPanel = usePreviewPanel({
   selectedNodeIds: computed(() => store.selectedNodeIds),
-  isSemanticZoomCollapsed,
+  isSemanticZoomCollapsed: computed(() => (isSemanticZoomCollapsed.value || isLODMode.value) && !neighborhoodMode.value),
   contextMenuVisible: contextMenuVisibleRef,
   getNode: store.getNode,
   zoomToNode,
@@ -691,7 +691,7 @@ const { onWheel, onCanvasPointerMove, onCanvasPointerEnter, onCanvasPointerLeave
   scale,
   offsetX,
   offsetY,
-  isZooming,
+  isZooming, minZoom,
   startZooming,
   scheduleSaveViewState,
 })
@@ -760,11 +760,13 @@ const { isPanning, startPan, beginContact } = useCanvasInput({
   scale,
   offsetX,
   offsetY,
+  isZooming, minZoom,
   startZooming,
   scheduleSaveViewState,
   onPanEnd: () => {
     lastDragEndTime = Date.now()
   },
+  gestureActive,
 })
 
 // Get reactive refs from store for the hover composable
@@ -779,6 +781,7 @@ const nodeHover = useNodeHover({
   filteredEdges: storeFilteredEdges,
   getNode: store.getNode,
   hoverTooltipEnabled: toRef(displayStore, 'hoverTooltipEnabled'),
+  isPanning,
 })
 const {
   hoveredNodeId,
@@ -1394,12 +1397,6 @@ function getNodeHeight(
   return Math.max(120, Math.min(600, contentHeight + 80))
 }
 
-// Transform for the canvas content
-// Use 2D transform to avoid z-axis issues when zooming in
-const transform = computed(() => {
-  return `translate(${offsetX.value}px, ${offsetY.value}px) scale(${scale.value})`
-})
-
 // Pan with pointer drag on empty canvas space (supports mouse, touch, pen)
 function onCanvasPointerDown(e: PointerEvent) {
   // A pinch takes the viewport outright; nothing else may act on this press.
@@ -1721,7 +1718,7 @@ const { edgeLines } = useEdgeRouting({
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties
-const { visibleEdgeLines } = useEdgeVisibility({
+const { visibleEdgeLines, canvasEdges } = useEdgeVisibility({
   edgeLines,
   totalEdgeCount: computed(() => store.filteredEdges.length),
   visibleNodeIds,
@@ -2070,7 +2067,6 @@ defineExpose({
       ref="canvasRef"
       class="canvas-viewport"
       :class="{ panning: isPanning, 'frame-placement': frames.pendingFramePlacement.value }"
-      :style="{ backgroundPosition: offsetX + 'px ' + offsetY + 'px' }"
       @wheel="onWheel"
       @pointerdown="onCanvasPointerDown"
       @pointermove="onCanvasPointerMove"
@@ -2079,6 +2075,10 @@ defineExpose({
       @dblclick="onCanvasDoubleClick"
       @contextmenu="onContextMenu"
     >
+      <!-- Background dot grid. Its own layer so a pan translates it on the GPU
+           instead of repainting the whole viewport (canvas-viewport.css) -->
+      <div class="canvas-grid" :style="{ transform: gridTransform }"></div>
+
       <!-- Floating color bar (shown when nodes or frame is selected) -->
       <CanvasColorBar
         v-if="store.selectedNodeIds.length > 0 || store.selectedFrameId"
@@ -2098,6 +2098,8 @@ defineExpose({
       <CanvasLODCanvas
         v-if="isLODMode"
         :nodes="lodCircleNodes"
+        :edges="canvasEdges" :highlighted-edge-ids="highlightedEdgeIds"
+        :edge-stroke-width="edgeStrokeWidth" :highlight-color="highlightColor"
         :scale="scale"
         :offset-x="offsetX"
         :offset-y="offsetY"
@@ -2136,8 +2138,8 @@ defineExpose({
 
         <!-- SVG for edges (above frames) -->
         <CanvasEdgesSVG
-          :edges="visibleEdgeLines"
-          :is-large-graph="isLargeGraph"
+          :edges="isLODMode ? [] : visibleEdgeLines"
+          :simplified="useSimpleEdges"
           :edge-stroke-width="edgeStrokeWidth"
           :edge-label-size="edgeLabelSize"
           :zoom="scale"
@@ -2270,8 +2272,7 @@ defineExpose({
         :pending-frame-placement="frames.pendingFramePlacement.value"
         :highlight-all-edges="highlightAllEdges"
         :bubble-mode-active="isBubbleModeForced"
-        @zoom-in="scale = Math.min(scale * 1.25, 3)"
-        @zoom-out="scale = Math.max(scale * 0.8, 0.01)"
+        @zoom-in="zoomIn" @zoom-out="zoomOut"
         @fit-to-content="fitToContent"
         @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
         @layout="autoLayoutNodes"

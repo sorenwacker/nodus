@@ -47,3 +47,32 @@ describe('CRLF frontmatter', () => {
     expect(updated).toContain('Body text')
   })
 })
+
+describe('reading a frontmatter field', () => {
+  it('finds a field in a plain block', async () => {
+    const { extractFrontmatterField } = await import('../lib/timelineDates')
+    expect(extractFrontmatterField('---\ndate: 1969-07-20\n---\nbody', 'date')).toBe(
+      '1969-07-20'
+    )
+  })
+
+  it('finds a field in a CRLF block', async () => {
+    const { extractFrontmatterField } = await import('../lib/timelineDates')
+    expect(
+      extractFrontmatterField('---\r\ndate: 1969-07-20\r\n---\r\nbody', 'date')
+    ).toBe('1969-07-20')
+  })
+
+  it('agrees with splitFrontmatter about where a block ends', async () => {
+    // A line opening with --- but carrying other text is not a closing
+    // delimiter. The field reader had its own boundary rule that accepted one,
+    // so this file had frontmatter for the timeline and none for every other
+    // view of it.
+    const { extractFrontmatterField } = await import('../lib/timelineDates')
+    const { splitFrontmatter } = await import('../lib/contentParser')
+    const content = '---\ndate: 1969\n---abc\nmore\n'
+
+    expect(splitFrontmatter(content).frontmatter).toBeNull()
+    expect(extractFrontmatterField(content, 'date')).toBeNull()
+  })
+})

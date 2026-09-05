@@ -669,10 +669,6 @@
       "title": "Trouver vos storylines",
       "instruction": "Amenez le pointeur contre le bord droit de la fenêtre pour afficher l'aperçu des storylines."
     },
-    "bottom": {
-      "title": "Voir la chronologie",
-      "instruction": "Maintenez le pointeur un instant contre le bord inférieur. Le panneau des chronologies remonte."
-    },
     "left": {
       "title": "Interroger l'agent",
       "instruction": "Amenez le pointeur contre le bord gauche pour afficher le panneau de l'agent."

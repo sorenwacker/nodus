@@ -9,6 +9,7 @@ import { useAppSearch } from './composables/useAppSearch'
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNotifications } from './composables/useNotifications'
 import { usePanelReveal } from './composables/usePanelReveal'
+import { useWebviewZoomGuard } from './composables/useWebviewZoomGuard'
 import { createEdgeStepper } from './lib/edgeGesture'
 import { isEdgeGesturePointer } from './composables/edgeGesturePointer'
 import GraphCanvas from './canvas/GraphCanvas.vue'
@@ -148,6 +149,8 @@ const gestureCoach = useGestureCoach()
 // Steps: graph -> overview -> half-screen reader -> full-screen reader.
 // The timelines view opens from the overview's button and sits in the
 // half-screen slot; stepping right from it enters the reader.
+useWebviewZoomGuard()
+
 const edgeStepper = createEdgeStepper({
   threshold: 12,
   // Once a storyline layer occupies the edge, stepping deeper needs a push
@@ -159,21 +162,13 @@ const edgeStepper = createEdgeStepper({
   // region, so mouse travel inside the reader or sheet cannot close them
   leftThreshold: () =>
     storylinePanel.isOpen.value || readerStorylineId.value || showTimelines.value ? 3 : 12,
-  bottomThreshold: () => (showTimelines.value ? 3 : 12),
-  // The top edge only acts while the sheet is open; 0 disables it otherwise
-  topThreshold: () => (showTimelines.value ? 12 : 0),
-  // The sheet opens only after the pointer dwells at the bottom edge, so
-  // passing near it does not fire accidentally
-  bottomDwellMs: 100,
-  // Bottom edge: the timelines sheet slides up (also while reading)
-  stepBottom: () => {
-    showTimelines.value = true
-    gestureCoach.recordGesture('bottom')
-  },
-  // Top edge: the sheet came up from below, so pushing up closes it
-  stepTop: () => {
-    showTimelines.value = false
-  },
+  // No bottom or top edge here on purpose. The timelines sheet used to slide up
+  // from a 100ms dwell at the bottom edge, which fired during ordinary work -
+  // panning the canvas towards the bottom of the window rests the pointer in
+  // the band for far longer than that, and the sheet unfolded on its own.
+  // Restricting the gesture to a mouse (isEdgeGesturePointer) fixed it only for
+  // pen and touch. The sheet now opens from the toolbar button, which is the
+  // thing a user can see (PRODUCT_DESIGN.md > Edge handles).
   stepRight: () => {
     gestureCoach.recordGesture('right')
     if (readerStorylineId.value) {
@@ -886,14 +881,19 @@ async function openFolderDialog() {
       <div class="toolbar-actions">
         <button
           class="icon-btn"
+          :class="{ active: showTimelines }"
+          :data-tooltip="t('storyline.timelines')"
+          @click="showTimelines = !showTimelines"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="16" y1="14" x2="16" y2="18"/></svg>
+        </button>
+        <button
+          class="icon-btn"
           :class="{ active: storylinePanel.pinned.value || readerStorylineId }"
           :data-tooltip="t('toolbar.storylines')"
           @click="toggleStorylinePanel"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-          </svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         </button>
         <button class="icon-btn" :data-tooltip="t('toolbar.importVault')" @click="showImportDialog = true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1256,7 +1256,7 @@ async function openFolderDialog() {
     <!-- Onboarding Flow -->
     <OnboardingFlow @complete="onOnboardingComplete" />
 
-    <EdgeHandles :top-active="showTimelines" />
+    <EdgeHandles />
 
     <TooltipLayer />
 

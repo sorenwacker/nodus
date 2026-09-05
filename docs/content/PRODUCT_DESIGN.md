@@ -279,7 +279,7 @@ Users don't abandon Obsidian — they enhance it with Nodus.
 | Dates live in frontmatter (`date:`, `date_end:`) | Files stay the source of truth; Obsidian/OKF compatible; the in-app date editor (node card chip, preview panel) writes the same fields |
 | Broken axis | Large empty stretches between event clusters are abbreviated with a marked break; gap detection compares against both span share and median spacing so even spreads never fragment |
 | Per-segment label detail | Each axis segment labels itself at its own scale — years, months, days, or clock times — so a one-hour narrative and a millennium can share one axis |
-| Bottom sheet, sized to content | Timelines slide up from the bottom edge (spatial model: storylines right, time below, graph above), only as tall as the lanes need, capped at 45% |
+| Bottom sheet, sized to content | Timelines slide up from below (spatial model: storylines right, time below, graph above), opened from the toolbar, only as tall as the lanes need, capped at 45% |
 | Coexists with overview and reader | The sheet stays open alongside the storyline overview and under a shortened reader; left-edge pushes still step back through reader and overview but never close the sheet |
 | Closes with an upward push | The sheet opened by moving down, so it closes by moving up: a push into the top edge band closes it, and so does the pointer leaving the window through the top region - an upward motion usually exits into the title bar before any pointermove lands in the narrow band. The same applies to every edge: a window leave counts as a push on the edge it left through, with horizontal exits taking precedence over vertical ones, because a fast flick reaches the desktop before any sample lands inside a 12px band. Mirrors the spatial model (time below, graph above); the left edge is reserved for stepping back through the storyline layers |
 | Unassigned lane | Dated nodes outside every storyline get a neutral gray lane so the timeline shows every dated node in the workspace |
@@ -1475,6 +1475,30 @@ Three tiers change how the canvas renders as a graph grows: large, huge, massive
 
 They were inline literals with "massive" at 800 nodes and "huge" at 1000, so a 900-node graph was massive but not huge, and the names carried no information about which came first.
 
+### Detail also drops by zoom
+
+A count tier alone cannot decide how much detail to draw, because a small graph can be drawn at a zoom where none of that detail is legible. Two mechanisms therefore have a zoom tier alongside their count tier, and either one turning on is enough:
+
+| Mechanism | Count tier | Zoom tier |
+|---|---|---|
+| Bubble mode (`isLODMode`) | more visible nodes than the LOD threshold | a default-width card would render under 30 screen px, with a floor of 20 visible nodes |
+| Single-path edges (`useSimpleEdges`) | the large-graph tier | the 12px edge hit stroke would render under 4 screen px |
+
+The floor keeps a sparse workspace as cards: a handful of nodes costs nothing to draw properly, and bubbling them would only take detail away.
+
+Without the zoom tier the count tier could never fire for the case that needs it most. Fitting a workspace whose layout spans tens of thousands of canvas px puts every node on screen at once at a zoom near the floor, so viewport culling culls nothing and the node count never changes. A card is a composited DOM subtree of some sixty elements, and the compositor backs each one whatever its size on screen. Measured on a 215-node workspace with a 41,000 x 50,000 px layout: 6 GB of shared graphics memory and a kernel out-of-memory kill as cards, against 476 MB and a live application as circles. Card cost saturates by about 60 rendered cards, so the tier has to be reachable well below any node-count threshold.
+
+### Keeping the webview at 100%
+
+The webview stays at 100% zoom. Only the canvas zooms, and it has its own controls.
+
+WebKitGTK zooms the whole page on Ctrl+wheel from inside the widget, which cannot be prevented from the page: the DOM event's default action is not what performs the zoom, so `preventDefault` has no effect on it. Scaling the interface up put the toolbar and the zoom controls outside the window with no way back, because Ctrl+0 and Ctrl+plus/minus are already the canvas font scale, and once the chrome has scaled away no non-canvas surface is left to Ctrl+wheel over. WKWebView has no such gesture, so this is a Linux problem in practice.
+
+Since the zoom cannot be prevented, it is undone: after any gesture that could have zoomed, the zoom level is set back to 1. Two properties make that workable.
+
+- **Every route is caught, not only the ones the guard can name.** A page zoom changes the viewport, so the webview reports a resize; listening for the resize covers the wheel gesture, the hotkeys, and anything the platform does natively that never reaches the DOM.
+- **Resets are coalesced to one per frame.** A wheel burst is dozens of events, and one reset per event would be one IPC call per event.
+
 ### Arrowheads above the LOD threshold
 
 An undirected edge has no arrowhead at any zoom level. Above the level-of-detail threshold the arrowhead-suppression flag was hardcoded to false, so an edge with `directed === false` drew no arrow at normal zoom and grew one as soon as the graph crossed the threshold.
@@ -1700,12 +1724,14 @@ A selected node inside a frame keeps the position the layout computed for it. Fr
 - Handles are drawn on screen. A gesture that requires aim must show where to aim, and a visible handle answers the discoverability problem the first-run coach addresses in words.
 - The handle geometry has one definition, used by both the gesture and the drawing. A handle drawn anywhere other than where the gesture listens is worse than no handle at all.
 - Handles never take pointer events. They mark a region; the canvas underneath stays fully interactive.
+- **Only the left and right edges carry a gesture.** The bottom edge raised the timelines sheet after a short dwell and the top edge closed it again. A dwell is not an aimed gesture: panning the canvas towards the bottom of the window rests the pointer in the band for far longer than the dwell, and the sheet unfolded during ordinary work. Narrowing the gesture to a mouse fixed it only for pen and touch, because a mouse is exactly what pans the canvas. A sheet that covers the lower half of the screen is too disruptive to open on an ambiguous signal, so it opens from a toolbar button - a control the user can see, aim at, and choose. The edge stepper still supports a bottom and top step; nothing is wired to them.
 
 ### First-run gesture coach
 
-**Required behavior:** The edge-step gestures are the canvas's primary navigation and are invisible: nothing on screen suggests that pushing the pointer against a screen edge reveals the storyline overview, that dwelling at the bottom edge raises the timelines sheet, or that the left edge reveals the agent. A user who never discovers them never finds those features at all.
+**Required behavior:** The edge-step gestures are the canvas's primary navigation and are invisible: nothing on screen suggests that pushing the pointer against a screen edge reveals the storyline overview, or that the left edge reveals the agent. A user who never discovers them never finds those features at all.
 
-- After onboarding, a coach teaches one gesture at a time, in the order a new user would need them: storylines (right edge), timelines (bottom edge dwell), agent (left edge).
+- After onboarding, a coach teaches one gesture at a time, in the order a new user would need them: storylines (right edge), agent (left edge).
+- **A lesson exists only for a gesture that exists.** The coach taught the bottom-edge timelines dwell; when that gesture was removed the lesson could never be performed, and the tour would have stalled on it forever. Removing a gesture removes its lesson in the same change. Timelines are not taught, because a visible toolbar button needs no teaching.
 - A lesson advances only when the user actually performs the gesture, not on a timer or a click. Reading about a gesture is not learning it, and the coach exists precisely because the gesture is hard to guess.
 - The coach can be skipped at any point, remembers that it has been completed or skipped, and never appears again.
 - It listens to the same edge-step events the application already uses, so it cannot drift from the gestures it teaches: if a gesture stops firing, the lesson stops advancing.

@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- maximum-scale + user-scalable=no disable pinch-to-zoom page scaling.
+         A touchpad pinch drives WebKit's viewport page-scale factor, which is a
+         different mechanism from the zoom-level property that Ctrl+/- uses, and
+         it is not a DOM default action - so no JavaScript listener can prevent
+         it. Left enabled it scaled the whole interface until the toolbar and the
+         canvas controls sat outside the window, with no way to undo it. Zooming
+         on this canvas is the canvas's own gesture, not the page's. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Nodus</title>
     <style>
       * {
@@ -14,6 +24,9 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
+        /* The application interprets touch and pen gestures itself; without
+           this the webview claims pinch and pan for its own scrolling first */
+        touch-action: none;
       }
     </style>
   </head>

@@ -2,7 +2,8 @@
  * Fitting the viewport to the content on the canvas.
  */
 import { type Ref } from 'vue'
-import { NODE_DEFAULTS } from '../../constants'
+import { ZOOM_LIMITS } from '../../constants'
+import { contentSpan } from '../../utils/contentBounds'
 
 export interface Node {
   id: string
@@ -53,28 +54,25 @@ export function fitToContent(
   store: LayoutStrategyStore,
   viewState: ViewState
 ): void {
-  const nodes = store.getFilteredNodes()
-  if (nodes.length === 0) return
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const node of nodes) {
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH))
-    maxY = Math.max(maxY, node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT))
-  }
+  const span = contentSpan(store.getFilteredNodes())
+  if (!span) return
 
   const rect = viewState.canvasRect()
   if (!rect) return
 
   const padding = 50
-  const contentWidth = maxX - minX + padding * 2
-  const contentHeight = maxY - minY + padding * 2
+  const minX = span.minX
+  const minY = span.minY
+  const contentWidth = span.width + padding * 2
+  const contentHeight = span.height + padding * 2
 
   const scaleX = rect.width / contentWidth
   const scaleY = rect.height / contentHeight
-  // Minimum scale of 0.01 to keep nodes visible, max of 1 to not zoom in beyond 100%
-  viewState.scale.value = Math.max(0.01, Math.min(scaleX, scaleY, 1))
+  // Capped at 1 so fitting never zooms in beyond 100%. The floor is the
+  // shared one, low enough that a fit is not silently cut short: the old 0.01
+  // clamp left a 69,000px layout showing 65,000 - the whole graph minus a
+  // slice nobody could scroll to, since zooming out further was also clamped.
+  viewState.scale.value = Math.max(ZOOM_LIMITS.MIN, Math.min(scaleX, scaleY, 1))
 
   viewState.offsetX.value = (rect.width - contentWidth * viewState.scale.value) / 2 - minX * viewState.scale.value + padding * viewState.scale.value
   viewState.offsetY.value = (rect.height - contentHeight * viewState.scale.value) / 2 - minY * viewState.scale.value + padding * viewState.scale.value

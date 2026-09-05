@@ -11,9 +11,7 @@
 
 import { ref, type Ref } from 'vue'
 
-/** Matches the wheel path in useCanvasZoom, so both routes agree. */
-const MIN_SCALE = 0.01
-const MAX_SCALE = 3
+import { ZOOM_LIMITS } from '../../constants'
 
 export interface UseCanvasPinchContext {
   canvasRef: Ref<HTMLElement | null>
@@ -22,6 +20,8 @@ export interface UseCanvasPinchContext {
   offsetY: Ref<number>
   startZooming: () => void
   scheduleSaveViewState: () => void
+  /** Dynamic zoom-out floor, from content extent (useViewState > minZoom) */
+  minZoom?: () => number
   /**
    * Called when a second contact turns a drag into a pinch, so a pan already
    * in progress can be abandoned rather than fighting the gesture.
@@ -43,7 +43,7 @@ interface GestureStart {
 }
 
 export function useCanvasPinch(ctx: UseCanvasPinchContext) {
-  const { canvasRef, scale, offsetX, offsetY, startZooming, scheduleSaveViewState, onPinchStart } =
+  const { canvasRef, scale, offsetX, offsetY, startZooming, scheduleSaveViewState, onPinchStart, minZoom } =
     ctx
 
   const isPinching = ref(false)
@@ -106,8 +106,8 @@ export function useCanvasPinch(ctx: UseCanvasPinchContext) {
 
     const local = toLocal(midX, midY)
     const next = Math.min(
-      Math.max((gestureStart.scale * distance) / gestureStart.distance, MIN_SCALE),
-      MAX_SCALE
+      Math.max((gestureStart.scale * distance) / gestureStart.distance, minZoom?.() ?? ZOOM_LIMITS.MIN),
+      ZOOM_LIMITS.MAX
     )
 
     // Hold the anchor under the midpoint. Because the midpoint is re-read each

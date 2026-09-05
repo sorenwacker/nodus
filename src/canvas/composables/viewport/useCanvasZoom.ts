@@ -8,8 +8,9 @@
  * - 'pinch': Only pinch gesture (ctrl+scroll) = zoom, scroll = pan
  */
 
-import { ref, type Ref } from 'vue'
+import { ref, onMounted, onUnmounted, type Ref } from 'vue'
 import { canvasStorage } from '../../../lib/storage'
+import { ZOOM_LIMITS } from '../../constants'
 
 export interface UseCanvasZoomContext {
   canvasRef: Ref<HTMLElement | null>
@@ -17,6 +18,8 @@ export interface UseCanvasZoomContext {
   offsetX: Ref<number>
   offsetY: Ref<number>
   isZooming: Ref<boolean>
+  /** Dynamic zoom-out floor, from content extent (useViewState > minZoom) */
+  minZoom?: () => number
   startZooming: () => void
   scheduleSaveViewState: () => void
 }
@@ -26,6 +29,8 @@ export interface UseCanvasZoomReturn {
   isMouseOnCanvas: Ref<boolean>
 
   // Functions
+  /** Zoom by a multiplicative factor about a point in canvas-viewport pixels */
+  zoomByRatio: (ratio: number, mouseX: number, mouseY: number) => void
   onWheel: (e: WheelEvent) => void
   onCanvasPointerMove: (e: PointerEvent) => void
   onCanvasPointerEnter: () => void
@@ -39,6 +44,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     offsetX,
     offsetY,
     isZooming,
+    minZoom,
     startZooming,
     scheduleSaveViewState,
   } = ctx
@@ -68,7 +74,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
     const zoomIntensity = 0.003
     const delta = Math.exp(-deltaY * zoomIntensity)
-    const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
+    const newScale = Math.min(Math.max(scale.value * delta, minZoom?.() ?? ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
@@ -80,12 +86,82 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
   function applyZoomAtPoint(deltaY: number, mouseX: number, mouseY: number, intensity: number) {
     const delta = Math.exp(-deltaY * intensity)
-    const newScale = Math.min(Math.max(scale.value * delta, 0.01), 3)
+    const newScale = Math.min(Math.max(scale.value * delta, minZoom?.() ?? ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
     const scaleChange = newScale / scale.value
     offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
     offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
     scale.value = newScale
   }
+
+  /**
+   * Zoom by a multiplicative factor about a point, in canvas-viewport pixels.
+   * The touchpad reports a cumulative scale rather than a wheel delta, so it
+   * needs this rather than applyZoomAtPoint's exponential-of-delta form.
+   */
+  function zoomByRatio(ratio: number, mouseX: number, mouseY: number) {
+    if (!(ratio > 0)) return
+    const newScale = Math.min(Math.max(scale.value * ratio, minZoom?.() ?? ZOOM_LIMITS.MIN), ZOOM_LIMITS.MAX)
+    const scaleChange = newScale / scale.value
+    offsetX.value = mouseX - (mouseX - offsetX.value) * scaleChange
+    offsetY.value = mouseY - (mouseY - offsetY.value) * scaleChange
+    scale.value = newScale
+    scheduleSaveViewState()
+  }
+
+  // The touchpad pinch, handed over from GTK.
+  //
+  // WebKit answers a pinch by changing the viewport page-scale, which scales
+  // the whole interface - the toolbar and the canvas controls included - and
+  // is unreachable from here: it is not the zoom-level property and not a DOM
+  // default action. The Rust side consumes the gesture at the GTK widget
+  // before WebKit sees one and calls this instead, so a pinch zooms the canvas
+  // about the pointer like every other zoom (main.rs > pinch guard).
+  let lastPinchScale = 1
+  let lastPinchAt = 0
+  /** Last pointer position seen over the canvas, in client pixels. */
+  let lastPointerX: number | null = null
+  let lastPointerY: number | null = null
+  /** A gap this long means the previous gesture ended and scale restarts at 1. */
+  const PINCH_GESTURE_GAP_MS = 200
+
+  function onNativePinch(cumulativeScale: number, x: number, y: number) {
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (!rect || !(cumulativeScale > 0)) return
+    // Anchor on the pointer the canvas itself tracks, in the same coordinate
+    // space the wheel path uses, rather than trusting the widget coordinates
+    // the gesture carries: those come from GTK and need not share an origin
+    // with the page once a panel, a header or a display scale factor is in
+    // play. The gesture's own position is the fallback.
+    const anchorX = lastPointerX ?? x
+    const anchorY = lastPointerY ?? y
+    const now = performance.now()
+    const isNewGesture = now - lastPinchAt > PINCH_GESTURE_GAP_MS
+    lastPinchAt = now
+    if (isNewGesture) {
+      // A gesture starts at 1; nothing to apply until it moves
+      lastPinchScale = cumulativeScale
+      return
+    }
+    // GDK reports scale 1 again when the gesture ends. Taken as a sample that
+    // is a ratio of 1/lastScale, which throws the view back to where the pinch
+    // started - the zoom appearing to spring back the moment fingers lift.
+    if (cumulativeScale === 1) {
+      lastPinchScale = 1
+      return
+    }
+    const ratio = cumulativeScale / lastPinchScale
+    lastPinchScale = cumulativeScale
+    startZooming()
+    zoomByRatio(ratio, anchorX - rect.left, anchorY - rect.top)
+  }
+
+  onMounted(() => {
+    ;(window as unknown as Record<string, unknown>).__NODUS_PINCH_ZOOM = onNativePinch
+  })
+
+  onUnmounted(() => {
+    delete (window as unknown as Record<string, unknown>).__NODUS_PINCH_ZOOM
+  })
 
   function startPinchMomentum() {
     if (momentumRafId) return
@@ -105,6 +181,11 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
         return
       }
 
+      // Momentum is still the zoom gesture: keep isZooming alive for its
+      // whole run, or it reports the gesture over 150ms in while the scale is
+      // still changing - and anything deferred to the gesture's end (the
+      // renderer switch in useGraphMetrics) would fire mid-flight
+      startZooming()
       applyZoomAtPoint(pinchVelocity, lastPinchMouseX, lastPinchMouseY, 0.008)
       pinchVelocity *= friction
 
@@ -222,8 +303,11 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
     }
   }
 
-  function onCanvasPointerMove(_e: PointerEvent) {
-    // Mouse tracking - kept for potential future use
+  function onCanvasPointerMove(e: PointerEvent) {
+    // The pinch gesture carries no usable page coordinate of its own, so the
+    // pointer is tracked here and used as the zoom anchor
+    lastPointerX = e.clientX
+    lastPointerY = e.clientY
   }
 
   function onCanvasPointerEnter() {
@@ -236,6 +320,7 @@ export function useCanvasZoom(ctx: UseCanvasZoomContext): UseCanvasZoomReturn {
 
   return {
     isMouseOnCanvas,
+    zoomByRatio,
     onWheel,
     onCanvasPointerMove,
     onCanvasPointerEnter,

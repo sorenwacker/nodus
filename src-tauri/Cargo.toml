@@ -68,3 +68,12 @@ tempfile = "3.10"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+# Linux only: the touchpad pinch is consumed at the GTK widget before WebKit
+# receives it. WebKit's own pinch handling changes the viewport page-scale,
+# which is internal - it is not the zoom-level property and not a DOM default
+# action, so neither JavaScript nor webkit2gtk can undo it (main.rs).
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+gdk = "0.18"
+webkit2gtk = "2.0"

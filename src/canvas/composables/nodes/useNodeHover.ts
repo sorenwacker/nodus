@@ -14,6 +14,15 @@ export interface UseNodeHoverContext {
   filteredEdges: Ref<Edge[]> | ComputedRef<Edge[]>
   getNode: (id: string) => Node | undefined
   hoverTooltipEnabled?: Ref<boolean>
+  /**
+   * True while the canvas is being panned. Hover is ignored for the duration:
+   * a pan slides every node under a stationary pointer, so the cards fire
+   * pointerenter and pointerleave continuously, and each one rebuilds the edge
+   * model and re-renders the edge layer - once per frame, for a highlight the
+   * user cannot even see while the view is moving
+   * (PRODUCT_DESIGN.md > Canvas rendering).
+   */
+  isPanning?: Ref<boolean>
 }
 
 export interface EdgeStats {
@@ -40,7 +49,7 @@ export interface UseNodeHoverReturn {
 }
 
 export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
-  const { scale, isLODMode, selectedNodeIds, filteredEdges, getNode, hoverTooltipEnabled } = ctx
+  const { scale, isLODMode, selectedNodeIds, filteredEdges, getNode, hoverTooltipEnabled, isPanning } = ctx
 
   const hoveredNodeId = ref<string | null>(null)
   const hoverMousePos = ref({ x: 0, y: 0 })
@@ -160,11 +169,13 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
 
   // Event handlers
   function onNodePointerEnter(e: PointerEvent, nodeId: string) {
+    if (isPanning?.value) return
     hoveredNodeId.value = nodeId
     hoverMousePos.value = { x: e.clientX, y: e.clientY }
   }
 
   function onNodePointerMove(e: PointerEvent) {
+    if (isPanning?.value) return
     hoverMousePos.value = { x: e.clientX, y: e.clientY }
   }
 

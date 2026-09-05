@@ -163,6 +163,29 @@ describe('duplicate implementations', () => {
     expect(grown, `These gained another copy:\n  ${grown.join('\n  ')}`).toEqual([])
   })
 
+  /**
+   * A syntax pattern is not a named function, so the body scan above cannot see
+   * it. Wikilink syntax had five separate literals - the frontmatter parser, the
+   * markdown renderer, the file-rename path, the references sidebar and the
+   * fullscreen editor - and they had already drifted over whether an empty
+   * alias counts, so the same text was a link in one view and prose in another.
+   * Derived by scanning, so a sixth copy fails here rather than being counted
+   * by hand.
+   */
+  it('defines wikilink syntax in one place', () => {
+    const owner = join(SRC, 'lib/contentParser.ts')
+    const offenders = sourceFiles(SRC)
+      .filter((file) => file !== owner)
+      .filter((file) => /\\\[\\\[/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(REPO, file))
+
+    expect(
+      offenders,
+      'These carry their own copy of the wikilink pattern. Use ' +
+        `wikilinkPattern() or matchWikilinks() from lib/contentParser:\n  ${offenders.join('\n  ')}`
+    ).toEqual([])
+  })
+
   it('drops an entry once its copies are consolidated', () => {
     const names = new Map<string, Set<string>>()
     for (const body of bodies.filter(b => b.exported)) {

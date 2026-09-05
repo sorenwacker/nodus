@@ -139,10 +139,16 @@ export async function applyForceLayout(
     .force('gravityY', forceY<SimNode>(centerY).strength(gravityStrength))
     .force('collide', forceCollide<SimNode>()
       .radius(d => {
-        // Use actual node diagonal / 2 as collision radius
-        // Large gap (80px) for generous spacing between nodes
+        // Half the node's diagonal keeps rectangles from overlapping at any
+        // approach angle; the padding on top is what gives the layout air.
+        // A flat 80px read as generous next to a 200x120 card and as nothing
+        // next to a 400x380 one - resizing every card up and re-running the
+        // layout barely changed the spread, so the bigger cards packed
+        // visibly tighter. The padding scales with the card (a quarter of
+        // the diagonal) and the 80px floor keeps small cards spaced exactly
+        // as before.
         const diagonal = Math.sqrt(d.width ** 2 + d.height ** 2)
-        return diagonal / 2 + 80
+        return diagonal / 2 + Math.max(80, diagonal * 0.25)
       })
       .strength(1.0)
       .iterations(5))

@@ -13,7 +13,7 @@
  */
 import { nextTick } from 'vue'
 import { marked } from '../lib/markdown'
-import { stripFrontmatter } from '../lib/contentParser'
+import { stripFrontmatter, wikilinkPattern } from '../lib/contentParser'
 import { invoke, isTauri } from '../lib/tauri'
 import {
   renderMath as renderMathWasm,
@@ -130,8 +130,7 @@ export function renderMarkdown(content: string | null, options: RenderOptions = 
   })
 
   // Convert [[link]] and [[link|display]] wikilinks to clickable elements
-  const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-  html = html.replace(wikilinkRegex, (_match, target, display) => {
+  html = html.replace(wikilinkPattern(), (_match, target, display) => {
     const displayText = display || target
     const targetTrimmed = target.trim()
 

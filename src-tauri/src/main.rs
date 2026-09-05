@@ -195,6 +195,61 @@ fn main() {
                 app.set_menu(menu)?;
             }
 
+            // A touchpad pinch scales the whole interface: WebKit treats it as a
+            // viewport page-scale gesture, which pushed the toolbar and the
+            // canvas controls outside the window with no way back - the
+            // shortcuts that would reset a zoom belong to the canvas font
+            // scale, and once the chrome has gone there is no non-canvas
+            // surface left to gesture over.
+            //
+            // Page-scale is internal to WebKit. It is not the zoom-level
+            // property, so webkit2gtk cannot pin it, and it is not a DOM
+            // default action, so preventDefault cannot stop it - both were
+            // tried and neither fires. What can be reached is the gesture
+            // itself: GTK offers a widget its `event` signal before the
+            // widget's own handler runs, so consuming the pinch there means
+            // WebKit never sees one. Zooming on this canvas is the canvas's
+            // own gesture (PRODUCT_DESIGN.md > Canvas rendering).
+            #[cfg(target_os = "linux")]
+            {
+                use gtk::glib;
+                use gtk::prelude::*;
+                if let Some(window) = app.get_webview_window("main") {
+                    let for_eval = window.clone();
+                    let attached = window.with_webview(move |webview| {
+                        let view = webview.inner();
+                        view.add_events(gdk::EventMask::TOUCHPAD_GESTURE_MASK);
+                        view.connect_event(move |_, event| {
+                            if event.event_type() != gdk::EventType::TouchpadPinch {
+                                return glib::Propagation::Proceed;
+                            }
+                            // Consumed, then handed to the canvas so a pinch
+                            // still zooms - just the canvas, not the page. The
+                            // gesture reports a cumulative scale, which the
+                            // canvas turns into a ratio (useCanvasZoom).
+                            if let Some(pinch) = event.downcast_ref::<gdk::EventTouchpadPinch>() {
+                                let (x, y) = pinch.position();
+                                let scale = pinch.scale();
+                                // Every value is interpolated into JavaScript
+                                // source, and Rust writes a non-finite float as
+                                // `inf` - not a JavaScript literal but an
+                                // undefined identifier, so the whole call would
+                                // throw a ReferenceError instead of zooming.
+                                if scale.is_finite() && x.is_finite() && y.is_finite() {
+                                    let _ = for_eval.eval(format!(
+                                        "window.__NODUS_PINCH_ZOOM&&window.__NODUS_PINCH_ZOOM({scale},{x},{y})"
+                                    ));
+                                }
+                            }
+                            glib::Propagation::Stop
+                        });
+                    });
+                    if let Err(e) = attached {
+                        eprintln!("[pinch] guard failed to attach: {e}");
+                    }
+                }
+            }
+
             Ok(())
         })
         .on_menu_event(|app, event| {
