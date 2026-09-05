@@ -29,7 +29,9 @@ Hashtags in node content become node tags:
 
 - `#tag` tokens are extracted whenever content is set: on node creation and on every content edit, from any interface (canvas editor, MCP tools, LLM agent)
 - Loading a workspace scans every node's body as well, so content that arrived before tags were extracted, or that another editor wrote into the vault, is tagged like anything else. The pass writes only the nodes whose tags changed, so a workspace already current costs no writes
-- Extracted tags merge with the node's existing tags
+- A `#tag` in the text always creates its tag node and the edge to it. Whether those are drawn is a separate, view-only question answered by the tag filter, which never creates or destroys anything
+- Deleting a `#tag` from the text withdraws it: the tag leaves the node, its edge is deleted, and the tag node goes too once the last note using it lets go
+- A tag added by hand from a card's chips was never in the text, so an edit never withdraws it. Only a tag the previous body carried and the new one does not is taken away
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
 - With tag nodes enabled in settings, each tag becomes a tag node connected to the notes that use it

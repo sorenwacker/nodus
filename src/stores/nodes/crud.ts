@@ -8,8 +8,14 @@ import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { recordContentBefore } from './undoRecorder'
 import { generateShortId } from '../../lib/ids'
-import { extractHashtags, extractWikilinks } from '../../lib/contentParser'
-import { tagStorage } from '../../lib/storage'
+import { planTagChange } from '../../lib/tagSync'
+
+/**
+ * Removes the edges of tags a node has withdrawn, and any tag node left with
+ * nothing pointing at it.
+ */
+export type TagCleanup = (nodeId: string, removedTags: string[]) => Promise<void>
+import { extractWikilinks } from '../../lib/contentParser'
 import { clampCoord, clampNodeSize } from '../../lib/geometry'
 import type {
   Node,
@@ -191,7 +197,8 @@ export async function updateNodeContent(
   options?: {
     /** Set only by undo and redo, which must not record their own replay */
     skipUndo?: boolean
-  }
+  },
+  tagCleanup?: TagCleanup
 ): Promise<void> {
   const { state, edgesStore } = deps
 
@@ -213,6 +220,10 @@ export async function updateNodeContent(
       })
     }
 
+    // Read before the write below overwrites it: the tags a body withdraws can
+    // only be known by comparing it with the body it replaces
+    const previousContent = node.markdown_content
+
     node.markdown_content = trimmedContent
     node.updated_at = Date.now()
     try {
@@ -225,7 +236,7 @@ export async function updateNodeContent(
       console.error('Failed to update content:', e)
     }
 
-    await extractAndPersistHashtags(node, trimmedContent, tagNodesComposable)
+    await extractAndPersistHashtags(node, trimmedContent, tagNodesComposable, previousContent, tagCleanup)
 
     // Sync wikilink edges through the backend engine, whose resolver also
     // handles folder/note path links and #section anchors. A backend that
@@ -246,12 +257,10 @@ export async function updateNodeContent(
 async function extractAndPersistHashtags(
   node: Node,
   content: string,
-  tagNodesComposable?: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> }
+  tagNodesComposable?: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> },
+  previousContent?: string | null,
+  tagCleanup?: TagCleanup
 ): Promise<void> {
-  const extractedTags = extractHashtags(content)
-  if (extractedTags.length === 0) return
-
-  // Merge with existing tags (deduplicate)
   let existingTags: string[] = []
   if (node.tags) {
     try {
@@ -263,20 +272,40 @@ async function extractAndPersistHashtags(
       existingTags = []
     }
   }
-  const mergedTags = Array.from(new Set([...existingTags, ...extractedTags]))
-  node.tags = JSON.stringify(mergedTags)
+
+  // What the body gives it takes away: a tag the previous body carried and the
+  // new one does not is withdrawn, while a tag added from a card's chips was
+  // never in the body and survives (docs/content/features.md > Tags).
+  const change = planTagChange(previousContent, content, existingTags)
+  const unchanged =
+    change.added.length === 0 &&
+    change.removed.length === 0 &&
+    change.tags.length === existingTags.length
+  if (unchanged) return
+
+  node.tags = JSON.stringify(change.tags)
   try {
-    await invoke('update_node_tags', { id: node.id, tags: mergedTags })
+    await invoke('update_node_tags', { id: node.id, tags: change.tags })
   } catch (e) {
     console.error('Failed to update tags:', e)
   }
 
-  // Create tag nodes if setting is enabled
-  if (tagStorage.getShowTagNodes() && tagNodesComposable) {
+  // A #tag in the text always gets its tag node and edge. Whether those are
+  // drawn is a view question, answered by the tag filter, and a view control
+  // must not decide whether data exists (docs/content/features.md > Tags).
+  if (tagNodesComposable && change.added.length > 0) {
     try {
-      await tagNodesComposable.createTagEdges(node.id, extractedTags)
+      await tagNodesComposable.createTagEdges(node.id, change.added)
     } catch (e) {
       console.error('Failed to create tag edges:', e)
+    }
+  }
+
+  if (tagCleanup && change.removed.length > 0) {
+    try {
+      await tagCleanup(node.id, change.removed)
+    } catch (e) {
+      console.error('Failed to remove tag edges:', e)
     }
   }
 }
