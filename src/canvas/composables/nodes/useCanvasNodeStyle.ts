@@ -53,6 +53,13 @@ export interface UseCanvasNodeStyleContext {
   isSemanticZoomCollapsed: ComputedRef<boolean>
   /** Selected node IDs */
   selectedNodeIds: ComputedRef<string[]>
+  /**
+   * Neighbours of the selection or the hovered node. They are exempt from the
+   * collapsed dimming below: that dimming writes an inline border colour, which
+   * outranks the stylesheet and would erase the highlight
+   * (docs/content/features.md > Neighbor Highlighting).
+   */
+  highlightedNodeIds: ComputedRef<Set<string>>
   /** Current theme name */
   currentTheme: Ref<string>
 }
@@ -87,6 +94,7 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     nodeBorderWidth,
     isSemanticZoomCollapsed,
     selectedNodeIds,
+    highlightedNodeIds,
     currentTheme,
   } = ctx
 
@@ -171,7 +179,11 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     } else if (!isTagNode && isSemanticZoomCollapsed.value && !selectedNodeIds.value.includes(node.id)) {
       // Collapsed non-selected nodes get canvas background
       style.background = 'var(--bg-canvas)'
-      style.borderColor = 'var(--text-muted)'
+      // A highlighted neighbour keeps the stylesheet's border. Writing one here
+      // would win on inline weight alone and blank the highlight out.
+      if (!highlightedNodeIds.value.has(node.id)) {
+        style.borderColor = 'var(--text-muted)'
+      }
     }
 
     return style
