@@ -1856,7 +1856,7 @@ const nodeStyle = useCanvasNodeStyle({
   nodeZOrder,
   nodeBorderWidth,
   isSemanticZoomCollapsed,
-  selectedNodeIds: computed(() => store.selectedNodeIds),
+  selectedNodeIds: computed(() => store.selectedNodeIds), highlightedNodeIds,
   currentTheme,
 })
 const { getNodeStyle } = nodeStyle

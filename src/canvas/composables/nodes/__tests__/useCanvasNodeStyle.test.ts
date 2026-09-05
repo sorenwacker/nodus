@@ -12,6 +12,7 @@ function makeContext(scale: number): UseCanvasNodeStyleContext {
     nodeBorderWidth: computed(() => Math.max(1, 2 / scale)),
     isSemanticZoomCollapsed: computed(() => false),
     selectedNodeIds: computed(() => []),
+    highlightedNodeIds: computed(() => new Set<string>()),
     currentTheme: ref('light'),
   }
 }
