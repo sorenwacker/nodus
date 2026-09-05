@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { placeMenuInViewport } from '../utils/menuPlacement'
 import type { Storyline, Workspace, Node, EntityNodeType } from '../../types'
 import { ENTITY_NODE_TYPES } from '../../types'
 
@@ -48,12 +49,43 @@ const otherWorkspaces = computed(() => {
   return props.workspaces.filter(w => w.id !== props.currentWorkspaceId)
 })
 
-// Check if submenu should flip to left side (menu too close to right edge)
+/**
+ * Where the menu actually opens. The pointer position is the anchor, but a menu
+ * anchored near an edge runs off screen, so it is measured once it is in the DOM
+ * and placed from its real size (PRODUCT_DESIGN.md > Context Menu > Placement).
+ */
+const menuRef = ref<HTMLElement | null>(null)
+const placement = ref({ x: 0, y: 0 })
+const EDGE_MARGIN = 8
+
+watch(
+  [() => props.visible, () => props.position],
+  async ([visible]) => {
+    if (!visible) return
+    // Anchor first so the menu is measured where it would have opened
+    placement.value = { ...props.position }
+    await nextTick()
+    const el = menuRef.value
+    if (!el) return
+    const { width, height } = el.getBoundingClientRect()
+    placement.value = placeMenuInViewport(
+      props.position,
+      { width, height },
+      { width: window.innerWidth, height: window.innerHeight },
+      EDGE_MARGIN
+    )
+  },
+  { immediate: true }
+)
+
+// Check if submenu should flip to left side (menu too close to right edge).
+// Measured from where the menu opens, not from the pointer, which are no longer
+// the same once the menu has been placed.
 const shouldFlipSubmenu = computed(() => {
   const submenuWidth = 200
   const menuWidth = 180
   const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1920
-  return props.position.x + menuWidth + submenuWidth > windowWidth - 20
+  return placement.value.x + menuWidth + submenuWidth > windowWidth - 20
 })
 
 // Entity type config for submenu
@@ -167,8 +199,9 @@ function handleCreateEntity(type: EntityNodeType) {
 <template>
   <div
     v-if="visible"
+    ref="menuRef"
     class="context-menu"
-    :style="{ left: position.x + 'px', top: position.y + 'px' }"
+    :style="{ left: placement.x + 'px', top: placement.y + 'px' }"
     @click.stop
     @wheel.stop
   >
