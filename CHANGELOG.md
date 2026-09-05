@@ -2,6 +2,47 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.5.0] - 2026-09-05
+
+A canvas pass: the viewport survives large graphs without an out-of-memory kill, and a graph too dense to read as cards is drawn as circles instead.
+
+### Added
+- Below a zoom threshold node cards become circles drawn on a 2D canvas, with their edges on the same canvas. The threshold has a hysteresis band, so a canvas held near it does not flip between forms
+- The preview panel is available in bubble mode, where a card never appears
+- Zoom and pan respond to two touch or pen contacts, and a touchpad pinch zooms the canvas rather than scaling the whole page
+- A node carries a date, and its anchored comments appear in the fullscreen view
+- The timelines sheet opens from the toolbar
+- An edge label sits on its curve, an edge shows its own colour, and search matches the rendered text
+- Every locale carries every key, and the components that had no translations were translated
+
+### Changed
+- The zoom-out floor is derived from the content rather than a constant, and the zoom range is defined once so fit-to-content can reach its own limit
+- The renderer holds steady while a zoom or pan gesture is live
+- The edge list is returned unchanged when nothing that routes an edge has changed
+- The dot grid renders on its own layer, so a pan no longer repaints the viewport
+- Edge form is chosen by zoom as well as by graph size; highlighted edges are painted in a second group instead of re-sorting the list, and a non-highlighted edge is dimmed once per edge
+- Node hover is ignored while the canvas is panning
+- Pan offset writes are coalesced to one per animation frame
+- Force-layout spacing scales with the card size it separates, and each radial ring is sized from its own radius
+- Ports are ordered so fewer edges cross, and a detour runs perpendicular to the segment so edges stop crossing nodes
+- A frame press becomes a drag only after 3px of travel, and a frame resize is stored once instead of on every pointer move
+- Undo is recorded in the store, so no writer can omit it; setting a date, fitting a frame, a bulk rewrite, a colour choice and a resize are each one undo step
+
+### Fixed
+- The zoom tiers that keep the canvas out of an out-of-memory kill are gated by tests, and the webview zoom guard applies on every route into a page zoom
+- A wikilink is read through one parser and a frontmatter block is found one way, so the timeline sees what other views see
+- A node is deleted only once its file is in the trash
+- Wikilink edges survive a backend failure, and an edge type change is stored
+- Frontmatter survives on CRLF files, and one block is written per exported document
+- A fresh database gets the same edges schema an upgraded one gets
+- A storyline drag ends on pointercancel, not only on pointerup
+- Caller-supplied paths are checked against the vaults before being acted on, and the PDF parser is patched against malformed input
+- The approval dialog opens when a plan is created, not when the model asks
+- An agent run ends on the done tool rather than on the words in a reply, a superseded node-agent loop no longer writes the new run's state, and a failure across the MCP boundary says what actually failed
+
+### Removed
+- Six components no interface mounts, and every export nothing imports, each gated against reappearing
+
 ## [1.4.0] - 2026-08-26
 
 Releases the work of 1.4.0-rc.1 through rc.3. The individual candidate entries below record each change in detail; this entry is the consolidated view for anyone upgrading from 1.3.0.
