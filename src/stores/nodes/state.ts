@@ -5,6 +5,7 @@
 import { ref, computed } from 'vue'
 import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
+import { runHashtagBackfill } from './hashtagBackfill'
 import { notifications$ } from '../../composables/useNotifications'
 import { useStorylinesStore } from '../storylines'
 import { useEdgesStore } from '../edges'
@@ -196,6 +197,18 @@ export async function initializeStore(
     console.log('[Nodes] Node sizes from DB:', fetchedNodes.slice(0, 5).map(n => ({ id: n.id.slice(0, 8), title: n.title, width: n.width, height: n.height })))
 
     storeLogger.debug(`[Nodes] Loaded ${fetchedNodes.length} total nodes`)
+
+    // Bring recorded tags up to date with the bodies just loaded. Not awaited:
+    // the pass writes only the nodes whose tags changed - none at all once a
+    // vault is current - and the canvas must not wait on it to appear
+    // (PRODUCT_DESIGN.md > Tags).
+    runHashtagBackfill(state.nodes.value, (id, tags) =>
+      invoke('update_node_tags', { id, tags })
+    )
+      .then(written => {
+        if (written > 0) storeLogger.debug(`[Nodes] Backfilled tags on ${written} nodes`)
+      })
+      .catch(e => storeLogger.error('[Nodes] Tag backfill failed:', e))
     const workspaceIds = [...new Set(fetchedNodes.map(n => n.workspace_id))]
     storeLogger.debug(`[Nodes] Workspace IDs in nodes: ${JSON.stringify(workspaceIds)}`)
     storeLogger.debug(`[Nodes] Filtered nodes count: ${computed.filteredNodes.value.length}`)

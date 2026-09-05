@@ -28,6 +28,7 @@ Edge labels have their own zoom threshold (Settings > Appearance): below it, lab
 Hashtags in node content become node tags:
 
 - `#tag` tokens are extracted whenever content is set: on node creation and on every content edit, from any interface (canvas editor, MCP tools, LLM agent)
+- Loading a workspace scans every node's body as well, so content that arrived before tags were extracted, or that another editor wrote into the vault, is tagged like anything else. The pass writes only the nodes whose tags changed, so a workspace already current costs no writes
 - Extracted tags merge with the node's existing tags
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
