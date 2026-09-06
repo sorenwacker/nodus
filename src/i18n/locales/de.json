@@ -642,7 +642,9 @@
     "repairTagNodes": "Tag-Knoten reparieren",
     "repairTagNodesHint": "Doppelte Tag-Knoten zusammenführen und fehlendes #-Präfix wiederherstellen",
     "repairTagNodesNone": "Tag-Knoten sind bereits konsistent",
-    "repairTagNodesResult": "{merged} zusammengeführt, {renamed} umbenannt, {edges} Kanten angepasst"
+    "repairTagNodesResult": "{merged} zusammengeführt, {renamed} umbenannt, {edges} Kanten angepasst",
+    "showPerfOverlay": "Leistungsanzeige einblenden",
+    "showPerfOverlayHint": "Frame-Zeiten über dem Graphen beim Verschieben oder Zoomen, zur Diagnose von Rucklern"
   },
   "fileMove": {
     "collision": {

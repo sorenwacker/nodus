@@ -6,7 +6,7 @@
  */
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { canvasStorage, tagStorage } from '../../lib/storage'
+import { canvasStorage, perfStorage, tagStorage } from '../../lib/storage'
 import { useNodesStore } from '../../stores/nodes'
 import { planTagNodeRepair, runTagNodeRepair } from '../../composables/tagNodeRepair'
 
@@ -30,6 +30,13 @@ const zoomMode = ref<'scroll' | 'pinch'>(canvasStorage.getZoomMode())
 
 // Tag Settings
 const showTagNodes = ref(tagStorage.getShowTagNodes())
+
+// Diagnostics
+const showPerfOverlay = ref(perfStorage.getShowPerfOverlay())
+watch(showPerfOverlay, value => {
+  perfStorage.setShowPerfOverlay(value)
+  window.dispatchEvent(new CustomEvent('nodus-perf-overlay-change', { detail: value }))
+})
 
 // Save Canvas settings (workspace-specific, except radialStyle/zoomMode which are global)
 function saveCanvasSettings() {
@@ -263,6 +270,14 @@ watch(workspaceId, (newId) => {
         {{ t('settings.showTagNodes') }}
       </label>
       <span class="hint">{{ t('settings.showTagNodesHint') }}</span>
+    </div>
+
+    <div class="setting-group">
+      <label class="checkbox-label">
+        <input v-model="showPerfOverlay" type="checkbox" />
+        {{ t('settings.showPerfOverlay') }}
+      </label>
+      <span class="hint">{{ t('settings.showPerfOverlayHint') }}</span>
     </div>
 
     <div class="setting-group">

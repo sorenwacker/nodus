@@ -42,6 +42,7 @@ const KEYS = {
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
   showTagNodes: 'nodus_show_tag_nodes',
+  showPerfOverlay: 'nodus_show_perf_overlay',
   zoteroUserId: 'nodus_zotero_user_id',
   zoteroApiKey: 'nodus_zotero_api_key',
   spellcheckEnabled: 'nodus_spellcheck_enabled',
@@ -390,6 +391,21 @@ export const canvasStorage = {
 /**
  * Tag settings storage
  */
+/**
+ * Canvas performance readout.
+ *
+ * Off by default: it is a diagnostic, not a feature, and it draws over the
+ * graph (PRODUCT_DESIGN.md > Measuring canvas performance).
+ */
+export const perfStorage = {
+  getShowPerfOverlay(): boolean {
+    return localStorage.getItem(KEYS.showPerfOverlay) === 'true'
+  },
+  setShowPerfOverlay(value: boolean): void {
+    localStorage.setItem(KEYS.showPerfOverlay, String(value))
+  },
+}
+
 export const tagStorage = {
   getShowTagNodes(): boolean {
     return localStorage.getItem(KEYS.showTagNodes) === 'true'

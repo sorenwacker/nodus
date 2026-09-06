@@ -1269,6 +1269,15 @@ Resetting the default workspace also removes its previous frames and storylines 
 - **A card renders a preview, not a document.** A node holding an imported paper can carry tens of kilobytes of markdown; rendering 73KB measured at 82ms, five dropped frames for one click, into a card a few hundred pixels tall. Cards render the leading portion of the content, and the card says the text continues. The full document renders where it is read - the fullscreen view and the storyline reader, which render independently - so nothing is lost, only deferred to the surface that shows it.
 - **The preview is sized to the card, not to a constant.** A 200x120 card shows about 162 characters, 27 across and 6 down, while a flat 4000-character cap rendered an average of 896. Measured over 400 nodes of a real vault that is 38 DOM elements per card against 7, and the difference is built, styled and painted for text that cannot be seen. The cap is derived from the card's width, height and the user's font scale, with headroom because markdown syntax does not render and lines break early, a floor so a small card still says something, and the flat cap as its ceiling. The card's size is part of the render cache key, so a card that is resized fills the space it gained.
 
+### Measuring canvas performance
+
+**Required behavior:** The canvas can be asked how long its frames take, in the running app, on the real graph.
+
+- Probing from outside the browser repeatedly cleared the code of blame while the canvas stayed laggy: culling and node styling measured 0.015ms per frame over a steady pan of a 360-node workspace, and the edge model 0.41ms for 1,000 edges, both against a 16.7ms budget. What such a probe cannot see is rendering - the Vue patch, layout, paint and compositing - which is where the time goes.
+- Settings > Canvas > Show performance readout puts frame timing over the graph: median, 95th percentile, worst frame, how many missed the budget, and the time attributed to each named phase. It also states which renderer is live, and how many nodes and edges it is drawing, because the two modes fail differently.
+- Frames are sampled only while a viewport gesture is live. That is when a stutter is felt, and a permanent frame loop would itself be work the canvas does not need.
+- The readout is off by default. It is a diagnostic, not a feature, and it draws over the graph.
+
 ### Painting while the viewport moves
 
 **Required behavior:** A live pan or zoom drops the canvas's decorative paint - the drop-shadow glow on edges - and restores it when the gesture ends.
