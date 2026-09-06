@@ -2066,7 +2066,7 @@ defineExpose({
     <div
       ref="canvasRef"
       class="canvas-viewport"
-      :class="{ panning: isPanning, 'frame-placement': frames.pendingFramePlacement.value }"
+      :class="{ panning: isPanning, 'gesture-active': gestureActive, 'frame-placement': frames.pendingFramePlacement.value }"
       @wheel="onWheel"
       @pointerdown="onCanvasPointerDown"
       @pointermove="onCanvasPointerMove"

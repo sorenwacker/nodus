@@ -173,3 +173,25 @@
   box-shadow: 0 8px 24px var(--shadow-md);
   z-index: 1000;
 }
+
+/* While a pan, pinch or zoom is live, the canvas drops its decorative paint.
+ *
+ * The per-frame JavaScript is not what makes a pan stutter: culling and node
+ * styling together measured 0.015ms per frame over a steady pan of a real
+ * 360-node workspace, against a 16.7ms budget. Paint is. A drop-shadow forces
+ * its own paint pass over a region larger than the path it decorates, and
+ * .edge-highlighted carries one in every theme while the cyber theme puts one
+ * on every visible edge - so selecting a hub, whose whole fan then highlights,
+ * multiplies the cost by the graph rather than by the viewport.
+ *
+ * It is keyed to the gesture rather than to panning alone, so a pinch zoom gets
+ * it too, and the glow returns the moment the gesture settles. Nothing is lost:
+ * a glow is imperceptible while the view is moving
+ * (PRODUCT_DESIGN.md > Painting while the viewport moves).
+ */
+.canvas-viewport.gesture-active .edge-line-visible,
+.canvas-viewport.gesture-active .edge-line-fast,
+.canvas-viewport.gesture-active .edge-highlighted,
+.canvas-viewport.gesture-active .edge-selected {
+  filter: none;
+}
