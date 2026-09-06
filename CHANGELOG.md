@@ -2,6 +2,11 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.3] - 2026-09-06
+
+### Added
+- Settings > Canvas > Show performance readout puts frame timing over the graph while panning or zooming: median, 95th percentile, worst frame, how many frames missed the 16.7ms budget, and the time attributed to each named phase, alongside which renderer is live and how many nodes and edges it is drawing. Measuring the canvas from outside the browser kept clearing the code - culling and node styling at 0.015ms per frame, the edge model at 0.41ms for 1,000 edges - while the canvas stayed laggy, and lag in bubble mode ruled out cards, DOM subtrees, SVG and CSS filters alike. What remains is rendering, which only the running app can be asked about. Frames are sampled only while a gesture is live, and the readout is off by default
+
 ## [1.6.0-rc.2] - 2026-09-06
 
 ### Changed
