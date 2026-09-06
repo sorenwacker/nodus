@@ -682,6 +682,13 @@ Two methods for importing citations from Zotero:
 | `Cmd/Ctrl+V` | Paste nodes from clipboard |
 | `Ctrl+Shift+R` | Refresh workspace from files |
 
+### Toolbar
+
+**Required behavior:** No workspace name, however long, may push the toolbar's controls off screen.
+
+- A `<select>` takes the intrinsic width of its widest option. A workspace named "Lorenz workshop - Beyond Models: Sustainable AI Infrastructure as a Scientific Instrument" stretched the selector across the toolbar and pushed the search box and the icons past the right edge of the window.
+- The name is data, so no care in the markup prevents it: the control carries a maximum width. It still opens at full width when clicked, so long names stay readable where it matters.
+
 ### Context Menu
 
 Right-click on a node to access:

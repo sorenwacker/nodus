@@ -5,6 +5,7 @@
 import { ref, computed } from 'vue'
 import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
+import { tagStorage } from '../../lib/storage'
 import { runHashtagBackfill } from './hashtagBackfill'
 import { notifications$ } from '../../composables/useNotifications'
 import { useStorylinesStore } from '../storylines'
@@ -27,7 +28,11 @@ export function createState(): NodeStoreState {
     showManualEdges: ref(true),
     showStorylineEdges: ref(true),
     showWikilinkEdges: ref(true),
-    showTagEdges: ref(true),
+    // Whether tag nodes and their edges are drawn. Read from the stored setting
+    // rather than defaulting to true: hiding them was a choice that lasted only
+    // until the next launch, when every tag node reappeared
+    // (docs/content/features.md > Tags).
+    showTagEdges: ref(tagStorage.getShowTagNodes()),
     // Shared hover bus: canvas and timelines highlight each other's hovered node
     hoverHighlightNodeId: ref<string | null>(null),
     aiWorkingNodeId: ref<string | null>(null),
