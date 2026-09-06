@@ -1284,6 +1284,7 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The margin is what makes staging safe. It exists so a node mounts before it is on screen, so admitting it a frame or two later costs nothing visible: it is still outside the viewport when it arrives.
 - Departures apply immediately and in full. Unmounting frees work, and keeping a node the viewport has left would only add to the next frame.
 - Staging is confined to the gesture. With the viewport still there is no burst to spread, and a fresh load should paint at once rather than trickle in.
+- A card fades in as it mounts, over 120ms. Normally this is never seen: cards mount in the margin, off screen, and are fully faded before they are visible. It earns its place on a fast drag, when staging falls behind and a card would otherwise appear abruptly mid-view. The animation is opacity only, so it composites rather than repaints, and it is dropped entirely under prefers-reduced-motion.
 
 ### Measuring canvas performance
 
