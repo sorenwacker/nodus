@@ -642,7 +642,9 @@
     "repairTagNodes": "Reparar nodos de etiqueta",
     "repairTagNodesHint": "Fusionar nodos de etiqueta duplicados y restaurar el prefijo # que falte",
     "repairTagNodesNone": "Los nodos de etiqueta ya son coherentes",
-    "repairTagNodesResult": "{merged} fusionados, {renamed} renombrados, {edges} aristas ajustadas"
+    "repairTagNodesResult": "{merged} fusionados, {renamed} renombrados, {edges} aristas ajustadas",
+    "showPerfOverlay": "Mostrar métricas de rendimiento",
+    "showPerfOverlayHint": "Tiempos de fotograma sobre el grafo al desplazar o hacer zoom, para diagnosticar tirones"
   },
   "fileMove": {
     "collision": {

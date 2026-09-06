@@ -46,6 +46,8 @@ const props = defineProps<{
   draggingNodeId: string | null
   hoveredNodeId: string | null
   getLODRadius: (nodeId: string) => number
+  /** Reports how long one draw took, for the performance readout. */
+  onRenderTime?: (ms: number) => void
 }>()
 
 const emit = defineEmits<{
@@ -83,6 +85,12 @@ const nodePositions = computed(() => {
 })
 
 function render() {
+  const started = performance.now()
+  renderFrame()
+  props.onRenderTime?.(performance.now() - started)
+}
+
+function renderFrame() {
   if (!canvasRef.value || !ctx) return
 
   const canvas = canvasRef.value

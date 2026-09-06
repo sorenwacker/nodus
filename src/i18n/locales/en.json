@@ -642,7 +642,9 @@
     "repairTagNodes": "Repair Tag Nodes",
     "repairTagNodesHint": "Merge tag nodes that duplicate each other and restore a missing # prefix",
     "repairTagNodesNone": "Tag nodes are already consistent",
-    "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted"
+    "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted",
+    "showPerfOverlay": "Show performance readout",
+    "showPerfOverlayHint": "Frame timing over the graph while you pan or zoom, for diagnosing stutter"
   },
   "fileMove": {
     "collision": {

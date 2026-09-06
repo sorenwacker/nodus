@@ -89,6 +89,8 @@ import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
 import CanvasNodeCard from './components/CanvasNodeCard.vue'
 import CanvasPreviewPanel from './components/CanvasPreviewPanel.vue'
 import CanvasLODCanvas from './components/CanvasLODCanvas.vue'
+import CanvasPerfOverlay from './components/CanvasPerfOverlay.vue'
+import { usePerfOverlay } from './composables/util/usePerfOverlay'
 import CanvasAgentLogPanel from './components/CanvasAgentLogPanel.vue'
 import { isErrorLog } from '../llm/agentLog'
 import CanvasColorBar from './components/CanvasColorBar.vue'
@@ -375,6 +377,7 @@ const viewportCulling = useViewportCulling({
 const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewportCulling
 
 const gestureActive = ref(false) // live while any viewport gesture is (useCanvasInput)
+const { showPerfOverlay, perfSummary, recordSpan: recordPerfSpan } = usePerfOverlay(gestureActive)
 
 // Graph metrics composable - computes graph size thresholds and LOD mode
 const graphMetrics = useGraphMetrics({
@@ -435,19 +438,13 @@ watch(
 
 
 // Expose functions with original names for compatibility
-function toggleNeighborhoodMode(nodeId?: string) {
-  neighborhood.toggle(nodeId)
-}
-function layoutNeighborhood(focusId: string) {
-  return neighborhood.layout(focusId)
-}
 
 // Handle double-click on node: navigate in neighborhood mode, zoom when zoomed out, otherwise edit
 function handleNodeDoubleClick(nodeId: string) {
   // In neighborhood mode, double-click navigates to clicked node's neighborhood
   if (neighborhoodMode.value && nodeId !== focusNodeId.value) {
     focusNodeId.value = nodeId
-    layoutNeighborhood(nodeId)
+    neighborhood.layout(nodeId)
     return
   }
   // When zoomed out (LOD mode or semantic zoom collapsed), zoom to the node instead of editing
@@ -1025,7 +1022,7 @@ function fitNodeToContent(nodeId: string) {
 
   // In neighborhood mode, re-layout to adapt to new sizes
   if (neighborhoodMode.value && focusNodeId.value) {
-    setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
+    setTimeout(() => neighborhood.layout(focusNodeId.value!), 10)
   }
 }
 
@@ -1583,7 +1580,7 @@ const nodeResizing = useNodeResizing({
   snapToGrid,
   neighborhoodMode,
   focusNodeId,
-  layoutNeighborhood,
+  layoutNeighborhood: neighborhood.layout,
   pushOverlappingNodesAway,
   setLastDragEndTime: (time: number) => {
     lastDragEndTime = time
@@ -1653,7 +1650,7 @@ const nodeDragging = useNodeDragging({
   isCreatingEdge,
   edgeStartNode,
   edgePreviewEnd,
-  layoutNeighborhood,
+  layoutNeighborhood: neighborhood.layout,
   pushOverlappingNodesAway,
   pushUndo,
   pushFrameAssignmentUndo,
@@ -1952,7 +1949,7 @@ useCanvasKeyboardShortcuts({
   layoutNodes: () => store.layoutNodes(undefined, { frameId: store.selectedFrameId ?? undefined }),
   fitToContent,
   fitSelectedFrameToContents,
-  toggleNeighborhoodMode,
+  toggleNeighborhoodMode: neighborhood.toggle,
   fontScale,
   increaseFontScale,
   decreaseFontScale,
@@ -2095,6 +2092,7 @@ defineExpose({
       />
 
       <!-- Canvas 2D LOD layer for GPU-accelerated circle rendering -->
+      <CanvasPerfOverlay v-if="showPerfOverlay" :summary="perfSummary" :visible-nodes="isLODMode ? lodCircleNodes.length : lodCardNodes.length" :edges="isLODMode ? canvasEdges.length : visibleEdgeLines.length" :mode="isLODMode ? 'bubbles (canvas)' : 'cards (DOM + SVG)'" />
       <CanvasLODCanvas
         v-if="isLODMode"
         :nodes="lodCircleNodes"
@@ -2107,7 +2105,7 @@ defineExpose({
         :highlighted-node-ids="highlightedNodeIds"
         :dragging-node-id="draggingNode"
         :hovered-node-id="hoveredNodeId"
-        :get-l-o-d-radius="getLODRadius"
+        :get-l-o-d-radius="getLODRadius" :on-render-time="(ms: number) => recordPerfSpan('canvas draw', ms)"
         @node-pointerdown="onNodePointerDown"
         @node-pointerenter="onNodePointerEnter"
         @node-pointerleave="onNodePointerLeave"
@@ -2278,7 +2276,7 @@ defineExpose({
         @layout="autoLayoutNodes"
         @fit-nodes-to-content="fitAllNodesToContent"
         @cycle-edge-style="cycleEdgeStyle"
-        @toggle-neighborhood-mode="toggleNeighborhoodMode()"
+        @toggle-neighborhood-mode="neighborhood.toggle()"
         @set-neighborhood-depth="setDepth"
         @create-frame="createFrameAtCenter"
         @show-help="showHelpModal = true"
