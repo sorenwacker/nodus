@@ -2,6 +2,12 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.2] - 2026-09-06
+
+### Changed
+- A live pan, pinch or zoom drops the drop-shadow glow on edges and restores it when the gesture settles. The per-frame JavaScript was never the cost: culling and node styling together measure 0.015ms per frame over a steady pan of a 360-node workspace, against a 16.7ms budget. Paint is, and a filter forces its own paint pass over a region larger than the path it decorates - `.edge-highlighted` carries one in every theme, the cyber theme puts one on every visible edge, and selecting a hub highlights its whole fan. It is also why zooming out stayed smooth: above the level-of-detail threshold edges are drawn on a 2D canvas, where no CSS filter applies
+- A card's content cap is derived from its width, height and the user's font scale instead of a flat 4000 characters. A 200x120 card shows about 162 characters while the flat cap rendered an average of 896; measured over 400 nodes of a real vault that is 38 DOM elements per card against 7. The card's size is part of the render cache key, so a resized card fills the space it gained
+
 ## [1.6.0-rc.1] - 2026-09-05
 
 ### Added
