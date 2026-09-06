@@ -1,5 +1,13 @@
 
 .node-card {
+  /* A card that arrives mid-pan fades rather than pops. Newly visible cards are
+     admitted a few per frame, and they normally mount in the viewport margin -
+     off screen, fully faded by the time they are seen. The fade earns its place
+     on a fast drag, when staging falls behind and a card would otherwise appear
+     abruptly in the middle of the view. Opacity only: it composites, so it adds
+     no repaint to the frames it covers
+     (PRODUCT_DESIGN.md > Staging what the viewport mounts). */
+  animation: node-card-appear 120ms ease-out;
   position: absolute;
   background: var(--bg-surface);
   border: 2px solid var(--border-default);
@@ -533,4 +541,19 @@
 
 .node-card.tag-node.selected {
   box-shadow: 0 0 0 calc(3px * var(--zoom-scale, 1)) rgba(255, 255, 255, 0.5), 0 2px 8px var(--shadow-md);
+}
+
+@keyframes node-card-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-card {
+    animation: none;
+  }
 }

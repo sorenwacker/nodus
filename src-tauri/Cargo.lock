@@ -3564,7 +3564,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nodus"
-version = "1.6.0-rc.3"
+version = "1.6.0-rc.4"
 dependencies = [
  "chrono",
  "comemo",

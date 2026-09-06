@@ -224,10 +224,25 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
     const style = globalEdgeStyle.value
 
-    // Everything below is a pure function of the edge list, the node layout
-    // version, and the style inputs keyed here. Same key, same product.
+    // Everything below is a pure function of the edge list, the node geometry,
+    // and the style inputs keyed here. Same key, same product.
+    //
+    // Geometry cannot be represented by nodeLayoutVersion alone. The store bumps
+    // that on a position write, and neighbourhood mode deliberately never makes
+    // one: its positions are an overlay, so leaving restores the canvas exactly.
+    // Keyed on the version alone the memo reported a hit and returned edges
+    // routed against where the nodes used to be - stubs radiating from the focus
+    // node. A running total over the displayed positions costs one pass of
+    // arithmetic and no allocation, and it notices a move the store never saw
+    // (PRODUCT_DESIGN.md > Re-routing edges during an interaction).
+    let geometry = 0
+    for (const node of displayNodes.value) {
+      geometry += node.canvas_x + node.canvas_y * 31
+    }
+
     const fullKey =
-      `${edges.length}|${style}|${isHugeGraph.value}|${store.nodeLayoutVersion}|` +
+      `${edges.length}|${style}|${isHugeGraph.value}|${store.nodeLayoutVersion}|${geometry}|` +
+      `${displayNodes.value.length}|` +
       edges.map(e => `${e.id}:${e.source_node_id}>${e.target_node_id}`).join(',')
     if (
       memoEdgeLines &&

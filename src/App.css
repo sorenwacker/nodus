@@ -47,6 +47,13 @@
   background: var(--bg-surface);
   cursor: pointer;
   min-width: 120px;
+  /* A select takes the intrinsic width of its widest option, so one long
+     workspace name stretched this across the toolbar and pushed the search box
+     and the icons past the right edge of the window. The name is data, so only
+     a bound prevents it; the control still opens at full width when clicked
+     (PRODUCT_DESIGN.md > Toolbar). */
+  max-width: 240px;
+  text-overflow: ellipsis;
 }
 
 .workspace-selector select:hover {

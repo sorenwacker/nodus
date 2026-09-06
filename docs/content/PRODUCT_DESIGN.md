@@ -682,6 +682,13 @@ Two methods for importing citations from Zotero:
 | `Cmd/Ctrl+V` | Paste nodes from clipboard |
 | `Ctrl+Shift+R` | Refresh workspace from files |
 
+### Toolbar
+
+**Required behavior:** No workspace name, however long, may push the toolbar's controls off screen.
+
+- A `<select>` takes the intrinsic width of its widest option. A workspace named "Lorenz workshop - Beyond Models: Sustainable AI Infrastructure as a Scientific Instrument" stretched the selector across the toolbar and pushed the search box and the icons past the right edge of the window.
+- The name is data, so no care in the markup prevents it: the control carries a maximum width. It still opens at full width when clicked, so long names stay readable where it matters.
+
 ### Context Menu
 
 Right-click on a node to access:
@@ -1277,6 +1284,7 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The margin is what makes staging safe. It exists so a node mounts before it is on screen, so admitting it a frame or two later costs nothing visible: it is still outside the viewport when it arrives.
 - Departures apply immediately and in full. Unmounting frees work, and keeping a node the viewport has left would only add to the next frame.
 - Staging is confined to the gesture. With the viewport still there is no burst to spread, and a fresh load should paint at once rather than trickle in.
+- A card fades in as it mounts, over 120ms. Normally this is never seen: cards mount in the margin, off screen, and are fully faded before they are visible. It earns its place on a fast drag, when staging falls behind and a card would otherwise appear abruptly mid-view. The animation is opacity only, so it composites rather than repaints, and it is dropped entirely under prefers-reduced-motion.
 
 ### Measuring canvas performance
 
@@ -1478,6 +1486,12 @@ An edge routes around a node rather than through it. The three-segment router ch
 Each of the three calls passed the opposite of the segment's own orientation, so a horizontal segment was offered a horizontal detour - which cannot clear a horizontal obstruction. Obstacle avoidance therefore never produced a waypoint, and edges ran straight through nodes at every zoom level.
 
 ### Re-routing edges during an interaction
+
+**Required behavior:** The edge memo notices every change to node geometry, including geometry the store never records.
+
+- Positions are usually written to the store, which bumps `nodeLayoutVersion`, and the memo keys on that. Neighbourhood mode is the exception: its positions are an overlay, deliberately never written, so leaving the mode restores the canvas exactly as it was.
+- Keyed on the version alone, the memo reported a hit on entering the mode and returned edges routed against the positions the nodes had left. On screen the edges became stubs radiating from the focus node while its neighbours sat elsewhere, unconnected.
+- The key therefore carries a running total over the displayed positions. It costs one pass of arithmetic and no allocation - cheaper than the edge-id string already in the key - and it notices a move no version counter saw.
 
 Edges are re-routed when the graph changes, and live while a node is dragged, because the edges attached to it must follow. A cached path cannot do that.
 
