@@ -13,7 +13,7 @@ import {
   type RenderOptions,
 } from '../../../services/MarkdownRenderService'
 import type { Node, Frame } from '../../../types'
-import { previewForCard } from '../../../lib/cardPreview'
+import { capForCard, previewForCard } from '../../../lib/cardPreview'
 
 export interface UseContentRendererOptions {
   getFilteredNodes: () => Node[]
@@ -24,11 +24,13 @@ export interface UseContentRendererOptions {
    */
   getRenderableNodes?: () => Node[]
   getFilteredFrames?: () => Frame[]
+  /** The user's font scale: larger text fits less of a document on a card. */
+  getFontScale?: () => number
   debounceMs?: number
 }
 
 export function useContentRenderer(options: UseContentRendererOptions) {
-  const { getFilteredNodes, getFilteredFrames, debounceMs = 50 } = options
+  const { getFilteredNodes, getFilteredFrames, getFontScale, debounceMs = 50 } = options
   // Falls back to the whole workspace when no viewport set is supplied
   const renderableNodes = options.getRenderableNodes ?? getFilteredNodes
 
@@ -121,8 +123,14 @@ export function useContentRenderer(options: UseContentRendererOptions) {
    * text continues. The full document renders in the fullscreen view and the
    * reader (PRODUCT_DESIGN.md > Rendering node content).
    */
-  function renderCardMarkdown(content: string | null | undefined): string {
-    const { text, truncated } = previewForCard(content)
+  function renderCardMarkdown(
+    content: string | null | undefined,
+    node?: { width?: number; height?: number }
+  ): string {
+    const { text, truncated } = previewForCard(
+      content,
+      capForCard(node?.width, node?.height, getFontScale?.() ?? 1)
+    )
     const html = renderMarkdown(text)
     return truncated ? `${html}<p class="content-continues">...</p>` : html
   }
@@ -142,17 +150,19 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       const existingIds = new Set(getFilteredNodes().map(n => n.id))
 
       for (const node of renderableNodes()) {
-        const contentKey = node.markdown_content || ''
+        // The size is part of the key: the cap is derived from it, so a resized
+        // card must render again to fill the space it just gained
+        const contentKey = `${node.width ?? ''}x${node.height ?? ''}:${node.markdown_content || ''}`
         const prevHash = nodeContentHashes.get(node.id)
 
         // Only re-render if content actually changed
         if (prevHash !== contentKey) {
-          result[node.id] = renderCardMarkdown(node.markdown_content)
+          result[node.id] = renderCardMarkdown(node.markdown_content, node)
           nodeContentHashes.set(node.id, contentKey)
           changed = true
         } else if (!result[node.id]) {
           // New node, render it
-          result[node.id] = renderCardMarkdown(node.markdown_content)
+          result[node.id] = renderCardMarkdown(node.markdown_content, node)
           nodeContentHashes.set(node.id, contentKey)
           changed = true
         }

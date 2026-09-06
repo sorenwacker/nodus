@@ -547,7 +547,7 @@ const { copySelectedNodes, pasteNodes } = clipboard
 // Content renderer composable - handles markdown, math, mermaid rendering with caching
 const contentRenderer = useContentRenderer({
   getFilteredNodes: () => store.filteredNodes,
-  getFilteredFrames: () => store.filteredFrames,
+  getFilteredFrames: () => store.filteredFrames, getFontScale: () => displayStore.fontScale,
   // Only what the viewport shows, plus whatever is being edited
   // (PRODUCT_DESIGN.md > Rendering node content)
   getRenderableNodes: () => {
@@ -2066,7 +2066,7 @@ defineExpose({
     <div
       ref="canvasRef"
       class="canvas-viewport"
-      :class="{ panning: isPanning, 'frame-placement': frames.pendingFramePlacement.value }"
+      :class="{ panning: isPanning, 'gesture-active': gestureActive, 'frame-placement': frames.pendingFramePlacement.value }"
       @wheel="onWheel"
       @pointerdown="onCanvasPointerDown"
       @pointermove="onCanvasPointerMove"

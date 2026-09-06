@@ -1267,6 +1267,16 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The rendering pass covers the nodes the viewport shows, plus any node being edited, and it caches by content so an unchanged node is never rendered twice.
 - A node that scrolls into view renders then. Culling already tracks what is visible, so the set is available without new bookkeeping.
 - **A card renders a preview, not a document.** A node holding an imported paper can carry tens of kilobytes of markdown; rendering 73KB measured at 82ms, five dropped frames for one click, into a card a few hundred pixels tall. Cards render the leading portion of the content, and the card says the text continues. The full document renders where it is read - the fullscreen view and the storyline reader, which render independently - so nothing is lost, only deferred to the surface that shows it.
+- **The preview is sized to the card, not to a constant.** A 200x120 card shows about 162 characters, 27 across and 6 down, while a flat 4000-character cap rendered an average of 896. Measured over 400 nodes of a real vault that is 38 DOM elements per card against 7, and the difference is built, styled and painted for text that cannot be seen. The cap is derived from the card's width, height and the user's font scale, with headroom because markdown syntax does not render and lines break early, a floor so a small card still says something, and the flat cap as its ceiling. The card's size is part of the render cache key, so a card that is resized fills the space it gained.
+
+### Painting while the viewport moves
+
+**Required behavior:** A live pan or zoom drops the canvas's decorative paint - the drop-shadow glow on edges - and restores it when the gesture ends.
+
+- The per-frame JavaScript is not the cost. Measured over 120 frames of a steady pan on a real 360-node workspace, culling and node styling together take 0.015ms per frame against a 16.7ms budget: a tenth of one percent. Blaming culling, styling or markdown rendering for pan lag is measuring the wrong thing.
+- What costs is paint. `filter: drop-shadow()` on an edge forces its own paint pass over a region larger than the path, and `.edge-highlighted` carries one in every theme while the cyber theme puts one on every visible edge. Selecting a hub highlights its whole fan, so the count scales with the graph, not the viewport.
+- This is why zooming out is smooth and zooming in is not: above the LOD threshold edges are drawn on a 2D canvas, where no CSS filter applies. The filtered SVG edges only exist at the zoom levels where cards are shown.
+- Suppression is keyed to the gesture, not to panning alone, so a pinch zoom gets it too. Nothing is visually lost: the glow is imperceptible while the view is in motion, and it returns the moment the gesture settles.
 
 ### Selected nodes in bubble mode
 
