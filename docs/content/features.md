@@ -34,7 +34,7 @@ Hashtags in node content become node tags:
 - A tag added by hand from a card's chips was never in the text, so an edit never withdraws it. Only a tag the previous body carried and the new one does not is taken away
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
-- With tag nodes enabled in settings, each tag becomes a tag node connected to the notes that use it
+- A tag becomes a tag node once at least two notes share it. One node per distinct tag put 606 tag nodes into a workspace holding 360 real ones, and 542 of them - 89% - were reachable from a single note or none: a tag used once labels that note rather than linking it to anything, and its card already shows it as a chip. What earns a node is a tag that joins notes together
 - Loading a workspace connects any node whose tags have no edges, so tags that arrived without them - from the body scan, or from an agent setting a node's tags over MCP - are shown like any other. An existing connection is never duplicated, so a connected workspace costs nothing
 - Settings > Canvas > Repair Tag Nodes merges tag nodes that duplicate each other and restores a missing # prefix, left behind by an earlier lookup that compared a bare name against a title stored with its hash
 
