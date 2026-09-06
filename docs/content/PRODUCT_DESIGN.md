@@ -1487,6 +1487,12 @@ Each of the three calls passed the opposite of the segment's own orientation, so
 
 ### Re-routing edges during an interaction
 
+**Required behavior:** The edge memo notices every change to node geometry, including geometry the store never records.
+
+- Positions are usually written to the store, which bumps `nodeLayoutVersion`, and the memo keys on that. Neighbourhood mode is the exception: its positions are an overlay, deliberately never written, so leaving the mode restores the canvas exactly as it was.
+- Keyed on the version alone, the memo reported a hit on entering the mode and returned edges routed against the positions the nodes had left. On screen the edges became stubs radiating from the focus node while its neighbours sat elsewhere, unconnected.
+- The key therefore carries a running total over the displayed positions. It costs one pass of arithmetic and no allocation - cheaper than the edge-id string already in the key - and it notices a move no version counter saw.
+
 Edges are re-routed when the graph changes, and live while a node is dragged, because the edges attached to it must follow. A cached path cannot do that.
 
 Zooming is not such a case. Pan and zoom are one container transform, so edge geometry in canvas coordinates does not change and the cache stays correct. Counting zoom as a reason to re-route ran the most expensive path on every recompute while zooming.
