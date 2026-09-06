@@ -16,13 +16,20 @@ function node(id: string, tags: string[] | null, type = 'note'): Node {
 }
 
 describe('syncAllTagNodes', () => {
-  it('connects every node that carries tags', async () => {
+  it('connects nodes through the tags they share', async () => {
     const createTagEdges = vi.fn(async () => {})
-    await syncAllTagNodes([node('a', ['x']), node('b', ['y', 'z'])], { createTagEdges })
+    await syncAllTagNodes([node('a', ['shared', 'solo']), node('b', ['shared'])], { createTagEdges })
 
+    // 'solo' belongs to one note, so it labels rather than links and earns no node
     expect(createTagEdges).toHaveBeenCalledTimes(2)
-    expect(createTagEdges).toHaveBeenCalledWith('a', ['x'])
-    expect(createTagEdges).toHaveBeenCalledWith('b', ['y', 'z'])
+    expect(createTagEdges).toHaveBeenCalledWith('a', ['shared'])
+    expect(createTagEdges).toHaveBeenCalledWith('b', ['shared'])
+  })
+
+  it('leaves a tag only one note carries', async () => {
+    const createTagEdges = vi.fn(async () => {})
+    await syncAllTagNodes([node('a', ['lonely'])], { createTagEdges })
+    expect(createTagEdges).not.toHaveBeenCalled()
   })
 
   it('skips tag nodes, untagged nodes and empty tag lists', async () => {
@@ -37,7 +44,8 @@ describe('syncAllTagNodes', () => {
   it('survives a node whose tags field is malformed', async () => {
     const createTagEdges = vi.fn(async () => {})
     const broken = { id: 'b', title: 'b', node_type: 'note', tags: '{oops' } as unknown as Node
-    await expect(syncAllTagNodes([broken, node('a', ['x'])], { createTagEdges })).resolves.toBeUndefined()
+    const shared = [node('a', ['x']), node('c', ['x'])]
+    await expect(syncAllTagNodes([broken, ...shared], { createTagEdges })).resolves.toBeUndefined()
     expect(createTagEdges).toHaveBeenCalledWith('a', ['x'])
   })
 })

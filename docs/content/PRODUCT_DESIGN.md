@@ -1269,6 +1269,15 @@ Resetting the default workspace also removes its previous frames and storylines 
 - **A card renders a preview, not a document.** A node holding an imported paper can carry tens of kilobytes of markdown; rendering 73KB measured at 82ms, five dropped frames for one click, into a card a few hundred pixels tall. Cards render the leading portion of the content, and the card says the text continues. The full document renders where it is read - the fullscreen view and the storyline reader, which render independently - so nothing is lost, only deferred to the surface that shows it.
 - **The preview is sized to the card, not to a constant.** A 200x120 card shows about 162 characters, 27 across and 6 down, while a flat 4000-character cap rendered an average of 896. Measured over 400 nodes of a real vault that is 38 DOM elements per card against 7, and the difference is built, styled and painted for text that cannot be seen. The cap is derived from the card's width, height and the user's font scale, with headroom because markdown syntax does not render and lines break early, a floor so a small card still says something, and the flat cap as its ceiling. The card's size is part of the render cache key, so a card that is resized fills the space it gained.
 
+### Staging what the viewport mounts
+
+**Required behavior:** While a viewport gesture is live, newly visible cards mount a few per frame rather than all at once.
+
+- A grid layout crosses the viewport margin in columns, so mounting is a sawtooth rather than a steady cost. Measured on a dense workspace at the density that puts ~360 cards in view: churn is 0 for most frames and then 20 in a single one; at ~870 visible it is 30, and 60 to 120 under a fast drag. Mounting is the expensive part - swapping some 300 cards between renderers is recorded as costing seconds - so the burst is what is felt while the median frame stays healthy and hides it.
+- The margin is what makes staging safe. It exists so a node mounts before it is on screen, so admitting it a frame or two later costs nothing visible: it is still outside the viewport when it arrives.
+- Departures apply immediately and in full. Unmounting frees work, and keeping a node the viewport has left would only add to the next frame.
+- Staging is confined to the gesture. With the viewport still there is no burst to spread, and a fresh load should paint at once rather than trickle in.
+
 ### Measuring canvas performance
 
 **Required behavior:** The canvas can be asked how long its frames take, in the running app, on the real graph.
