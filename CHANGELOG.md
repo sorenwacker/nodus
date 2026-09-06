@@ -2,6 +2,12 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.4] - 2026-09-06
+
+### Changed
+- Newly visible cards mount a few per frame while a viewport gesture is live. A grid layout crosses the viewport margin in columns, so mounting is a sawtooth: measured on a dense workspace, the cards mounting per frame are 0 for most frames and then 20 in one, 30 at higher density, 60 to 120 under a fast drag. Mounting is the expensive part, so the burst is what is felt while a healthy median frame time hides it. The margin is what makes staging safe - it exists so a node mounts before it is on screen, so admitting it a frame or two later costs nothing visible. Departures apply immediately, and staging stops when the gesture does
+- A tag earns a node of its own once at least two notes share it. One node per distinct tag put 606 tag nodes into a workspace holding 360 real ones, and 542 of them - 89% - were reachable from a single note or none. A tag used once labels that note rather than linking anything, and its card already shows it as a chip. On the same data the threshold yields roughly 60 nodes instead of 606
+
 ## [1.6.0-rc.3] - 2026-09-06
 
 ### Added
