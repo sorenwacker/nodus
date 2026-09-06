@@ -10,6 +10,7 @@ import type { Node, Edge } from '../../../types'
 import { useDisplayStore } from '../../../stores/display'
 import { canvasStorage } from '../../../lib/storage'
 import { NODE_DEFAULTS } from '../../constants'
+import { MOUNT_BUDGET_PER_FRAME, stageAdditions, stagingIncomplete } from '../../utils/stagedMounting'
 
 export interface UseGraphMetricsContext {
   displayNodes: ComputedRef<Node[]>
@@ -206,10 +207,47 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     const editing = getEditingNodeId?.() ?? null
     return visibleNodes.value.filter(n => n.id !== editing)
   })
-  const lodCardNodes = computed(() => {
-    if (!isLODMode.value) return visibleNodes.value
+  /**
+   * Cards are admitted a few per frame while a gesture is live.
+   *
+   * A grid crosses the margin in columns, so the number of cards mounting in a
+   * frame is 0 for most frames and then 20, 30 or 60 in one. Mounting is the
+   * expensive part, so the burst is what is felt. Staging is confined to the
+   * gesture: when the viewport is still there is no burst to spread, and a
+   * fresh load should paint at once rather than trickle
+   * (PRODUCT_DESIGN.md > Staging what the viewport mounts).
+   */
+  const mountedCardIds = ref(new Set<string>())
+  let stagingFrame: number | null = null
+
+  function advanceStaging() {
+    stagingFrame = null
     const editing = getEditingNodeId?.() ?? null
-    return visibleNodes.value.filter(n => n.id === editing)
+    const wanted = new Set(
+      (isLODMode.value ? visibleNodes.value.filter(n => n.id === editing) : visibleNodes.value).map(
+        n => n.id
+      )
+    )
+    const budget = gestureActive?.value ? MOUNT_BUDGET_PER_FRAME : 0
+    mountedCardIds.value = stageAdditions(mountedCardIds.value, wanted, budget)
+    if (stagingIncomplete(mountedCardIds.value, wanted) && stagingFrame === null) {
+      stagingFrame = requestAnimationFrame(advanceStaging)
+    }
+  }
+
+  watch(
+    [() => visibleNodes.value, isLODMode, () => gestureActive?.value ?? false],
+    advanceStaging,
+    { immediate: true }
+  )
+
+  const lodCardNodes = computed(() => {
+    const editing = getEditingNodeId?.() ?? null
+    const wanted = isLODMode.value
+      ? visibleNodes.value.filter(n => n.id === editing)
+      : visibleNodes.value
+    const mounted = mountedCardIds.value
+    return wanted.filter(n => mounted.has(n.id))
   })
 
   /** Stroke width of an edge's invisible hit path, in canvas px (CanvasEdgesSVG). */

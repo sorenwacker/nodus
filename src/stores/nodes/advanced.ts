@@ -6,6 +6,7 @@ import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { getWorkspace } from '../../lib/tauri'
 import { canvasStorage } from '../../lib/storage'
+import { tagsWorthDrawing } from '../../lib/tagSync'
 import {
   getStarterTemplates,
   getStarterTitles,
@@ -367,13 +368,22 @@ export async function syncAllTagNodes(
   nodes: Node[],
   tagNodesComposable: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> }
 ): Promise<void> {
+  // Only tags that join notes together earn a node. One per distinct tag put
+  // 606 tag nodes into a workspace of 360 real ones, 89% of them reachable from
+  // a single note (docs/content/features.md > Tags).
+  const worth = tagsWorthDrawing(nodes)
+
   for (const node of nodes) {
     if (node.node_type === 'tag') continue // Skip tag nodes themselves
     if (!node.tags) continue
     try {
       const tags = JSON.parse(node.tags)
-      if (Array.isArray(tags) && tags.length > 0) {
-        await tagNodesComposable.createTagEdges(node.id, tags)
+      if (!Array.isArray(tags)) continue
+      const shared = tags.filter(
+        (tag: unknown) => typeof tag === 'string' && worth.has(tag.replace(/^#/, '').toLowerCase())
+      )
+      if (shared.length > 0) {
+        await tagNodesComposable.createTagEdges(node.id, shared)
       }
     } catch {
       // Invalid JSON in tags
