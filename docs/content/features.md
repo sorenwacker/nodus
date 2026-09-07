@@ -33,6 +33,7 @@ Hashtags in node content become node tags:
 - Deleting a `#tag` from the text withdraws it: the tag leaves the node, its edge is deleted, and the tag node goes too once the last note using it lets go
 - A tag added by hand from a card's chips was never in the text, so an edit never withdraws it. Only a tag the previous body carried and the new one does not is taken away
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
+- Whether tag nodes are drawn is remembered between sessions. Hiding them is a view choice, so it neither creates nor deletes anything, and it holds across a restart
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
 - A tag becomes a tag node once at least two notes share it. One node per distinct tag put 606 tag nodes into a workspace holding 360 real ones, and 542 of them - 89% - were reachable from a single note or none: a tag used once labels that note rather than linking it to anything, and its card already shows it as a chip. What earns a node is a tag that joins notes together
 - Loading a workspace connects any node whose tags have no edges, so tags that arrived without them - from the body scan, or from an agent setting a node's tags over MCP - are shown like any other. An existing connection is never duplicated, so a connected workspace costs nothing
