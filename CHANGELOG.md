@@ -2,6 +2,16 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.5] - 2026-09-07
+
+### Fixed
+- Entering neighbourhood mode re-routes the edges. Its positions are an overlay, deliberately never written to the store so leaving restores the canvas exactly, but the edge memo keyed geometry on the store's layout version - which an overlay never bumps. The memo reported a hit and returned edges routed against where the nodes had been, drawn as stubs radiating from the focus node. The key now carries a running total over the displayed positions: one pass of arithmetic, no allocation, and it notices a move no version counter saw
+- A long workspace name no longer pushes the toolbar off screen. A select takes the intrinsic width of its widest option, so a workspace named "Lorenz workshop - Beyond Models: Sustainable AI Infrastructure as a Scientific Instrument" stretched the selector across the toolbar and drove the search box and icons past the right edge of the window. The name is data, so only a bound prevents it; the control still opens at full width when clicked
+- Hiding tag nodes survives a restart. The flag was initialised to true on every launch whatever the setting said, so switching them off held until the next launch and then every tag node reappeared
+
+### Changed
+- A card fades in over 120ms as it mounts. Cards are admitted a few per frame during a gesture and normally arrive in the viewport margin, off screen and fully faded before they are seen; the fade earns its place on a fast drag, when staging falls behind and a card would otherwise appear abruptly mid-view. Opacity only, so it composites rather than repaints, and it is dropped under prefers-reduced-motion
+
 ## [1.6.0-rc.4] - 2026-09-06
 
 ### Changed
