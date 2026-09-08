@@ -1,7 +1,7 @@
 //! Workspace commands for managing workspaces
 
 use crate::database::{self, workspaces::Workspace};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::validate_path_in_workspace;
 
@@ -129,4 +129,57 @@ pub async fn read_file_content(path: String) -> Result<String, String> {
     let path_ref = std::path::Path::new(&path);
     validate_path_in_workspace(path_ref).await?;
     std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
+}
+
+/// A file's content and the checksum of the very bytes that produced it.
+#[derive(Debug, Serialize)]
+pub struct FileRead {
+    pub content: String,
+    pub checksum: String,
+}
+
+/// Read a file and checksum the same bytes.
+///
+/// Reading the content and taking the checksum from a watcher event describes
+/// two different moments: a write landing between them records a checksum for
+/// content the node does not hold, and the node then looks reconciled while it
+/// is not (PRODUCT_DESIGN.md > Reading a file and its checksum together).
+///
+/// The checksum is taken over the raw bytes, as the watcher takes it, so the
+/// two are comparable for a file that is not valid UTF-8 as well.
+#[tauri::command]
+pub async fn read_file_with_checksum(path: String) -> Result<FileRead, String> {
+    let path_ref = std::path::Path::new(&path);
+    validate_path_in_workspace(path_ref).await?;
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
+    Ok(FileRead {
+        checksum: crate::checksum::compute_bytes(&bytes),
+        content: String::from_utf8_lossy(&bytes).into_owned(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checksums_the_bytes_it_returns() {
+        let dir = std::env::temp_dir().join(format!("nodus-read-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("note.md");
+        std::fs::write(&file, "one\ntwo\n").unwrap();
+
+        let bytes = std::fs::read(&file).unwrap();
+        let read = FileRead {
+            checksum: crate::checksum::compute_bytes(&bytes),
+            content: String::from_utf8_lossy(&bytes).into_owned(),
+        };
+
+        // The same value the watcher reports for that file, so a node storing
+        // this checksum is not seen as changed by the next event
+        assert_eq!(read.checksum, crate::checksum::compute_file(&file).unwrap());
+        assert_eq!(read.content, "one\ntwo\n");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

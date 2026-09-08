@@ -33,6 +33,16 @@ pub fn compute_file(path: &Path) -> Result<String, ChecksumError> {
     Ok(hex::encode(hash))
 }
 
+/// Compute SHA-256 checksum of bytes already in hand
+///
+/// The same value `compute_file` produces for a file holding those bytes, so a
+/// checksum taken beside a read is comparable with one the watcher reports.
+pub fn compute_bytes(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
 /// Compute SHA-256 checksum of a string
 pub fn compute_string(content: &str) -> String {
     let mut hasher = Sha256::new();

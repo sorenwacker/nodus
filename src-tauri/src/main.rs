@@ -333,6 +333,7 @@ fn main() {
             commands::cleanup_orphan_edges,
             commands::debug_get_all_edges,
             commands::read_file_content,
+            commands::read_file_with_checksum,
             commands::http_request,
             commands::save_export_file,
             commands::http_stream_request,

@@ -8,7 +8,7 @@ import { ref } from 'vue'
 import {
   invoke,
   listen,
-  readTextFile,
+  readTextFileWithChecksum,
   createNodeFromFile,
   syncNodeWikilinks,
   getWorkspace,
@@ -255,7 +255,12 @@ export function useFileSync(deps: FileSyncDeps) {
         }
         if (node && event.new_checksum && node.checksum !== event.new_checksum) {
           try {
-            const content = await readTextFile(filePath)
+            // Content and checksum from one read: the event's checksum
+            // describes the file at the moment of the event, and a write
+            // landing between the two would store a checksum for content the
+            // node does not hold
+            // (PRODUCT_DESIGN.md > Reading a file and its checksum together)
+            const { content, checksum } = await readTextFileWithChecksum(filePath)
             storeLogger.info(`[FileSync] Read new content (${content.length} chars)`)
 
             // Extract frontmatter metadata (title, tags)
@@ -264,7 +269,7 @@ export function useFileSync(deps: FileSyncDeps) {
 
             const updates: Partial<Node> = {
               markdown_content: content,
-              checksum: event.new_checksum,
+              checksum,
               updated_at: Date.now(),
             }
 
@@ -297,7 +302,7 @@ export function useFileSync(deps: FileSyncDeps) {
             await invoke('update_node_content_from_file', {
               id: node.id,
               content,
-              checksum: event.new_checksum,
+              checksum,
             })
             storeLogger.info(`[FileSync] Content updated in DB`)
             // Sync wikilinks to create/remove edges

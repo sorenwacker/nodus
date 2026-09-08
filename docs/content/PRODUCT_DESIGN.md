@@ -918,6 +918,14 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 | New file added | No matching `file_path` | Create new node, run through parser |
 | File deleted | `file_path` exists, file gone | Soft delete node |
 
+### Reading a file and its checksum together
+
+**Required behavior:** The checksum stored against a node is the checksum of the content that node holds. Both come from one read.
+
+- The handler read the file itself and stored the checksum carried by the watcher event. Those describe two different moments: a write landing between the event and the read stores a checksum for content the node does not hold, and the node then looks reconciled while it is not - the next event for that file matches the stored checksum and does nothing, so the difference never resolves.
+- One backend call returns the content and the checksum of the same bytes. The checksum is taken over the raw bytes, as the watcher takes it, so the two remain comparable for a file that is not valid UTF-8.
+- Applying content newer than the event announced is correct, not a race lost: it is the state of the file, stored with its own checksum, and the event for that newer write then finds nothing to do.
+
 ### A save that does not reach the vault
 
 **Required behavior:** When a node is backed by a file in a vault that syncs, a save that did not reach that file is reported to the user. Silence is reserved for saves that were never meant to touch a file.

@@ -10,12 +10,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const invoke = vi.fn()
-const readTextFile = vi.fn()
+const readFile = vi.fn()
 
 vi.mock('../lib/tauri', () => ({
   invoke: (...args: unknown[]) => invoke(...args),
   listen: vi.fn(),
-  readTextFile: (...args: unknown[]) => readTextFile(...args),
+  readTextFile: vi.fn(),
+  readTextFileWithChecksum: (...args: unknown[]) => readFile(...args),
   createNodeFromFile: vi.fn(),
   syncNodeWikilinks: vi.fn(async () => 0),
   getWorkspace: vi.fn(async () => ({ sync_enabled: true })),
@@ -57,9 +58,9 @@ async function setup(editingNodeId: string | null) {
 describe('an external change while a node is open in the editor', () => {
   beforeEach(() => {
     invoke.mockReset()
-    readTextFile.mockReset()
+    readFile.mockReset()
     info.mockReset()
-    readTextFile.mockResolvedValue('the older text still on disk')
+    readFile.mockResolvedValue({ content: 'the older text still on disk', checksum: 'new' })
     invoke.mockResolvedValue(null)
   })
 
@@ -69,7 +70,7 @@ describe('an external change while a node is open in the editor', () => {
     await sync.handleFileChange({ change_type: 'Modified', path: FILE, new_checksum: 'new' } as never)
 
     expect(updateNodeInPlace).not.toHaveBeenCalled()
-    expect(readTextFile).not.toHaveBeenCalled()
+    expect(readFile).not.toHaveBeenCalled()
     expect(invoke).not.toHaveBeenCalledWith('update_node_content_from_file', expect.anything())
     expect(info).toHaveBeenCalled()
   })

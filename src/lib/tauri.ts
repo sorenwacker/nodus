@@ -68,6 +68,19 @@ export async function readTextFile(path: string): Promise<string> {
 }
 
 /**
+ * A file's content and the checksum of the same bytes.
+ *
+ * One read: a checksum taken from a watcher event describes the file at the
+ * moment of the event, not the moment of the read
+ * (PRODUCT_DESIGN.md > Reading a file and its checksum together).
+ */
+export async function readTextFileWithChecksum(
+  path: string
+): Promise<{ content: string; checksum: string }> {
+  return invoke<{ content: string; checksum: string }>('read_file_with_checksum', { path })
+}
+
+/**
  * Ask the user where to save an exported document, then write it there.
  *
  * The dialog is owned by the backend, so the chosen path never round-trips
