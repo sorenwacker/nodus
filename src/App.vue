@@ -10,8 +10,7 @@ import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts'
 import { useNotifications } from './composables/useNotifications'
 import { usePanelReveal } from './composables/usePanelReveal'
 import { useWebviewZoomGuard } from './composables/useWebviewZoomGuard'
-import { createEdgeStepper } from './lib/edgeGesture'
-import { isEdgeGesturePointer } from './composables/edgeGesturePointer'
+import { useEdgeNavigation } from './composables/useEdgeNavigation'
 import GraphCanvas from './canvas/GraphCanvas.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import NotificationToast from './components/NotificationToast.vue'
@@ -151,8 +150,7 @@ const gestureCoach = useGestureCoach()
 // half-screen slot; stepping right from it enters the reader.
 useWebviewZoomGuard()
 
-const edgeStepper = createEdgeStepper({
-  threshold: 12,
+const { onEdgePointerMove, onEdgePointerOut } = useEdgeNavigation({
   // Once a storyline layer occupies the edge, stepping deeper needs a push
   // against the very edge; otherwise using the panel near the window border
   // would fire it
@@ -201,20 +199,6 @@ const edgeStepper = createEdgeStepper({
     displayStore.toggleAgentPanel({ persist: false })
   },
 })
-
-function onEdgePointerMove(e: PointerEvent) {
-  if (!isEdgeGesturePointer(e)) return
-  edgeStepper.onPointer(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
-}
-
-// A fast motion exits the window before any pointermove lands in the narrow
-// edge band, so a leave counts as a push on the edge it left through
-function onEdgePointerOut(e: PointerEvent) {
-  if (!isEdgeGesturePointer(e)) return
-  if (e.relatedTarget === null) {
-    edgeStepper.onPointerLeave(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
-  }
-}
 
 function toggleStorylinePanel() {
   storylinePanel.togglePin()

@@ -52,16 +52,35 @@ export interface EdgeStepperOptions {
   leftThreshold?: () => number
   stepRight: () => void
   stepLeft: () => void
+  /**
+   * Whether the gesture is live, evaluated per event. A window edge that is not
+   * a screen edge is crossed during ordinary work, so the caller keeps the
+   * gesture to full screen (PRODUCT_DESIGN.md > Edge handles).
+   */
+  enabled?: () => boolean
 }
 
 export function createEdgeStepper(options: EdgeStepperOptions) {
   const { threshold, stepRight, stepLeft } = options
   const rightThreshold = options.rightThreshold ?? (() => threshold)
   const leftThreshold = options.leftThreshold ?? (() => threshold)
+  const enabled = options.enabled ?? (() => true)
   let rightArmed = true
   let leftArmed = true
 
+  /**
+   * Both edges are re-armed while the gesture is inert, so the pushes it
+   * ignored cannot leave an edge disarmed for the first push that counts.
+   */
+  function live(): boolean {
+    if (enabled()) return true
+    rightArmed = true
+    leftArmed = true
+    return false
+  }
+
   function onPointer(x: number, y: number, windowWidth: number, windowHeight: number): void {
+    if (!live()) return
     // Outside the handle the edge is inert, but the arming state still has to
     // follow the pointer: otherwise leaving through a dead stretch would leave
     // the edge disarmed for the next real push
@@ -94,6 +113,7 @@ export function createEdgeStepper(options: EdgeStepperOptions) {
 
   /** The pointer left the window at (x, y). */
   function onPointerLeave(x: number, y: number, windowWidth: number, windowHeight: number): void {
+    if (!live()) return
     // Reaching for another window drags the pointer out through a border; only
     // an exit through a handle was aimed at the gesture
     if (x >= windowWidth - SIDE_LEAVE_BAND || x <= SIDE_LEAVE_BAND) {

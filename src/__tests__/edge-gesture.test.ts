@@ -16,6 +16,33 @@ function makeStepper() {
 }
 
 describe('createEdgeStepper', () => {
+  it('fires nothing while the gesture is not live', () => {
+    // A window edge that is not a screen edge is crossed during ordinary work,
+    // so the gesture is live only in full screen
+    // (PRODUCT_DESIGN.md > Edge handles).
+    const stepRight = vi.fn()
+    const stepLeft = vi.fn()
+    const live = { value: false }
+    const stepper = createEdgeStepper({
+      threshold: 12,
+      stepRight,
+      stepLeft,
+      enabled: () => live.value,
+    })
+
+    stepper.onPointer(999, MID, WIDTH, HEIGHT)
+    stepper.onPointer(1, MID, WIDTH, HEIGHT)
+    stepper.onPointerLeave(999, MID, WIDTH, HEIGHT)
+    expect(stepRight).not.toHaveBeenCalled()
+    expect(stepLeft).not.toHaveBeenCalled()
+
+    // A push that begins the moment it becomes live still counts: the edge
+    // must not be left disarmed by the pushes it ignored
+    live.value = true
+    stepper.onPointer(999, MID, WIDTH, HEIGHT)
+    expect(stepRight).toHaveBeenCalledTimes(1)
+  })
+
   it('fires one right step per push against the right edge', () => {
     const { stepper, stepRight } = makeStepper()
     stepper.onPointer(995, MID, WIDTH, HEIGHT)

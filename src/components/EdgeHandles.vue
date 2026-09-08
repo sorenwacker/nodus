@@ -8,10 +8,16 @@
  *
  * Left and right only. The bottom edge no longer opens the timelines sheet and
  * the top no longer closes it - that moved to a toolbar button - so drawing
- * either would mark an edge that does nothing (App.vue > edgeStepper).
+ * either would mark an edge that does nothing (useEdgeNavigation).
+ *
+ * Nothing is drawn outside full screen, where the gesture is not live: a marked
+ * edge that ignores a push is worse than an unmarked one.
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { edgeHandleRange } from '../lib/edgeGesture'
+import { useWindowFullscreen } from '../composables/useWindowFullscreen'
+
+const { isFullscreen } = useWindowFullscreen()
 
 const height = ref(window.innerHeight)
 
@@ -29,7 +35,7 @@ const vertical = computed(() => {
 </script>
 
 <template>
-  <div class="edge-handles" aria-hidden="true">
+  <div v-if="isFullscreen" class="edge-handles" aria-hidden="true">
     <span class="edge-handle left" :style="vertical"></span>
     <span class="edge-handle right" :style="vertical"></span>
   </div>
