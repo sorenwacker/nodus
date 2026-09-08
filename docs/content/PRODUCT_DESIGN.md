@@ -1459,6 +1459,14 @@ A radial layout places each depth on a ring. When a depth holds more nodes than 
 
 Capacity was computed from the outermost radius the layout permits, while the nodes were placed at the ring's own radius - a small fraction of it at shallow depths. The branch meant to relieve crowding therefore put over a thousand nodes on a circle with room for a dozen, overlapping them completely: worse than the single ring it replaced. Rings were also sized for nodes the layout then skipped.
 
+**Required behavior:** every ring distance is derived from the size of the cards it has to seat, not from a constant.
+
+- The first ring clears the centre card: its radius is at least the centre's half-diagonal plus the neighbour's half-diagonal plus a gap.
+- Adjacent rings are at least a card height plus a gap apart.
+- Neighbours on one ring are at least a card width plus a gap apart, which is what a ring's seating capacity is computed from.
+
+The `compact` and `spacious` styles set the gap - 40px and 160px - so they still differ visibly, and neither can place a card on top of another. The constants they used instead (a 300px first ring, 80px between neighbours in `compact`) were sized for the 200x120 default card. A workspace of 356x301 cards put all seventeen neighbours of a hub inside the hub's own card.
+
 ### Placing an edge label
 
 A label sits on the curve it belongs to, computed from the four points that define the curve.
@@ -1492,6 +1500,7 @@ Each of the three calls passed the opposite of the segment's own orientation, so
 - Positions are usually written to the store, which bumps `nodeLayoutVersion`, and the memo keys on that. Neighbourhood mode is the exception: its positions are an overlay, deliberately never written, so leaving the mode restores the canvas exactly as it was.
 - Keyed on the version alone, the memo reported a hit on entering the mode and returned edges routed against the positions the nodes had left. On screen the edges became stubs radiating from the focus node while its neighbours sat elsewhere, unconnected.
 - The key therefore carries a running total over the displayed positions. It costs one pass of arithmetic and no allocation - cheaper than the edge-id string already in the key - and it notices a move no version counter saw.
+- The routing cache under the memo carries the same total. Keyed on the version alone it answered a fresh memo with the paths it had routed against the previous geometry, so the cards moved and their edges stayed where the cards had been.
 
 Edges are re-routed when the graph changes, and live while a node is dragged, because the edges attached to it must follow. A cached path cannot do that.
 

@@ -66,6 +66,10 @@ describe('edge routing across a neighbourhood overlay', () => {
     expect(after).toBeDefined()
     // The edge must reach where the node now is, not where it was
     expect(`${after.x2},${after.y2}`).not.toBe(`${before.x2},${before.y2}`)
+    // The drawn path is what the canvas shows, and it comes from the routing
+    // cache rather than from the endpoints computed above
+    expect(after.path).not.toBe(before.path)
+    expect(after.path).toContain(`${after.x2}`)
   })
 
   it('re-routes again when the mode is left and the nodes go back', () => {
@@ -82,5 +86,6 @@ describe('edge routing across a neighbourhood overlay', () => {
     const out = edgeLines.value[0]
 
     expect(`${out.x2},${out.y2}`).not.toBe(`${inMode.x2},${inMode.y2}`)
+    expect(out.path).not.toBe(inMode.path)
   })
 })

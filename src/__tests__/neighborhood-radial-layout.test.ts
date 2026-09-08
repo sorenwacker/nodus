@@ -15,32 +15,32 @@ import type { Node } from '../types'
 
 const HUB = 'hub'
 
-function node(id: string): Node {
+function node(id: string, width = 200, height = 120): Node {
   return {
     id,
     title: id,
     markdown_content: '',
     canvas_x: 0,
     canvas_y: 0,
-    width: 200,
-    height: 120,
+    width,
+    height,
   } as unknown as Node
 }
 
 /** A hub with `count` neighbours, every edge pointing at the hub. */
-function starGraph(count: number) {
-  const nodes = [node(HUB)]
+function starGraph(count: number, width?: number, height?: number) {
+  const nodes = [node(HUB, width, height)]
   const edges = []
   for (let i = 0; i < count; i++) {
     const id = `n${i}`
-    nodes.push(node(id))
+    nodes.push(node(id, width, height))
     edges.push({ id: `e${i}`, source_node_id: id, target_node_id: HUB, directed: true })
   }
   return { nodes, edges }
 }
 
-function setup(count: number) {
-  const { nodes, edges } = starGraph(count)
+function setup(count: number, width?: number, height?: number) {
+  const { nodes, edges } = starGraph(count, width, height)
   const mode = useNeighborhoodMode({
     store: {
       getFilteredNodes: () => nodes,
@@ -84,6 +84,34 @@ describe('neighbourhood mode layout', () => {
     const xs = [...positions.values()].map(p => p.x)
     // A row of 40 cards at 200px plus gaps runs past 10,000px. A ring must not.
     expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(6000)
+  })
+
+  it('seats cards clear of the focus card and of each other', () => {
+    // A workspace of large cards: the ring constants were sized for the
+    // 200x120 default, so a 300px first ring placed every neighbour inside
+    // the focus card itself (PRODUCT_DESIGN.md > Radial rings).
+    const WIDTH = 356
+    const HEIGHT = 301
+    const { mode } = setup(17, WIDTH, HEIGHT)
+    mode.toggle(HUB)
+
+    const placed = [...mode.neighborhoodPositions.value.entries()]
+    expect(placed.length).toBe(18)
+
+    const overlaps = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.abs(a.x - b.x) < WIDTH && Math.abs(a.y - b.y) < HEIGHT
+
+    const focus = mode.neighborhoodPositions.value.get(HUB)!
+    for (const [id, pos] of placed) {
+      if (id === HUB) continue
+      expect(overlaps(pos, focus), `${id} overlaps the focus card`).toBe(false)
+    }
+    for (const [idA, a] of placed) {
+      for (const [idB, b] of placed) {
+        if (idA >= idB) continue
+        expect(overlaps(a, b), `${idA} overlaps ${idB}`).toBe(false)
+      }
+    }
   })
 
   it('leaves stored coordinates untouched', () => {

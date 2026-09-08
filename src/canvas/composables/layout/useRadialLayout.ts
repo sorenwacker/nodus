@@ -165,15 +165,34 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
   const radialStyle = canvasStorage.getRadialStyle()
   const isCompact = radialStyle === 'compact'
 
+  // Every ring distance is derived from the cards the ring has to seat.
+  //
+  // These were constants sized for the 200x120 default card - a 300px first
+  // ring, 80px between neighbours in `compact` - so a workspace of 356x301
+  // cards put all seventeen neighbours of a hub inside the hub's own card. Two
+  // equally sized cards cannot overlap once their centres are a diagonal
+  // apart, whatever direction one lies from the other, so the diagonal plus a
+  // gap is the clearance every ring keeps. The style sets that gap, and so
+  // still spaces a graph visibly differently, without placing a card on top of
+  // another (PRODUCT_DESIGN.md > Radial rings).
+  const diagonal = (node: Node) =>
+    Math.hypot(node.width || NODE_DEFAULTS.WIDTH, node.height || NODE_DEFAULTS.HEIGHT)
+  const gap = isCompact ? 40 : 160
+  const cardDiagonal = nodesToLayout.reduce((widest, n) => Math.max(widest, diagonal(n)), 0)
+  const clearance = cardDiagonal + gap
+
   // Calculate positions for each level
   const targets = new Map<string, { x: number; y: number }>()
-  // Adjust ring distance based on style - compact has tighter rings with overlap allowed
-  // Both baseRadius and minNodeSpacing scale with style to make difference visible even with many nodes
-  const firstRingRadius = isCompact ? 300 : 500 // Minimum distance from center to first ring
-  const baseRadius = isCompact ? 150 : 400 // Distance between subsequent rings
-  const minNodeSpacing = isCompact ? 80 : 280 // Spacing between nodes on a ring (must exceed node width ~200px for spacious)
+  // Distance from the center card to the first ring: half of each card, so the
+  // ring clears the center whatever its size
+  const firstRingRadius = Math.max(
+    isCompact ? 300 : 500,
+    (diagonal(centerNode) + cardDiagonal) / 2 + gap
+  )
+  const baseRadius = Math.max(isCompact ? 150 : 400, clearance) // Distance between subsequent rings
+  const minNodeSpacing = Math.max(isCompact ? 80 : 280, clearance) // Spacing between nodes on a ring
   const maxRadius = 50000 // Cap radius for reasonable layout size
-  const ringSpacing = isCompact ? 180 : 400 // Spacing between sub-rings when splitting large levels
+  const ringSpacing = Math.max(isCompact ? 180 : 400, clearance) // Spacing between sub-rings when splitting large levels
 
   let lastUsedRadius = 0 // Track the actual radius used by the previous ring
 

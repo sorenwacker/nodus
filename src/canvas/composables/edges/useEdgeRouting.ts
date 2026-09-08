@@ -370,8 +370,14 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
 
     // Create a key to detect when routing needs recalculation
     // Include edge IDs and directions so reversing an edge triggers recalculation
+    //
+    // The same geometry total the memo above carries: the paths held here were
+    // routed against the positions of the moment, so a key blind to an overlay
+    // move answers a fresh memo with the previous geometry - cards where the
+    // store put them, their edges where the overlay had them
+    // (PRODUCT_DESIGN.md > Re-routing edges during an interaction).
     const edgeKey = edges.map(e => `${e.id}:${e.source_node_id}>${e.target_node_id}`).join(',')
-    const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}-${edgeKey}`
+    const routingKey = `${edges.length}-${style}-${store.nodeLayoutVersion}-${geometry}-${edgeKey}`
 
     // Re-route when the graph changed, or live while a node is dragged
     if (routingKey !== lastRoutingKey.value || mustRerouteLive()) {
