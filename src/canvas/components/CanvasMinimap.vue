@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import type { Node } from '../../types'
+/**
+ * The minimap: one mark per node in the workspace, and a rectangle showing
+ * where the viewport sits among them.
+ *
+ * The rectangle moves on every frame of a pan or zoom; the marks do not. The
+ * marks are precomputed by useMinimap and drawn by their own component, so a
+ * viewport move re-renders the rectangle alone
+ * (PRODUCT_DESIGN.md > Minimap redraw).
+ */
+import CanvasMinimapMarks from './CanvasMinimapMarks.vue'
+import type { MinimapMark } from '../composables/viewport/useMinimap'
 
 defineProps<{
   visible: boolean
-  nodes: Node[]
+  marks: MinimapMark[]
   minimapSize: number
-  getNodePosition: (node: Node) => { x: number; y: number; width: number; height: number }
-  isSelected: (nodeId: string) => boolean
   viewportX: number
   viewportY: number
   viewportWidth: number
@@ -20,23 +28,12 @@ defineEmits<{
 
 <template>
   <div
-    v-if="visible && nodes.length > 0"
+    v-if="visible && marks.length > 0"
     class="minimap"
     @click="$emit('click', $event)"
   >
     <svg :width="minimapSize" :height="minimapSize">
-      <!-- Nodes -->
-      <rect
-        v-for="node in nodes"
-        :key="'mm-' + node.id"
-        :x="getNodePosition(node).x"
-        :y="getNodePosition(node).y"
-        :width="getNodePosition(node).width"
-        :height="getNodePosition(node).height"
-        :fill="node.color_theme || 'var(--text-muted)'"
-        :opacity="isSelected(node.id) ? 1 : 0.6"
-        rx="1"
-      />
+      <CanvasMinimapMarks :marks="marks" />
       <!-- Viewport indicator -->
       <rect
         :x="viewportX"

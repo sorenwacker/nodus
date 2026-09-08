@@ -1304,6 +1304,14 @@ Resetting the default workspace also removes its previous frames and storylines 
 - This is why zooming out is smooth and zooming in is not: above the LOD threshold edges are drawn on a 2D canvas, where no CSS filter applies. The filtered SVG edges only exist at the zoom levels where cards are shown.
 - Suppression is keyed to the gesture, not to panning alone, so a pinch zoom gets it too. Nothing is visually lost: the glow is imperceptible while the view is in motion, and it returns the moment the gesture settles.
 
+### Minimap redraw
+
+**Required behavior:** A viewport move redraws the minimap's viewport rectangle and nothing else. The marks that stand for the nodes are computed once per node set and reused.
+
+- The minimap draws one mark per node in the workspace, not per visible node, so its cost scales with the graph while the canvas above it scales with the viewport. Panning eight cards must not redraw a thousand marks.
+- Every mark's geometry was recomputed inside the template, and the position function was called once for each of x, y, width and height - four calls per node per frame. Measured over 60 viewport-only frames: 0.74ms per frame at 168 nodes, 4.47ms at 1581, against a 16.7ms budget that also has to cover the canvas itself. That is a floor, measured without the SVG rasterisation a browser adds.
+- The marks are therefore precomputed as a list and rendered by their own component. A viewport move leaves that list untouched by identity, so the marks are not re-rendered at all; a node move, a resize or a change of selection rebuilds it once.
+
 ### Selected nodes in bubble mode
 
 **Required behavior:** Above the level-of-detail threshold, nodes are circles on a 2D canvas, except selected ones, which render as real cards so their text is readable. A selected node must stay draggable across that swap.

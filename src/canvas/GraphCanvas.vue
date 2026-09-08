@@ -2338,10 +2338,8 @@ defineExpose({
       <CanvasMinimap
         v-if="minimap.viewport.value"
         :visible="store.filteredNodes.length > 0"
-        :nodes="store.filteredNodes"
+        :marks="minimap.nodeMarks.value"
         :minimap-size="minimap.MINIMAP_SIZE"
-        :get-node-position="minimap.getNodePosition"
-        :is-selected="minimap.isSelected"
         :viewport-x="minimap.viewport.value.x || 0"
         :viewport-y="minimap.viewport.value.y || 0"
         :viewport-width="minimap.viewport.value.width || 50"

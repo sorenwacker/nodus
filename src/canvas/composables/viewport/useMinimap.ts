@@ -13,6 +13,17 @@ export interface MinimapNode {
   color_theme: string | null
 }
 
+/** A node as the minimap draws it: geometry and paint, nothing to recompute. */
+export interface MinimapMark {
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+  fill: string
+  opacity: number
+}
+
 export interface MinimapOptions {
   nodes: ComputedRef<MinimapNode[]>
   selectedNodeIds: ComputedRef<string[]>
@@ -104,25 +115,38 @@ export function useMinimap(options: MinimapOptions) {
   })
 
   /**
-   * Get node position in minimap coordinates
+   * One mark per node, in minimap coordinates.
+   *
+   * A list, computed once per node set, rather than geometry worked out in the
+   * template: the template called a position function once each for x, y, width
+   * and height - four calls per node - and did it again on every frame of a pan,
+   * because the viewport rectangle beside the marks moves with the viewport.
+   * Held here, the list keeps its identity while the viewport moves, so the
+   * marks are not re-rendered at all (PRODUCT_DESIGN.md > Minimap redraw).
    */
-  function getNodePosition(node: MinimapNode) {
+  const nodeMarks = computed<MinimapMark[]>(() => {
     const b = bounds.value
     const mScale = minimapScale.value
+    const selected = new Set(selectedNodeIds.value)
 
-    // Guard against NaN values
-    const x = (node.canvas_x - b.minX) * mScale + MINIMAP_PADDING
-    const y = (node.canvas_y - b.minY) * mScale + MINIMAP_PADDING
-    const width = Math.max((node.width || 200) * mScale, 3)
-    const height = Math.max((node.height || 120) * mScale, 2)
+    return nodes.value.map(node => {
+      // Guard against NaN values
+      const x = (node.canvas_x - b.minX) * mScale + MINIMAP_PADDING
+      const y = (node.canvas_y - b.minY) * mScale + MINIMAP_PADDING
+      const width = Math.max((node.width || 200) * mScale, 3)
+      const height = Math.max((node.height || 120) * mScale, 2)
 
-    return {
-      x: isNaN(x) ? 0 : x,
-      y: isNaN(y) ? 0 : y,
-      width: isNaN(width) ? 3 : width,
-      height: isNaN(height) ? 2 : height,
-    }
-  }
+      return {
+        id: node.id,
+        x: isNaN(x) ? 0 : x,
+        y: isNaN(y) ? 0 : y,
+        width: isNaN(width) ? 3 : width,
+        height: isNaN(height) ? 2 : height,
+        fill: node.color_theme || 'var(--text-muted)',
+        opacity: selected.has(node.id) ? 1 : 0.6,
+      }
+    })
+  })
 
   /**
    * Handle click on minimap - returns new offset values
@@ -145,18 +169,13 @@ export function useMinimap(options: MinimapOptions) {
     }
   }
 
-  function isSelected(nodeId: string): boolean {
-    return selectedNodeIds.value.includes(nodeId)
-  }
-
   return {
     MINIMAP_SIZE,
     MINIMAP_PADDING,
     bounds,
     minimapScale,
     viewport,
-    getNodePosition,
+    nodeMarks,
     handleClick,
-    isSelected,
   }
 }
