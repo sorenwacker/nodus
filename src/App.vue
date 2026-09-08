@@ -19,6 +19,7 @@ import { useUpdateCheck } from './composables/useUpdateCheck'
 import OnboardingFlow from './components/OnboardingFlow.vue'
 import GestureCoach from './components/GestureCoach.vue'
 import EdgeHandles from './components/EdgeHandles.vue'
+import WorkspaceSwitcher from './components/WorkspaceSwitcher.vue'
 import TooltipLayer from './components/TooltipLayer.vue'
 import { useGestureCoach } from './composables/useGestureCoach'
 import StorylinePanel from './components/StorylinePanel.vue'
@@ -831,15 +832,12 @@ async function openFolderDialog() {
       <div class="toolbar-left">
         <h1 class="app-title">Nodus</h1>
         <div class="workspace-selector">
-          <select
-            :value="store.currentWorkspaceId || ''"
-            @change="store.switchWorkspace(($event.target as HTMLSelectElement).value || null)"
-          >
-            <option value="">Default</option>
-            <option v-for="ws in store.workspaces" :key="ws.id" :value="ws.id">
-              {{ ws.name }}
-            </option>
-          </select>
+          <WorkspaceSwitcher
+            :workspaces="store.workspaces"
+            :nodes="store.nodes"
+            :current-workspace-id="store.currentWorkspaceId"
+            @switch="store.switchWorkspace($event)"
+          />
           <button class="icon-btn" :data-tooltip="t('toolbar.editWorkspace')" @click="openWorkspaceEditor">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>

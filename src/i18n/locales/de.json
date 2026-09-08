@@ -212,7 +212,12 @@
     "deleteConfirmText": "Möchten Sie \"{name}\" wirklich löschen?",
     "keepFiles": "Original-Markdown-Dateien behalten (Quelldaten)",
     "keepFilesWarning": "Warnung: Dies löscht die Originaldateien dauerhaft von der Festplatte",
-    "keepFilesInfo": "Dateien bleiben in Ihrem Vault für zukünftigen Re-Import"
+    "keepFilesInfo": "Dateien bleiben in Ihrem Vault für zukünftigen Re-Import",
+    "default": "Standard",
+    "switch": "Arbeitsbereich wechseln",
+    "filter": "Arbeitsbereiche filtern...",
+    "recent": "zuletzt",
+    "noMatch": "Kein passender Arbeitsbereich"
   },
   "onboarding": {
     "language": {

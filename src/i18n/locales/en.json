@@ -212,7 +212,12 @@
     "deleteConfirmText": "Are you sure you want to delete \"{name}\"?",
     "keepFiles": "Keep original markdown files (source of truth)",
     "keepFilesWarning": "Warning: This will permanently delete original files from disk",
-    "keepFilesInfo": "Files will remain in your vault for future re-import"
+    "keepFilesInfo": "Files will remain in your vault for future re-import",
+    "default": "Default",
+    "switch": "Switch workspace",
+    "filter": "Filter workspaces...",
+    "recent": "recent",
+    "noMatch": "No workspace matches"
   },
   "onboarding": {
     "language": {

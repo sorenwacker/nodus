@@ -1746,6 +1746,15 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 - The final positions are persisted once, when the animation completes.
 - An animation superseded by another persists what it reached, so a position is never left unsaved.
 
+### Choosing a workspace
+
+**Required behavior:** The workspace list is searchable, ordered by what the user touched most recently, and says how large each workspace is.
+
+- The workspace scopes the canvas, search, the agent's context and file sync, so choosing one is the most consequential control in the toolbar. A plain dropdown of every workspace in creation order stops being usable somewhere around a dozen entries; this installation has thirty-seven.
+- Typing filters the list by name, ignoring case and accents. The keyboard alone can reach any workspace: arrows move, Enter switches, Escape closes.
+- Recently opened workspaces come first, in the order they were last opened, and the rest follow alphabetically. Recency is the only ordering that reflects how the list is actually used, and alphabetical order underneath keeps a workspace findable when it has not been opened before.
+- Each row carries its node count, taken from the nodes already in memory rather than a query, so the list says which workspaces hold work and which are empty.
+
 ### Workspace scoping for MCP connections
 
 **Required behavior:** A connection scoped to a workspace sees that workspace, consistently. Scoping only the list getters produced a store that contradicted itself: `list_frames` returned the target workspace's frames while `get_frame` on those same ids failed, because it resolved against whichever workspace the user happened to have open.

@@ -212,7 +212,12 @@
     "deleteConfirmText": "Sei sicuro di voler eliminare \"{name}\"?",
     "keepFiles": "Mantieni i file markdown originali (fonte di verità)",
     "keepFilesWarning": "Attenzione: Questo eliminerà permanentemente i file originali dal disco",
-    "keepFilesInfo": "I file rimarranno nel tuo vault per una futura reimportazione"
+    "keepFilesInfo": "I file rimarranno nel tuo vault per una futura reimportazione",
+    "default": "Predefinito",
+    "switch": "Cambia spazio di lavoro",
+    "filter": "Filtra spazi...",
+    "recent": "recente",
+    "noMatch": "Nessuno spazio corrispondente"
   },
   "onboarding": {
     "language": {
