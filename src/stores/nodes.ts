@@ -5,6 +5,7 @@
  * to submodules in src/stores/nodes/ for implementation.
  */
 
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { invoke } from '../lib/tauri'
 import { extractHashtags } from '../lib/contentParser'
@@ -145,8 +146,18 @@ export const useNodesStore = defineStore('nodes', () => {
   // Create dependencies for submodules
   const deps = createDependencies(state, computed, stores)
 
+  // The node an editor currently has open, set by the canvas. Transient: it
+  // exists so an external file change is not written over what the user is
+  // typing (PRODUCT_DESIGN.md > Reconciling a file with the node open in the
+  // editor)
+  const editingNodeId = ref<string | null>(null)
+  function setEditingNode(id: string | null) {
+    editingNodeId.value = id
+  }
+
   // File sync composable
   const fileSync = useFileSync({
+    getEditingNodeId: () => editingNodeId.value,
     getNodes: () => nodes.value,
     updateNodeInPlace: (id: string, updates: Partial<Node>) => {
       const node = nodes.value.find((n) => n.id === id)
@@ -581,6 +592,8 @@ export const useNodesStore = defineStore('nodes', () => {
 
   return {
     // State
+    editingNodeId,
+    setEditingNode,
     nodes,
     edges,
     frames,

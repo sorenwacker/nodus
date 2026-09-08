@@ -619,6 +619,7 @@ const nodeEditor = useNodeEditor({
     getNode: store.getNode,
     updateNodeContent: store.updateNodeContent,
     updateNodeTitle: store.updateNodeTitle,
+    setEditingNode: store.setEditingNode,
   },
 })
 // Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit

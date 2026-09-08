@@ -918,6 +918,14 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 | New file added | No matching `file_path` | Create new node, run through parser |
 | File deleted | `file_path` exists, file gone | Soft delete node |
 
+### Reconciling a file with the node open in the editor
+
+**Required behavior:** An external change to a file is never written over an editor that is open on that node. The editor's copy is what the user is looking at and typing into; replacing it under them destroys text no undo step covers.
+
+- While a node is being edited, a `Modified` event for its file leaves the node alone and says so once. The node keeps the checksum it had, so the difference is not forgotten: the next write settles it, and that write is normally the user's own save, which carries the editor's text to the file.
+- The guard is the editor's own state, handed to the watcher as a dependency. The watcher cannot reach into the canvas to ask, and the editor cannot know a file changed.
+- Without it, the handler read the file and pushed it into both the store and the database unconditionally. A stale file - one the database had already moved past - therefore replaced newer text with older, which is exactly how a save appears to come back old.
+
 ### Typst Rendering Workflow
 
 1. User types `$E=mc^2$` in a node

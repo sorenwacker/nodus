@@ -32,6 +32,14 @@ export interface FileSyncDeps {
   // Frontmatter sync (optional)
   updateNodeTitle?: (id: string, title: string) => Promise<void>
   updateNodeTags?: (id: string, tags: string[]) => Promise<void>
+  /**
+   * The node an editor is currently open on, if any.
+   *
+   * Handed in rather than discovered: the watcher cannot reach into the canvas
+   * to ask, and the editor cannot know a file changed
+   * (PRODUCT_DESIGN.md > Reconciling a file with the node open in the editor).
+   */
+  getEditingNodeId?: () => string | null
 }
 
 // Extract filename from path
@@ -232,6 +240,19 @@ export function useFileSync(deps: FileSyncDeps) {
         }
         storeLogger.info(`[FileSync] Found node: ${node.title} (${node.id})`)
         storeLogger.info(`[FileSync] Checksums - old: ${node.checksum}, new: ${event.new_checksum}`)
+        // The editor's copy is what the user is looking at and typing into.
+        // The node keeps its checksum, so the difference is not forgotten: the
+        // next write settles it, normally the user's own save carrying the
+        // editor's text to the file
+        // (PRODUCT_DESIGN.md > Reconciling a file with the node open in the editor)
+        if (deps.getEditingNodeId?.() === node.id) {
+          storeLogger.info(`[FileSync] Skipping external change: node is being edited`)
+          notifications$.info(
+            'External change not applied',
+            `"${node.title}" is open for editing. Your version is kept.`
+          )
+          break
+        }
         if (node && event.new_checksum && node.checksum !== event.new_checksum) {
           try {
             const content = await readTextFile(filePath)

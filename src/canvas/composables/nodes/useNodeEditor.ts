@@ -10,6 +10,12 @@ export interface NodeEditorStore {
   getNode: (id: string) => Node | undefined
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
+  /**
+   * Report which node has an editor open, so a file change arriving for it is
+   * not written over what the user is typing
+   * (PRODUCT_DESIGN.md > Reconciling a file with the node open in the editor).
+   */
+  setEditingNode?: (id: string | null) => void
 }
 
 export interface UseNodeEditorOptions {
@@ -40,6 +46,11 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   // Frontmatter of the node being edited: metadata is never shown in the
   // editor, but survives the edit untouched
   let editingFrontmatter: string | null = null
+
+  /** Publish which node is open, whether for its body or its title. */
+  function publishEditingNode() {
+    store.setEditingNode?.(editingNodeId.value ?? editingTitleId.value)
+  }
 
   // Autosave timers
   let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
@@ -88,6 +99,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
 
 
     editingNodeId.value = nodeId
+    publishEditingNode()
     // The editor shows only the body; a metadata header stays out of sight
     // and out of reach of accidental edits
     const { frontmatter, body } = splitFrontmatter(node.markdown_content || '')
@@ -110,6 +122,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
 
 
     editingTitleId.value = nodeId
+    publishEditingNode()
     editTitle.value = node.title || ''
     setTimeout(() => {
       const input = document.querySelector('.title-editor') as HTMLInputElement
@@ -137,11 +150,13 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     }
     editingTitleId.value = null
     editTitle.value = ''
+    publishEditingNode()
   }
 
   function cancelTitleEditing() {
     editingTitleId.value = null
     editTitle.value = ''
+    publishEditingNode()
   }
 
   function saveEditing(e?: FocusEvent) {
@@ -171,6 +186,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     editingNodeId.value = null
     editContent.value = ''
     editingFrontmatter = null
+    publishEditingNode()
     onSaveComplete?.()
   }
 
