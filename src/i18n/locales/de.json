@@ -239,6 +239,18 @@
       "title": "Mathematik & Gleichungen",
       "description": "Verwenden Sie $...$ für Inline-Mathematik und $$...$$ für Anzeigegleichungen. Unterstützt von Typst."
     },
+    "neighborhood": {
+      "title": "Auf eine Idee fokussieren",
+      "description": "Waehlen Sie einen Knoten und druecken Sie N, um nur diesen Knoten und seine Verbindungen zu sehen. Die Tiefensteuerung erweitert den Kreis Schritt fuer Schritt."
+    },
+    "storylines": {
+      "title": "Aus dem Graphen ein Dokument machen",
+      "description": "Fuegen Sie Knoten zu einer Storyline zusammen, um ihre Reihenfolge festzulegen, sie als einen Text zu lesen und als PDF oder Typst zu exportieren. Datierte Knoten erscheinen zusaetzlich in der Zeitleiste."
+    },
+    "agent": {
+      "title": "Einen Assistenten einsetzen",
+      "description": "Im Panel links bittet man ein Modell, Knoten anzulegen, zu verbinden und neu zu ordnen - lokal mit Ollama oder ueber einen konfigurierten Anbieter. Externe Assistenten koennen sich per MCP verbinden."
+    },
     "buttons": {
       "next": "Weiter",
       "back": "Zurück",

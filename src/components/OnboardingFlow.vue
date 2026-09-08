@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, getLocale } from '../i18n'
 import type { SupportedLocale } from '../lib/templates'
+import { ONBOARDING_STEPS } from '../lib/onboardingSteps'
 
 const { t } = useI18n()
 
@@ -30,13 +31,12 @@ const emit = defineEmits<{
 const isVisible = ref(false)
 const currentStep = ref(0)
 
-const stepKeys = ['language', 'welcome', 'nodes', 'edges', 'import', 'math'] as const
-const stepIcons = ['language', 'graph', 'node', 'edge', 'import', 'math']
-
-const steps = computed(() => stepKeys.map((key, i) => ({
+// The list lives in lib so the tour can be checked against the locales
+// (PRODUCT_DESIGN.md > First-run tour)
+const steps = computed(() => ONBOARDING_STEPS.map(({ key, icon }) => ({
   title: t(`onboarding.${key}.title`),
   description: t(`onboarding.${key}.description`),
-  icon: stepIcons[i],
+  icon,
 })))
 
 const isLastStep = computed(() => currentStep.value === steps.value.length - 1)
@@ -141,6 +141,27 @@ defineExpose({
             <template v-else-if="steps[currentStep].icon === 'math'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M4 12h16M4 6l8 12M12 6l8 12" />
+              </svg>
+            </template>
+            <template v-else-if="steps[currentStep].icon === 'focus'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3" />
+                <circle cx="12" cy="12" r="8" stroke-dasharray="3 3" />
+                <circle cx="12" cy="4" r="1.6" /><circle cx="20" cy="12" r="1.6" />
+                <circle cx="12" cy="20" r="1.6" /><circle cx="4" cy="12" r="1.6" />
+              </svg>
+            </template>
+            <template v-else-if="steps[currentStep].icon === 'story'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="5" cy="7" r="2" /><circle cx="12" cy="7" r="2" /><circle cx="19" cy="7" r="2" />
+                <path d="M7 7h3M14 7h3" />
+                <path d="M4 14h16M4 18h11" />
+              </svg>
+            </template>
+            <template v-else-if="steps[currentStep].icon === 'agent'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="8" width="16" height="12" rx="2" />
+                <path d="M12 4v4M9 14h.01M15 14h.01M8 18h8" />
               </svg>
             </template>
           </div>

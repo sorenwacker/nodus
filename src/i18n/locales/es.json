@@ -239,6 +239,18 @@
       "title": "Matemáticas y ecuaciones",
       "description": "Usa $...$ para matemáticas en línea y $$...$$ para ecuaciones en bloque. Impulsado por Typst."
     },
+    "neighborhood": {
+      "title": "Centrarse en una idea",
+      "description": "Selecciona un nodo y pulsa N para ver solo ese nodo y aquello con lo que conecta. El control de profundidad amplia el circulo un salto cada vez."
+    },
+    "storylines": {
+      "title": "Convertir el grafo en un documento",
+      "description": "Enhebra nodos en una storyline para fijar su orden, leerlos como un solo texto y exportar el resultado en PDF o Typst. Los nodos con fecha aparecen ademas en la linea de tiempo."
+    },
+    "agent": {
+      "title": "Poner a trabajar a un asistente",
+      "description": "El panel de la izquierda pide a un modelo que cree, conecte y reorganice nodos: en local con Ollama o mediante un proveedor que configures. Los asistentes externos pueden conectarse por MCP."
+    },
     "buttons": {
       "next": "Siguiente",
       "back": "Atrás",

@@ -239,6 +239,18 @@
       "title": "Math & Equations",
       "description": "Use $...$ for inline math and $$...$$ for display equations. Powered by Typst."
     },
+    "neighborhood": {
+      "title": "Focus on one idea",
+      "description": "Select a node and press N to see only that node and what it connects to. The depth control widens the circle one hop at a time."
+    },
+    "storylines": {
+      "title": "Turn a graph into a document",
+      "description": "Thread nodes into a storyline to fix their order, read them as one text, and export the result as PDF or Typst. Dated nodes also appear on the timelines sheet."
+    },
+    "agent": {
+      "title": "Put an assistant to work",
+      "description": "The panel on the left asks a model to build, connect and rearrange nodes for you - locally with Ollama, or through a provider you configure. External assistants can connect over MCP."
+    },
     "buttons": {
       "next": "Next",
       "back": "Back",

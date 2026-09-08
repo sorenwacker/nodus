@@ -1249,6 +1249,14 @@ Nodus supports multiple EU languages:
 - Locale files: `src/i18n/locales/{lang}.json`
 - All UI strings are translatable; user content remains in original language
 
+### First-run tour
+
+**Required behavior:** The tour covers what distinguishes the product, not only what a user would guess from looking at a canvas.
+
+- Creating a node, connecting two, dropping a file and typing maths are all discoverable by trying. The features that make this more than a whiteboard - focusing on one node's neighbourhood, threading nodes into a storyline that leaves the graph as a document, and asking the agent to work on the graph - are not discoverable at all, and a tour that omits them ends the first session with a canvas of notes and no reason to come back.
+- Every step points at something the seeded default workspace already contains, so a step can be followed the moment it is read rather than describing a feature the user has no material for.
+- A step exists in all five locales or it does not exist. A tour that falls back to English mid-sequence is worse than a shorter tour.
+
 ### Starter Content
 
 After onboarding (and via Settings > Reset default workspace), the empty default workspace is seeded with starter content. The starter content must demo every user-facing feature, localized in all five locales:

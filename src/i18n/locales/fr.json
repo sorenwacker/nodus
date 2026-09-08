@@ -239,6 +239,18 @@
       "title": "Maths et équations",
       "description": "Utilisez $...$ pour les maths en ligne et $$...$$ pour les équations en bloc. Propulsé par Typst."
     },
+    "neighborhood": {
+      "title": "Se concentrer sur une idee",
+      "description": "Selectionnez un noeud et appuyez sur N pour ne voir que ce noeud et ses connexions. Le reglage de profondeur elargit le cercle d'un saut a la fois."
+    },
+    "storylines": {
+      "title": "Transformer le graphe en document",
+      "description": "Enchainez des noeuds dans une storyline pour fixer leur ordre, les lire comme un seul texte et exporter le resultat en PDF ou en Typst. Les noeuds dates apparaissent aussi sur la frise chronologique."
+    },
+    "agent": {
+      "title": "Mettre un assistant au travail",
+      "description": "Le panneau de gauche demande a un modele de creer, relier et reorganiser des noeuds - en local avec Ollama ou via un fournisseur que vous configurez. Des assistants externes peuvent se connecter via MCP."
+    },
     "buttons": {
       "next": "Suivant",
       "back": "Retour",
