@@ -9,11 +9,9 @@ Notes are stored in [Open Knowledge Format](https://github.com/GoogleCloudPlatfo
 
 ## Download
 
-| Platform | Download |
-|----------|----------|
-| macOS | [Universal DMG](https://github.com/sorenwacker/nodus/releases/latest) |
-| Windows | [Installer (exe)](https://github.com/sorenwacker/nodus/releases/latest) |
-| Linux | [AppImage](https://github.com/sorenwacker/nodus/releases/latest) / [deb](https://github.com/sorenwacker/nodus/releases/latest) |
+**[sorenwacker.net/nodus](https://sorenwacker.net/nodus/)** - installers for macOS, Windows and Linux, with installation instructions.
+
+The build artifacts for a given version are also attached to its [GitHub release](https://github.com/sorenwacker/nodus/releases/latest).
 
 ## What it does
 
