@@ -310,19 +310,27 @@ export function useLayout(options: UseLayoutOptions) {
       .getFilteredEdges()
       .filter(e => overlay.nodeIds.has(e.source_node_id) && overlay.nodeIds.has(e.target_node_id))
 
+    // The node a radial run centres on. Only radial takes a centre; to every
+    // other algorithm a selection means "lay out only these", so handing them
+    // the centre made them arrange the focus node alone and leave the subgraph
+    // exactly as it was - the control appeared to do nothing. The overlay's own
+    // node set is the scope of a run in this mode
+    // (PRODUCT_DESIGN.md > Neighborhood Mode).
+    const centreIds = () =>
+      overlay.centerId ? [overlay.centerId] : store.getSelectedNodeIds().filter(id => overlay.nodeIds.has(id))
+
     const scopedStore = {
       ...store,
       getFilteredNodes: () => nodes,
       getFilteredEdges: () => edges,
       // The overlay draws no frames, so nothing in it may be constrained to one
       getFilteredFrames: () => [],
-      getSelectedNodeIds: () =>
-        overlay.centerId ? [overlay.centerId] : store.getSelectedNodeIds().filter(id => overlay.nodeIds.has(id)),
+      getSelectedNodeIds: () => [],
     }
 
     if (layout === 'radial') {
       const result = computeRadialLayout({
-        getSelectedNodeIds: scopedStore.getSelectedNodeIds,
+        getSelectedNodeIds: centreIds,
         getNode: store.getNode,
         getFilteredNodes: () => nodes,
         getFilteredEdges: () => edges,

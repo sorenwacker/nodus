@@ -83,6 +83,31 @@ describe('layout while an overlay is open', () => {
     expect([...applied[0].keys()]).not.toContain('outside')
   })
 
+  it.each(['grid', 'horizontal', 'vertical', 'force', 'hierarchical', 'radial'] as const)(
+    'arranges every node of the overlay with the %s layout',
+    async layoutType => {
+      // The controls act on the subgraph on screen. A run that places the
+      // focus node alone leaves the mode's own arrangement untouched, which
+      // reads as the control doing nothing
+      // (PRODUCT_DESIGN.md > Neighborhood Mode).
+      const applied: Map<string, { x: number; y: number }>[] = []
+      const overlay: LayoutOverlay = {
+        nodeIds: new Set(['hub', 'a', 'b']),
+        centerId: 'hub',
+        apply: p => {
+          applied.push(p)
+        },
+      }
+      const { layout } = setup(overlay)
+
+      await layout.autoLayout(layoutType)
+
+      expect(applied.length).toBeGreaterThan(0)
+      const placed = new Set(applied.flatMap(p => [...p.keys()]))
+      expect([...placed].sort()).toEqual(['a', 'b', 'hub'])
+    }
+  )
+
   it('writes to the store when no overlay is open', async () => {
     const { layout, pushUndo } = setup(null)
     await layout.autoLayout('grid')

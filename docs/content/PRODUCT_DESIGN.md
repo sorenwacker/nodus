@@ -711,7 +711,7 @@ Focus view that isolates a node and its connected neighbors:
 - **Depth control:** Configurable 1-5 hops (edges away from focus node)
 - **BFS traversal:** Finds all nodes within specified depth
 - **Layout:** The subgraph is arranged by the same layout algorithms the canvas uses, not by a placement of its own. Entering the mode arranges it radially around the focus node, which suits a focus view and keeps a hub with many neighbours on screen: the radius grows with the neighbour count rather than a row growing with it.
-- **Changing the layout:** While the mode is active, the grid, force, hierarchical and radial controls apply to the visible subgraph rather than the whole canvas.
+- **Changing the layout:** While the mode is active, the grid, force, hierarchical and radial controls apply to the visible subgraph rather than the whole canvas. The subgraph is the whole scope of such a run: the selection that put the canvas into the mode does not narrow it. Only a radial run reads the focus node, as its centre - handed to the others, which read a selection as "lay out only these", it made them arrange the focus node alone and leave the subgraph as it was.
 - **Positions are not stored:** Every arrangement computed in this mode is an ephemeral overlay. Stored coordinates are untouched, so leaving the mode restores the canvas exactly as it was.
 - **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
 
