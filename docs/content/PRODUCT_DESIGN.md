@@ -918,6 +918,15 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 | New file added | No matching `file_path` | Create new node, run through parser |
 | File deleted | `file_path` exists, file gone | Soft delete node |
 
+### A save that does not reach the vault
+
+**Required behavior:** When a node is backed by a file in a vault that syncs, a save that did not reach that file is reported to the user. Silence is reserved for saves that were never meant to touch a file.
+
+- The backend writes the file only when the node has one, it exists, and a workspace with sync enabled covers it; otherwise it updates the database alone and returns no checksum. The frontend read that as an ordinary save, so a node whose file was missing, moved, or outside its vault kept taking edits that went nowhere near disk.
+- A write that throws was caught into a log line and nothing else. The node kept the new text in memory, so the edit looked saved.
+- Either case now raises a notification naming the node. The database still holds the edit - nothing is lost at the moment it happens - but the vault copy is behind, and the next external change to that file would replace the newer text with the older.
+- Fifteen nodes in one workspace reached this state before it was noticed: text written to the database on one day, files untouched for five months.
+
 ### Reconciling a file with the node open in the editor
 
 **Required behavior:** An external change to a file is never written over an editor that is open on that node. The editor's copy is what the user is looking at and typing into; replacing it under them destroys text no undo step covers.

@@ -48,6 +48,13 @@ interface DbWorkspace {
 // Extended workspace type for internal use with vault_path
 interface InternalWorkspace extends Workspace {
   vault_path?: string | null
+  /**
+   * Whether this workspace writes its nodes back to files in its vault. Read
+   * from the database and dropped in the mapping below, so nothing in the
+   * frontend could tell a workspace that syncs from one that does not
+   * (PRODUCT_DESIGN.md > A save that does not reach the vault).
+   */
+  sync_enabled?: boolean
 }
 
 export const useWorkspaceStore = defineStore('workspaces', () => {
@@ -82,6 +89,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
       name: w.name,
       created_at: w.created_at,
       vault_path: w.vault_path,
+      sync_enabled: w.sync_enabled,
     }))
 
     // Update local state from database

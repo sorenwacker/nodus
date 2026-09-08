@@ -6,6 +6,7 @@ import type { Ref } from 'vue'
 import { syncWikilinks } from './wikilinkSync'
 import { invoke } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
+import { notifications$ } from '../../composables/useNotifications'
 import { recordContentBefore } from './undoRecorder'
 import { generateShortId } from '../../lib/ids'
 import { planTagChange } from '../../lib/tagSync'
@@ -25,6 +26,26 @@ import type {
   NodeStoreDependencies,
 } from './types'
 import { findNodeByTitle } from './state'
+
+/**
+ * Whether a save of this node was meant to reach a file.
+ *
+ * True only for a node backed by a file in a workspace that syncs to a vault:
+ * everywhere else the backend updating the database alone is the normal case,
+ * and a warning would be noise (PRODUCT_DESIGN.md > A save that does not reach
+ * the vault).
+ */
+function expectsFileWrite(deps: NodeStoreDependencies, node: Node): boolean {
+  return !!node.file_path && !!deps.workspaceStore.currentWorkspace?.sync_enabled
+}
+
+/** Say that the database has the edit and the vault does not. */
+function reportVaultWriteMissed(node: Node, detail: string): void {
+  notifications$.error(
+    `Saved to Nodus only: "${node.title}"`,
+    `${detail}. The canvas holds your edit; the vault copy is behind.`
+  )
+}
 
 /**
  * Update node position with optional frame containment
@@ -231,9 +252,18 @@ export async function updateNodeContent(
       // Update checksum if file was written (prevents watcher reload loop)
       if (newChecksum) {
         node.checksum = newChecksum
+      } else if (expectsFileWrite(deps, node)) {
+        // The backend updated the database alone. The edit is not lost, but the
+        // vault copy is now behind, and the next external change to that file
+        // would replace the newer text with the older
+        // (PRODUCT_DESIGN.md > A save that does not reach the vault)
+        reportVaultWriteMissed(node, 'The vault file was not written')
       }
     } catch (e) {
-      console.error('Failed to update content:', e)
+      storeLogger.error('Failed to update content:', e)
+      if (expectsFileWrite(deps, node)) {
+        reportVaultWriteMissed(node, String(e))
+      }
     }
 
     await extractAndPersistHashtags(node, trimmedContent, tagNodesComposable, previousContent, tagCleanup)
