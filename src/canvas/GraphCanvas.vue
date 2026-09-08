@@ -379,6 +379,38 @@ const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewport
 const gestureActive = ref(false) // live while any viewport gesture is (useCanvasInput)
 const { showPerfOverlay, perfSummary, recordSpan: recordPerfSpan } = usePerfOverlay(gestureActive)
 
+// Before its readers (canvas-setup-order.test)
+const nodeEditor = useNodeEditor({
+  store: {
+    getNode: store.getNode,
+    updateNodeContent: store.updateNodeContent,
+    updateNodeTitle: store.updateNodeTitle,
+    setEditingNode: store.setEditingNode,
+  },
+})
+// Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit
+const {
+  editingNodeId,
+  editContent,
+  editingTitleId,
+  editTitle,
+  startEditing,
+  startEditingTitle,
+  saveTitleEditing,
+  cancelTitleEditing,
+  // In-node search
+  showNodeSearch,
+  searchNodeId,
+  nodeSearchQuery,
+  nodeSearchMatches,
+  nodeSearchIndex,
+  openNodeSearch,
+  closeNodeSearch,
+  updateNodeSearch,
+  findNextMatch,
+  findPrevMatch,
+} = nodeEditor
+
 // Graph metrics composable - computes graph size thresholds and LOD mode
 const graphMetrics = useGraphMetrics({
   displayNodes,
@@ -612,38 +644,6 @@ const colorsInUse = computed(() => {
     }
   })
 })
-
-// Node editor composable - handles inline editing with autosave
-const nodeEditor = useNodeEditor({
-  store: {
-    getNode: store.getNode,
-    updateNodeContent: store.updateNodeContent,
-    updateNodeTitle: store.updateNodeTitle,
-    setEditingNode: store.setEditingNode,
-  },
-})
-// Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit
-const {
-  editingNodeId,
-  editContent,
-  editingTitleId,
-  editTitle,
-  startEditing,
-  startEditingTitle,
-  saveTitleEditing,
-  cancelTitleEditing,
-  // In-node search
-  showNodeSearch,
-  searchNodeId,
-  nodeSearchQuery,
-  nodeSearchMatches,
-  nodeSearchIndex,
-  openNodeSearch,
-  closeNodeSearch,
-  updateNodeSearch,
-  findNextMatch,
-  findPrevMatch,
-} = nodeEditor
 
 // Edge manipulation composable - handles edge creation, selection, modification
 const edgeManipulation = useEdgeManipulation({
