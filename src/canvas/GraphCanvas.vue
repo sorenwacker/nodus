@@ -719,8 +719,11 @@ const frameBorderWidth = computed(() => {
 
 // Minimap - using composable
 const minimap = useMinimap({
+  // What the canvas is drawing, at the positions it is drawing them: in
+  // neighbourhood mode that is the subgraph on screen, whose positions are an
+  // overlay the store never sees (PRODUCT_DESIGN.md > Minimap redraw)
   nodes: computed(() =>
-    store.filteredNodes.map(n => ({
+    displayNodes.value.map(n => ({
       id: n.id,
       canvas_x: n.canvas_x,
       canvas_y: n.canvas_y,
@@ -2337,7 +2340,7 @@ defineExpose({
       <!-- Minimap -->
       <CanvasMinimap
         v-if="minimap.viewport.value"
-        :visible="store.filteredNodes.length > 0"
+        :visible="displayNodes.length > 0"
         :marks="minimap.nodeMarks.value"
         :minimap-size="minimap.MINIMAP_SIZE"
         :viewport-x="minimap.viewport.value.x || 0"

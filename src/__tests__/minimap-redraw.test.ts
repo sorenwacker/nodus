@@ -8,6 +8,8 @@
  * (PRODUCT_DESIGN.md > Minimap redraw).
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { useMinimap } from '../canvas/composables/viewport/useMinimap'
@@ -45,6 +47,20 @@ function setup(count = 500) {
   } as never)
   return { minimap, scale, offsetX, offsetY, selectedNodeIds, nodeList }
 }
+
+describe('what the minimap draws', () => {
+  // The wiring lives in the canvas template, where the composable is handed the
+  // node list it marks. Neighbourhood mode shows a subgraph at positions that
+  // are an overlay, so a minimap fed from the store marks a graph that is not on
+  // the canvas (PRODUCT_DESIGN.md > Minimap redraw).
+  const canvas = readFileSync(resolve(process.cwd(), 'src/canvas/GraphCanvas.vue'), 'utf8')
+  const wiring = canvas.slice(canvas.indexOf('useMinimap({'), canvas.indexOf('function onMinimapClick'))
+
+  it('marks the nodes the canvas displays, not the whole workspace', () => {
+    expect(wiring).toContain('displayNodes')
+    expect(wiring).not.toContain('store.filteredNodes')
+  })
+})
 
 describe('minimap redraw', () => {
   it('keeps the marks untouched while the viewport moves', () => {

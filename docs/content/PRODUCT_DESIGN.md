@@ -713,6 +713,7 @@ Focus view that isolates a node and its connected neighbors:
 - **Layout:** The subgraph is arranged by the same layout algorithms the canvas uses, not by a placement of its own. Entering the mode arranges it radially around the focus node, which suits a focus view and keeps a hub with many neighbours on screen: the radius grows with the neighbour count rather than a row growing with it.
 - **Changing the layout:** While the mode is active, the grid, force, hierarchical and radial controls apply to the visible subgraph rather than the whole canvas. The subgraph is the whole scope of such a run: the selection that put the canvas into the mode does not narrow it. Only a radial run reads the focus node, as its centre - handed to the others, which read a selection as "lay out only these", it made them arrange the focus node alone and leave the subgraph as it was.
 - **Positions are not stored:** Every arrangement computed in this mode is an ephemeral overlay. Stored coordinates are untouched, so leaving the mode restores the canvas exactly as it was.
+- **The minimap follows:** it shows the subgraph on screen at its overlay positions, not the workspace behind it.
 - **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
 
 ### Edge Routing (PCB-Style)
@@ -1311,6 +1312,7 @@ Resetting the default workspace also removes its previous frames and storylines 
 - The minimap draws one mark per node in the workspace, not per visible node, so its cost scales with the graph while the canvas above it scales with the viewport. Panning eight cards must not redraw a thousand marks.
 - Every mark's geometry was recomputed inside the template, and the position function was called once for each of x, y, width and height - four calls per node per frame. Measured over 60 viewport-only frames: 0.74ms per frame at 168 nodes, 4.47ms at 1581, against a 16.7ms budget that also has to cover the canvas itself. That is a floor, measured without the SVG rasterisation a browser adds.
 - The marks are therefore precomputed as a list and rendered by their own component. A viewport move leaves that list untouched by identity, so the marks are not re-rendered at all; a node move, a resize or a change of selection rebuilds it once.
+- The minimap draws the nodes the canvas is drawing, at the positions the canvas is drawing them. In neighbourhood mode that is the subgraph on screen at its overlay positions: showing the whole workspace there marked a graph that is not on the canvas, and placed the viewport rectangle among coordinates nothing is drawn at.
 
 ### Selected nodes in bubble mode
 
