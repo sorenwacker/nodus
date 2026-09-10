@@ -17,7 +17,9 @@ describe('CanvasNodeCard', () => {
      * 5. Shown when editing title (isEditingTitle=true)
      *
      * Title editing interactions:
-     * - Double-click on header: Start title editing (works in any mode)
+     * - Double-click on header: Start title editing, unless the card is collapsed
+     *   or is a neighbour in neighborhood mode, where the double-click reaches the
+     *   card and navigates (neighborhood-dblclick-navigation.test.ts)
      * - Single-click on header while editing content: Start title editing
      *
      * To edit a title on an untitled node:

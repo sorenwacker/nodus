@@ -181,6 +181,22 @@ const showDateEditor = ref(false)
 const dateInput = ref('')
 const dateEndInput = ref('')
 
+/**
+ * A double-click on the header renames the node, except where the card has
+ * to see it: a collapsed card is nothing but its header, and a neighbour in
+ * neighborhood mode navigates on double-click. Stopping the event before the
+ * card saw it opened the rename input on a neighbour's title instead
+ * (PRODUCT_DESIGN.md > Neighborhood Mode > Moving the focus).
+ */
+function onHeaderDoubleClick() {
+  const isNeighbour = props.isNeighborhoodMode && !props.isNeighborhoodFocus
+  if (props.isCollapsed || isNeighbour) {
+    emit('dblclick')
+    return
+  }
+  emit('start-editing-title')
+}
+
 function openDateEditor() {
   const content = props.node.markdown_content || ''
   dateInput.value = extractFrontmatterField(content, 'date') || ''
@@ -247,7 +263,7 @@ async function removeTag(tag: string) {
       v-else-if="node.title || isEditing || isEditingTitle || isCollapsed"
       class="node-header"
       tabindex="-1"
-      @dblclick.stop="!isCollapsed && emit('start-editing-title')"
+      @dblclick.stop="onHeaderDoubleClick"
       @click.stop="isEditing && !isEditingTitle && emit('start-editing-title')"
     >
       <input
