@@ -2,6 +2,24 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.6] - 2026-09-10
+
+### Fixed
+- Double-clicking a neighbour in neighbourhood mode moves the focus to it, on its title as well as its body. The header's rename handler stopped the event before the card saw it, so a double-click on a neighbour's title opened the rename input with the title selected instead of navigating, and a collapsed card, which is nothing but its header, swallowed the double-click entirely. Renaming by double-click stays available on the focus node and outside the mode
+- Neighbourhood rings are seated clear of the cards they hold. The first ring's radius, the distance between rings and the seating along a ring are derived from the card sizes instead of constants sized for the default 200x120 card, which had put all seventeen neighbours of a hub inside the hub's own card
+- The grid, force and hierarchical controls arrange the whole neighbourhood subgraph while the mode is open. They read the selection that entered the mode as "lay out only these" and arranged the focus node alone
+- The minimap draws the graph the canvas is drawing. In neighbourhood mode that is the subgraph at its overlay positions; showing the whole workspace marked a graph that was not on the canvas and placed the viewport rectangle among coordinates nothing was drawn at
+- An external file change is never written over the node open in the editor. The watcher pushed the file into the store and the database unconditionally, so a stale file replaced newer text while the user was typing. The node keeps its old checksum, and the next save settles the difference
+- A save that reaches the database but not the vault file raises a notification naming the node. A node whose file was missing, moved or outside its vault kept taking edits that went nowhere near disk, and a failed write was caught into a log line; fifteen nodes in one workspace reached that state before it was noticed
+- The checksum stored against a node is the checksum of the content the node holds, both taken from one read. The handler read the file itself and stored the checksum carried by the watcher event, which describe two moments, so a write landing between them left the node looking reconciled while it was not
+- The canvas creates the node editor before the composables that read its state, rather than handing them a reference that was still empty when they were wired
+
+### Changed
+- The workspace list is searchable, orders recently opened workspaces first and the rest alphabetically, and shows each workspace's node count. A plain dropdown in creation order stops being usable around a dozen entries; this installation has thirty-seven. Arrows, Enter and Escape reach any workspace from the keyboard
+- The first-run tour covers neighbourhood mode, storylines and the agent, the features a canvas does not explain by itself. Every step points at something the seeded default workspace contains, in all five locales
+- The screen-edge gestures that open the side panels are live only while the window is in full screen, where the window edge is the screen edge and a push against it can only be deliberate. Windowed, the panels open from their toolbar buttons
+- A viewport move redraws only the minimap's viewport rectangle. The node marks were recomputed in the template every frame, 4.47ms per frame at 1,581 nodes; they are now computed once per node set and reused until a node moves, resizes or is selected
+
 ## [1.6.0-rc.5] - 2026-09-07
 
 ### Fixed
