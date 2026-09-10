@@ -108,6 +108,7 @@ Focus on a specific node and its connections:
 - Toggle neighborhood mode to hide unrelated nodes
 - Adjust depth (1-5 hops) to control how far connections extend
 - The subgraph is arranged radially around the focus node; the layout controls rearrange it without changing stored positions
+- Double-click any neighbour, on its title or its body, to make it the new focus
 - Useful for exploring dense graphs
 
 ---

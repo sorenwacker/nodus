@@ -715,6 +715,7 @@ Focus view that isolates a node and its connected neighbors:
 - **Positions are not stored:** Every arrangement computed in this mode is an ephemeral overlay. Stored coordinates are untouched, so leaving the mode restores the canvas exactly as it was.
 - **The minimap follows:** it shows the subgraph on screen at its overlay positions, not the workspace behind it.
 - **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
+- **Moving the focus:** Double-clicking any neighbour card, on its title or its body, collapsed or expanded, makes that node the focus and re-arranges the subgraph around it. The title's double-click-to-rename is suspended for neighbours while the mode is open, because the header's rename handler used to stop the event before the card saw it: a double-click on a neighbour's title opened the rename input, with the title selected, instead of navigating. Renaming by double-click stays available on the focus node and outside the mode.
 
 ### Edge Routing (PCB-Style)
 
