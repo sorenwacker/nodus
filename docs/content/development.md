@@ -30,7 +30,10 @@ make dev
 | `npm run build` | Build frontend |
 | `npm run tauri build` | Build for production |
 | `cargo test` | Run Rust tests (in src-tauri/) |
-| `cargo clippy` | Lint Rust code |
+| `cargo clippy --all-targets -- -D warnings` | Lint Rust code, test code included (in src-tauri/) |
+| `npm ci && npm run build` | Install and type-check the MCP server (in packages/nodus-mcp-server/) |
+| `scripts/setup-hooks.sh` | Install the pre-commit hook, which runs the CI checks for the parts of the tree a commit touches |
+| `scripts/ci-check.sh` | Run every check CI runs, on the whole tree |
 
 ## Project Structure
 
