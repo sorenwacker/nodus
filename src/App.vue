@@ -210,7 +210,7 @@ function toggleStorylinePanel() {
 }
 const mcpPendingConnectionId = ref<string | null>(null)
 const newWorkspaceName = ref('')
-const editingWorkspace = ref<{ id: string | null; name: string; description: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
+const editingWorkspace = ref<{ id: string | null; name: string; vault_path: string | null; sync_enabled: boolean } | null>(null)
 
 // Tauri workspace functions
 import { invoke, surveyOkfBackfill, applyOkfBackfill, getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
@@ -436,7 +436,7 @@ async function createNewWorkspace() {
   if (!newWorkspaceName.value.trim()) return
   try {
     const ws = await store.createWorkspace(newWorkspaceName.value.trim())
-    store.switchWorkspace(ws.id)
+    await store.switchWorkspace(ws.id)
     store.clearCanvas()
     newWorkspaceName.value = ''
     showWorkspaceDialog.value = false
@@ -454,12 +454,11 @@ async function openWorkspaceEditor() {
     editingWorkspace.value = {
       id: current.id,
       name: current.name,
-      description: '',
       vault_path: wsSettings?.vault_path ?? null,
       sync_enabled: wsSettings?.sync_enabled ?? false,
     }
   } else {
-    editingWorkspace.value = { id: null, name: 'Default', description: '', vault_path: null, sync_enabled: false }
+    editingWorkspace.value = { id: null, name: 'Default', vault_path: null, sync_enabled: false }
   }
   showWorkspaceEditor.value = true
 }
@@ -467,7 +466,11 @@ async function openWorkspaceEditor() {
 async function saveWorkspaceChanges() {
   if (!editingWorkspace.value) return
   if (editingWorkspace.value.id) {
-    store.renameWorkspace(editingWorkspace.value.id, editingWorkspace.value.name)
+    try {
+      await store.renameWorkspace(editingWorkspace.value.id, editingWorkspace.value.name)
+    } catch {
+      return // The store has reported the refusal and kept the old name
+    }
 
     // Save vault settings
     await setWorkspaceVaultPath(editingWorkspace.value.id, editingWorkspace.value.vault_path)
@@ -1079,15 +1082,6 @@ async function openFolderDialog() {
               class="path-input"
               :disabled="!store.currentWorkspaceId"
             />
-          </label>
-          <label>
-            {{ t('workspace.description') }}:
-            <textarea
-              v-model="editingWorkspace.description"
-              :placeholder="t('workspace.descriptionPlaceholder')"
-              class="description-input"
-              rows="3"
-            ></textarea>
           </label>
 
           <!-- Vault Sync Settings -->

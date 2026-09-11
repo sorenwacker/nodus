@@ -56,10 +56,12 @@ describe('the flag the warning depends on', () => {
     // could never fire (PRODUCT_DESIGN.md > A save that does not reach the vault)
     const source = readFileSync(resolve(process.cwd(), 'src/stores/workspaces.ts'), 'utf8')
     const mapping = source.slice(
-      source.indexOf('const loadedWorkspaces'),
-      source.indexOf('workspaces.value = loadedWorkspaces')
+      source.indexOf('function toWorkspace('),
+      source.indexOf('export const useWorkspaceStore')
     )
     expect(mapping).toContain('sync_enabled')
+    // Loading goes through that mapping rather than a copy of it
+    expect(source).toContain('dbWorkspaces.map(toWorkspace)')
   })
 })
 

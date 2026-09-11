@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '../lib/tauri'
 import { workspaceStorage } from '../lib/storage'
+import { notifications$ } from '../composables/useNotifications'
 import { storeLogger } from '../lib/logger'
 import { stripHtmlTags } from '../lib/sanitize'
 import type { Workspace } from '../types'
@@ -57,6 +58,21 @@ interface InternalWorkspace extends Workspace {
   sync_enabled?: boolean
 }
 
+/**
+ * A workspace as the frontend holds it, from its database record. Loading and
+ * recovering both use this, so neither can drop the vault settings the other
+ * keeps (PRODUCT_DESIGN.md > Workspace settings).
+ */
+function toWorkspace(w: DbWorkspace): InternalWorkspace {
+  return {
+    id: w.id,
+    name: w.name,
+    created_at: w.created_at,
+    vault_path: w.vault_path,
+    sync_enabled: w.sync_enabled,
+  }
+}
+
 export const useWorkspaceStore = defineStore('workspaces', () => {
   // Initialize from localStorage for quick startup, but database is source of truth
   const workspaces = ref<InternalWorkspace[]>(workspaceStorage.getAll())
@@ -84,13 +100,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     storeLogger.debug(`[Workspace] DB workspaces: ${JSON.stringify(dbWorkspaces.map(w => ({ id: w.id, name: w.name })))}`)
 
     // Convert database workspaces to frontend format (including vault_path for sync)
-    const loadedWorkspaces: InternalWorkspace[] = dbWorkspaces.map((w) => ({
-      id: w.id,
-      name: w.name,
-      created_at: w.created_at,
-      vault_path: w.vault_path,
-      sync_enabled: w.sync_enabled,
-    }))
+    const loadedWorkspaces = dbWorkspaces.map(toWorkspace)
 
     // Update local state from database
     workspaces.value = loadedWorkspaces
@@ -181,6 +191,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
   async function renameWorkspace(id: string, newName: string) {
     const workspace = workspaces.value.find((w) => w.id === id)
     if (workspace) {
+      const previousName = workspace.name
       const sanitizedName = sanitizeWorkspaceName(newName)
       workspace.name = sanitizedName
       saveWorkspacesToStorage()
@@ -189,6 +200,11 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
         await invoke('rename_workspace', { id, newName: sanitizedName })
       } catch (e) {
         storeLogger.error('[Workspaces] Failed to persist workspace rename:', e)
+        // A refused rename keeps the old name (PRODUCT_DESIGN.md > Workspace settings)
+        workspace.name = previousName
+        saveWorkspacesToStorage()
+        notifications$.error(`Could not rename "${previousName}"`, String(e))
+        throw e
       }
     }
   }
@@ -213,12 +229,8 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
       return null
     }
 
-    // Add to local list
-    const workspace: Workspace = {
-      id: dbWorkspace.id,
-      name: dbWorkspace.name,
-      created_at: dbWorkspace.created_at,
-    }
+    // Add to local list, with the vault settings the database holds
+    const workspace = toWorkspace(dbWorkspace)
 
     workspaces.value.push(workspace)
     saveWorkspacesToStorage()

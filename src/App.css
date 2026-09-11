@@ -686,23 +686,6 @@
   gap: 8px;
 }
 
-.description-input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  font-size: 13px;
-  background: var(--bg-surface);
-  color: var(--text-main);
-  resize: vertical;
-  font-family: inherit;
-}
-
-.description-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
 .workspace-stats {
   display: flex;
   gap: 8px;
