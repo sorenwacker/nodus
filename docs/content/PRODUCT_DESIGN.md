@@ -1727,6 +1727,7 @@ The 1000-line limit existed only as prose in the project rules, and seven files 
 - A recorded file may shrink freely; shrinking past 1000 lines removes it from the list.
 - A recorded file that grows fails the gate, so splitting is the only way forward.
 - A file not on the list may not cross 1000 lines at all.
+- The gate covers every tree of shipped code: `src/`, `src-tauri/src/` and the MCP server package's `packages/nodus-mcp-server/src/`.
 
 This enforces the limit from where the codebase actually is rather than blocking every commit until seven files are split.
 
