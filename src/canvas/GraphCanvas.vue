@@ -388,7 +388,7 @@ const nodeEditor = useNodeEditor({
     setEditingNode: store.setEditingNode,
   },
 })
-// Use composable for state and title editing; content editing functions are local for mermaid render + auto-fit
+// One save path: the event handlers save content through nodeEditor.saveEditing, then render mermaid and auto-fit
 const {
   editingNodeId,
   editContent,
@@ -1865,11 +1865,10 @@ const { getNodeStyle } = nodeStyle
 // Canvas event handlers composable - handles content clicks, editing, context menus
 const eventHandlers = useCanvasEventHandlers({
   editingNodeId,
-  editContent,
   showNodeSearch,
   closeNodeSearch,
   openNodeSearch,
-  updateNodeContent: store.updateNodeContent,
+  saveEditor: nodeEditor.saveEditing,
   getNode: store.getNode,
   renderMermaidDiagrams,
   fitNodeToContent,

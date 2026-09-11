@@ -20,16 +20,18 @@ export interface ContextMenuInterface {
 export interface UseCanvasEventHandlersContext {
   /** Currently editing node ID */
   editingNodeId: Ref<string | null>
-  /** Edit content for the editing node */
-  editContent: Ref<string>
   /** Whether in-node search is active */
   showNodeSearch: Ref<boolean>
   /** Close in-node search */
   closeNodeSearch: () => void
   /** Open in-node search */
   openNodeSearch: (nodeId?: string) => void
-  /** Update node content in store */
-  updateNodeContent: (nodeId: string, content: string) => void
+  /**
+   * Save the open editor through the node editor, which writes the
+   * frontmatter back and tells the store the edit has ended
+   * (PRODUCT_DESIGN.md > Saving from the canvas editor)
+   */
+  saveEditor: () => void
   /** Get a node by ID */
   getNode: (nodeId: string) => { auto_fit?: boolean } | undefined
   /** Render mermaid diagrams */
@@ -113,11 +115,10 @@ export function useCanvasEventHandlers(
 ): UseCanvasEventHandlersReturn {
   const {
     editingNodeId,
-    editContent,
     showNodeSearch,
     closeNodeSearch,
     openNodeSearch,
-    updateNodeContent,
+    saveEditor,
     getNode,
     renderMermaidDiagrams,
     fitNodeToContent,
@@ -187,8 +188,8 @@ export function useCanvasEventHandlers(
     }
 
     const nodeId = editingNodeId.value
+    saveEditor()
     if (nodeId) {
-      updateNodeContent(nodeId, editContent.value)
       // Trigger mermaid rendering after content update
       setTimeout(renderMermaidDiagrams, 100)
       // Auto-fit node to content after saving (if enabled for this node)
@@ -198,8 +199,6 @@ export function useCanvasEventHandlers(
         setTimeout(() => fitNodeToContent(nodeId), 500)
       }
     }
-    editingNodeId.value = null
-    editContent.value = ''
   }
 
   /**
