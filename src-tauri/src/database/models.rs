@@ -340,33 +340,47 @@ pub mod storylines {
         storyline_id: &str,
         node_id: &str,
     ) -> Result<(), DatabaseError> {
+        // One transaction: a removal either completes or changes nothing
+        // (PRODUCT_DESIGN.md > Storyline chain edges)
+        let mut tx = pool.begin().await?;
+
         // Get the sequence_order of the node being removed
         let order: Option<i32> = sqlx::query_scalar(
             "SELECT sequence_order FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?",
         )
         .bind(storyline_id)
         .bind(node_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *tx)
         .await?;
 
         // Delete the node
         sqlx::query("DELETE FROM storyline_nodes WHERE storyline_id = ? AND node_id = ?")
             .bind(storyline_id)
             .bind(node_id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
 
-        // Shift remaining nodes to fill the gap
+        // Close the gap. A direct -= 1 violates UNIQUE(storyline_id,
+        // sequence_order) row-by-row once a reorder has left rows out of
+        // sequence order, so go through disjoint negative values first
+        // (same technique as add_node): s -> -s -> s - 1
         if let Some(removed_order) = order {
             sqlx::query(
-                "UPDATE storyline_nodes SET sequence_order = sequence_order - 1 WHERE storyline_id = ? AND sequence_order > ?",
+                "UPDATE storyline_nodes SET sequence_order = -sequence_order WHERE storyline_id = ? AND sequence_order > ?",
             )
             .bind(storyline_id)
             .bind(removed_order)
-            .execute(pool)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query(
+                "UPDATE storyline_nodes SET sequence_order = -sequence_order - 1 WHERE storyline_id = ? AND sequence_order < 0",
+            )
+            .bind(storyline_id)
+            .execute(&mut *tx)
             .await?;
         }
 
+        tx.commit().await?;
         Ok(())
     }
 
@@ -767,5 +781,91 @@ pub mod frames {
             }
         };
         Ok(frame)
+    }
+}
+
+#[cfg(test)]
+mod storyline_order_tests {
+    use super::storylines;
+    use crate::database::{self, DbPool};
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    async fn memory_pool() -> DbPool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory pool");
+        database::run_migrations(&pool).await.expect("migrations");
+        pool
+    }
+
+    /// A storyline holding n1, n2, n3 in that order.
+    async fn storyline_of_three(pool: &DbPool) {
+        sqlx::query(
+            "INSERT INTO storylines (id, title, created_at, updated_at) VALUES ('s1', 'S', 0, 0)",
+        )
+        .execute(pool)
+        .await
+        .expect("insert storyline");
+        for id in ["n1", "n2", "n3"] {
+            sqlx::query(
+                "INSERT INTO nodes (id, title, created_at, updated_at) VALUES (?, ?, 0, 0)",
+            )
+            .bind(id)
+            .bind(id)
+            .execute(pool)
+            .await
+            .expect("insert node");
+            storylines::add_node(pool, "s1", id, None)
+                .await
+                .expect("add node");
+        }
+    }
+
+    async fn order(pool: &DbPool) -> Vec<(String, i32)> {
+        sqlx::query_as(
+            "SELECT node_id, sequence_order FROM storyline_nodes WHERE storyline_id = 's1' ORDER BY sequence_order",
+        )
+        .fetch_all(pool)
+        .await
+        .expect("read order")
+    }
+
+    /// Closing the gap in one UPDATE moved rows in insertion order, so after a
+    /// reorder a decremented row collided with one not yet moved
+    /// (PRODUCT_DESIGN.md > Storyline chain edges).
+    #[tokio::test]
+    async fn removes_a_node_after_the_storyline_was_reordered() {
+        let pool = memory_pool().await;
+        storyline_of_three(&pool).await;
+        let reversed = ["n3", "n2", "n1"].map(String::from);
+        storylines::reorder_nodes(&pool, "s1", &reversed)
+            .await
+            .expect("reorder");
+
+        storylines::remove_node(&pool, "s1", "n3")
+            .await
+            .expect("a removal after a reorder succeeds");
+
+        assert_eq!(
+            order(&pool).await,
+            vec![("n2".to_string(), 0), ("n1".to_string(), 1)]
+        );
+    }
+
+    #[tokio::test]
+    async fn numbers_the_remaining_nodes_from_zero_without_a_gap() {
+        let pool = memory_pool().await;
+        storyline_of_three(&pool).await;
+
+        storylines::remove_node(&pool, "s1", "n2")
+            .await
+            .expect("removed");
+
+        assert_eq!(
+            order(&pool).await,
+            vec![("n1".to_string(), 0), ("n3".to_string(), 1)]
+        );
     }
 }
