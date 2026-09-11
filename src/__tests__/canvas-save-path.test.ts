@@ -7,7 +7,7 @@
  * canvas save dropped the node's frontmatter, and the file watcher kept
  * ignoring changes to the last edited node for the rest of the session.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { useNodeEditor } from '../canvas/composables/nodes/useNodeEditor'
@@ -87,6 +87,17 @@ const WAYS_OF_LEAVING: Array<[string, (w: Wired) => void]> = [
 ]
 
 describe.each(WAYS_OF_LEAVING)('leaving the canvas editor by %s', (_, leave) => {
+  // startEditing schedules a focus timer; on real timers it can fire after this
+  // file's environment is torn down, where `document` no longer exists
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+
   it('writes the frontmatter back with the body', () => {
     const wired = wireCanvas(`${HEADER}The body`)
     wired.editor.startEditing('n1')
@@ -112,6 +123,7 @@ describe.each(WAYS_OF_LEAVING)('leaving the canvas editor by %s', (_, leave) => 
 
 describe('after a canvas save', () => {
   afterEach(() => {
+    vi.clearAllTimers()
     vi.useRealTimers()
   })
 
