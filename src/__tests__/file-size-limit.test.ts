@@ -20,11 +20,13 @@ const LIMIT = 1000
  */
 const OVER_LIMIT: Record<string, number> = {
   'src/canvas/GraphCanvas.vue': 2481,
-  'src/App.vue': 1292,
-  'src/lib/templates.ts': 1254,
+  'src/App.vue': 1273,
+  'src/lib/templates.ts': 1246,
   'src/components/StorylineReader.vue': 1214,
   'src/__tests__/layoutFrameIntegration.test.ts': 1205,
   'src/__tests__/frameCollision.test.ts': 1201,
+  // Recorded when the gate was extended to the MCP server package
+  'packages/nodus-mcp-server/src/tools.ts': 1046,
 }
 
 const EXTENSIONS = ['.ts', '.vue', '.rs']
@@ -53,6 +55,7 @@ describe('file size limit', () => {
   const files = [
     ...sourceFiles(join(REPO_ROOT, 'src')),
     ...sourceFiles(join(REPO_ROOT, 'src-tauri/src')),
+    ...sourceFiles(join(REPO_ROOT, 'packages/nodus-mcp-server/src')),
   ]
 
   it('scans the source tree', () => {
