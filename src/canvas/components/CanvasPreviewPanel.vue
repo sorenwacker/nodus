@@ -53,17 +53,6 @@ const showLinkPicker = ref(false)
 const linkPickerPosition = ref({ top: 0, left: 0 })
 const wikilinkStart = ref(-1)
 
-// Reset edit state when panel closes or node changes
-watch(() => props.visible, (visible) => {
-  if (!visible) {
-    isEditing.value = false
-  }
-})
-
-watch(() => props.nodeId, () => {
-  isEditing.value = false
-})
-
 // Metadata header of the edited node: hidden from the editor, kept on save
 let editingFrontmatter: string | null = null
 
@@ -98,6 +87,30 @@ function saveDate() {
 // Tag editor (same store method as the card chips and MCP)
 const showTagInput = ref(false)
 const tagInput = ref('')
+
+/**
+ * Close every editor the panel holds for the node it shows. An editor opened
+ * for one field belongs to that node, so changing the node or closing the
+ * panel drops it without writing
+ * (PRODUCT_DESIGN.md > Saving edits when the open node changes).
+ */
+function closeFieldEditors() {
+  isEditing.value = false
+  showDateEditor.value = false
+  dateInput.value = ''
+  dateEndInput.value = ''
+  // Cleared before the input unmounts, so a blur on removal saves nothing
+  tagInput.value = ''
+  showTagInput.value = false
+  showLinkPicker.value = false
+  wikilinkStart.value = -1
+}
+
+watch(() => props.visible, (visible) => {
+  if (!visible) closeFieldEditors()
+})
+
+watch(() => props.nodeId, closeFieldEditors)
 
 const nodeTags = computed<string[]>(() => {
   const raw = store.getNode(props.nodeId)?.tags
