@@ -655,14 +655,8 @@ function handleEscape() {
 function handleDelete() {
   if (store.selectedNodeIds.length > 0) {
     for (const id of [...store.selectedNodeIds]) {
-      const node = store.getNode(id)
-      if (node) {
-        const connectedEdges = store.filteredEdges.filter(
-          e => e.source_node_id === id || e.target_node_id === id
-        )
-        pushDeletionUndo(node, connectedEdges)
-      }
-      store.deleteNode(id)
+      // A refusal has already been reported by the store, and the node stays
+      nodeService.deleteNode(id).catch(() => undefined)
     }
   } else if (store.selectedFrameId) {
     store.deleteFrame(store.selectedFrameId)

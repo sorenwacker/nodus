@@ -4,7 +4,8 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { invoke } from '../lib/tauri'
+import { invoke, isTauri } from '../lib/tauri'
+import { notifications$ } from '../composables/useNotifications'
 import { storeLogger } from '../lib/logger'
 import { generateShortId } from '../lib/ids'
 import type { Edge, CreateEdgeInput, EntityLinkType } from '../types'
@@ -114,7 +115,12 @@ export const useEdgesStore = defineStore('edges', () => {
       return edge
     } catch (e) {
       storeLogger.error('Failed to create edge:', e)
-      // Fallback for development
+      // In the desktop app a refused create adds nothing; only the browser
+      // build keeps a local edge (PRODUCT_DESIGN.md > A write the backend refused)
+      if (isTauri()) {
+        notifications$.error('Could not create the link', String(e))
+        throw e
+      }
       const edge: Edge = {
         id: generateShortId(),
         source_node_id: data.source_node_id,

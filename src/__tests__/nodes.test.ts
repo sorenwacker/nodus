@@ -28,6 +28,11 @@ vi.mock('@tauri-apps/api/core', () => ({
     if (command === 'update_node_workspace') {
       return Promise.resolve()
     }
+    // A delete changes the canvas only once the backend has made it
+    // (PRODUCT_DESIGN.md > A write the backend refused)
+    if (command === 'delete_node') {
+      return Promise.resolve()
+    }
     // Reject other commands to trigger fallbacks
     return Promise.reject(new Error('Mock: No backend'))
   }),

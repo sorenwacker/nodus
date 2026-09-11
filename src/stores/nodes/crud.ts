@@ -4,7 +4,7 @@
 
 import type { Ref } from 'vue'
 import { syncWikilinks } from './wikilinkSync'
-import { invoke } from '../../lib/tauri'
+import { invoke, isTauri } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { notifications$ } from '../../composables/useNotifications'
 import { recordContentBefore } from './undoRecorder'
@@ -541,8 +541,14 @@ export async function createNode(
     }
     return node
   } catch (e) {
-    console.error('Failed to create node:', e)
-    // Fallback for development
+    storeLogger.error('Failed to create node:', e)
+    // The canvas shows what is stored: in the desktop app a refused create
+    // adds nothing. Only the browser build, which has no backend, keeps a
+    // local node (PRODUCT_DESIGN.md > A write the backend refused)
+    if (isTauri()) {
+      notifications$.error(`Could not create "${inputWithWorkspace.title}"`, String(e))
+      throw e
+    }
     const node: Node = {
       id: generateShortId(),
       title: data.title.trim(),
@@ -578,10 +584,15 @@ export async function deleteNode(
   id: string
 ): Promise<void> {
   const { state, edgesStore } = deps
+  // Removed from the view only once the backend has deleted it, as deleting
+  // several nodes already does (PRODUCT_DESIGN.md > A write the backend refused)
   try {
     await invoke('delete_node', { id })
   } catch (e) {
-    console.error('Failed to delete node:', e)
+    storeLogger.error('Failed to delete node:', e)
+    const title = state.nodes.value.find(n => n.id === id)?.title ?? id
+    notifications$.error(`Could not delete "${title}"`, String(e))
+    throw e
   }
   state.nodes.value = state.nodes.value.filter(n => n.id !== id)
   // Clear selection if deleted node was selected

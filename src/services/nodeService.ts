@@ -64,11 +64,10 @@ export class NodeService {
       e => e.source_node_id === id || e.target_node_id === id
     )
 
-    // Push to undo stack BEFORE deleting
-    this.undo.pushDeletionUndo(node, connectedEdges)
-
-    // Execute deletion
+    // Recorded only once the delete has happened: a refused delete leaves
+    // nothing to undo (PRODUCT_DESIGN.md > A write the backend refused)
     await this.store.deleteNode(id)
+    this.undo.pushDeletionUndo(node, connectedEdges)
   }
 
   /**
