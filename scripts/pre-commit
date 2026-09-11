@@ -1,38 +1,47 @@
 #!/bin/bash
-# Pre-commit hook for linting TypeScript and Rust code
-# Only checks staged files, not the entire codebase
-# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Pre-commit hook: runs the CI checks for the parts of the tree a commit touches.
+# Install with scripts/setup-hooks.sh; scripts/ci-check.sh runs every check on
+# the whole tree. src/__tests__/local-checks-mirror-ci.test.ts fails when this
+# hook stops running a check CI runs.
 
 set -e
 
+cd "$(git rev-parse --show-toplevel)"
+STAGED=$(git diff --cached --name-only)
+
 echo "Running pre-commit checks..."
 
-# Get the root directory of the repo
-ROOT_DIR=$(git rev-parse --show-toplevel)
+echo "Frontend lint..."
+npm run lint --silent
 
-# Check for staged TypeScript/Vue files
-TS_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|vue)$' | grep -v node_modules || true)
+echo "Frontend types..."
+npm run typecheck
 
-if [ -n "$TS_FILES" ]; then
-    echo "Linting staged TypeScript/Vue files..."
-    cd "$ROOT_DIR"
-    # Only lint the staged files, not the entire codebase
-    echo "$TS_FILES" | xargs npx eslint --max-warnings=0 2>/dev/null || {
-        echo "ESLint found errors in staged files. Please fix them before committing."
-        exit 1
-    }
-fi
+echo "Frontend tests..."
+npm test -- --run
 
-# Check for staged Rust files
-RS_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.rs$' || true)
-
-if [ -n "$RS_FILES" ]; then
-    echo "Checking Rust formatting..."
-    cd "$ROOT_DIR/src-tauri"
+if echo "$STAGED" | grep -q "^src-tauri/"; then
+    echo "Rust checks..."
+    cd src-tauri
     cargo fmt --check || {
-        echo "Rust formatting check failed. Run 'cargo fmt' to fix."
+        echo "Rust formatting failed. Run 'cargo fmt' to fix."
         exit 1
     }
+    # --all-targets so test code is linted too: without it a clippy error in a
+    # test file passes this hook and every CI gate
+    cargo clippy --all-targets -- -D warnings
+    cargo test --quiet
+    cd ..
+else
+    echo "Rust checks skipped: no Rust changes"
 fi
 
-echo "Pre-commit checks passed."
+if echo "$STAGED" | grep -q "^packages/nodus-mcp-server/"; then
+    echo "MCP server build..."
+    # tsc type-checks the server files the root suite never imports
+    (cd packages/nodus-mcp-server && { [ -d node_modules ] || npm ci; } && npm run build)
+else
+    echo "MCP server build skipped: no MCP server changes"
+fi
+
+echo "Pre-commit checks passed"
