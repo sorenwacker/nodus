@@ -2,7 +2,7 @@
  * Edge operations for the nodes store
  */
 
-import { invoke } from '../../lib/tauri'
+import { asOneUndoStep } from './undoRecorder'
 import type { Node, Edge, CreateEdgeInput, NodeStoreDependencies } from './types'
 
 /**
@@ -16,45 +16,47 @@ export function createEdge(
 }
 
 /**
- * Delete an edge. If it's a wikilink edge, convert the [[...]] to plain text in the source node.
+ * Delete an edge. A wikilink edge stands for a link in the node that holds it,
+ * or in both nodes when it is undirected; that link becomes plain text first
+ * (PRODUCT_DESIGN.md > Deleting a merged wikilink edge).
+ *
+ * @param saveContent - Writes a node's content through the store, so the
+ *   rewrite is recorded for undo and keeps the node's checksum current. It
+ *   must not re-sync wikilink edges, because this edge is being deleted.
  */
 export async function deleteEdge(
   deps: NodeStoreDependencies,
-  id: string
+  id: string,
+  saveContent: (nodeId: string, content: string) => Promise<void>
 ): Promise<void> {
   const { state, edgesStore } = deps
   const edge = edgesStore.getEdge(id)
 
-  // If it's a wikilink edge, convert the wikilink to plain text in source node
   if (edge && edge.link_type === 'wikilink') {
-    const sourceNode = state.nodes.value.find(n => n.id === edge.source_node_id)
-    const targetNode = state.nodes.value.find(n => n.id === edge.target_node_id)
-
-    if (sourceNode && targetNode && sourceNode.markdown_content) {
-      // Replace [[Target Title]] or [[Target Title|display]] with just the display text
-      const targetTitle = targetNode.title
-      const wikilinkRegex = new RegExp(
-        `\\[\\[${escapeRegex(targetTitle)}(?:\\|([^\\]]+))?\\]\\]`,
-        'gi'
-      )
-      const newContent = sourceNode.markdown_content.replace(wikilinkRegex, (_match, display) => {
-        return display || targetTitle
-      })
-
-      if (newContent !== sourceNode.markdown_content) {
-        // Update content without triggering edge sync (would cause infinite loop)
-        sourceNode.markdown_content = newContent
-        sourceNode.updated_at = Date.now()
-        try {
-          await invoke<string | null>('update_node_content', { id: sourceNode.id, content: newContent })
-        } catch (e) {
-          console.error('Failed to update content after wikilink removal:', e)
-        }
-      }
+    const byId = (nodeId: string) => state.nodes.value.find(n => n.id === nodeId)
+    const holders: Array<[Node | undefined, Node | undefined]> = [
+      [byId(edge.source_node_id), byId(edge.target_node_id)],
+    ]
+    if (edge.directed === false) {
+      holders.push([byId(edge.target_node_id), byId(edge.source_node_id)])
     }
+
+    await asOneUndoStep(async () => {
+      for (const [holder, linked] of holders) {
+        if (!holder?.markdown_content || !linked) continue
+        const unlinked = withoutWikilinksTo(holder.markdown_content, linked.title)
+        if (unlinked !== holder.markdown_content) await saveContent(holder.id, unlinked)
+      }
+    })
   }
 
   await edgesStore.deleteEdge(id)
+}
+
+/** Replace `[[Title]]` and `[[Title|display]]` with their display text */
+function withoutWikilinksTo(content: string, title: string): string {
+  const wikilink = new RegExp(`\\[\\[${escapeRegex(title)}(?:\\|([^\\]]+))?\\]\\]`, 'gi')
+  return content.replace(wikilink, (_match, display) => display || title)
 }
 
 /**

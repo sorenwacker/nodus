@@ -290,7 +290,7 @@ export const useNodesStore = defineStore('nodes', () => {
   async function updateNodeContent(
     id: string,
     content: string,
-    options?: { skipUndo?: boolean }
+    options?: { skipUndo?: boolean; skipWikilinkSync?: boolean }
   ) {
     await updateNodeContentFn(deps, id, content, tagNodesComposable, createEdge, options, removeTagEdges)
   }
@@ -347,7 +347,9 @@ export const useNodesStore = defineStore('nodes', () => {
   const createEdge = (data: CreateEdgeInput) => createEdgeFn(edgesStore, data)
 
   async function deleteEdge(id: string): Promise<void> {
-    await deleteEdgeFn(deps, id)
+    await deleteEdgeFn(deps, id, (nodeId, content) =>
+      updateNodeContent(nodeId, content, { skipWikilinkSync: true })
+    )
   }
 
   const restoreEdge = (edge: Edge) => restoreEdgeFn(edgesStore, edge)

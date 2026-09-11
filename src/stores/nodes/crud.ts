@@ -218,6 +218,11 @@ export async function updateNodeContent(
   options?: {
     /** Set only by undo and redo, which must not record their own replay */
     skipUndo?: boolean
+    /**
+     * Set only by deleting a wikilink edge: the edge is being deleted, and a
+     * re-sync of the rewritten text would race that delete
+     */
+    skipWikilinkSync?: boolean
   },
   tagCleanup?: TagCleanup
 ): Promise<void> {
@@ -272,10 +277,12 @@ export async function updateNodeContent(
     // handles folder/note path links and #section anchors. A backend that
     // fails leaves the edges alone; only the absence of a backend falls back
     // to the title-only resolver (PRODUCT_DESIGN.md > Syncing wikilink edges)
-    await syncWikilinks(id, trimmedContent, {
-      reloadEdges: () => edgesStore.loadEdges(deps.workspaceStore.currentWorkspaceId),
-      localFallback: () => syncWikilinkEdgesLocal(deps, id, trimmedContent, createEdgeFn),
-    })
+    if (!options?.skipWikilinkSync) {
+      await syncWikilinks(id, trimmedContent, {
+        reloadEdges: () => edgesStore.loadEdges(deps.workspaceStore.currentWorkspaceId),
+        localFallback: () => syncWikilinkEdgesLocal(deps, id, trimmedContent, createEdgeFn),
+      })
+    }
   }
 }
 
