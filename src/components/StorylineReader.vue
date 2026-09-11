@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, toRef, nextTick, inject } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
 import { acquireEditLock, releaseEditLock } from '../lib/tauri'
@@ -50,6 +50,7 @@ const storylineService = inject<StorylineService>('storylineService')
 
 const storyline = ref<Storyline | null>(null)
 const nodes = ref<Node[]>([])
+const readerTitle = computed(() => storyline.value?.title ?? (props.singleNodeId ? nodes.value[0]?.title : undefined) ?? '')
 const edgesStore = useEdgesStore()
 const showExport = ref(false)
 
@@ -195,9 +196,8 @@ const comments = useStorylineReaderComments()
 const { getCommentMeta, isCommentCollapsed, toggleCommentCollapsed } = comments
 
 // Scroll position memory
-const storylineIdRef = toRef(props, 'storylineId')
 const { schedulePositionSave, restorePosition } = useScrollPositionMemory(
-  storylineIdRef,
+  computed(() => (props.singleNodeId ? `node:${props.singleNodeId}` : props.storylineId)),
   contentRef,
   activeNodeIndex
 )
@@ -273,9 +273,8 @@ async function loadStoryline() {
     if (props.singleNodeId) {
       const node = store.nodes.find(n => n.id === props.singleNodeId)
       nodes.value = node ? [node] : []
-      storyline.value = node
-        ? ({ id: node.id, title: node.title } as typeof storyline.value)
-        : null
+      // No storyline while one node is read (PRODUCT_DESIGN.md > Reading a single node)
+      storyline.value = null
       return
     }
     // Find storyline
@@ -420,7 +419,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
     <div class="reader-container">
       <!-- Header -->
       <StorylineReaderHeader
-        :title="storyline?.title || ''"
+        :title="readerTitle"
         :active-index="activeNodeIndex"
         :node-count="nodes.length"
         :has-entities="hasEntities"
@@ -439,7 +438,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
         v-if="showExport"
         :nodes="nodes"
         :edges="storylineEdges"
-        :default-title="storyline?.title || ''"
+        :default-title="readerTitle"
         preserve-order
         @close="showExport = false"
       />
@@ -456,6 +455,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
               :storyline-id="storylineId"
               :active-index="activeNodeIndex"
               compact
+              :readonly="!!singleNodeId"
               @node-click="goToNode"
               @reorder="handleNodeReorder"
               @remove="handleNodeRemove"

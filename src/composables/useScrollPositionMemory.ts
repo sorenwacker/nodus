@@ -1,5 +1,8 @@
 /**
- * Composable for saving and restoring scroll position in storyline reader
+ * Composable for saving and restoring scroll position in storyline reader.
+ *
+ * Positions are stored under a reading key: a storyline id, or `node:<id>` for
+ * a node read on its own.
  */
 import { ref, onUnmounted, type Ref } from 'vue'
 import { storylineReadingStorage } from '../lib/storage'
@@ -7,7 +10,7 @@ import { storylineReadingStorage } from '../lib/storage'
 const SAVE_DEBOUNCE_MS = 500
 
 export function useScrollPositionMemory(
-  storylineId: Ref<string>,
+  readingKey: Readonly<Ref<string>>,
   contentRef: Ref<HTMLElement | null>,
   activeNodeIndex: Ref<number>
 ) {
@@ -27,7 +30,7 @@ export function useScrollPositionMemory(
     saveTimeout = setTimeout(() => {
       const scrollTop = contentRef.value?.scrollTop ?? 0
       storylineReadingStorage.setPosition(
-        storylineId.value,
+        readingKey.value,
         activeNodeIndex.value,
         scrollTop
       )
@@ -39,7 +42,7 @@ export function useScrollPositionMemory(
    * Returns true if position was restored
    */
   function restorePosition(): boolean {
-    const saved = storylineReadingStorage.getPosition(storylineId.value)
+    const saved = storylineReadingStorage.getPosition(readingKey.value)
     if (!saved || !contentRef.value) return false
 
     isRestoring.value = true
@@ -62,7 +65,7 @@ export function useScrollPositionMemory(
    * Clear saved position for current storyline
    */
   function clearPosition() {
-    storylineReadingStorage.clearPosition(storylineId.value)
+    storylineReadingStorage.clearPosition(readingKey.value)
   }
 
   onUnmounted(() => {

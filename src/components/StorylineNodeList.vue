@@ -15,6 +15,8 @@ const props = defineProps<{
   storylineId: string
   activeIndex?: number
   compact?: boolean
+  /** Offer no insert, remove or reorder control: the list is not a storyline */
+  readonly?: boolean
   externalDropIndex?: number | null
 }>()
 
@@ -227,6 +229,7 @@ function onDragLeave() {
       <template v-for="(node, index) in nodes" :key="node.id">
         <!-- Insert zone before each node - also accepts drops for reordering -->
         <div
+          v-if="!readonly"
           class="insert-zone"
           :class="{
             active: hoveringInsertIndex === index || showingInsertPicker === index,
@@ -270,12 +273,12 @@ function onDragLeave() {
               node.color_theme ? { background: getNodeBackground(node.color_theme) } : {},
               node.node_type === 'comment' ? { '--comment-color': getCommentStyle(node).color } : {}
             ]"
-            @pointerdown="onPointerDown($event, index)"
+            @pointerdown="readonly || onPointerDown($event, index)"
             @click="handleNodeClick(index)"
             @mouseenter="showNodeHover(node)"
             @mouseleave="hideNodeHover"
           >
-            <div class="drag-handle">
+            <div v-if="!readonly" class="drag-handle">
               <Icon name="drag" :size="compact ? 10 : 12" />
             </div>
             <span v-if="node.node_type === 'comment'" class="node-order comment-icon" :style="{ background: getCommentStyle(node).color }">
@@ -291,7 +294,7 @@ function onDragLeave() {
             >
               <Icon :name="isExpanded(node.id) ? 'chevron-up' : 'chevron-down'" :size="12" />
             </button>
-            <button class="remove-btn" :aria-label="t('storyline.removeFromStoryline')" @click.stop="handleRemove(node.id)">
+            <button v-if="!readonly" class="remove-btn" :aria-label="t('storyline.removeFromStoryline')" @click.stop="handleRemove(node.id)">
               <Icon name="close" :size="compact ? 8 : 10" />
             </button>
           </div>
@@ -305,6 +308,7 @@ function onDragLeave() {
 
       <!-- Insert zone at the end - also accepts drops for reordering -->
       <div
+        v-if="!readonly"
         class="insert-zone insert-zone-end"
         :class="{
           active: hoveringInsertIndex === nodes.length || showingInsertPicker === nodes.length,
