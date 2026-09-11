@@ -4,6 +4,7 @@
  */
 import { ref } from 'vue'
 import { relativeFolder } from '../lib/vaultPaths'
+import { frameSizeToContain, type CanvasRect } from '../lib/geometry'
 import { invoke, readTextFile, refreshWorkspace as refreshWorkspaceApi, setWorkspaceSync } from '../lib/tauri'
 import { parseReferences, citationToMarkdown } from '../lib/bibtex'
 import { storeLogger } from '../lib/logger'
@@ -54,12 +55,15 @@ export interface ImportDeps {
   ) => Promise<{ id: string }>
   assignNodesToFrame?: (nodeIds: string[], frameId: string | null) => void
   updateNodePosition?: (id: string, x: number, y: number) => void
+  /** Grow a folder frame that gained nodes (PRODUCT_DESIGN.md > Refreshing a workspace from its files) */
+  updateFrameSize?: (id: string, width: number, height: number) => void
   getFrames?: () => Array<{ id: string; folder_path: string | null; canvas_x: number; canvas_y: number; width: number; height: number }>
   getVaultPath?: () => string | null
 }
 
 /**
- * Layout nodes inside a frame in a grid, using actual node sizes
+ * Layout nodes inside a frame in a grid, using actual node sizes, starting at
+ * `top`. Returns where each node was placed.
  */
 function layoutNodesInFrame(
   nodes: Node[],
@@ -67,13 +71,15 @@ function layoutNodesInFrame(
   padding: number,
   spacing: number,
   nodesPerRow: number,
-  deps: ImportDeps
-): void {
-  if (!deps.updateNodePosition || nodes.length === 0) return
+  deps: ImportDeps,
+  top = frame.canvas_y + padding + 40 // +40 for frame title
+): CanvasRect[] {
+  if (!deps.updateNodePosition || nodes.length === 0) return []
+  const placed: CanvasRect[] = []
 
   // Calculate positions row by row, accounting for actual node heights
   let currentX = frame.canvas_x + padding
-  let currentY = frame.canvas_y + padding + 40 // +40 for frame title
+  let currentY = top
   let rowMaxHeight = 0
   let colIndex = 0
 
@@ -91,6 +97,7 @@ function layoutNodesInFrame(
 
     // Position the node
     deps.updateNodePosition(node.id, currentX, currentY)
+    placed.push({ canvas_x: currentX, canvas_y: currentY, width: nodeWidth, height: nodeHeight })
 
     // Track max height in this row
     rowMaxHeight = Math.max(rowMaxHeight, nodeHeight)
@@ -99,6 +106,7 @@ function layoutNodesInFrame(
     currentX += nodeWidth + spacing
     colIndex++
   }
+  return placed
 }
 
 /**
@@ -229,13 +237,22 @@ async function createFramesFromFolders(
     // Check if frame already exists for this folder
     const existingFrame = existingFramesByPath.get(folderPath)
     if (existingFrame) {
-      // Frame exists - move nodes into it using actual node sizes
-      if (deps.updateNodePosition && nodeIds.length > 0) {
-        const folderNodes = nodeIds.map((id) => nodeMap.get(id)).filter((n): n is Node => !!n)
-        layoutNodesInFrame(folderNodes, existingFrame, FRAME_PADDING, NODE_SPACING, NODES_PER_ROW, deps)
-      }
-      if (nodeIds.length > 0) {
-        deps.assignNodesToFrame(nodeIds, existingFrame.id)
+      // Only nodes new to the frame are placed; the rest stay where the user
+      // put them (PRODUCT_DESIGN.md > Refreshing a workspace from its files)
+      const held = nodes.filter((n) => n.frame_id === existingFrame.id)
+      const newcomers = nodeIds
+        .map((id) => nodeMap.get(id))
+        .filter((n): n is Node => !!n && n.frame_id !== existingFrame.id)
+      if (newcomers.length === 0) continue
+
+      const heldRects = held.map((n) => ({ canvas_x: n.canvas_x, canvas_y: n.canvas_y, width: n.width || 200, height: n.height || 120 }))
+      const top = held.length > 0 ? Math.max(...heldRects.map((r) => r.canvas_y + r.height)) + NODE_SPACING : undefined
+      const placed = layoutNodesInFrame(newcomers, existingFrame, FRAME_PADDING, NODE_SPACING, NODES_PER_ROW, deps, top)
+      deps.assignNodesToFrame(newcomers.map((n) => n.id), existingFrame.id)
+
+      const size = frameSizeToContain(existingFrame, [...heldRects, ...placed], FRAME_PADDING)
+      if (size && (size.width !== existingFrame.width || size.height !== existingFrame.height)) {
+        deps.updateFrameSize?.(existingFrame.id, size.width, size.height)
       }
       continue
     }

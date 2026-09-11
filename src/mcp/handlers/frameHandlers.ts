@@ -9,6 +9,7 @@ import type { McpFrame } from '../types'
 import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface } from '../messageHandler'
 import { normalizeColor, McpError } from './nodeHandlers'
+import { frameSizeToContain } from '../../lib/geometry'
 
 /**
  * Convert internal Frame to MCP format
@@ -43,27 +44,10 @@ async function fitFrameToNodesAndResolveOverlaps(
   const nodesInFrame = store.getFilteredNodes().filter((n) => n.frame_id === frameId)
   if (nodesInFrame.length === 0) return
 
-  // Calculate bounding box of all nodes
-  let maxX = -Infinity, maxY = -Infinity
-  for (const node of nodesInFrame) {
-    maxX = Math.max(maxX, node.canvas_x + node.width)
-    maxY = Math.max(maxY, node.canvas_y + node.height)
-  }
-
-  // Measured from the frame's own origin, because that is where the frame
-  // starts. `maxX - minX` is the nodes' extent, which is smaller than the span
-  // the frame has to cover whenever the nodes sit to the right of or below the
-  // frame's corner - so the frame was resized to something that still did not
-  // contain them (PRODUCT_DESIGN.md > Fitting a frame to its contents)
-  const requiredWidth = maxX + padding - frame.canvas_x
-  const requiredHeight = maxY + padding - frame.canvas_y + titleHeight
-
-  // Only resize if needed (frame too small)
-  const newWidth = Math.max(frame.width, requiredWidth)
-  const newHeight = Math.max(frame.height, requiredHeight)
-
-  if (newWidth !== frame.width || newHeight !== frame.height) {
-    await store.updateFrameSize(frameId, newWidth, newHeight)
+  // One rule for every fit (PRODUCT_DESIGN.md > Fitting a frame to its contents)
+  const size = frameSizeToContain(frame, nodesInFrame, padding, titleHeight)
+  if (size && (size.width !== frame.width || size.height !== frame.height)) {
+    await store.updateFrameSize(frameId, size.width, size.height)
   }
 
   // Resolve overlaps with other frames

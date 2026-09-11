@@ -9,26 +9,18 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { frameSizeToContain } from '../lib/geometry'
 
 
 const PADDING = 40
 const TITLE_HEIGHT = 30
 
-/** The rule under test, mirrored: measured from the frame's own origin. */
 function requiredSize(
   frame: { canvas_x: number; canvas_y: number },
   nodes: Array<{ canvas_x: number; canvas_y: number; width: number; height: number }>
 ) {
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const n of nodes) {
-    maxX = Math.max(maxX, n.canvas_x + n.width)
-    maxY = Math.max(maxY, n.canvas_y + n.height)
-  }
-  return {
-    width: maxX + PADDING - frame.canvas_x,
-    height: maxY + PADDING - frame.canvas_y + TITLE_HEIGHT,
-  }
+  // A zero-sized frame, so the result is the requirement itself
+  return frameSizeToContain({ ...frame, width: 0, height: 0 }, nodes, PADDING, TITLE_HEIGHT)!
 }
 
 describe('fitting a frame to its contents', () => {
@@ -53,12 +45,12 @@ describe('fitting a frame to its contents', () => {
     expect(requiredSize(frame, nodes).width).toBeGreaterThan(extentOnly)
   })
 
-  it('is applied by the handler', () => {
+  it('is the rule the handler applies', () => {
     const source = readFileSync(
       resolve(__dirname, '../mcp/handlers/frameHandlers.ts'),
       'utf-8'
     )
-    expect(source).toContain('maxX + padding - frame.canvas_x')
+    expect(source).toContain('frameSizeToContain(')
     expect(source).not.toMatch(/requiredWidth = maxX - minX/)
   })
 })

@@ -485,6 +485,7 @@ export const useNodesStore = defineStore('nodes', () => {
         )
       }
     },
+    updateFrameSize: (id, width, height) => framesStore.updateFrameSize(id, width, height),
     getFrames: () => framesStore.frames,
     getVaultPath: () => workspaceStore.currentVaultPath,
   })
