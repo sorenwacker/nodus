@@ -203,3 +203,36 @@ describe('the annotation author', () => {
     expect(entry.text).not.toContain('sdrwacker')
   })
 })
+
+/**
+ * A highlight that spans lines keeps a key on one frontmatter line
+ * (PRODUCT_DESIGN.md > PDF highlights as nodes: import is additive).
+ *
+ * The key embedded the passage with its line breaks, so the frontmatter field
+ * was written across several lines: the continuation lines broke the
+ * frontmatter, and the key read back was only its first line, so every
+ * re-import offered the highlight again.
+ */
+describe('a highlight that spans lines', () => {
+  const spanning = annotation({ content: 'the first line of a passage\nand the line after it' })
+
+  function frontmatterLines(content: string): string[] {
+    const end = content.indexOf('\n---\n', 4)
+    return content.slice(4, end).split('\n')
+  }
+
+  it('leaves the frontmatter intact', () => {
+    const lines = frontmatterLines(highlightNodeContent('paper.pdf', spanning))
+    expect(lines.every(line => /^[A-Za-z_][\w-]*:/.test(line)), lines.join(' | ')).toBe(true)
+  })
+
+  it('is recognised as imported on the next import', () => {
+    const imported = importedHighlightKeys([{ markdown_content: highlightNodeContent('paper.pdf', spanning) }])
+    const [entry] = toHighlightImports([spanning], 'paper.pdf', imported)
+    expect(entry.alreadyImported).toBe(true)
+  })
+
+  it('leaves the key of a one-line passage as it was, so earlier imports still match', () => {
+    expect(highlightKey('paper.pdf', annotation({ content: 'two  spaces kept' }))).toBe('paper.pdf#p3:two  spaces kept')
+  })
+})

@@ -30,7 +30,13 @@ export interface HighlightImport {
  * recognised across imports of the same file.
  */
 export function highlightKey(filename: string, annotation: PdfAnnotation): string {
-  const text = (annotation.content || annotation.comment || '').trim().slice(0, 120)
+  // On one line: the key is a frontmatter field, and a line break would split
+  // the field and break the frontmatter. Other whitespace is kept, so keys
+  // stored for one-line passages still match
+  const text = (annotation.content || annotation.comment || '')
+    .trim()
+    .replace(/\s*[\r\n]+\s*/g, ' ')
+    .slice(0, 120)
   return `${filename}#p${annotation.page}:${text}`
 }
 
