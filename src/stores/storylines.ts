@@ -215,6 +215,10 @@ export const useStorylinesStore = defineStore('storylines', () => {
   async function removeNodeFromStoryline(storylineId: string, nodeId: string): Promise<void> {
     if (!deps) throw new Error('Storylines store not initialized')
     try {
+      // The backend removes the node first; the chain edges change only once it
+      // has (PRODUCT_DESIGN.md > Storyline chain edges)
+      await invoke('remove_node_from_storyline', { storylineId, nodeId })
+
       const nodeIds = storylineNodes.value.get(storylineId) || []
       const nodeIndex = nodeIds.indexOf(nodeId)
 
@@ -239,8 +243,6 @@ export const useStorylinesStore = defineStore('storylines', () => {
           await deps.createEdge({ source_node_id: prevNodeId, target_node_id: nextNodeId, link_type: 'related', color: edgeColor, storyline_id: storylineId })
         }
       }
-
-      await invoke('remove_node_from_storyline', { storylineId, nodeId })
 
       const newMap = new Map(storylineNodes.value)
       newMap.set(storylineId, nodeIds.filter(id => id !== nodeId))

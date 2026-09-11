@@ -100,4 +100,21 @@ describe('storyline chain edges', () => {
     // The user's own edge is not one of the storyline edges removed with the node
     expect(deleteEdge.mock.calls.map(c => c[0])).not.toContain('user-edge')
   })
+  it('changes no chain edge when the backend refuses the removal', async () => {
+    // Chain edges change only after the backend has removed the node
+    // (PRODUCT_DESIGN.md > Storyline chain edges)
+    const store = useStorylinesStore()
+    store.storylines = [{ id: 's1', title: 'Argument', created_at: 0, updated_at: 0 }] as never
+    store.storylineNodes = new Map([['s1', ['a', 'b', 'c']]])
+    edges = [edge('chain-ab', 'a', 'b', 's1'), edge('chain-bc', 'b', 'c', 's1')]
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'remove_node_from_storyline') throw new Error('refused')
+    })
+
+    await expect(store.removeNodeFromStoryline('s1', 'b')).rejects.toThrow('refused')
+
+    expect(deleteEdge).not.toHaveBeenCalled()
+    expect(createEdge).not.toHaveBeenCalled()
+    expect(store.storylineNodes.get('s1')).toEqual(['a', 'b', 'c'])
+  })
 })
