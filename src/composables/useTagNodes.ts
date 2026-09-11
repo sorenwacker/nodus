@@ -21,6 +21,14 @@ export interface TagNodeDeps {
   createEdge: (data: CreateEdgeInput) => Promise<Edge>
 }
 
+/**
+ * The workspace an id names. The unnamed workspace is stored as null and named
+ * "default" by the workspace store, so both spellings are the same workspace.
+ */
+function sameWorkspace(id: string | null | undefined): string | null {
+  return id === 'default' || id === undefined ? null : id
+}
+
 export function useTagNodes(deps: TagNodeDeps) {
   /**
    * Find or create a tag node for a given tag name.
@@ -33,9 +41,18 @@ export function useTagNodes(deps: TagNodeDeps) {
     // tag node and another edge to it.
     const normalizedTag = tagName.replace(/^#/, '').toLowerCase()
     const nodes = deps.getNodes()
+    const nearNode = nearNodeId ? nodes.find(n => n.id === nearNodeId) : undefined
+
+    // A tag node belongs to the workspace of the note it tags: reusing one from
+    // another workspace links workspaces where no view shows the link
+    // (PRODUCT_DESIGN.md > Tag nodes belong to a workspace)
+    const workspaceId = sameWorkspace(nearNode ? nearNode.workspace_id : deps.getCurrentWorkspaceId())
 
     const existingTagNode = nodes.find(
-      n => n.node_type === 'tag' && n.title.replace(/^#/, '').toLowerCase() === normalizedTag
+      n =>
+        n.node_type === 'tag' &&
+        sameWorkspace(n.workspace_id) === workspaceId &&
+        n.title.replace(/^#/, '').toLowerCase() === normalizedTag
     )
     if (existingTagNode) {
       return existingTagNode
@@ -44,13 +61,10 @@ export function useTagNodes(deps: TagNodeDeps) {
     // Calculate position near the first node using this tag
     let x = 100
     let y = 100
-    if (nearNodeId) {
-      const nearNode = nodes.find(n => n.id === nearNodeId)
-      if (nearNode) {
-        // Position to the right of the source node, offset slightly
-        x = nearNode.canvas_x + (nearNode.width || 200) + 80
-        y = nearNode.canvas_y
-      }
+    if (nearNode) {
+      // Position to the right of the source node, offset slightly
+      x = nearNode.canvas_x + (nearNode.width || 200) + 80
+      y = nearNode.canvas_y
     }
 
     // Create tag node with title prefixed with # for display
@@ -61,7 +75,8 @@ export function useTagNodes(deps: TagNodeDeps) {
       canvas_y: y,
       width: 70,
       height: 22,
-      workspace_id: deps.getCurrentWorkspaceId() || undefined,
+      // Explicit, so the store does not fall back to the open workspace
+      workspace_id: workspaceId ?? 'default',
     })
 
     return tagNode
