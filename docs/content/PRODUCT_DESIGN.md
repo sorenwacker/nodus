@@ -944,6 +944,16 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 - The guard is the editor's own state, handed to the watcher as a dependency. The watcher cannot reach into the canvas to ask, and the editor cannot know a file changed.
 - Without it, the handler read the file and pushed it into both the store and the database unconditionally. A stale file - one the database had already moved past - therefore replaced newer text with older, which is exactly how a save appears to come back old.
 
+### Saving from the canvas editor
+
+**Required behavior:** Saving a node from the canvas keeps its frontmatter and ends the edit. The editor shows the body only, so the save is what puts the metadata back.
+
+- The editor splits the frontmatter off when it opens and joins it back onto the body when it saves. The body alone is never written to the store, the database or the file.
+- Every way of leaving the editor goes through one save path: clicking away, **Escape**, and **Cmd/Ctrl+Enter**.
+- Leaving the editor clears the editing guard. The guard stops the watcher from writing a file over an open editor, so a guard left set after the editor closes makes the watcher ignore that node's file for the rest of the session.
+
+Two save functions existed, and the canvas was wired to the one that did neither. Every canvas save dropped the frontmatter from the node and its database copy, and left the guard on the last edited node.
+
 ### Typst Rendering Workflow
 
 1. User types `$E=mc^2$` in a node
@@ -1366,11 +1376,21 @@ A truncated title ends at a whole line. The line clamp bounds how many lines ren
 
 Side padding is narrow at this type size. With 24px each side, a default card left about 150px for text - less than one long word at 28px bold - so words broke mid-character.
 
+### A write the backend refused
+
+**Required behavior:** The canvas shows what is stored. A create, delete or update that the backend refused leaves the canvas as it was, and a notification names the node or edge.
+
+- A failed create adds nothing. A node that was never stored can still be linked and edited, then disappears on the next load and takes those links with it.
+- A failed delete removes nothing, as deleting several nodes already does.
+- The browser build has no backend, so there creates stay local and the interface can be developed without the desktop shell. That exception depends on whether a backend exists, never on whether a call failed.
+
 ### Deleting nodes with files
 
 Deleting a node moves its file to the vault's `.nodus-trash` folder, so the delete can be undone and no text is destroyed.
 
 A node is deleted only once its file is in the trash. Deleting the row while the file stays in the vault leaves the file watcher to read it back, and the node returns - the user deletes something and it reappears. A node with no file has nothing to move and is deleted.
+
+A node whose stored record cannot be read is not deleted. Without the record there is no file path to move, and deleting the row would leave the file for the watcher to read back.
 
 Deleting several nodes therefore deletes those whose files moved and reports the rest by title. The interface removes from the view only what the backend deleted; clearing the view on a failure hid nodes that were still stored, and they came back on the next load.
 
@@ -1384,11 +1404,24 @@ Neither did. Undo removed the snapshot without recording anything to redo, and r
 
 Hidden files and folders are skipped when walking a vault, but the vault folder itself is always visited. A vault whose own name starts with a dot is still a vault, and testing every entry including the root pruned the walk at once, so the vault scanned as empty. The import walk and the file watcher share one rule.
 
+### Refreshing a workspace from its files
+
+**Required behavior:** A refresh brings in what changed on disk and leaves the arrangement on the canvas alone. Where a node sits is the user's decision, and a refresh has no information that should override it.
+
+- A node already inside its folder's frame keeps its position.
+- Only nodes new to a frame are placed, below what the frame already holds. The frame is then fitted to its contents, as described in Fitting a frame to its contents.
+
+Refresh re-ran the import grid for every folder that already had a frame, so each refresh put every node inside a folder frame back into a three-column grid.
+
 ### Storyline chain edges
 
 A storyline's sequence is carried by edges belonging to that storyline. Adding a node links it to its neighbours in the sequence, and removing one reconnects the neighbours it sat between.
 
 Whether such an edge already exists is decided by source, target, **and** storyline. Matching source and target alone let any other edge between the two nodes - a wikilink, a `supports` edge the user drew - stand in for the chain edge, so none was created and the sequence had a gap.
+
+Removing a node from a storyline changes the chain edges only after the backend has removed the node.
+
+The sequence stays numbered from zero without gaps, whatever reorders came before. A removal either completes or changes nothing: closing the gap after a reorder violated the unique order constraint, and because the removal and the renumbering were not one transaction, the node was gone while the call reported failure.
 
 ### Recording an undo step
 
@@ -1606,10 +1639,6 @@ A marker id is derived from a colour by removing everything that is not a letter
 
 A diagram render that arrives while another is in flight is queued with the container it asked for. Replaying the in-flight call's own container rendered that view twice and left the queued caller's diagrams unrendered.
 
-### Reading a single node
-
-Opening a storyline in the reader clears any single node being read. It was cleared only by the reader's close button, so reading one node and then opening a storyline showed that node again instead of the storyline.
-
 ### Depending on what is supplied
 
 A composable moves nodes through the collaborator it was given, not by reaching past it. `pushOverlappingNodes` mutated node objects and called the backend directly, while the same file used its injected `updateNodePosition` two functions away - so coordinate clamping, layout bookkeeping and persistence policy applied to every moved node except a pushed one.
@@ -1717,6 +1746,7 @@ Both editors debounce writes, so a write can still be pending when the node bein
 - A scheduled write records the node it was armed for, along with the title and body to store.
 - Changing the open node flushes the pending write first, then loads the new node.
 - Closing the editor flushes rather than drops.
+- An editor opened for one field, such as a date, a tag or the link picker, belongs to the node it was opened on. Changing the node closes it without writing, so nothing typed for one node is written into another.
 
 Without this, the write compares the new node's stored text against the previous node's buffer, finds no difference to make, and the previous node's last keystrokes are lost with nothing reported.
 
@@ -1757,6 +1787,31 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 - Recently opened workspaces come first, in the order they were last opened, and the rest follow alphabetically. Recency is the only ordering that reflects how the list is actually used, and alphabetical order underneath keeps a workspace findable when it has not been opened before.
 - Each row carries its node count, taken from the nodes already in memory rather than a query, so the list says which workspaces hold work and which are empty.
 
+### Workspace settings
+
+**Required behavior:** The workspace editor offers only what is stored, and stores everything it offers.
+
+- Creating a workspace with a vault stores the vault path. The frontend sent the field in camelCase and the backend read snake_case, so the path was dropped.
+- Restoring a deleted workspace restores its vault path and its sync setting.
+- The description field is removed. No workspace description is stored anywhere, so text typed there was discarded on save.
+- A rename that fails is reported. A new workspace is opened only after it has been created.
+
+### Tag nodes belong to a workspace
+
+A tag node is looked up in the workspace of the node being tagged. Reusing a tag node from another workspace linked nodes across workspaces, where no view shows the link.
+
+### Creating a comment
+
+A comment is created the same way from the storyline panel and from the reader. It carries the type the user chose and the meta header that records it, and it is anchored into the node it comments on. The panel wrote neither and did not anchor, so a question or a todo created there was shown as a plain note.
+
+### Checking outbound URLs
+
+**Required behavior:** A URL that the interface or the agent asks the backend to fetch is checked before any request is made.
+
+- Only `http` and `https` are allowed.
+- Link-local addresses and cloud metadata services are refused however they are written: as an IPv4 literal, an IPv6 literal, an IPv4-mapped IPv6 literal, or a hostname that resolves to one. The check applies to the address the request connects to, so a name that resolves differently on a second lookup cannot pass it.
+- Localhost stays reachable, because local model providers (Ollama, LM Studio) and the Zotero API run there.
+
 ### Workspace scoping for MCP connections
 
 **Required behavior:** A connection scoped to a workspace sees that workspace, consistently. Scoping only the list getters produced a store that contradicted itself: `list_frames` returned the target workspace's frames while `get_frame` on those same ids failed, because it resolved against whichever workspace the user happened to have open.
@@ -1770,6 +1825,7 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 
 - Deleting an undirected wikilink edge removes the wikilink from both nodes' content.
 - Deleting a directed one removes it from the source only, as before.
+- Removing the wikilink is an edit like any other. It is recorded as an undo step and saved through the store, so the node's checksum stays current and the watcher does not read the file back as an outside change.
 
 ### Agent log contents
 
@@ -1810,6 +1866,9 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 
 - Any node can be opened in the reader on its own, showing its text with its anchored nodes expanded, using the same reader the storylines use rather than a second implementation.
 - The single-node reader is reachable from the node itself on the canvas.
+- Storyline operations are unavailable while a single node is being read, because there is no storyline for them to act on. Adding, removing and reordering reached a placeholder storyline built from the node, and the refetch that followed replaced the node with the storyline read before it.
+- The scroll position of a single node is not remembered under a storyline. It was saved under the storyline read before it.
+- Opening a storyline in the reader clears any single node being read. It was cleared only by the reader's close button, so reading one node and then opening a storyline showed that node again instead of the storyline.
 
 ### Layout of a selection
 
