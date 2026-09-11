@@ -25,6 +25,16 @@ const FILESYSTEM_OPS: &[&str] = &[
     ".is_dir()",
 ];
 
+/// Database writes that record a path. A command that stores a caller-supplied
+/// path hands it unchecked to every later command that trusts the stored value
+/// (PRODUCT_DESIGN.md > Validating caller-supplied paths).
+const PATH_STORING_OPS: &[&str] = &[
+    "::update_file_path(",
+    "::update_file_path_only(",
+    "::update_vault_path(",
+    "::update_folder_path(",
+];
+
 const VALIDATORS: &[&str] = &[
     "validate_path_in_workspace",
     "validate_target_dir_in_workspace",
@@ -41,10 +51,13 @@ const PATH_CARRYING_STRUCTS: &[&str] = &["Node", "ImportOntologyInput"];
 /// Commands exempt from the rule, each with the reason.
 ///
 /// The vault path is the thing being chosen here: validating it against the
-/// vault list it is about to define is circular. All four are reachable only
-/// from a folder dialog.
+/// vault list it is about to define is circular.
 const EXEMPT: &[(&str, &str)] = &[
     ("watch_vault", "registers the vault folder the user picked"),
+    (
+        "set_workspace_vault_path",
+        "records the vault folder the user chose for a workspace, which defines the vault list itself",
+    ),
     ("import_vault", "imports the vault folder the user picked"),
     (
         "sync_missing_files",
@@ -229,9 +242,10 @@ fn every_caller_supplied_path_is_validated_before_use() {
             checked += 1;
 
             let touches_filesystem = FILESYSTEM_OPS.iter().any(|op| command.body.contains(op));
+            let stores_path = PATH_STORING_OPS.iter().any(|op| command.body.contains(op));
             let validates = VALIDATORS.iter().any(|v| command.body.contains(v));
 
-            if touches_filesystem && !validates {
+            if (touches_filesystem || stores_path) && !validates {
                 offenders.push(format!("{}::{}", path.display(), command.name));
             }
         }
@@ -243,8 +257,8 @@ fn every_caller_supplied_path_is_validated_before_use() {
     );
     assert!(
         offenders.is_empty(),
-        "These commands act on a caller-supplied path without checking it against \
-         the workspace vaults. Call validate_path_in_workspace (existing path) or \
+        "These commands act on or store a caller-supplied path without checking it \
+         against the workspace vaults. Call validate_path_in_workspace (existing path) or \
          validate_target_dir_in_workspace (directory that may not exist yet):\n  {}",
         offenders.join("\n  ")
     );

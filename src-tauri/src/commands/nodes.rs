@@ -525,6 +525,12 @@ pub async fn update_node_file_path(id: String, file_path: Option<String>) -> Res
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     // Treat empty string as None (clear file_path)
     let file_path = file_path.filter(|p| !p.is_empty());
+    // Every later file operation on this node trusts the stored path, so it
+    // must lie in a workspace vault. Clearing the path stores nothing to check
+    // (PRODUCT_DESIGN.md > Validating caller-supplied paths)
+    if let Some(path) = &file_path {
+        super::validate_path_in_workspace(std::path::Path::new(path)).await?;
+    }
     database::nodes::update_file_path_only(pool, &id, file_path.as_deref())
         .await
         .map_err(|e| e.to_string())
