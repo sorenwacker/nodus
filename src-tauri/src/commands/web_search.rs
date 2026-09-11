@@ -106,7 +106,7 @@ pub async fn web_search(
 pub async fn fetch_url(url: String, use_reader: Option<bool>) -> Result<String, String> {
     super::http::validate_outbound_url(&url)?;
 
-    let client = reqwest::Client::builder()
+    let client = super::http::guarded_client_builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;

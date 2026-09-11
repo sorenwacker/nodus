@@ -23,9 +23,11 @@ pub struct HttpResponse {
 
 /// Validate a URL before making an outbound request on behalf of the webview.
 /// Only http/https are allowed, and link-local addresses (notably cloud
-/// metadata services like 169.254.169.254) are blocked. Localhost stays
-/// reachable because local LLM providers (Ollama, LM Studio) and the Zotero
-/// API run there.
+/// metadata services like 169.254.169.254) are blocked however they are
+/// written. Localhost stays reachable because local LLM providers (Ollama,
+/// LM Studio) and the Zotero API run there. A host given by name is checked
+/// by `GuardedResolver` when the client connects, and every redirect is
+/// checked again (PRODUCT_DESIGN.md > Checking outbound URLs).
 pub(crate) fn validate_outbound_url(url: &str) -> Result<(), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
     match parsed.scheme() {
@@ -37,21 +39,81 @@ pub(crate) fn validate_outbound_url(url: &str) -> Result<(), String> {
         .ok_or_else(|| "URL must have a host".to_string())?;
     let bare_host = host.trim_start_matches('[').trim_end_matches(']');
     if let Ok(ip) = bare_host.parse::<std::net::IpAddr>() {
-        let blocked = match ip {
-            std::net::IpAddr::V4(v4) => {
-                v4.is_link_local() || v4.is_unspecified() || v4.is_broadcast()
-            }
-            std::net::IpAddr::V6(v6) => {
-                v6.is_unspecified() || (v6.segments()[0] & 0xffc0) == 0xfe80
-            }
-        };
-        if blocked {
+        if is_blocked_ip(ip) {
             return Err("Access to link-local addresses is not allowed".to_string());
         }
     } else if bare_host.eq_ignore_ascii_case("metadata.google.internal") {
         return Err("Access to cloud metadata services is not allowed".to_string());
     }
     Ok(())
+}
+
+/// Whether an outbound request may not connect to `ip`: link-local (cloud
+/// metadata services live there), unspecified or broadcast. An IPv4 address
+/// carried inside IPv6 is the same address and gets the same answer.
+fn is_blocked_ip(ip: std::net::IpAddr) -> bool {
+    let blocked_v4 =
+        |v4: std::net::Ipv4Addr| v4.is_link_local() || v4.is_unspecified() || v4.is_broadcast();
+    match ip {
+        std::net::IpAddr::V4(v4) => blocked_v4(v4),
+        std::net::IpAddr::V6(v6) => {
+            v6.is_unspecified()
+                || (v6.segments()[0] & 0xffc0) == 0xfe80
+                || v6.to_ipv4().is_some_and(blocked_v4)
+        }
+    }
+}
+
+/// The addresses a lookup returned that a request may connect to. A name that
+/// resolves only to blocked addresses is refused.
+fn allowed_addrs(
+    addrs: impl IntoIterator<Item = std::net::SocketAddr>,
+) -> Result<Vec<std::net::SocketAddr>, String> {
+    let allowed: Vec<_> = addrs
+        .into_iter()
+        .filter(|a| !is_blocked_ip(a.ip()))
+        .collect();
+    if allowed.is_empty() {
+        return Err("Access to link-local addresses is not allowed".to_string());
+    }
+    Ok(allowed)
+}
+
+/// Resolves a host when the client connects and drops blocked addresses, so a
+/// name is judged by the address the request actually reaches.
+struct GuardedResolver;
+
+impl reqwest::dns::Resolve for GuardedResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            // Port 0: the client substitutes the URL's port
+            let addrs = tokio::net::lookup_host((host.as_str(), 0)).await?;
+            let allowed = allowed_addrs(addrs)?;
+            let addrs: reqwest::dns::Addrs = Box::new(allowed.into_iter());
+            Ok(addrs)
+        })
+    }
+}
+
+/// Follows a redirect only to a URL that would pass the first check.
+fn guarded_redirects() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() >= 10 {
+            return attempt.error("too many redirects");
+        }
+        match validate_outbound_url(attempt.url().as_str()) {
+            Ok(()) => attempt.follow(),
+            Err(e) => attempt.error(e),
+        }
+    })
+}
+
+/// A client for requests to URLs the webview supplies.
+pub(crate) fn guarded_client_builder() -> reqwest::ClientBuilder {
+    reqwest::Client::builder()
+        .dns_resolver(std::sync::Arc::new(GuardedResolver))
+        .redirect(guarded_redirects())
 }
 
 /// Describe a failed request in terms the user can act on.
@@ -95,7 +157,9 @@ fn describe_request_error(err: &reqwest::Error, timeout: std::time::Duration) ->
 #[tauri::command]
 pub async fn http_request(input: HttpRequestInput) -> Result<HttpResponse, String> {
     validate_outbound_url(&input.url)?;
-    let client = reqwest::Client::new();
+    let client = guarded_client_builder()
+        .build()
+        .map_err(|e| e.to_string())?;
 
     let timeout = std::time::Duration::from_millis(input.timeout_ms.unwrap_or(60000));
 
@@ -142,7 +206,9 @@ pub async fn http_stream_request(
     use futures_util::StreamExt;
 
     validate_outbound_url(&input.url)?;
-    let client = reqwest::Client::new();
+    let client = guarded_client_builder()
+        .build()
+        .map_err(|e| e.to_string())?;
     let timeout = std::time::Duration::from_millis(input.timeout_ms.unwrap_or(60000));
 
     let mut request = match input.method.to_uppercase().as_str() {
@@ -203,6 +269,68 @@ mod tests {
             validate_outbound_url("http://metadata.google.internal/computeMetadata/v1/").is_err()
         );
         assert!(validate_outbound_url("http://0.0.0.0/").is_err());
+    }
+
+    /// The metadata address written as an IPv4-mapped IPv6 literal is the same
+    /// address, and must be refused as such (PRODUCT_DESIGN.md > Checking
+    /// outbound URLs).
+    #[test]
+    fn blocks_ipv4_mapped_ipv6_literals() {
+        assert!(
+            validate_outbound_url("http://[::ffff:169.254.169.254]/latest/meta-data/").is_err()
+        );
+        assert!(validate_outbound_url("http://[::ffff:a9fe:a9fe]/").is_err());
+        assert!(validate_outbound_url("http://[::ffff:0.0.0.0]/").is_err());
+    }
+
+    /// A name is checked by the addresses it resolves to when the client
+    /// connects, so a lookup that answers differently the second time cannot
+    /// pass a check made the first time.
+    #[test]
+    fn drops_link_local_addresses_a_name_resolves_to() {
+        use std::net::SocketAddr;
+        let metadata: SocketAddr = "169.254.169.254:80".parse().unwrap();
+        let mapped: SocketAddr = "[::ffff:169.254.169.254]:80".parse().unwrap();
+        let loopback: SocketAddr = "127.0.0.1:11434".parse().unwrap();
+
+        assert!(super::allowed_addrs(vec![metadata, mapped]).is_err());
+        assert_eq!(
+            super::allowed_addrs(vec![metadata, loopback, mapped]).unwrap(),
+            vec![loopback]
+        );
+    }
+
+    /// A redirect is a request to another address, so it is checked like the
+    /// first one rather than followed to wherever it points.
+    #[tokio::test]
+    async fn refuses_a_redirect_to_a_link_local_address() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut request = [0u8; 1024];
+                let _ = stream.read(&mut request);
+                let _ = stream.write_all(
+                    b"HTTP/1.1 302 Found\r\nLocation: http://169.254.169.254/latest/meta-data/\r\nContent-Length: 0\r\n\r\n",
+                );
+            }
+        });
+
+        let result = super::http_request(super::HttpRequestInput {
+            url: format!("http://{}/redirect", addr),
+            method: "GET".to_string(),
+            headers: std::collections::HashMap::new(),
+            body: None,
+            timeout_ms: Some(2000),
+        })
+        .await;
+
+        let message = result.unwrap_err();
+        assert!(
+            message.contains("not allowed"),
+            "expected the redirect to be refused, got: {message}"
+        );
     }
 
     #[tokio::test]
