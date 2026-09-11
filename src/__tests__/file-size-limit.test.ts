@@ -22,7 +22,7 @@ const OVER_LIMIT: Record<string, number> = {
   'src/canvas/GraphCanvas.vue': 2481,
   'src/App.vue': 1267,
   'src/lib/templates.ts': 1246,
-  'src/components/StorylineReader.vue': 1214,
+  'src/components/StorylineReader.vue': 1197,
   'src/__tests__/layoutFrameIntegration.test.ts': 1205,
   'src/__tests__/frameCollision.test.ts': 1201,
   // Recorded when the gate was extended to the MCP server package

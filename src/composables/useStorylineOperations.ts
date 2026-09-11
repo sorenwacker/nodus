@@ -6,6 +6,9 @@
  */
 import type { StorylineService } from '../services/storylineService'
 import type { useNodesStore } from '../stores/nodes'
+import type { Node, CommentType } from '../types'
+import { createCommentContent } from './useCommentMeta'
+import { commentAnchorTitle, anchorCommentInText } from '../lib/anchoredNodes'
 
 type NodesStore = ReturnType<typeof useNodesStore>
 
@@ -14,11 +17,50 @@ export interface StorylineOperationsOptions {
   storylineService: StorylineService | undefined
   /** Ref or computed holding the storyline the operations apply to */
   selectedStorylineId: { readonly value: string | null }
+  /** The storyline's nodes in order; a new comment is anchored in one of them */
+  storylineNodes: () => Node[]
   showToast?: (message: string, type: 'error' | 'success' | 'info') => void
 }
 
+/** What creating a storyline comment needs */
+export interface StorylineCommentInput {
+  store: Pick<NodesStore, 'nodes' | 'createNode' | 'updateNodeContent'>
+  /** The storyline's nodes in order */
+  storylineNodes: Node[]
+  /** Where the comment goes; it is anchored in the node before this position */
+  index: number
+  text: string
+  commentType: CommentType
+  /** Add the created comment to the storyline at `index` */
+  addToStoryline: (nodeId: string, index: number) => Promise<void>
+}
+
+/**
+ * Create a comment in a storyline. Its type is recorded in the meta header,
+ * and a wikilink in the passage it comments on anchors it there
+ * (PRODUCT_DESIGN.md > Creating a comment). The storyline panel and the reader
+ * both create comments here, so the two cannot drift apart again.
+ */
+export async function createStorylineComment(input: StorylineCommentInput): Promise<Node> {
+  const { store, storylineNodes, index, text, commentType, addToStoryline } = input
+  const title = commentAnchorTitle(text, store.nodes.map(n => n.title))
+  const node = await store.createNode({
+    title,
+    node_type: 'comment',
+    markdown_content: createCommentContent(text, commentType),
+    canvas_x: 0,
+    canvas_y: 0,
+  })
+  const anchor = storylineNodes[index - 1] ?? storylineNodes[index] ?? storylineNodes[0]
+  if (anchor) {
+    await store.updateNodeContent(anchor.id, anchorCommentInText(anchor.markdown_content || '', title))
+  }
+  await addToStoryline(node.id, index)
+  return node
+}
+
 export function useStorylineOperations(options: StorylineOperationsOptions) {
-  const { store, storylineService, selectedStorylineId, showToast } = options
+  const { store, storylineService, selectedStorylineId, storylineNodes, showToast } = options
 
   async function handleNodeAdd(index: number, nodeId: string) {
     if (!selectedStorylineId.value) return
@@ -57,22 +99,21 @@ export function useStorylineOperations(options: StorylineOperationsOptions) {
     }
   }
 
-  async function handleCommentCreate(index: number, text: string) {
-    if (!selectedStorylineId.value) return
+  async function handleCommentCreate(index: number, text: string, commentType: CommentType = 'note') {
+    const storylineId = selectedStorylineId.value
+    if (!storylineId) return
     try {
-      // Provide default canvas position for storyline-created comments
-      const node = await store.createNode({
-        title: 'Comment',
-        node_type: 'comment',
-        markdown_content: text,
-        canvas_x: 0,
-        canvas_y: 0,
+      await createStorylineComment({
+        store,
+        storylineNodes: storylineNodes(),
+        index,
+        text,
+        commentType,
+        addToStoryline: (nodeId, at) =>
+          storylineService
+            ? storylineService.addNode(storylineId, nodeId, at)
+            : store.addNodeToStoryline(storylineId, nodeId, at),
       })
-      if (storylineService) {
-        await storylineService.addNode(selectedStorylineId.value, node.id, index)
-      } else {
-        await store.addNodeToStoryline(selectedStorylineId.value, node.id, index)
-      }
       showToast?.('Added comment', 'success')
     } catch (e) {
       console.error('Failed to create comment:', e)

@@ -45,6 +45,7 @@ const {
   store,
   storylineService,
   selectedStorylineId: computed(() => props.storyline.id),
+  storylineNodes: () => props.nodes,
   showToast,
 })
 

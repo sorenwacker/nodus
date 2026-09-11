@@ -19,8 +19,7 @@ import { useStorylineNavigation } from '../composables/useStorylineNavigation'
 import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdownRendering'
 import { useScrollPositionMemory } from '../composables/useScrollPositionMemory'
 import { useScrollObserver } from '../composables/useScrollObserver'
-import { createCommentContent } from '../composables/useCommentMeta'
-import { commentAnchorTitle, anchorCommentInText } from '../lib/anchoredNodes'
+import { createStorylineComment } from '../composables/useStorylineOperations'
 import { useStorylineReaderContent } from '../composables/useStorylineReaderContent'
 import { useStorylineReaderComments } from '../composables/useStorylineReaderComments'
 import { useStorylineReaderEntities } from '../composables/useStorylineReaderEntities'
@@ -319,27 +318,11 @@ async function handleNodeCreate(index: number, title: string) {
 async function handleCommentCreate(index: number, text: string, commentType: CommentType = 'note') {
   if (!storyline.value || !storylineService) return
   try {
-    const content = createCommentContent(text, commentType)
-    // The comment is anchored by a wikilink in the text it comments on, so it
-    // stays with that passage (PRODUCT_DESIGN.md > Anchored nodes)
-    const title = commentAnchorTitle(text, store.nodes.map(n => n.title))
-    const node = await store.createNode({
-      title,
-      node_type: 'comment',
-      markdown_content: content,
-      canvas_x: 0,
-      canvas_y: 0,
+    const [service, storylineId] = [storylineService, storyline.value.id]
+    const node = await createStorylineComment({
+      store, storylineNodes: nodes.value, index, text, commentType,
+      addToStoryline: (nodeId, at) => service.addNode(storylineId, nodeId, at),
     })
-
-    const anchorNode = nodes.value[index - 1] ?? nodes.value[index] ?? nodes.value[0]
-    if (anchorNode) {
-      await store.updateNodeContent(
-        anchorNode.id,
-        anchorCommentInText(anchorNode.markdown_content || '', title)
-      )
-    }
-
-    await storylineService.addNode(storyline.value.id, node.id, index)
     nodes.value = await store.getStorylineNodes(props.storylineId)
     renderNodeContent(node)
     await nextTick()
