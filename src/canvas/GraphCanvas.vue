@@ -493,6 +493,7 @@ function getVisualNode(nodeId: string) {
 // Node navigation composable
 const nodeNavigation = useNodeNavigation({
   getFilteredNodes: () => store.filteredNodes,
+  getFrames: () => store.filteredFrames,
   getNode: store.getNode,
   getVisualNode,
   selectNode: id => store.selectNode(id),

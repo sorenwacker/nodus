@@ -1,5 +1,7 @@
 import { type Ref } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
+import { resolveWikilink } from '../../../lib/wikilink'
+import type { Node, Frame } from '../../../types'
 
 export interface NodeLike {
   id: string
@@ -11,7 +13,9 @@ export interface NodeLike {
 }
 
 export interface NodeNavigationDeps {
-  getFilteredNodes: () => Array<{ id: string; title: string; canvas_x: number; canvas_y: number; width?: number; height?: number }>
+  getFilteredNodes: () => Node[]
+  /** Frames, so a link naming a folder resolves inside it */
+  getFrames?: () => Frame[]
   getNode: (id: string) => { id: string; canvas_x: number; canvas_y: number; width?: number; height?: number } | undefined
   getVisualNode: (id: string) => { id: string; canvas_x: number; canvas_y: number; width?: number; height?: number } | undefined
   selectNode: (id: string) => void
@@ -35,28 +39,21 @@ export function useNodeNavigation(deps: NodeNavigationDeps) {
     const nodes = deps.getFilteredNodes()
     const titleLower = title.toLowerCase()
 
-    // Try exact title match first
-    let targetNode = nodes.find(n => n.title.toLowerCase() === titleLower)
+    // The resolver the link rendering uses, so a link leads to the same note
+    // wherever it is followed (PRODUCT_DESIGN.md > Syncing wikilink edges)
+    let targetNode: NodeLike | undefined = resolveWikilink(title, {
+      nodes,
+      frames: deps.getFrames?.() ?? [],
+    })
 
-    // Fallback: extract filename from path and try matching
-    if (!targetNode && title.includes('/')) {
-      // wikilink-target: uses '/' on every platform
-      const filename = title.split('/').pop()?.toLowerCase()
-      if (filename) {
-        targetNode = nodes.find(n => n.title.toLowerCase() === filename)
-      }
-    }
-
-    // Fallback: try partial match (filename anywhere in nodes)
+    // A title written with hyphens for a note whose title has spaces: the
+    // resolver matches titles exactly, and this spelling is common in links
     if (!targetNode) {
-      const searchTerm = title.includes('/')
-        // wikilink-target: uses '/' on every platform
-        ? title.split('/').pop()?.toLowerCase()
-        : titleLower
+      // wikilink-target: uses '/' on every platform
+      const searchTerm = title.includes('/') ? title.split('/').pop()?.toLowerCase() : titleLower
       if (searchTerm) {
-        targetNode = nodes.find(n =>
-          n.title.toLowerCase() === searchTerm ||
-          n.title.toLowerCase().replace(/-/g, ' ') === searchTerm.replace(/-/g, ' ')
+        targetNode = nodes.find(
+          n => n.title.toLowerCase().replace(/-/g, ' ') === searchTerm.replace(/-/g, ' ')
         )
       }
     }
