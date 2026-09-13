@@ -10,6 +10,7 @@
  * change to a node the user never named
  * (PRODUCT_DESIGN.md > What the agent acts on).
  */
+import { applyForceLayout } from '../../layout'
 import type { ToolContext } from '../../../llm/registry'
 import type { useNodesStore } from '../../../stores/nodes'
 
@@ -64,6 +65,8 @@ export function buildAgentToolContext(deps: AgentToolContextDeps): ToolContext {
     pushContentUndo: deps.pushContentUndo,
     pushContentsUndo: deps.pushContentsUndo,
     service: deps.service,
+    // The canvas owns its layout and supplies it; the tool does not reach for it
+    applyForceLayout,
     selectedNodeIds: deps.getRunSelection() ?? store.selectedNodeIds,
     editingNodeId: deps.getEditingNodeId(),
   }

@@ -5,7 +5,7 @@
  * significantly reducing latency for large graphs.
  */
 
-import type { LLMQueueInterface } from '../canvas/composables/agent/useLLMTools'
+import type { LLMQueueInterface } from './types'
 
 export interface ClassificationResult {
   nodeId: string

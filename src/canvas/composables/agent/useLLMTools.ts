@@ -24,9 +24,10 @@ import type { INodeStore } from '../../../llm/registry'
 /**
  * LLM Queue interface (subset of llmQueue)
  */
-export interface LLMQueueInterface {
-  generate: (prompt: string, system?: string, priority?: number) => Promise<string>
-}
+import type { LLMQueueInterface } from '../../../llm/types'
+
+// Re-exported for the composables that already import it from here
+export type { LLMQueueInterface }
 
 /**
  * Edge interface for LLM tools

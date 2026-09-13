@@ -22,6 +22,16 @@ export interface AgentTool {
 // Alias for use in composables
 export type ToolDefinition = AgentTool
 
+/**
+ * The one method the classifier and the tools need of the queue.
+ *
+ * Defined here, in the shared layer: it lived in a canvas composable and was
+ * imported back into the library, so library code depended on a consumer.
+ */
+export interface LLMQueueInterface {
+  generate: (prompt: string, system?: string, priority?: number) => Promise<string>
+}
+
 export interface AgentTask {
   id: string
   description: string
