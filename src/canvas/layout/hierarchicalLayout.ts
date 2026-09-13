@@ -45,8 +45,9 @@ export function applyHierarchicalLayout(
 ): Map<string, { x: number; y: number }> {
   const {
     direction = 'TB',
-    nodeSpacingX = 150,
-    nodeSpacingY = 240,
+    // Tight but non-overlapping (PRODUCT_DESIGN.md > Hierarchical layout spacing)
+    nodeSpacingX = 24,
+    nodeSpacingY = 60,
     centerX: optionCenterX,
     centerY: optionCenterY,
     align,

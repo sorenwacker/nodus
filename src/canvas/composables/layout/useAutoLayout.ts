@@ -271,8 +271,6 @@ export async function executeAutoLayout(
         setTimeout(() => {
           const result = applyHierarchicalLayout(layoutNodes, layoutEdges, {
             direction: 'TB',
-            nodeSpacingX: 150,
-            nodeSpacingY: 360,
             centerX,
             centerY,
             ranker,

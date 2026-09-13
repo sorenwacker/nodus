@@ -1881,6 +1881,15 @@ A comment is created the same way from the storyline panel and from the reader. 
 
 A selected node inside a frame keeps the position the layout computed for it. Frames otherwise move as rigid units, carrying their members by the offsets captured before the layout ran - and that rigid move used to overwrite the computed positions too, so a selected framed node was put back exactly where it started. Grid and vertical layouts used the computed targets directly and did move it, so the two disagreed about the same action.
 
+### Hierarchical layout spacing
+
+**Required behavior:** A hierarchical layout places nodes as close together as they can go without overlapping. Nodes in the same rank are 24 px apart, the gap the grid layout packs with, and consecutive ranks are 60 px apart, which keeps the edges between them visible.
+
+- Gaps are measured between card borders. The layout sizes each node by its stored width and height (default 200 x 120), which is the size the card renders at, so no gap is needed to absorb a size mismatch.
+- The spacing is defined once, in the layout module. The canvas layout command does not pass values of its own.
+
+The gaps were 150 px within a rank and 360 px between ranks, three times the height of a default card between consecutive rows. The canvas command also passed its own values over the module's defaults, so the layout had two spacings and the one in effect was not the one the module declared.
+
 ### Edge handles
 
 **Required behavior:** An edge that is live along its whole length fires during ordinary mouse travel. In a window that does not fill the screen the pointer crosses a border constantly - reaching for another application, the dock, the desktop - and every crossing opened a panel the user did not ask for. The gesture has to be aimed to count.
