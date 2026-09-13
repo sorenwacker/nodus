@@ -20,7 +20,12 @@ export function relativeFolder(filePath: string, vaultPath: string | null): stri
   const normalizedFile = filePath.replace(/\\/g, '/')
   const normalizedVault = vaultPath.replace(/\\/g, '/').replace(/\/$/, '')
 
-  if (!normalizedFile.startsWith(normalizedVault)) return ''
+  // Inside the vault means the vault itself or a path below it. A plain prefix
+  // also matches a sibling whose name begins with the vault's name, such as
+  // `notes-archive` next to `notes` (PRODUCT_DESIGN.md > Walking a vault)
+  if (normalizedFile !== normalizedVault && !normalizedFile.startsWith(`${normalizedVault}/`)) {
+    return ''
+  }
 
   const relativePath = normalizedFile.slice(normalizedVault.length + 1)
   const lastSlash = relativePath.lastIndexOf('/')
