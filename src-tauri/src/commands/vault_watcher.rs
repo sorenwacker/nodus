@@ -390,9 +390,6 @@ pub(crate) async fn import_vault_impl(
     // Key: relative folder path, Value: (frame_id, frame_x, frame_y)
     let mut folder_frames: std::collections::HashMap<String, (String, f64, f64)> =
         std::collections::HashMap::new();
-    // Track folder file counts separately
-    let mut folder_file_counts: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
 
     // First pass: collect all files and create frames for folders
     let now = chrono::Utc::now().timestamp_millis();
@@ -401,11 +398,6 @@ pub(crate) async fn import_vault_impl(
         .into_iter()
         .map(|f| (f.path, f.folder))
         .collect();
-
-    // Store folder file counts
-    for (folder, count) in &folder_counts {
-        folder_file_counts.insert(folder.clone(), *count);
-    }
 
     // Create frames for non-root folders with multiple files
     let mut frame_count = 0;
