@@ -107,75 +107,46 @@ export const colorMatchingHandler: ToolHandler = async (
   let colored = 0
   const matchedTitles: string[] = []
 
-  // Detect if this is a literal text pattern vs semantic criterion
-  const isLiteralPattern =
-    criterion.includes('...') ||
-    criterion.includes('"') ||
-    criterion.includes("'") ||
-    /^[A-Z][a-z]/.test(criterion) ||
-    / of\b/.test(criterion) ||
-    / and\b/.test(criterion)
+  // The criterion is judged by the model, whatever its wording. A hidden test
+  // for an ellipsis, a quote, a leading capital or the words "of" and "and"
+  // sent some criteria down a substring path instead, so two similar requests
+  // were answered by different machinery for reasons no user could see. Text
+  // matching has its own tool, color_regex, which this tool's description
+  // points at (PRODUCT_DESIGN.md > Classifying what the user wrote).
+  ctx.log(`> color_matching: semantic evaluation of ${nodes.length} nodes for "${criterion}"`)
 
-  if (isLiteralPattern) {
-    // Simple text matching
-    const searchText = criterion
-      .replace(/\.{2,}/g, '')
-      .replace(/['"]/g, '')
-      .trim()
-      .toLowerCase()
-    ctx.log(`> color_matching: text search for "${searchText}" in ${nodes.length} nodes`)
+  for (const node of nodes) {
+    if (ctx.isCancelled()) {
+      ctx.log(`> Stopped after ${colored} nodes`)
+      return `Stopped. Colored ${colored}/${nodes.length} nodes.`
+    }
 
-    for (const node of nodes) {
-      if (ctx.isCancelled()) {
-        ctx.log(`> Stopped after ${colored} nodes`)
-        return `Stopped. Colored ${colored}/${nodes.length} nodes.`
-      }
-
-      if (node.title.toLowerCase().includes(searchText)) {
+    try {
+      // An explicit tag is an explicit answer, and costs no model call
+      const content = node.markdown_content || ''
+      const tagPattern = `#${criterion.replace(/^#/, '').toLowerCase()}`
+      if (content.toLowerCase().includes(tagPattern)) {
         await ctx.store.updateNodeColor(node.id, color)
         matchedTitles.push(node.title)
         colored++
-        ctx.log(`> ${node.title} -> match`)
-      }
-    }
-  } else {
-    // Semantic evaluation
-    ctx.log(`> color_matching: semantic evaluation of ${nodes.length} nodes for "${criterion}"`)
-
-    for (const node of nodes) {
-      if (ctx.isCancelled()) {
-        ctx.log(`> Stopped after ${colored} nodes`)
-        return `Stopped. Colored ${colored}/${nodes.length} nodes.`
+        ctx.log(`> ${node.title} -> tag`)
+        continue
       }
 
-      try {
-        // Check for explicit tag match first
-        const content = node.markdown_content || ''
-        const tagPattern = `#${criterion.replace(/^#/, '').toLowerCase()}`
-        if (content.toLowerCase().includes(tagPattern)) {
-          await ctx.store.updateNodeColor(node.id, color)
-          matchedTitles.push(node.title)
-          colored++
-          ctx.log(`> ${node.title} -> tag`)
-          continue
-        }
+      const prompt = `Is "${node.title}" a ${criterion}? Answer only YES or NO.`
+      const response = await ctx.llmQueue.generate(prompt)
+      const answer = (response || '').toUpperCase().trim()
 
-        // Semantic evaluation via LLM
-        const prompt = `Is "${node.title}" a ${criterion}? Answer only YES or NO.`
-        const response = await ctx.llmQueue.generate(prompt)
-        const answer = (response || '').toUpperCase().trim()
-
-        if (answer === 'YES' || answer.startsWith('YES')) {
-          await ctx.store.updateNodeColor(node.id, color)
-          matchedTitles.push(node.title)
-          colored++
-          ctx.log(`> ${node.title} -> YES`)
-        } else {
-          ctx.log(`> ${node.title} -> NO`)
-        }
-      } catch (e) {
-        ctx.log(`> ${node.title}: failed - ${e}`)
+      if (answer === 'YES' || answer.startsWith('YES')) {
+        await ctx.store.updateNodeColor(node.id, color)
+        matchedTitles.push(node.title)
+        colored++
+        ctx.log(`> ${node.title} -> YES`)
+      } else {
+        ctx.log(`> ${node.title} -> NO`)
       }
+    } catch (e) {
+      ctx.log(`> ${node.title}: failed - ${e}`)
     }
   }
 

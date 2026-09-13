@@ -92,58 +92,40 @@ function createMockContext(mockLLMResponse?: (prompt: string) => string): LLMToo
 }
 
 describe('color_matching tool', () => {
-  describe('literal pattern detection', () => {
-    it('should detect "Faculty of..." as literal pattern', async () => {
-      const ctx = createMockContext()
+  describe('what decides how a criterion is judged', () => {
+    // The tool's own schema says it colours by SEMANTIC criterion and sends
+    // text patterns to color_regex. It also guessed: a criterion containing an
+    // ellipsis, a quote, the word "of" or a leading capital took a hidden
+    // substring path, so "Papers of Hinton" and "papers about learning" were
+    // answered by different machinery for reasons no user could see
+    // (PRODUCT_DESIGN.md > Classifying what the user wrote).
+    it('asks the model, whatever the wording of the criterion', async () => {
+      const ctx = createMockContext(() => 'NO')
       const { executeLLMTool } = useLLMTools(ctx)
 
       await executeLLMTool('color_matching', { pattern: 'Faculty of...', color: '#ef4444' })
 
-      // Should match: Faculty of Science, Faculty of Engineering, Faculty of Arts
-      expect(colorUpdates.size).toBe(3)
-      expect(colorUpdates.has('1')).toBe(true) // Faculty of Science
-      expect(colorUpdates.has('2')).toBe(true) // Faculty of Engineering
-      expect(colorUpdates.has('7')).toBe(true) // Faculty of Arts
-
-      // Should NOT match people or departments
-      expect(colorUpdates.has('4')).toBe(false) // John Smith
-      expect(colorUpdates.has('3')).toBe(false) // Department of Physics
+      expect(ctx.llmQueue.generate, 'the wording chose the path').toHaveBeenCalled()
     })
 
-    it('should detect "Department of" as literal pattern', async () => {
-      const ctx = createMockContext()
+    it('colours what the model accepts', async () => {
+      const ctx = createMockContext(prompt => (prompt.includes('Faculty of') ? 'YES' : 'NO'))
       const { executeLLMTool } = useLLMTools(ctx)
 
-      await executeLLMTool('color_matching', { pattern: 'Department of', color: '#3b82f6' })
+      await executeLLMTool('color_matching', { pattern: 'faculty', color: '#ef4444' })
 
-      // Should match: Department of Physics, Department of Chemistry
-      expect(colorUpdates.size).toBe(2)
-      expect(colorUpdates.has('3')).toBe(true)
-      expect(colorUpdates.has('9')).toBe(true)
-
-      // Should NOT match faculties or people
-      expect(colorUpdates.has('1')).toBe(false)
+      expect(colorUpdates.has('1')).toBe(true)
       expect(colorUpdates.has('4')).toBe(false)
     })
 
-    it('should handle quoted patterns as literal', async () => {
+    it('leaves text matching to color_regex, which needs no model', async () => {
       const ctx = createMockContext()
       const { executeLLMTool } = useLLMTools(ctx)
 
-      await executeLLMTool('color_matching', { pattern: '"Faculty"', color: '#ef4444' })
+      await executeLLMTool('color_regex', { regex: '^Faculty of', color: '#ef4444' })
 
-      // Should match anything with "Faculty" in title
       expect(colorUpdates.size).toBe(3)
-    })
-
-    it('should be case-insensitive for literal patterns', async () => {
-      const ctx = createMockContext()
-      const { executeLLMTool } = useLLMTools(ctx)
-
-      await executeLLMTool('color_matching', { pattern: 'faculty of', color: '#ef4444' })
-
-      // Should still match Faculty of... nodes
-      expect(colorUpdates.size).toBe(3)
+      expect(ctx.llmQueue.generate).not.toHaveBeenCalled()
     })
   })
 
@@ -198,20 +180,11 @@ describe('color_matching tool', () => {
       expect(ctx.llmQueue.generate).toHaveBeenCalled()
     })
 
-    it('should NOT call LLM for literal patterns', async () => {
-      const ctx = createMockContext()
-      const { executeLLMTool } = useLLMTools(ctx)
-
-      await executeLLMTool('color_matching', { pattern: 'Faculty of...', color: '#ef4444' })
-
-      // Should NOT have called LLM - literal pattern uses text search
-      expect(ctx.llmQueue.generate).not.toHaveBeenCalled()
-    })
   })
 
   describe('cancellation', () => {
     it('should stop when isRunning becomes false', async () => {
-      const ctx = createMockContext()
+      const ctx = createMockContext(() => 'YES')
       const isRunning = ctx.isRunning!
 
       // Set up to cancel after first node
@@ -224,7 +197,7 @@ describe('color_matching tool', () => {
       })
 
       const { executeLLMTool } = useLLMTools(ctx)
-      const result = await executeLLMTool('color_matching', { pattern: 'Faculty of...', color: '#ef4444' })
+      const result = await executeLLMTool('color_matching', { pattern: 'faculty', color: '#ef4444' })
 
       // Should have stopped early
       expect(result).toContain('Stopped')
