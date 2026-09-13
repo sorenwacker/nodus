@@ -3,7 +3,8 @@
  * Manages available providers and the active provider
  */
 
-import type { ILLMProvider, ProviderConfig } from './types'
+import { ref } from 'vue'
+import type { ILLMProvider } from './types'
 import { OllamaProvider } from './ollama'
 import { OpenAIProvider } from './openai'
 import { OpenAICompatibleProvider } from './openai-compatible'
@@ -12,7 +13,15 @@ import { AnthropicProvider } from './anthropic'
 class ProviderRegistry {
   private providers = new Map<string, ILLMProvider>()
   private activeProviderId: string = 'ollama'
-  private configs = new Map<string, ProviderConfig>()
+  /**
+   * Bumped whenever the active provider or a provider's configuration changes.
+   *
+   * What the application reports for a run - the model, the context length -
+   * is derived from the configuration, and a `computed` over a plain read has
+   * no dependency to invalidate: it caches the value held at load for the rest
+   * of the session (PRODUCT_DESIGN.md > Reads that stay live).
+   */
+  readonly configVersion = ref(0)
 
   constructor() {
     // Register built-in providers
@@ -63,6 +72,7 @@ class ProviderRegistry {
       return false
     }
     this.activeProviderId = id
+    this.configVersion.value++
     return true
   }
 
@@ -75,48 +85,18 @@ class ProviderRegistry {
 
   /**
    * Configure a provider
+   *
+   * Takes what the provider itself accepts: the stored configuration is a
+   * plain record, and the identifier is this argument, not a field inside it.
    */
-  configureProvider(id: string, config: ProviderConfig): void {
+  configureProvider(id: string, config: Record<string, unknown>): void {
     const provider = this.providers.get(id)
     if (provider) {
       provider.configure(config)
-      this.configs.set(id, config)
+      this.configVersion.value++
     }
-  }
-
-  /**
-   * Get provider configuration
-   */
-  getProviderConfig(id: string): ProviderConfig | undefined {
-    return this.configs.get(id)
-  }
-
-  /**
-   * Load configurations from storage
-   */
-  loadConfigs(configs: Record<string, ProviderConfig>, activeId?: string): void {
-    for (const [id, config] of Object.entries(configs)) {
-      this.configureProvider(id, config)
-    }
-    if (activeId && this.providers.has(activeId)) {
-      this.activeProviderId = activeId
-    }
-  }
-
-  /**
-   * Export all configurations
-   */
-  exportConfigs(): { configs: Record<string, ProviderConfig>; activeId: string } {
-    const configs: Record<string, ProviderConfig> = {}
-    for (const [id, config] of this.configs) {
-      configs[id] = config
-    }
-    return { configs, activeId: this.activeProviderId }
   }
 }
 
 // Singleton instance
 export const providerRegistry = new ProviderRegistry()
-
-// Re-export types
-export type { ILLMProvider, ProviderConfig, ProviderModel } from './types'

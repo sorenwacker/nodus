@@ -7,7 +7,6 @@ import { computed, ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
 import type { ChatTurn } from './chatTranscript'
 import { providerRegistry } from './providers'
-import type { ProviderConfig } from './providers/types'
 import { agentTools } from './tools'
 import { llmStorage } from '../lib/storage'
 import { DEFAULT_SYSTEM_PROMPT } from './prompts'
@@ -30,7 +29,7 @@ export function useLLM() {
     // Load provider config
     const config = llmStorage.getProviderConfig(providerId)
     if (Object.keys(config).length > 0) {
-      providerRegistry.configureProvider(providerId, config as ProviderConfig)
+      providerRegistry.configureProvider(providerId, config)
     }
   }
 
@@ -44,9 +43,18 @@ export function useLLM() {
   }
 
   // Read the provider config live: a one-shot snapshot would go stale when
-  // the user changes model or provider in settings mid-session
-  const model = computed(() => (getProviderConfig().model as string) || 'llama3.2')
-  const contextLength = computed(() => (getProviderConfig().contextLength as number) || 4096)
+  // the user changes model or provider in settings mid-session. The registry's
+  // version is the dependency that makes these recompute; without it a
+  // `computed` over a plain call caches the value held at load
+  // (PRODUCT_DESIGN.md > Reads that stay live).
+  const model = computed(() => {
+    providerRegistry.configVersion.value
+    return (getProviderConfig().model as string) || 'llama3.2'
+  })
+  const contextLength = computed(() => {
+    providerRegistry.configVersion.value
+    return (getProviderConfig().contextLength as number) || 4096
+  })
 
   // Agent state
   const isRunning = ref(false)

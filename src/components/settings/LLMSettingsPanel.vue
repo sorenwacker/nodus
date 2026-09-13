@@ -196,11 +196,9 @@ function saveProviderConfig() {
 
   llmStorage.setProviderConfig(selectedProvider.value, config)
 
-  // Apply to provider
-  const provider = currentProvider.value
-  if (provider) {
-    provider.configure(config)
-  }
+  // One path for configuring a provider, so everything derived from the
+  // configuration is told it changed (PRODUCT_DESIGN.md > Reads that stay live)
+  providerRegistry.configureProvider(selectedProvider.value, config)
 
   // Notify canvas of config change
   window.dispatchEvent(new CustomEvent('nodus-llm-config-change'))
