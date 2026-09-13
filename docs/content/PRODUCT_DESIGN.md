@@ -919,6 +919,8 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 | New file added | No matching `file_path` | Create new node, run through parser |
 | File deleted | `file_path` exists, file gone | Soft delete node |
 
+A file moved outside Nodus keeps its node: the watcher records the new path. If recording it fails, the user is told, rather than the node pointing at a path that no longer exists.
+
 ### Reading a file and its checksum together
 
 **Required behavior:** The checksum stored against a node is the checksum of the content that node holds. Both come from one read.
@@ -1382,7 +1384,7 @@ Side padding is narrow at this type size. With 24px each side, a default card le
 
 - A failed create adds nothing. A node that was never stored can still be linked and edited, then disappears on the next load and takes those links with it.
 - A failed delete removes nothing, as deleting several nodes already does.
-- The browser build has no backend, so there creates stay local and the interface can be developed without the desktop shell. That exception depends on whether a backend exists, never on whether a call failed.
+- The browser build has no backend, so there creates stay local and the interface can be developed without the desktop shell. That exception depends on whether a backend exists, never on whether a call failed. A delete has nothing to confirm it there, so the browser build cannot delete.
 
 ### Deleting nodes with files
 
@@ -1404,6 +1406,12 @@ Neither did. Undo removed the snapshot without recording anything to redo, and r
 
 Hidden files and folders are skipped when walking a vault, but the vault folder itself is always visited. A vault whose own name starts with a dot is still a vault, and testing every entry including the root pruned the walk at once, so the vault scanned as empty. The import walk and the file watcher share one rule.
 
+The rule is tested against the path relative to the vault folder, never the absolute path. A vault that lives inside a hidden folder, such as `~/.config/notes`, is still walked and still watched.
+
+A path is inside the vault only when it is the vault folder or lies below it. A sibling folder whose name begins with the vault's name, such as `notes-archive` next to `notes`, is outside.
+
+Symbolic links inside a vault are not followed. A link can point outside the vault, where file operations would escape the vault check, or back into it, where the walk would not end.
+
 ### Refreshing a workspace from its files
 
 **Required behavior:** A refresh brings in what changed on disk and leaves the arrangement on the canvas alone. Where a node sits is the user's decision, and a refresh has no information that should override it.
@@ -1412,6 +1420,13 @@ Hidden files and folders are skipped when walking a vault, but the vault folder 
 - Only nodes new to a frame are placed, below what the frame already holds. The frame is then fitted to its contents, as described in Fitting a frame to its contents.
 
 Refresh re-ran the import grid for every folder that already had a frame, so each refresh put every node inside a folder frame back into a three-column grid.
+
+### Importing a vault
+
+**Required behavior:** A file that cannot be read or stored does not stop the import. The import takes every other file, then names the ones it skipped and why.
+
+- Linking an existing node to its file takes the file's content and its checksum from one read, as the watcher does, so the node holds what the file holds.
+- A node is recorded as synced with its wikilinks only once that sync has succeeded. A failed sync is left for the next pass rather than marked done.
 
 ### Storyline chain edges
 
@@ -1667,6 +1682,8 @@ The backend resolver understands folder path links and `#section` anchors as wel
 
 Treating any rejection as "no backend" ran the local resolver against edges the backend had created, which it could not see and therefore deleted. A single transient failure destroyed real edges, with nothing reported. Whether a backend exists is checked directly, and a backend that fails leaves the edges exactly as they were.
 
+Import resolves wikilinks with the same backend resolver as the sync, and canvas navigation uses the same frontend resolver as link rendering. Each carried its own copy, so a link could lead to a different node depending on where it was followed.
+
 ### Changing an edge's type
 
 An edge's type is stored before the change is shown. The unique constraint covers source, target, and link type together, so setting a type that already connects the same two nodes fails, and the message says so.
@@ -1791,7 +1808,7 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 
 **Required behavior:** The workspace editor offers only what is stored, and stores everything it offers.
 
-- Creating a workspace with a vault stores the vault path. The frontend sent the field in camelCase and the backend read snake_case, so the path was dropped.
+- Creating a workspace stores no vault path. The vault is chosen in the workspace editor, which stores it there. The create command carried a vault path field that no caller ever filled, under a key the backend did not read, and both are gone.
 - Restoring a deleted workspace restores its vault path and its sync setting.
 - The description field is removed. No workspace description is stored anywhere, so text typed there was discarded on save.
 - A rename that fails is reported. A new workspace is opened only after it has been created.
@@ -2195,6 +2212,8 @@ User saves → Write to .md → Release lock
 ```
 
 **Important:** Do NOT lock during initial import checksum scan — only during active editing.
+
+Editing a node on the canvas takes this lock, as editing in the reader does, through one composable for both. A second request for a lock Nodus already holds on the same node succeeds: Nodus is not another application, and reporting it as one locked the user out of their own note.
 
 ### CRDT to canvas integration (planned)
 
