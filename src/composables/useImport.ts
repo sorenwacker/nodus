@@ -19,6 +19,8 @@ export interface ImportDeps {
   setNodes: (nodes: Node[]) => void
   addNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
+  /** The edges store's deduplication, so the import does not carry a second rule */
+  deduplicateEdges: (edges: Edge[]) => Edge[]
   reloadFrames: () => Promise<void>
   createNode: (data: {
     title: string
@@ -409,21 +411,9 @@ export function useImport(deps: ImportDeps) {
       // Fetch all edges to include newly created wikilink edges
       const fetchedEdges = await invoke<Edge[]>('get_edges', { workspaceId })
 
-      // Deduplicate edges (handles bidirectional duplicates)
-      const seenPairs = new Set<string>()
-      const beforeCount = fetchedEdges.length
-      const deduplicatedEdges = fetchedEdges.filter((e) => {
-        const ids = [e.source_node_id, e.target_node_id].sort()
-        const key = `${ids[0]}:${ids[1]}`
-        if (seenPairs.has(key)) return false
-        seenPairs.add(key)
-        return true
-      })
-      const removed = beforeCount - deduplicatedEdges.length
-      if (removed > 0) {
-        storeLogger.info(`Frontend deduplication removed ${removed} duplicate edges`)
-      }
-      deps.setEdges(deduplicatedEdges)
+      // The edges store's rule, so an import cannot hide an edge the store
+      // would keep (PRODUCT_DESIGN.md > One rule, one place)
+      deps.setEdges(deps.deduplicateEdges(fetchedEdges))
 
       // Reload frames to include newly created ones
       await deps.reloadFrames()
@@ -444,8 +434,10 @@ export function useImport(deps: ImportDeps) {
         context: 'Import',
         error,
         notify: (t, m) => notifications$.error(t, m),
+        rethrow: false,
       })(e)
-      return []
+      // Rethrown here, in plain sight: the caller decides what a failure means
+      throw e
     } finally {
       loading.value = false
     }
@@ -511,8 +503,10 @@ export function useImport(deps: ImportDeps) {
         context: 'Citation import',
         error,
         notify: (t, m) => notifications$.error(t, m),
+        rethrow: false,
       })(e)
-      return []
+      // Rethrown here, in plain sight: the caller decides what a failure means
+      throw e
     } finally {
       loading.value = false
     }
@@ -569,8 +563,10 @@ export function useImport(deps: ImportDeps) {
         context: 'Ontology import',
         error,
         notify: (t, m) => notifications$.error(t, m),
+        rethrow: false,
       })(e)
-      return { nodesCreated: 0, edgesCreated: 0, classNodesCreated: 0, nodeIds: [] }
+      // Rethrown here, in plain sight: the caller decides what a failure means
+      throw e
     } finally {
       loading.value = false
     }
@@ -656,8 +652,10 @@ export function useImport(deps: ImportDeps) {
         context: 'Refresh',
         error,
         notify: (t, m) => notifications$.error(t, m),
+        rethrow: false,
       })(e)
-      return 0 // Return 0 on error (unreachable due to rethrow, but satisfies TypeScript)
+      // Rethrown here, in plain sight: the caller decides what a failure means
+      throw e
     } finally {
       loading.value = false
     }

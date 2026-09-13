@@ -243,6 +243,12 @@ export const useEdgesStore = defineStore('edges', () => {
    * - For directed edges: keep exact duplicates only (same source, target, link_type)
    * - For undirected edges: treat A->B and B->A as same
    */
+  /**
+   * The edges of a list, without duplicates. An edge is the same as another
+   * only when it connects the same pair *by the same link type*: two notes may
+   * be connected by a wikilink and a citation at once
+   * (PRODUCT_DESIGN.md > One rule, one place).
+   */
   function deduplicateEdgesLocal(edgeList: Edge[]): Edge[] {
     const seenKeys = new Set<string>()
     const beforeCount = edgeList.length
@@ -392,6 +398,7 @@ export const useEdgesStore = defineStore('edges', () => {
     updateEdgeDirected,
     cleanupOrphanEdges,
     deduplicateEdges,
+    deduplicateEdgesLocal,
     cleanupOrphanEdgesDb,
     debugGetAllEdges,
     getEdge,

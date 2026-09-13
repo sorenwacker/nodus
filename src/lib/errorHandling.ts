@@ -18,8 +18,15 @@ export interface AsyncErrorOptions {
 /**
  * Creates an error handler for async operations
  * Standardizes logging, error state, and user notifications
+ *
+ * The handler rethrows unless asked not to, and its type says so: a caller
+ * that reports and rethrows needs no fallback value afterwards, and one
+ * written anyway would be unreachable code
+ * (PRODUCT_DESIGN.md > Lookups that cannot be made).
  */
-export function handleAsyncError(options: AsyncErrorOptions) {
+export function handleAsyncError(options: AsyncErrorOptions & { rethrow?: true }): (e: unknown) => never
+export function handleAsyncError(options: AsyncErrorOptions & { rethrow: false }): (e: unknown) => void
+export function handleAsyncError(options: AsyncErrorOptions): (e: unknown) => void {
   return (e: unknown): void => {
     const message = e instanceof Error ? e.message : String(e)
     options.error.value = message

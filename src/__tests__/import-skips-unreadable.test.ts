@@ -34,6 +34,7 @@ function wire() {
     setNodes: vi.fn(),
     addNodes: vi.fn((nodes: Node[]) => added.push(...nodes)),
     setEdges: vi.fn(),
+    deduplicateEdges: (edges: unknown[]) => edges,
     reloadFrames: vi.fn().mockResolvedValue(undefined),
     createNode: vi.fn(),
     watchVault: vi.fn().mockResolvedValue(undefined),

@@ -457,6 +457,7 @@ export const useNodesStore = defineStore('nodes', () => {
     setNodes: (n) => { nodes.value = n },
     addNodes: (n) => { nodes.value.push(...n) },
     setEdges: (e) => { edgesStore.edges.splice(0, edgesStore.edges.length, ...e) },
+    deduplicateEdges: (e) => edgesStore.deduplicateEdgesLocal(e),
     reloadFrames: () => framesStore.initialize(),
     createNode,
     watchVault: (path) => fileSync.watchVault(path),
