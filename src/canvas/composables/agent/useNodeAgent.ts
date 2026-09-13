@@ -23,6 +23,7 @@ import { registerCoreTools } from '../../../llm/tools'
 registerCoreTools()
 
 import { escapeForPrompt, isValidFetchUrl } from '../../../lib/promptSecurity'
+import { searchWikipedia, fetchWikipediaArticle } from '../../../llm/research'
 
 interface SearchResult {
   title: string
@@ -89,62 +90,25 @@ async function executeFetchUrl(url: string, currentContextChars = 0): Promise<st
 }
 
 // Timeout for fetch requests (10 seconds)
-const FETCH_TIMEOUT_MS = 10_000
 
-/**
- * Fetch with timeout support
- */
-async function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await fetch(url, { signal: controller.signal })
-    return response
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
 
 async function executeWikipediaSearch(query: string): Promise<string> {
-  // First, search for the article
-  try {
-    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`
-    const searchResp = await fetchWithTimeout(searchUrl)
-    if (searchResp.ok) {
-      const searchData = await searchResp.json()
-      if (searchData.query?.search?.length > 0) {
-        const title = searchData.query.search[0].title
+  const [top] = await searchWikipedia(query, 1)
+  const extract = top ? await fetchWikipediaArticle(top.title) : null
 
-        // Fetch the full article content using TextExtracts API
-        const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&explaintext=1&exsectionformat=plain&format=json&origin=*`
-        const contentResp = await fetchWithTimeout(contentUrl)
-        if (contentResp.ok) {
-          const contentData = await contentResp.json()
-          const pages = contentData.query?.pages
-          if (pages) {
-            const pageId = Object.keys(pages)[0]
-            const extract = pages[pageId]?.extract
-            if (extract) {
-              // Use the context limit from settings (default 50k)
-              const maxChars = llmStorage.getChainContextLimit()
-              const content = maxChars > 0 && extract.length > maxChars
-                ? extract.slice(0, maxChars) + '...\n\n[Content truncated]'
-                : extract
-              return `# ${title}\n\n${content}\n\nSource: https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
-            }
-          }
-        }
-      }
-    }
-  } catch (e) {
-    // Check if it was a timeout
-    if (e instanceof Error && e.name === 'AbortError') {
-      throw new Error(`Wikipedia search timed out for "${query}". Try again.`)
-    }
-    // Wikipedia search failed for other reasons
+  if (!top || !extract) {
+    throw new Error(`Wikipedia search failed for "${query}". Try a different query.`)
   }
 
-  throw new Error(`Wikipedia search failed for "${query}". Try a different query.`)
+  // The note's context limit decides how much of the article is worth carrying
+  const maxChars = llmStorage.getChainContextLimit()
+  const content =
+    maxChars > 0 && extract.length > maxChars
+      ? extract.slice(0, maxChars) + '...\n\n[Content truncated]'
+      : extract
+
+  const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(top.title.replace(/ /g, '_'))}`
+  return `# ${top.title}\n\n${content}\n\nSource: ${url}`
 }
 
 /**

@@ -157,7 +157,7 @@ async function searchWebTavily(
 /**
  * Search Wikipedia
  */
-async function searchWikipedia(
+export async function searchWikipedia(
   query: string,
   maxResults: number,
   log?: (msg: string) => void

@@ -9,15 +9,7 @@ import type { Ref } from 'vue'
 import type { Node } from '../../../types'
 import type { AgentPlan } from '../../../llm/types'
 import type { NodeService } from '../../../services/nodeService'
-import { stripHtmlTags } from '../../../lib/sanitize'
-import {
-  quickResearch,
-  deepResearch,
-  formatDeepResearchResults,
-  fetchWikipediaArticle,
-  validateClaim,
-  assessCompleteness,
-} from '../../../llm/research'
+import { assessCompleteness, deepResearch, fetchWikipediaArticle, formatDeepResearchResults, quickResearch, searchWikipedia, validateClaim } from '../../../llm/research'
 
 /**
  * Plan state interface (subset of usePlanState return type)
@@ -146,30 +138,15 @@ export function useMarkerHandlers(ctx: MarkerHandlerContext) {
 
         log(`> Wikipedia search: "${query}"`)
 
-        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=${limit}`
-        const resp = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) })
+        const found = await searchWikipedia(query, limit)
 
-        if (!resp.ok) {
-          return `Wikipedia search failed: ${resp.status}`
-        }
+        log(`> Found ${found.length} Wikipedia articles`)
 
-        const respData = await resp.json()
-        const results: string[] = []
-
-        if (respData.query?.search) {
-          for (const item of respData.query.search) {
-            const cleanSnippet = stripHtmlTags(item.snippet)
-            const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`
-            results.push(`**${item.title}**\n${cleanSnippet}\n[${url}]`)
-          }
-        }
-
-        log(`> Found ${results.length} Wikipedia articles`)
-
-        if (results.length === 0) {
+        if (found.length === 0) {
           return `No Wikipedia articles found for "${query}"`
         }
 
+        const results = found.map(r => `**${r.title}**\n${r.content}\n[${r.url}]`)
         return `## Wikipedia Search: "${query}"\n\n${results.join('\n\n')}`
       } catch (e) {
         console.error('[MarkerHandlers] Wikipedia search error:', e)
