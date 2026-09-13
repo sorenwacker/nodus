@@ -1,14 +1,12 @@
 /**
  * Plan State Machine
  *
- * Manages agent plan lifecycle:
- * - Create plans with steps
- * - Request user approval
- * - Track approval/rejection
- * - Modify steps before approval
+ * Manages a plan up to the point the user approves it: create it with steps,
+ * modify those steps, and approve or reject. What happens after approval is
+ * reported through the agent tasks store, which the task tools write.
  */
 
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import type { AgentPlan, PlanStep } from './types'
 
 /**
@@ -25,38 +23,8 @@ export function usePlanState() {
   // Current plan being worked on
   const currentPlan = ref<AgentPlan | null>(null)
 
-  // Plan history for session
-  const planHistory = ref<AgentPlan[]>([])
-
   // Whether approval modal should be shown
   const showApprovalModal = ref(false)
-
-  // Computed: is there a pending plan?
-  const hasPendingPlan = computed(() =>
-    currentPlan.value?.status === 'pending_approval'
-  )
-
-  // Computed: is plan approved and ready to execute?
-  const isApproved = computed(() =>
-    currentPlan.value?.status === 'approved'
-  )
-
-  // Computed: current step being executed
-  const currentStepIndex = computed(() => {
-    if (!currentPlan.value || currentPlan.value.status !== 'executing') return -1
-    return currentPlan.value.steps.findIndex(s => s.status === 'in_progress')
-  })
-
-  // Computed: progress percentage
-  const progress = computed(() => {
-    if (!currentPlan.value) return 0
-    const total = currentPlan.value.steps.length
-    if (total === 0) return 0
-    const done = currentPlan.value.steps.filter(s =>
-      s.status === 'done' || s.status === 'error'
-    ).length
-    return Math.round((done / total) * 100)
-  })
 
   /**
    * Create a new plan
@@ -132,7 +100,6 @@ export function usePlanState() {
     }
 
     currentPlan.value.status = 'cancelled'
-    planHistory.value.push({ ...currentPlan.value })
 
     // Keep plan for reference but close modal
     showApprovalModal.value = false
@@ -220,100 +187,10 @@ export function usePlanState() {
     return true
   }
 
-  /**
-   * Mark current step as done and move to next
-   */
-  function completeCurrentStep(): PlanStep | null {
-    if (!currentPlan.value || currentPlan.value.status !== 'executing') return null
-
-    const current = currentPlan.value.steps.find(s => s.status === 'in_progress')
-    if (!current) return null
-
-    current.status = 'done'
-
-    // Find next approved step
-    const nextStep = currentPlan.value.steps.find(s => s.status === 'approved')
-    if (nextStep) {
-      nextStep.status = 'in_progress'
-      return nextStep
-    }
-
-    // No more steps - plan complete
-    currentPlan.value.status = 'completed'
-    planHistory.value.push({ ...currentPlan.value })
-    return null
-  }
-
-  /**
-   * Mark current step as failed
-   */
-  function failCurrentStep(error: string): void {
-    if (!currentPlan.value || currentPlan.value.status !== 'executing') return
-
-    const current = currentPlan.value.steps.find(s => s.status === 'in_progress')
-    if (current) {
-      current.status = 'error'
-      current.details = (current.details || '') + `\nError: ${error}`
-    }
-  }
-
-  /**
-   * Update step status by index (for agent use)
-   */
-  function updateStepStatus(stepIndex: number, status: PlanStep['status']): boolean {
-    if (!currentPlan.value) return false
-    if (stepIndex < 0 || stepIndex >= currentPlan.value.steps.length) return false
-
-    currentPlan.value.steps[stepIndex].status = status
-
-    // Check if all steps are done
-    const allDone = currentPlan.value.steps.every(s =>
-      s.status === 'done' || s.status === 'error' || s.status === 'rejected'
-    )
-    if (allDone && currentPlan.value.status === 'executing') {
-      currentPlan.value.status = 'completed'
-      planHistory.value.push({ ...currentPlan.value })
-    }
-
-    return true
-  }
-
-  /**
-   * Clear current plan
-   */
-  function clearPlan(): void {
-    if (currentPlan.value) {
-      planHistory.value.push({ ...currentPlan.value })
-    }
-    currentPlan.value = null
-    showApprovalModal.value = false
-  }
-
-  /**
-   * Get plan summary for context
-   */
-  function getPlanSummary(): string {
-    if (!currentPlan.value) return 'No active plan'
-
-    const plan = currentPlan.value
-    const stepsSummary = plan.steps
-      .map((s, i) => `${i + 1}. [${s.status}] ${s.description}`)
-      .join('\n')
-
-    return `Plan: ${plan.title} (${plan.status})\n${stepsSummary}`
-  }
-
   return {
     // State
     currentPlan,
-    planHistory,
     showApprovalModal,
-
-    // Computed
-    hasPendingPlan,
-    isApproved,
-    currentStepIndex,
-    progress,
 
     // Actions
     createPlan,
@@ -324,10 +201,5 @@ export function usePlanState() {
     addStep,
     removeStep,
     startExecution,
-    completeCurrentStep,
-    failCurrentStep,
-    updateStepStatus,
-    clearPlan,
-    getPlanSummary,
   }
 }
