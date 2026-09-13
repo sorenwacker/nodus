@@ -589,60 +589,15 @@ pub(crate) async fn import_vault_impl(
         nodes.push(node);
     }
 
-    // Create edges for wikilinks (deduplicated)
-    let now = chrono::Utc::now().timestamp();
+    // Wikilinks are resolved by the sync's resolver, so a link the import
+    // cannot resolve is remembered and becomes an edge when its note is
+    // created later (PRODUCT_DESIGN.md > Syncing wikilink edges)
+    let title_to_id = build_title_to_id_map(&nodes);
     let mut edge_count = 0;
-    let mut seen_edges: std::collections::HashSet<(String, String)> =
-        std::collections::HashSet::new();
-
     for (source_id, links) in node_links {
-        let unique_links: std::collections::HashSet<String> = links
-            .into_iter()
-            .map(|l| {
-                // Strip section anchors (e.g., "Note#Section" -> "Note")
-                let without_anchor = l.split('#').next().unwrap_or(&l);
-                without_anchor.to_lowercase()
-            })
-            .collect();
-
-        for link in unique_links {
-            // Try exact match first, then fall back to filename-only match
-            // This handles [[note]], [[folder/note]], and [[note#section]] style links
-            let target_id = title_to_id
-                .get(&link)
-                .or_else(|| {
-                    // Extract filename from path (e.g., "folder/note" -> "note")
-                    link.rsplit('/')
-                        .next()
-                        .and_then(|name| title_to_id.get(name))
-                })
-                .cloned();
-
-            if let Some(target_id) = target_id {
-                if source_id != target_id {
-                    let edge_key = (source_id.clone(), target_id.clone());
-                    if seen_edges.contains(&edge_key) {
-                        continue;
-                    }
-                    seen_edges.insert(edge_key);
-
-                    let edge = database::edges::Edge {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        source_node_id: source_id.clone(),
-                        target_node_id: target_id.clone(),
-                        label: None,
-                        link_type: "wikilink".to_string(),
-                        weight: 1.0,
-                        color: None,
-                        storyline_id: None,
-                        created_at: now,
-                        directed: true,
-                    };
-                    if database::edges::create(pool, &edge).await.is_ok() {
-                        edge_count += 1;
-                    }
-                }
-            }
+        match sync_wikilinks_for_node_with_map(pool, &source_id, &links, &title_to_id).await {
+            Ok((created, _removed)) => edge_count += created,
+            Err(e) => eprintln!("Failed to sync wikilinks for {}: {}", source_id, e),
         }
     }
 
@@ -746,6 +701,96 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
 
 #[cfg(test)]
 mod tests {
+    /// The import resolves wikilinks the way the sync does
+    /// (PRODUCT_DESIGN.md > Syncing wikilink edges).
+    ///
+    /// Three ways the import's own pass differs: a link into a nested folder,
+    /// a link that resolves to no note at all, and a pair already connected by
+    /// another edge.
+    #[tokio::test]
+    async fn imports_a_link_into_a_nested_folder() {
+        let pool = memory_pool().await;
+        let vault = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir_all(vault.path().join("area/concepts")).expect("folders");
+        // The shared map keys a note by its own folder and filename, so this
+        // link names it the way the sync would resolve it
+        std::fs::write(vault.path().join("Alpha.md"), "sees [[concepts/beta]]").expect("write");
+        std::fs::write(vault.path().join("area/concepts/beta.md"), "body").expect("write");
+
+        super::import_vault_impl(
+            &pool,
+            vault.path().to_str().unwrap(),
+            Some("w1".into()),
+            false,
+        )
+        .await
+        .expect("import");
+
+        let edges: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM edges WHERE link_type = 'wikilink'")
+                .fetch_one(&pool)
+                .await
+                .expect("count edges");
+        assert_eq!(edges, 1, "the link becomes an edge");
+    }
+
+    /// A link naming no note is remembered, so the edge appears when that note
+    /// is created later.
+    #[tokio::test]
+    async fn remembers_a_link_whose_note_does_not_exist_yet() {
+        let pool = memory_pool().await;
+        let vault = tempfile::tempdir().expect("temp dir");
+        std::fs::write(vault.path().join("Alpha.md"), "sees [[Gamma]]").expect("write");
+
+        super::import_vault_impl(
+            &pool,
+            vault.path().to_str().unwrap(),
+            Some("w1".into()),
+            false,
+        )
+        .await
+        .expect("import");
+
+        let pending: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pending_wikilinks")
+            .fetch_one(&pool)
+            .await
+            .expect("count pending");
+        assert_eq!(pending, 1, "the unresolved link is remembered");
+    }
+
+    #[tokio::test]
+    async fn imports_wikilinks_through_the_shared_resolver() {
+        let pool = memory_pool().await;
+        let vault = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir_all(vault.path().join("concepts")).expect("folder");
+        // The link names the note by folder and filename, while the note's
+        // title differs from its filename
+        std::fs::write(vault.path().join("Alpha.md"), "sees [[concepts/beta]]").expect("write");
+        std::fs::write(vault.path().join("concepts/beta.md"), "# Beta Note\n\nbody")
+            .expect("write");
+
+        super::import_vault_impl(
+            &pool,
+            vault.path().to_str().unwrap(),
+            Some("w1".into()),
+            false,
+        )
+        .await
+        .expect("import");
+
+        let edges: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM edges WHERE link_type = 'wikilink'")
+                .fetch_one(&pool)
+                .await
+                .expect("count edges");
+        assert_eq!(edges, 1, "the link becomes an edge");
+
+        let pending: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pending_wikilinks")
+            .fetch_one(&pool)
+            .await
+            .expect("count pending");
+        assert_eq!(pending, 0, "nothing is left waiting for a note that exists");
+    }
     /// A file the import cannot take does not stop it: the rest arrives, and
     /// the one left behind is named (PRODUCT_DESIGN.md > Importing a vault).
     #[tokio::test]
