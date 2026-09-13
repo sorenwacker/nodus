@@ -192,8 +192,14 @@ export function registerBatchTools(): void {
       } else if (filter === 'has_content') {
         nodes = nodes.filter(n => n.markdown_content?.trim())
       } else if (filter !== 'all') {
+        // A search term matches the body as well as the title: a user asking
+        // to process nodes "about beta" means the ones that mention it
         const term = filter.toLowerCase()
-        nodes = nodes.filter(n => n.title.toLowerCase().includes(term))
+        nodes = nodes.filter(
+          n =>
+            n.title.toLowerCase().includes(term) ||
+            n.markdown_content?.toLowerCase().includes(term)
+        )
       }
 
       if (nodes.length === 0) return `No nodes match filter "${filter}"`

@@ -10,8 +10,6 @@ import { asOneUndoStep } from '../../../stores/nodes/undoRecorder'
 import { invoke } from '@tauri-apps/api/core'
 import type { Node } from '../../../types'
 import type { AgentTask, AgentPlan } from '../../../llm/types'
-import { quickResearch } from '../../../llm/research'
-import { evalMathExpr } from '../../../llm/utils'
 import {
   batchClassifyForMove,
   batchClassifyForConnect,
@@ -206,59 +204,6 @@ export function useLLMTools(ctx: LLMToolsContext) {
 
     // Handle remaining tools that haven't been extracted yet
     switch (name) {
-      case 'for_each_node': {
-        let nodes = [...store.getFilteredNodes()]
-        const filter = (args.filter as string) || 'all'
-        if (filter === 'empty') {
-          nodes = nodes.filter((n) => !n.markdown_content?.trim())
-        } else if (filter === 'has_content') {
-          nodes = nodes.filter((n) => n.markdown_content?.trim())
-        } else if (filter !== 'all') {
-          const term = filter.toLowerCase()
-          nodes = nodes.filter(
-            (n) =>
-              n.title.toLowerCase().includes(term) ||
-              n.markdown_content?.toLowerCase().includes(term)
-          )
-        }
-        if (nodes.length === 0) return `No nodes match filter "${filter}"`
-        log(`> Iterating ${nodes.length} nodes`)
-
-        const results: string[] = []
-        for (const node of nodes) {
-          const num = parseInt(node.title.match(/\d+/)?.[0] || '0')
-          const query = ((args.template as string) || '')
-            .replace(/\{title\}/g, node.title)
-            .replace(/\{([^}]+)\}/g, (_: string, expr: string) => evalMathExpr(expr, num))
-
-          if (args.action === 'set') {
-            await store.updateNodeContent(node.id, query)
-            results.push(`${node.title}: set`)
-          } else if (args.action === 'append') {
-            await store.updateNodeContent(node.id, (node.markdown_content || '') + '\n\n' + query)
-            results.push(`${node.title}: appended`)
-          } else if (args.action === 'llm') {
-            if (!node.markdown_content?.trim()) {
-              results.push(`${node.title}: skipped (empty)`)
-              continue
-            }
-            try {
-              const prompt = `${query}\n\nContent to process:\n${node.markdown_content}`
-              const system =
-                'You are a text processor. Apply the instruction to the content. Output ONLY the processed text, nothing else.'
-              const result = await callOllama(prompt, system)
-              if (result?.trim()) {
-                await store.updateNodeContent(node.id, result.trim())
-                results.push(`${node.title}: processed`)
-              }
-            } catch (e) {
-              results.push(`${node.title}: llm failed - ${e}`)
-            }
-          }
-        }
-        return `Processed ${nodes.length} nodes`
-      }
-
       case 'smart_move': {
         const nodes = store.getFilteredNodes()
         if (nodes.length === 0) return 'No nodes to move'
@@ -434,68 +379,6 @@ export function useLLMTools(ctx: LLMToolsContext) {
       // Memory handlers (remember, set_goal, update_progress, complete_goal)
       // and stack handlers (push_task, pop_task, peek_stack, clear_stack)
       // are now handled by the tool registry above
-
-      case 'create_plan': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const title = (parsedArgs.title as string) || 'Untitled Plan'
-        const steps = (parsedArgs.steps as Array<{ description: string; details?: string }>) || []
-
-        if (!Array.isArray(steps) || steps.length === 0) {
-          return 'No steps provided for plan'
-        }
-
-        const plan = planState.createPlan(title, steps)
-        log(`> Plan created: ${title} (${steps.length} steps)`)
-
-        return `__CREATE_PLAN__:${JSON.stringify({ planId: plan.id, title, stepCount: steps.length })}`
-      }
-
-      case 'request_approval': {
-        if (!planState.currentPlan.value) {
-          return 'No plan to approve'
-        }
-
-        const success = planState.requestApproval()
-        if (!success) {
-          return 'Failed to request approval'
-        }
-
-        log('> Requesting approval...')
-        return `__REQUEST_APPROVAL__:${JSON.stringify({ planId: planState.currentPlan.value.id })}`
-      }
-
-      case 'research': {
-        let parsedArgs = args
-        if (typeof args === 'string') {
-          try {
-            parsedArgs = JSON.parse(args)
-          } catch {
-            parsedArgs = {}
-          }
-        }
-        const query = (parsedArgs.query as string) || ''
-        if (!query) return 'No query provided'
-
-        const sources = Array.isArray(parsedArgs.sources)
-          ? (parsedArgs.sources as Array<'local' | 'web' | 'wikipedia'>)
-          : (['local', 'web'] as Array<'local' | 'web' | 'wikipedia'>)
-
-        log(`> Researching: ${query}`)
-
-        try {
-          const results = await quickResearch(query, store.getFilteredNodes(), sources)
-          return results
-        } catch (e) {
-          return `Research failed: ${e}`
-        }
-      }
 
       default:
         return null
