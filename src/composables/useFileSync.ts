@@ -146,7 +146,11 @@ export function useFileSync(deps: FileSyncDeps) {
     // Note: listen() wrapper already extracts payload, so event IS the FileChangeEvent
     watcherUnlisten = await listen<FileChangeEvent>('vault-file-changed', (event) => {
       storeLogger.info(`[FileSync] File change detected: ${event.change_type} - ${event.path}`)
-      handleFileChange(event)
+      // A failure inside the handler is reported, not left to escape as an
+      // unhandled rejection
+      void handleFileChange(event).catch(e =>
+        storeLogger.error('[FileSync] Failed to handle a file change:', e)
+      )
     })
     await invoke('watch_vault', { path })
     isWatching.value = true
@@ -158,6 +162,14 @@ export function useFileSync(deps: FileSyncDeps) {
       watcherUnlisten()
       watcherUnlisten = null
     }
+    // A deletion waiting to see whether it was a move belongs to the vault
+    // being closed: firing it afterwards would remove a node from a vault
+    // nobody is watching (PRODUCT_DESIGN.md > File Watcher Logic)
+    for (const pending of pendingDeletions.values()) {
+      clearTimeout(pending.timeoutId)
+    }
+    pendingDeletions.clear()
+    pendingProgrammaticMoves.clear()
     try {
       await invoke('stop_watching')
     } catch {
@@ -205,9 +217,18 @@ export function useFileSync(deps: FileSyncDeps) {
             file_path: filePath,
             updated_at: Date.now(),
           })
-          // Update file_path in database
-          await invoke('update_node_file_path', { id: pendingDeletion.nodeId, filePath })
-          storeLogger.info(`File moved: ${pendingDeletion.filePath} -> ${filePath}`)
+          // Update file_path in database. A refusal is reported: the node
+          // would otherwise keep a path that no longer exists
+          try {
+            await invoke('update_node_file_path', { id: pendingDeletion.nodeId, filePath })
+            storeLogger.info(`File moved: ${pendingDeletion.filePath} -> ${filePath}`)
+          } catch (e) {
+            storeLogger.error('[FileSync] Failed to record a moved file:', e)
+            notifications$.error(
+              'Could not follow a moved file',
+              `${getFilename(filePath)}: ${String(e)}`
+            )
+          }
 
           // Update frame assignment based on new folder
           assignNodeToFrameByPath(pendingDeletion.nodeId, filePath)
