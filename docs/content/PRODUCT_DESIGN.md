@@ -1478,6 +1478,8 @@ A run acts on the nodes that were selected when the user asked. The selection is
 
 Reading the live selection instead meant a click made while the model was still thinking redirected the change: a user who asked for one node to be rewritten, then selected another to look at it, had the second node overwritten with the first one's new text. Nothing said so, and before the store took over undo recording, nothing could reverse it.
 
+The capture reaches every surface a tool reads its targets from. It was handed to one adapter that the selection tools do not read: those tools take their targets from the tool context the canvas builds for each call, and that context read the live selection, so the rule held only for the tools that never needed it.
+
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
 ### Dropping a node on the storyline panel
@@ -1492,6 +1494,10 @@ A tool's schema says enough for a model to call it without guessing. An array de
 
 A parameter declared as an object is read as one. `push_task` declared `context` as an object and read it as a string, so every object a model sent was dropped without a word.
 
+An array's declared element type is the type the handler reads. `create_nodes_batch` declared an array of strings and read `title` and `content` off each element, so a model that followed the schema produced a batch of untitled, empty nodes.
+
+Every property in a schema is a parameter the handler reads. `batch_update` carried an `items` property beside `updates`, which is the element type of `updates` written one level too high: it declares a parameter that does not exist and leaves the real array's elements undeclared.
+
 ### Deciding an agent run has ended
 
 A run ends when the model calls `done`, or when it asks the user a question the loop cannot answer. It is never decided by reading the wording of a reply.
@@ -1505,6 +1511,70 @@ A reply with no tool call gets one request to act or to declare itself finished.
 Starting a run while one is in progress supersedes it. The superseded loop is still awaiting its request, so it must not write the new run's state when that request finally rejects.
 
 Each run takes a generation number, and every write to shared state - the running flag, the log, the node's content - happens only while that generation is still current. Without it, the old loop cleared the new run's running flag, pushed into the log the new run had just reset, and could overwrite the new content from a tool call already in flight. Stopping advances the generation for the same reason.
+
+A superseded loop stops iterating rather than merely stopping its writes. Guarding each write leaves the loop running: it keeps requesting completions and keeps executing the tool calls that come back, and a tool that writes through the store rather than through the guarded state still lands on the note. Both run loops check the generation at the top of each iteration and before any write to the node, so a superseded run makes no further request and no further change.
+
+### One path for a tool call
+
+A tool call recovered from the text of a reply is executed on the same path as one the provider returned in `tool_calls`. Models that cannot emit native calls write them as fenced JSON, and that text was executed directly: it skipped the mode allow-list, so a plan-mode model could run a mutating tool the request had stripped, and it skipped the log and the transcript, so the call happened with no line saying so.
+
+- One function handles a call whatever its shape: allow-list, execution, log line, transcript, marker handling.
+- A message recognised as a tool call is not also appended to the transcript as prose.
+
+### One implementation per tool
+
+A tool call is answered by exactly one layer. The canvas tries the registry, then the marker handlers, then the LLM-dependent tools, and takes the first real answer, so a tool with a real handler in two layers runs the first and the second is dead code that reads as the live one. Four tools had two implementations, and the unreachable copy was the one later edits were made against.
+
+- A registry handler returns `__UNHANDLED__` only when the real implementation is elsewhere.
+- A gate asserts that no tool name has both a real registry result and a case in the LLM-dependent dispatcher.
+
+### A whitelist names registered tools
+
+A mode's whitelist filters registered tools, so a name in it that matches no tool does nothing. Such names read as capabilities the mode has: the execute whitelist named tools for reporting progress that were never registered under those names, with a comment citing the rule that requires progress to advance.
+
+- The reachability gate checks both directions: every registered tool reaches a mode, and every name a mode lists is a registered tool.
+
+### Reads that stay live
+
+The agent's view of the workspace is read when a tool runs, not when the agent was composed. The canvas builds the agent's store adapter once at setup, so a value copied rather than exposed as a getter freezes at that moment: the workspace identifier was copied, and after the user switched workspace the memory tools kept writing to the old one.
+
+- Values the adapter exposes are getters.
+- A `computed` derives from reactive state. One built from a plain function call has no dependency that can invalidate it and never recomputes, which is how the model and context length reported for a run stayed at the values held when the panel was created.
+
+### Classifying what the user wrote
+
+What the user meant is decided by the model, never by matching patterns against their words. The phrasings are unbounded: a prompt was classified into a graph type and a domain by regular expressions, and a colour criterion was judged literal or semantic by testing whether it contained a quotation mark, the word "of", or a leading capital - so "Papers of Hinton" took the literal path and "papers about learning" the semantic one, for reasons no user could see.
+
+- A classification that changes what the agent does is either asked of the model or removed.
+- Where it adds little, removing it is the better fix: the graph-type enhancement appended two lines the system prompt already carried.
+
+### The prompt of an approved run carries its plan
+
+A run resuming after approval is given the plan the user approved. The prompt has a section for it, and the value that section renders from was never assigned, so it could never appear and the model executed approved plans it could not see.
+
+### Reporting a provider failure
+
+A failed request says what the provider said. The message the API returned was parsed and then thrown inside the `try` whose own `catch` replaced it with generic text, so a bad key, a rate limit and an unknown model all arrived as the same sentence.
+
+- The parsed message survives to the caller.
+- A failure that is not a connection failure is not reported as one. A malformed chunk from a running server was reported as "Cannot connect to Ollama. Start it with: ollama serve", which sends the user to start a server that is already running.
+- Availability is decided by the one shared probe, for every provider. Three providers delegate to it and one re-implemented it by hand, so a change to the shared rule would have skipped that provider silently.
+
+### Reading an event stream
+
+A streamed response is split on event boundaries as the specification defines them, which are blank lines with either line ending. Splitting only on `\n\n` meant a server sending `\r\n\r\n` produced no events at all and the stream was reported as having ended before it was complete. Whatever remains in the buffer when the stream closes is dispatched rather than dropped.
+
+### Showing a task's stored context
+
+A task's context is stored as an object and rendered as text. Interpolating it directly printed `[object Object]`, so the context the model pushed came back to it as nothing.
+
+### Reporting what a multi-phase run found
+
+A run that works in phases reports what all of its phases found. The knowledge-base build overwrote its accumulator each phase, so the completion payload carried only the last phase's results, typically the smallest, and what the earlier phases found was dropped without a word.
+
+### Where research calls live
+
+One module makes the research calls. Wikipedia search was written three times over, twice in the agent composables and once beside the article fetch it belongs with, with different timeouts and different result shapes, so a fix to one left the others as they were.
 
 ### Reconnecting to Nodus
 
