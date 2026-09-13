@@ -100,8 +100,21 @@ export function registerUpdateTools(): void {
     {
       type: 'object',
       properties: {
-        updates: { type: 'array', description: '[{title: "Node 1", set_title?: "Lion", set_content?: "...", x?: 100, y?: 200}]' },
-        items: { type: 'string' },
+        updates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Title of the node to update' },
+              set_title: { type: 'string', description: 'New title for the node' },
+              set_content: { type: 'string', description: 'New markdown body' },
+              x: { type: 'number', description: 'New canvas x position' },
+              y: { type: 'number', description: 'New canvas y position' },
+            },
+            required: ['title'],
+          },
+          description: 'One entry per node to update.',
+        },
       },
       required: ['updates'],
     },

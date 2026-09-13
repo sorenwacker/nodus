@@ -84,8 +84,20 @@ export function registerBatchTools(): void {
       properties: {
         nodes: {
           type: 'array',
-          items: { type: 'string' },
-          description: 'Array of {title, content, mode?} objects. mode="append" adds to existing content.',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Node title' },
+              content: { type: 'string', description: 'Markdown body of the node' },
+              mode: {
+                type: 'string',
+                enum: ['replace', 'append'],
+                description: '"append" adds to an existing node\'s content; the default replaces it',
+              },
+            },
+            required: ['title'],
+          },
+          description: 'The nodes to create or update.',
         },
       },
       required: ['nodes'],
