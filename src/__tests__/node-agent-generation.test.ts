@@ -35,8 +35,11 @@ describe('the node agent generation token', () => {
     expect(unguarded.length).toBe(1)
   })
 
-  it('guards the content, so an in-flight tool call cannot overwrite it', () => {
-    const inLoop = [...source.matchAll(/if \(isCurrent\(\)\) currentContent\.value =/g)]
-    expect(inLoop.length).toBeGreaterThanOrEqual(2)
+  it('stops the loop when superseded, rather than only its reports', () => {
+    // Guarding each write left the loop requesting completions and executing
+    // the tool calls that came back, and the note is written through
+    // ctx.updateContent, which no guard covered
+    const bails = [...source.matchAll(/if \(!isCurrent\(\)\) return SUPERSEDED/g)]
+    expect(bails.length, 'the loop and every write to the note bail out').toBeGreaterThanOrEqual(6)
   })
 })

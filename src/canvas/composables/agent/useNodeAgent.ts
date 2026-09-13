@@ -172,6 +172,9 @@ function getNodeAgentTools() {
   return tools.filter(t => allowedTools.has(t.function.name))
 }
 
+/** What a run returns once a newer run has superseded it. */
+const SUPERSEDED = 'Superseded by a newer run'
+
 export function useNodeAgent() {
   const isRunning = ref(false)
   const log: Ref<string[]> = ref([])
@@ -299,8 +302,13 @@ DO NOT call node_done() without first calling update_content(). Your response wi
     const maxIterations = 20
 
     for (let i = 0; i < maxIterations; i++) {
+      // A superseded run stops working rather than only stopping its reports:
+      // it makes no further request and no further change to the note
+      // (PRODUCT_DESIGN.md > Superseding an agent run)
+      if (!isCurrent()) return SUPERSEDED
       try {
         const data = await llmQueue.chat(messages, nodeTools)
+        if (!isCurrent()) return SUPERSEDED
         const msg = data.message
         messages.push(msg)
 
@@ -375,7 +383,8 @@ DO NOT call node_done() without first calling update_content(). Your response wi
 
               case 'update_content': {
                 const rawContent = args.content as string
-                if (isCurrent()) currentContent.value = rawContent
+                if (!isCurrent()) return SUPERSEDED
+                currentContent.value = rawContent
                 await ctx.updateContent(rawContent)
                 contentWasUpdated = true
                 result = 'Content updated and saved'
@@ -385,6 +394,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
 
               case 'append_content': {
                 const rawText = args.text as string
+                if (!isCurrent()) return SUPERSEDED
                 currentContent.value += '\n' + rawText
                 await ctx.updateContent(currentContent.value)
                 contentWasUpdated = true
@@ -394,6 +404,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
               }
 
               case 'update_title':
+                if (!isCurrent()) return SUPERSEDED
                 await ctx.updateTitle(args.title as string)
                 result = `Title changed to "${args.title}"`
                 if (isCurrent()) log.value.push(`  Title: ${args.title}`)
@@ -407,7 +418,8 @@ DO NOT call node_done() without first calling update_content(). Your response wi
                   llmQueue.generate(p, s)
                 )
                 if (formatted !== originalContent) {
-                  if (isCurrent()) currentContent.value = formatted
+                  if (!isCurrent()) return SUPERSEDED
+                  currentContent.value = formatted
                   await ctx.updateContent(formatted)
                   contentWasUpdated = true
                   result = 'Math reformatted to Typst and saved'
