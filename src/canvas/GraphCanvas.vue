@@ -382,10 +382,9 @@ const { showPerfOverlay, perfSummary, recordSpan: recordPerfSpan } = usePerfOver
 // Before its readers (canvas-setup-order.test)
 const nodeEditor = useNodeEditor({
   store: {
-    getNode: store.getNode,
-    updateNodeContent: store.updateNodeContent,
-    updateNodeTitle: store.updateNodeTitle,
-    setEditingNode: store.setEditingNode,
+    getNode: store.getNode, updateNodeContent: store.updateNodeContent,
+    updateNodeTitle: store.updateNodeTitle, setEditingNode: store.setEditingNode,
+    beginEdit: store.startEditing, endEdit: store.stopEditing,
   },
 })
 // One save path: the event handlers save content through nodeEditor.saveEditing, then render mermaid and auto-fit

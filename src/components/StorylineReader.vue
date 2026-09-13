@@ -2,7 +2,6 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNodesStore } from '../stores/nodes'
-import { acquireEditLock, releaseEditLock } from '../lib/tauri'
 import { extractHeadings } from '../lib/contentParser'
 import { uiStorage } from '../lib/storage'
 import { usePanelReveal } from '../composables/usePanelReveal'
@@ -99,11 +98,10 @@ async function startSectionEdit(node: Node) {
   if (editingSectionId.value) await saveSectionEdit()
 
   editingLockError.value = null
-  try {
-    // The lock comes first: a locked file must never be silently forked
-    await acquireEditLock(node.id)
-  } catch (e) {
-    editingLockError.value = e instanceof Error ? e.message : String(e)
+  // The lock comes first: a locked file must never be silently forked. One
+  // composable holds the locks, shared with the canvas editor
+  if (!(await store.startEditing(node.id))) {
+    editingLockError.value = 'This file is open in another application'
     return
   }
   editingText.value = node.markdown_content || ''
@@ -124,14 +122,14 @@ async function saveSectionEdit() {
       renderNodeContent(node)
     }
   } finally {
-    await releaseEditLock(id).catch(() => {})
+    await store.stopEditing(id)
   }
 }
 
 async function cancelSectionEdit() {
   const id = editingSectionId.value
   editingSectionId.value = null
-  if (id) await releaseEditLock(id).catch(() => {})
+  if (id) await store.stopEditing(id)
 }
 
 function onEditorKeydown(event: KeyboardEvent) {

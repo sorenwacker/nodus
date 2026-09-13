@@ -87,7 +87,7 @@ describe('editing in the reader', () => {
   it('acquires the file lock before the textarea appears', () => {
     // A locked file must never be silently forked
     const fn = reader.slice(reader.indexOf('async function startSectionEdit'))
-    const lock = fn.indexOf('acquireEditLock')
+    const lock = fn.indexOf('store.startEditing')
     const editing = fn.indexOf('editingSectionId.value = node.id')
     expect(lock).toBeGreaterThan(-1)
     expect(lock).toBeLessThan(editing)
@@ -96,7 +96,7 @@ describe('editing in the reader', () => {
   it('saves through the store path the canvas uses', () => {
     const fn = reader.slice(reader.indexOf('async function saveSectionEdit'))
     expect(fn).toContain('updateNodeContent')
-    expect(fn).toContain('releaseEditLock')
+    expect(fn).toContain('store.stopEditing')
   })
 })
 

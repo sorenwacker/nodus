@@ -16,6 +16,14 @@ export interface NodeEditorStore {
    * (PRODUCT_DESIGN.md > Reconciling a file with the node open in the editor).
    */
   setEditingNode?: (id: string | null) => void
+  /**
+   * Take the node's file lock before editing it, and report whether it was
+   * granted. A file another application holds is never edited here
+   * (PRODUCT_DESIGN.md > File Locking Workflow).
+   */
+  beginEdit?: (id: string) => Promise<boolean>
+  /** Release the lock taken for a node */
+  endEdit?: (id: string) => Promise<void>
 }
 
 export interface UseNodeEditorOptions {
@@ -100,6 +108,15 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
 
     editingNodeId.value = nodeId
     publishEditingNode()
+    void store.beginEdit?.(nodeId).then(granted => {
+      // Refused: the file belongs to another application for now
+      if (!granted && editingNodeId.value === nodeId) {
+        editingNodeId.value = null
+        editContent.value = ''
+        editingFrontmatter = null
+        publishEditingNode()
+      }
+    })
     // The editor shows only the body; a metadata header stays out of sight
     // and out of reach of accidental edits
     const { frontmatter, body } = splitFrontmatter(node.markdown_content || '')
@@ -174,6 +191,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     if (nodeId) {
       store.updateNodeContent(nodeId, joinFrontmatter(editingFrontmatter, editContent.value))
       onAfterSave?.(nodeId)
+      void store.endEdit?.(nodeId)
     }
     editingNodeId.value = null
     editContent.value = ''
