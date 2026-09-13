@@ -14,7 +14,6 @@ pub struct CreateWorkspaceInput {
     pub id: String,
     pub name: String,
     pub color: Option<String>,
-    pub vault_path: Option<String>,
 }
 
 #[tauri::command]
@@ -26,7 +25,9 @@ pub async fn create_workspace(input: CreateWorkspaceInput) -> Result<Workspace, 
         id: input.id,
         name: input.name,
         color: input.color,
-        vault_path: input.vault_path,
+        // The vault is chosen in the workspace editor, which stores it there
+        // (PRODUCT_DESIGN.md > Workspace settings)
+        vault_path: None,
         sync_enabled: false,
         created_at: now,
         updated_at: now,

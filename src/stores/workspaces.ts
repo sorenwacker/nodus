@@ -157,7 +157,6 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
         id: workspace.id,
         name: workspace.name,
         color: null,
-        vaultPath: null,
       },
     })
 
