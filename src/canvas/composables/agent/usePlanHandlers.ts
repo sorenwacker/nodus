@@ -48,7 +48,10 @@ export function usePlanHandlers(ctx: UsePlanHandlersContext): UsePlanHandlersRet
         // Resume agent with approval. The selection captured when the run
         // started is still held, so execution acts on the nodes the user had
         // selected when they asked (PRODUCT_DESIGN.md > What the agent acts on)
-        await agentRunner.resume({ approved: true })
+        // The runner is handed the plan rather than reaching for it: its
+        // prompt is rebuilt around what the user approved
+        // (PRODUCT_DESIGN.md > The prompt of an approved run carries its plan)
+        await agentRunner.resume({ approved: true }, planState.currentPlan.value)
       }
     }
   }

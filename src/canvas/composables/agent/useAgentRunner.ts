@@ -25,11 +25,6 @@ import {
   getModeMaxIterations,
   DEFAULT_AGENT_MODE,
 } from '../../../llm/agentModes'
-import {
-  shouldEnhancePrompt,
-  enhancePrompt,
-  detectIntent,
-} from '../../../llm/promptEnhancer'
 import { preflightCheck, estimateAgentTokens } from '../../../llm/tokenEstimator'
 import { buildSystemPrompt, pruneMessages } from './systemPrompt'
 
@@ -223,23 +218,6 @@ export function useAgentRunner(ctx: AgentContext) {
     ctx.log.value.push(`> Provider: ${providerId} (${ctx.model.value})`)
     ctx.log.value.push(`> Mode: ${mode.value}`)
 
-    // Enhance prompt if it's a graph creation request
-    let enhancedRequest = userRequest
-    if (shouldEnhancePrompt(userRequest)) {
-      const intent = detectIntent(userRequest)
-      ctx.log.value.push(`> Detected: ${intent.graphType} (${intent.domain})`)
-      enhancedRequest = enhancePrompt(userRequest)
-      // Log enhanced prompt in agent log
-      ctx.log.value.push(`--- ENHANCED PROMPT ---`)
-      for (const line of enhancedRequest.split('\n').slice(0, 20)) {
-        ctx.log.value.push(line)
-      }
-      if (enhancedRequest.split('\n').length > 20) {
-        ctx.log.value.push('... (truncated)')
-      }
-      ctx.log.value.push(`-----------------------`)
-    }
-
     // Build initial messages with current node state, memories, and mode
     // Include recent conversation history for context continuity
     const recentHistory = ctx.conversationHistory.value.slice(-6) // Last 3 exchanges
@@ -247,7 +225,7 @@ export function useAgentRunner(ctx: AgentContext) {
     const messages: ChatMessage[] = [
       buildSystemPrompt(ctx.filteredNodes(), ctx.filteredEdges(), ctx.workspaceId(), mode.value, currentPlan.value, selectedIds),
       ...recentHistory,
-      { role: 'user', content: enhancedRequest },
+      { role: 'user', content: userRequest },
     ]
     pinnedMessageCount = messages.length
 
@@ -265,7 +243,10 @@ export function useAgentRunner(ctx: AgentContext) {
   /**
    * Resume after pause (e.g., after approval)
    */
-  async function resume(approvalResult?: { approved: boolean; message?: string }): Promise<AgentRunResult> {
+  async function resume(
+    approvalResult?: { approved: boolean; message?: string },
+    approvedPlan?: AgentPlan | null
+  ): Promise<AgentRunResult> {
     if (!isPaused.value || savedMessages.length === 0) {
       return { status: 'error', message: 'No paused agent to resume' }
     }
@@ -283,6 +264,21 @@ export function useAgentRunner(ctx: AgentContext) {
         // Switch to execute mode
         mode.value = 'execute'
         ctx.log.value.push('> Plan approved - switching to execute mode')
+
+        // Resuming replays the messages this run saved, whose system prompt was
+        // built in plan mode: it carries no plan and tells the model it has no
+        // tools to change the graph. Rebuild it for the mode now in force, with
+        // the plan the user approved
+        // (PRODUCT_DESIGN.md > The prompt of an approved run carries its plan).
+        currentPlan.value = approvedPlan ?? null
+        savedMessages[0] = buildSystemPrompt(
+          ctx.filteredNodes(),
+          ctx.filteredEdges(),
+          ctx.workspaceId(),
+          mode.value,
+          currentPlan.value,
+          ctx.selectedNodeIds?.() || []
+        )
       } else {
         savedMessages.push({
           role: 'user',

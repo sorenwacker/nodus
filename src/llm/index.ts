@@ -15,12 +15,3 @@ export { registerCoreTools, resetPositionCounter as resetToolPositionCounter } f
 
 // LLM Queue - all LLM calls MUST go through this
 export { llmQueue } from './queue'
-
-// Prompt enhancement
-export {
-  enhancePrompt,
-  detectIntent,
-  shouldEnhancePrompt,
-  type GraphType,
-  type Domain,
-} from './promptEnhancer'
