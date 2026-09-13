@@ -39,6 +39,22 @@ pub async fn acquire_edit_lock(
     locks_state: State<'_, LocksState>,
 ) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+    acquire_edit_lock_impl(pool, &locks_state.0, &node_id).await
+}
+
+pub(crate) async fn acquire_edit_lock_impl(
+    pool: &database::DbPool,
+    locks: &std::sync::Mutex<std::collections::HashMap<String, FileLock>>,
+    node_id: &str,
+) -> Result<(), String> {
+    let node_id = node_id.to_string();
+
+    // A lock this session already holds is not another application holding it:
+    // taking it again would refuse the user their own editor
+    // (PRODUCT_DESIGN.md > File Locking Workflow)
+    if locks.lock().unwrap().contains_key(&node_id) {
+        return Ok(());
+    }
 
     // Get the node to find its file path
     let node = database::nodes::get_by_id(pool, &node_id)
@@ -65,8 +81,8 @@ pub async fn acquire_edit_lock(
     })?;
 
     // Store lock
-    let mut locks = locks_state.0.lock().unwrap();
-    locks.insert(node_id, lock);
+    let mut held = locks.lock().unwrap();
+    held.insert(node_id, lock);
 
     Ok(())
 }
@@ -87,4 +103,51 @@ pub async fn release_edit_lock(
 pub async fn get_locked_nodes(locks_state: State<'_, LocksState>) -> Result<Vec<String>, String> {
     let locks = locks_state.0.lock().unwrap();
     Ok(locks.keys().cloned().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::DbPool;
+    use sqlx::sqlite::SqlitePoolOptions;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    async fn memory_pool() -> DbPool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory pool");
+        database::run_migrations(&pool).await.expect("migrations");
+        pool
+    }
+
+    /// Nodus is not another application: a second request for a lock this
+    /// session already holds succeeds (PRODUCT_DESIGN.md > File Locking Workflow).
+    #[tokio::test]
+    async fn takes_a_lock_it_already_holds_without_complaint() {
+        let pool = memory_pool().await;
+        let dir = tempfile::tempdir().expect("temp dir");
+        let file = dir.path().join("Alpha.md");
+        std::fs::write(&file, "a note").expect("write note");
+        sqlx::query("INSERT INTO nodes (id, title, file_path, created_at, updated_at) VALUES ('n1', 'Alpha', ?, 0, 0)")
+            .bind(file.to_string_lossy().to_string())
+            .execute(&pool)
+            .await
+            .expect("insert node");
+        let locks: Mutex<HashMap<String, FileLock>> = Mutex::new(HashMap::new());
+
+        acquire_edit_lock_impl(&pool, &locks, "n1")
+            .await
+            .expect("first lock");
+        let second = acquire_edit_lock_impl(&pool, &locks, "n1").await;
+
+        assert!(
+            second.is_ok(),
+            "the user's own editor is refused: {:?}",
+            second
+        );
+        assert_eq!(locks.lock().unwrap().len(), 1);
+    }
 }
