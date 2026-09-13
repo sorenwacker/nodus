@@ -28,11 +28,11 @@ pub async fn sync_node_wikilinks(node_id: String) -> Result<usize, String> {
 /// Record the content hash a node's wikilinks were last synced at, so the
 /// full pass can skip it while unchanged
 pub(crate) async fn set_synced_hash(pool: &database::DbPool, node_id: &str, hash: &str) {
-    let _ = sqlx::query("UPDATE nodes SET wikilink_synced_hash = ? WHERE id = ?")
-        .bind(hash)
-        .bind(node_id)
-        .execute(pool)
-        .await;
+    // Bookkeeping: a failure here costs a redundant sync next time, so it is
+    // reported rather than dropped
+    if let Err(e) = database::wikilinks::set_synced_hash(pool, node_id, hash).await {
+        eprintln!("[Wikilinks] Failed to record the synced hash for {node_id}: {e}");
+    }
 }
 
 /// The normalized keys under which a node is reachable by wikilinks
@@ -63,14 +63,10 @@ pub(crate) async fn resolve_pending_links_to(
     let keys = node_link_keys(node);
     let mut sources: Vec<String> = Vec::new();
     for key in &keys {
-        let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT DISTINCT source_node_id FROM pending_wikilinks WHERE target_key = ?",
-        )
-        .bind(key)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-        for (id,) in rows {
+        let rows = database::wikilinks::sources_waiting_for(pool, key)
+            .await
+            .map_err(|e| e.to_string())?;
+        for id in rows {
             if !sources.contains(&id) && id != node.id {
                 sources.push(id);
             }
@@ -124,16 +120,9 @@ pub(crate) async fn sync_workspace_wikilinks_impl(
         .map_err(|e| e.to_string())?;
 
     // Last-synced hashes, fetched in one query
-    let synced_hashes: std::collections::HashMap<String, String> =
-        sqlx::query_as::<_, (String, Option<String>)>(
-            "SELECT id, wikilink_synced_hash FROM nodes WHERE wikilink_synced_hash IS NOT NULL",
-        )
-        .fetch_all(pool)
+    let synced_hashes = database::wikilinks::synced_hashes(pool)
         .await
-        .map_err(|e| e.to_string())?
-        .into_iter()
-        .filter_map(|(id, hash)| hash.map(|h| (id, h)))
-        .collect();
+        .map_err(|e| e.to_string())?;
 
     // Build title map lazily: only needed once a node actually syncs
     let mut title_to_id: Option<std::collections::HashMap<String, String>> = None;
@@ -288,18 +277,8 @@ pub(crate) async fn sync_wikilinks_for_node_with_map(
     }
 
     // Replace this node's pending-link records with the current unresolved set
-    let _ = sqlx::query("DELETE FROM pending_wikilinks WHERE source_node_id = ?")
-        .bind(source_id)
-        .execute(pool)
-        .await;
-    for key in &unresolved {
-        let _ = sqlx::query(
-            "INSERT OR IGNORE INTO pending_wikilinks (source_node_id, target_key) VALUES (?, ?)",
-        )
-        .bind(source_id)
-        .bind(key)
-        .execute(pool)
-        .await;
+    if let Err(e) = database::wikilinks::replace_pending_links(pool, source_id, &unresolved).await {
+        eprintln!("[Wikilinks] Failed to record pending links for {source_id}: {e}");
     }
 
     let now = chrono::Utc::now().timestamp();

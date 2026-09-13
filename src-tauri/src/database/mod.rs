@@ -14,6 +14,7 @@ pub mod edges;
 pub mod mcp_trust;
 pub mod models;
 pub mod nodes;
+pub mod wikilinks;
 
 // Re-export submodules for backward compatibility
 pub use models::frames;
