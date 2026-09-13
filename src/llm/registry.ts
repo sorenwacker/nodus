@@ -52,6 +52,18 @@ export interface ToolContext {
   ) => void
   // NodeService for guaranteed undo on deletions and moves
   service?: NodeService
+  /**
+   * Arrange nodes by simulating forces.
+   *
+   * Supplied by whoever composes the application: the layout belongs to the
+   * canvas, and the shared layer must not reach into a consumer to find it. A
+   * context that does not supply it reports the capability as unavailable.
+   */
+  applyForceLayout?: (
+    nodes: Array<{ id: string; x: number; y: number; width: number; height: number }>,
+    edges: Array<{ source: string; target: string }>,
+    options?: { centerX?: number; centerY?: number; iterations?: number }
+  ) => Promise<Map<string, { x: number; y: number }>>
   // Selection state for selection-aware tools
   selectedNodeIds?: string[]
   editingNodeId?: string | null
@@ -137,22 +149,6 @@ class ToolRegistry {
   }
 
   /**
-   * Unregister a tool (useful for plugin cleanup)
-   */
-  unregister(name: string): boolean {
-    const tool = this.tools.get(name)
-    if (!tool) return false
-
-    this.tools.delete(name)
-
-    // Remove from category tracking
-    const category = tool.category || 'default'
-    this.categories.get(category)?.delete(name)
-
-    return true
-  }
-
-  /**
    * Get all tool definitions for LLM function calling
    */
   getToolDefinitions(): Array<{ type: 'function'; function: ToolDefinition }> {
@@ -160,22 +156,6 @@ class ToolRegistry {
       type: 'function' as const,
       function: t.definition,
     }))
-  }
-
-  /**
-   * Get tool definitions filtered by category
-   */
-  getToolsByCategory(category: string): Array<{ type: 'function'; function: ToolDefinition }> {
-    const names = this.categories.get(category)
-    if (!names) return []
-
-    return Array.from(names)
-      .map(name => this.tools.get(name))
-      .filter((t): t is RegisteredTool => t !== undefined)
-      .map(t => ({
-        type: 'function' as const,
-        function: t.definition,
-      }))
   }
 
   /**
@@ -252,20 +232,6 @@ class ToolRegistry {
    */
   has(name: string): boolean {
     return this.tools.has(name)
-  }
-
-  /**
-   * Get all registered tool names
-   */
-  getToolNames(): string[] {
-    return Array.from(this.tools.keys())
-  }
-
-  /**
-   * Get all categories
-   */
-  getCategories(): string[] {
-    return Array.from(this.categories.keys())
   }
 
   /**
