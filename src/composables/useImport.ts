@@ -4,6 +4,7 @@
  */
 import { ref } from 'vue'
 import { relativeFolder } from '../lib/vaultPaths'
+import { fileNameFromPath } from '../lib/pdfGraph'
 import { frameSizeToContain, type CanvasRect } from '../lib/geometry'
 import { invoke, readTextFile, refreshWorkspace as refreshWorkspaceApi, setWorkspaceSync } from '../lib/tauri'
 import { parseReferences, citationToMarkdown } from '../lib/bibtex'
@@ -378,14 +379,24 @@ export function useImport(deps: ImportDeps) {
       const workspaceId = targetWorkspaceId ?? deps.getCurrentWorkspaceId()
       storeLogger.info(`Importing vault: ${path}, deleteOriginals: ${deleteOriginals}`)
 
-      const importedNodes = await invoke<Node[]>('import_vault', {
-        path,
-        workspaceId,
-        deleteOriginals: deleteOriginals ?? false,
-      })
+      const result = await invoke<{ nodes: Node[]; skipped: Array<{ path: string; reason: string }> }>(
+        'import_vault',
+        { path, workspaceId, deleteOriginals: deleteOriginals ?? false }
+      )
+      const importedNodes = result.nodes
 
       storeLogger.info(`Imported ${importedNodes.length} nodes`)
       deps.addNodes(importedNodes)
+
+      // A file the import could not take is named, rather than left unsaid
+      // (PRODUCT_DESIGN.md > Importing a vault)
+      if (result.skipped.length > 0) {
+        const names = result.skipped.map(s => `${fileNameFromPath(s.path)}: ${s.reason}`)
+        notifications$.warning(
+          `Imported ${importedNodes.length} notes, skipped ${result.skipped.length}`,
+          names.join('; ')
+        )
+      }
 
       // Create frames from folder structure if frame creation is available
       if ((deps.createFrame || deps.createFrameAsync) && deps.assignNodesToFrame && importedNodes.length > 0) {

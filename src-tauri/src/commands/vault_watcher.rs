@@ -341,9 +341,32 @@ pub async fn import_vault(
     path: String,
     workspace_id: Option<String>,
     delete_originals: Option<bool>,
-) -> Result<Vec<Node>, String> {
-    let path = PathBuf::from(&path);
-    let should_delete = delete_originals.unwrap_or(false);
+) -> Result<ImportResult, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    import_vault_impl(pool, &path, workspace_id, delete_originals.unwrap_or(false)).await
+}
+
+/// A file the import could not take, and why.
+#[derive(Debug, serde::Serialize)]
+pub struct SkippedFile {
+    pub path: String,
+    pub reason: String,
+}
+
+/// What an import took, and what it left behind.
+#[derive(Debug, serde::Serialize)]
+pub struct ImportResult {
+    pub nodes: Vec<Node>,
+    pub skipped: Vec<SkippedFile>,
+}
+
+pub(crate) async fn import_vault_impl(
+    pool: &database::DbPool,
+    path: &str,
+    workspace_id: Option<String>,
+    should_delete: bool,
+) -> Result<ImportResult, String> {
+    let path = PathBuf::from(path);
 
     println!(
         "Importing vault from: {:?}, workspace_id: {:?}, delete_originals: {}",
@@ -354,12 +377,14 @@ pub async fn import_vault(
         return Err("Vault path does not exist".to_string());
     }
 
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
     let mut nodes = Vec::new();
     let mut title_to_id: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
     let mut node_links: Vec<(String, Vec<String>)> = Vec::new();
     let mut skipped = 0;
+    // A file the import cannot take is left behind and named, rather than
+    // stopping the import (PRODUCT_DESIGN.md > Importing a vault)
+    let mut skipped_files: Vec<SkippedFile> = Vec::new();
 
     // Track folders and their frames
     // Key: relative folder path, Value: (frame_id, frame_x, frame_y)
@@ -453,7 +478,17 @@ pub async fn import_vault(
         }
 
         // Read file content
-        let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(content) => content,
+            Err(e) => {
+                eprintln!("Skipping {}: {}", file_path_str, e);
+                skipped_files.push(SkippedFile {
+                    path: file_path_str.clone(),
+                    reason: e.to_string(),
+                });
+                continue;
+            }
+        };
 
         // Extract title from filename
         let title = file_path
@@ -529,9 +564,14 @@ pub async fn import_vault(
             deleted_at: None,
         };
 
-        database::nodes::create(pool, &node)
-            .await
-            .map_err(|e| e.to_string())?;
+        if let Err(e) = database::nodes::create(pool, &node).await {
+            eprintln!("Skipping {}: {}", file_path_str, e);
+            skipped_files.push(SkippedFile {
+                path: file_path_str.clone(),
+                reason: e.to_string(),
+            });
+            continue;
+        }
 
         // Track file for deletion if requested
         if should_delete {
@@ -632,7 +672,10 @@ pub async fn import_vault(
              nodes.len(), skipped, edge_count, frame_count, duplicates_removed,
              if should_delete { format!(", {} files deleted", deleted_count) } else { String::new() });
 
-    Ok(nodes)
+    Ok(ImportResult {
+        nodes,
+        skipped: skipped_files,
+    })
 }
 
 /// Refresh all nodes in a workspace from their source files
@@ -703,6 +746,37 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
 
 #[cfg(test)]
 mod tests {
+    /// A file the import cannot take does not stop it: the rest arrives, and
+    /// the one left behind is named (PRODUCT_DESIGN.md > Importing a vault).
+    #[tokio::test]
+    async fn imports_the_rest_and_names_the_file_it_could_not_read() {
+        let pool = memory_pool().await;
+        let vault = tempfile::tempdir().expect("temp dir");
+        std::fs::write(vault.path().join("Good.md"), "a readable note").expect("write note");
+        // Not valid UTF-8, so reading it as text fails
+        std::fs::write(vault.path().join("Broken.md"), [0xff, 0xfe, 0x00]).expect("write bytes");
+
+        let result = super::import_vault_impl(
+            &pool,
+            vault.path().to_str().unwrap(),
+            Some("w1".to_string()),
+            false,
+        )
+        .await
+        .expect("the import finishes");
+
+        assert_eq!(
+            result
+                .nodes
+                .iter()
+                .map(|n| n.title.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Good"]
+        );
+        assert_eq!(result.skipped.len(), 1, "the unreadable file is reported");
+        assert!(result.skipped[0].path.ends_with("Broken.md"));
+        assert!(!result.skipped[0].reason.is_empty());
+    }
     use crate::database::{self, DbPool};
     use sqlx::sqlite::SqlitePoolOptions;
 
