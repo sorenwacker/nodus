@@ -53,6 +53,8 @@ export function agentToolStoreAdapter(
       store.createStoryline(title, description),
     addNodeToStoryline: (storylineId: string, nodeId: string) =>
       store.addNodeToStoryline(storylineId, nodeId),
-    currentWorkspaceId: store.currentWorkspaceId,
+    get currentWorkspaceId() {
+      return store.currentWorkspaceId
+    },
   }
 }

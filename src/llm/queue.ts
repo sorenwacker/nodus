@@ -227,9 +227,15 @@ class LLMQueue {
 
   /**
    * Reactive state
+   *
+   * One value, created once: a getter that built a fresh `computed` per access
+   * handed every reader a different value to watch
+   * (PRODUCT_DESIGN.md > Reads that stay live).
    */
+  private readonly pending = computed(() => this.queue.length)
+
   get pendingCount() {
-    return computed(() => this.queue.length)
+    return this.pending
   }
 
   get isProcessing() {
@@ -239,20 +245,3 @@ class LLMQueue {
 
 // Singleton - THE ONLY way to call LLMs
 export const llmQueue = new LLMQueue()
-
-/**
- * Composable for LLM queue
- */
-export function useLLMQueue() {
-  return {
-    generate: (prompt: string, system?: string, priority?: number, onProgress?: (textSoFar: string) => void) =>
-      llmQueue.generate(prompt, system, priority, onProgress),
-    chat: (messages: ChatMessage[], tools?: LLMTool[]) =>
-      llmQueue.chat(messages, tools),
-    cancel: () => llmQueue.cancel(),
-    cancelCurrent: () => llmQueue.cancelCurrent(),
-    stats: () => llmQueue.getStats(),
-    isProcessing: llmQueue.isProcessing,
-    pendingCount: llmQueue.pendingCount,
-  }
-}

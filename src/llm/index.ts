@@ -14,7 +14,7 @@ export { toolRegistry, defineTool, type ToolDefinition, type ToolHandler, type I
 export { registerCoreTools, resetPositionCounter as resetToolPositionCounter } from './tools'
 
 // LLM Queue - all LLM calls MUST go through this
-export { llmQueue, useLLMQueue } from './queue'
+export { llmQueue } from './queue'
 
 // Prompt enhancement
 export {
