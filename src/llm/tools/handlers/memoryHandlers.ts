@@ -157,7 +157,11 @@ export const popTaskHandler: ToolHandler = async (
   if (!task) return 'Stack is empty'
 
   ctx.log(`[stack] Popped: ${task.description}`)
-  return `Popped task: ${task.description}${task.context ? `\nContext: ${task.context}` : ''}`
+  // The context is stored as an object, so it is serialised to be read:
+  // interpolating it printed "[object Object]" and the context the model
+  // pushed came back to it as nothing
+  // (PRODUCT_DESIGN.md > Showing a task's stored context)
+  return `Popped task: ${task.description}${task.context ? `\nContext: ${JSON.stringify(task.context)}` : ''}`
 }
 
 /**
@@ -172,7 +176,7 @@ export const peekStackHandler: ToolHandler = async (
 
   if (!task) return 'Stack is empty'
 
-  return `Next task: ${task.description}${task.context ? `\nContext: ${task.context}` : ''}\nPriority: ${task.priority}`
+  return `Next task: ${task.description}${task.context ? `\nContext: ${JSON.stringify(task.context)}` : ''}\nPriority: ${task.priority}`
 }
 
 /**

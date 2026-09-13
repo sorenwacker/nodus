@@ -155,6 +155,11 @@ export class OpenAICompatibleProvider implements ILLMProvider {
       onChunk: chunk => sse.push(chunk),
     })
 
+    // The stream has closed: dispatch whatever it left buffered, since a server
+    // that ends without a final blank line would otherwise lose its last event
+    // (PRODUCT_DESIGN.md > Reading an event stream)
+    sse.flush()
+
     if (status < 200 || status >= 300) {
       throw new Error(`API error ${status}: ${sse.error() || sse.text().slice(0, 300)}`)
     }

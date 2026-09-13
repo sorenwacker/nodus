@@ -14,6 +14,11 @@ interface StreamDelta {
 export interface SseAccumulator {
   /** Feed a chunk of the response body */
   push(chunk: string): void
+  /**
+   * Dispatch whatever is still buffered, for a stream that closed without a
+   * final blank line. Without it the last event is dropped.
+   */
+  flush(): void
   /** The message assembled so far */
   text(): string
   /** Whether the stream reported that it finished */
@@ -21,6 +26,13 @@ export interface SseAccumulator {
   /** An error the stream carried in place of content, if any */
   error(): string | null
 }
+
+/**
+ * An event boundary is a blank line, and the specification allows either line
+ * ending. Splitting only on "\n\n" meant a server sending "\r\n\r\n"
+ * produced no events at all (PRODUCT_DESIGN.md > Reading an event stream).
+ */
+const EVENT_BOUNDARY = /\r\n\r\n|\n\n|\r\r/
 
 export function createSseAccumulator(): SseAccumulator {
   let buffer = ''
@@ -55,20 +67,30 @@ export function createSseAccumulator(): SseAccumulator {
     }
   }
 
+  function dispatchBlock(block: string) {
+    for (const line of block.split(/\r\n|\n|\r/)) {
+      // Comments keep the connection alive and carry nothing
+      if (line.startsWith(':')) continue
+      if (line.startsWith('data:')) handleEvent(line.slice(5))
+    }
+  }
+
   return {
     push(chunk: string) {
       buffer += chunk
-      let boundary = buffer.indexOf('\n\n')
-      while (boundary !== -1) {
-        const block = buffer.slice(0, boundary)
-        buffer = buffer.slice(boundary + 2)
-        for (const line of block.split('\n')) {
-          // Comments keep the connection alive and carry nothing
-          if (line.startsWith(':')) continue
-          if (line.startsWith('data:')) handleEvent(line.slice(5))
-        }
-        boundary = buffer.indexOf('\n\n')
+      let match = EVENT_BOUNDARY.exec(buffer)
+      while (match) {
+        const block = buffer.slice(0, match.index)
+        buffer = buffer.slice(match.index + match[0].length)
+        dispatchBlock(block)
+        match = EVENT_BOUNDARY.exec(buffer)
       }
+    },
+
+    flush() {
+      const remaining = buffer
+      buffer = ''
+      if (remaining.trim()) dispatchBlock(remaining)
     },
     text: () => content,
     done: () => finished,
