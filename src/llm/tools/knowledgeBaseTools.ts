@@ -172,7 +172,12 @@ export function registerKnowledgeBaseTools(): void {
       ctx.log(`==============================\n`)
 
       const phaseResults: SupervisorEvaluation[] = []
-      let totalResearchResult: DeepResearchResult | undefined
+      // Kept across every phase, so the completion payload reports the whole run
+    // rather than whichever phase happened to finish last
+    const findingsByPhase: DeepResearchResult['findings'][] = []
+    const seenClaims = new Set<string>()
+    const allConcepts = new Set<string>()
+    const allFollowUps = new Set<string>()
 
       // Run each phase
       for (let i = 0; i < phases.length; i++) {
@@ -192,7 +197,20 @@ export function registerKnowledgeBaseTools(): void {
             log: ctx.log,
           })
 
-          totalResearchResult = result
+          // Every phase's results are kept: reassigning here meant the
+          // completion payload carried only the last phase - typically the
+          // smallest - and everything found earlier was dropped without a word
+          // (PRODUCT_DESIGN.md > Reporting what a multi-phase run found)
+          const phaseFindings: DeepResearchResult['findings'] = []
+          for (const finding of result.findings ?? []) {
+            if (!seenClaims.has(finding.claim)) {
+              seenClaims.add(finding.claim)
+              phaseFindings.push(finding)
+            }
+          }
+          findingsByPhase.push(phaseFindings)
+          for (const concept of result.concepts ?? []) allConcepts.add(concept)
+          for (const followUp of result.suggestedFollowUps ?? []) allFollowUps.add(followUp)
 
           const evaluation = evaluatePhase(phase, result)
           phaseResults.push(evaluation)
@@ -234,15 +252,30 @@ export function registerKnowledgeBaseTools(): void {
       ctx.log(`Edge ratio: ${edgeRatio.toFixed(2)}`)
       ctx.log(`================================\n`)
 
+      // The payload is capped, and a cap taken from the front would drop the
+      // later phases - the same loss as before, from the other end. Take from
+      // each phase in turn, so every one of them is represented
+      // (PRODUCT_DESIGN.md > Reporting what a multi-phase run found).
+      const REPORTED_FINDINGS = 30
+      const reportedFindings: DeepResearchResult['findings'] = []
+      for (let depth = 0; reportedFindings.length < REPORTED_FINDINGS; depth++) {
+        const stillHaveFindings = findingsByPhase.filter(phase => phase.length > depth)
+        if (stillHaveFindings.length === 0) break
+        for (const phase of stillHaveFindings) {
+          if (reportedFindings.length >= REPORTED_FINDINGS) break
+          reportedFindings.push(phase[depth])
+        }
+      }
+
       // Return summary with findings for agent to create nodes
       return `__KB_BUILD_COMPLETE__:${JSON.stringify({
         topic: fullTopic,
         totalNodes,
         totalEdges,
         phases: phaseResults,
-        findings: totalResearchResult?.findings?.slice(0, 30) || [],
-        concepts: totalResearchResult?.concepts || [],
-        suggestedFollowUps: totalResearchResult?.suggestedFollowUps || [],
+        findings: reportedFindings,
+        concepts: Array.from(allConcepts),
+        suggestedFollowUps: Array.from(allFollowUps),
       })}`
     },
     { category: 'research' }
