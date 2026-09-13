@@ -63,6 +63,21 @@ describe('tool reachability', () => {
     expect(broken, 'documented to the model but stripped from the request').toEqual([])
   })
 
+  it('lists only tools that exist', () => {
+    // A whitelist filters registered tools, so a name matching none does
+    // nothing while reading as a capability the mode has
+    // (PRODUCT_DESIGN.md > A whitelist names registered tools)
+    const registered = new Set(toolRegistry.getToolDefinitions().map(t => t.function.name))
+    const missing: string[] = []
+    for (const mode of ['explore', 'plan', 'execute'] as AgentMode[]) {
+      for (const name of getAgentMode(mode).toolWhitelist) {
+        if (!registered.has(name)) missing.push(`${mode}: ${name}`)
+      }
+    }
+
+    expect(missing, 'named by a mode but registered by nothing').toEqual([])
+  })
+
   it('keeps the unexposed ledger honest: nothing listed there is also exposed', () => {
     const exposed = exposedNames()
     const contradictions = [...UNEXPOSED_TOOLS].filter(name => exposed.has(name))
