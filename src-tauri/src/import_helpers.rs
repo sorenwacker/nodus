@@ -11,10 +11,13 @@ pub struct MarkdownFile {
     pub folder: String,
 }
 
-/// Check if a markdown file should be excluded from import
-/// Excludes: CLAUDE.md, README.md
-fn should_exclude_file(path: &Path) -> bool {
+/// Whether a markdown file is kept out of a vault's notes: hidden files, and
+/// the files that describe the repository rather than the vault.
+pub(crate) fn should_exclude_file(path: &Path) -> bool {
     if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+        if filename.starts_with('.') {
+            return true;
+        }
         let excluded = ["CLAUDE.md", "README.md"];
         if excluded.iter().any(|&e| filename.eq_ignore_ascii_case(e)) {
             return true;
@@ -35,40 +38,46 @@ pub fn is_visible_vault_entry(entry: &walkdir::DirEntry) -> bool {
     entry.depth() == 0 || !entry.file_name().to_string_lossy().starts_with('.')
 }
 
+/// The notes of a vault: every markdown file the vault holds, hidden entries
+/// and excluded files left out.
+///
+/// Symbolic links are not followed. A link can point outside the vault, where
+/// every file operation would escape the vault check, or back into it, where
+/// the walk would not end (PRODUCT_DESIGN.md > Walking a vault). The import,
+/// the watcher and the sync passes all walk here, so they cannot drift apart.
+pub fn markdown_files_in_vault(vault_path: &Path) -> Vec<PathBuf> {
+    walkdir::WalkDir::new(vault_path)
+        .into_iter()
+        .filter_entry(is_visible_vault_entry)
+        .filter_map(|e| e.ok())
+        // The entry's own type, so a link is never taken for the file it points
+        // at: `is_file` on the path would follow it out of the vault
+        .filter(|entry| entry.file_type().is_file())
+        .map(|entry| entry.into_path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "md"))
+        .filter(|path| !should_exclude_file(path))
+        .collect()
+}
+
 pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<String, usize>) {
     let mut files = Vec::new();
     let mut folder_counts: HashMap<String, usize> = HashMap::new();
 
-    for entry in walkdir::WalkDir::new(vault_path)
-        .follow_links(true)
-        .into_iter()
-        .filter_entry(is_visible_vault_entry)
-        .filter_map(|e| e.ok())
-    {
-        let file_path = entry.path();
+    for file_path in markdown_files_in_vault(vault_path) {
+        let folder = get_relative_folder(&file_path, vault_path).unwrap_or_default();
+        println!(
+            "  Found: {:?} in folder: '{}'",
+            file_path.file_name(),
+            folder
+        );
 
-        if file_path.extension().is_some_and(|ext| ext == "md") {
-            // Skip excluded files (CLAUDE.md, README.md)
-            if should_exclude_file(file_path) {
-                println!("  Skipping excluded file: {:?}", file_path.file_name());
-                continue;
-            }
+        files.push(MarkdownFile {
+            path: file_path,
+            folder: folder.clone(),
+        });
 
-            let folder = get_relative_folder(file_path, vault_path).unwrap_or_default();
-            println!(
-                "  Found: {:?} in folder: '{}'",
-                file_path.file_name(),
-                folder
-            );
-
-            files.push(MarkdownFile {
-                path: file_path.to_path_buf(),
-                folder: folder.clone(),
-            });
-
-            // Track folder for frame creation
-            *folder_counts.entry(folder).or_insert(0) += 1;
-        }
+        // Track folder for frame creation
+        *folder_counts.entry(folder).or_insert(0) += 1;
     }
 
     println!(
@@ -147,6 +156,68 @@ mod tests {
     /// The hidden-entry filter tested every entry including the root, so the
     /// walk was pruned at depth 0 and the vault scanned as empty. The watcher's
     /// copy of the same rule already exempted the root.
+    /// One walk for import, the watcher and the sync passes
+    /// (PRODUCT_DESIGN.md > Walking a vault).
+    #[test]
+    fn collects_the_notes_of_a_vault_and_nothing_else() {
+        let vault = tempfile::tempdir().expect("temp dir");
+        // A vault whose own folder is hidden is still a vault
+        let root = vault.path().join(".notes");
+        let outside = vault.path().join("outside");
+        std::fs::create_dir_all(root.join("sub")).unwrap();
+        std::fs::create_dir_all(root.join(".obsidian")).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        for (path, name) in [
+            (root.join("note.md"), "note"),
+            (root.join("sub/deep.md"), "deep"),
+            (root.join(".obsidian/cache.md"), "cache"),
+            (root.join("CLAUDE.md"), "claude"),
+            (root.join("README.md"), "readme"),
+            (outside.join("elsewhere.md"), "elsewhere"),
+        ] {
+            std::fs::write(path, name).unwrap();
+        }
+        // A link out of the vault, and a linked folder holding a note
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(outside.join("elsewhere.md"), root.join("linked.md"))
+                .unwrap();
+            std::os::unix::fs::symlink(&outside, root.join("linked-folder")).unwrap();
+        }
+
+        let found = super::markdown_files_in_vault(&root);
+
+        let mut names: Vec<String> = found
+            .iter()
+            .map(|p| p.strip_prefix(&root).unwrap().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+        assert_eq!(
+            names,
+            vec!["note.md".to_string(), "sub/deep.md".to_string()]
+        );
+    }
+
+    /// The hidden rule is read against the vault, not the whole path, so a
+    /// vault inside a hidden folder still receives events
+    /// (PRODUCT_DESIGN.md > Walking a vault).
+    #[test]
+    fn hidden_is_judged_within_the_vault() {
+        let root = std::path::Path::new("/home/dana/.config/notes");
+        assert!(!crate::watcher::is_hidden_within(
+            root,
+            std::path::Path::new("/home/dana/.config/notes/a.md")
+        ));
+        assert!(!crate::watcher::is_hidden_within(
+            root,
+            std::path::Path::new("/home/dana/.config/notes/sub/a.md")
+        ));
+        assert!(crate::watcher::is_hidden_within(
+            root,
+            std::path::Path::new("/home/dana/.config/notes/.obsidian/a.md")
+        ));
+    }
+
     #[test]
     fn a_vault_in_a_dot_directory_is_not_empty() {
         let base = std::env::temp_dir().join("nodus-dot-vault-test");

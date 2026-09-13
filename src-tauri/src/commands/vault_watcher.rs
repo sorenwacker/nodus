@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
 
 use super::{
-    should_exclude_file, wikilinks,
+    wikilinks,
     wikilinks::{build_title_to_id_map, sync_wikilinks_for_node, sync_wikilinks_for_node_with_map},
     WatcherState,
 };
@@ -110,24 +110,8 @@ pub async fn sync_missing_files(
         .filter(|n| n.workspace_id.as_deref() == Some(&workspace_id))
         .count();
 
-    for entry in walkdir::WalkDir::new(vault_path)
-        .into_iter()
-        .filter_entry(|e| {
-            // Skip hidden files and directories
-            !e.file_name().to_string_lossy().starts_with('.')
-        })
-        .filter_map(|e| e.ok())
-    {
-        let path = entry.path();
-        if path.extension().is_none_or(|ext| ext != "md") {
-            continue;
-        }
-
-        // Skip excluded files (CLAUDE.md, README.md, hidden files)
-        if should_exclude_file(path) {
-            continue;
-        }
-
+    for path in crate::import_helpers::markdown_files_in_vault(std::path::Path::new(vault_path)) {
+        let path = path.as_path();
         let path_str = path.to_string_lossy().to_string();
         if existing_paths.contains(&path_str) {
             continue; // Already has a node
@@ -261,21 +245,7 @@ pub async fn link_nodes_to_files(workspace_id: String, vault_path: String) -> Re
     let mut filename_to_path: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
 
-    for entry in walkdir::WalkDir::new(vault_path_obj)
-        .into_iter()
-        .filter_entry(|e| !e.file_name().to_string_lossy().starts_with('.'))
-        .filter_map(|e| e.ok())
-    {
-        let path = entry.path();
-        if path.extension().is_none_or(|ext| ext != "md") {
-            continue;
-        }
-
-        // Skip excluded files (CLAUDE.md, README.md, hidden files)
-        if should_exclude_file(path) {
-            continue;
-        }
-
+    for path in crate::import_helpers::markdown_files_in_vault(vault_path_obj) {
         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
             let normalized = stem.to_lowercase();
             filename_to_path.insert(normalized, path.to_string_lossy().to_string());

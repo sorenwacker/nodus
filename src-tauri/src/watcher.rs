@@ -78,6 +78,21 @@ impl Drop for FileLock {
     }
 }
 
+/// Whether a path is hidden as far as its vault is concerned.
+///
+/// The rule is read against the path relative to the vault folder, never the
+/// absolute path: a vault inside a hidden folder, such as `~/.config/notes`,
+/// is still watched (PRODUCT_DESIGN.md > Walking a vault). A path outside the
+/// vault is not this vault's business.
+pub fn is_hidden_within(root: &Path, path: &Path) -> bool {
+    match path.strip_prefix(root) {
+        Ok(relative) => relative
+            .components()
+            .any(|c| c.as_os_str().to_string_lossy().starts_with('.')),
+        Err(_) => true,
+    }
+}
+
 /// Vault watcher state
 pub struct VaultWatcher {
     watcher: RecommendedWatcher,
@@ -93,17 +108,14 @@ impl VaultWatcher {
     {
         let checksums: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
         let checksums_clone = checksums.clone();
+        let root = path.clone();
 
         let watcher = RecommendedWatcher::new(
             move |res: Result<Event, notify::Error>| {
                 match res {
                     Ok(event) => {
                         for path in event.paths {
-                            // Skip hidden files/directories (any component starting with .)
-                            let is_hidden = path
-                                .components()
-                                .any(|c| c.as_os_str().to_string_lossy().starts_with('.'));
-                            if is_hidden {
+                            if is_hidden_within(&root, &path) {
                                 continue;
                             }
 
@@ -162,19 +174,11 @@ impl VaultWatcher {
             self.watched_path
         );
 
-        for entry in walkdir::WalkDir::new(&self.watched_path)
-            .follow_links(true)
-            .into_iter()
-            // One rule, shared with the import walk, so the two cannot drift
-            .filter_entry(crate::import_helpers::is_visible_vault_entry)
-            .filter_map(|e| e.ok())
-        {
-            let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "md") {
-                if let Ok(hash) = checksum::compute_file(path) {
-                    checksums.insert(path.to_path_buf(), hash);
-                    count += 1;
-                }
+        // One walk, shared with the import and the sync passes
+        for path in crate::import_helpers::markdown_files_in_vault(&self.watched_path) {
+            if let Ok(hash) = checksum::compute_file(&path) {
+                checksums.insert(path, hash);
+                count += 1;
             }
         }
 

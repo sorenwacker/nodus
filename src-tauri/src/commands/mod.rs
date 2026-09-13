@@ -48,23 +48,6 @@ pub struct WatcherState(pub Mutex<Option<crate::watcher::VaultWatcher>>);
 /// Global file locks state for tracking active edit locks
 pub struct LocksState(pub Mutex<std::collections::HashMap<String, FileLock>>);
 
-/// Check if a markdown file should be excluded from import/sync
-/// Excludes: hidden files (starting with .), CLAUDE.md, README.md
-pub(crate) fn should_exclude_file(path: &std::path::Path) -> bool {
-    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-        // Exclude hidden files
-        if filename.starts_with('.') {
-            return true;
-        }
-        // Exclude special files
-        let excluded = ["CLAUDE.md", "README.md"];
-        if excluded.iter().any(|&e| filename.eq_ignore_ascii_case(e)) {
-            return true;
-        }
-    }
-    false
-}
-
 /// Fetch the canonicalized vault paths of all workspaces
 async fn workspace_vaults() -> Result<Vec<std::path::PathBuf>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
