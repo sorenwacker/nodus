@@ -75,6 +75,16 @@ function extractBalancedJson(str: string): string | null {
   return null // Unbalanced
 }
 
+/** Tools whose effect on the graph is worth a line in the log. */
+const MUTATING_TOOLS = [
+  'create_node',
+  'create_nodes_batch',
+  'create_edge',
+  'create_edges_batch',
+  'delete_node',
+  'delete_matching',
+]
+
 export interface AgentContext {
   // Node store access
   filteredNodes: () => Array<{ id: string; title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>
@@ -287,6 +297,48 @@ export function useAgentRunner(ctx: AgentContext) {
   }
 
   /**
+   * Run one tool call, whatever shape it arrived in.
+   *
+   * A call recovered from the text of a reply used to be executed directly,
+   * skipping the mode allow-list, the log and the transcript. Both paths come
+   * through here (PRODUCT_DESIGN.md > One path for a tool call).
+   */
+  async function handleToolCall(
+    name: string,
+    args: Record<string, unknown>,
+    allowed: Set<string>
+  ): Promise<{ kind: 'refused'; message: string } | { kind: 'ran'; result: string }> {
+    if (!allowed.has(name)) {
+      ctx.log.value.push(`> Rejected: ${name} (not allowed in ${mode.value} mode)`)
+      return {
+        kind: 'refused',
+        message: `Error: Tool "${name}" is not available in ${mode.value} mode. Use only the tools provided.`,
+      }
+    }
+
+    // The log is where the user looks to see what the agent did, so every call
+    // appears there with its arguments summarised
+    // (PRODUCT_DESIGN.md > Agent log contents)
+    ctx.log.value.push(`> ${describeToolCall(name, args)}`)
+
+    const result = await ctx.executeAgentTool(name, args)
+    recordAction(ctx.transcript.value, name)
+
+    const outcome = String(result ?? '')
+    if (/^error/i.test(outcome.trim())) {
+      ctx.log.value.push(`  failed: ${outcome.trim().slice(0, 160)}`)
+    }
+
+    if (MUTATING_TOOLS.includes(name)) {
+      const nodes = ctx.filteredNodes()
+      const edges = ctx.filteredEdges()
+      ctx.log.value.push(`  [Graph: ${nodes.length} nodes, ${edges.length} edges]`)
+    }
+
+    return { kind: 'ran', result }
+  }
+
+  /**
    * Main agent loop
    */
   async function runLoop(
@@ -302,6 +354,7 @@ export function useAgentRunner(ctx: AgentContext) {
     for (let i = startIteration; i < maxIterations; i++) {
       // Get tools for current mode (refresh each iteration in case mode changed)
       const tools = getFilteredTools()
+      const allowedToolNames = new Set(tools.map(t => t.function.name))
       // Stop when the user stopped the agent, or when a newer run superseded
       // this loop (isRunning alone is not enough: a restart sets it back to
       // true before the old loop observes the stop)
@@ -352,27 +405,7 @@ export function useAgentRunner(ctx: AgentContext) {
         }
 
         if (msg.tool_calls && msg.tool_calls.length > 0 && !hasEmbeddedToolsInContent) {
-          // Get allowed tools for current mode
-          const allowedToolNames = new Set(tools.map(t => t.function.name))
-
           for (const tc of msg.tool_calls) {
-            // Log tool call in agent log
-            const argsPreview = typeof tc.function.arguments === 'string'
-              ? tc.function.arguments.slice(0, 150)
-              : JSON.stringify(tc.function.arguments).slice(0, 150)
-            ctx.log.value.push(`> ${tc.function.name}(${argsPreview}${argsPreview.length >= 150 ? '...' : ''})`)
-
-            // Validate tool is allowed in current mode
-            if (!allowedToolNames.has(tc.function.name)) {
-              ctx.log.value.push(`> Rejected: ${tc.function.name} (not allowed in ${mode.value} mode)`)
-              messages.push({
-                role: 'tool',
-                content: `Error: Tool "${tc.function.name}" is not available in ${mode.value} mode. Use only the tools provided.`,
-                tool_call_id: tc.id
-              })
-              continue
-            }
-
             // Parse arguments from string to object
             let parsedArgs: Record<string, unknown> = {}
             try {
@@ -394,26 +427,13 @@ export function useAgentRunner(ctx: AgentContext) {
               })
               continue
             }
-            // The log is where the user looks to see what the agent did, so
-            // every call appears there with its arguments summarised
-            // (PRODUCT_DESIGN.md > Agent log contents)
-            ctx.log.value.push(`> ${describeToolCall(tc.function.name, parsedArgs)}`)
-
-            const result = await ctx.executeAgentTool(tc.function.name, parsedArgs)
+            const handled = await handleToolCall(tc.function.name, parsedArgs, allowedToolNames)
+            if (handled.kind === 'refused') {
+              messages.push({ role: 'tool', content: handled.message, tool_call_id: tc.id })
+              continue
+            }
+            const result = handled.result
             messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
-            recordAction(ctx.transcript.value, tc.function.name)
-
-            const outcome = String(result ?? '')
-            if (/^error/i.test(outcome.trim())) {
-              ctx.log.value.push(`  failed: ${outcome.trim().slice(0, 160)}`)
-            }
-
-            // Log graph state after mutations
-            if (['create_node', 'create_nodes_batch', 'create_edge', 'create_edges_batch', 'delete_node', 'delete_matching'].includes(tc.function.name)) {
-              const nodes = ctx.filteredNodes()
-              const edges = ctx.filteredEdges()
-              ctx.log.value.push(`  [Graph: ${nodes.length} nodes, ${edges.length} edges]`)
-            }
 
             // Check for special markers
             if (result.startsWith('AGENT_DONE:')) {
@@ -477,17 +497,10 @@ export function useAgentRunner(ctx: AgentContext) {
             }
           }
         } else if (msg.content) {
-          // The log keeps a short line for diagnostics; the transcript keeps
-          // the answer in full, since a text-only reply changes nothing on
-          // the canvas and would otherwise leave no trace
-          ctx.log.value.push(`LLM: ${msg.content.slice(0, 80)}...`)
-          appendAssistantText(ctx.transcript.value, msg.content)
-
-          // Try to parse tool calls from text FIRST (fallback for models
-          // without native tool calling). The done/question heuristics below
-          // must not fire on messages that contain tool JSON: words like
-          // "complete" inside tool arguments would otherwise end the run
-          // without executing the tool.
+          // Models without native tool calling write the call into the text.
+          // Recover it BEFORE anything else: the reply is not an answer to
+          // show the user, and the wording of a tool's arguments must not be
+          // read as a completion (PRODUCT_DESIGN.md > One path for a tool call)
           let toolJson: string | null = null
 
           const jsonMatch = msg.content.match(/```json\s*([\s\S]*?)\s*```/)
@@ -516,35 +529,55 @@ export function useAgentRunner(ctx: AgentContext) {
           const rawJsonMatch = msg.content.match(/^\s*(\{"name"\s*:[\s\S]*\})/)
           if (!toolJson && rawJsonMatch) toolJson = rawJsonMatch[1]
 
+          let embeddedCall: { name: string; args: Record<string, unknown> } | null = null
           if (toolJson) {
             try {
               const parsed = JSON.parse(toolJson)
-              const toolName = parsed.name
-              const toolArgs = parsed.arguments || parsed.parameters || {}
-
-              if (toolName) {
-                const result = await ctx.executeAgentTool(toolName, toolArgs)
-                messages.push({ role: 'assistant', content: `Executed: ${toolName}` })
-                messages.push({ role: 'user', content: `Tool result: ${result}\n\nContinue with the next action or call done if finished.` })
-
-                if (result.startsWith('AGENT_DONE:')) {
-                  ctx.conversationHistory.value.push({
-                    role: 'assistant',
-                    content: result.replace('AGENT_DONE:', '').trim()
-                  })
-                  ctx.isRunning.value = false
-                  return { status: 'done', message: result.replace('AGENT_DONE:', '').trim() }
+              if (parsed.name) {
+                embeddedCall = {
+                  name: parsed.name,
+                  args: (parsed.arguments || parsed.parameters || {}) as Record<string, unknown>,
                 }
-                continue
               }
             } catch { /* Not valid tool JSON */ }
           }
 
-          // No tool call in this reply. Whether the model has finished is not
-          // something to infer from its wording: matching words like "created"
-          // or "done" ended the run on a message describing what the model was
-          // ABOUT to do, and missed completions phrased any other way. The
-          // project rule says as much - no regex over natural language
+          if (embeddedCall) {
+            const handled = await handleToolCall(
+              embeddedCall.name,
+              embeddedCall.args,
+              allowedToolNames
+            )
+            if (handled.kind === 'refused') {
+              messages.push({ role: 'user', content: handled.message })
+              continue
+            }
+
+            const result = handled.result
+            messages.push({ role: 'assistant', content: `Executed: ${embeddedCall.name}` })
+            messages.push({ role: 'user', content: `Tool result: ${result}\n\nContinue with the next action or call done if finished.` })
+
+            if (result.startsWith('AGENT_DONE:')) {
+              const answer = result.replace('AGENT_DONE:', '').trim()
+              ctx.conversationHistory.value.push({ role: 'assistant', content: answer })
+              appendAssistantText(ctx.transcript.value, answer)
+              ctx.isRunning.value = false
+              return { status: 'done', message: answer }
+            }
+            continue
+          }
+
+          // A reply with no tool call is an answer: the log keeps a short line
+          // for diagnostics, the transcript keeps it in full, since a text-only
+          // reply changes nothing on the canvas and would leave no trace
+          ctx.log.value.push(`LLM: ${msg.content.slice(0, 80)}...`)
+          appendAssistantText(ctx.transcript.value, msg.content)
+
+          // Whether the model has finished is not something to infer from its
+          // wording: matching words like "created" or "done" ended the run on a
+          // message describing what the model was ABOUT to do, and missed
+          // completions phrased any other way. The project rule says as much -
+          // no regex over natural language
           // (PRODUCT_DESIGN.md > Deciding an agent run has ended).
           //
           // A question to the user ends the run, because the model is waiting
@@ -569,10 +602,6 @@ export function useAgentRunner(ctx: AgentContext) {
 
           ctx.isRunning.value = false
           return { status: 'done', message: msg.content.slice(0, 200) }
-
-          // Prompt to continue
-          messages.push({ role: 'user', content: 'Use tools only. Call done() when finished.' })
-          continue
         }
       } catch (e: unknown) {
         const error = e as { name?: string; message?: string }

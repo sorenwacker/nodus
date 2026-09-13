@@ -43,7 +43,14 @@ describe('the runner writes those lines', () => {
   )
 
   it('logs every tool call, not only mutations', () => {
-    expect(runner).toContain('describeToolCall(tc.function.name, parsedArgs)')
+    expect(runner).toContain('describeToolCall(name, args)')
+  })
+
+  it('logs a call recovered from reply text the same way', () => {
+    // Both shapes go through one handler, so neither can skip the log, the
+    // allow-list or the transcript (PRODUCT_DESIGN.md > One path for a tool call)
+    const calls = [...runner.matchAll(/await handleToolCall\(/g)]
+    expect(calls.length, 'the native and text paths both call the handler').toBe(2)
   })
 
   it('marks a failed call as failed', () => {
