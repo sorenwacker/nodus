@@ -150,12 +150,18 @@ export class AnthropicProvider implements ILLMProvider {
 
     if (!response.ok) {
       const errorText = await response.text()
+      // The parsed message is what the user needs: a bad key, a rate limit and
+      // an unknown model are different problems. Throwing it inside the `try`
+      // meant the sibling `catch` replaced every one of them with the status
+      // line (PRODUCT_DESIGN.md > Reporting a provider failure).
+      let message = `Anthropic error: ${response.status}`
       try {
-        const error = JSON.parse(errorText)
-        throw new Error(error.error?.message || `Anthropic error: ${response.status}`)
+        const parsed = JSON.parse(errorText)
+        if (parsed.error?.message) message = parsed.error.message
       } catch {
-        throw new Error(`Anthropic error: ${response.status}`)
+        // Not JSON: the status line is all there is
       }
+      throw new Error(message)
     }
 
     const data = await response.json()

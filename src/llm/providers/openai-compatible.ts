@@ -4,6 +4,7 @@
  */
 
 import { httpFetch, httpStreamFetch } from './http'
+import { probeProvider } from './availability'
 import { createSseAccumulator } from './sse'
 import type {
   ILLMProvider,
@@ -87,8 +88,8 @@ export class OpenAICompatibleProvider implements ILLMProvider {
    * (PRODUCT_DESIGN.md > Provider status).
    */
   async isAvailable(): Promise<boolean> {
-    try {
-      const response = await httpFetch(`${this.baseUrl}/chat/completions`, {
+    const { available, reason } = await probeProvider(() =>
+      httpFetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({
@@ -98,17 +99,9 @@ export class OpenAICompatibleProvider implements ILLMProvider {
         }),
         connectTimeout: 5000,
       })
-      if (!response.ok) {
-        const detail = typeof response.text === 'function' ? await response.text() : ''
-        this.lastAvailabilityError = `HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`
-        return false
-      }
-      this.lastAvailabilityError = null
-      return true
-    } catch (error) {
-      this.lastAvailabilityError = error instanceof Error ? error.message : String(error)
-      return false
-    }
+    )
+    this.lastAvailabilityError = reason
+    return available
   }
 
   async listModels(): Promise<ProviderModel[]> {

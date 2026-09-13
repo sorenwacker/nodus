@@ -90,6 +90,7 @@ export class OllamaProvider implements ILLMProvider {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), this.timeout)
     const streaming = typeof options.onProgress === 'function'
+    let serverAnswered = false
 
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
@@ -106,6 +107,11 @@ export class OllamaProvider implements ILLMProvider {
         }),
         signal: controller.signal,
       })
+
+      // The server answered. Anything that fails from here is a problem with
+      // the response, not with reaching Ollama
+      // (PRODUCT_DESIGN.md > Reporting a provider failure).
+      serverAnswered = true
 
       if (!response.ok) {
         clearTimeout(timeout)
@@ -150,6 +156,9 @@ export class OllamaProvider implements ILLMProvider {
       if (e instanceof Error && e.message.startsWith('Ollama error')) {
         throw e
       }
+      if (serverAnswered) {
+        throw e instanceof Error ? e : new Error(String(e))
+      }
       throw new Error('Cannot connect to Ollama. Start it with: ollama serve')
     }
   }
@@ -157,6 +166,7 @@ export class OllamaProvider implements ILLMProvider {
   async chat(options: ChatOptions): Promise<ChatResult> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), this.timeout)
+    let serverAnswered = false
 
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
@@ -175,6 +185,10 @@ export class OllamaProvider implements ILLMProvider {
       })
 
       clearTimeout(timeout)
+
+      // The server answered; a failure past this point is not a connection
+      // failure (PRODUCT_DESIGN.md > Reporting a provider failure)
+      serverAnswered = true
 
       if (!response.ok) {
         throw new Error(`Ollama error: ${response.status}`)
@@ -206,6 +220,9 @@ export class OllamaProvider implements ILLMProvider {
       clearTimeout(timeout)
       if (e instanceof Error && e.name === 'AbortError') {
         throw new Error('Request timed out')
+      }
+      if (serverAnswered) {
+        throw e instanceof Error ? e : new Error(String(e))
       }
       throw new Error('Cannot connect to Ollama. Start it with: ollama serve')
     }
