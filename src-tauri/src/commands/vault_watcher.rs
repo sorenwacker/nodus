@@ -71,7 +71,17 @@ pub async fn sync_missing_files(
     vault_path: String,
 ) -> Result<Vec<Node>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    let vault_path = std::path::Path::new(&vault_path);
+    sync_missing_files_impl(pool, &workspace_id, &vault_path).await
+}
+
+/// Create nodes for the vault's files that have none yet.
+pub(crate) async fn sync_missing_files_impl(
+    pool: &database::DbPool,
+    workspace_id: &str,
+    vault_path: &str,
+) -> Result<Vec<Node>, String> {
+    let workspace_id = workspace_id.to_string();
+    let vault_path = std::path::Path::new(vault_path);
 
     if !vault_path.exists() {
         return Err("Vault path does not exist".to_string());
@@ -173,11 +183,21 @@ pub async fn sync_missing_files(
             continue;
         }
 
-        // Create edges for wikilinks
+        // Create edges for wikilinks. The hash records what was synced, so it
+        // is written only once the sync has succeeded: a node whose sync failed
+        // is left for the next pass (PRODUCT_DESIGN.md > Importing a vault)
         let links = import_helpers::extract_wikilinks(&content);
-        let _ = sync_wikilinks_for_node(pool, &node_id, &links).await;
-        wikilinks::set_synced_hash(pool, &node_id, &crate::checksum::compute_string(&content))
-            .await;
+        match sync_wikilinks_for_node(pool, &node_id, &links).await {
+            Ok(_) => {
+                if let Some(hash) = node.checksum.as_deref() {
+                    wikilinks::set_synced_hash(pool, &node_id, hash).await;
+                }
+            }
+            Err(e) => eprintln!(
+                "[SyncMissing] Failed to sync wikilinks for {}: {}",
+                node.title, e
+            ),
+        }
 
         // Links elsewhere that dangled until this file's node existed
         if let Err(e) = wikilinks::resolve_pending_links_to(pool, &node).await {
@@ -669,4 +689,79 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
 
     println!("[RefreshWorkspace] Updated {} nodes", updated);
     Ok(updated)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::database::{self, DbPool};
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    async fn memory_pool() -> DbPool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory pool");
+        database::run_migrations(&pool).await.expect("migrations");
+        sqlx::query(
+            "INSERT INTO workspaces (id, name, created_at, updated_at) VALUES ('w1', 'W', 0, 0)",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert workspace");
+        pool
+    }
+
+    /// A vault holding one note that links to another.
+    fn vault_with_a_linking_note() -> tempfile::TempDir {
+        let vault = tempfile::tempdir().expect("temp dir");
+        std::fs::write(vault.path().join("Alpha.md"), "sees [[Beta]]").expect("write note");
+        vault
+    }
+
+    async fn synced_hash(pool: &DbPool, title: &str) -> Option<String> {
+        sqlx::query_scalar::<_, Option<String>>(
+            "SELECT wikilink_synced_hash FROM nodes WHERE title = ?",
+        )
+        .bind(title)
+        .fetch_one(pool)
+        .await
+        .expect("node row")
+    }
+
+    #[tokio::test]
+    async fn records_the_synced_hash_once_the_sync_has_succeeded() {
+        let pool = memory_pool().await;
+        let vault = vault_with_a_linking_note();
+
+        let created = super::sync_missing_files_impl(&pool, "w1", vault.path().to_str().unwrap())
+            .await
+            .expect("sync");
+
+        assert_eq!(created.len(), 1);
+        assert_eq!(
+            synced_hash(&pool, "Alpha").await,
+            Some(crate::checksum::compute_string("sees [[Beta]]"))
+        );
+    }
+
+    /// A node whose wikilink sync failed is left for the next pass, not marked
+    /// done (PRODUCT_DESIGN.md > Importing a vault).
+    #[tokio::test]
+    async fn records_no_synced_hash_when_the_sync_failed() {
+        let pool = memory_pool().await;
+        let vault = vault_with_a_linking_note();
+        // The sync reads a node's edges first, so this makes it fail
+        sqlx::query("DROP TABLE edges")
+            .execute(&pool)
+            .await
+            .expect("drop edges");
+
+        let created = super::sync_missing_files_impl(&pool, "w1", vault.path().to_str().unwrap())
+            .await
+            .expect("sync");
+
+        assert_eq!(created.len(), 1, "the note still becomes a node");
+        assert_eq!(synced_hash(&pool, "Alpha").await, None);
+    }
 }
