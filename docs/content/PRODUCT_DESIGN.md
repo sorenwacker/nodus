@@ -390,6 +390,12 @@ Three things had to be true before any of that could happen, and none were:
 - `toggleServer` awaited the start with no catch, so a failure surfaced only as an unhandled rejection.
 - The error row sat inside the "server is running" block, which is never true when a start fails.
 
+### Stopping the server
+
+Stopping reports success when the server has stopped, not when it has been asked to stop.
+
+The command sent on the shutdown channel and returned, while the flags that say whether a server runs, and on which port, were cleared later by the task that observes that message. A status read straight afterwards still reported the old port as running. A start issued straight afterwards, which is what a toggle off and on does, was refused as "already running" by a server that was already shutting down, and the settings panel then believed a server was up that had just gone.
+
 ### Provider status
 
 **Required behavior:** The status light beside a provider must report whether the application can get an answer from it, because that is the only thing the user consults it for. Probing a different endpoint from the one the work uses - a model listing rather than a completion - reports a route that can succeed while every real request fails on authorisation, gateway routing or timeout, and a green light next to a failing provider is worse than no light at all.
@@ -1576,6 +1582,16 @@ A run that works in phases reports what all of its phases found. The knowledge-b
 
 One module makes the research calls. Wikipedia search was written three times over, twice in the agent composables and once beside the article fetch it belongs with, with different timeouts and different result shapes, so a fix to one left the others as they were.
 
+### One connection attempt at a time
+
+The server reconnects, and several tool calls can want the link at the same moment. One attempt runs at a time, and a socket it replaces is detached.
+
+Each call made its own attempt: with Nodus down, ten tool calls produced ten reconnection chains, each replacing the socket the others were holding. Handlers on the superseded sockets went on firing. An old socket's opening sent authentication down whichever socket was current, an old socket's reply could mark the connection approved, and an old socket's closing scheduled yet another attempt.
+
+- An attempt already in flight is joined rather than started again.
+- A socket that is replaced is closed and its handlers removed, and an event from a socket that is no longer the current one is ignored.
+- A disconnection the application asked for does not reconnect. Closing the socket ran the same handler as a dropped link, so a deliberate disconnection reconnected at once.
+
 ### Reconnecting to Nodus
 
 The MCP server outlives any one Nodus session, so it reconnects. A tool call attempts a connection when there is none - which the startup message already promised and nothing implemented - and a successful connection restores the retry budget, because a counter that never reset ended reconnection for good after ten drops across a long session.
@@ -1592,6 +1608,18 @@ A failure says what went wrong, and its code says what kind of failure it was.
 - A request the user rejected is told apart from one still waiting. Both carry the same code, and treating them alike reported a refusal as "waiting for approval" while the caller's promise never settled.
 - Requests still in flight when the socket closes are rejected. A promise nobody will settle looks to the caller like a request still running.
 - "Not connected" covers three situations - never reached, dropped, and waiting for approval - and each says which, because the advice differs.
+- A rejection is recognised by the code and the state it carries, never by the words in its message. The text was matched against "reject", "denied" and "declined", so a refusal phrased any other way read as a wait. The refusal names no request to settle, so the connection itself records it: every later call then says the user refused, rather than that approval is still pending.
+
+### A result keyed by what identifies a node
+
+A result that maps to nodes is keyed by the node's id. Titles are not unique, and keying by title silently merges the nodes that share one: the adjacency list came back with fewer entries than the graph has nodes, and which of them survived depended on the order they were walked. The tool's own description already promised ids.
+
+### A routed tool is an advertised tool
+
+A name the request router accepts is one the server advertises, and the reverse. A name routed but never advertised answers a request no client can send, which is a handler kept alive by nothing; three were in that state.
+
+- Every case the router handles names an advertised tool, and every advertised tool is routed.
+- A gate compares the two lists, so they cannot drift apart.
 
 ### Finding nodes by colour
 
@@ -1608,6 +1636,12 @@ Three were inaccurate. A batch update counted lines of output rather than nodes,
 A node belongs to a frame when its `frame_id` says so. There is no spatial fallback, because overlap makes membership depend on where things happen to be rather than on what the user put where.
 
 Dragging a frame decided membership by 50% overlap instead, so it carried unrelated nodes that merely sat on top of it and left behind members that had been moved outside its bounds. Every other frame-aware path already stated the frame_id rule.
+
+### Moving a frame
+
+A frame moves with what it contains. Membership is the `frame_id`, so the nodes that move are the ones assigned to it, wherever they sit.
+
+Resolving an overlap pushed the neighbouring frame aside and left its nodes where they were, outside the frame that owned them. Fitting that frame to its contents afterwards then measured it around nodes it no longer held. The batch move already moved a frame's nodes by the same delta, so two paths disagreed about what moving a frame means; they now share one.
 
 ### Fitting a frame to its contents
 
@@ -1905,6 +1939,9 @@ A comment is created the same way from the storyline panel and from the reader. 
 
 - Single-entity lookups resolve within the connection's scope, exactly as the list getters do. An id a scoped listing returned must be usable by every operation that takes an id.
 - A scoped store derives its lookups from its own scoped collections rather than from the application's, so the two cannot drift.
+- A write lands in the connection's workspace, as its reads come from it. Creating a frame took the workspace from whichever one the user had open, so a scoped connection's frame appeared in a workspace nobody had asked for.
+- Storylines are scoped like nodes, edges and frames. They were read and written through the application's open workspace throughout, so a scoped connection listed the wrong workspace's storylines and created its own in the wrong place.
+- A store that scopes some of its methods and inherits the rest cannot be read for what it does. Each method is either scoped or recorded as independent of the workspace, and a gate holds the list.
 
 ### Deleting a merged wikilink edge
 
