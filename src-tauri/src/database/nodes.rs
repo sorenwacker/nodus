@@ -251,6 +251,30 @@ pub async fn update_title(pool: &DbPool, id: &str, title: &str) -> Result<(), Da
     Ok(())
 }
 
+/// Link a node to a file: its path, the content it holds and the checksum of
+/// that content, from one read, in one write
+/// (PRODUCT_DESIGN.md > Importing a vault).
+pub async fn link_to_file(
+    pool: &DbPool,
+    id: &str,
+    file_path: &str,
+    content: &str,
+    checksum: &str,
+) -> Result<(), DatabaseError> {
+    let now = chrono::Utc::now().timestamp();
+    sqlx::query(
+        "UPDATE nodes SET file_path = ?, markdown_content = ?, checksum = ?, updated_at = ? WHERE id = ?",
+    )
+    .bind(file_path)
+    .bind(content)
+    .bind(checksum)
+    .bind(now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn update_file_path_only(
     pool: &DbPool,
     id: &str,

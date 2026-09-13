@@ -217,7 +217,18 @@ pub(crate) async fn sync_missing_files_impl(
 #[tauri::command]
 pub async fn link_nodes_to_files(workspace_id: String, vault_path: String) -> Result<i32, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    let vault_path_obj = std::path::Path::new(&vault_path);
+    link_nodes_to_files_impl(pool, &workspace_id, &vault_path).await
+}
+
+/// Link nodes that have no file, or whose file is gone, to a file of the same
+/// name in the vault.
+pub(crate) async fn link_nodes_to_files_impl(
+    pool: &database::DbPool,
+    workspace_id: &str,
+    vault_path: &str,
+) -> Result<i32, String> {
+    let workspace_id = workspace_id.to_string();
+    let vault_path_obj = std::path::Path::new(vault_path);
 
     if !vault_path_obj.exists() {
         return Err("Vault path does not exist".to_string());
@@ -283,24 +294,23 @@ pub async fn link_nodes_to_files(workspace_id: String, vault_path: String) -> Re
     for node in nodes_to_link {
         let title_normalized = node.title.to_lowercase();
         if let Some(file_path) = filename_to_path.get(&title_normalized) {
-            // Compute checksum
-            let checksum = match crate::checksum::compute_file(std::path::Path::new(file_path)) {
+            // The content and its checksum come from one read, so the node
+            // holds what the file holds and the next refresh does not take a
+            // stale node for a settled one (PRODUCT_DESIGN.md > Importing a vault)
+            let content = match std::fs::read_to_string(file_path) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!(
-                        "[LinkNodes] Failed to compute checksum for {}: {}",
-                        file_path, e
-                    );
+                    eprintln!("[LinkNodes] Failed to read {}: {}", file_path, e);
                     continue;
                 }
             };
+            let checksum = crate::checksum::compute_string(&content);
 
-            // Update node with file_path and checksum (single call)
             if let Err(e) =
-                database::nodes::update_file_path(pool, &node.id, file_path, &checksum).await
+                database::nodes::link_to_file(pool, &node.id, file_path, &content, &checksum).await
             {
                 eprintln!(
-                    "[LinkNodes] Failed to update file_path for {}: {}",
+                    "[LinkNodes] Failed to link {} to its file: {}",
                     node.title, e
                 );
                 continue;
@@ -727,6 +737,48 @@ mod tests {
         .fetch_one(pool)
         .await
         .expect("node row")
+    }
+
+    async fn node_row(
+        pool: &DbPool,
+        title: &str,
+    ) -> (Option<String>, Option<String>, Option<String>) {
+        sqlx::query_as::<_, (Option<String>, Option<String>, Option<String>)>(
+            "SELECT file_path, checksum, markdown_content FROM nodes WHERE title = ?",
+        )
+        .bind(title)
+        .fetch_one(pool)
+        .await
+        .expect("node row")
+    }
+
+    /// A node linked to its file holds what the file holds: the content and
+    /// the checksum come from one read (PRODUCT_DESIGN.md > Importing a vault).
+    #[tokio::test]
+    async fn links_a_node_to_its_file_with_the_content_that_file_holds() {
+        let pool = memory_pool().await;
+        let vault = tempfile::tempdir().expect("temp dir");
+        std::fs::write(vault.path().join("Alpha.md"), "what the file says").expect("write note");
+        sqlx::query(
+            "INSERT INTO nodes (id, title, markdown_content, workspace_id, created_at, updated_at) \
+             VALUES ('n1', 'Alpha', 'what the node used to say', 'w1', 0, 0)",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert node");
+
+        let linked = super::link_nodes_to_files_impl(&pool, "w1", vault.path().to_str().unwrap())
+            .await
+            .expect("link");
+
+        assert_eq!(linked, 1);
+        let (file_path, checksum, content) = node_row(&pool, "Alpha").await;
+        assert!(file_path.is_some_and(|p| p.ends_with("Alpha.md")));
+        assert_eq!(
+            checksum,
+            Some(crate::checksum::compute_string("what the file says"))
+        );
+        assert_eq!(content, Some("what the file says".to_string()));
     }
 
     #[tokio::test]
