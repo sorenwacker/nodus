@@ -7,7 +7,7 @@ import { useDisplayStore } from '../stores/display'
 import type { Node, Edge } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
-import { useLLM, executeTool, llmQueue, type ToolContext } from '../llm'
+import { useLLM, executeTool, llmQueue } from '../llm'
 import { useI18n } from 'vue-i18n'
 import { usePanelReveal } from '../composables/usePanelReveal'
 import { memoryStorage, agentMemoryStorage } from '../lib/storage'
@@ -52,6 +52,7 @@ import { useLayout, useNeighborhoodMode } from './composables/layout'
 import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
 import { framesStoreAdapter } from './composables/frames/framesStoreAdapter'
 import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
+import { buildAgentToolContext } from './composables/agent/agentToolContext'
 import { useAgentPrompt } from './composables/agent/useAgentPrompt'
 import { usePdfGraphImport } from './composables/util/usePdfGraphImport'
 import {
@@ -1238,44 +1239,19 @@ const llmTools = useLLMTools({
 })
 
 async function executeAgentTool(name: string, args: Record<string, unknown>): Promise<string> {
-  // Create tool context for the extracted executor
-  const toolCtx: ToolContext = {
-    store: {
-      filteredNodes: store.filteredNodes,
-      filteredEdges: store.filteredEdges,
-      createNode: store.createNode,
-      createEdge: store.createEdge,
-      deleteNode: store.deleteNode,
-      deleteEdge: store.deleteEdge,
-      updateNodePosition: store.updateNodePosition,
-      updateNodeContent: store.updateNodeContent,
-      updateNodeTitle: store.updateNodeTitle,
-      updateNodeTags: store.updateNodeTags,
-      updateEdgeLabel: store.updateEdgeLabel,
-      updateEdgeColor: store.updateEdgeColor,
-      getFrames: () => store.filteredFrames,
-      createFrame: (x: number, y: number, width: number, height: number, title: string) =>
-        store.createFrame(x, y, width, height, title),
-      assignNodesToFrame: store.assignNodesToFrame,
-      getStorylines: () => store.filteredStorylines,
-      createStoryline: (title: string, description?: string) =>
-        store.createStoryline(title, description),
-      addNodeToStoryline: (storylineId: string, nodeId: string) =>
-        store.addNodeToStoryline(storylineId, nodeId),
-    },
+  const toolCtx = buildAgentToolContext({
+    store,
     log: (msg: string) => agentLog.value.push(msg),
     screenToCanvas,
     snapToGrid,
-    ollamaModel: ollamaModel.value,
-    ollamaContextLength: ollamaContextLength.value,
-    // Enable undo for AI content changes
+    getOllamaModel: () => ollamaModel.value,
+    getOllamaContextLength: () => ollamaContextLength.value,
     pushContentUndo,
-    // NodeService for guaranteed undo on deletions and moves
+    pushContentsUndo,
     service: nodeService ?? undefined,
-    // Selection state for selection-aware tools
-    selectedNodeIds: store.selectedNodeIds,
-    editingNodeId: editingNodeId.value,
-  }
+    getRunSelection: () => runSelection.value,
+    getEditingNodeId: () => editingNodeId.value,
+  })
 
   // Try extracted executor (handles simple tools)
   const result = await executeTool(name, args, toolCtx)
