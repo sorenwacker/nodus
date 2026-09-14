@@ -87,8 +87,19 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
   const centerFrameId = getNodeFrameId(centerNode)
   const centerIsFramed = !!centerFrameId
 
+  // Where no frames are shown, frame membership constrains nothing.
+  //
+  // The neighbourhood view is an overlay: it positions nodes above the canvas
+  // rather than in it, and passes an empty frame list to say so. The filter
+  // below read each node's stored frame regardless, so an unframed focus
+  // refused to place any neighbour belonging to a frame, and a framed focus
+  // refused every unframed one - they stayed wherever they sat on the canvas
+  // (PRODUCT_DESIGN.md > Radial rings).
+  const framesAreShown = getFilteredFrames().length > 0
+
   // Filter nodes to only those that should be laid out (frame_id only)
   const nodesToLayout = allNodes.filter(n => {
+    if (!framesAreShown) return true
     const nodeFrameId = getNodeFrameId(n)
     if (centerIsFramed) {
       // Center is in a frame - only include nodes in the SAME frame
@@ -287,7 +298,12 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
       const startAngle = -Math.PI / 2 // Start from top
 
       for (let i = 0; i < nodeCount; i++) {
-        const nodeId = nodesAtDepth[i]
+        // The nodes this layout may move, as the split-ring branch above also
+        // reads. Walking the unfiltered level with this count stopped early,
+        // never reaching the placeable nodes further along, and spread the
+        // angles over the indices of the wrong list
+        // (PRODUCT_DESIGN.md > Radial rings)
+        const nodeId = placeable[i]
         const node = allNodes.find(n => n.id === nodeId)
         if (!node) continue
 
