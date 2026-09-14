@@ -228,8 +228,8 @@ pub async fn start_server(
             }
             connections.clear();
         }
-        *state_clone.running.write().await = false;
-        *state_clone.port.write().await = None;
+        // `stop_server` has already cleared `running` and `port`, so that a
+        // caller sees the server gone the moment its stop returns
         println!("[MCP] Server stopped");
     });
 
@@ -241,6 +241,19 @@ pub async fn stop_server(state: Arc<McpServerState>) -> Result<(), String> {
     if !*state.running.read().await {
         return Err("Server not running".to_string());
     }
+
+    // Cleared here, before returning. Leaving it to the task that observes the
+    // shutdown message meant a status read straight afterwards still named the
+    // old port as running, and a start issued straight afterwards - which is
+    // what a toggle off and on does - was refused as "already running" by a
+    // server that was already shutting down
+    // (PRODUCT_DESIGN.md > Stopping the server).
+    //
+    // The listener itself is dropped when the task leaves its loop a moment
+    // later. A restart that overlaps that moment simply binds the next free
+    // port, which `find_available_port` already scans for.
+    *state.running.write().await = false;
+    *state.port.write().await = None;
 
     if let Some(tx) = state.shutdown_tx.lock().await.take() {
         let _ = tx.send(()).await;
@@ -622,6 +635,48 @@ async fn handle_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Stopping reports success when the server has stopped, not when it has
+    /// been asked to. The command sent on the shutdown channel and returned,
+    /// while the flags saying whether a server runs, and on which port, were
+    /// cleared later by the task that observes that message. A status read
+    /// straight afterwards still named the old port as running, and a start
+    /// issued straight afterwards was refused as "already running" by a server
+    /// that was already shutting down
+    /// (PRODUCT_DESIGN.md > Stopping the server).
+    #[tokio::test]
+    async fn stopping_clears_the_state_before_it_returns() {
+        let state = Arc::new(McpServerState::new());
+        let (tx, _rx) = mpsc::channel::<()>(1);
+        *state.running.write().await = true;
+        *state.port.write().await = Some(9742);
+        *state.shutdown_tx.lock().await = Some(tx);
+
+        stop_server(Arc::clone(&state)).await.unwrap();
+
+        assert!(
+            !state.is_running().await,
+            "a status read straight after stopping still reported a running server"
+        );
+        assert_eq!(
+            state.get_port().await,
+            None,
+            "the old port was still reported after stopping"
+        );
+    }
+
+    /// A second stop has nothing to stop, and says so rather than pretending.
+    #[tokio::test]
+    async fn stopping_twice_reports_that_nothing_is_running() {
+        let state = Arc::new(McpServerState::new());
+        let (tx, _rx) = mpsc::channel::<()>(1);
+        *state.running.write().await = true;
+        *state.shutdown_tx.lock().await = Some(tx);
+
+        stop_server(Arc::clone(&state)).await.unwrap();
+
+        assert!(stop_server(Arc::clone(&state)).await.is_err());
+    }
 
     #[test]
     fn test_json_rpc_response_success() {
