@@ -2,6 +2,43 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.7] - 2026-09-14
+
+A codebase review ran over the whole project and its findings were worked through in phases. This candidate carries the first four: data safety, vault sync and file locking, the agent and its tools, and MCP workspace scoping. Every fix landed with a test that failed against the unfixed code, and several rules gained a gate so they cannot erode again.
+
+### Fixed
+- Canvas edits are saved through the node editor, so a node's frontmatter survives an edit made on the card and the file watcher resumes afterwards
+- A node whose database record cannot be read is not deleted, so its file never outlives its row. A create or delete the backend refused no longer changes anything on the canvas, and says so
+- Deleting a merged wikilink edge removes the link from both notes in one undo step. It previously rewrote the source only, so the next sync saw the surviving link and recreated the edge
+- A storyline node is removed in one transaction, renumbering through negatives, so a reordered storyline cannot collide with its own ordering constraint. Chain edges are rewired only after the backend has removed the node
+- Tag nodes are looked up and created in the workspace of the note being tagged, so a tag can no longer link notes across workspaces where no view shows the link
+- A vault is walked by one rule everywhere: paths relative to the vault, links never followed, one exclusion list. A folder that merely shares the vault's name is outside it
+- An import keeps a node created from a file even when its wikilink sync fails, skips the files it cannot read and names them, and deduplicates its edges by the same rule the store uses
+- A node is recorded as wikilink-synced only once its sync has succeeded, and a node is linked to its file using the content that file holds, read once
+- Editing a node on the canvas takes its file lock, through the same composable the reader uses, and a session that already holds a lock can take it again
+- A wikilink followed on the canvas resolves through the same resolver that renders the link, so the two cannot disagree
+- Outbound URLs are checked against the address the request actually connects to, including IPv4-mapped literals and every redirect in a chain
+- An agent run acts on the nodes selected when it was asked, on every surface its tools read from. A superseded run stops working rather than only falling silent: it makes no further request and no further change to the note
+- A tool call a model writes into its reply text goes through the same path as a native one, so it is checked against the mode's allow-list, logged, and recorded in the transcript
+- A failed provider request reports what the provider said. A malformed chunk from a running server is no longer reported as a failure to reach it, and availability is decided by one shared probe for every provider
+- A streamed response is read whatever its line endings, and the last event is kept when a server closes without a trailing blank line
+- A run resumed after approval is told the plan it is executing, under the mode that may act. It previously replayed a prompt saying it had no tools to change the graph
+- A connection scoped to a workspace creates its frames and storylines there, rather than in whichever workspace happens to be open, and lists that workspace's storylines
+- The graph structure an MCP client receives is keyed by node id, so two nodes sharing a title no longer collapse into one entry
+- Resolving an overlap between frames carries each frame's nodes with it, instead of leaving them outside the frame that owns them
+- Stopping the MCP server reports success once it has stopped, so an immediate restart is not refused as already running
+- A refused MCP connection is recognised from what the refusal carries rather than its wording, and every later call says the user refused instead of reporting that approval is pending
+- Every neighbour a radial ring may move is placed, and spread evenly. In the neighbourhood view, which draws no frames, a neighbour belonging to a frame is laid out with the rest instead of staying at its canvas position
+
+### Changed
+- A card no longer repeats a node's tags as chips. A tag is written as a hashtag in the body, which the card renders, and a tag shared by more than one note is drawn as a tag node besides. The chip row now shows only the date and status, which are frontmatter and appear nowhere else
+- A colour criterion is judged by what it means, asked of the model, rather than by testing its wording for quotation marks, a leading capital or the words "of" and "and"
+- The request sent to the agent is what the user wrote. The enhancer that classified it by pattern and appended two lines the system prompt already carried is gone
+- A knowledge base built in phases reports what every phase found. Its capped result takes from each phase in turn rather than from one end
+- Hierarchical layouts are laid out tightly, sizing cards as they render instead of leaving the wide gaps that spread the graph
+- Three MCP tools the request router already accepted are now offered to clients, and the tool declarations are split into one module per group
+- Dependencies: vitest and @vitest/mocker to 4.1.11
+
 ## [1.6.0-rc.6] - 2026-09-10
 
 ### Fixed
