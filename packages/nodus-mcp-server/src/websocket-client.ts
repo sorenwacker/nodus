@@ -3,6 +3,7 @@
  */
 
 import WebSocket from 'ws'
+import { ConnectionLifecycle, interpretMessage } from './connection.js'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -86,8 +87,12 @@ export class NodusWebSocketClient {
     this.pendingRequests.clear()
   }
   private requestId = 0
-  private reconnectAttempts = 0
+  private lifecycle = new ConnectionLifecycle(MAX_RECONNECT_ATTEMPTS)
+  /** The attempt in flight, so callers join it rather than start another */
+  private connecting: Promise<void> | null = null
   private isApproved = false
+  /** The user said no. The socket stays open, so only this records it */
+  private refused = false
   private everConnected = false
   private options: WebSocketClientOptions
 
@@ -101,30 +106,48 @@ export class NodusWebSocketClient {
    * Connect to the Nodus WebSocket server
    */
   async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    // One attempt at a time. Each tool call made its own, so with Nodus down
+    // ten calls produced ten reconnection chains, each replacing the socket the
+    // others held (PRODUCT_DESIGN.md > One connection attempt at a time)
+    if (this.lifecycle.begin() === 'join' && this.connecting) return this.connecting
+
+    this.connecting = new Promise<void>((resolve, reject) => {
       const url = `ws://${this.host}:${this.port}`
       console.error(`[MCP Client] Connecting to ${url}...`)
 
-      this.ws = new WebSocket(url)
+      // A socket being replaced is closed and detached: handlers on superseded
+      // sockets went on firing, authenticating down whichever socket was
+      // current and scheduling further attempts
+      const previous = this.ws
+      if (previous) {
+        previous.removeAllListeners()
+        previous.close()
+      }
 
-      this.ws.on('open', () => {
+      const socket = new WebSocket(url)
+      this.ws = socket
+      const isCurrent = () => this.ws === socket
+
+      socket.on('open', () => {
+        if (!isCurrent()) return
         console.error('[MCP Client] Connected')
-        this.reconnectAttempts = 0
         this.authenticate()
         this.everConnected = true
         // A fresh budget after every successful connection: the counter never
         // reset, so ten drops over a long session ended reconnection for good
         // (PRODUCT_DESIGN.md > Reconnecting to Nodus)
-        this.reconnectAttempts = 0
+        this.lifecycle.succeeded()
         this.options.onConnected?.()
         resolve()
       })
 
-      this.ws.on('message', (data) => {
+      socket.on('message', (data) => {
+        if (!isCurrent()) return
         this.handleMessage(data.toString())
       })
 
-      this.ws.on('close', () => {
+      socket.on('close', () => {
+        if (!isCurrent()) return
         console.error('[MCP Client] Disconnected')
         this.isApproved = false
         // Every request still waiting will never be answered, so reject them
@@ -135,19 +158,30 @@ export class NodusWebSocketClient {
         this.attemptReconnect()
       })
 
-      this.ws.on('error', (error) => {
+      socket.on('error', (error) => {
+        if (!isCurrent()) return
         console.error('[MCP Client] Error:', error.message)
+        this.lifecycle.failed()
         this.options.onError?.(error)
         reject(error)
       })
     })
+
+    try {
+      await this.connecting
+    } finally {
+      this.connecting = null
+    }
   }
 
   /**
    * Disconnect from the server
    */
   disconnect(): void {
+    // Asked for by the application, so the close handler must not reconnect
+    this.lifecycle.closeRequested()
     if (this.ws) {
+      this.ws.removeAllListeners()
       this.ws.close()
       this.ws = null
     }
@@ -169,7 +203,7 @@ export class NodusWebSocketClient {
    */
   async ensureConnected(): Promise<void> {
     if (this.isConnected()) return
-    this.reconnectAttempts = 0
+    this.lifecycle.wanted()
     await this.connect()
   }
 
@@ -184,7 +218,18 @@ export class NodusWebSocketClient {
 
   /** Whether the socket is open but still waiting for the user to approve it */
   isAwaitingApproval(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN && !this.isApproved
+    return this.ws?.readyState === WebSocket.OPEN && !this.isApproved && !this.refused
+  }
+
+  /**
+   * Whether the user refused this connection.
+   *
+   * Nodus leaves the socket open after a refusal, so nothing about the socket
+   * says so and only this records it. Without it every later call reported that
+   * approval was still pending (PRODUCT_DESIGN.md > Reporting MCP errors).
+   */
+  wasRefused(): boolean {
+    return this.refused
   }
 
   /**
@@ -243,58 +288,40 @@ export class NodusWebSocketClient {
   private handleMessage(data: string): void {
     try {
       const message = JSON.parse(data) as JsonRpcResponse
+      const outcome = interpretMessage(message)
 
-      // Check for approval message
-      if (message.result && typeof message.result === 'object') {
-        const result = message.result as Record<string, unknown>
-        if (result.status === 'approved') {
+      switch (outcome.kind) {
+        case 'approved':
           console.error('[MCP Client] Connection approved')
-          if (typeof result.token === 'string') {
-            saveTrustToken(result.token)
-          }
+          if (outcome.token) saveTrustToken(outcome.token)
           this.isApproved = true
+          this.refused = false
           this.options.onApproved?.()
           return
-        }
-        if (result.status === 'pending_approval') {
-          console.error('[MCP Client] Waiting for user approval...')
-          return
-        }
-      }
 
-      // -32001 means the request is waiting for the user. A rejection carries
-      // the same code, and swallowing both left the caller's promise pending
-      // for ever after the user said no
-      // (PRODUCT_DESIGN.md > Reporting MCP errors)
-      if (message.error?.code === -32001) {
-        const text = message.error.message || ''
-        const wasRejected = /reject|denied|declined/i.test(text)
-        if (!wasRejected) {
+        case 'awaiting-approval':
           console.error('[MCP Client] Waiting for user approval...')
           return
-        }
-        console.error(`[MCP Client] Request rejected: ${text}`)
-        if (message.id !== undefined && message.id !== null) {
-          const pending = this.pendingRequests.get(message.id)
+
+        case 'refused':
+          console.error(`[MCP Client] Refused: ${outcome.message}`)
+          this.refused = true
+          this.isApproved = false
+          this.rejectAllPending(outcome.message)
+          return
+
+        case 'settle': {
+          const pending = this.pendingRequests.get(outcome.id)
           if (pending) {
-            this.pendingRequests.delete(message.id)
-            pending.reject(new Error(text || 'The user rejected this request'))
+            this.pendingRequests.delete(outcome.id)
+            if (outcome.error) pending.reject(new Error(outcome.error))
+            else pending.resolve(outcome.result)
           }
+          return
         }
-        return
-      }
 
-      // Handle response to pending request
-      if (message.id !== undefined && message.id !== null) {
-        const pending = this.pendingRequests.get(message.id)
-        if (pending) {
-          this.pendingRequests.delete(message.id)
-          if (message.error) {
-            pending.reject(new Error(message.error.message))
-          } else {
-            pending.resolve(message.result)
-          }
-        }
+        case 'ignore':
+          return
       }
     } catch (error) {
       console.error('[MCP Client] Failed to parse message:', error)
@@ -305,13 +332,13 @@ export class NodusWebSocketClient {
    * Attempt to reconnect
    */
   private attemptReconnect(): void {
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.error('[MCP Client] Max reconnection attempts reached')
+    if (!this.lifecycle.shouldReconnect()) {
+      console.error('[MCP Client] Not reconnecting')
       return
     }
 
-    this.reconnectAttempts++
-    console.error(`[MCP Client] Reconnecting in ${RECONNECT_DELAY / 1000}s (attempt ${this.reconnectAttempts})...`)
+    const attempt = this.lifecycle.countAttempt()
+    console.error(`[MCP Client] Reconnecting in ${RECONNECT_DELAY / 1000}s (attempt ${attempt})...`)
 
     setTimeout(() => {
       this.connect().catch((error) => {

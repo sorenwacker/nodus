@@ -28,17 +28,27 @@ describe('the error code a handler chose', () => {
   })
 })
 
-describe('a request the user rejected', () => {
+describe('a connection the user refused', () => {
   const source = readFileSync(CLIENT, 'utf-8')
 
-  it('is told apart from one still waiting', () => {
-    // Both carry -32001, and treating them alike left the caller waiting
-    expect(source).toMatch(/reject\|denied\|declined/)
+  // What it carries tells it apart, not how it is worded: a wait names the
+  // request it concerns, a refusal names none. The wording was matched instead,
+  // so a refusal phrased any other way read as a wait. The rule itself is
+  // exercised in mcp-client-connection.test.ts, which drives the logic without
+  // a socket; these check that the client acts on it.
+  it('is recorded, since the socket stays open and says nothing', () => {
+    expect(source).toContain('this.refused = true')
+    expect(source).toContain('wasRefused()')
   })
 
-  it('settles the caller promise', () => {
-    const block = source.slice(source.indexOf('-32001'), source.indexOf('-32001') + 900)
-    expect(block).toContain('pending.reject')
+  it('is no longer reported as still waiting for approval', () => {
+    const awaiting = source.slice(source.indexOf('isAwaitingApproval(): boolean'))
+    expect(awaiting.slice(0, 200)).toContain('!this.refused')
+  })
+
+  it('fails the requests that will never be answered', () => {
+    const block = source.slice(source.indexOf("case 'refused'"))
+    expect(block.slice(0, 300)).toContain('rejectAllPending')
   })
 })
 
@@ -47,8 +57,10 @@ describe('requests in flight when the socket closes', () => {
 
   it('are rejected rather than left pending', () => {
     expect(source).toContain('rejectAllPending')
-    const closeBlock = source.slice(source.indexOf("this.ws.on('close'"))
-    expect(closeBlock.slice(0, 500)).toContain('rejectAllPending')
+    // Anchored on the event, not the variable holding the socket: the client
+    // names it `socket` now, so that it can tell a superseded one apart
+    const closeBlock = source.slice(source.indexOf("on('close'"))
+    expect(closeBlock.slice(0, 600)).toContain('rejectAllPending')
   })
 
   it('clears the pending map, so a reconnect starts clean', () => {

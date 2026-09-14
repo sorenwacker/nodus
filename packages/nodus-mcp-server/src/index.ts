@@ -109,11 +109,13 @@ class NodusMcpServer {
           content: [
             {
               type: 'text',
-              text: this.wsClient.isAwaitingApproval()
-                ? 'Error: Waiting for this connection to be approved in Nodus. Approve it in the prompt Nodus is showing.'
-                : this.wsClient.hasEverConnected()
-                  ? 'Error: The connection to Nodus dropped. Nodus may have closed, or the MCP server may have been switched off in Settings > Integrations.'
-                  : 'Error: Could not reach Nodus. Check that Nodus is running and that the MCP server is enabled in Settings > Integrations.',
+              text: this.wsClient.wasRefused()
+                ? 'Error: Nodus refused this connection. Forget this client in Settings > Integrations, then restart it to ask again.'
+                : this.wsClient.isAwaitingApproval()
+                  ? 'Error: Waiting for this connection to be approved in Nodus. Approve it in the prompt Nodus is showing.'
+                  : this.wsClient.hasEverConnected()
+                    ? 'Error: The connection to Nodus dropped. Nodus may have closed, or the MCP server may have been switched off in Settings > Integrations.'
+                    : 'Error: Could not reach Nodus. Check that Nodus is running and that the MCP server is enabled in Settings > Integrations.',
             },
           ],
           isError: true,
