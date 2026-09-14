@@ -67,9 +67,9 @@ async function fitFrameToNodesAndResolveOverlaps(
     )
 
     if (overlap) {
-      // Push other frame to the right
+      // Push other frame to the right, with everything it holds
       const newX = updatedFrame.canvas_x + updatedFrame.width + 20
-      await store.updateFramePosition(otherFrame.id, newX, otherFrame.canvas_y)
+      await moveFrameWithNodes(store, otherFrame.id, newX, otherFrame.canvas_y)
     }
   }
 }
@@ -77,6 +77,33 @@ async function fitFrameToNodesAndResolveOverlaps(
 /**
  * Helper: Pull nodes inside frame bounds
  */
+/**
+ * Move a frame, and the nodes it contains with it.
+ *
+ * Membership is the frame_id, so the nodes that move are the ones assigned to
+ * it. Overlap resolution used to move the frame alone and leave its nodes
+ * outside it (PRODUCT_DESIGN.md > Moving a frame).
+ */
+async function moveFrameWithNodes(
+  store: McpStoreInterface,
+  frameId: string,
+  x: number,
+  y: number
+): Promise<void> {
+  const frame = store.getFrame(frameId)
+  if (!frame) return
+
+  const dx = x - frame.canvas_x
+  const dy = y - frame.canvas_y
+
+  await store.updateFramePosition(frameId, x, y)
+
+  const nodesInFrame = store.getFilteredNodes().filter((n) => n.frame_id === frameId)
+  for (const node of nodesInFrame) {
+    await store.updateNodePosition(node.id, node.canvas_x + dx, node.canvas_y + dy)
+  }
+}
+
 async function pullNodesInsideFrame(store: McpStoreInterface, frameId: string): Promise<void> {
   const frame = store.getFrame(frameId)
   if (!frame) return
@@ -341,18 +368,7 @@ export async function handleBatchMoveFrames(
     const frame = store.getFrame(move.id)
     if (!frame) continue
 
-    // Calculate delta to move nodes with frame
-    const dx = move.x - frame.canvas_x
-    const dy = move.y - frame.canvas_y
-
-    // Move frame
-    await store.updateFramePosition(move.id, move.x, move.y)
-
-    // Move all nodes assigned to this frame
-    const nodesInFrame = store.getFilteredNodes().filter((n) => n.frame_id === move.id)
-    for (const node of nodesInFrame) {
-      await store.updateNodePosition(node.id, node.canvas_x + dx, node.canvas_y + dy)
-    }
+    await moveFrameWithNodes(store, move.id, move.x, move.y)
 
     count++
   }
@@ -479,9 +495,9 @@ export async function handleResolveFrameOverlaps(store: McpStoreInterface): Prom
       )
 
       if (overlaps) {
-        // Push other frame to the right
+        // Push other frame to the right, with everything it holds
         const newX = frame.canvas_x + frame.width + 20
-        await store.updateFramePosition(otherFrame.id, newX, otherFrame.canvas_y)
+        await moveFrameWithNodes(store, otherFrame.id, newX, otherFrame.canvas_y)
         // Update local reference for cascade resolution
         otherFrame.canvas_x = newX
         resolved++
