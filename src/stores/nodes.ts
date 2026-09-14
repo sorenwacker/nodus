@@ -377,8 +377,15 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   // Frame operations
-  function createFrame(x: number, y: number, width = 400, height = 300, title = 'Frame') {
-    return createFrameFn(deps, x, y, width, height, title)
+  function createFrame(
+    x: number,
+    y: number,
+    width = 400,
+    height = 300,
+    title = 'Frame',
+    workspaceId?: string | null
+  ) {
+    return createFrameFn(deps, x, y, width, height, title, workspaceId)
   }
 
   const updateFramePosition = (id: string, x: number, y: number, options?: { skipPersist?: boolean }) => updateFramePositionFn(framesStore, id, x, y, options)

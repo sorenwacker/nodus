@@ -214,10 +214,10 @@ const editingWorkspace = ref<{ id: string | null; name: string; vault_path: stri
 
 // Tauri workspace functions
 import { invoke, surveyOkfBackfill, applyOkfBackfill, getWorkspace, setWorkspaceSync, setWorkspaceVaultPath, syncMissingFiles, syncAllWikilinks, linkNodesToFiles, exportNodesToFiles, exportOkfBundle } from './lib/tauri'
-import type { Edge } from './types'
 
 // MCP Server
 import { useMcpServer } from './composables/useMcpServer'
+import { appMcpStore } from './mcp/appStore'
 import { useEdgesStore } from './stores/edges'
 import { useStorylinesStore } from './stores/storylines'
 
@@ -320,61 +320,7 @@ provide('storylineService', storylineService)
 // MCP Server setup (with undo and viewport integration)
 const edgesStore = useEdgesStore()
 const mcpServer = useMcpServer({
-  store: {
-    getFilteredNodes: () => store.filteredNodes,
-    getFilteredEdges: () => store.graphEdges,
-    getNode: store.getNode,
-    // Workspace scoping: lets each MCP connection target its own workspace
-    getAllNodes: () => store.nodes,
-    getAllFrames: () => store.frames,
-    getWorkspaces: () => {
-      const current = store.currentWorkspaceId ?? 'default'
-      return [
-        { id: 'default', name: 'Default', current: current === 'default' },
-        ...store.workspaces.map(w => ({ id: w.id, name: w.name, current: w.id === current })),
-      ]
-    },
-    loadWorkspaceEdges: (workspaceId) => invoke<Edge[]>('get_edges', { workspaceId }),
-    createEdgeRaw: (data) => invoke<Edge>('create_edge', { input: data }),
-    deleteEdgeRaw: (id) => invoke('delete_edge', { id }),
-    createNode: store.createNode,
-    updateNodeContent: store.updateNodeContent,
-    updateNodeTags: async (id: string, tags: string[]) => {
-      await invoke('update_node_tags', { id, tags })
-      const node = store.getNode(id)
-      if (node) node.tags = JSON.stringify(tags)
-    },
-    updateNodeTitle: store.updateNodeTitle,
-    updateNodePosition: store.updateNodePosition,
-    updateNodeSize: store.updateNodeSize,
-    updateNodeColor: store.updateNodeColor,
-    deleteNode: store.deleteNode,
-    createEdge: store.createEdge,
-    deleteEdge: store.deleteEdge,
-    updateEdgeDirected: edgesStore.updateEdgeDirected,
-    updateEdgeLabel: edgesStore.updateEdgeLabel,
-    updateEdgeColor: edgesStore.updateEdgeColor,
-    // Frame operations
-    getFilteredFrames: () => store.filteredFrames,
-    getFrame: (id: string) => store.filteredFrames.find(f => f.id === id),
-    createFrame: store.createFrame,
-    updateFramePosition: store.updateFramePosition,
-    updateFrameSize: store.updateFrameSize,
-    updateFrameTitle: store.updateFrameTitle,
-    updateFrameColor: store.updateFrameColor,
-    deleteFrame: store.deleteFrame,
-    assignNodesToFrame: store.assignNodesToFrame,
-    // Storyline operations
-    getFilteredStorylines: () => storylinesStore.filteredStorylines,
-    getStoryline: (id: string) => storylinesStore.filteredStorylines.find(s => s.id === id),
-    getStorylineNodes: storylinesStore.getStorylineNodes,
-    createStoryline: storylinesStore.createStoryline,
-    updateStoryline: storylinesStore.updateStoryline,
-    deleteStoryline: storylinesStore.deleteStoryline,
-    addNodeToStoryline: storylinesStore.addNodeToStoryline,
-    removeNodeFromStoryline: storylinesStore.removeNodeFromStoryline,
-    reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
-  },
+  store: appMcpStore({ store, edgesStore, storylinesStore, invoke }),
   viewport: {
     getViewport: () => graphCanvasRef.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
     focusNode: (id: string) => graphCanvasRef.value?.focusNode(id),

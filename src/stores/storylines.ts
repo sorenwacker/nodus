@@ -84,13 +84,27 @@ export const useStorylinesStore = defineStore('storylines', () => {
     }
   }
 
-  async function createStoryline(title: string, description?: string, color?: string): Promise<Storyline> {
+  /**
+   * Create a storyline.
+   *
+   * `workspaceId` names the workspace explicitly, for a caller that is not the
+   * open one: an MCP connection scoped to another workspace wrote its
+   * storylines into whichever the user had open
+   * (PRODUCT_DESIGN.md > Workspace scoping for MCP connections).
+   */
+  async function createStoryline(
+    title: string,
+    description?: string,
+    color?: string,
+    workspaceId?: string | null
+  ): Promise<Storyline> {
     if (!deps) throw new Error('Storylines store not initialized')
+    const target = workspaceId !== undefined ? workspaceId : deps.getCurrentWorkspaceId()
     const input: CreateStorylineInput = {
       title,
       description,
       color,
-      workspace_id: deps.getCurrentWorkspaceId() || undefined,
+      workspace_id: target || undefined,
     }
 
     try {

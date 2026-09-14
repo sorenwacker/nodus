@@ -7,7 +7,12 @@ import { storeLogger } from '../../lib/logger'
 import type { Node, NodeStoreDependencies } from './types'
 
 /**
- * Create a frame in the current workspace
+ * Create a frame, in the open workspace unless one is named.
+ *
+ * `workspaceId` lets a caller that is not the open workspace say where the
+ * frame belongs: an MCP connection scoped to another workspace created its
+ * frames in whichever one the user had open
+ * (PRODUCT_DESIGN.md > Workspace scoping for MCP connections).
  */
 export function createFrame(
   deps: NodeStoreDependencies,
@@ -15,11 +20,13 @@ export function createFrame(
   y: number,
   width = 400,
   height = 300,
-  title = 'Frame'
+  title = 'Frame',
+  workspaceId?: string | null
 ): import('../../types').Frame {
   const { workspaceStore, framesStore } = deps
   const wsId = workspaceStore.currentWorkspaceId
-  const workspaceForBackend = wsId === 'default' ? null : wsId
+  const workspaceForBackend =
+    workspaceId !== undefined ? workspaceId : wsId === 'default' ? null : wsId
   return framesStore.createFrame(x, y, width, height, title, workspaceForBackend)
 }
 

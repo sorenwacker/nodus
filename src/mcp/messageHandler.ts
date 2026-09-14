@@ -140,7 +140,14 @@ export interface McpStoreInterface {
   // Frame operations
   getFilteredFrames: () => Frame[]
   getFrame: (id: string) => Frame | undefined
-  createFrame: (x: number, y: number, width: number, height: number, title: string) => Frame
+  createFrame: (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    title: string,
+    workspaceId?: string | null
+  ) => Frame
   updateFramePosition: (id: string, x: number, y: number) => void
   updateFrameSize: (id: string, width: number, height: number) => void
   updateFrameTitle: (id: string, title: string) => void
@@ -149,10 +156,16 @@ export interface McpStoreInterface {
   assignNodesToFrame: (nodeIds: string[], frameId: string | null) => void
 
   // Storyline operations
+  getAllStorylines: () => Storyline[]
   getFilteredStorylines: () => Storyline[]
   getStoryline: (id: string) => Storyline | undefined
   getStorylineNodes: (storylineId: string) => Promise<Node[]>
-  createStoryline: (title: string, description?: string, color?: string) => Promise<Storyline>
+  createStoryline: (
+    title: string,
+    description?: string,
+    color?: string,
+    workspaceId?: string | null
+  ) => Promise<Storyline>
   updateStoryline: (id: string, title: string, description?: string, color?: string) => Promise<void>
   deleteStoryline: (id: string) => Promise<void>
   addNodeToStoryline: (storylineId: string, nodeId: string, position?: number) => Promise<void>
@@ -212,6 +225,8 @@ export function createMcpMessageHandler(
       store.getAllNodes().filter(n => (n.workspace_id ?? null) === workspaceId && !n.deleted_at)
     const framesInScope = () =>
       store.getAllFrames().filter(f => (f.workspace_id ?? null) === workspaceId)
+    const storylinesInScope = () =>
+      store.getAllStorylines().filter(s => (s.workspace_id ?? null) === workspaceId)
 
     return {
       ...store,
@@ -226,6 +241,18 @@ export function createMcpMessageHandler(
       // workspace's edges
       createEdge: data => store.createEdgeRaw(data),
       deleteEdge: id => store.deleteEdgeRaw(id),
+      // A write lands where the reads come from. Frame creation took the
+      // workspace the user had open, so a scoped connection's frame appeared
+      // in a workspace nobody asked for
+      // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
+      createFrame: (x, y, width, height, title) =>
+        store.createFrame(x, y, width, height, title, workspaceId),
+      // Storylines are scoped like nodes, edges and frames: they were read and
+      // written through the app's open workspace throughout
+      getFilteredStorylines: storylinesInScope,
+      getStoryline: (id: string) => storylinesInScope().find(s => s.id === id),
+      createStoryline: (title, description, color) =>
+        store.createStoryline(title, description, color, workspaceId),
     }
   }
 

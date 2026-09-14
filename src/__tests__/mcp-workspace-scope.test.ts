@@ -51,13 +51,31 @@ function makeFakeStore() {
   const loadWorkspaceEdges = vi.fn(async (workspaceId: string | null) =>
     workspaceId === 'ws-research' ? [researchEdge] : []
   )
+  const allFrames = [
+    { id: 'f-open', title: 'Open frame', workspace_id: null },
+    { id: 'f-research', title: 'Research frame', workspace_id: 'ws-research' },
+  ]
+  const allStorylines = [
+    { id: 's-open', title: 'Open storyline', workspace_id: null },
+    { id: 's-research', title: 'Research storyline', workspace_id: 'ws-research' },
+  ]
+  const createFrame = vi.fn()
+  const createStoryline = vi.fn(async (title: string) => ({ id: 'new-storyline', title }))
+
   const store = {
     // Unscoped view follows the open (default) workspace
     getFilteredNodes: () => allNodes.filter(n => n.workspace_id === null),
     getFilteredEdges: () => [] as Edge[],
     getNode: (id: string) => allNodes.find(n => n.id === id),
     getAllNodes: () => allNodes,
-    getAllFrames: () => [],
+    getAllFrames: () => allFrames,
+    getAllStorylines: () => allStorylines,
+    createFrame,
+    // The app's own views, which follow the workspace the user has open
+    getFilteredStorylines: () => allStorylines.filter(s => s.workspace_id === null),
+    getStoryline: (id: string) =>
+      allStorylines.filter(s => s.workspace_id === null).find(s => s.id === id),
+    createStoryline,
     getWorkspaces: () => [
       { id: 'default', name: 'Default', current: true },
       { id: 'ws-research', name: 'Research', current: false },
@@ -66,21 +84,26 @@ function makeFakeStore() {
     createEdgeRaw: vi.fn(),
     deleteEdgeRaw: vi.fn(),
     createNode,
-    getFilteredFrames: () => [],
-    getFrame: () => undefined,
+    getFilteredFrames: () => allFrames.filter(f => f.workspace_id === null),
+    getFrame: (id: string) =>
+      allFrames.filter(f => f.workspace_id === null).find(f => f.id === id),
   } as unknown as McpStoreInterface
-  return { store, createNode, loadWorkspaceEdges }
+  return { store, createNode, loadWorkspaceEdges, createFrame, createStoryline }
 }
 
 describe('MCP workspace scoping', () => {
   let store: McpStoreInterface
   let createNode: ReturnType<typeof vi.fn>
+  let createFrame: ReturnType<typeof vi.fn>
+  let createStoryline: ReturnType<typeof vi.fn>
   let handler: ReturnType<typeof createMcpMessageHandler>
 
   beforeEach(() => {
     const fake = makeFakeStore()
     store = fake.store
     createNode = fake.createNode
+    createFrame = fake.createFrame
+    createStoryline = fake.createStoryline
     handler = createMcpMessageHandler(store)
   })
 
@@ -125,6 +148,45 @@ describe('MCP workspace scoping', () => {
     await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
     const res = await handler.handleRequest(request('get_edges'), 'conn-a')
     expect((res.result as Edge[]).map(e => e.id)).toEqual(['e-research'])
+  })
+
+  it('creates frames in the scoped workspace', async () => {
+    await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
+    await handler.handleRequest(request('create_frame', { title: 'Agent frame' }), 'conn-a')
+
+    // The workspace is the sixth argument the frames store takes
+    expect(createFrame).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      'Agent frame',
+      'ws-research'
+    )
+  })
+
+  it('lists the scoped workspace storylines, not the open one', async () => {
+    await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
+
+    const res = await handler.handleRequest(request('list_storylines'), 'conn-a')
+    const titles = (res.result as Array<{ title: string }>).map(s => s.title)
+
+    expect(titles).toEqual(['Research storyline'])
+  })
+
+  it('creates storylines in the scoped workspace', async () => {
+    await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
+    await handler.handleRequest(
+      request('create_storyline', { title: 'Agent storyline' }),
+      'conn-a'
+    )
+
+    expect(createStoryline).toHaveBeenCalledWith(
+      'Agent storyline',
+      undefined,
+      undefined,
+      'ws-research'
+    )
   })
 
   it('rejects unknown workspaces and reports scope via get_workspace', async () => {
