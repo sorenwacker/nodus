@@ -1289,7 +1289,7 @@ After onboarding (and via Settings > Reset default workspace), the empty default
 | Frames | "Demo Project" frame (dated story nodes) and "Entity Types" frame |
 | Storylines (panel, reader, timelines lane) | A storyline threading the three dated project notes in order |
 | Timelines / dated nodes | `date:`/`date_end:` frontmatter on the project notes (incl. one date range); a dated citation outside the storyline shows the unassigned lane |
-| Hashtags / tags | `#hashtags` in the project notes become tag chips |
+| Hashtags / tags | `#hashtags` in the project notes; the shared ones become tag nodes |
 | Entity node types | One node each: citation (with DOI), comment, character, location, term, item |
 
 Resetting the default workspace also removes its previous frames and storylines before reseeding, so repeated resets do not accumulate duplicates.
@@ -1916,6 +1916,16 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 - Restoring a deleted workspace restores its vault path and its sync setting.
 - The description field is removed. No workspace description is stored anywhere, so text typed there was discarded on save.
 - A rename that fails is reported. A new workspace is opened only after it has been created.
+
+### What a card's chip row shows
+
+A card's chip row surfaces the OKF frontmatter, which is stripped before the body is rendered and so appears nowhere else on the card. That is the date and the status.
+
+Tags were shown there too, and a tag is not frontmatter: it is written as a `#hashtag` in the body, the body is what the card renders, and a sync keeps the node's tag list in step with it. A tag shared by more than one note is also drawn as a tag node with edges to the notes carrying it. So a chip was a fourth appearance of a fact already in the text, already in the preview and already on the canvas, and it took the bottom strip of every card that had one - space the preview is otherwise sized to use.
+
+- Tags are read in the text, and followed through their tag nodes.
+- Tags are edited by typing in the body. A chip that wrote the tag list directly could set a tag the body did not contain, which is the same duplication in the other direction, and only the body keeps the note and its file agreeing.
+- A tag used by a single note still describes that note and is kept. What did not scale was drawing a node for it: one per distinct tag put 606 tag nodes into a workspace holding 360 real ones.
 
 ### Tag nodes belong to a workspace
 

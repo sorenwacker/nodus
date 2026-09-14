@@ -166,27 +166,28 @@ describe('CanvasNodeCard tag chips', () => {
     })
   }
 
-  it('shows tags from the node as chips', () => {
+  // A tag is written as a #hashtag in the body, which is what the card renders,
+  // and a shared one is drawn as a tag node besides. A chip was a fourth
+  // appearance of the same fact, taking the bottom strip of every card that had
+  // one (PRODUCT_DESIGN.md > What a card's chip row shows).
+  it('does not repeat the tags, which are in the text it renders', () => {
     const wrapper = mountCard('["research","AI2024"]')
-    const chips = wrapper.findAll('.node-tag-chip')
-    expect(chips.map(c => c.text())).toEqual(['#research', '#AI2024'])
+
+    expect(wrapper.findAll('.node-tag-chip').length).toBe(0)
   })
 
-  it('renders no chip row for nodes without tags', () => {
+  it('gives a node with only tags no chip row at all', () => {
+    expect(mountCard('["research","AI2024"]').find('.node-tag-footer').exists()).toBe(false)
     expect(mountCard(null).find('.node-tag-footer').exists()).toBe(false)
     expect(mountCard('not-json').find('.node-tag-footer').exists()).toBe(false)
   })
 
-  it('offers tag editing on a selected node', () => {
+  it('offers no tag editing, since the body is where a tag is written', () => {
     const selected = mountCard('["research"]', true)
-    // Each chip gets a remove button, plus a ghost chip to add tags
-    expect(selected.findAll('.tag-remove').length).toBe(1)
-    expect(selected.find('.node-tag-chip.ghost').exists()).toBe(true)
 
-    // Unselected cards stay read-only
-    const unselected = mountCard('["research"]', false)
-    expect(unselected.findAll('.tag-remove').length).toBe(0)
-    expect(unselected.find('.node-tag-chip.ghost').exists()).toBe(false)
+    expect(selected.findAll('.tag-remove').length).toBe(0)
+    expect(selected.find('.node-tag-chip.ghost').exists()).toBe(false)
+    expect(selected.find('.tag-input').exists()).toBe(false)
   })
 
   it('surfaces OKF date and status frontmatter as chips', () => {

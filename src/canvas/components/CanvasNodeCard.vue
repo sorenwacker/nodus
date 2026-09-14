@@ -139,15 +139,6 @@ const moreEntitiesCount = computed(() =>
 const displayTitle = computed(() => nodeDisplayTitle(props.node, t('canvas.node.untitled')))
 
 // Tags from the node's metadata (JSON column), shown as chips
-const nodeTags = computed<string[]>(() => {
-  if (!props.node.tags) return []
-  try {
-    const parsed = JSON.parse(props.node.tags)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-})
 
 // OKF frontmatter metadata, shown as chips like tags
 const nodeDate = computed<string | null>(() => {
@@ -169,8 +160,7 @@ const showMetaChips = computed(
     !isTagNode.value &&
     !props.isCollapsed &&
     !props.isEditing &&
-    (nodeTags.value.length > 0 ||
-      nodeDate.value !== null ||
+    (nodeDate.value !== null ||
       nodeStatus.value !== null ||
       props.isSelected)
 )
@@ -216,23 +206,6 @@ async function saveDate() {
 }
 
 // Inline tag editor
-const showTagInput = ref(false)
-const tagInput = ref('')
-
-async function addTag() {
-  const tag = tagInput.value.replace(/^#/, '').trim()
-  tagInput.value = ''
-  showTagInput.value = false
-  if (!tag || nodeTags.value.includes(tag)) return
-  await nodesStore.updateNodeTags(props.node.id, [...nodeTags.value, tag])
-}
-
-async function removeTag(tag: string) {
-  await nodesStore.updateNodeTags(
-    props.node.id,
-    nodeTags.value.filter(existing => existing !== tag)
-  )
-}
 </script>
 
 <template>
@@ -341,34 +314,6 @@ async function removeTag(tag: string) {
       >
         {{ nodeDate || `+ ${t('canvas.node.setDate')}` }}
       </button>
-      <span v-for="tag in nodeTags" :key="tag" class="node-tag-chip">
-        #{{ tag }}
-        <button
-          v-if="isSelected"
-          class="tag-remove"
-          :data-tooltip="t('common.delete')"
-          @click.stop="removeTag(tag)"
-        >&times;</button>
-      </span>
-      <input
-        v-if="showTagInput"
-        v-model.trim="tagInput"
-        type="text"
-        class="tag-input"
-        :placeholder="t('canvas.node.addTagPlaceholder')"
-        @keydown.enter="addTag"
-        @keydown.escape="showTagInput = false"
-        @blur="addTag"
-        @click.stop
-      />
-      <button
-        v-else-if="isSelected"
-        class="node-tag-chip ghost"
-        :data-tooltip="t('canvas.node.addTag')"
-        @click.stop="showTagInput = true"
-      >
-        + #
-      </button>
     </div>
 
     <!-- Inline date editor -->
@@ -456,57 +401,6 @@ async function removeTag(tag: string) {
   padding: 6px 10px;
   border-top: 1px solid var(--border-default);
   background: var(--bg-surface-alt, rgba(0, 0, 0, 0.02));
-}
-
-.node-tag-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 6px;
-  font-size: 10px;
-  color: var(--primary-color);
-  background: rgba(59, 130, 246, 0.1);
-  border: none;
-  border-radius: 8px;
-  white-space: nowrap;
-}
-
-.node-tag-chip.ghost {
-  border: 1px dashed var(--border-default);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.node-tag-chip.ghost:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.tag-remove {
-  border: none;
-  background: none;
-  color: inherit;
-  font-size: 11px;
-  line-height: 1;
-  padding: 0;
-  cursor: pointer;
-  opacity: 0.6;
-}
-
-.tag-remove:hover {
-  opacity: 1;
-}
-
-.tag-input {
-  width: 90px;
-  padding: 1px 6px;
-  font-size: 10px;
-  border: 1px solid var(--primary-color);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  color: var(--text-main);
-  outline: none;
 }
 
 .node-date-chip {
