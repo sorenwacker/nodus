@@ -298,7 +298,10 @@ export function handleGetGraphStructure(
       })
       .filter((t): t is string => t !== null)
 
-    result[node.title] = {
+    // Keyed by id, as the tool's description promises: titles are not unique,
+    // and keying by one silently merged the nodes that shared it
+    // (PRODUCT_DESIGN.md > A result keyed by what identifies a node)
+    result[node.id] = {
       title: node.title,
       connections: connectionTitles,
     }
