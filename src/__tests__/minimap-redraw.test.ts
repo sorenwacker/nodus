@@ -15,9 +15,6 @@ import { mount } from '@vue/test-utils'
 import { useMinimap } from '../canvas/composables/viewport/useMinimap'
 import CanvasMinimap from '../canvas/components/CanvasMinimap.vue'
 
-// Wall-clock budgets are load-sensitive; the full suite runs this alongside
-// everything else (matches the SLACK convention in canvas-performance.test.ts)
-const SLACK = 6
 const FRAMES = 60
 
 function nodes(count: number) {
@@ -119,7 +116,15 @@ describe('minimap redraw', () => {
     }
     const perFrame = (performance.now() - start) / FRAMES
 
-    // 4.47ms per frame before the marks were lifted out of the redraw
-    expect(perFrame).toBeLessThan(0.15 * SLACK)
+    // 4.47ms per frame before the marks were lifted out of the redraw, so a
+    // budget well under that still catches the regression this guards.
+    //
+    // It used to allow 0.15ms, which even with SLACK left 0.9ms for sixty
+    // frames: at that scale one garbage collection pause outweighs the work
+    // being measured, and the test failed on a machine that was merely busy.
+    // That the marks are not rebuilt at all is asserted by identity above,
+    // where it is deterministic; this case exists to catch per-node cost
+    // returning to the rendered component, and 4.47ms is the number that means.
+    expect(perFrame).toBeLessThan(2)
   })
 })
