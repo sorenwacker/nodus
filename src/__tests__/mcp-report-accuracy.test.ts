@@ -62,8 +62,9 @@ describe('what fit_frame_to_contents reports', () => {
 
 describe('what batch_move_nodes promises', () => {
   it('does not offer relative offsets it cannot accept', () => {
+    // The declarations live in one module per group; this tool is a node write
     const tools = readFileSync(
-      resolve(__dirname, '../../packages/nodus-mcp-server/src/tools.ts'),
+      resolve(__dirname, '../../packages/nodus-mcp-server/src/tools/nodeTools.ts'),
       'utf-8'
     )
     const start = tools.indexOf("name: 'batch_move_nodes'")

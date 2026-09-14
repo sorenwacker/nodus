@@ -19,12 +19,11 @@ import { resolve } from 'node:path'
 import { getAgentTools } from '../llm/tools'
 import { NODUS_TOOLS } from '../../packages/nodus-mcp-server/src/tools'
 
-const MCP_TOOLS_FILE = resolve(__dirname, '../../packages/nodus-mcp-server/src/tools.ts')
-
 /** Tool names the MCP server advertises to clients */
 function mcpToolNames(): string[] {
-  const source = readFileSync(MCP_TOOLS_FILE, 'utf8')
-  return [...new Set([...source.matchAll(/name:\s*'([a-z_0-9]+)'/g)].map(m => m[1]))]
+  // From the declarations themselves: the tools live in one module per group,
+  // so scanning a single file for names would miss most of them
+  return [...new Set(NODUS_TOOLS.map(t => t.name))]
 }
 
 /** Tool names the in-app agent can call */
@@ -70,6 +69,9 @@ const INTENTIONAL_AGENT_ONLY: Record<string, string> = {
 
 /** Pre-existing asymmetry, recorded so new drift stands out. Shrink over time. */
 const BASELINE_MCP_ONLY: Record<string, string> = {
+  batch_update_nodes:
+    'the in-app agent has batch_update, which names its targets by title rather than id',
+  cleanup_duplicate_edges: 'graph maintenance: no in-app agent counterpart yet',
   arrange_radial: 'baseline debt: no in-app agent counterpart yet',
   batch_assign_nodes_to_frame: 'baseline debt: no in-app agent counterpart yet',
   batch_create_edges: 'baseline debt: no in-app agent counterpart yet',
@@ -80,6 +82,7 @@ const BASELINE_MCP_ONLY: Record<string, string> = {
   batch_resize_nodes: 'baseline debt: no in-app agent counterpart yet',
   batch_set_node_colors: 'baseline debt: no in-app agent counterpart yet',
   check_frame_overlaps: 'baseline debt: no in-app agent counterpart yet',
+  get_duplicate_edges: 'graph maintenance: no in-app agent counterpart yet',
   delete_edge: 'baseline debt: no in-app agent counterpart yet',
   delete_edges_for_node: 'baseline debt: no in-app agent counterpart yet',
   delete_frame: 'baseline debt: no in-app agent counterpart yet',

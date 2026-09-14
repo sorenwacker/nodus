@@ -27,7 +27,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { NodusWebSocketClient } from './websocket-client.js'
-import { NODUS_TOOLS } from './tools.js'
+import { NODUS_TOOLS } from './tools/index.js'
 
 const PORT = parseInt(process.env.NODUS_MCP_PORT || '9742', 10)
 

@@ -35,7 +35,8 @@ describe('the MCP surface knows the format', () => {
   })
 
   it('states it on the content parameter that writes node bodies', () => {
-    const tools = read('packages/nodus-mcp-server/src/tools.ts')
+    // The content parameter that writes node bodies is a node write tool
+    const tools = read('packages/nodus-mcp-server/src/tools/nodeTools.ts')
     expect(tools).toContain('Open Knowledge Format')
   })
 })

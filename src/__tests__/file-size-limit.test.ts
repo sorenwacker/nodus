@@ -25,8 +25,6 @@ const OVER_LIMIT: Record<string, number> = {
   'src/components/StorylineReader.vue': 1197,
   'src/__tests__/layoutFrameIntegration.test.ts': 1205,
   'src/__tests__/frameCollision.test.ts': 1201,
-  // Recorded when the gate was extended to the MCP server package
-  'packages/nodus-mcp-server/src/tools.ts': 1046,
 }
 
 const EXTENSIONS = ['.ts', '.vue', '.rs']
