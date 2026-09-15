@@ -142,3 +142,38 @@ describe('the collapsed title never shows part of a line', () => {
     expect(Number(padding![1])).toBeLessThanOrEqual(12)
   })
 })
+
+describe('a collapsed title fits the card it is drawn in', () => {
+  // A fixed type size truncated almost every title: a 200px card at 28px bold
+  // holds about ten characters a line, so two lines lost everything past about
+  // twenty of a thirty-five character title
+  // (PRODUCT_DESIGN.md > Collapsed node titles)
+  const AVG_CHAR_EM = 0.52
+  const SIDE_PADDING = 10
+  const BORDER = 2
+
+  function fitFor(title: string, width: number, height: number, fontScale: number) {
+    const ctx = makeContext(1)
+    const { getNodeStyle } = useCanvasNodeStyle({ ...ctx, fontScale: ref(fontScale) })
+    const style = getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width, height, title })
+    const size = parseFloat(style['--title-size'])
+    const lines = Number(style['--title-lines'])
+    const textWidth = width - SIDE_PADDING * 2 - BORDER * 2
+    const perLine = Math.max(1, Math.floor(textWidth / (size * fontScale * AVG_CHAR_EM)))
+    return { size, lines, needed: Math.ceil(title.length / perLine) }
+  }
+
+  it('shrinks the type until a long title fits the lines it has', () => {
+    const r = fitFor('Non-consensual intimate imagery generation', 200, 120, 1.1)
+    expect(r.needed).toBeLessThanOrEqual(r.lines)
+  })
+
+  it('fits the title that shipped truncated on a default card', () => {
+    const r = fitFor('General-purpose AI model obligations', 200, 120, 1.1)
+    expect(r.needed).toBeLessThanOrEqual(r.lines)
+  })
+
+  it('leaves a short title at the base type size', () => {
+    expect(fitFor('Untitled', 200, 120, 1).size).toBe(28)
+  })
+})

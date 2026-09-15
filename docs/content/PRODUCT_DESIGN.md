@@ -1384,6 +1384,12 @@ A truncated title ends at a whole line. The line clamp bounds how many lines ren
 
 Side padding is narrow at this type size. With 24px each side, a default card left about 150px for text - less than one long word at 28px bold - so words broke mid-character.
 
+**The type size follows the card, not the other way round.** A fixed 28px meant a 200px card held about ten characters a line, so two lines showed about twenty of them. Ordinary titles are longer than that - "General-purpose AI model obligations" is thirty-five characters, "Non-consensual intimate imagery generation" is forty-two - so the clamp truncated almost every title on a default card, and the ellipsis was the normal case rather than the exception. Adjusting the padding, the line bound and the box model each corrected a different artifact of that truncation without removing the truncation itself.
+
+The card therefore chooses the largest type size, up to the base size, at which the whole title fits the lines its height allows. Only a title too long for the smallest readable size is truncated, which makes the ellipsis rare and meaningful again. The line budget and the type size are chosen together, because each depends on the other: a smaller size yields more lines and more characters a line.
+
+The budget subtracts the border the card actually draws. The collapsed card's border is written inline from the zoom, so it is not the 2px the stylesheet declares; assuming the declared value overestimated the height available at every zoom where cards are collapsed.
+
 ### A write the backend refused
 
 **Required behavior:** The canvas shows what is stored. A create, delete or update that the backend refused leaves the canvas as it was, and a notification names the node or edge.

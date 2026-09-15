@@ -357,13 +357,23 @@ describe('collapsed node titles', () => {
       resolve(__dirname, '../canvas/composables/nodes/useCanvasNodeStyle.ts'),
       'utf-8'
     )
-    const cssFont = Number(rule.match(/font-size: calc\((\d+)px/)?.[1])
+    // The stylesheet takes the type size from the card, falling back to the
+    // base size; the budget's base must be that same fallback
+    // (PRODUCT_DESIGN.md > Collapsed node titles)
+    const cssFont = Number(rule.match(/font-size: calc\(var\(--title-size,\s*(\d+)px\)/)?.[1])
     const cssPadding = Number(rule.match(/padding: calc\((\d+)px/)?.[1])
+    const cssSidePadding = Number(
+      rule.match(/padding: calc\(\d+px \* var\(--zoom-scale, 1\)\) calc\((\d+)px/)?.[1]
+    )
     const budgetFont = Number(style.match(/COLLAPSED_FONT = (\d+)/)?.[1])
     const budgetPadding = Number(style.match(/COLLAPSED_PADDING = (\d+)/)?.[1])
+    const budgetSidePadding = Number(style.match(/COLLAPSED_SIDE_PADDING = (\d+)/)?.[1])
 
     expect(cssFont).toBe(budgetFont)
     expect(cssPadding).toBe(budgetPadding)
+    // The size now depends on the width the title has, so the side padding is
+    // part of the budget and must not drift from the stylesheet either
+    expect(cssSidePadding).toBe(budgetSidePadding)
     // The budget must also account for the user's font scale, which the
     // stylesheet applies to the same type size
     expect(rule).toContain('var(--font-scale')

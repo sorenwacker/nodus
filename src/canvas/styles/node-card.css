@@ -73,7 +73,7 @@
   /* Type size and line limit together fit the default 120px card, so a
      wrapped title stays inside its outline
      (PRODUCT_DESIGN.md > Collapsed node titles) */
-  font-size: calc(28px * var(--font-scale, 1) * var(--zoom-scale, 1));
+  font-size: calc(var(--title-size, 28px) * var(--font-scale, 1) * var(--zoom-scale, 1));
   font-weight: 700;
   /* Narrow side padding: at this type size, 24px each side left too little
      room for an ordinary word, so words broke mid-character

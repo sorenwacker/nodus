@@ -7,6 +7,7 @@
 import type { Ref, ComputedRef } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import { getNodeBackground as getNodeBackgroundUtil } from '../../utils/nodeColors'
+import { nodeDisplayTitle } from '../../utils/nodeDisplayTitle'
 
 /**
  * Node shape for style computation
@@ -19,6 +20,9 @@ export interface NodeForStyle {
   height?: number
   color_theme?: string | null
   node_type?: string
+  /** The collapsed type size is chosen to fit the title actually drawn. */
+  title?: string | null
+  markdown_content?: string | null
 }
 
 /**
@@ -142,17 +146,40 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     const COLLAPSED_FONT = 28
     const COLLAPSED_LINE_HEIGHT = 1.2
     const COLLAPSED_PADDING = 14
-    // The card's own border consumes height the header cannot use
-    const CARD_BORDER = 2
-    const renderedLine = COLLAPSED_FONT * (fontScale?.value ?? 1) * COLLAPSED_LINE_HEIGHT
-    const titleLines = Math.max(
-      1,
-      Math.floor((height - COLLAPSED_PADDING * 2 - CARD_BORDER * 2) / renderedLine)
-    )
+    const COLLAPSED_SIDE_PADDING = 10
+    /** Smallest type the collapsed title may shrink to before it is truncated. */
+    const MIN_COLLAPSED_FONT = 11
+    /** Mean advance of a bold sans glyph, as a fraction of the type size. */
+    const AVG_CHAR_EM = 0.52
+    const textScale = fontScale?.value ?? 1
+    // The border the card actually draws, not the 2px the stylesheet declares:
+    // it is written inline from the zoom, so at every scale where cards are
+    // collapsed it is wider than the declared value, and assuming the declared
+    // one overestimated the height available
+    // (PRODUCT_DESIGN.md > Collapsed node titles)
+    const border = nodeBorderWidth.value
+    const availableHeight = height - COLLAPSED_PADDING * 2 - border * 2
+    const availableWidth = width - COLLAPSED_SIDE_PADDING * 2 - border * 2
+    // Size and line count are chosen together: a smaller size yields both more
+    // lines and more characters a line, so neither can be settled alone. The
+    // largest size at which the whole title fits wins, and only a title too
+    // long for the smallest readable size is truncated.
+    const renderedTitle = nodeDisplayTitle(node)
+    let titleSize = COLLAPSED_FONT
+    let titleLines = 1
+    for (let size = COLLAPSED_FONT; size >= MIN_COLLAPSED_FONT; size--) {
+      const lineBox = size * textScale * COLLAPSED_LINE_HEIGHT
+      const lines = Math.max(1, Math.floor(availableHeight / lineBox))
+      const perLine = Math.max(1, Math.floor(availableWidth / (size * textScale * AVG_CHAR_EM)))
+      titleSize = size
+      titleLines = lines
+      if (Math.ceil(renderedTitle.length / perLine) <= lines) break
+    }
 
     const style: Record<string, string> = {
       '--zoom-scale': '1',
       '--title-lines': String(titleLines),
+      '--title-size': titleSize + 'px',
       transform: `translate(${x}px, ${y}px)`,
       transformOrigin: '0 0',
       width: logicalWidth,
