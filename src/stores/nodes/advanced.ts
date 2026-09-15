@@ -366,14 +366,28 @@ export function updateStorylineEdgeColors(
  */
 export async function syncAllTagNodes(
   nodes: Node[],
-  tagNodesComposable: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> }
+  tagNodesComposable: { createTagEdges: (nodeId: string, tags: string[]) => Promise<void> },
+  workspaceId: string | null
 ): Promise<void> {
-  // Only tags that join notes together earn a node. One per distinct tag put
-  // 606 tag nodes into a workspace of 360 real ones, 89% of them reachable from
-  // a single note (docs/content/features.md > Tags).
-  const worth = tagsWorthDrawing(nodes)
+  // The workspace that is open, because that is the workspace whose edges are
+  // loaded. createTagEdges skips a connection it can see, and it can only see
+  // the edges the application holds; walking every node in the database meant a
+  // note elsewhere looked unconnected, so the pass asked for an edge that
+  // already existed and the database refused it, once per note, on every load
+  // (PRODUCT_DESIGN.md > Connecting tags on load).
+  const inWorkspace =
+    !workspaceId || workspaceId === 'default'
+      ? nodes.filter(n => !n.workspace_id || n.workspace_id === 'default')
+      : nodes.filter(n => n.workspace_id === workspaceId)
 
-  for (const node of nodes) {
+  // Only tags that join notes together earn a node, counted within this
+  // workspace: a tag one note here carries labels it rather than linking it,
+  // whatever other workspaces hold. One per distinct tag put 606 tag nodes into
+  // a workspace of 360 real ones, 89% of them reachable from a single note
+  // (docs/content/features.md > Tags).
+  const worth = tagsWorthDrawing(inWorkspace)
+
+  for (const node of inWorkspace) {
     if (node.node_type === 'tag') continue // Skip tag nodes themselves
     if (!node.tags) continue
     try {

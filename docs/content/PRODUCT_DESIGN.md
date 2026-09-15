@@ -1568,6 +1568,15 @@ What the user meant is decided by the model, never by matching patterns against 
 
 A run resuming after approval is given the plan the user approved. The prompt has a section for it, and the value that section renders from was never assigned, so it could never appear and the model executed approved plans it could not see.
 
+### Retrying a provider failure
+
+A failure that says the provider is busy, unreachable for a moment, or took too long to answer is tried again before it reaches the user. One that says the request itself was wrong is not: retrying a bad key or an unknown model only repeats the same answer more slowly.
+
+A gateway timeout was missing from the list. Something between the application and the model gives up on a slow generation and answers 504, and that is the most ordinary way a long run fails: an agent researching a topic gathers findings for minutes, then asks for an answer carrying all of them, and the proxy in front of the model runs out of patience before the model finishes. A single retry usually carries it. Instead the run ended on the first refusal, with a message reading as an empty object, because a gateway that times out sends no body to quote.
+
+- A gateway status - it timed out, or it could not reach the model - is retried like the other transient ones.
+- A status with no body says what the status means, rather than showing an empty body as if the provider had said nothing worth repeating.
+
 ### Reporting a provider failure
 
 A failed request says what the provider said. The message the API returned was parsed and then thrown inside the `try` whose own `catch` replaced it with generic text, so a bad key, a rate limit and an unknown model all arrived as the same sentence.
@@ -1947,6 +1956,14 @@ Tags were shown there too, and a tag is not frontmatter: it is written as a `#ha
 - Tags are read in the text, and followed through their tag nodes.
 - Tags are edited by typing in the body. A chip that wrote the tag list directly could set a tag the body did not contain, which is the same duplication in the other direction, and only the body keeps the note and its file agreeing.
 - A tag used by a single note still describes that note and is kept. What did not scale was drawing a node for it: one per distinct tag put 606 tag nodes into a workspace holding 360 real ones.
+
+### Connecting tags on load
+
+The pass that connects tagged notes walks the workspace that is open, because that is the workspace whose edges are loaded.
+
+Its guard against making a connection twice checks the edges the application holds, and those are fetched for one workspace. The loop walked every node in the database. So for a note in any other workspace the guard saw no edge, concluded the connection was missing, and asked for one that already existed - which the database refuses, once per note, on every load. A vault of several workspaces produced a wall of failures saying a link could not be created, for links that were all present already.
+
+- The loop and the guard see the same workspace. A note elsewhere is connected when its own workspace is opened and its edges are loaded.
 
 ### Tag nodes belong to a workspace
 

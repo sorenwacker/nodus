@@ -239,8 +239,10 @@ export const useNodesStore = defineStore('nodes', () => {
   /**
    * Connect any node whose tags have no edges, when tag nodes are switched on.
    *
-   * createTagEdges skips a connection that already exists, so this is safe to
-   * run on every load and costs nothing on a vault that is already connected.
+   * createTagEdges skips a connection it can see, and it sees the edges the
+   * application has loaded, which are the open workspace's. The pass walks that
+   * same workspace, so it costs nothing on a vault already connected
+   * (PRODUCT_DESIGN.md > Connecting tags on load).
    */
   function syncTagEdgesIfEnabled() {
     syncAllTagNodes().catch(e => storeLogger.error('[Tags] Edge sync failed:', e))
@@ -454,7 +456,13 @@ export const useNodesStore = defineStore('nodes', () => {
   // Tag operations
   async function syncAllTagNodes() {
     if (!tagNodesComposable) return
-    await syncAllTagNodesFn(nodes.value, tagNodesComposable)
+    // The open workspace, matching the edges the guard can see
+    // (PRODUCT_DESIGN.md > Connecting tags on load)
+    await syncAllTagNodesFn(
+      nodes.value,
+      tagNodesComposable,
+      workspaceStore.currentWorkspaceId
+    )
   }
 
   // Initialize composables that depend on functions defined above
