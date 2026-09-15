@@ -5,8 +5,11 @@
  * lets a 69,000px layout fit lets an 11,000px one shrink to a ~55px smudge -
  * every card visually piled on every other - while a pan moves two hundred
  * canvas px per mouse px, so the view ends up megapixels from the graph. The
- * floor is now the fit scale with ~40% margin: the whole graph plus breathing
- * room is as far out as out goes (useViewState > minZoom).
+ * Deriving it from the fit scale went too far the other way: capped at half
+ * scale, zoom-out stopped at exactly the threshold where cards collapse to
+ * titles, so that overview could not be reached at all. The floor now sits
+ * well below the fit scale and always below the collapse threshold
+ * (PRODUCT_DESIGN.md > How far out zoom goes).
  *
  * The force layout's collision padding scales with the card for the same
  * user: resizing every card up and re-running the layout used to barely
@@ -17,6 +20,7 @@ import { describe, it, expect } from 'vitest'
 import { useViewState } from '../canvas/composables/viewport/useViewState'
 import { ZOOM_LIMITS } from '../canvas/constants'
 import { contentSpan } from '../canvas/utils/contentBounds'
+import { displayStorage } from '../lib/storage'
 import { applyForceLayout } from '../canvas/layout'
 
 const RECT = { width: 1536, height: 652 } as DOMRect
@@ -29,15 +33,32 @@ function viewStateFor(span: { width: number; height: number } | null) {
 }
 
 describe('content-aware zoom-out floor', () => {
-  it('stops zooming out a little past the whole graph', () => {
+  it('pulls back well past the whole graph', () => {
     // The measured workspace: 11,175 x 10,668px in a 1536x652 viewport
     const vs = viewStateFor({ width: 11175, height: 10668 })
     for (let i = 0; i < 100; i++) vs.zoomOut()
     const fit = Math.min(RECT.width / 11275, RECT.height / 10768)
-    expect(vs.scale.value).toBeGreaterThanOrEqual(fit * 0.7 * 0.99)
+    expect(vs.scale.value).toBeCloseTo(fit * 0.25, 4)
     expect(vs.scale.value).toBeLessThan(fit)
-    // nowhere near the absolute floor that produced the smudge
-    expect(vs.scale.value).toBeGreaterThan(ZOOM_LIMITS.MIN * 5)
+    // nowhere near the absolute floor that produced the smudge: the graph
+    // keeps a usable size on screen instead of collapsing to ~55px
+    expect(11175 * vs.scale.value).toBeGreaterThan(120)
+  })
+
+  it('always reaches the scale where cards collapse to titles', () => {
+    // The cap was the collapse threshold itself, so a workspace whose content
+    // fits the window could never reach the title-only overview and zoom-out
+    // simply stopped (PRODUCT_DESIGN.md > How far out zoom goes)
+    const threshold = displayStorage.getSemanticZoomThreshold()
+    for (const span of [
+      { width: 500, height: 300 },
+      { width: 2000, height: 1200 },
+      { width: 11175, height: 10668 },
+    ]) {
+      const vs = viewStateFor(span)
+      for (let i = 0; i < 100; i++) vs.zoomOut()
+      expect(vs.scale.value, `span ${span.width}x${span.height}`).toBeLessThan(threshold)
+    }
   })
 
   it('still reaches the absolute floor for a vast layout', () => {
@@ -60,10 +81,10 @@ describe('content-aware zoom-out floor', () => {
     expect(vs.scale.value).toBeCloseTo(fit, 5)
   })
 
-  it('lets a tiny workspace zoom out to half scale for planning room', () => {
+  it('lets a tiny workspace zoom out for planning room', () => {
     const vs = viewStateFor({ width: 500, height: 300 })
     for (let i = 0; i < 100; i++) vs.zoomOut()
-    expect(vs.scale.value).toBeCloseTo(0.5, 3)
+    expect(vs.scale.value).toBeCloseTo(0.1, 3)
   })
 })
 

@@ -92,17 +92,21 @@ export function useViewState(options: UseViewStateOptions) {
    * lets a 69,000px layout fit lets an 11,000px one shrink to a smudge and
    * the pointer travel two hundred canvas px per mouse px - the view ends up
    * megapixels from the graph with nothing on screen to navigate back by.
-   * The floor is therefore the fit scale with margin: the whole graph plus
-   * ~40% of breathing room is as far out as out goes. ZOOM_LIMITS.MIN remains
-   * the absolute bound (content unknown, or vast), and the 0.5 cap keeps a
-   * tiny two-node workspace zoomable-out enough to plan around.
+   * The floor is therefore set well below the fit scale - the view reaches
+   * about four times the graph's own extent - and always below the semantic
+   * zoom collapse threshold. Capping it at 0.5 put the furthest the view
+   * could travel at exactly the scale where cards collapse to titles, so
+   * that overview could not be reached at all and zoom-out appeared to stop
+   * for no reason (PRODUCT_DESIGN.md > How far out zoom goes).
+   * ZOOM_LIMITS.MIN remains the absolute bound (content unknown, or vast),
+   * which is what keeps the smudge from returning.
    */
   function minZoom(): number {
     const span = getContentSpan?.()
     const rect = getCanvasRect()
     if (!span || !rect || span.width <= 0 || span.height <= 0) return ZOOM_LIMITS.MIN
     const fit = Math.min(rect.width / (span.width + 100), rect.height / (span.height + 100))
-    return Math.min(0.5, Math.max(ZOOM_LIMITS.MIN, fit * 0.7))
+    return Math.min(0.1, Math.max(ZOOM_LIMITS.MIN, fit * 0.25))
   }
 
   // Zoom controls

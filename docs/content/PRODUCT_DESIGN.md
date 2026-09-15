@@ -1744,6 +1744,14 @@ Above its own threshold, the canvas draws only the edges touching what is hovere
 
 This was gated on the unrelated "hide all edges above N" setting, which defaults to 0 - so the path could never run in a default install, and a user who set that setting to 5000 silently also enabled hover-only rendering above 1500, which is not what the setting says.
 
+### How far out zoom goes
+
+The zoom-out floor comes from the content rather than a constant. A fixed floor serves every workspace the same number, and the number that lets a very large layout fit lets a mid-size one shrink to an unusable smudge while a pan crosses hundreds of canvas pixels per mouse pixel.
+
+Deriving it from the fit scale then went too far the other way. The floor was the fit scale less a small margin, capped at half scale, so in any workspace whose content already fits the window zoom-out stopped at 0.5 - which is also the default threshold at which cards collapse to titles. The furthest the view could travel was exactly the point where the collapsed overview begins, so that overview could not be reached at all and zoom-out appeared to stop for no reason.
+
+The floor is therefore set well below the fit scale, and always below the collapse threshold. Whatever the content, the user can pull back far enough to read the graph as titles. The absolute bound still applies for a vast or unknown layout, which is what keeps the smudge from returning.
+
 ### Semantic zoom collapse
 
 Cards collapse to titles below a threshold the user can set. The collapse state is re-evaluated when the scale changes **and** when the threshold changes; watching only the scale left cards collapsed or expanded until the user happened to zoom, disagreeing with every other view of the same setting.
