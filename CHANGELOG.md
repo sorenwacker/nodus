@@ -2,6 +2,13 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.8] - 2026-09-15
+
+### Fixed
+- Tagged notes are connected within the workspace that is open. The pass walked every node in the database while its guard against making a connection twice could only see the edges the application had loaded, which are one workspace's. A note in any other workspace therefore looked unconnected, so the pass asked for a link that already existed and the database refused it, once per note, on every load. A vault of several workspaces opened onto a wall of failures reporting links it could not create, for links that were all present already. Whether a tag is shared widely enough to earn a node of its own is now counted within the workspace too
+- A tool call a model writes into its reply in its own syntax is carried out. Models that cannot emit native calls write them into the message and do not agree on how; one writes `call:name(key:value)` with its own string delimiters, which every pattern missed, so seven node creations and eight edges arrived in the chat as raw markup instead of running. Such a call now takes the same path as any other, with the mode's allow list, the log line and the transcript record that path applies
+- A reply carrying tool call markers that cannot be read is never shown as the agent's answer. The model is told once what to send instead, and a second unusable reply ends the run rather than pasting markup into the conversation
+
 ## [1.6.0-rc.7] - 2026-09-14
 
 A codebase review ran over the whole project and its findings were worked through in phases. This candidate carries the first four: data safety, vault sync and file locking, the agent and its tools, and MCP workspace scoping. Every fix landed with a test that failed against the unfixed code, and several rules gained a gate so they cannot erode again.
