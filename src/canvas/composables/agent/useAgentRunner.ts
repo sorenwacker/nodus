@@ -26,6 +26,7 @@ import {
   DEFAULT_AGENT_MODE,
 } from '../../../llm/agentModes'
 import { preflightCheck, estimateAgentTokens } from '../../../llm/tokenEstimator'
+import { carriesCallMarkers, decodeCallSyntax } from '../../../llm/callSyntax'
 import { buildSystemPrompt, pruneMessages } from './systemPrompt'
 
 /**
@@ -526,6 +527,15 @@ export function useAgentRunner(ctx: AgentContext) {
           if (!toolJson && rawJsonMatch) toolJson = rawJsonMatch[1]
 
           let embeddedCall: { name: string; args: Record<string, unknown> } | null = null
+
+          // A model that writes calls in its own syntax rather than JSON: the
+          // arguments are JSON once its string delimiters and bare keys are
+          // repaired (PRODUCT_DESIGN.md > A reply that carries a tool call it
+          // could not make)
+          if (!toolJson) {
+            const [decoded] = decodeCallSyntax(msg.content)
+            if (decoded) embeddedCall = decoded
+          }
           if (toolJson) {
             try {
               const parsed = JSON.parse(toolJson)
@@ -561,6 +571,31 @@ export function useAgentRunner(ctx: AgentContext) {
               return { status: 'done', message: answer }
             }
             continue
+          }
+
+          // A reply carrying call markers nothing could decode is not an
+          // answer. Showing it puts raw markup where the agent's words belong,
+          // so say what to send instead and let the run continue; a second
+          // unusable reply ends it, as an unusable prose reply already does
+          // (PRODUCT_DESIGN.md > A reply that carries a tool call it could not
+          // make)
+          if (carriesCallMarkers(msg.content)) {
+            ctx.log.value.push('> A tool call arrived in a form that could not be read')
+            if (!hasBeenNudged) {
+              hasBeenNudged = true
+              messages.push({
+                role: 'user',
+                content:
+                  'That tool call could not be read. Send it as the tool call itself, or as a JSON object with "name" and "arguments".',
+              })
+              continue
+            }
+            appendAssistantText(
+              ctx.transcript.value,
+              'The model sent a tool call I could not carry out.'
+            )
+            ctx.isRunning.value = false
+            return { status: 'error', message: 'Unreadable tool call' }
           }
 
           // A reply with no tool call is an answer: the log keeps a short line

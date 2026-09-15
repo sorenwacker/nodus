@@ -132,3 +132,81 @@ describe('a tool call recovered from the reply text', () => {
     expect(prose, 'the raw tool JSON was shown to the user as an answer').not.toContain('"name"')
   })
 })
+
+describe('a call written in the model own syntax', () => {
+  beforeEach(() => {
+    chat.mockReset()
+  })
+
+  // Every JSON pattern missed this, so the calls arrived in the chat as raw
+  // markup instead of running
+  // (PRODUCT_DESIGN.md > A reply that carries a tool call it could not make)
+  const OPEN = '<' + '|tool_call>'
+  const CLOSE = '<tool_call' + '|>'
+  const Q = '<' + '|"' + '|>'
+
+  function replyInCallSyntax(body: string) {
+    return { message: { role: 'assistant', content: OPEN + body + CLOSE } }
+  }
+
+  it('runs the tool it names, with the arguments it carries', async () => {
+    const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const ctx = makeContext(async (name, args) => {
+      calls.push({ name, args })
+      return 'Thought recorded'
+    })
+    const runner = useAgentRunner(ctx as never)
+
+    chat.mockImplementation(async () => ({ message: { role: 'assistant', content: 'ok' } }))
+    chat.mockReturnValueOnce(
+      Promise.resolve(replyInCallSyntax('call:think(thought:' + Q + 'a plan' + Q + ')'))
+    )
+
+    void runner.run('research this')
+    await settle()
+
+    expect(calls).toEqual([{ name: 'think', args: { thought: 'a plan' } }])
+  })
+
+  it('is still refused when the mode does not offer that tool', async () => {
+    const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
+    const executed: string[] = []
+    const ctx = makeContext(async name => {
+      executed.push(name)
+      return 'done'
+    })
+    const runner = useAgentRunner(ctx as never)
+
+    chat.mockImplementation(async () => ({ message: { role: 'assistant', content: 'ok' } }))
+    chat.mockReturnValueOnce(
+      Promise.resolve(replyInCallSyntax('call:create_node(title:' + Q + 'Smuggled' + Q + ')'))
+    )
+
+    void runner.run('research this')
+    await settle()
+
+    expect(executed).not.toContain('create_node')
+  })
+
+  it('never shows the markup as the agent answer', async () => {
+    const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
+    const ctx = makeContext(async () => 'Thought recorded')
+    const runner = useAgentRunner(ctx as never)
+
+    // The model repeated a key: nothing can be decoded from it
+    chat.mockImplementation(async () => ({ message: { role: 'assistant', content: 'ok' } }))
+    chat.mockReturnValueOnce(
+      Promise.resolve(
+        replyInCallSyntax('call:create_node(title:title:' + Q + 'The Mines' + Q + ')')
+      )
+    )
+
+    void runner.run('research this')
+    await settle()
+
+    const prose = ctx.transcript.value.map((t: { text?: string }) => t.text || '').join('\n')
+    expect(prose, 'raw markup was shown where the agent words belong').not.toContain('call:')
+    expect(ctx.log.value.join('\n')).toContain('could not be read')
+  })
+})

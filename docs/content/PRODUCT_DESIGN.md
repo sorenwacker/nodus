@@ -1527,6 +1527,16 @@ A tool call recovered from the text of a reply is executed on the same path as o
 - One function handles a call whatever its shape: allow-list, execution, log line, transcript, marker handling.
 - A message recognised as a tool call is not also appended to the transcript as prose.
 
+### A reply that carries a tool call it could not make
+
+Models that cannot emit native tool calls write them into the text, and they do not agree on how. A reply carrying such markers is never shown to the user as prose: it is not an answer, and rendering it puts raw markup in the transcript where the agent's words belong.
+
+- A format the application can decode is executed on the one path every call takes, with the mode's allow-list, the log line and the transcript record that path applies.
+- A format it cannot decode is reported back to the model, naming what it should send instead, so the run continues rather than stopping on a reply nobody can use. The model is told once; a second unusable reply ends the run, as an unusable prose reply already does.
+- The user is told the reply could not be carried out, rather than being shown its markup.
+
+One model wrote `call:name(key:value)` with its own string delimiters, and every pattern missed it, so seven node creations and eight edges arrived in the chat as text. The same reply also repeated a key, which is the model's own error: a decoder reports such a call as unusable rather than guessing at what was meant.
+
 ### One implementation per tool
 
 A tool call is answered by exactly one layer. The canvas tries the registry, then the marker handlers, then the LLM-dependent tools, and takes the first real answer, so a tool with a real handler in two layers runs the first and the second is dead code that reads as the live one. Four tools had two implementations, and the unreachable copy was the one later edits were made against.
@@ -1620,6 +1630,17 @@ A name the request router accepts is one the server advertises, and the reverse.
 
 - Every case the router handles names an advertised tool, and every advertised tool is routed.
 - A gate compares the two lists, so they cannot drift apart.
+
+### The colour a node is given
+
+A colour set through a tool is the colour the interface offers. The canvas stores a node's colour as a translucent tint and layers it over the surface, so a card keeps its depth and reads the same in light and dark themes, which the palettes are paired to convert between. Anything that needs the colour solid converts it where it is used, as the timeline marks do.
+
+The MCP server kept a second palette of its own: eight saturated hex values. They appear in none of the canvas palettes, so a colour set by an agent matched no conversion and was painted raw, turning a card into a solid slab that ignored the theme.
+
+- A colour name resolves to the palette value the colour bar writes, whoever asks for it.
+- Those eight saturated values are recognised as the colours they were meant to be, so the nodes already carrying them correct themselves rather than staying solid.
+- Edges, frames and storylines keep solid values: an edge stroke is drawn as given, a frame adds its own transparency, a timeline lane is painted opaque on purpose.
+- The node palette holds seven colours and no grey, so grey is not offered for a node. It stays available where it already works.
 
 ### Finding nodes by colour
 
