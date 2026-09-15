@@ -189,13 +189,21 @@ export async function executeAutoLayout(
       // frame_id is the ONLY source of truth for frame membership
       // NO spatial fallback - that creates non-deterministic behavior
       if (node.frame_id) {
-        if (frameMap.has(node.frame_id)) {
+        const frameIsShown = frameMap.has(node.frame_id)
+        if (frameIsShown) {
           if (!frameNodes.has(node.frame_id)) {
             frameNodes.set(node.frame_id, [])
           }
           frameNodes.get(node.frame_id)!.push(node)
         }
-        if (!laidOutBySelection) continue
+        // A framed node is set aside only when its frame is actually on the
+        // canvas. Skipping on the id alone dropped it from runs where no such
+        // frame exists to constrain it: the neighbourhood overlay draws no
+        // frames at all, so a framed neighbour was never placed and a subgraph
+        // of entirely framed nodes was arranged not at all. A frame that has
+        // been deleted leaves the same dangling id behind
+        // (PRODUCT_DESIGN.md > Neighborhood Mode).
+        if (frameIsShown && !laidOutBySelection) continue
       }
 
       unframedNodes.push(node)
