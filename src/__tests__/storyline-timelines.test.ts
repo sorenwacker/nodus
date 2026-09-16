@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
@@ -153,6 +154,29 @@ describe('StorylineTimelines', () => {
     // The unassigned lane opens no reader
     await labels[2].trigger('click')
     expect(wrapper.emitted('open-reader')).toBeUndefined()
+  })
+
+  it('lays the axis out to the width of its container', async () => {
+    // A fixed plot width is wrong at every width except by coincidence: too
+    // narrow a container scrolls with the last tick against the border, too
+    // wide a one leaves dead space
+    // (PRODUCT_DESIGN.md > Timelines: Design Decisions)
+    seedDatedNodes()
+    const wrapper = await mountTimelines()
+
+    const plot = wrapper.find('.tl-plot').element
+    Object.defineProperty(plot, 'clientWidth', { value: 1400, configurable: true })
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+
+    expect(Number(wrapper.find('.timelines-svg').attributes('width'))).toBe(1400)
+  })
+
+  it('keeps a usable axis when the container cannot be measured', async () => {
+    // jsdom reports 0; the axis must fall back rather than collapse
+    seedDatedNodes()
+    const wrapper = await mountTimelines()
+    expect(Number(wrapper.find('.timelines-svg').attributes('width'))).toBeGreaterThan(0)
   })
 
   it('shows the date hint instead of guessing positions when nothing is dated', async () => {

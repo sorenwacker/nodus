@@ -147,7 +147,7 @@ const axisSegments = computed<AxisSegment[]>(() => {
   if (manualMin !== null) values.push(manualMin)
   if (manualMax !== null) values.push(manualMax)
   if (values.length === 0) return []
-  return buildBrokenAxis(values, PADDING, PLOT_WIDTH)
+  return buildBrokenAxis(values, PADDING, plotWidth.value)
 })
 
 const hasAxis = computed(() => axisSegments.value.length > 0)
@@ -292,7 +292,44 @@ const axisBreaks = computed(() =>
     .map((seg, i) => ({ x: (axisSegments.value[i].x2 + seg.x1) / 2 }))
 )
 
-const svgWidth = computed(() => PADDING * 2 + PLOT_WIDTH)
+/**
+ * The width the axis is drawn across, measured from the plot column.
+ *
+ * A fixed width is wrong at every size except by coincidence: a container
+ * narrower than it overflows into a horizontal scroll with the last tick
+ * pressed against the border, and a wider one leaves dead space to the right
+ * (PRODUCT_DESIGN.md > Timelines: Design Decisions). PLOT_WIDTH remains the
+ * fallback for when nothing can be measured, so the axis never collapses.
+ */
+const plotEl = ref<HTMLElement | null>(null)
+const plotWidth = ref(PLOT_WIDTH)
+/** Narrowest axis worth drawing; below this the plot scrolls instead. */
+const MIN_PLOT_WIDTH = 240
+
+function measurePlot() {
+  const available = (plotEl.value?.clientWidth ?? 0) - PADDING * 2
+  plotWidth.value = available > 0 ? Math.max(MIN_PLOT_WIDTH, available) : PLOT_WIDTH
+}
+
+let plotObserver: ResizeObserver | null = null
+onMounted(() => {
+  measurePlot()
+  // The sheet also changes width when a sibling panel opens beside it, which
+  // resizes no window; an observer catches that and the listener covers
+  // environments without one.
+  if (typeof ResizeObserver !== 'undefined' && plotEl.value) {
+    plotObserver = new ResizeObserver(measurePlot)
+    plotObserver.observe(plotEl.value)
+  }
+  window.addEventListener('resize', measurePlot)
+})
+onUnmounted(() => {
+  plotObserver?.disconnect()
+  plotObserver = null
+  window.removeEventListener('resize', measurePlot)
+})
+
+const svgWidth = computed(() => PADDING * 2 + plotWidth.value)
 const svgHeight = computed(() => AXIS_HEIGHT + lanes.value.length * LANE_HEIGHT + 8)
 
 // The sheet sizes itself to the lane count (including the unassigned lane)
@@ -361,7 +398,7 @@ onMounted(() => {
       </div>
 
       <!-- Scrollable plot -->
-      <div class="tl-plot">
+      <div ref="plotEl" class="tl-plot">
         <svg :width="svgWidth" :height="svgHeight" class="timelines-svg">
           <!-- Alternating lane stripes (recessive) -->
           <rect
