@@ -100,6 +100,24 @@ const legacyColorMap: Record<string, string> = {
   'rgba(59, 130, 246, 0.18)': 'rgba(59, 130, 246, 0.28)',
   'rgba(168, 85, 247, 0.18)': 'rgba(168, 85, 247, 0.28)',
   'rgba(236, 72, 153, 0.18)': 'rgba(236, 72, 153, 0.28)',
+  // Saturated values written by the agent tools, which kept a palette of their
+  // own. They appear in no canvas palette, so they were layered over the
+  // surface opaque and the card became a solid slab that ignored the theme
+  // (PRODUCT_DESIGN.md > The colour a node is given)
+  '#ef4444': 'rgba(239, 68, 68, 0.28)',
+  '#f97316': 'rgba(249, 115, 22, 0.28)',
+  '#eab308': 'rgba(234, 179, 8, 0.28)',
+  '#22c55e': 'rgba(34, 197, 94, 0.28)',
+  '#3b82f6': 'rgba(59, 130, 246, 0.28)',
+  '#8b5cf6': 'rgba(168, 85, 247, 0.28)',
+  '#ec4899': 'rgba(236, 72, 153, 0.28)',
+  // The ontology importer's "purple for classes", written onto every class
+  // node it created. The same value on a subClassOf edge is left alone: an
+  // edge stroke is drawn as given.
+  '#9333ea': 'rgba(168, 85, 247, 0.28)',
+  // Recognised but not offered: the node palette holds no grey, and a node
+  // already carrying it should still not render as a slab.
+  '#6b7280': 'rgba(107, 114, 128, 0.28)',
 }
 
 /**

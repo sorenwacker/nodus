@@ -1656,6 +1656,8 @@ The MCP server kept a second palette of its own: eight saturated hex values. The
 
 - A colour name resolves to the palette value the colour bar writes, whoever asks for it.
 - Those eight saturated values are recognised as the colours they were meant to be, so the nodes already carrying them correct themselves rather than staying solid.
+- The ontology importer kept a ninth: it wrote a saturated purple onto every class node it created, which is how most solid nodes in a vault built from an ontology got that way. It is recognised as the palette's purple, so those nodes read like any other purple one. The same value on a `subClassOf` edge is left as it is, because an edge stroke is drawn as given.
+- Grey is recognised even though it is not offered. A node that already carries it stops rendering as a slab, but the bar still does not hand grey out for a node.
 - Edges, frames and storylines keep solid values: an edge stroke is drawn as given, a frame adds its own transparency, a timeline lane is painted opaque on purpose.
 - The node palette holds seven colours and no grey, so grey is not offered for a node. It stays available where it already works.
 - The row of colours in use offers only what the presets do not. Its purpose is to reach a colour the palette does not carry, so listing a colour that is already a swatch directly below it repeats the same choice twice and crowds out the custom ones it exists for. A colour the current theme's palette does not offer still belongs there, because in that theme it is not otherwise reachable. When every colour in use is a preset the row is empty and disappears, separator included.
