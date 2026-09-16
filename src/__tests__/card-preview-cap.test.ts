@@ -58,6 +58,20 @@ describe('previewForCard with a cap', () => {
   })
 
   it('falls back to the flat cap when given none', () => {
-    expect(previewForCard(long).text.length).toBeLessThanOrEqual(CARD_PREVIEW_LIMIT + 200)
+    expect(previewForCard(long).text.length).toBeLessThanOrEqual(CARD_PREVIEW_LIMIT)
+  })
+
+  it('never returns more than the cap it was given', () => {
+    // The search window ran 200 characters past the cap, but the break search
+    // never looks beyond the cap itself, so those characters were never
+    // searched for a break - only leaked into the card, which is the one thing
+    // the cap exists to prevent (PRODUCT_DESIGN.md > Rendering node content)
+    const noBreaks = 'x'.repeat(5000)
+    expect(previewForCard(noBreaks, 300).text.length).toBeLessThanOrEqual(300)
+  })
+
+  it('cuts at the cap when the only break is too early to use', () => {
+    const earlyBreak = 'a\n' + 'b'.repeat(5000)
+    expect(previewForCard(earlyBreak, 300).text.length).toBeLessThanOrEqual(300)
   })
 })

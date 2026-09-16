@@ -80,11 +80,15 @@ export function previewForCard(content: string | null | undefined, limit = CARD_
   const text = content || ''
   if (text.length <= limit) return { text, truncated: false }
 
-  const window = text.slice(0, limit + 200)
-  const lastBreak = window.lastIndexOf('\n', limit)
+  // Searched backwards from the cap, so the text beyond it is never read: the
+  // window that used to run 200 characters past the cap could never supply a
+  // break, and when none was found it returned all 200 of them - 524 characters
+  // into a default card capped at 324, which is the one thing the cap exists to
+  // prevent (PRODUCT_DESIGN.md > Rendering node content).
+  const lastBreak = text.lastIndexOf('\n', limit)
 
   return {
-    text: lastBreak > limit / 2 ? window.slice(0, lastBreak) : window,
+    text: lastBreak > limit / 2 ? text.slice(0, lastBreak) : text.slice(0, limit),
     truncated: true,
   }
 }
