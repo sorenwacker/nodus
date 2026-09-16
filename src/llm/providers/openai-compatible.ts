@@ -33,6 +33,31 @@ function sanitizeContent(content: string | undefined): string {
     .trim()
 }
 
+/**
+ * What a status means, for when the provider sent nothing to quote.
+ *
+ * A gateway that times out sends no body, so the error read as an empty object
+ * - "API error 504: {}" - which tells the user nothing
+ * (PRODUCT_DESIGN.md > Retrying a provider failure).
+ */
+function statusMeaning(status: number): string {
+  switch (status) {
+    case 504:
+      return 'the gateway timed out waiting for the model'
+    case 502:
+      return 'the gateway could not reach the model'
+    case 503:
+      return 'the provider is unavailable'
+    case 429:
+      return 'the provider is rate limiting this key'
+    case 401:
+    case 403:
+      return 'the provider rejected the credentials'
+    default:
+      return 'the provider sent no message'
+  }
+}
+
 export class OpenAICompatibleProvider implements ILLMProvider {
   readonly id = 'openai-compatible'
   readonly name = 'OpenAI Compatible'
@@ -161,7 +186,9 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     sse.flush()
 
     if (status < 200 || status >= 300) {
-      throw new Error(`API error ${status}: ${sse.error() || sse.text().slice(0, 300)}`)
+      throw new Error(
+        `API error ${status}: ${sse.error() || sse.text().slice(0, 300) || statusMeaning(status)}`
+      )
     }
     const streamError = sse.error()
     if (streamError) throw new Error(`API error: ${streamError}`)
@@ -204,9 +231,16 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}))
-      const errorMsg = error.error?.message || error.message || error.detail || JSON.stringify(error)
-      throw new Error(`API error ${response.status}: ${errorMsg}`)
+      // null, not {}: a body that failed to parse and a body that is genuinely
+      // empty both used to stringify to "{}" and be shown as the provider's
+      // own words (PRODUCT_DESIGN.md > Retrying a provider failure)
+      const error = await response.json().catch(() => null)
+      const quoted =
+        error?.error?.message ||
+        error?.message ||
+        error?.detail ||
+        (error && Object.keys(error).length > 0 ? JSON.stringify(error) : null)
+      throw new Error(`API error ${response.status}: ${quoted || statusMeaning(response.status)}`)
     }
 
     const data = await response.json()

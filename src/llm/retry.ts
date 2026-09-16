@@ -32,6 +32,11 @@ const DEFAULT_OPTIONS: RetryOptions = {
     'timeout',
     'overloaded',
     '503',
+    // A gateway that gave up on a slow generation, or could not reach the
+    // model at all. This is the most ordinary way a long agent run fails and a
+    // single retry usually carries it
+    // (PRODUCT_DESIGN.md > Retrying a provider failure)
+    '504',
     '502',
     '429',
   ],
