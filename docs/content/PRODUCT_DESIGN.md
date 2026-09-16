@@ -1658,6 +1658,7 @@ The MCP server kept a second palette of its own: eight saturated hex values. The
 - Those eight saturated values are recognised as the colours they were meant to be, so the nodes already carrying them correct themselves rather than staying solid.
 - Edges, frames and storylines keep solid values: an edge stroke is drawn as given, a frame adds its own transparency, a timeline lane is painted opaque on purpose.
 - The node palette holds seven colours and no grey, so grey is not offered for a node. It stays available where it already works.
+- The row of colours in use offers only what the presets do not. Its purpose is to reach a colour the palette does not carry, so listing a colour that is already a swatch directly below it repeats the same choice twice and crowds out the custom ones it exists for. A colour the current theme's palette does not offer still belongs there, because in that theme it is not otherwise reachable. When every colour in use is a preset the row is empty and disappears, separator included.
 
 ### Finding nodes by colour
 

@@ -162,3 +162,45 @@ export function getNodeBackground(colorTheme: string | null, currentTheme: strin
   // Use linear-gradient to layer transparent color over solid background
   return `linear-gradient(${themeColor}, ${themeColor}), var(--bg-surface)`
 }
+
+
+/** A colour a node or frame currently carries, with the swatch to draw for it. */
+export interface ColorInUse {
+  value: string
+  display: string
+}
+
+/** A palette entry the colour bar offers. */
+export interface PaletteColor {
+  value: string | null
+  display: string | null
+}
+
+/**
+ * The colours currently in use that the colour bar should offer as a row.
+ *
+ * Only colours the palette does not already offer: the row exists to reach a
+ * colour the presets do not carry, and one that is already a swatch directly
+ * below it repeats the same choice twice and crowds out the custom colours
+ * (PRODUCT_DESIGN.md > The colour a node is given). The palette is the active
+ * theme's, so a colour this theme does not offer still belongs in the row,
+ * being unreachable otherwise.
+ *
+ * Args:
+ *   colored: Stored colour of every node and frame; empty values are ignored.
+ *   palette: The presets the bar already offers, for the active theme.
+ *
+ * Returns:
+ *   One entry per distinct colour the palette does not carry. Its display is
+ *   the stored value, which is the only thing there is to draw it with.
+ */
+export function colorsInUseFor(colored: Array<string | null | undefined>, palette: PaletteColor[]): ColorInUse[] {
+  const values = new Set<string>()
+  for (const value of colored) {
+    if (value) values.add(value)
+  }
+
+  return Array.from(values)
+    .filter(value => !palette.some(preset => preset.value === value))
+    .map(value => ({ value, display: value }))
+}

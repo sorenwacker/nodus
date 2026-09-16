@@ -108,6 +108,7 @@ import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 import { useNodeService } from '../composables/useNodeService'
 import { notifications$ } from '../composables/useNotifications'
+import { colorsInUseFor } from './utils/nodeColors'
 
 // Undo handlers
 const {
@@ -618,33 +619,15 @@ const previewConnectedNodes = computed(() => {
 
 // Colors currently in use in nodes and frames (for color bar)
 // Returns objects with value (stored) and display (shown in dot)
-const colorsInUse = computed(() => {
-  const colorValues = new Set<string>()
-
-  // Collect colors from nodes
-  for (const node of store.filteredNodes) {
-    if (node.color_theme) {
-      colorValues.add(node.color_theme)
-    }
-  }
-
-  // Collect colors from frames
-  for (const frame of store.filteredFrames) {
-    if (frame.color) {
-      colorValues.add(frame.color)
-    }
-  }
-
-  // Map stored values to display colors using nodeColors palette
-  return Array.from(colorValues).map(value => {
-    // Find matching preset color to get display value
-    const preset = nodeColors.value.find(c => c.value === value)
-    return {
-      value,
-      display: preset?.display || value // fallback to stored value if no match
-    }
-  })
-})
+const colorsInUse = computed(() =>
+  colorsInUseFor(
+    [
+      ...store.filteredNodes.map(n => n.color_theme),
+      ...store.filteredFrames.map(f => f.color),
+    ],
+    nodeColors.value
+  )
+)
 
 // Edge manipulation composable - handles edge creation, selection, modification
 const edgeManipulation = useEdgeManipulation({
