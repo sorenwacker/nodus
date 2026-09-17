@@ -2,6 +2,18 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.9] - 2026-09-17
+
+### Fixed
+- A collapsed card chooses the largest type size at which its whole title fits, rather than holding a fixed size and clamping away whatever overflows. At 28px bold a default card held about twenty characters across two lines, so an ordinary title was truncated as a matter of course and the ellipsis was the normal case instead of the exception. The line budget also subtracts the border the card actually draws, which is written from the zoom and is wider than the stylesheet's at every scale where cards are collapsed
+- The view zooms out far enough to reach the title-only overview. The floor was the fit scale capped at half scale, which is also the threshold at which cards collapse, so in any workspace whose content already fitted the window zoom-out stopped exactly where the collapsed view begins and that view could not be reached at all
+- Every layout arranges the neighbourhood overlay, not only the radial one. The grouping pass set aside any node carrying a frame id whether or not its frame was shown; the overlay draws no frames, so a framed neighbour was dropped from the run and a subgraph of entirely framed nodes was arranged not at all. A node whose frame has since been deleted is laid out again rather than excluded for ever by a dangling id
+- The timeline axis is drawn across the width its plot column actually has. A fixed plot width met the panel edge in a narrow window, scrolling with the last tick against the border, and left dead space in a wide one
+- A card preview stays inside the cap it was given. The search window ran 200 characters past the cap while the break search never looked beyond the cap itself, so those characters could never supply a break and were returned whenever none was found: 524 characters into a default card sized for 324
+- A gateway timeout is retried instead of ending the run. It was missing from the list of transient failures, so the most ordinary way a long agent run fails, a proxy giving up on a slow generation, stopped at the first refusal. A status that carries no body now says what the status means rather than showing an empty object as though it were the provider's own words
+- The row of colours in use offers only what the presets do not. It listed every colour in use, so a node coloured from the bar appeared directly above the identical preset, repeating the same choice twice and crowding out the custom colours the row exists for
+- A colour written by an agent or by the ontology importer is recognised as the colour it was meant to be. The agent tools kept eight saturated values of their own and the importer wrote a ninth onto every class node it created; none appeared in any canvas palette, so each was layered opaque over the surface and the card became a solid slab that ignored the theme. Grey is recognised for the same reason without being offered for a node
+
 ## [1.6.0-rc.8] - 2026-09-15
 
 ### Fixed
