@@ -5,6 +5,8 @@
 import type { Workspace } from '../types'
 import type { SessionMemory, StackTask } from '../llm/types'
 
+export type AgentStartMode = 'plan' | 'explore'
+
 // Storage key definitions with types
 const KEYS = {
   theme: 'nodus-theme',
@@ -41,6 +43,7 @@ const KEYS = {
   canvasZoomMode: 'nodus_canvas_zoom_mode',
   chainContextLimit: 'nodus_chain_context_limit',
   searchApiKey: 'nodus_search_api_key',
+  agentDefaultMode: 'nodus_agent_default_mode',
   showTagNodes: 'nodus_show_tag_nodes',
   showPerfOverlay: 'nodus_show_perf_overlay',
   zoteroUserId: 'nodus_zotero_user_id',
@@ -253,6 +256,17 @@ export const llmStorage = {
   setSearchApiKey(value: string): void {
     localStorage.setItem(KEYS.searchApiKey, value)
   },
+  /**
+   * The mode a run starts in. Only plan and explore are start modes: execute
+   * is entered by approving a plan (PRODUCT_DESIGN.md > Agent section).
+   */
+  getDefaultAgentMode(): AgentStartMode {
+    const stored = localStorage.getItem(KEYS.agentDefaultMode)
+    return stored === 'explore' ? 'explore' : 'plan'
+  },
+  setDefaultAgentMode(value: AgentStartMode): void {
+    localStorage.setItem(KEYS.agentDefaultMode, value)
+  },
   getLLMEnabled(): boolean {
     return localStorage.getItem(KEYS.llmEnabled) !== 'false'
   },
@@ -435,6 +449,11 @@ export const memoryStorage = {
     // Keep last 50 memories
     const trimmed = memories.slice(-50)
     localStorage.setItem(`nodus_memories_${workspaceId}`, JSON.stringify(trimmed))
+  },
+  removeMemory(workspaceId: string, index: number): void {
+    const memories = this.getMemories(workspaceId)
+    memories.splice(index, 1)
+    localStorage.setItem(`nodus_memories_${workspaceId}`, JSON.stringify(memories))
   },
   clearMemories(workspaceId: string): void {
     localStorage.removeItem(`nodus_memories_${workspaceId}`)

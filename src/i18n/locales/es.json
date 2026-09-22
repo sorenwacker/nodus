@@ -659,7 +659,38 @@
     "repairTagNodesNone": "Los nodos de etiqueta ya son coherentes",
     "repairTagNodesResult": "{merged} fusionados, {renamed} renombrados, {edges} aristas ajustadas",
     "showPerfOverlay": "Mostrar métricas de rendimiento",
-    "showPerfOverlayHint": "Tiempos de fotograma sobre el grafo al desplazar o hacer zoom, para diagnosticar tirones"
+    "showPerfOverlayHint": "Tiempos de fotograma sobre el grafo al desplazar o hacer zoom, para diagnosticar tirones",
+    "ai": {
+      "connection": "Conexión",
+      "generation": "Generación",
+      "search": "Búsqueda web",
+      "prompts": "Prompts",
+      "agent": "Agente"
+    },
+    "agent": {
+      "defaultMode": "Modo predeterminado",
+      "defaultModeHint": "El modo en que comienza una ejecución. Planificar propone pasos y espera su aprobación; explorar investiga y construye sin plan.",
+      "modes": {
+        "plan": "Planificar",
+        "explore": "Explorar",
+        "execute": "Ejecutar",
+        "node": "Editor de notas"
+      },
+      "tools": "Herramientas",
+      "toolsHint": "Todas las herramientas del agente, leídas de su registro. Las herramientas web necesitan la clave de búsqueda de arriba.",
+      "tool": "Herramienta",
+      "offeredIn": "Ofrecida en",
+      "status": "Estado",
+      "changesGraph": "cambia el grafo",
+      "notOffered": "no ofrecida",
+      "available": "disponible",
+      "needsSearchKey": "necesita una clave de búsqueda web",
+      "facts": "Hechos",
+      "factsHint": "Lo que el agente ha recordado para este espacio de trabajo. Cada hecho se añade a su prompt.",
+      "noFacts": "Nada recordado todavía.",
+      "forget": "Olvidar",
+      "forgetAll": "Olvidar todo"
+    }
   },
   "fileMove": {
     "collision": {

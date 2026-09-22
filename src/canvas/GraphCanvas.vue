@@ -11,7 +11,7 @@ import { useLLM, llmQueue, toolRegistry } from '../llm'
 import { createSearchService } from '../llm/searchService'
 import { useI18n } from 'vue-i18n'
 import { usePanelReveal } from '../composables/usePanelReveal'
-import { memoryStorage, agentMemoryStorage } from '../lib/storage'
+import { memoryStorage, agentMemoryStorage, llmStorage } from '../lib/storage'
 import {
   useMinimap,
   useViewState,
@@ -1183,7 +1183,7 @@ const { sendPrompt: sendGraphPrompt, runSelection } = useAgentPrompt({
   isLoading: isGraphLLMLoading,
   getSelectedNodeIds: () => store.selectedNodeIds,
   savePromptToHistory,
-  run: prompt => agentRunner.run(prompt),
+  run: prompt => agentRunner.run(prompt, llmStorage.getDefaultAgentMode()),
   reportError: message => alert(message),
 })
 

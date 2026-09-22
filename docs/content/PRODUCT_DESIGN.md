@@ -1576,7 +1576,7 @@ The modes were three hand-written arrays of names, the mutating tools a fourth, 
 
 - A tool declares `modes`, a subset of `explore`, `plan`, `execute`, and the node agent's `node`. The list offered to the model in a mode is derived from these declarations.
 - A tool declares `mutates`. `plan` mode is read-only: a tool with `mutates: true` cannot declare `plan`, and registration rejects one that does.
-- A tool declares `requires`, the context services it uses. A call whose context lacks one is answered with the service's name before the handler runs, and the declaration is what an interface listing the tools can read to say which are usable here.
+- A tool declares `requires`, the context services it uses. A call whose context lacks one is answered with the service's name before the handler runs, and the tool table in Settings > AI > Agent reads the same declaration to say which tools are usable now.
 - A tool offered in no mode declares `modes: []` together with `unexposedReason`. Registration rejects an empty `modes` without one. This replaces the separate ledger.
 - A tool name that a mode's prompt mentions is offered in that mode. The gate checks this per mode, because a prompt that tells a plan-mode model to call an execute-only tool is the same defect as documenting an unregistered one.
 
@@ -2151,15 +2151,20 @@ Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integr
 - Grid size (px)
 - Edge style (straight, orthogonal, diagonal, curved, hyperbolic)
 
-**AI:**
-- LLM Features toggle (show/hide AI prompts)
-- Provider selection (Ollama, OpenAI, Anthropic, OpenAI-compatible)
-- Streaming toggle (optional)
-- API key, base URL, model selection
-- Max tokens, context window, timeout
-- Neighbor context limit
-- Web search API key (Tavily)
-- System prompt customization
+**AI:** the tab is a sequence of named sections, each a collapsible group with a heading. A flat list of thirteen controls gave no hint which ones a first-time user must fill in and which they may ignore; the sections carry that.
+
+- LLM Features toggle (show/hide AI prompts); off, the sections below are hidden
+- *Connection* (open): provider (Ollama, OpenAI, Anthropic, OpenAI-compatible), API key with validation, base URL, model with fetch, streaming toggle
+- *Generation* (collapsed): max tokens, context window, timeout, neighbour context limit. These have working defaults; the section is collapsed so they read as optional
+- *Web search*: Tavily API key with a test button. It is a tool credential, not a model parameter: the `web_search` and research tools require it, and the Agent section below reports them unavailable while it is empty
+- *Prompts*: system prompt and agent prompt, each with a reset
+- *Agent*: see the next section
+
+**Agent section (Settings > AI > Agent):**
+
+- *Default mode* selects the mode a run starts in: `plan` (propose first, act after approval) or `explore` (research and build without a plan). Until this setting existed every run started in plan mode and no interface entered explore mode, so its tools were reachable by declaration and unreachable in practice.
+- *Tools* is a read-only table of every registered tool: name, the modes offering it, whether it changes the graph, and whether it is usable now. It is rendered from the registry declarations, so it cannot describe a tool the agent does not have. A tool is marked unavailable when a service it requires is not configured, with the reason - `web_search` with no Tavily key reads "needs a web search key" here instead of failing mid-run. Tools offered in no mode are listed with their `unexposedReason`, because a user reading the table should not find a tool the model cannot call and assume it can.
+- *Facts* lists what the agent has remembered for the current workspace through `remember`, each with a delete control, and a control to forget them all. The memory is capped at 50 per workspace; a memory that no interface shows cannot be checked or corrected, and it is fed into every system prompt.
 
 **Citations:**
 - Zotero connection (library access, collection import)
