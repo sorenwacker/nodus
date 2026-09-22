@@ -659,7 +659,38 @@
     "repairTagNodesNone": "Les nœuds d'étiquette sont déjà cohérents",
     "repairTagNodesResult": "{merged} fusionnés, {renamed} renommés, {edges} arêtes ajustées",
     "showPerfOverlay": "Afficher les mesures de performance",
-    "showPerfOverlayHint": "Temps de trame au-dessus du graphe pendant un panoramique ou un zoom, pour diagnostiquer les saccades"
+    "showPerfOverlayHint": "Temps de trame au-dessus du graphe pendant un panoramique ou un zoom, pour diagnostiquer les saccades",
+    "ai": {
+      "connection": "Connexion",
+      "generation": "Génération",
+      "search": "Recherche web",
+      "prompts": "Prompts",
+      "agent": "Agent"
+    },
+    "agent": {
+      "defaultMode": "Mode par défaut",
+      "defaultModeHint": "Le mode dans lequel une exécution commence. Planifier propose des étapes et attend votre approbation ; explorer recherche et construit sans plan.",
+      "modes": {
+        "plan": "Planifier",
+        "explore": "Explorer",
+        "execute": "Exécuter",
+        "node": "Éditeur de note"
+      },
+      "tools": "Outils",
+      "toolsHint": "Tous les outils de l'agent, lus depuis leur enregistrement. Les outils web nécessitent la clé de recherche ci-dessus.",
+      "tool": "Outil",
+      "offeredIn": "Proposé dans",
+      "status": "État",
+      "changesGraph": "modifie le graphe",
+      "notOffered": "non proposé",
+      "available": "disponible",
+      "needsSearchKey": "nécessite une clé de recherche web",
+      "facts": "Faits",
+      "factsHint": "Ce que l'agent a retenu pour cet espace de travail. Chaque fait est ajouté à son prompt.",
+      "noFacts": "Rien de retenu pour l'instant.",
+      "forget": "Oublier",
+      "forgetAll": "Tout oublier"
+    }
   },
   "fileMove": {
     "collision": {

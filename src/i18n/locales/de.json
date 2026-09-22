@@ -659,7 +659,38 @@
     "repairTagNodesNone": "Tag-Knoten sind bereits konsistent",
     "repairTagNodesResult": "{merged} zusammengeführt, {renamed} umbenannt, {edges} Kanten angepasst",
     "showPerfOverlay": "Leistungsanzeige einblenden",
-    "showPerfOverlayHint": "Frame-Zeiten über dem Graphen beim Verschieben oder Zoomen, zur Diagnose von Rucklern"
+    "showPerfOverlayHint": "Frame-Zeiten über dem Graphen beim Verschieben oder Zoomen, zur Diagnose von Rucklern",
+    "ai": {
+      "connection": "Verbindung",
+      "generation": "Generierung",
+      "search": "Websuche",
+      "prompts": "Prompts",
+      "agent": "Agent"
+    },
+    "agent": {
+      "defaultMode": "Standardmodus",
+      "defaultModeHint": "Der Modus, in dem ein Lauf beginnt. Planen schlägt Schritte vor und wartet auf Ihre Freigabe; Erkunden recherchiert und baut ohne Plan.",
+      "modes": {
+        "plan": "Planen",
+        "explore": "Erkunden",
+        "execute": "Ausführen",
+        "node": "Notiz-Editor"
+      },
+      "tools": "Werkzeuge",
+      "toolsHint": "Alle Werkzeuge des Agenten, aus ihrer Registrierung gelesen. Web-Werkzeuge benötigen den Suchschlüssel oben.",
+      "tool": "Werkzeug",
+      "offeredIn": "Verfügbar in",
+      "status": "Status",
+      "changesGraph": "ändert den Graphen",
+      "notOffered": "nicht angeboten",
+      "available": "verfügbar",
+      "needsSearchKey": "benötigt einen Websuche-Schlüssel",
+      "facts": "Fakten",
+      "factsHint": "Was sich der Agent für diesen Arbeitsbereich gemerkt hat. Jeder Fakt wird seinem Prompt hinzugefügt.",
+      "noFacts": "Noch nichts gemerkt.",
+      "forget": "Vergessen",
+      "forgetAll": "Alle vergessen"
+    }
   },
   "fileMove": {
     "collision": {

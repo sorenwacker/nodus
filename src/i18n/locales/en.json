@@ -659,7 +659,38 @@
     "repairTagNodesNone": "Tag nodes are already consistent",
     "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted",
     "showPerfOverlay": "Show performance readout",
-    "showPerfOverlayHint": "Frame timing over the graph while you pan or zoom, for diagnosing stutter"
+    "showPerfOverlayHint": "Frame timing over the graph while you pan or zoom, for diagnosing stutter",
+    "ai": {
+      "connection": "Connection",
+      "generation": "Generation",
+      "search": "Web search",
+      "prompts": "Prompts",
+      "agent": "Agent"
+    },
+    "agent": {
+      "defaultMode": "Default mode",
+      "defaultModeHint": "The mode a run starts in. Plan proposes steps and waits for your approval; explore researches and builds without a plan.",
+      "modes": {
+        "plan": "Plan",
+        "explore": "Explore",
+        "execute": "Execute",
+        "node": "Note editor"
+      },
+      "tools": "Tools",
+      "toolsHint": "Every tool the agent has, read from its registration. Web tools need the search key above.",
+      "tool": "Tool",
+      "offeredIn": "Offered in",
+      "status": "Status",
+      "changesGraph": "changes the graph",
+      "notOffered": "not offered",
+      "available": "available",
+      "needsSearchKey": "needs a web search key",
+      "facts": "Facts",
+      "factsHint": "What the agent has remembered for this workspace. Every fact is added to its prompt.",
+      "noFacts": "Nothing remembered yet.",
+      "forget": "Forget",
+      "forgetAll": "Forget all"
+    }
   },
   "fileMove": {
     "collision": {
