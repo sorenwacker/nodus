@@ -126,6 +126,7 @@ flowchart LR
     Def[Tool entry<br/>definition + declaration + handler] --> Reg[Tool registry]
     Reg -->|tools for the mode| Runner[Agent runner]
     Reg -->|tools for the mode| NodeAgent[Node agent]
+    Reg -->|declarations| Settings[Settings > AI > Agent<br/>tool table]
     Compose[Canvas composes<br/>the tool context] -->|services| Reg
     Runner -->|execute name, args| Reg
     Reg -->|text + optional signal| Runner
@@ -204,7 +205,7 @@ LIFO todo queue. Persists across refresh.
 
 ## Facts Memory
 
-Long-term knowledge (up to 50 per workspace).
+Long-term knowledge (up to 50 per workspace), written by `remember` and shown, with delete controls, in Settings > AI > Agent.
 
 ## Tools
 
