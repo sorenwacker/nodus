@@ -1,17 +1,14 @@
 /**
- * Node editing tool registrations
+ * Node-edit tools, used by the node agent on the note it is editing:
+ * update_content, append_content, update_title, format_math, node_done.
  *
- * Tools for editing individual node content, used by the node agent:
- * - update_content: Replace node content
- * - append_content: Append text to node content
- * - update_title: Change node title
- * - format_math: Convert LaTeX math to Typst format
- * - node_done: Signal node editing completion (with content validation)
- *
- * These tools return markers that are handled by useNodeAgent.
+ * The note arrives as the `nodeDraft` context service, which the node agent
+ * composes per run; `node_done` ends the run with a typed signal
+ * (PRODUCT_DESIGN.md > Tool signals).
  */
 
 import { defineTool } from '../registry'
+import { formatMathToTypst } from '../typstFormat'
 
 export function registerNodeEditTools(): void {
   defineTool<{ content: string }>(
@@ -24,10 +21,13 @@ export function registerNodeEditTools(): void {
       },
       required: ['content'],
     },
-    async (args, _ctx) => {
-      return `__UPDATE_CONTENT__:${JSON.stringify({ content: args.content })}`
+    async (args, ctx) => {
+      const content = args.content ?? ''
+      await ctx.nodeDraft!.updateContent(content)
+      ctx.log(`  Updated content (${content.length} chars)`)
+      return 'Content updated and saved'
     },
-    { category: 'node-edit' }
+    { modes: ['node'], mutates: true, requires: ['nodeDraft'] }
   )
 
   defineTool<{ text: string }>(
@@ -40,10 +40,13 @@ export function registerNodeEditTools(): void {
       },
       required: ['text'],
     },
-    async (args, _ctx) => {
-      return `__APPEND_CONTENT__:${JSON.stringify({ text: args.text })}`
+    async (args, ctx) => {
+      const draft = ctx.nodeDraft!
+      await draft.updateContent(draft.content + '\n' + (args.text ?? ''))
+      ctx.log('  Appended text')
+      return 'Text appended and saved'
     },
-    { category: 'node-edit' }
+    { modes: ['node'], mutates: true, requires: ['nodeDraft'] }
   )
 
   defineTool<{ title: string }>(
@@ -56,10 +59,13 @@ export function registerNodeEditTools(): void {
       },
       required: ['title'],
     },
-    async (args, _ctx) => {
-      return `__UPDATE_TITLE__:${JSON.stringify({ title: args.title })}`
+    async (args, ctx) => {
+      const title = args.title ?? ''
+      await ctx.nodeDraft!.updateTitle(title)
+      ctx.log(`  Title: ${title}`)
+      return `Title changed to "${title}"`
     },
-    { category: 'node-edit' }
+    { modes: ['node'], mutates: true, requires: ['nodeDraft'] }
   )
 
   defineTool<Record<string, never>>(
@@ -70,10 +76,20 @@ export function registerNodeEditTools(): void {
       properties: {},
       required: [],
     },
-    async () => {
-      return '__FORMAT_MATH__:{}'
+    async (_args, ctx) => {
+      const draft = ctx.nodeDraft!
+      const original = draft.content
+      ctx.log('  Formatting math to Typst...')
+      const formatted = await formatMathToTypst(original, (p, s) => ctx.llm!.generate(p, s))
+      if (formatted === original) {
+        ctx.log('  Math already in Typst format')
+        return 'Math already in Typst format (content unchanged)'
+      }
+      await draft.updateContent(formatted)
+      ctx.log(`  Formatted math to Typst (${formatted.length} chars)`)
+      return 'Math reformatted to Typst and saved'
     },
-    { category: 'node-edit' }
+    { modes: ['node'], mutates: true, requires: ['nodeDraft', 'llm'] }
   )
 
   // Node-specific done tool with content validation
@@ -88,10 +104,20 @@ export function registerNodeEditTools(): void {
       },
       required: ['summary'],
     },
-    async (args, _ctx) => {
-      // Return marker - actual validation happens in useNodeAgent
-      return `__NODE_DONE__:${JSON.stringify({ summary: args.summary })}`
+    async (args, ctx) => {
+      if (!ctx.nodeDraft!.saved) {
+        ctx.log('  WARNING: No content saved yet!')
+        return `REJECTED: You cannot call node_done() yet because you have not saved any content to the note.
+
+YOUR NEXT STEP: Call update_content with your answer. Example:
+update_content("# Pi\\n\\nPi (\\u03c0) is a mathematical constant equal to approximately 3.14159...")
+
+After update_content succeeds, then you may call node_done().`
+      }
+      const summary = args.summary || 'Done'
+      ctx.log(`> Done: ${summary}`)
+      return { text: summary, signal: 'node_done' }
     },
-    { category: 'node-edit' }
+    { modes: ['node'], mutates: false, requires: ['nodeDraft'] }
   )
 }

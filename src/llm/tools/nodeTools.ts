@@ -71,7 +71,7 @@ export function registerNodeTools(): void {
         return `Error creating node: ${e}`
       }
     },
-    { category: 'crud' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 
   defineTool<{ from_title: string; to_title: string; label?: string; color?: string }>(
@@ -101,7 +101,7 @@ export function registerNodeTools(): void {
       })
       return `Created edge from "${args.from_title}" to "${args.to_title}"`
     },
-    { category: 'crud' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 
   defineTool<{ edges: Array<{ from_title: string; to_title: string; label?: string; color?: string }> }>(
@@ -169,7 +169,7 @@ export function registerNodeTools(): void {
       }
       return `Created ${created} edges`
     },
-    { category: 'batch' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 
   defineTool<{ title: string }>(
@@ -193,7 +193,7 @@ export function registerNodeTools(): void {
       }
       return `Deleted node "${args.title}"`
     },
-    { category: 'crud' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 
   defineTool<{ filter: string }>(
@@ -227,7 +227,7 @@ export function registerNodeTools(): void {
       }
       return `Deleted ${edges.length} edges`
     },
-    { category: 'crud' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 
   defineTool<{ from_title: string; to_title: string; label?: string; color?: string }>(
@@ -274,7 +274,7 @@ export function registerNodeTools(): void {
 
       return `Updated edge "${args.from_title}" -> "${args.to_title}": ${updates.join(', ')}`
     },
-    { category: 'crud' }
+    { modes: ['execute'], mutates: true }
   )
 
   defineTool<{ filter: string }>(
@@ -321,6 +321,6 @@ export function registerNodeTools(): void {
       }
       return `Deleted ${nodes.length} nodes (${filter})`
     },
-    { category: 'crud' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 }

@@ -38,8 +38,12 @@ describe('the node agent generation token', () => {
   it('stops the loop when superseded, rather than only its reports', () => {
     // Guarding each write left the loop requesting completions and executing
     // the tool calls that came back, and the note is written through
-    // ctx.updateContent, which no guard covered
-    const bails = [...source.matchAll(/if \(!isCurrent\(\)\) return SUPERSEDED/g)]
-    expect(bails.length, 'the loop and every write to the note bail out').toBeGreaterThanOrEqual(6)
+    // ctx.updateContent, which no guard covered. The loop returns; the draft
+    // the tools write through throws, which the registry reports as a failed
+    // call and the loop then returns on
+    const loopBails = [...source.matchAll(/if \(!isCurrent\(\)\) return SUPERSEDED/g)]
+    const draftBails = [...source.matchAll(/if \(!isCurrent\(\)\) throw new Error\(SUPERSEDED\)/g)]
+    expect(loopBails.length, 'before the request, after it, and after each tool').toBeGreaterThanOrEqual(3)
+    expect(draftBails.length, 'content and title writes').toBe(2)
   })
 })

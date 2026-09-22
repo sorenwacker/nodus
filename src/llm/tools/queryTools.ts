@@ -32,7 +32,7 @@ export function registerQueryTools(): void {
         .join('\n')
       return `The graph falls into ${result.component_count} separate groups:\n${groups}`
     },
-    { category: 'query' }
+    { modes: ['plan', 'execute'], mutates: false }
   )
 
   defineTool<{ mode?: string; include_content?: boolean; max_content_length?: number }>(
@@ -56,7 +56,7 @@ export function registerQueryTools(): void {
       }
 
       // Get context limit from provider config (chars ≈ tokens * 4)
-      const contextLimit = ctx.ollamaContextLength || 8192
+      const contextLimit = ctx.contextLength || 8192
       const reservedForConversation = Math.min(contextLimit * 0.6, 6000) // Reserve 60% or 6k for conversation
       const availableTokens = contextLimit - reservedForConversation
       const availableChars = availableTokens * 3.5 // Conservative: ~3.5 chars per token
@@ -164,7 +164,7 @@ ${nodeDescriptions.join('\n')}
 EDGES (${edgeDescriptions.length}/${allEdges.length}):
 ${edgeDescriptions.length > 0 ? edgeDescriptions.join('\n') : '  (none)'}${truncationNote}`
     },
-    { category: 'query' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false }
   )
 
   defineTool<{ filter: string }>(
@@ -201,6 +201,6 @@ ${edgeDescriptions.length > 0 ? edgeDescriptions.join('\n') : '  (none)'}${trunc
 
       return `Found ${result.length} nodes:\n${result.map(n => `- ${n.title}${n.has_content ? '' : ' (empty)'}`).join('\n')}`
     },
-    { category: 'query' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false }
   )
 }

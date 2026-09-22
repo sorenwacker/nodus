@@ -9,8 +9,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import {
   setUndoSink,
   recordContentBefore,
@@ -166,20 +164,29 @@ describe('the recorder is connected', () => {
 })
 
 describe('a tool call is one undo step', () => {
-  // A tool author does nothing to make their tool undoable. Grouping at the
-  // points where tools execute means neither "no undo at all" nor "one entry
-  // per node" is reachable (PRODUCT_DESIGN.md > Recording an undo step).
-  //
-  // The handler map is module-private, so a probe cannot be registered into it.
-  // What is asserted is the property: both executors wrap their call.
-  it.each([
-    ['src/llm/tools/handlers/index.ts', 'executeRegisteredTool'],
-    ['src/canvas/composables/agent/useLLMTools.ts', 'executeLLMTool'],
-  ])('%s wraps tool execution in a group', (file, fn) => {
-    const source = readFileSync(resolve(__dirname, '../..', file), 'utf-8')
+  // A tool author does nothing to make their tool undoable. The registry
+  // groups every execution, so neither "no undo at all" nor "one entry per
+  // node" is reachable from a tool (PRODUCT_DESIGN.md > Recording an undo step).
+  it('groups every content write a tool makes into one entry', async () => {
+    const { ToolRegistry } = await import('../llm/registry')
+    const pushContentsUndo = vi.fn()
+    setUndoSink({ pushContentsUndo: pushContentsUndo as never })
 
-    expect(source, `${fn} must group its writes`).toContain('asOneUndoStep')
-    // The call must be around the handler, not merely imported
-    expect(source).toMatch(/asOneUndoStep\(\(\) =>/)
+    const registry = new ToolRegistry()
+    registry.register(
+      { name: 'rewrite_two', description: '', parameters: { type: 'object', properties: {} } },
+      async () => {
+        // What the store does before each of two content writes
+        recordContentBefore({ nodeId: 'a', content: 'before a', title: 'A' })
+        recordContentBefore({ nodeId: 'b', content: 'before b', title: 'B' })
+        return 'rewrote two nodes'
+      },
+      { modes: ['execute'], mutates: true }
+    )
+
+    await registry.execute('rewrite_two', {}, { log: () => {}, store: {} } as never)
+
+    expect(pushContentsUndo, 'one tool call, one undo step').toHaveBeenCalledTimes(1)
+    expect(pushContentsUndo.mock.calls[0][0]).toHaveLength(2)
   })
 })

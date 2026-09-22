@@ -40,9 +40,9 @@ describe('the completion signal', () => {
     ).toEqual([])
   })
 
-  it('comes from the done tool', () => {
+  it('comes from the done tool, as a typed signal', () => {
     const runner = files.find(f => f.name === 'useAgentRunner.ts')!
-    expect(runner.text).toContain('AGENT_DONE:')
+    expect(runner.text).toContain("signal === 'done'")
   })
 
   it('asks the model to act before giving up on it', () => {

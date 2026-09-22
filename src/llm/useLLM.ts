@@ -7,7 +7,7 @@ import { computed, ref, watch } from 'vue'
 import type { AgentTask, ChatMessage } from './types'
 import type { ChatTurn } from './chatTranscript'
 import { providerRegistry } from './providers'
-import { agentTools } from './tools'
+import { getAgentTools } from './tools'
 import { llmStorage } from '../lib/storage'
 import { DEFAULT_SYSTEM_PROMPT } from './prompts'
 import { llmQueue } from './queue'
@@ -107,7 +107,7 @@ export function useLLM() {
    * Chat with tool calling - goes through queue
    */
   async function chatWithTools(messages: ChatMessage[]): Promise<ChatMessage> {
-    const result = await llmQueue.chat(messages, agentTools)
+    const result = await llmQueue.chat(messages, getAgentTools())
     return result.message as ChatMessage
   }
 
@@ -160,9 +160,6 @@ export function useLLM() {
     stop,
     savePromptToHistory,
     navigateHistory,
-
-    // Re-export tools for convenience
-    agentTools,
 
     // Provider access
     getActiveProvider: () => providerRegistry.getActiveProvider(),

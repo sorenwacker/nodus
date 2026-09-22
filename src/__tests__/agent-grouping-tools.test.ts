@@ -4,7 +4,7 @@
  * reach, so asking the agent to organise a graph had no tool that could.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { executeTool } from '../llm'
+import { toolRegistry } from '../llm'
 import type { ToolContext } from '../llm'
 
 function makeContext(options: { withGrouping?: boolean } = {}) {
@@ -67,11 +67,11 @@ describe('agent frame tools', () => {
   it('sizes a new frame around the nodes it is given and puts them inside', async () => {
     const { ctx, createFrame, assignNodesToFrame } = makeContext()
 
-    const result = await executeTool(
+    const result = (await toolRegistry.execute(
       'create_frame',
       { title: 'Demo', node_titles: ['Kickoff', 'Findings'] },
       ctx
-    )
+    )).text
 
     expect(result).toContain('2 node(s)')
     const [x, y, width, height] = createFrame.mock.calls[0]
@@ -86,7 +86,7 @@ describe('agent frame tools', () => {
   it('creates an empty frame when no nodes are named', async () => {
     const { ctx, createFrame, assignNodesToFrame } = makeContext()
 
-    await executeTool('create_frame', { title: 'Empty' }, ctx)
+    await toolRegistry.execute('create_frame', { title: 'Empty' }, ctx)
 
     expect(createFrame).toHaveBeenCalled()
     expect(assignNodesToFrame).not.toHaveBeenCalled()
@@ -94,11 +94,11 @@ describe('agent frame tools', () => {
 
   it('reports nodes it could not find rather than failing silently', async () => {
     const { ctx } = makeContext()
-    const result = await executeTool(
+    const result = (await toolRegistry.execute(
       'create_frame',
       { title: 'Partial', node_titles: ['Kickoff', 'Nonexistent'] },
       ctx
-    )
+    )).text
     expect(result).toContain('1 node(s)')
     expect(result).toContain('not found')
   })
@@ -106,11 +106,11 @@ describe('agent frame tools', () => {
   it('moves nodes into an existing frame by title', async () => {
     const { ctx, assignNodesToFrame } = makeContext()
 
-    const result = await executeTool(
+    const result = (await toolRegistry.execute(
       'assign_node_to_frame',
       { frame_title: 'demo project', node_titles: ['Findings'] },
       ctx
-    )
+    )).text
 
     expect(assignNodesToFrame).toHaveBeenCalledWith(['b'], 'f-existing')
     expect(result).toContain('Demo Project')
@@ -118,17 +118,17 @@ describe('agent frame tools', () => {
 
   it('reports an unknown frame', async () => {
     const { ctx } = makeContext()
-    const result = await executeTool(
+    const result = (await toolRegistry.execute(
       'assign_node_to_frame',
       { frame_title: 'Missing', node_titles: ['Kickoff'] },
       ctx
-    )
+    )).text
     expect(result).toContain('not found')
   })
 
   it('lists frames with their node counts', async () => {
     const { ctx } = makeContext()
-    const result = await executeTool('list_frames', {}, ctx)
+    const result = (await toolRegistry.execute('list_frames', {}, ctx)).text
     expect(result).toContain('Demo Project')
   })
 })
@@ -137,11 +137,11 @@ describe('agent storyline tools', () => {
   it('creates a storyline and threads the named nodes in order', async () => {
     const { ctx, createStoryline, addNodeToStoryline } = makeContext()
 
-    const result = await executeTool(
+    const result = (await toolRegistry.execute(
       'create_storyline',
       { title: 'Research arc', description: 'from kickoff to findings', node_titles: ['Kickoff', 'Findings'] },
       ctx
-    )
+    )).text
 
     expect(createStoryline).toHaveBeenCalledWith('Research arc', 'from kickoff to findings')
     expect(addNodeToStoryline.mock.calls.map(c => c[1])).toEqual(['a', 'b'])
@@ -151,11 +151,11 @@ describe('agent storyline tools', () => {
   it('appends to an existing storyline by title', async () => {
     const { ctx, addNodeToStoryline } = makeContext()
 
-    const result = await executeTool(
+    const result = (await toolRegistry.execute(
       'add_node_to_storyline',
       { storyline_title: 'project story', node_titles: ['Findings'] },
       ctx
-    )
+    )).text
 
     expect(addNodeToStoryline).toHaveBeenCalledWith('s-existing', 'b')
     expect(result).toContain('Project Story')
@@ -163,7 +163,7 @@ describe('agent storyline tools', () => {
 
   it('lists storylines', async () => {
     const { ctx } = makeContext()
-    expect(await executeTool('list_storylines', {}, ctx)).toContain('Project Story')
+    expect((await toolRegistry.execute('list_storylines', {}, ctx)).text).toContain('Project Story')
   })
 })
 
@@ -179,7 +179,7 @@ describe('contexts without grouping support', () => {
       ['add_node_to_storyline', { storyline_title: 'x', node_titles: ['Kickoff'] }],
       ['list_storylines', {}],
     ] as const) {
-      const result = await executeTool(tool, args as Record<string, unknown>, ctx)
+      const result = (await toolRegistry.execute(tool, args as Record<string, unknown>, ctx)).text
       expect(result, `${tool} should report unavailability`).toContain('not available')
     }
   })

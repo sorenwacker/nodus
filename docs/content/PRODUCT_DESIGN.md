@@ -1576,7 +1576,7 @@ The modes were three hand-written arrays of names, the mutating tools a fourth, 
 
 - A tool declares `modes`, a subset of `explore`, `plan`, `execute`, and the node agent's `node`. The list offered to the model in a mode is derived from these declarations.
 - A tool declares `mutates`. `plan` mode is read-only: a tool with `mutates: true` cannot declare `plan`, and registration rejects one that does.
-- A tool declares `requires`, the context services it uses. The registry can therefore report, before a run, which tools are unavailable and why - a `web_search` with no search key is reported in the interface rather than failing mid-run.
+- A tool declares `requires`, the context services it uses. A call whose context lacks one is answered with the service's name before the handler runs, and the declaration is what an interface listing the tools can read to say which are usable here.
 - A tool offered in no mode declares `modes: []` together with `unexposedReason`. Registration rejects an empty `modes` without one. This replaces the separate ledger.
 - A tool name that a mode's prompt mentions is offered in that mode. The gate checks this per mode, because a prompt that tells a plan-mode model to call an execute-only tool is the same defect as documenting an unregistered one.
 

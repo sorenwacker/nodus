@@ -1,35 +1,25 @@
 /**
  * Node Agent composable
- * Agent runner focused on a single node with web search and editing tools
+ * Agent runner focused on a single node with web search and editing tools.
  *
- * Uses registry tools filtered by categories:
- * - 'utility' for web_search (shared with graph agent)
- * - 'research' for fetch_url
- * - 'node-edit' for update_content, append_content, update_title, node_done
- * - 'agent' for wikipedia_search (from agentTools)
+ * Every tool call goes to the registry with a context composed for this run:
+ * the note under edit as the `nodeDraft` service, plus `search` and `llm`.
+ * The tools offered are those declaring the `node` mode
+ * (PRODUCT_DESIGN.md > One implementation per tool, A tool declares its modes).
  */
 import { ref, type Ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import type { ChatMessage } from '../../../llm/types'
 import { llmQueue } from '../../../llm/queue'
 import { errorLog } from '../../../llm/agentLog'
 import { notifications$ } from '../../../composables/useNotifications'
 import { llmStorage } from '../../../lib/storage'
-import { formatMathToTypst } from '../../../llm/typstFormat'
-import { toolRegistry } from '../../../llm/registry'
+import { toolRegistry, type NodeDraftService, type ToolContext } from '../../../llm/registry'
 import { registerCoreTools } from '../../../llm/tools'
+import { createSearchService } from '../../../llm/searchService'
+import { escapeForPrompt } from '../../../lib/promptSecurity'
 
 // Ensure tools are registered
 registerCoreTools()
-
-import { escapeForPrompt, isValidFetchUrl } from '../../../lib/promptSecurity'
-import { searchWikipedia, fetchWikipediaArticle } from '../../../llm/research'
-
-interface SearchResult {
-  title: string
-  url: string
-  content: string
-}
 
 export interface NodeAgentContext {
   nodeId: string
@@ -42,98 +32,21 @@ export interface NodeAgentContext {
   updateTitle: (title: string) => Promise<void>
 }
 
-async function executeWebSearch(query: string): Promise<string> {
-  try {
-    const apiKey = llmStorage.getSearchApiKey()
-    const results = await invoke<SearchResult[]>('web_search', { query, apiKey })
-    if (results.length === 0) {
-      throw new Error('No results found')
-    }
-    return results
-      .map(r => `**${r.title}**\n${r.content}\nSource: ${r.url}`)
-      .join('\n\n---\n\n')
-  } catch (e) {
-    throw new Error(`Web search failed: ${e instanceof Error ? e.message : String(e)}`)
-  }
-}
-
-async function executeFetchUrl(url: string, currentContextChars = 0): Promise<string> {
-  try {
-    let content = await invoke<string>('fetch_url', { url })
-
-    // Smart truncation based on context budget
-    // Default to 16k token model if not specified, leave room for response
-    const userLimit = llmStorage.getChainContextLimit()
-    const modelContextTokens = 16000 // Assume conservative 16k model
-    const reserveForResponse = 2000 // Reserve tokens for model response
-
-    // Calculate remaining budget
-    const usedTokens = Math.ceil(currentContextChars / 4)
-    const availableTokens = modelContextTokens - usedTokens - reserveForResponse
-    const maxChars = Math.min(
-      userLimit,
-      Math.max(availableTokens * 4, 4000) // At least 4k chars, or remaining budget
-    )
-
-    if (content.length > maxChars) {
-      // Keep start and end for better context
-      const keepStart = Math.floor(maxChars * 0.85)
-      const keepEnd = Math.floor(maxChars * 0.1)
-      content = content.slice(0, keepStart) +
-        `\n\n[... truncated ${content.length - maxChars} chars to fit context ...]\n\n` +
-        content.slice(-keepEnd)
-    }
-    return content
-  } catch (e) {
-    throw new Error(`Failed to fetch URL: ${e instanceof Error ? e.message : String(e)}`)
-  }
-}
-
-// Timeout for fetch requests (10 seconds)
-
-
-async function executeWikipediaSearch(query: string): Promise<string> {
-  const [top] = await searchWikipedia(query, 1)
-  const extract = top ? await fetchWikipediaArticle(top.title) : null
-
-  if (!top || !extract) {
-    throw new Error(`Wikipedia search failed for "${query}". Try a different query.`)
-  }
-
-  // The note's context limit decides how much of the article is worth carrying
-  const maxChars = llmStorage.getChainContextLimit()
-  const content =
-    maxChars > 0 && extract.length > maxChars
-      ? extract.slice(0, maxChars) + '...\n\n[Content truncated]'
-      : extract
-
-  const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(top.title.replace(/ /g, '_'))}`
-  return `# ${top.title}\n\n${content}\n\nSource: ${url}`
-}
-
-/**
- * Get node agent tools from registry
- * Uses tools from: utility (web_search), research (fetch_url), node-edit, agent (wikipedia_search)
- */
-function getNodeAgentTools() {
-  // Get tools by categories - utility has web_search, research has fetch_url,
-  // node-edit has update_content/append_content/update_title/node_done,
-  // agent has wikipedia_search
-  const tools = toolRegistry.getToolsByCategories(['utility', 'research', 'node-edit', 'agent'])
-
-  // Filter to only the tools we need for node editing
-  const allowedTools = new Set([
-    'web_search',
-    'fetch_url',
-    'wikipedia_search',
-    'update_content',
-    'append_content',
-    'update_title',
-    'format_math',
-    'node_done',
-  ])
-
-  return tools.filter(t => allowedTools.has(t.function.name))
+/** A note store the node-mode tools can read; they write through the draft */
+const NO_GRAPH: ToolContext['store'] = {
+  filteredNodes: [],
+  filteredEdges: [],
+  createNode: async () => {
+    throw new Error('The node agent edits one note and creates no nodes')
+  },
+  createEdge: async () => {
+    throw new Error('The node agent edits one note and creates no edges')
+  },
+  deleteNode: async () => {},
+  deleteEdge: async () => {},
+  updateNodePosition: async () => {},
+  updateNodeContent: async () => {},
+  updateNodeTitle: async () => {},
 }
 
 /** What a run returns once a newer run has superseded it. */
@@ -193,7 +106,8 @@ ${connectedContext}
 TOOLS:
 - web_search(query): Search the web for current information (OPTIONAL)
 - fetch_url(url): Read full web page content (OPTIONAL)
-- wikipedia_search(query): Search Wikipedia (OPTIONAL)
+- wikipedia_search(query): Search Wikipedia for matching articles (OPTIONAL)
+- fetch_wikipedia(title): Read a Wikipedia article found by wikipedia_search (OPTIONAL)
 - update_content(content): Replace note content - THIS SAVES YOUR WORK
 - append_content(text): Add text to end of note
 - update_title(title): Change note title
@@ -241,7 +155,7 @@ DO NOT call node_done() without first calling update_content(). Your response wi
     isRunning.value = true
     const providerId = llmStorage.getProvider()
     const providerConfig = llmStorage.getProviderConfig(providerId)
-    const modelName = providerConfig.model || 'unknown'
+    const modelName = String(providerConfig.model || 'unknown')
     log.value = [
       `> User: ${prompt}`,
       `> Provider: ${providerId} (${modelName})`,
@@ -254,15 +168,49 @@ DO NOT call node_done() without first calling update_content(). Your response wi
     }
 
     currentContent.value = ctx.nodeContent
-    let contentWasUpdated = false // Track if update_content was called
+    // Content and title live on the draft, which the node-edit tools write
+    // through; `saved` is what node_done checks
+    const draft: NodeDraftService = {
+      content: ctx.nodeContent,
+      title: ctx.nodeTitle,
+      saved: false,
+      updateContent: async content => {
+        if (!isCurrent()) throw new Error(SUPERSEDED)
+        draft.content = content
+        currentContent.value = content
+        await ctx.updateContent(content)
+        draft.saved = true
+      },
+      updateTitle: async title => {
+        if (!isCurrent()) throw new Error(SUPERSEDED)
+        draft.title = title
+        await ctx.updateTitle(title)
+      },
+    }
+    const toolCtx: ToolContext = {
+      store: NO_GRAPH,
+      log: msg => {
+        if (isCurrent()) log.value.push(msg)
+      },
+      screenToCanvas: (x, y) => ({ x, y }),
+      snapToGrid: v => v,
+      model: modelName,
+      contextLength: llmStorage.getChainContextLimit(),
+      llm: {
+        generate: (p, sys, priority) => llmQueue.generate(p, sys, priority),
+        isCancelled: () => !isCurrent(),
+      },
+      search: createSearchService(),
+      nodeDraft: draft,
+    }
 
     const messages: ChatMessage[] = [
       { role: 'system', content: buildSystemPrompt(ctx) },
       { role: 'user', content: prompt },
     ]
 
-    // Get tools from registry
-    const nodeTools = getNodeAgentTools()
+    const nodeTools = toolRegistry.getToolsForMode('node')
+    const allowed = new Set(nodeTools.map(t => t.function.name))
     const maxIterations = 20
 
     for (let i = 0; i < maxIterations; i++) {
@@ -279,7 +227,6 @@ DO NOT call node_done() without first calling update_content(). Your response wi
         if (msg.tool_calls && msg.tool_calls.length > 0) {
           for (const tc of msg.tool_calls) {
             const name = tc.function.name
-            const toolCallId = tc.id
             let args: Record<string, unknown>
             try {
               args = typeof tc.function.arguments === 'string'
@@ -289,134 +236,27 @@ DO NOT call node_done() without first calling update_content(). Your response wi
               args = {}
             }
 
-            if (isCurrent()) log.value.push(`> ${name}`)
-            let result = ''
-
-            // Handle tool execution based on name
-            // Tools return markers, but we execute the actual logic here
-            switch (name) {
-              case 'web_search':
-                if (isCurrent()) log.value.push(`  Searching: ${args.query}`)
-                try {
-                  result = await executeWebSearch(args.query as string)
-                  if (isCurrent()) log.value.push(`  Found results`)
-                } catch (e) {
-                  const errorMsg = e instanceof Error ? e.message : 'Search failed'
-                  if (isCurrent()) log.value.push(errorLog(errorMsg))
-                  notifications$.error('Web search failed', errorMsg)
-                  result = `Error: ${errorMsg}`
-                }
-                break
-
-              case 'fetch_url': {
-                const urlToFetch = args.url as string
-                if (isCurrent()) log.value.push(`  Fetching: ${urlToFetch}`)
-                // Validate URL before fetching
-                if (!isValidFetchUrl(urlToFetch)) {
-                  const errorMsg = 'Invalid URL: only http/https URLs to public hosts are allowed'
-                  if (isCurrent()) log.value.push(errorLog(errorMsg))
-                  result = `Error: ${errorMsg}`
-                  break
-                }
-                try {
-                  // Calculate current context size for smart truncation
-                  const currentContextChars = messages.reduce((sum, m) => sum + (m.content?.length || 0), 0)
-                  result = await executeFetchUrl(urlToFetch, currentContextChars)
-                  if (isCurrent()) log.value.push(`  Got content (${result.length} chars)`)
-                } catch (e) {
-                  const errorMsg = e instanceof Error ? e.message : 'Fetch failed'
-                  if (isCurrent()) log.value.push(errorLog(errorMsg))
-                  notifications$.error('URL fetch failed', errorMsg)
-                  result = `Error: ${errorMsg}`
-                }
-                break
-              }
-
-              case 'wikipedia_search':
-                if (isCurrent()) log.value.push(`  Wikipedia: ${args.query}`)
-                try {
-                  result = await executeWikipediaSearch(args.query as string)
-                  if (isCurrent()) log.value.push(`  Found results`)
-                } catch (e) {
-                  const errorMsg = e instanceof Error ? e.message : 'Search failed'
-                  if (isCurrent()) log.value.push(errorLog(errorMsg))
-                  notifications$.error('Wikipedia search failed', errorMsg)
-                  result = `Error: ${errorMsg}`
-                }
-                break
-
-              case 'update_content': {
-                const rawContent = args.content as string
-                if (!isCurrent()) return SUPERSEDED
-                currentContent.value = rawContent
-                await ctx.updateContent(rawContent)
-                contentWasUpdated = true
-                result = 'Content updated and saved'
-                if (isCurrent()) log.value.push(`  Updated content (${rawContent.length} chars)`)
-                break
-              }
-
-              case 'append_content': {
-                const rawText = args.text as string
-                if (!isCurrent()) return SUPERSEDED
-                currentContent.value += '\n' + rawText
-                await ctx.updateContent(currentContent.value)
-                contentWasUpdated = true
-                result = 'Text appended and saved'
-                if (isCurrent()) log.value.push(`  Appended text`)
-                break
-              }
-
-              case 'update_title':
-                if (!isCurrent()) return SUPERSEDED
-                await ctx.updateTitle(args.title as string)
-                result = `Title changed to "${args.title}"`
-                if (isCurrent()) log.value.push(`  Title: ${args.title}`)
-                break
-
-              case 'format_math': {
-                // Reformat math to Typst syntax via the model (see llm/typstFormat.ts)
-                const originalContent = currentContent.value
-                if (isCurrent()) log.value.push(`  Formatting math to Typst...`)
-                const formatted = await formatMathToTypst(originalContent, (p, s) =>
-                  llmQueue.generate(p, s)
-                )
-                if (formatted !== originalContent) {
-                  if (!isCurrent()) return SUPERSEDED
-                  currentContent.value = formatted
-                  await ctx.updateContent(formatted)
-                  contentWasUpdated = true
-                  result = 'Math reformatted to Typst and saved'
-                  if (isCurrent()) log.value.push(`  Formatted math to Typst (${formatted.length} chars)`)
-                } else {
-                  result = 'Math already in Typst format (content unchanged)'
-                  if (isCurrent()) log.value.push(`  Math already in Typst format`)
-                }
-                break
-              }
-
-              case 'node_done':
-                // Check if content was actually updated
-                if (!contentWasUpdated) {
-                  if (isCurrent()) log.value.push(`  WARNING: No content saved yet!`)
-                  result = `REJECTED: You cannot call node_done() yet because you have not saved any content to the note.
-
-YOUR NEXT STEP: Call update_content with your answer. Example:
-update_content("# Pi\\n\\nPi (\\u03c0) is a mathematical constant equal to approximately 3.14159...")
-
-After update_content succeeds, then you may call node_done().`
-                  break
-                }
-                if (isCurrent()) log.value.push(`> Done: ${args.summary}`)
-                if (isCurrent()) isRunning.value = false
-                return args.summary as string
-
-              default:
-                if (isCurrent()) log.value.push(`  Unknown tool: ${name}`)
-                result = `Error: Unknown tool "${name}". Available tools: web_search, fetch_url, wikipedia_search, update_content, append_content, update_title, node_done`
+            if (!allowed.has(name)) {
+              messages.push({
+                role: 'tool',
+                content: `Error: Unknown tool "${name}". Available tools: ${[...allowed].join(', ')}`,
+                tool_call_id: tc.id,
+              })
+              continue
             }
 
-            messages.push({ role: 'tool', content: result, tool_call_id: toolCallId })
+            const outcome = await toolRegistry.execute(name, args, toolCtx)
+            if (!isCurrent()) return SUPERSEDED
+            if (/^error/i.test(outcome.text)) {
+              if (isCurrent()) log.value.push(errorLog(outcome.text))
+              notifications$.error(`${name} failed`, outcome.text.slice(0, 200))
+            }
+            messages.push({ role: 'tool', content: outcome.text, tool_call_id: tc.id })
+
+            if (outcome.signal === 'node_done') {
+              if (isCurrent()) isRunning.value = false
+              return outcome.text
+            }
           }
         } else if (msg.content) {
           // Whether the model has finished is what `node_done` is for. Matching
@@ -441,6 +281,7 @@ After update_content succeeds, then you may call node_done().`
       } catch (e: unknown) {
         const errorMsg = e instanceof Error ? e.message : String(e)
 
+        if (errorMsg === SUPERSEDED) return SUPERSEDED
         if (errorMsg === 'Cancelled' || errorMsg.includes('AbortError')) {
           if (isCurrent()) log.value.push('> Stopped')
           if (isCurrent()) isRunning.value = false
@@ -470,7 +311,7 @@ After update_content succeeds, then you may call node_done().`
     }
 
     if (isCurrent()) isRunning.value = false
-    if (!contentWasUpdated) {
+    if (!draft.saved) {
       if (isCurrent()) log.value.push('> Failed: Agent did not save any content')
       notifications$.error('Agent failed', 'The AI model failed to use update_content(). Try a different model or rephrase your request.')
     } else {

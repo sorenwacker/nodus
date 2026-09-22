@@ -9,7 +9,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import type { ToolDefinition } from '../llm/types'
+import { registerCoreTools } from '../llm/tools'
+
+// The runner offers the tools the registry declares for the mode:
+// create_node is absent from plan mode, think is in it
+registerCoreTools()
 
 const chat = vi.fn()
 
@@ -26,13 +30,6 @@ vi.mock('../lib/storage', () => ({
   agentMemoryStorage: { getAgentMemory: () => ({ session: null, stack: [], facts: [] }) },
 }))
 
-function toolNamed(name: string): ToolDefinition {
-  return {
-    type: 'function',
-    function: { name, description: name, parameters: { type: 'object', properties: {} } },
-  } as unknown as ToolDefinition
-}
-
 function makeContext(executeAgentTool: (name: string, args: Record<string, unknown>) => Promise<string>) {
   return {
     filteredNodes: () => [],
@@ -48,9 +45,9 @@ function makeContext(executeAgentTool: (name: string, args: Record<string, unkno
     tasks: ref([]),
     conversationHistory: ref([]),
     transcript: ref([]),
-    // create_node is absent from the plan-mode whitelist; think is in it
-    agentTools: [toolNamed('create_node'), toolNamed('think')],
-    executeAgentTool,
+    executeAgentTool: async (name: string, args: Record<string, unknown>) => ({
+      text: await executeAgentTool(name, args),
+    }),
   }
 }
 

@@ -126,7 +126,6 @@ flowchart LR
     Def[Tool entry<br/>definition + declaration + handler] --> Reg[Tool registry]
     Reg -->|tools for the mode| Runner[Agent runner]
     Reg -->|tools for the mode| NodeAgent[Node agent]
-    Reg -->|availability report| UI[Settings, agent panel]
     Compose[Canvas composes<br/>the tool context] -->|services| Reg
     Runner -->|execute name, args| Reg
     Reg -->|text + optional signal| Runner
@@ -147,13 +146,15 @@ The tool context always carries the node store, the log, and coordinate helpers.
 
 | Service | Supplies | Used by |
 |---------|----------|---------|
-| `llm` | A model call through the LLM queue, with cancellation | `smart_move`, `smart_connect`, `smart_color`, `color_matching` |
-| `search` | Web search, Wikipedia search and fetch, URL fetch, claim validation, completeness assessment | Research tools, knowledge-base tools |
+| `llm` | A model call through the LLM queue, with cancellation | `smart_move`, `smart_connect`, `smart_color`, `color_matching`, `for_each_node`, `research_topic`, `create_theme`, `update_theme`, `format_math` |
+| `search` | Web search, URL fetch, Wikipedia search and fetch, quick and deep research, claim validation | `web_search`, `fetch_url`, `research`, `deep_research`, `wikipedia_search`, `fetch_wikipedia`, `validate_claim`, `build_knowledge_base`, `expand_aspect` |
 | `themes` | The themes store | Theme tools |
-| `plan` | Plan state and the task list | `create_plan`, `request_approval`, `plan`, `update_task` |
-| `memory` | Session, stack and facts storage | Memory tools |
-| `nodeDraft` | The content and title of the node the node agent is editing | Node-edit tools |
+| `plan` | Plan state and the task list the panel shows | `create_plan`, `request_approval`, `plan`, `update_task` |
+| `memory` | Facts, session and stack storage for the current workspace | `remember` and the unexposed session and stack tools |
+| `nodeDraft` | The content and title of the note the node agent is editing, and whether the run has saved | Node-edit tools |
 | `layout` | Force layout | `auto_layout` |
+
+Completeness assessment is a pure function of its inputs, so `check_completeness` and `check_progress` call it directly and require no service.
 
 ### Handler result
 

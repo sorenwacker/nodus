@@ -62,7 +62,7 @@ export function registerUpdateTools(): void {
       }
       return `Updated node "${args.title}"`
     },
-    { category: 'update' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 
   defineTool<{ title: string; x: number; y: number }>(
@@ -91,7 +91,7 @@ export function registerUpdateTools(): void {
       }
       return `Moved "${args.title}" to (${x}, ${y})`
     },
-    { category: 'update' }
+    { modes: ['execute'], mutates: true }
   )
 
   defineTool<{ updates: Array<{ title: string; set_title?: string; set_content?: string; x?: number; y?: number }> }>(
@@ -183,6 +183,6 @@ export function registerUpdateTools(): void {
         ? `${summary}. Not found: ${notFound.join(', ')}`
         : summary
     },
-    { category: 'update' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 }

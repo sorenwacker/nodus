@@ -8,12 +8,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Research arrives through the `search` context service
 const deepResearch = vi.fn()
-
-vi.mock('../llm/research', () => ({
-  deepResearch: (...args: unknown[]) => deepResearch(...args),
-  assessCompleteness: () => ({ score: 1, missing: [], suggestions: [] }),
-}))
 
 /**
  * A phase counts as complete only when its findings reach its minimum, and the
@@ -54,17 +50,20 @@ describe('a knowledge base built in phases', () => {
         filteredEdges: [],
       },
       log: () => {},
+      search: { deepResearch },
     } as never
 
-    const result = await toolRegistry.execute(
+    const { text } = await toolRegistry.execute(
       'build_knowledge_base',
       { topic: 'photosynthesis', target_nodes: 1000 },
       ctx
     )
 
-    expect(result.startsWith('__KB_BUILD_COMPLETE__:'), result.slice(0, 60)).toBe(true)
-    const payload = JSON.parse(result.replace('__KB_BUILD_COMPLETE__:', ''))
-    const claims = payload.findings.map((f: { claim: string }) => f.claim)
+    expect(text, text.slice(0, 60)).toContain('KNOWLEDGE BASE RESEARCH COMPLETE')
+    // The report lists findings as "- <claim>" lines, before the follow-ups
+    const findingsSection = text.slice(text.indexOf('REMAINING FINDINGS'), text.indexOf('SUGGESTED FOLLOW-UPS'))
+    const claims = [...findingsSection.matchAll(/^- (.+)$/gm)].map(m => m[1])
+    expect(claims.length).toBeGreaterThan(0)
 
     expect(phase, 'the test needs more than one phase to be meaningful').toBeGreaterThan(1)
 

@@ -15,6 +15,7 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { stripHtmlTags } from '../lib/sanitize'
+import { llmStorage } from '../lib/storage'
 import type { ResearchResult } from './types'
 import type { Node } from '../types'
 
@@ -67,11 +68,15 @@ const DEPTH_CONFIG = {
 }
 
 /**
- * Get the Tavily API key from storage
+ * Search the web through the Tavily API (via the Tauri backend).
+ *
+ * Throws when no key is configured or the backend fails, so a caller can tell
+ * an outage from an empty result.
  */
-function getApiKey(): string | null {
-  // Key is stored directly, not in a JSON object
-  return localStorage.getItem('nodus_search_api_key') || null
+export async function webSearch(query: string): Promise<TavilyResult[]> {
+  const apiKey = llmStorage.getSearchApiKey()
+  if (!apiKey) throw new Error('Web search requires a Tavily API key in Settings')
+  return invoke<TavilyResult[]>('web_search', { query, apiKey })
 }
 
 /**
@@ -128,19 +133,8 @@ async function searchWebTavily(
   log?: (msg: string) => void
 ): Promise<ResearchResult[]> {
   try {
-    const apiKey = await getApiKey()
-    if (!apiKey) {
-      log?.('> Web search: No API key configured')
-      return []
-    }
-
     log?.(`> Web search: "${query}"`)
-
-    const results = await invoke<TavilyResult[]>('web_search', {
-      query,
-      apiKey,
-    })
-
+    const results = await webSearch(query)
     return results.map(r => ({
       source: 'web' as const,
       title: r.title,

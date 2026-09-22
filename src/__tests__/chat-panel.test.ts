@@ -136,7 +136,7 @@ describe('every run outcome reaches the transcript', () => {
   )
 
   it('says something when pausing for plan approval', () => {
-    const block = runner.slice(runner.indexOf("__REQUEST_APPROVAL__:'"))
+    const block = runner.slice(runner.indexOf('function pauseForApproval'))
     expect(block.slice(0, 900)).toContain('appendAssistantText')
   })
 

@@ -55,10 +55,6 @@ export function registerLayoutTools(): void {
       if (layout === 'force') {
         // Supplied by whoever composed the context, never imported from the
         // canvas: the shared layer does not depend on a consumer
-        if (!ctx.applyForceLayout) {
-          return 'Force-directed layout is not available in this context'
-        }
-
         const layoutNodes = nodes.map(n => ({
           id: n.id,
           x: n.canvas_x,
@@ -70,7 +66,7 @@ export function registerLayoutTools(): void {
           source: e.source_node_id,
           target: e.target_node_id,
         }))
-        const positions = await ctx.applyForceLayout(layoutNodes, layoutEdges, {
+        const positions = await ctx.layout!.applyForceLayout(layoutNodes, layoutEdges, {
           centerX,
           centerY,
           iterations: 300,
@@ -121,6 +117,6 @@ export function registerLayoutTools(): void {
       }
       return `Arranged ${nodes.length} nodes in ${layout} layout`
     },
-    { category: 'layout' }
+    { modes: ['explore', 'execute'], mutates: true, requires: ['layout'] }
   )
 }

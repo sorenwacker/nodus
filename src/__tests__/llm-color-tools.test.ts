@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ref } from 'vue'
-import { useLLMTools, type LLMToolsContext } from '../canvas/composables/agent/useLLMTools'
+import { toolRegistry, type ToolContext } from '../llm/registry'
+import { registerCoreTools } from '../llm/tools'
 import type { Node } from '../types'
+
+registerCoreTools()
 
 // Mock node data
 const createMockNodes = () => [
@@ -20,30 +22,20 @@ const createMockNodes = () => [
 // Track color updates
 const colorUpdates: Map<string, string> = new Map()
 
-// Create mock context
-function createMockContext(mockLLMResponse?: (prompt: string) => string): LLMToolsContext {
+/** A context whose model answers as the test dictates (NO by default) */
+function createMockContext(mockLLMResponse?: (prompt: string) => string) {
   const nodes = createMockNodes()
   colorUpdates.clear()
+  const generate = vi.fn().mockImplementation(async (prompt: string) =>
+    mockLLMResponse ? mockLLMResponse(prompt) : 'NO'
+  )
 
-  return {
-    llmQueue: {
-      generate: vi.fn().mockImplementation(async (prompt: string) => {
-        if (mockLLMResponse) {
-          return mockLLMResponse(prompt)
-        }
-        // Default: return NO for everything
-        return 'NO'
-      }),
-    },
-    callOllama: vi.fn().mockResolvedValue(''),
+  const ctx: ToolContext = {
+    llm: { generate, isCancelled: () => false },
     store: {
       // Partial fixtures: the colour tools only read id, title and content.
       // The rest satisfy the store contract the registry hands to every tool.
-      getFilteredNodes: () => nodes as unknown as Node[],
-      getFilteredEdges: () => [],
-      get filteredNodes() {
-        return nodes as unknown as Node[]
-      },
+      filteredNodes: nodes as unknown as Node[],
       filteredEdges: [],
       createNode: vi.fn().mockResolvedValue({ id: 'new' }),
       deleteNode: vi.fn().mockResolvedValue(undefined),
@@ -56,39 +48,13 @@ function createMockContext(mockLLMResponse?: (prompt: string) => string): LLMToo
       }),
       createEdge: vi.fn().mockResolvedValue({}),
     },
-    themesStore: {
-      themes: [],
-      builtinThemes: [],
-      customThemes: [],
-      currentThemeName: 'default',
-      createTheme: vi.fn().mockResolvedValue({ id: '1', name: 'test' }),
-      updateTheme: vi.fn().mockResolvedValue(undefined),
-      setTheme: vi.fn(),
-    },
-    planState: {
-      currentPlan: ref(null),
-      createPlan: vi.fn(),
-      requestApproval: vi.fn().mockReturnValue(true),
-    },
-    tasks: ref([]),
-    memoryStorage: {
-      addMemory: vi.fn(),
-    },
-    agentMemoryStorage: {
-      getSession: vi.fn().mockReturnValue(null),
-      setSession: vi.fn(),
-      clearSession: vi.fn(),
-      updateProgress: vi.fn(),
-      getStack: vi.fn().mockReturnValue([]),
-      pushTask: vi.fn().mockReturnValue({ id: 'task_1', description: 'test', priority: 'medium', created_at: new Date().toISOString() }),
-      popTask: vi.fn().mockReturnValue(null),
-      peekTask: vi.fn().mockReturnValue(null),
-      clearStack: vi.fn(),
-    },
     log: vi.fn(),
-    pushContentUndo: vi.fn(),
-    isRunning: ref(true),
+    screenToCanvas: (x, y) => ({ x, y }),
+    snapToGrid: v => v,
+    model: 'test',
+    contextLength: 8192,
   }
+  return { ctx, generate }
 }
 
 describe('color_matching tool', () => {
@@ -100,52 +66,47 @@ describe('color_matching tool', () => {
     // answered by different machinery for reasons no user could see
     // (PRODUCT_DESIGN.md > Classifying what the user wrote).
     it('asks the model, whatever the wording of the criterion', async () => {
-      const ctx = createMockContext(() => 'NO')
-      const { executeLLMTool } = useLLMTools(ctx)
+      const { ctx, generate } = createMockContext(() => 'NO')
 
-      await executeLLMTool('color_matching', { pattern: 'Faculty of...', color: '#ef4444' })
+      await toolRegistry.execute('color_matching', { pattern: 'Faculty of...', color: '#ef4444' }, ctx)
 
-      expect(ctx.llmQueue.generate, 'the wording chose the path').toHaveBeenCalled()
+      expect(generate, 'the wording chose the path').toHaveBeenCalled()
     })
 
     it('colours what the model accepts', async () => {
-      const ctx = createMockContext(prompt => (prompt.includes('Faculty of') ? 'YES' : 'NO'))
-      const { executeLLMTool } = useLLMTools(ctx)
+      const { ctx } = createMockContext(prompt => (prompt.includes('Faculty of') ? 'YES' : 'NO'))
 
-      await executeLLMTool('color_matching', { pattern: 'faculty', color: '#ef4444' })
+      await toolRegistry.execute('color_matching', { pattern: 'faculty', color: '#ef4444' }, ctx)
 
       expect(colorUpdates.has('1')).toBe(true)
       expect(colorUpdates.has('4')).toBe(false)
     })
 
     it('leaves text matching to color_regex, which needs no model', async () => {
-      const ctx = createMockContext()
-      const { executeLLMTool } = useLLMTools(ctx)
+      const { ctx, generate } = createMockContext()
 
-      await executeLLMTool('color_regex', { regex: '^Faculty of', color: '#ef4444' })
+      await toolRegistry.execute('color_regex', { regex: '^Faculty of', color: '#ef4444' }, ctx)
 
       expect(colorUpdates.size).toBe(3)
-      expect(ctx.llmQueue.generate).not.toHaveBeenCalled()
+      expect(generate).not.toHaveBeenCalled()
     })
   })
 
   describe('tag matching', () => {
     it('should match #faculty tag in content', async () => {
-      const ctx = createMockContext()
-      const { executeLLMTool } = useLLMTools(ctx)
+      const { ctx } = createMockContext()
 
       // Using a semantic criterion that triggers tag check
-      await executeLLMTool('color_matching', { pattern: 'faculty', color: '#ef4444' })
+      await toolRegistry.execute('color_matching', { pattern: 'faculty', color: '#ef4444' }, ctx)
 
       // Should match node 6 which has #faculty tag
       expect(colorUpdates.has('6')).toBe(true)
     })
 
     it('should match #department tag', async () => {
-      const ctx = createMockContext()
-      const { executeLLMTool } = useLLMTools(ctx)
+      const { ctx } = createMockContext()
 
-      await executeLLMTool('color_matching', { pattern: 'department', color: '#3b82f6' })
+      await toolRegistry.execute('color_matching', { pattern: 'department', color: '#3b82f6' }, ctx)
 
       // Should match nodes with #department tag (3 and 9)
       expect(colorUpdates.has('3')).toBe(true)
@@ -153,10 +114,9 @@ describe('color_matching tool', () => {
     })
 
     it('should match #person tag', async () => {
-      const ctx = createMockContext()
-      const { executeLLMTool } = useLLMTools(ctx)
+      const { ctx } = createMockContext()
 
-      await executeLLMTool('color_matching', { pattern: 'person', color: '#22c55e' })
+      await toolRegistry.execute('color_matching', { pattern: 'person', color: '#22c55e' }, ctx)
 
       // Should match node 5 which has #person tag
       expect(colorUpdates.has('5')).toBe(true)
@@ -165,42 +125,38 @@ describe('color_matching tool', () => {
 
   describe('semantic evaluation', () => {
     it('should use LLM for abstract criteria like "person"', async () => {
-      const ctx = createMockContext((prompt) => {
+      const { ctx, generate } = createMockContext((prompt) => {
         // Simulate LLM correctly identifying people
         if (prompt.includes('John Smith') || prompt.includes('Jane Doe') || prompt.includes('Kees Vuik')) {
           return 'YES'
         }
         return 'NO'
       })
-      const { executeLLMTool } = useLLMTools(ctx)
 
-      await executeLLMTool('color_matching', { pattern: 'person', color: '#22c55e' })
+      await toolRegistry.execute('color_matching', { pattern: 'person', color: '#22c55e' }, ctx)
 
       // Should have called LLM for non-tag nodes
-      expect(ctx.llmQueue.generate).toHaveBeenCalled()
+      expect(generate).toHaveBeenCalled()
     })
 
   })
 
   describe('cancellation', () => {
-    it('should stop when isRunning becomes false', async () => {
-      const ctx = createMockContext(() => 'YES')
-      const isRunning = ctx.isRunning!
+    it('should stop when the run is cancelled', async () => {
+      const { ctx } = createMockContext(() => 'YES')
 
-      // Set up to cancel after first node
+      // Cancel after the first node is coloured
       let callCount = 0
+      let cancelled = false
+      ctx.llm!.isCancelled = () => cancelled
       ctx.store.updateNodeColor = vi.fn().mockImplementation(async () => {
         callCount++
-        if (callCount >= 1) {
-          isRunning.value = false
-        }
+        cancelled = true
       })
-
-      const { executeLLMTool } = useLLMTools(ctx)
-      const result = await executeLLMTool('color_matching', { pattern: 'faculty', color: '#ef4444' })
+      const result = await toolRegistry.execute('color_matching', { pattern: 'faculty', color: '#ef4444' }, ctx)
 
       // Should have stopped early
-      expect(result).toContain('Stopped')
+      expect(result.text).toContain('Stopped')
       expect(callCount).toBeLessThan(3) // Should not process all 3 Faculty nodes
     })
   })
@@ -209,7 +165,7 @@ describe('color_matching tool', () => {
 describe('smart_color tool', () => {
   describe('category extraction', () => {
     it('should extract category-color mappings from instruction', async () => {
-      const ctx = createMockContext((prompt) => {
+      const { ctx, generate } = createMockContext((prompt) => {
         // Mock LLM extracting categories
         if (prompt.includes('Extract category-to-color')) {
           return '[{"category":"faculty","color":"#ef4444"},{"category":"department","color":"#3b82f6"}]'
@@ -219,28 +175,26 @@ describe('smart_color tool', () => {
         if (prompt.includes('Department of')) return 'department'
         return 'NONE'
       })
-      const { executeLLMTool } = useLLMTools(ctx)
 
-      await executeLLMTool('smart_color', { instruction: 'faculties red, departments blue' })
+      await toolRegistry.execute('smart_color', { instruction: 'faculties red, departments blue' }, ctx)
 
       // Should have called LLM for category extraction
-      expect(ctx.llmQueue.generate).toHaveBeenCalled()
+      expect(generate).toHaveBeenCalled()
     })
   })
 
   describe('tag-based fast path', () => {
     it('should use tags before LLM classification', async () => {
       const llmCalls: string[] = []
-      const ctx = createMockContext((prompt) => {
+      const { ctx } = createMockContext((prompt) => {
         llmCalls.push(prompt)
         if (prompt.includes('Extract category-to-color')) {
           return '[{"category":"faculty","color":"#ef4444"}]'
         }
         return 'NONE'
       })
-      const { executeLLMTool } = useLLMTools(ctx)
 
-      await executeLLMTool('smart_color', { instruction: 'faculty red' })
+      await toolRegistry.execute('smart_color', { instruction: 'faculty red' }, ctx)
 
       // Node 6 has #faculty tag - should be colored without LLM classification call
       expect(colorUpdates.has('6')).toBe(true)
