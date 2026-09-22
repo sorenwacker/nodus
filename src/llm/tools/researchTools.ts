@@ -1,20 +1,41 @@
 /**
- * Research tool registrations
- *
- * Shared research tools used by both graph agent and node agent:
- * - web_search: Search the web using Tavily API
- * - fetch_url: Fetch and parse URL content
- * - wikipedia_search: Search Wikipedia for encyclopedic information
- *
- * These tools return markers that are handled by the agent runners.
+ * Web tools shared by the graph agent and the node agent: web_search and
+ * fetch_url. Both go through the `search` context service.
  */
 
 import { defineTool } from '../registry'
+import { isValidFetchUrl } from '../../lib/promptSecurity'
 
 export function registerResearchTools(): void {
-  // Note: web_search is already registered in planningTools.ts for the graph agent
-  // This registration provides the same tool for node agent compatibility
-  // The actual execution is handled by the agent runners via markers
+  defineTool<{ query: string }>(
+    'web_search',
+    'Search the web for information. Use this to research topics before creating nodes.',
+    {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+      },
+      required: ['query'],
+    },
+    async (args, ctx) => {
+      const query = args.query || ''
+      ctx.log(`> Web search: "${query}"`)
+      try {
+        const results = await ctx.search!.webSearch(query)
+        ctx.log(`> Web search: Found ${results.length} results`)
+        if (results.length === 0) return `No web results for "${query}"`
+        const formatted = results
+          .map((r, i) => `${i + 1}. **${r.title}**\n${r.content}\n[${r.url}]`)
+          .join('\n\n')
+        return `## Web Search: "${query}"\n\n${formatted}`
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        ctx.log(`> Web search failed: ${message}`)
+        return `Error: Web search failed: ${message}`
+      }
+    },
+    { modes: ['explore', 'plan', 'execute', 'node'], mutates: false, requires: ['search'] }
+  )
 
   defineTool<{ url: string }>(
     'fetch_url',
@@ -26,9 +47,22 @@ export function registerResearchTools(): void {
       },
       required: ['url'],
     },
-    async (args, _ctx) => {
-      return `__FETCH_URL__:${args.url}`
+    async (args, ctx) => {
+      const url = args.url || ''
+      ctx.log(`> Fetching: ${url}`)
+      if (!isValidFetchUrl(url)) {
+        return 'Error: Invalid URL: only http/https URLs to public hosts are allowed'
+      }
+      try {
+        const content = await ctx.search!.fetchUrl(url)
+        ctx.log(`> Got content (${content.length} chars)`)
+        return content
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        ctx.log(`> Fetch failed: ${message}`)
+        return `Error: Failed to fetch URL: ${message}`
+      }
     },
-    { category: 'research' }
+    { modes: ['node'], mutates: false, requires: ['search'] }
   )
 }

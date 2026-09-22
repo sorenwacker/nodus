@@ -1,7 +1,9 @@
 /**
- * Planning and thinking tool registrations
+ * Planning tools: think, plan, update_task, done.
  *
- * Handles: think, plan, update_task, remember, done, web_search
+ * `plan` and `update_task` write the task list the panel shows through the
+ * `plan` context service. `done` ends the run with a typed signal
+ * (PRODUCT_DESIGN.md > Tool signals).
  */
 
 import { defineTool } from '../registry'
@@ -21,7 +23,7 @@ export function registerPlanningTools(): void {
       ctx.log(`[think] ${args.thought}`)
       return 'Thought recorded'
     },
-    { category: 'planning' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false }
   )
 
   defineTool<{ tasks: string[] }>(
@@ -38,11 +40,17 @@ export function registerPlanningTools(): void {
       },
       required: ['tasks'],
     },
-    async (_args, _ctx) => {
-      // Return unhandled so GraphCanvas.vue handles it with task state
-      return `__UNHANDLED__:plan`
+    async (args, ctx) => {
+      const taskList = Array.isArray(args.tasks) ? args.tasks : []
+      if (taskList.length === 0) return 'No tasks provided'
+
+      ctx.plan!.setTasks(taskList)
+      ctx.log('--- PLAN ---')
+      taskList.forEach((t, i) => ctx.log(`[ ] ${i + 1}. ${t}`))
+      ctx.log('------------')
+      return `Created plan with ${taskList.length} tasks`
     },
-    { category: 'planning' }
+    { modes: ['execute'], mutates: false, requires: ['plan'] }
   )
 
   defineTool<{ task_index: number; status: string }>(
@@ -56,44 +64,19 @@ export function registerPlanningTools(): void {
       },
       required: ['task_index', 'status'],
     },
-    async (_args, _ctx) => {
-      // Return unhandled so GraphCanvas.vue handles it with task state
-      return `__UNHANDLED__:update_task`
-    },
-    { category: 'planning' }
-  )
+    async (args, ctx) => {
+      const plan = ctx.plan!
+      const index = typeof args.task_index === 'number' ? args.task_index : -1
+      if (index < 0 || index >= plan.taskCount()) return `Invalid task index: ${index}`
 
-  defineTool<{ message: string }>(
-    'remember',
-    'Store important information for future reference in this conversation.',
-    {
-      type: 'object',
-      properties: {
-        message: { type: 'string', description: 'Information to remember' },
-      },
-      required: ['message'],
-    },
-    async (_args, _ctx) => {
-      // Return unhandled so GraphCanvas.vue handles it with memory state
-      return `__UNHANDLED__:remember`
-    },
-    { category: 'planning' }
-  )
+      const status = args.status === 'done' ? 'done' : args.status === 'failed' ? 'failed' : 'in_progress'
+      plan.updateTaskStatus(index, status)
 
-  defineTool<{ query: string }>(
-    'web_search',
-    'Search the web for information. Use this to research topics before creating nodes.',
-    {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query' },
-      },
-      required: ['query'],
+      const icon = status === 'done' ? '[x]' : status === 'failed' ? '[!]' : '[>]'
+      ctx.log(`${icon} Task ${index + 1}: ${plan.taskDescription(index)} -> ${status}`)
+      return `Task ${index + 1} updated: ${status}`
     },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:web_search`
-    },
-    { category: 'utility' }
+    { modes: ['execute'], mutates: false, requires: ['plan'] }
   )
 
   defineTool<{ summary: string; force?: boolean }>(
@@ -160,124 +143,11 @@ Create at least ${Math.ceil(nodes.length * 0.5)} edges, then call done() again. 
       }
 
       ctx.log(`> Completed: ${nodes.length} nodes, ${edges.length} edges`)
-      return `AGENT_DONE: ${args.summary || 'completed'} (${nodes.length} nodes, ${edges.length} edges)`
+      return {
+        text: `${args.summary || 'completed'} (${nodes.length} nodes, ${edges.length} edges)`,
+        signal: 'done',
+      }
     },
-    { category: 'utility' }
-  )
-
-  // Session memory tools
-  defineTool<{ goal: string; steps?: string[] }>(
-    'set_goal',
-    'Start tracking a new goal. Clears previous session memory.',
-    {
-      type: 'object',
-      properties: {
-        goal: { type: 'string', description: 'The goal to accomplish' },
-        steps: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional list of planned steps'
-        },
-      },
-      required: ['goal'],
-    },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:set_goal`
-    },
-    { category: 'planning' }
-  )
-
-  defineTool<{ progress: number; completed_action?: string }>(
-    'update_progress',
-    'Update progress on current goal (0-100%).',
-    {
-      type: 'object',
-      properties: {
-        progress: { type: 'number', description: 'Progress percentage (0-100)' },
-        completed_action: { type: 'string', description: 'Description of action just completed' },
-      },
-      required: ['progress'],
-    },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:update_progress`
-    },
-    { category: 'planning' }
-  )
-
-  defineTool<{ summary: string }>(
-    'complete_goal',
-    'Mark current goal as complete and clear session memory.',
-    {
-      type: 'object',
-      properties: {
-        summary: { type: 'string', description: 'Summary of what was accomplished' },
-      },
-      required: ['summary'],
-    },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:complete_goal`
-    },
-    { category: 'planning' }
-  )
-
-  // Stack (todo queue) tools
-  defineTool<{ description: string; priority?: string; context?: Record<string, unknown> }>(
-    'push_task',
-    'Add a task to the todo stack for later. Tasks are processed LIFO (last in, first out).',
-    {
-      type: 'object',
-      properties: {
-        description: { type: 'string', description: 'Task description' },
-        priority: { type: 'string', description: 'Priority: high, medium, low (default: medium)' },
-        context: { type: 'object', description: 'Optional context data for the task' },
-      },
-      required: ['description'],
-    },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:push_task`
-    },
-    { category: 'planning' }
-  )
-
-  defineTool<Record<string, never>>(
-    'pop_task',
-    'Get and remove the top task from the stack.',
-    {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:pop_task`
-    },
-    { category: 'planning' }
-  )
-
-  defineTool<Record<string, never>>(
-    'peek_stack',
-    'View the task stack without removing tasks.',
-    {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:peek_stack`
-    },
-    { category: 'planning' }
-  )
-
-  defineTool<Record<string, never>>(
-    'clear_stack',
-    'Clear all tasks from the stack.',
-    {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    async (_args, _ctx) => {
-      return `__UNHANDLED__:clear_stack`
-    },
-    { category: 'planning' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false }
   )
 }

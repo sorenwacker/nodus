@@ -72,24 +72,15 @@ export {
   type UseLassoOptions,
 } from './selection'
 
-// Agent: LLM agent runner, tools, handlers
+// Agent: LLM agent runners and the tool context they compose
 export {
   useAgentRunner,
-  useLLMTools,
-  useMarkerHandlers,
+  buildAgentToolContext,
   useNodeAgent,
   usePlanHandlers,
   type AgentContext,
   type AgentRunResult,
-  type LLMQueueInterface,
-  type LLMToolsNodeStore,
-  type ThemesStoreInterface,
-  type PlanStateInterface,
-  type MemoryStorageInterface,
-  type LLMToolsContext,
-  type UseLLMToolsReturn,
-  type MarkerHandlerContext,
-  type UseMarkerHandlersReturn,
+  type AgentToolContextDeps,
   type NodeAgentContext,
   type UsePlanHandlersContext,
   type UsePlanHandlersReturn,

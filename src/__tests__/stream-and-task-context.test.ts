@@ -60,8 +60,9 @@ describe('an event stream', () => {
 describe("a task's stored context", () => {
   function contextFor(task: unknown) {
     return {
-      store: { currentWorkspaceId: 'w1' },
-      agentMemoryStorage: {
+      store: {},
+      memory: {
+        workspaceId: () => 'w1',
         popTask: () => task,
         peekTask: () => task,
       },
@@ -77,18 +78,20 @@ describe("a task's stored context", () => {
   }
 
   it('is readable when the task is popped', async () => {
-    const { popTaskHandler } = await import('../llm/tools/handlers/memoryHandlers')
+    const { toolRegistry } = await import('../llm/registry')
+    await import('../llm/tools')
 
-    const result = await popTaskHandler({}, contextFor(task))
+    const { text: result } = await toolRegistry.execute('pop_task', {}, contextFor(task))
 
     expect(result, 'the context came back as [object Object]').toContain('TU Delft')
     expect(result).not.toContain('[object Object]')
   })
 
   it('is readable when the stack is peeked', async () => {
-    const { peekStackHandler } = await import('../llm/tools/handlers/memoryHandlers')
+    const { toolRegistry } = await import('../llm/registry')
+    await import('../llm/tools')
 
-    const result = await peekStackHandler({}, contextFor(task))
+    const { text: result } = await toolRegistry.execute('peek_stack', {}, contextFor(task))
 
     expect(result).toContain('TU Delft')
     expect(result).not.toContain('[object Object]')

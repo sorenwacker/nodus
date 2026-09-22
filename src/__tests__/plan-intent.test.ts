@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { classifyStepAction, summarizePlanIntent } from '../llm/planIntent'
-import { getAgentMode } from '../llm/agentModes'
+import { toolsForMode } from '../llm/agentModes'
+import { registerCoreTools } from '../llm/tools'
 import type { AgentPlan } from '../llm/types'
 
 function plan(steps: AgentPlan['steps']): AgentPlan {
@@ -48,8 +49,11 @@ describe('summarizePlanIntent', () => {
 })
 
 describe('plan mode is read-only (plan-first guarantee)', () => {
+  registerCoreTools()
+  const names = (mode: 'plan' | 'execute') => new Set(toolsForMode(mode).map(t => t.function.name))
+
   it('does not expose any graph-write tools', () => {
-    const planTools = new Set(getAgentMode('plan').toolWhitelist)
+    const planTools = names('plan')
     for (const writeTool of [
       'create_node',
       'create_nodes_batch',
@@ -69,6 +73,6 @@ describe('plan mode is read-only (plan-first guarantee)', () => {
   })
 
   it('still lets execute mode create nodes after approval', () => {
-    expect(new Set(getAgentMode('execute').toolWhitelist).has('create_node')).toBe(true)
+    expect(names('execute').has('create_node')).toBe(true)
   })
 })

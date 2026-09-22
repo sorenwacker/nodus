@@ -1,73 +1,36 @@
 /**
  * Agent Modes Configuration
  *
- * Defines the three agent modes with their tool whitelists and system prompts:
- * - Explore: Read-only research mode
- * - Plan: Design approach and create plans
- * - Execute: Make changes after approval
+ * Defines the three agent modes with their prompts and iteration caps:
+ * - Explore: research and build the graph
+ * - Plan: read-only; design a plan for approval
+ * - Execute: carry out an approved plan
+ *
+ * Which tools a mode offers is declared on each tool and read from the
+ * registry; no list of tool names lives here
+ * (PRODUCT_DESIGN.md > A tool declares its modes).
  */
 
 import type { AgentMode } from './types'
+import { toolRegistry } from './registry'
 
 /**
- * Mode configuration with tool filtering and prompt additions
+ * Mode configuration with prompt additions
  */
 export interface AgentModeConfig {
   name: AgentMode
   description: string
   maxIterations: number
-  toolWhitelist: string[]
   systemPromptAddition: string
 }
 
 /**
- * Explore mode - read-only research
+ * Explore mode - research and build
  */
 const exploreMode: AgentModeConfig = {
   name: 'explore',
   description: 'Research mode - gather information and build the graph',
   maxIterations: 200,
-  toolWhitelist: [
-    // Reading
-    'read_graph',
-    'query_nodes',
-    // Research
-    'web_search',
-    'research',
-    'deep_research',
-    'fetch_wikipedia',
-    'wikipedia_search',
-    'validate_claim',
-    'check_completeness',
-    // Creating (build as you go)
-    'create_node',
-    'create_nodes_batch',
-    'create_edge',
-    'create_edges_batch',
-    'update_node',
-    'auto_layout',
-    // Deleting (for corrections)
-    'delete_node',
-    'delete_edges',
-    'delete_matching',
-    // Coloring
-    'smart_color',
-    'color_matching',
-    'reset_edge_colors',
-    // Batch operations
-    'for_each_node',
-    'batch_update',
-    // Thinking
-    'think',
-    'done',
-    // Reading structure, and the research tools the prompt documents
-    'list_frames',
-    'list_storylines',
-    'research_topic',
-    'build_knowledge_base',
-    'check_progress',
-    'expand_aspect',
-  ],
   systemPromptAddition: `
 MODE: EXPLORE (Research & Build)
 Research thoroughly AND build the graph as you discover information.
@@ -98,25 +61,6 @@ const planMode: AgentModeConfig = {
   name: 'plan',
   description: 'Research and read only, then propose a plan for approval',
   maxIterations: 200,
-  toolWhitelist: [
-    // Reading
-    'read_graph',
-    'get_connected_components',
-    'query_nodes',
-    // Research (read-only)
-    'web_search',
-    'research',
-    'deep_research',
-    'fetch_wikipedia',
-    'wikipedia_search',
-    'validate_claim',
-    'check_completeness',
-    // Planning
-    'think',
-    'create_plan',
-    'request_approval',
-    'done',
-  ],
   systemPromptAddition: `
 MODE: PLAN (Research, then propose)
 Research and read ONLY. Do NOT modify the graph in this phase: you have no tools
@@ -145,71 +89,6 @@ const executeMode: AgentModeConfig = {
   name: 'execute',
   description: 'Execute approved plan and make changes',
   maxIterations: 500,
-  toolWhitelist: [
-    'read_graph',
-    'get_connected_components',
-    'create_node',
-    'create_edge',
-    'create_edges_batch',
-    'delete_node',
-    'delete_edges',
-    'delete_matching',
-    'update_node',
-    'move_node',
-    'batch_update',
-    'generate_sequence',
-    'create_nodes_batch',
-    'auto_layout',
-    'query_nodes',
-    'for_each_node',
-    'smart_move',
-    'smart_connect',
-    'smart_color',
-    'color_matching',
-    'reset_edge_colors',
-    'web_search',
-    'research',
-    'deep_research',
-    'fetch_wikipedia',
-    'wikipedia_search',
-    'validate_claim',
-    'check_completeness',
-    'think',
-    'plan',
-    'update_task',
-    'remember',
-    'create_theme',
-    'update_theme',
-    'apply_theme',
-    'list_themes',
-    'done',
-    // Structure: frames and storylines. Registered and tested but exposed to
-    // no mode until now, so the agent could not group or sequence anything
-    // (PRODUCT_DESIGN.md > Tool reachability)
-    'create_frame',
-    'assign_node_to_frame',
-    'list_frames',
-    'create_storyline',
-    'add_node_to_storyline',
-    'list_storylines',
-    // Acting on the user's selection
-    'append_to_selected',
-    'color_selected',
-    'connect_selected_to',
-    'delete_selected',
-    'expand_selected',
-    'rename_selected',
-    'summarize_selected',
-    'update_selected_content',
-    // Research and colouring the system prompt documents to the model
-    'research_topic',
-    'build_knowledge_base',
-    'check_progress',
-    'expand_aspect',
-    'color_regex',
-    // Edge editing, which the MCP surface has always had
-    'update_edge',
-  ],
   systemPromptAddition: `
 MODE: EXECUTE (Approved)
 You are executing an approved plan. Make the changes as specified.
@@ -251,32 +130,10 @@ export function getAgentMode(mode: AgentMode): AgentModeConfig {
 }
 
 /**
- * Filter tools based on current mode
+ * The tools a mode offers, from each tool's declaration
  */
-/**
- * Tools deliberately not exposed to any mode, with the reason.
- *
- * The task and goal stack predates create_plan, which covers the same ground
- * with user approval. They stay registered and tested, but unexposed, until
- * that overlap is resolved (PRODUCT_DESIGN.md > Tool reachability).
- */
-export const UNEXPOSED_TOOLS = new Set([
-  'push_task',
-  'pop_task',
-  'peek_stack',
-  'clear_stack',
-  'set_goal',
-  'complete_goal',
-  'update_progress',
-])
-
-export function filterToolsForMode<T extends { function: { name: string } }>(
-  tools: T[],
-  mode: AgentMode
-): T[] {
-  const config = getAgentMode(mode)
-  const whitelist = new Set(config.toolWhitelist)
-  return tools.filter(tool => whitelist.has(tool.function.name))
+export function toolsForMode(mode: AgentMode) {
+  return toolRegistry.getToolsForMode(mode)
 }
 
 /**

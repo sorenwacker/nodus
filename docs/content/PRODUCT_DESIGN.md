@@ -1532,7 +1532,7 @@ A superseded loop stops iterating rather than merely stopping its writes. Guardi
 
 A tool call recovered from the text of a reply is executed on the same path as one the provider returned in `tool_calls`. Models that cannot emit native calls write them as fenced JSON, and that text was executed directly: it skipped the mode allow-list, so a plan-mode model could run a mutating tool the request had stripped, and it skipped the log and the transcript, so the call happened with no line saying so.
 
-- One function handles a call whatever its shape: allow-list, execution, log line, transcript, marker handling.
+- One function handles a call whatever its shape: allow-list, execution, log line, transcript, signal handling.
 - A message recognised as a tool call is not also appended to the transcript as prose.
 
 ### A reply that carries a tool call it could not make
@@ -1547,16 +1547,38 @@ One model wrote `call:name(key:value)` with its own string delimiters, and every
 
 ### One implementation per tool
 
-A tool call is answered by exactly one layer. The canvas tries the registry, then the marker handlers, then the LLM-dependent tools, and takes the first real answer, so a tool with a real handler in two layers runs the first and the second is dead code that reads as the live one. Four tools had two implementations, and the unreachable copy was the one later edits were made against.
+**Required behavior:** A tool is defined once, in one registry, and its registered handler is its implementation. There is no second place a call can be answered.
 
-- A registry handler returns `__UNHANDLED__` only when the real implementation is elsewhere.
-- A gate asserts that no tool name has both a real registry result and a case in the LLM-dependent dispatcher.
+A call used to pass through up to four mechanisms: the registry, a chain of marker handlers that parsed strings such as `__RESEARCH__:{json}` a handler had returned in place of doing the work, a second registry with its own context type, and a `switch` in the canvas for the tools that need a model call. The canvas tried them in order and took the first real answer, so a tool implemented in two of them ran the first while the second read as the live one. Four tools had two implementations, and the unreachable copy was the one later edits were made against. A gate kept the layers from overlapping; it could not make a tool's behaviour findable in one place.
 
-### A whitelist names registered tools
+- The registered handler does the work and returns the result. It never returns a string that asks another layer to do the work: no `__UNHANDLED__`, no `__NAME__:{json}` payloads.
+- What a handler needs beyond the node store - a model call, web search, the themes store, plan state, agent memory, the draft of the node under edit - is a service on the tool context, supplied by whoever composes the application. This is the pattern `applyForceLayout` already follows. There is one context type.
+- A handler whose required service is absent answers that the capability is unavailable in this context, naming the service, rather than throwing or returning nothing.
+- The registry wraps every execution in one undo group, so the rule in *Recording an undo step* holds for every tool without any dispatcher repeating it.
+- The canvas composes the context and calls the registry. It contains no tool logic.
+- A gate fails when a file outside the registry maps tool names to behaviour: a second registry, a `case '<tool name>'` dispatcher, or a handler result beginning with `__`.
 
-A mode's whitelist filters registered tools, so a name in it that matches no tool does nothing. Such names read as capabilities the mode has: the execute whitelist named tools for reporting progress that were never registered under those names, with a comment citing the rule that requires progress to advance.
+### Tool signals
 
-- The reachability gate checks both directions: every registered tool reaches a mode, and every name a mode lists is a registered tool.
+**Required behavior:** A tool that must change the course of the run says so in a typed field of its result, not in a prefix of its text.
+
+The runner recognised `AGENT_DONE:`, `__CREATE_PLAN__:` and `__REQUEST_APPROVAL__:` by testing the start of the result string, in two places, once per reply shape. Control flow carried in text can be produced by accident - a node whose content begins with such a prefix - and cannot be checked by the compiler.
+
+- A handler returns either text or `{ text, signal }`. The signals are `done` (the run ends; `text` is the answer), `await_approval` (the run pauses for the user), and for the node agent `node_done`.
+- `text` is what the model receives as the tool result. The signal is never serialised into it.
+- The runner acts on signals in the one function every call passes through (*One path for a tool call*).
+
+### A tool declares its modes
+
+**Required behavior:** Which agent modes offer a tool, and whether it changes the graph, is declared on the tool where it is defined. Nothing else lists tool names.
+
+The modes were three hand-written arrays of names, the mutating tools a fourth, and the deliberately unexposed tools a fifth. A name in a whitelist that matched no tool did nothing and read as a capability: the execute whitelist named progress tools that were never registered under those names. A tool added without touching the arrays was registered, tested and unreachable: 27 of 71 once were.
+
+- A tool declares `modes`, a subset of `explore`, `plan`, `execute`, and the node agent's `node`. The list offered to the model in a mode is derived from these declarations.
+- A tool declares `mutates`. `plan` mode is read-only: a tool with `mutates: true` cannot declare `plan`, and registration rejects one that does.
+- A tool declares `requires`, the context services it uses. A call whose context lacks one is answered with the service's name before the handler runs, and the declaration is what an interface listing the tools can read to say which are usable here.
+- A tool offered in no mode declares `modes: []` together with `unexposedReason`. Registration rejects an empty `modes` without one. This replaces the separate ledger.
+- A tool name that a mode's prompt mentions is offered in that mode. The gate checks this per mode, because a prompt that tells a plan-mode model to call an execute-only tool is the same defect as documenting an unregistered one.
 
 ### Reads that stay live
 
@@ -1903,10 +1925,9 @@ Whether the user sees a plan must not depend on the model making a second call. 
 
 ### One creator per plan
 
-A plan is created once, by whoever handled the `create_plan` call. The marker processed after the call must not create it again: the second creation replaced the real plan with one holding no steps, `requestApproval` refuses a plan with no steps, and so no approval dialog appeared. The agent reported that it was waiting for approval on a plan the user was never shown, then retried and wrote the plan into the chat as prose instead.
+A plan is created once, by the `create_plan` handler, through the plan-state service on its context. It used to be created twice - by the handler and again by the marker processed after the call - and the second creation replaced the real plan with one holding no steps. `requestApproval` refuses a plan with no steps, so no approval dialog appeared. The agent reported that it was waiting for approval on a plan the user was never shown, then retried and wrote the plan into the chat as prose instead.
 
-- A `__CREATE_PLAN__` payload that names an existing plan is passed through untouched.
-- A payload carrying steps and no plan identifier is created, which is the path where nothing has created it yet.
+- No code other than the `create_plan` handler creates a plan from a tool call (*One implementation per tool*).
 - Requesting approval twice for the same plan opens one dialog.
 
 ### Saving edits when the open node changes
@@ -2029,9 +2050,9 @@ A comment is created the same way from the storyline panel and from the reader. 
 
 **Required behavior:** A registered tool that no mode exposes is dead code, and a prompt that documents such a tool is worse - it instructs the model to call something the request does not contain. Both existed: 27 of 71 registered tools reached no agent surface, and the system prompt described five of them to the model in detail.
 
-- Every registered tool is reachable from at least one agent mode, or is listed as deliberately unexposed with the reason.
-- A tool the system prompt documents must be reachable, without exception: promising a capability that cannot be called is the defect the ledger exists to prevent.
-- A gate compares the registry against the mode whitelists and the ledger, so a tool added without exposure fails the build rather than sitting unused.
+- Every registered tool is reachable from at least one agent mode, or declares itself deliberately unexposed with the reason (*A tool declares its modes*).
+- A tool the system prompt documents must be reachable, without exception: promising a capability that cannot be called is the defect this rule exists to prevent.
+- Registration enforces the first rule and a gate enforces the second, so a tool added without exposure fails the build rather than sitting unused.
 
 ### Plan approval summary
 

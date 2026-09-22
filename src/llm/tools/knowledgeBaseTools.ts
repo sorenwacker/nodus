@@ -9,7 +9,12 @@
  */
 
 import { defineTool } from '../registry'
-import { deepResearch, assessCompleteness, type DeepResearchResult } from '../research'
+import { assessCompleteness, type DeepResearchResult } from '../research'
+
+/** Findings as a list the model can turn into nodes */
+function findingsList(findings: DeepResearchResult['findings'], limit: number): string {
+  return findings.slice(0, limit).map(f => `- ${f.claim}`).join('\n')
+}
 
 /** Phase configuration for knowledge base building */
 interface PhaseConfig {
@@ -74,7 +79,7 @@ interface SupervisorEvaluation {
  * Evaluate phase completion.
  *
  * deepResearch only gathers findings; node creation happens later when the
- * agent processes the returned markers. The phase must therefore be judged on
+ * agent acts on the returned findings. The phase must therefore be judged on
  * the research output itself - a store-delta check would always read zero and
  * loop the first phase forever.
  */
@@ -171,13 +176,11 @@ export function registerKnowledgeBaseTools(): void {
       ctx.log(`Phases: ${phases.map(p => p.name).join(', ')}`)
       ctx.log(`==============================\n`)
 
-      const phaseResults: SupervisorEvaluation[] = []
-      // Kept across every phase, so the completion payload reports the whole run
-    // rather than whichever phase happened to finish last
-    const findingsByPhase: DeepResearchResult['findings'][] = []
-    const seenClaims = new Set<string>()
-    const allConcepts = new Set<string>()
-    const allFollowUps = new Set<string>()
+      // Kept across every phase, so the completion report covers the whole run
+      // rather than whichever phase happened to finish last
+      const findingsByPhase: DeepResearchResult['findings'][] = []
+      const seenClaims = new Set<string>()
+      const allFollowUps = new Set<string>()
 
       // Run each phase
       for (let i = 0; i < phases.length; i++) {
@@ -190,7 +193,7 @@ export function registerKnowledgeBaseTools(): void {
 
         // Run deep research for this phase
         try {
-          const result = await deepResearch(phaseQuery, {
+          const result = await ctx.search!.deepResearch(phaseQuery, {
             depth: phase.searchDepth,
             localNodes: ctx.store.filteredNodes,
             aspects: phase.aspects,
@@ -209,25 +212,24 @@ export function registerKnowledgeBaseTools(): void {
             }
           }
           findingsByPhase.push(phaseFindings)
-          for (const concept of result.concepts ?? []) allConcepts.add(concept)
           for (const followUp of result.suggestedFollowUps ?? []) allFollowUps.add(followUp)
 
           const evaluation = evaluatePhase(phase, result)
-          phaseResults.push(evaluation)
 
           ctx.log(`[Supervisor] ${evaluation.message}`)
 
-          // If phase incomplete, return marker for agent to continue
+          // An incomplete phase hands its findings to the model to build from
           if (!evaluation.isComplete) {
-            const instruction = `Research more about: ${evaluation.missingAspects.join(', ')}`
+            return `PHASE INCOMPLETE: ${phase.name}
 
-            return `__KB_PHASE_INCOMPLETE__:${JSON.stringify({
-              phase: phase.name,
-              evaluation,
-              instruction,
-              findings: result.findings.slice(0, 10),
-              concepts: result.concepts.slice(0, 20),
-            })}`
+SUPERVISOR INSTRUCTION: Research more about: ${evaluation.missingAspects.join(', ')}
+
+RESEARCH FINDINGS (create nodes for these):
+${findingsList(result.findings, 10)}
+
+KEY CONCEPTS: ${result.concepts.slice(0, 15).join(', ')}
+
+ACTION REQUIRED: Use create_nodes_batch to add nodes for the findings above, then create_edges_batch to connect them. Call check_progress when done.`
           }
         } catch (e) {
           ctx.log(`[Phase ${phase.name}] Error: ${e}`)
@@ -267,18 +269,24 @@ export function registerKnowledgeBaseTools(): void {
         }
       }
 
-      // Return summary with findings for agent to create nodes
-      return `__KB_BUILD_COMPLETE__:${JSON.stringify({
-        topic: fullTopic,
-        totalNodes,
-        totalEdges,
-        phases: phaseResults,
-        findings: reportedFindings,
-        concepts: Array.from(allConcepts),
-        suggestedFollowUps: Array.from(allFollowUps),
-      })}`
+      // The findings still to be added go back to the model, which creates the nodes
+      if (reportedFindings.length > 0 && totalNodes < 30) {
+        const followUps = Array.from(allFollowUps).slice(0, 5)
+        return `KNOWLEDGE BASE RESEARCH COMPLETE for "${fullTopic}"
+
+Current state: ${totalNodes} nodes, ${totalEdges} edges
+
+REMAINING FINDINGS (create nodes):
+${findingsList(reportedFindings, 20)}
+
+${followUps.length > 0 ? `SUGGESTED FOLLOW-UPS:\n${followUps.map(s => `- ${s}`).join('\n')}` : ''}
+
+ACTION: Use create_nodes_batch for findings, create_edges_batch to connect, then call done().`
+      }
+
+      return `KNOWLEDGE BASE COMPLETE: "${fullTopic}" - ${totalNodes} nodes, ${totalEdges} edges. Call done() to finish.`
     },
-    { category: 'research' }
+    { modes: ['explore', 'execute'], mutates: false, requires: ['search'] }
   )
 
   // Supervisor check tool - agent can call to get feedback
@@ -362,7 +370,7 @@ export function registerKnowledgeBaseTools(): void {
           : `Knowledge graph needs work. Priority: ${actions[0] || 'Continue research'}`,
       }, null, 2)
     },
-    { category: 'research' }
+    { modes: ['explore', 'execute'], mutates: false }
   )
 
   // Continue research tool - for iterative expansion
@@ -384,26 +392,28 @@ export function registerKnowledgeBaseTools(): void {
       ctx.log(`\n[Expand] Researching aspect: ${aspect} (depth: ${depth})`)
 
       try {
-        const result = await deepResearch(aspect, {
+        const result = await ctx.search!.deepResearch(aspect, {
           depth,
           localNodes: ctx.store.filteredNodes,
           aspects: [aspect],
           log: ctx.log,
         })
 
-        ctx.log(`[Expand] Found ${result.findings.length} findings, ${result.concepts.length} concepts`)
+        const coverageScore = Math.round(result.completenessScore * 100)
+        ctx.log(`[Expand] "${aspect}": ${result.findings.length} findings, ${coverageScore}% coverage`)
 
-        return `__EXPAND_ASPECT__:${JSON.stringify({
-          aspect,
-          findings: result.findings.slice(0, 20),
-          concepts: result.concepts.slice(0, 15),
-          suggestedFollowUps: result.suggestedFollowUps,
-          coverageScore: Math.round(result.completenessScore * 100),
-        })}`
+        return `ASPECT RESEARCH: ${aspect} (${coverageScore}% coverage)
+
+FINDINGS (create nodes):
+${findingsList(result.findings, 15)}
+
+CONCEPTS: ${result.concepts.slice(0, 10).join(', ')}
+
+ACTION: Use create_nodes_batch for these findings, then create_edges_batch to connect to existing graph.`
       } catch (e) {
         return `Error researching "${aspect}": ${e}`
       }
     },
-    { category: 'research' }
+    { modes: ['explore', 'execute'], mutates: false, requires: ['search'] }
   )
 }

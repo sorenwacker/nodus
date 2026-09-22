@@ -1,11 +1,11 @@
 /**
- * Agent tool registrations (interactive approval flow and research)
- *
- * Handles: create_plan, request_approval, research, deep_research, fetch_wikipedia,
- *          wikipedia_search, validate_claim, check_completeness
+ * Approval-flow tools (create_plan, request_approval) and the research tools
+ * built on the `search` context service (research, deep_research,
+ * fetch_wikipedia, wikipedia_search, validate_claim, check_completeness).
  */
 
 import { defineTool } from '../registry'
+import { assessCompleteness } from '../research'
 
 export function registerAgentTools(): void {
   defineTool<{
@@ -43,11 +43,15 @@ export function registerAgentTools(): void {
       },
       required: ['title', 'steps'],
     },
-    async (args, _ctx) => {
-      // Return marker for GraphCanvas to handle with plan state
-      return `__CREATE_PLAN__:${JSON.stringify(args)}`
+    async (args, ctx) => {
+      // The one place a plan is created from a tool call
+      // (PRODUCT_DESIGN.md > One creator per plan)
+      const steps = Array.isArray(args.steps) ? args.steps : []
+      const plan = ctx.plan!.createPlan(args.title || 'Plan', steps)
+      ctx.log(`> Plan created: ${plan.title} (${plan.steps.length} steps)`)
+      return `Plan "${plan.title}" created with ${plan.steps.length} steps. Call request_approval to ask the user.`
     },
-    { category: 'agent' }
+    { modes: ['plan'], mutates: false, requires: ['plan'] }
   )
 
   defineTool<{ plan_id?: string; message?: string }>(
@@ -61,11 +65,19 @@ export function registerAgentTools(): void {
       },
       required: [],
     },
-    async (args, _ctx) => {
-      // Return marker for GraphCanvas to handle - pauses agent loop
-      return `__REQUEST_APPROVAL__:${JSON.stringify(args)}`
+    async (_args, ctx) => {
+      const plan = ctx.plan!
+      if (!plan.currentPlan()) {
+        return 'Error: No plan to approve. Call create_plan first.'
+      }
+      // Requesting approval twice for the same plan opens one dialog
+      if (!plan.isApprovalOpen()) {
+        plan.requestApproval()
+        ctx.log('> Requesting approval...')
+      }
+      return { text: 'Approval requested. Waiting for the user.', signal: 'await_approval' }
     },
-    { category: 'agent' }
+    { modes: ['plan'], mutates: false, requires: ['plan'] }
   )
 
   defineTool<{ query: string; sources?: string[] }>(
@@ -83,11 +95,20 @@ export function registerAgentTools(): void {
       },
       required: ['query'],
     },
-    async (args, _ctx) => {
-      // Return marker for GraphCanvas to handle with research module
-      return `__RESEARCH__:${JSON.stringify(args)}`
+    async (args, ctx) => {
+      const query = args.query || ''
+      const sources = Array.isArray(args.sources)
+        ? (args.sources as Array<'local' | 'web' | 'wikipedia'>)
+        : (['local', 'web'] as Array<'local' | 'web' | 'wikipedia'>)
+      ctx.log(`> Researching: ${query}`)
+      try {
+        const result = await ctx.search!.quickResearch(query, ctx.store.filteredNodes, sources)
+        return result || 'No results found'
+      } catch (e) {
+        return `Research failed: ${e}`
+      }
     },
-    { category: 'agent' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false, requires: ['search'] }
   )
 
   defineTool<{
@@ -113,10 +134,29 @@ export function registerAgentTools(): void {
       },
       required: ['topic'],
     },
-    async (args, _ctx) => {
-      return `__DEEP_RESEARCH__:${JSON.stringify(args)}`
+    async (args, ctx) => {
+      const topic = args.topic || ''
+      const depth = args.depth || 'thorough'
+      ctx.log(`> Deep research: ${topic} (depth: ${depth})`)
+      try {
+        const search = ctx.search!
+        const result = await search.deepResearch(topic, {
+          depth,
+          localNodes: ctx.store.filteredNodes,
+          validateClaims: true,
+          extractConcepts: true,
+          aspects: args.aspects || [],
+          log: ctx.log,
+        })
+        ctx.log(
+          `> Research complete: ${result.findings.length} findings, ${Math.round(result.completenessScore * 100)}% coverage`
+        )
+        return search.formatDeepResearchResults(result)
+      } catch (e) {
+        return `Deep research failed: ${e}`
+      }
     },
-    { category: 'agent' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false, requires: ['search'] }
   )
 
   defineTool<{ title: string }>(
@@ -129,10 +169,18 @@ export function registerAgentTools(): void {
       },
       required: ['title'],
     },
-    async (args, _ctx) => {
-      return `__FETCH_WIKIPEDIA__:${JSON.stringify(args)}`
+    async (args, ctx) => {
+      const title = args.title || ''
+      try {
+        const content = await ctx.search!.fetchWikipediaArticle(title, ctx.log)
+        if (!content) return `Wikipedia article "${title}" not found`
+        ctx.log(`> Wikipedia: Got ${content.length} chars for "${title}"`)
+        return `# Wikipedia: ${title}\n\n${content}`
+      } catch (e) {
+        return `Wikipedia fetch failed: ${e}`
+      }
     },
-    { category: 'agent' }
+    { modes: ['explore', 'plan', 'execute', 'node'], mutates: false, requires: ['search'] }
   )
 
   defineTool<{ query: string; limit?: number }>(
@@ -146,10 +194,20 @@ export function registerAgentTools(): void {
       },
       required: ['query'],
     },
-    async (args, _ctx) => {
-      return `__WIKIPEDIA_SEARCH__:${JSON.stringify(args)}`
+    async (args, ctx) => {
+      const query = args.query || ''
+      ctx.log(`> Wikipedia search: "${query}"`)
+      try {
+        const found = await ctx.search!.searchWikipedia(query, args.limit || 5)
+        ctx.log(`> Found ${found.length} Wikipedia articles`)
+        if (found.length === 0) return `No Wikipedia articles found for "${query}"`
+        const results = found.map(r => `**${r.title}**\n${r.content}\n[${r.url}]`)
+        return `## Wikipedia Search: "${query}"\n\n${results.join('\n\n')}`
+      } catch (e) {
+        return `Wikipedia search failed: ${e}`
+      }
     },
-    { category: 'agent' }
+    { modes: ['explore', 'plan', 'execute', 'node'], mutates: false, requires: ['search'] }
   )
 
   defineTool<{ claim: string }>(
@@ -162,10 +220,17 @@ export function registerAgentTools(): void {
       },
       required: ['claim'],
     },
-    async (args, _ctx) => {
-      return `__VALIDATE_CLAIM__:${JSON.stringify(args)}`
+    async (args, ctx) => {
+      const claim = args.claim || ''
+      ctx.log(`> Validating: ${claim.slice(0, 50)}...`)
+      try {
+        const v = await ctx.search!.validateClaim(claim, ctx.store.filteredNodes)
+        return `Claim: "${claim}"\nValidated: ${v.validated ? 'YES' : 'NO'}\nConfidence: ${v.confidence}\nSources: ${v.sources.join(', ') || 'none'}`
+      } catch (e) {
+        return `Validation failed: ${e}`
+      }
     },
-    { category: 'agent' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false, requires: ['search'] }
   )
 
   defineTool<{ topic: string; findings: string[] }>(
@@ -183,9 +248,29 @@ export function registerAgentTools(): void {
       },
       required: ['topic', 'findings'],
     },
-    async (args, _ctx) => {
-      return `__CHECK_COMPLETENESS__:${JSON.stringify(args)}`
+    async (args, ctx) => {
+      const topic = args.topic || ''
+      const findings = Array.isArray(args.findings) ? args.findings : []
+      ctx.log(`> Checking completeness: ${topic}`)
+
+      const assessment = assessCompleteness(
+        topic,
+        findings.map(f => ({ claim: f, sources: [], confidence: 'medium' as const, validated: false })),
+        []
+      )
+      const response = [
+        `Topic: ${topic}`,
+        `Coverage Score: ${Math.round(assessment.score * 100)}%`,
+        `Findings Analyzed: ${findings.length}`,
+        '',
+        assessment.score >= 0.8 ? 'Research appears COMPLETE.' : 'Research may be INCOMPLETE.',
+      ]
+      if (assessment.suggestions.length > 0) {
+        response.push('', 'Suggested follow-up queries:')
+        for (const s of assessment.suggestions) response.push(`- ${s}`)
+      }
+      return response.join('\n')
     },
-    { category: 'agent' }
+    { modes: ['explore', 'plan', 'execute'], mutates: false }
   )
 }

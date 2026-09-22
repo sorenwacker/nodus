@@ -73,7 +73,7 @@ export function registerGroupingTools(): void {
       const note = missing > 0 ? ` (${missing} named node(s) not found)` : ''
       return `Created frame "${args.title}" with ${named.length} node(s)${note}`
     },
-    { category: 'crud' }
+    { modes: ['execute'], mutates: true }
   )
 
   defineTool<{ frame_title: string; node_titles: string[] }>(
@@ -104,7 +104,7 @@ export function registerGroupingTools(): void {
       ctx.store.assignNodesToFrame(named.map(n => n.id), frame.id)
       return `Moved ${named.length} node(s) into frame "${frame.title}"`
     },
-    { category: 'update' }
+    { modes: ['execute'], mutates: true }
   )
 
   defineTool<Record<string, never>>(
@@ -122,7 +122,7 @@ export function registerGroupingTools(): void {
         })
         .join('\n')
     },
-    { category: 'query' }
+    { modes: ['explore', 'execute'], mutates: false }
   )
 
   defineTool<{ title: string; description?: string; node_titles?: string[] }>(
@@ -152,7 +152,7 @@ export function registerGroupingTools(): void {
       }
       return `Created storyline "${args.title}" with ${added} node(s)`
     },
-    { category: 'crud' }
+    { modes: ['execute'], mutates: true }
   )
 
   defineTool<{ storyline_title: string; node_titles: string[] }>(
@@ -185,7 +185,7 @@ export function registerGroupingTools(): void {
       if (added === 0) return 'Error: none of the named nodes were found'
       return `Added ${added} node(s) to storyline "${storyline.title}"`
     },
-    { category: 'update' }
+    { modes: ['execute'], mutates: true }
   )
 
   defineTool<Record<string, never>>(
@@ -198,6 +198,6 @@ export function registerGroupingTools(): void {
       if (storylines.length === 0) return 'No storylines in this workspace'
       return storylines.map(s => `${s.title}${s.description ? `: ${s.description}` : ''}`).join('\n')
     },
-    { category: 'query' }
+    { modes: ['explore', 'execute'], mutates: false }
   )
 }

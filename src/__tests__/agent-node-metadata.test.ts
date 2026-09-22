@@ -5,7 +5,7 @@
  * could write date fields, so the agent had no tool that could satisfy it.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { executeTool } from '../llm'
+import { toolRegistry } from '../llm'
 import type { ToolContext } from '../llm'
 import { extractFrontmatterField } from '../lib/timelineDates'
 
@@ -41,7 +41,7 @@ describe('agent update_node metadata', () => {
       { id: 'a', title: 'Alpha', markdown_content: 'The body text stays.' },
     ])
 
-    const result = await executeTool('update_node', { title: 'Alpha', date: '1969-07-20' }, ctx)
+    const result = (await toolRegistry.execute('update_node', { title: 'Alpha', date: '1969-07-20' }, ctx)).text
 
     expect(result).toContain('Updated')
     const written = updateNodeContent.mock.calls[0][1]
@@ -52,7 +52,7 @@ describe('agent update_node metadata', () => {
   it('writes a date range', async () => {
     const { ctx, updateNodeContent } = makeContext([{ id: 'a', title: 'Alpha', markdown_content: 'x' }])
 
-    await executeTool(
+    await toolRegistry.execute(
       'update_node',
       { title: 'Alpha', date: '2026-02-03', date_end: '2026-02-14' },
       ctx
@@ -68,7 +68,7 @@ describe('agent update_node metadata', () => {
       { id: 'a', title: 'Alpha', markdown_content: '---\ndate: 1999\n---\n\nbody' },
     ])
 
-    await executeTool('update_node', { title: 'Alpha', date: '' }, ctx)
+    await toolRegistry.execute('update_node', { title: 'Alpha', date: '' }, ctx)
 
     const written = updateNodeContent.mock.calls[0][1]
     expect(extractFrontmatterField(written, 'date')).toBeNull()
@@ -78,7 +78,7 @@ describe('agent update_node metadata', () => {
   it('sets tags', async () => {
     const { ctx, updateNodeTags } = makeContext([{ id: 'a', title: 'Alpha', markdown_content: 'x' }])
 
-    await executeTool('update_node', { title: 'Alpha', tags: ['demo', 'results'] }, ctx)
+    await toolRegistry.execute('update_node', { title: 'Alpha', tags: ['demo', 'results'] }, ctx)
 
     expect(updateNodeTags).toHaveBeenCalledWith('a', ['demo', 'results'])
   })
@@ -86,7 +86,7 @@ describe('agent update_node metadata', () => {
   it('still updates content on its own', async () => {
     const { ctx, updateNodeContent } = makeContext([{ id: 'a', title: 'Alpha', markdown_content: 'old' }])
 
-    await executeTool('update_node', { title: 'Alpha', new_content: 'brand new' }, ctx)
+    await toolRegistry.execute('update_node', { title: 'Alpha', new_content: 'brand new' }, ctx)
 
     expect(updateNodeContent.mock.calls[0][1]).toContain('brand new')
   })
@@ -94,7 +94,7 @@ describe('agent update_node metadata', () => {
   it('says so when there is nothing to change', async () => {
     const { ctx, updateNodeContent } = makeContext([{ id: 'a', title: 'Alpha', markdown_content: 'x' }])
 
-    const result = await executeTool('update_node', { title: 'Alpha' }, ctx)
+    const result = (await toolRegistry.execute('update_node', { title: 'Alpha' }, ctx)).text
 
     expect(result).toContain('Nothing to update')
     expect(updateNodeContent).not.toHaveBeenCalled()
@@ -102,7 +102,7 @@ describe('agent update_node metadata', () => {
 
   it('reports an unknown node instead of silently doing nothing', async () => {
     const { ctx } = makeContext([{ id: 'a', title: 'Alpha' }])
-    const result = await executeTool('update_node', { title: 'Missing', date: '2020' }, ctx)
+    const result = (await toolRegistry.execute('update_node', { title: 'Missing', date: '2020' }, ctx)).text
     expect(result).toContain('not found')
   })
 })
@@ -111,7 +111,7 @@ describe('agent create_node metadata', () => {
   it('creates a dated, tagged node in one call', async () => {
     const { ctx, createNode } = makeContext([])
 
-    await executeTool(
+    await toolRegistry.execute(
       'create_node',
       { title: 'Kickoff', content: 'Start of the project', date: '2026-01-12', tags: ['demo'] },
       ctx

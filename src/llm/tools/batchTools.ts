@@ -73,7 +73,7 @@ export function registerBatchTools(): void {
 
       return `Generated ${count} nodes${connect ? ` with ${count - 1} edges` : ''}`
     },
-    { category: 'batch' }
+    { modes: ['execute'], mutates: true }
   )
 
   defineTool<{ nodes: Array<{ title?: string; content?: string; mode?: string }> }>(
@@ -180,7 +180,7 @@ export function registerBatchTools(): void {
       if (updated.length) parts.push(`updated ${updated.length}`)
       return parts.join(', ') || 'No changes'
     },
-    { category: 'batch' }
+    { modes: ['explore', 'execute'], mutates: true }
   )
 
   defineTool<{ filter?: string; action: string; template: string }>(
@@ -221,8 +221,6 @@ export function registerBatchTools(): void {
 
       // LLM action - use LLM to generate/transform content
       if (action === 'llm') {
-        // All LLM calls go through the queue for retry/cancellation
-        const { llmQueue } = await import('../queue')
         let processed = 0
 
         for (let i = 0; i < nodes.length; i++) {
@@ -254,7 +252,7 @@ export function registerBatchTools(): void {
               prompt = `Write about "${node.title}". ${instruction}`
             }
 
-            const content = await llmQueue.generate(
+            const content = await ctx.llm!.generate(
               prompt,
               `Write about "${node.title}" only. No preamble.`
             )
@@ -297,7 +295,7 @@ export function registerBatchTools(): void {
 
       return `Updated ${nodes.length} nodes with template`
     },
-    { category: 'batch' }
+    { modes: ['explore', 'execute'], mutates: true, requires: ['llm'] }
   )
 
   defineTool<{ topic: string; target_count: number; batch_size?: number }>(
@@ -313,9 +311,6 @@ export function registerBatchTools(): void {
       required: ['topic', 'target_count'],
     },
     async (args, ctx) => {
-      // All LLM calls go through the queue for retry/cancellation
-      const { llmQueue } = await import('../queue')
-
       const topic = args.topic
       const targetCount = Math.min(args.target_count || 100, 2000)
       const batchSize = args.batch_size || 20
@@ -340,7 +335,7 @@ export function registerBatchTools(): void {
           : ''
 
         try {
-          const responseText = await llmQueue.generate(
+          const responseText = await ctx.llm!.generate(
             `List exactly ${thisCount} specific subtopics about "${topic}".
 Return ONLY a JSON array of objects with "title" and "content" keys.
 Each content should be 2-3 sentences.
@@ -392,6 +387,6 @@ Example format:
 
       return `Created ${totalCreated} nodes about "${topic}"`
     },
-    { category: 'batch' }
+    { modes: ['explore', 'execute'], mutates: true, requires: ['llm'] }
   )
 }

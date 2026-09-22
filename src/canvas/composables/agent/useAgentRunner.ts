@@ -4,12 +4,13 @@
  * ALL LLM calls go through the queue
  *
  * Supports three modes:
- * - Explore: Read-only research
- * - Plan: Design approach for user approval
- * - Execute: Make changes after approval
+ * - Explore: research and build the graph
+ * - Plan: design an approach for user approval
+ * - Execute: make changes after approval
  */
 import { ref, type Ref } from 'vue'
 import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } from '../../../llm/types'
+import { toolRegistry, type ToolOutcome } from '../../../llm/registry'
 import { llmQueue } from '../../../llm/queue'
 import { errorLog } from '../../../llm/agentLog'
 import { describeToolCall } from '../../../lib/toolCallSummary'
@@ -21,7 +22,7 @@ import {
   type ChatTurn,
 } from '../../../llm/chatTranscript'
 import {
-  filterToolsForMode,
+  toolsForMode,
   getModeMaxIterations,
   DEFAULT_AGENT_MODE,
 } from '../../../llm/agentModes'
@@ -71,16 +72,6 @@ function extractBalancedJson(str: string): string | null {
   return null // Unbalanced
 }
 
-/** Tools whose effect on the graph is worth a line in the log. */
-const MUTATING_TOOLS = [
-  'create_node',
-  'create_nodes_batch',
-  'create_edge',
-  'create_edges_batch',
-  'delete_node',
-  'delete_matching',
-]
-
 export interface AgentContext {
   // Node store access
   filteredNodes: () => Array<{ id: string; title: string; canvas_x: number; canvas_y: number; markdown_content: string | null }>
@@ -104,11 +95,8 @@ export interface AgentContext {
   /** Visible chat transcript; the log stays the diagnostic surface */
   transcript: Ref<ChatTurn[]>
 
-  // Tools
-  agentTools: ToolDefinition[]
-
-  // Tool executor
-  executeAgentTool: (name: string, args: Record<string, unknown>) => Promise<string>
+  // Tool executor: the registry, with the canvas's context
+  executeAgentTool: (name: string, args: Record<string, unknown>) => Promise<ToolOutcome>
 }
 
 /**
@@ -118,7 +106,6 @@ export interface AgentRunResult {
   status: 'done' | 'paused' | 'error' | 'stopped' | 'max_iterations'
   message: string
   pauseReason?: 'approval_requested' | 'user_input_needed'
-  planData?: { title: string; steps: Array<{ description: string; details?: string }> }
 }
 
 export function useAgentRunner(ctx: AgentContext) {
@@ -160,7 +147,7 @@ export function useAgentRunner(ctx: AgentContext) {
    * Get tools filtered for current mode
    */
   function getFilteredTools(): ToolDefinition[] {
-    return filterToolsForMode(ctx.agentTools, mode.value) as ToolDefinition[]
+    return toolsForMode(mode.value) as ToolDefinition[]
   }
 
   /**
@@ -304,7 +291,7 @@ export function useAgentRunner(ctx: AgentContext) {
     name: string,
     args: Record<string, unknown>,
     allowed: Set<string>
-  ): Promise<{ kind: 'refused'; message: string } | { kind: 'ran'; result: string }> {
+  ): Promise<{ kind: 'refused'; message: string } | { kind: 'ran'; outcome: ToolOutcome }> {
     if (!allowed.has(name)) {
       ctx.log.value.push(`> Rejected: ${name} (not allowed in ${mode.value} mode)`)
       return {
@@ -318,21 +305,45 @@ export function useAgentRunner(ctx: AgentContext) {
     // (PRODUCT_DESIGN.md > Agent log contents)
     ctx.log.value.push(`> ${describeToolCall(name, args)}`)
 
-    const result = await ctx.executeAgentTool(name, args)
+    const outcome = await ctx.executeAgentTool(name, args)
     recordAction(ctx.transcript.value, name)
 
-    const outcome = String(result ?? '')
-    if (/^error/i.test(outcome.trim())) {
-      ctx.log.value.push(`  failed: ${outcome.trim().slice(0, 160)}`)
+    if (/^error/i.test(outcome.text.trim())) {
+      ctx.log.value.push(`  failed: ${outcome.text.trim().slice(0, 160)}`)
     }
 
-    if (MUTATING_TOOLS.includes(name)) {
+    if (toolRegistry.declarationOf(name)?.mutates) {
       const nodes = ctx.filteredNodes()
       const edges = ctx.filteredEdges()
       ctx.log.value.push(`  [Graph: ${nodes.length} nodes, ${edges.length} edges]`)
     }
 
-    return { kind: 'ran', result }
+    return { kind: 'ran', outcome }
+  }
+
+  /** The run ends; the tool's text is the answer */
+  function finish(answer: string): AgentRunResult {
+    ctx.conversationHistory.value.push({ role: 'assistant', content: answer })
+    appendAssistantText(ctx.transcript.value, answer)
+    ctx.isRunning.value = false
+    return { status: 'done', message: answer }
+  }
+
+  /** The run pauses for the user's decision on the plan */
+  function pauseForApproval(messages: ChatMessage[], nextIteration: number): AgentRunResult {
+    // The transcript has to say so: a run that stops silently is
+    // indistinguishable from a hung one (PRODUCT_DESIGN.md > Chat transcript)
+    ctx.log.value.push('> Waiting for approval...')
+    appendAssistantText(
+      ctx.transcript.value,
+      'I have prepared a plan and am waiting for your approval before making the changes.'
+    )
+    isPaused.value = true
+    pauseReason.value = 'approval_requested'
+    savedMessages = messages
+    savedIteration = nextIteration
+    ctx.isRunning.value = false
+    return { status: 'paused', message: 'Waiting for user approval', pauseReason: 'approval_requested' }
   }
 
   /**
@@ -429,69 +440,13 @@ export function useAgentRunner(ctx: AgentContext) {
               messages.push({ role: 'tool', content: handled.message, tool_call_id: tc.id })
               continue
             }
-            const result = handled.result
-            messages.push({ role: 'tool', content: result, tool_call_id: tc.id })
+            const { outcome } = handled
+            messages.push({ role: 'tool', content: outcome.text, tool_call_id: tc.id })
 
-            // Check for special markers
-            if (result.startsWith('AGENT_DONE:')) {
-              ctx.conversationHistory.value.push({
-                role: 'assistant',
-                content: result.replace('AGENT_DONE:', '').trim()
-              })
-              appendAssistantText(ctx.transcript.value, result.replace('AGENT_DONE:', '').trim())
-              ctx.isRunning.value = false
-              return { status: 'done', message: result.replace('AGENT_DONE:', '').trim() }
-            }
-
-            if (result.startsWith('__CREATE_PLAN__:')) {
-              // Plan was created, continue loop
-              ctx.log.value.push('> Plan created')
-            }
-
-            if (result.startsWith('__REQUEST_APPROVAL__:')) {
-              // Pause for user approval. The transcript has to say so: a run
-              // that stops silently is indistinguishable from a hung one
-              // (PRODUCT_DESIGN.md > Chat transcript)
-              ctx.log.value.push('> Waiting for approval...')
-              appendAssistantText(
-                ctx.transcript.value,
-                'I have prepared a plan and am waiting for your approval before making the changes.'
-              )
-              isPaused.value = true
-              pauseReason.value = 'approval_requested'
-              savedMessages = messages
-              savedIteration = i + 1
-              ctx.isRunning.value = false
-
-              // Extract plan data if present
-              let planData: { title: string; steps: Array<{ description: string; details?: string }> } | undefined
-              try {
-                const jsonStr = result.replace('__REQUEST_APPROVAL__:', '')
-                const data = JSON.parse(jsonStr)
-                if (data.planData) {
-                  planData = data.planData
-                }
-              } catch {
-                // No plan data in result
-              }
-
-              return {
-                status: 'paused',
-                message: 'Waiting for user approval',
-                pauseReason: 'approval_requested',
-                planData,
-              }
-            }
-
-            if (result.startsWith('AGENT_PAUSED:')) {
-              // Generic pause
-              isPaused.value = true
-              pauseReason.value = result.replace('AGENT_PAUSED:', '').trim()
-              savedMessages = messages
-              savedIteration = i + 1
-              ctx.isRunning.value = false
-              return { status: 'paused', message: pauseReason.value }
-            }
+            // A signal is a typed field, acted on here and nowhere else
+            // (PRODUCT_DESIGN.md > Tool signals)
+            if (outcome.signal === 'done') return finish(outcome.text)
+            if (outcome.signal === 'await_approval') return pauseForApproval(messages, i + 1)
           }
         } else if (msg.content) {
           // Models without native tool calling write the call into the text.
@@ -559,17 +514,12 @@ export function useAgentRunner(ctx: AgentContext) {
               continue
             }
 
-            const result = handled.result
+            const { outcome } = handled
             messages.push({ role: 'assistant', content: `Executed: ${embeddedCall.name}` })
-            messages.push({ role: 'user', content: `Tool result: ${result}\n\nContinue with the next action or call done if finished.` })
+            messages.push({ role: 'user', content: `Tool result: ${outcome.text}\n\nContinue with the next action or call done if finished.` })
 
-            if (result.startsWith('AGENT_DONE:')) {
-              const answer = result.replace('AGENT_DONE:', '').trim()
-              ctx.conversationHistory.value.push({ role: 'assistant', content: answer })
-              appendAssistantText(ctx.transcript.value, answer)
-              ctx.isRunning.value = false
-              return { status: 'done', message: answer }
-            }
+            if (outcome.signal === 'done') return finish(outcome.text)
+            if (outcome.signal === 'await_approval') return pauseForApproval(messages, i + 1)
             continue
           }
 

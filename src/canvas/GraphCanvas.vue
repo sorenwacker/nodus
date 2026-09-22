@@ -7,7 +7,8 @@ import { useDisplayStore } from '../stores/display'
 import type { Node, Edge } from '../types'
 // marked is imported in useContentRenderer composable
 import { openExternal } from '../lib/tauri'
-import { useLLM, executeTool, llmQueue } from '../llm'
+import { useLLM, llmQueue, toolRegistry } from '../llm'
+import { createSearchService } from '../llm/searchService'
 import { useI18n } from 'vue-i18n'
 import { usePanelReveal } from '../composables/usePanelReveal'
 import { memoryStorage, agentMemoryStorage } from '../lib/storage'
@@ -41,8 +42,6 @@ import {
 import { useLasso, useContextMenu, useSelectionActions } from './composables/selection'
 import {
   useAgentRunner,
-  useLLMTools,
-  useMarkerHandlers,
   usePlanHandlers,
   useCanvasLLMState,
   type AgentContext,
@@ -51,8 +50,8 @@ import { useContentRenderer, useViewportCulling, useGraphMetrics } from './compo
 import { useLayout, useNeighborhoodMode } from './composables/layout'
 import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
 import { framesStoreAdapter } from './composables/frames/framesStoreAdapter'
-import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
 import { buildAgentToolContext } from './composables/agent/agentToolContext'
+import type { ToolOutcome } from '../llm/registry'
 import { useAgentPrompt } from './composables/agent/useAgentPrompt'
 import { usePdfGraphImport } from './composables/util/usePdfGraphImport'
 import {
@@ -1052,8 +1051,8 @@ async function refreshFromFiles() {
 // LLM interface - using composable
 const llm = useLLM()
 const {
-  model: ollamaModel,
-  contextLength: ollamaContextLength,
+  model: llmModel,
+  contextLength: llmContextLength,
   isRunning: agentRunning,
   log: agentLog,
   tasks: agentTasks,
@@ -1062,7 +1061,6 @@ const {
   simpleGenerate: callOllama,
   savePromptToHistory,
   navigateHistory,
-  agentTools,
   getActiveProviderId,
 } = llm
 
@@ -1180,22 +1178,6 @@ function onPromptKeydown(e: KeyboardEvent) {
   }
 }
 
-// Marker handlers composable for processing tool result markers
-const markerHandlers = useMarkerHandlers({
-  planState,
-  nodes: computed(() => store.filteredNodes),
-  log: (msg: string) => agentLog.value.push(msg),
-  store: {
-    updateNodeContent: store.updateNodeContent,
-    updateNodeTitle: store.updateNodeTitle,
-    updateNodeColor: store.updateNodeColor,
-    deleteNode: store.deleteNode,
-    getNode: store.getNode,
-  },
-  nodeService,
-})
-
-// LLM tools composable for handling LLM-dependent tools
 const { sendPrompt: sendGraphPrompt, runSelection } = useAgentPrompt({
   prompt: graphPrompt,
   isLoading: isGraphLLMLoading,
@@ -1205,58 +1187,33 @@ const { sendPrompt: sendGraphPrompt, runSelection } = useAgentPrompt({
   reportError: message => alert(message),
 })
 
-const llmTools = useLLMTools({
-  llmQueue,
-  callOllama,
-  store: agentToolStoreAdapter(store, () => runSelection.value),
-  themesStore,
-  planState,
-  tasks: agentTasks,
-  agentTasksStore,
-  memoryStorage,
-  agentMemoryStorage,
-  log: (msg: string) => agentLog.value.push(msg),
-  pushContentUndo,
-  pushContentsUndo,
-  isRunning: agentRunning,
-})
+// One registry answers every tool call, with the context the canvas composes
+// (PRODUCT_DESIGN.md > One implementation per tool)
+const searchService = createSearchService()
 
-async function executeAgentTool(name: string, args: Record<string, unknown>): Promise<string> {
+async function executeAgentTool(name: string, args: Record<string, unknown>): Promise<ToolOutcome> {
   const toolCtx = buildAgentToolContext({
     store,
     log: (msg: string) => agentLog.value.push(msg),
     screenToCanvas,
     snapToGrid,
-    getOllamaModel: () => ollamaModel.value,
-    getOllamaContextLength: () => ollamaContextLength.value,
+    getModel: () => llmModel.value,
+    getContextLength: () => llmContextLength.value,
     pushContentUndo,
     pushContentsUndo,
     service: nodeService ?? undefined,
     getRunSelection: () => runSelection.value,
     getEditingNodeId: () => editingNodeId.value,
+    llmQueue,
+    isRunning: agentRunning,
+    search: searchService,
+    themes: themesStore,
+    planState,
+    taskList: agentTasksStore,
+    facts: memoryStorage,
+    agentMemory: agentMemoryStorage,
   })
-
-  // Try extracted executor (handles simple tools)
-  const result = await executeTool(name, args, toolCtx)
-
-  // Try marker handlers for async processing
-  const markerResult = await markerHandlers.handleMarker(result)
-  if (markerResult !== null) {
-    return markerResult
-  }
-
-  // If not a marker and not unhandled, return result
-  if (!result.startsWith('__UNHANDLED__:')) {
-    return result
-  }
-
-  // Try LLM-dependent tools
-  const llmResult = await llmTools.executeLLMTool(name, args)
-  if (llmResult !== null) {
-    return llmResult
-  }
-
-  return `Unknown tool: ${name}`
+  return toolRegistry.execute(name, args, toolCtx)
 }
 
 function clearConversation() {
@@ -1295,15 +1252,14 @@ const agentContext: AgentContext = {
   selectedNodeIds: () => [...store.selectedNodeIds],
   cleanupOrphanEdges: () => store.cleanupOrphanEdges(),
   workspaceId: () => store.currentWorkspaceId || 'default',
-  model: ollamaModel,
-  contextLength: ollamaContextLength,
+  model: llmModel,
+  contextLength: llmContextLength,
   getProviderId: getActiveProviderId,
   isRunning: agentRunning,
   log: agentLog,
   tasks: agentTasks,
   conversationHistory,
   transcript: agentTranscript,
-  agentTools,
   executeAgentTool,
 }
 

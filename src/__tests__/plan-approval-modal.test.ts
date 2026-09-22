@@ -1,16 +1,20 @@
 /**
  * A plan reaches the approval dialog with the steps it was created with.
  *
- * The create_plan handler built the plan, then returned a marker carrying only
- * {planId, title, stepCount}. The marker handler created the plan a SECOND time
- * from that payload, so `steps` was []. requestApproval() refuses a plan with no
- * steps, so no dialog opened: the agent said it was waiting for approval on a
- * plan the user never saw (PRODUCT_DESIGN.md > One creator per plan).
+ * The plan is created once, by the create_plan handler, through the plan
+ * service. It used to be created a second time by a marker handler from a
+ * payload carrying no steps; requestApproval() refuses a plan with no steps,
+ * so no dialog opened and the agent said it was waiting for approval on a plan
+ * the user never saw (PRODUCT_DESIGN.md > One creator per plan).
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { usePlanState } from '../llm/planState'
-import { useMarkerHandlers } from '../canvas/composables/agent/useMarkerHandlers'
-import { ref } from 'vue'
+import { toolRegistry } from '../llm/registry'
+import { registerCoreTools } from '../llm/tools'
+import { buildAgentToolContext } from '../canvas/composables/agent/agentToolContext'
+import { fakeAgentToolContextDeps } from './fixtures/agentToolContextDeps'
+
+registerCoreTools()
 
 const STEPS = [
   { description: 'Create 8 risk nodes', action: 'create' as const, details: 'Lack of Local GPU Infrastructure, ...' },
@@ -18,58 +22,37 @@ const STEPS = [
   { description: 'Colour the risk nodes red', action: 'other' as const },
 ]
 
-function markerHandlers(planState: ReturnType<typeof usePlanState>) {
-  return useMarkerHandlers({
-    planState,
-    nodes: ref([]),
-    log: vi.fn(),
-  })
+function contextWith(planState: ReturnType<typeof usePlanState>) {
+  return buildAgentToolContext(fakeAgentToolContextDeps({ planState }))
 }
 
 describe('plan approval dialog', () => {
-  it('keeps the created steps when the marker is processed', async () => {
+  it('creates the plan once, with every step', async () => {
     const planState = usePlanState()
-    const { handleMarker } = markerHandlers(planState)
 
-    // What the create_plan handler does: build the plan, then emit its marker
-    const plan = planState.createPlan('Risk analysis', STEPS)
-    await handleMarker(
-      `__CREATE_PLAN__:${JSON.stringify({
-        planId: plan.id,
-        title: 'Risk analysis',
-        stepCount: STEPS.length,
-      })}`
-    )
+    await toolRegistry.execute('create_plan', { title: 'Risk analysis', steps: STEPS }, contextWith(planState))
 
     expect(planState.currentPlan.value?.steps).toHaveLength(3)
-    expect(planState.currentPlan.value?.id).toBe(plan.id)
+    expect(planState.currentPlan.value?.title).toBe('Risk analysis')
   })
 
-  it('opens the dialog once approval is requested', async () => {
+  it('pauses the run with a typed signal once approval is requested', async () => {
     const planState = usePlanState()
-    const { handleMarker } = markerHandlers(planState)
+    const ctx = contextWith(planState)
 
-    const plan = planState.createPlan('Risk analysis', STEPS)
-    await handleMarker(
-      `__CREATE_PLAN__:${JSON.stringify({ planId: plan.id, title: 'Risk analysis', stepCount: 3 })}`
-    )
-    expect(planState.requestApproval()).toBe(true)
-    await handleMarker(`__REQUEST_APPROVAL__:${JSON.stringify({ planId: plan.id })}`)
+    await toolRegistry.execute('create_plan', { title: 'Risk analysis', steps: STEPS }, ctx)
+    const outcome = await toolRegistry.execute('request_approval', {}, ctx)
 
+    expect(outcome.signal).toBe('await_approval')
     expect(planState.showApprovalModal.value).toBe(true)
     expect(planState.currentPlan.value?.status).toBe('pending_approval')
   })
 
-  it('still creates the plan when the payload carries the steps itself', async () => {
-    // The registry's create_plan returns its raw arguments, with no plan id,
-    // because on that path nothing has created the plan yet
-    const planState = usePlanState()
-    const { handleMarker } = markerHandlers(planState)
+  it('refuses to request approval when no plan exists', async () => {
+    const outcome = await toolRegistry.execute('request_approval', {}, contextWith(usePlanState()))
 
-    await handleMarker(`__CREATE_PLAN__:${JSON.stringify({ title: 'Risk analysis', steps: STEPS })}`)
-
-    expect(planState.currentPlan.value?.steps).toHaveLength(3)
-    expect(planState.requestApproval()).toBe(true)
+    expect(outcome.signal).toBeUndefined()
+    expect(outcome.text).toMatch(/create_plan/)
   })
 })
 

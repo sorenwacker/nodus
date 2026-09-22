@@ -14,7 +14,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import type { ToolDefinition } from '../llm/types'
+import type { ToolOutcome } from '../llm/registry'
+import { registerCoreTools } from '../llm/tools'
+
+registerCoreTools()
 
 const chat = vi.fn()
 
@@ -31,14 +34,7 @@ vi.mock('../lib/storage', () => ({
   agentMemoryStorage: { getAgentMemory: () => ({ session: null, stack: [], facts: [] }) },
 }))
 
-function toolNamed(name: string): ToolDefinition {
-  return {
-    type: 'function',
-    function: { name, description: name, parameters: { type: 'object', properties: {} } },
-  } as unknown as ToolDefinition
-}
-
-function makeContext(executeAgentTool: (name: string, args: Record<string, unknown>) => Promise<string>) {
+function makeContext(executeAgentTool: (name: string, args: Record<string, unknown>) => Promise<ToolOutcome>) {
   return {
     filteredNodes: () => [],
     filteredEdges: () => [],
@@ -53,7 +49,6 @@ function makeContext(executeAgentTool: (name: string, args: Record<string, unkno
     tasks: ref([]),
     conversationHistory: ref([]),
     transcript: ref([]),
-    agentTools: [toolNamed('request_approval'), toolNamed('create_node'), toolNamed('think')],
     executeAgentTool,
   }
 }
@@ -67,7 +62,7 @@ describe('the request the model receives', () => {
 
   it('is what the user wrote, not a guess about it', async () => {
     const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
-    const ctx = makeContext(async () => 'ok')
+    const ctx = makeContext(async () => ({ text: 'ok' }))
     const runner = useAgentRunner(ctx as never)
 
     chat.mockImplementation(async () => ({ message: { role: 'assistant', content: 'ok' } }))
@@ -98,7 +93,7 @@ describe('a run resumed after approval', () => {
 
   it('is told the plan it is executing, and that it may act', async () => {
     const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
-    const ctx = makeContext(async () => '__REQUEST_APPROVAL__:{"planId":"p1"}')
+    const ctx = makeContext(async () => ({ text: 'Approval requested.', signal: 'await_approval' }))
     const runner = useAgentRunner(ctx as never)
 
     chat.mockImplementation(async () => ({ message: { role: 'assistant', content: 'ok' } }))

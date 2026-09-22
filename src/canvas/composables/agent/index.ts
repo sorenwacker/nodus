@@ -1,27 +1,13 @@
 /**
  * Agent composables
- * LLM agent runner, tools, and handlers
+ * LLM agent runners and the context they hand the tool registry
  */
 export {
   useAgentRunner,
   type AgentContext,
   type AgentRunResult,
 } from './useAgentRunner'
-export {
-  useLLMTools,
-  type LLMQueueInterface,
-  type LLMToolsNodeStore,
-  type ThemesStoreInterface,
-  type PlanStateInterface,
-  type MemoryStorageInterface,
-  type LLMToolsContext,
-  type UseLLMToolsReturn,
-} from './useLLMTools'
-export {
-  useMarkerHandlers,
-  type MarkerHandlerContext,
-  type UseMarkerHandlersReturn,
-} from './useMarkerHandlers'
+export { buildAgentToolContext, type AgentToolContextDeps } from './agentToolContext'
 export { useNodeAgent, type NodeAgentContext } from './useNodeAgent'
 export {
   usePlanHandlers,

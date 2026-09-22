@@ -20,6 +20,7 @@ import { registerNodeEditTools } from './nodeEditTools'
 import { registerSelectionTools } from './selectionTools'
 import { registerKnowledgeBaseTools } from './knowledgeBaseTools'
 import { registerGroupingTools } from './groupingTools'
+import { registerMemoryTools } from './memoryTools'
 
 export { resetPositionCounter } from './nodeTools'
 
@@ -47,6 +48,7 @@ export function registerCoreTools(): void {
   registerSelectionTools()
   registerKnowledgeBaseTools()
   registerGroupingTools()
+  registerMemoryTools()
 }
 
 // Ensure tools are registered before exporting
@@ -60,8 +62,3 @@ export function getAgentTools(): AgentTool[] {
   return toolRegistry.getToolDefinitions()
 }
 
-/**
- * @deprecated Use getAgentTools() instead
- * Maintained for backwards compatibility - now returns fresh data
- */
-export const agentTools: AgentTool[] = toolRegistry.getToolDefinitions()
