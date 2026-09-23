@@ -5,7 +5,7 @@
 ### Infinite Canvas
 Pan and zoom freely across an infinite workspace. Semantic zooming adjusts detail level:
 
-- **Zoomed in**: Full content, edit handles, detailed view
+- **Zoomed in**: Full content, edit handles, detailed view. Above 100%, card text keeps its on-screen size and the enlarged card shows more of it
 - **Zoomed out**: Titles only, collapsed cards for performance
 
 Edge labels have their own zoom threshold (Settings > Appearance): below it, labels are hidden to reduce clutter in the zoomed-out view.

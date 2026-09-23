@@ -546,6 +546,13 @@ size. The divisor is clamped to a 0.2–3× zoom window so labels neither balloo
 when zoomed far out nor collapse when zoomed far in; the base size still comes
 from the user's `edgeLabelSize` canvas setting.
 
+**Card text above 100% zoom (required behavior):** Zooming in past 100% enlarges the card, not its text. Card text renders at a constant on-screen size - the size it has at 100% times the user's font scale - so a card zoomed to 200% shows about four times as much text instead of the same text twice as large. At 100% and below, text scales with the card as before, down to the semantic zoom threshold.
+
+- Everything sized with `var(--zoom-scale)` in the card stylesheets - type, padding, margins, corner radii, resize handles - is multiplied by the counter-zoom factor `1 / max(1, zoom)`. Keeping the padding on-screen constant too stops the text from creeping into the border at high zoom.
+- The factor is set once on the node layer and inherited by every card, so a change patches one element. Tag nodes are exempt: they are sized to fit their label, and a counter-scaled label would shrink the node's canvas footprint as the user zooms in.
+- A card's canvas size does not depend on zoom. Layout, collisions, edge anchors and frames see the same geometry at every zoom level. Auto-sizing a card to its content measures it at the 100% size, so a card fitted while zoomed in stores the same height it would at 100%.
+- The factor is not updated during a viewport gesture. Changing it reflows the text of every visible card, which is too expensive to do on every frame of a scroll or pinch. While the gesture runs, text scales with the card; when the zoom has been still for 150ms, the factor is committed and the text reflows once.
+
 **Edge label zoom threshold (required behavior):** Analogous to the semantic
 zoom threshold for node content, edge labels have their own zoom threshold.
 When the viewport zoom is below the threshold, edge labels are not rendered;
