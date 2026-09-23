@@ -39,6 +39,25 @@ export function measureNodeContent(
 ): NodeSizeResult | null {
   const opts = { ...DEFAULT_OPTIONS, ...options }
 
+  // Measure at the 100% size: above 100% zoom the node layer counter-scales
+  // card text, and a card fitted while zoomed in must store the height it has
+  // at 100% (PRODUCT_DESIGN.md > Card text above 100% zoom)
+  // A tag node carries its own inline pin, which must survive the measurement
+  const pinned = cardEl.style.getPropertyValue('--zoom-scale')
+  cardEl.style.setProperty('--zoom-scale', '1')
+  try {
+    return measureAtBaseSize(cardEl, currentWidth, opts)
+  } finally {
+    if (pinned) cardEl.style.setProperty('--zoom-scale', pinned)
+    else cardEl.style.removeProperty('--zoom-scale')
+  }
+}
+
+function measureAtBaseSize(
+  cardEl: HTMLElement,
+  currentWidth: number,
+  opts: Required<NodeSizingOptions>
+): NodeSizeResult | null {
   const contentEl = cardEl.querySelector('.node-content') as HTMLElement
   const editorEl = cardEl.querySelector('.inline-editor') as HTMLTextAreaElement
   const headerEl = cardEl.querySelector('.node-header') as HTMLElement

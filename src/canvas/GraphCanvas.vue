@@ -16,6 +16,7 @@ import {
   useViewState,
   useCanvasInput,
   useCanvasZoom,
+  useCardCounterZoom,
   useCanvasDisplay,
   usePreviewPanel,
 } from './composables/viewport'
@@ -380,6 +381,8 @@ const { viewportWidth, viewportHeight, visibleNodes, visibleNodeIds } = viewport
 
 const gestureActive = ref(false) // live while any viewport gesture is (useCanvasInput)
 const { showPerfOverlay, perfSummary, recordSpan: recordPerfSpan } = usePerfOverlay(gestureActive)
+// Card text keeps its on-screen size above 100% zoom (PRODUCT_DESIGN.md > Card text above 100% zoom)
+const { counterZoom } = useCardCounterZoom(scale, gestureActive)
 
 // Before its readers (canvas-setup-order.test)
 const nodeEditor = useNodeEditor({
@@ -2130,7 +2133,7 @@ defineExpose({
       <div
         class="nodes-layer"
         :class="{ 'above-lod': isLODMode }"
-        :style="{ transform }"
+        :style="{ transform, '--zoom-scale': counterZoom }"
       >
         <CanvasNodeCard
           v-for="node in lodCardNodes"

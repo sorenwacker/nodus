@@ -134,8 +134,9 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     // and a pan frame patches one container instead of every visible card
     // (PRODUCT_DESIGN.md > Canvas rendering). The container scale rasterizes
     // text exactly as the per-card scale() it replaces did.
-    // --zoom-scale is pinned to 1 so calc(... * var(--zoom-scale)) rules
-    // resolve to their base sizes; the container transform applies the zoom.
+    // --zoom-scale is inherited from the node layer, which sets it to the
+    // counter-zoom factor so card text keeps its on-screen size above 100%
+    // (PRODUCT_DESIGN.md > Card text above 100% zoom).
     const logicalWidth = isTagNode ? 'fit-content' : width + 'px'
     const logicalHeight = isTagNode ? 'fit-content' : height + 'px'
 
@@ -177,7 +178,6 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     }
 
     const style: Record<string, string> = {
-      '--zoom-scale': '1',
       '--title-lines': String(titleLines),
       '--title-size': titleSize + 'px',
       transform: `translate(${x}px, ${y}px)`,
@@ -186,6 +186,9 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
       height: logicalHeight,
       borderWidth: nodeBorderWidth.value + 'px',
     }
+    // A tag node is sized to its label, so counter-scaling the label would
+    // shrink the node's canvas footprint as the user zooms in
+    if (isTagNode) style['--zoom-scale'] = '1'
 
     // Apply z-index from radial layout angle order (if set)
     const zIndex = nodeZOrder.value.get(node.id)

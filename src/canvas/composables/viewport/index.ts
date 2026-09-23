@@ -15,6 +15,7 @@ export {
   type UseCanvasZoomContext,
   type UseCanvasZoomReturn,
 } from './useCanvasZoom'
+export { useCardCounterZoom, COUNTER_ZOOM_SETTLE_MS, type UseCardCounterZoomReturn } from './useCardCounterZoom'
 export { useMinimap, type MinimapNode, type MinimapOptions } from './useMinimap'
 export {
   useViewState,

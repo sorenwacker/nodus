@@ -27,9 +27,24 @@ describe('useCanvasNodeStyle.getNodeStyle (container-transform scaling)', () => 
     // (PRODUCT_DESIGN.md > Canvas rendering)
     expect(style.width).toBe('180px')
     expect(style.height).toBe('90px')
-    expect(style['--zoom-scale']).toBe('1')
     expect(style.transform).toBe('translate(10px, 20px)')
     expect(style.transformOrigin).toBe('0 0')
+  })
+
+  it('inherits the counter-zoom factor from the node layer', () => {
+    // An inline value would shadow the layer's factor, and card text would
+    // grow with the zoom again (PRODUCT_DESIGN.md > Card text above 100% zoom)
+    const { getNodeStyle } = useCanvasNodeStyle(makeContext(2))
+    const style = getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width: 180, height: 90 })
+    expect(style['--zoom-scale']).toBeUndefined()
+  })
+
+  it('pins a tag node to its 100% size', () => {
+    // A tag node fits its label, so a counter-scaled label would shrink the
+    // node itself on the canvas as the user zooms in
+    const { getNodeStyle } = useCanvasNodeStyle(makeContext(2))
+    const style = getNodeStyle({ id: 't1', canvas_x: 0, canvas_y: 0, node_type: 'tag' })
+    expect(style['--zoom-scale']).toBe('1')
   })
 
   it('keeps a constant 2px on-screen border across zoom levels', () => {
