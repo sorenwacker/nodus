@@ -8,6 +8,7 @@ import { fileNameFromPath } from '../../../lib/pdfGraph'
 import { isOverStorylinePanel as overStorylinePanel } from '../util/dragDropTarget'
 import { ref, type Ref } from 'vue'
 import type { Node, Frame } from '../../../types'
+import { unnamedAsNull } from '../../../lib/workspaceId'
 
 export interface UseNodeDraggingContext {
   store: {
@@ -310,13 +311,20 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
         const nodeWidth = node.width || 200
         const nodeHeight = node.height || 120
         const nodeArea = nodeWidth * nodeHeight
-        const currentFrameId = node.frame_id
+        // Only frames of the node's own workspace: the store holds every
+        // workspace's frames at shared coordinates, and a frame the user
+        // cannot see must not take the node in. A stored membership in
+        // another workspace's frame counts as none, so the drop repairs it
+        // (PRODUCT_DESIGN.md > What belongs to a frame)
+        const nodeWorkspace = unnamedAsNull(node.workspace_id)
+        const candidateFrames = store.frames.filter(f => unnamedAsNull(f.workspace_id) === nodeWorkspace)
+        const currentFrameId = candidateFrames.some(f => f.id === node.frame_id) ? node.frame_id : null
         let assignedFrameId: string | null = currentFrameId // Keep current by default
         let assignedFrame: Frame | undefined
 
         // Check overlap with current frame first (for exit resistance)
         if (currentFrameId) {
-          const currentFrame = store.frames.find(f => f.id === currentFrameId)
+          const currentFrame = candidateFrames.find(f => f.id === currentFrameId)
           if (currentFrame) {
             const overlapX = Math.max(
               0,
@@ -345,7 +353,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
 
         // If not in a frame or just exited, check for entering a new frame
         if (!assignedFrameId) {
-          for (const frame of store.frames) {
+          for (const frame of candidateFrames) {
             const overlapX = Math.max(
               0,
               Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -

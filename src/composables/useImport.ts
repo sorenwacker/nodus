@@ -12,6 +12,7 @@ import { storeLogger } from '../lib/logger'
 import { handleAsyncError } from '../lib/errorHandling'
 import { notifications$ } from '../composables/useNotifications'
 import type { Node, Edge, OntologyImportResult } from '../types'
+import { unnamedAsNull } from '../lib/workspaceId'
 
 export interface ImportDeps {
   getCurrentWorkspaceId: () => string | null
@@ -60,7 +61,7 @@ export interface ImportDeps {
   updateNodePosition?: (id: string, x: number, y: number) => void
   /** Grow a folder frame that gained nodes (PRODUCT_DESIGN.md > Refreshing a workspace from its files) */
   updateFrameSize?: (id: string, width: number, height: number) => void
-  getFrames?: () => Array<{ id: string; folder_path: string | null; canvas_x: number; canvas_y: number; width: number; height: number }>
+  getFrames?: () => Array<{ id: string; workspace_id?: string | null; folder_path: string | null; canvas_x: number; canvas_y: number; width: number; height: number }>
   getVaultPath?: () => string | null
 }
 
@@ -181,7 +182,12 @@ async function createFramesFromFolders(
 
   // Build map of existing frames by folder path
   const existingFramesByPath = new Map<string, { id: string; canvas_x: number; canvas_y: number; width: number; height: number }>()
-  const existingFrames = deps.getFrames?.() || []
+  // Only the target workspace's frames and nodes: the stores hold every
+  // workspace's, and two workspaces on one vault share folder paths
+  // (PRODUCT_DESIGN.md > What belongs to a frame)
+  const target = unnamedAsNull(workspaceId)
+  const existingFrames = (deps.getFrames?.() || []).filter((f) => unnamedAsNull(f.workspace_id) === target)
+  nodes = nodes.filter((n) => unnamedAsNull(n.workspace_id) === target)
   for (const f of existingFrames) {
     if (f.folder_path) {
       existingFramesByPath.set(f.folder_path, f as { id: string; canvas_x: number; canvas_y: number; width: number; height: number })

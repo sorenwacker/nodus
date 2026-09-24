@@ -186,7 +186,7 @@ export const useNodesStore = defineStore('nodes', () => {
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
     reloadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
     // Frame sync dependencies for folder-frame sync
-    getFrames: () => framesStore.frames,
+    getFrames: () => filteredFrames.value,
     assignNodeToFrame: (nodeId: string, frameId: string | null) => {
       const node = nodes.value.find((n) => n.id === nodeId)
       if (node && node.frame_id !== frameId) {
