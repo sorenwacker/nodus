@@ -20,7 +20,7 @@ vi.mock('../lib/tauri', async importOriginal => ({
 
 import { useImport, type ImportDeps } from '../composables/useImport'
 
-const FRAME = { id: 'f1', folder_path: 'notes', canvas_x: 0, canvas_y: 0, width: 600, height: 800 }
+const FRAME = { id: 'f1', workspace_id: 'w', folder_path: 'notes', canvas_x: 0, canvas_y: 0, width: 600, height: 800 }
 
 function makeNode(id: string, frameId: string | null, x: number, y: number): Node {
   return {
