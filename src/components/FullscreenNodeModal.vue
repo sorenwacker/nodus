@@ -459,10 +459,9 @@ onUnmounted(() => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="fullscreen-node-title"
-        @click="handleClose"
         @wheel.stop
       >
-        <div class="fullscreen-modal-content" @click.stop>
+        <div class="fullscreen-modal-content">
           <!-- Header -->
           <div class="fullscreen-modal-header">
             <input
@@ -581,24 +580,19 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Fills the application window: the view replaces the canvas while it is
+   open rather than floating over it (features.md > Fullscreen Editor) */
 .fullscreen-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--bg-surface);
   display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 10000;
 }
 
 .fullscreen-modal-content {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 16px 64px var(--shadow-lg);
-  width: 90vw;
-  max-width: 1400px;
-  height: 85vh;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
