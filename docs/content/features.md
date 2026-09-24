@@ -59,6 +59,7 @@ Group related nodes visually. Frames act as containers that can be moved togethe
 Open any node in a fullscreen split-view editor for focused writing:
 
 - **Trigger**: Cmd+Click (Mac) or Ctrl+Click (Windows/Linux) on any node
+- **Fills the window**: The view covers the whole application window, edge to edge. The canvas, toolbar and panels are hidden until it is closed; it is not a dialog over the canvas, and there is no area outside it to click to close it
 - **Split view**: Markdown editor on left, live preview on right
 - **Auto-save**: Changes save automatically with 500ms debounce
 - **Keyboard shortcuts**:
