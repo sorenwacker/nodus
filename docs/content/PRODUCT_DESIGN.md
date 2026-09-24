@@ -1676,6 +1676,8 @@ Three were inaccurate. A batch update counted lines of output rather than nodes,
 
 A node belongs to a frame when its `frame_id` says so. There is no spatial fallback, because overlap makes membership depend on where things happen to be rather than on what the user put where.
 
+A node and its frame are in the same workspace. The frame store holds the frames of every workspace, and each workspace uses the same canvas coordinates, so every path that chooses a frame for a node chooses only among the frames of the node's own workspace: dropping a dragged node, matching a folder frame by `folder_path` when file sync picks up a file, and building folder frames on import, refresh or folder sync, which also considers only the nodes of the workspace it builds for. Dropping a node chose among all of them: a node released where another workspace's frame lies, unseen, joined that frame, and if that was a folder frame its `.md` file was moved into the other workspace's folder. Moving or fitting that frame then moved and measured a node the user could not see, and the node itself sat in a frame its own workspace does not draw. A stored membership in another workspace's frame counts as none, so the next drop of that node clears it.
+
 Dragging a frame decided membership by 50% overlap instead, so it carried unrelated nodes that merely sat on top of it and left behind members that had been moved outside its bounds. Every other frame-aware path already stated the frame_id rule.
 
 ### Moving a frame
