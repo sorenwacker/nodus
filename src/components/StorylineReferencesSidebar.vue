@@ -51,9 +51,7 @@ let scrollRaf: number | null = null
 
 /**
  * Build the cards from the links the reader renders, so a card exists exactly
- * where a link is shown: links inside an expanded callout are included, and a
- * link that expanded into a callout is no longer a link
- * (PRODUCT_DESIGN.md > Anchored nodes)
+ * where a link is shown (PRODUCT_DESIGN.md > Anchored nodes)
  */
 function scanRenderedLinks() {
   const container = props.contentRef

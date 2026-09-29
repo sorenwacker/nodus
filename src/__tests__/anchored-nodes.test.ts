@@ -5,73 +5,37 @@
  * in the text, so it survives editing anywhere else in the document.
  */
 import { describe, it, expect } from 'vitest'
-import { renderMarkdown } from '../services/MarkdownRenderService'
+import { createPinia, setActivePinia } from 'pinia'
+import { useNodesStore } from '../stores/nodes'
+import { useStorylineMarkdownRendering } from '../composables/useStorylineMarkdownRendering'
 import { commentAnchorTitle, anchorCommentInText } from '../lib/anchoredNodes'
+import type { Node } from '../types'
 
-const nodes: Record<string, { id: string; title: string; markdown: string }> = {
-  'check lumi quota': {
-    id: 'n1',
-    title: 'Check LUMI quota',
-    markdown: 'The quota is **not** confirmed yet. See [[Snellius]].',
-  },
-  snellius: { id: 'n2', title: 'Snellius', markdown: 'The national supercomputer.' },
-}
+const all = [
+  { id: 'n1', title: 'Check LUMI quota', markdown_content: 'The quota is **not** confirmed yet. See [[Snellius]].' },
+  { id: 'n2', title: 'Snellius', markdown_content: 'The national supercomputer.' },
+] as Node[]
 
-const anchoredNode = (target: string) => nodes[target.toLowerCase()] ?? null
-const wikilinkExists = (target: string) => anchoredNode(target) !== null
-
-describe('anchored node expansion', () => {
-  it('expands a wikilink into a callout where the link sits', () => {
-    const html = renderMarkdown('Local clusters are shared. [[Check LUMI quota]]\n', {
-      wikilinkExists,
-      anchoredNode,
-    })
-
-    expect(html).toContain('anchored-node')
-    expect(html).toContain('Check LUMI quota')
-    expect(html).toContain('quota is')
-    // The surrounding sentence is untouched, so the note stays where it belongs
-    expect(html).toContain('Local clusters are shared.')
+describe('links in the reader', () => {
+  // Expanding links into callouts at full width inserted whole notes
+  // mid-sentence: a chapter referenced inside a parenthesis opened there
+  it('offers no switch that expands links into callouts', () => {
+    setActivePinia(createPinia())
+    expect(Object.keys(useStorylineMarkdownRendering())).not.toContain('expandAnchors')
   })
 
-  it('leaves links inline when no expansion is requested', () => {
-    const html = renderMarkdown('See [[Snellius]].', { wikilinkExists })
+  it('renders a link to an existing node as an inline link', () => {
+    setActivePinia(createPinia())
+    useNodesStore().nodes = all
+    const rendering = useStorylineMarkdownRendering()
 
-    expect(html).toContain('wikilink')
-    expect(html).not.toContain('anchored-node')
-  })
+    rendering.renderNodeContent({ id: 'x', title: 'X', markdown_content: 'Local clusters are shared (see [[Check LUMI quota]]).' } as Node)
+    const html = rendering.getRenderedContent('x')
 
-  it('expands one level only', () => {
-    // Two nodes referencing each other would otherwise expand forever
-    const html = renderMarkdown('[[Check LUMI quota]]', { wikilinkExists, anchoredNode })
-
-    // The inner link stays a link: its content must not appear at all
-    expect(html).not.toContain('The national supercomputer.')
-    expect(html).toContain('data-target="Snellius"')
-    expect(html.match(/anchored-node/g)?.length).toBe(1)
-  })
-
-  it('leaves a missing target as a missing inline link', () => {
-    const html = renderMarkdown('[[Nowhere]]', { wikilinkExists, anchoredNode })
-
-    expect(html).toContain('missing')
-    expect(html).not.toContain('anchored-node')
-  })
-
-  it('keeps the callout usable inside a paragraph', () => {
-    // A block element inside <p> is closed by the parser and loses its styling
-    const html = renderMarkdown('Text before [[Snellius]] text after.', {
-      wikilinkExists,
-      anchoredNode,
-    })
-
-    expect(html).not.toMatch(/<p>[^<]*<div class="anchored-node/)
-  })
-
-  it('carries the node id so the callout can be opened', () => {
-    const html = renderMarkdown('[[Snellius]]', { wikilinkExists, anchoredNode })
-
-    expect(html).toContain('n2')
+    expect(html).toContain('<a class="wikilink" data-target="Check LUMI quota">')
+    expect(html).not.toContain('The quota is')
+    // The sentence stays whole around the link
+    expect(html).toContain('(see ')
   })
 })
 

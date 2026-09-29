@@ -229,18 +229,6 @@ function handleScroll() {
 const markdownRendering = useStorylineMarkdownRendering()
 const { renderNodeContent, renderAllNodes, processPendingContent, getRenderedContent } = markdownRendering
 
-// Only the full-width reader has room for anchored callouts; narrower steps
-// keep links inline (PRODUCT_DESIGN.md > Anchored nodes)
-watch(
-  () => props.fullWidth,
-  full => {
-    markdownRendering.expandAnchors.value = !!full
-    markdownRendering.clearCache()
-    void renderAllNodes(nodes.value)
-  },
-  { immediate: true }
-)
-
 // Content interaction composable
 const contentInteraction = useStorylineReaderContent({
   nodes,
@@ -647,42 +635,6 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--danger-color, #dc2626);
-}
-
-/* Anchored nodes read like comments, at the point in the text that links them
-   (PRODUCT_DESIGN.md > Anchored nodes) */
-:deep(.anchored-node) {
-  display: block;
-  margin: 14px 0;
-  padding: 12px 16px;
-  border-left: 3px solid var(--primary-color);
-  border-radius: 0 6px 6px 0;
-  background: var(--bg-surface-alt);
-}
-
-:deep(.anchored-title) {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-:deep(.anchored-body) {
-  display: block;
-  font-size: 0.94em;
-  color: var(--text-secondary);
-}
-
-:deep(.anchored-para) {
-  display: block;
-  margin: 0 0 8px;
-}
-
-:deep(.anchored-para:last-child) {
-  margin-bottom: 0;
 }
 
 /* Overlays the canvas (no layout reflow); enter/leave slide via App's

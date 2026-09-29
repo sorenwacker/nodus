@@ -20,22 +20,6 @@ import type { Node } from '../types'
  *   await processPendingContent()  // inject math/mermaid SVGs
  */
 export function useStorylineMarkdownRendering() {
-  /**
-   * Whether wikilinks expand into callouts. Only the full-width reader has the
-   * room for them (PRODUCT_DESIGN.md > Anchored nodes).
-   */
-  const expandAnchors = ref(false)
-
-  function resolveAnchoredNode(target: string) {
-    if (!expandAnchors.value) return null
-    const store = useNodesStore()
-    const node = store.filteredNodes.find(
-      n => n.title.toLowerCase() === target.toLowerCase()
-    )
-    if (!node) return null
-    return { id: node.id, title: node.title, markdown: node.markdown_content || '' }
-  }
-
   const renderedContent = ref<Map<string, string>>(new Map())
 
   function getWikilinkExists(target: string): boolean {
@@ -56,7 +40,6 @@ export function useStorylineMarkdownRendering() {
 
     const html = renderMarkdown(node.markdown_content, {
       wikilinkExists: getWikilinkExists,
-      anchoredNode: resolveAnchoredNode,
     })
 
     renderedContent.value = new Map(renderedContent.value).set(node.id, html)
@@ -89,7 +72,6 @@ export function useStorylineMarkdownRendering() {
         const html = node.markdown_content
           ? renderMarkdown(node.markdown_content, {
               wikilinkExists: getWikilinkExists,
-              anchoredNode: resolveAnchoredNode,
             })
           : ''
         newContent.set(node.id, html)
@@ -129,17 +111,11 @@ export function useStorylineMarkdownRendering() {
     return renderedContent.value.get(nodeId) || ''
   }
 
-  function clearCache(): void {
-    renderedContent.value = new Map()
-  }
-
   return {
-    expandAnchors,
     renderedContent,
     renderNodeContent,
     renderAllNodes,
     processPendingContent,
     getRenderedContent,
-    clearCache,
   }
 }

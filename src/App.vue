@@ -129,7 +129,7 @@ watch(
     readerEverOpened.value = true
     readerNodeId.value = id
     readerStorylineId.value = null
-    // A single node is read at full width, where its anchored nodes expand
+    // A single node is read at full width
     readerFullWidth.value = true
     displayStore.readingNodeId = null
   }

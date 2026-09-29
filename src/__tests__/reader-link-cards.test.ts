@@ -3,10 +3,9 @@
  * (PRODUCT_DESIGN.md > Anchored nodes).
  *
  * Cards were built from the section's Markdown and placed by counting the
- * rendered links. An expanded callout adds its own links to the rendered
- * count, so the section's cards were matched to the wrong links or to none,
- * fell back to the top of the reader out of view, and the callout's links
- * had no cards at all.
+ * rendered links. Whenever the two counts differed, cards were matched to
+ * the wrong links or to none and fell back to the top of the reader, out of
+ * view.
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
@@ -20,9 +19,8 @@ function node(id: string, title: string, markdown_content = ''): Node {
   return { id, title, markdown_content, node_type: 'note' } as Node
 }
 
-const expanded = node('chapter-2', 'Chapter 2', 'Ada meets [[Grace]] and [[Alan]].')
-const section = node('chapter-3', 'Chapter 3', 'Recap: [[Chapter 2]]\n\nThen [[Edsger]] arrives, and [[Barbara]] leaves.')
-const all = [expanded, section, node('g', 'Grace'), node('a', 'Alan'), node('e', 'Edsger'), node('b', 'Barbara')]
+const section = node('chapter-3', 'Chapter 3', 'Recap: [[Grace]] meets [[Alan]].\n\nThen [[Edsger]] arrives, and [[Barbara]] leaves.')
+const all = [section, node('g', 'Grace'), node('a', 'Alan'), node('e', 'Edsger'), node('b', 'Barbara')]
 
 /** Link spacing wide enough that no two cards collapse or push each other */
 const SPACING = 200
@@ -35,13 +33,12 @@ function mountOnRenderedSection() {
   const store = useNodesStore()
   store.nodes = all
 
-  // The reader's section, rendered at full width: the first link expands
+  // The reader's section as rendered
   const content = document.createElement('div')
   const article = document.createElement('article')
   article.setAttribute('data-node-index', '0')
   article.innerHTML = renderMarkdown(section.markdown_content!, {
     wikilinkExists: t => all.some(n => n.title === t),
-    anchoredNode: t => (t === expanded.title ? { id: expanded.id, title: expanded.title, markdown: expanded.markdown_content! } : null),
   })
   content.appendChild(article)
   document.body.appendChild(content)
@@ -71,19 +68,11 @@ afterEach(() => {
 })
 
 describe('the reader links sidebar', () => {
-  it('gives every rendered link a card, including those inside a callout', async () => {
-    const article = mountOnRenderedSection()
-    await new Promise(r => setTimeout(r, 150))
-
-    expect(article.querySelector('.anchored-node'), 'precondition: the first link expanded').not.toBeNull()
-    expect(cards().map(c => c.title)).toEqual(['Grace', 'Alan', 'Edsger', 'Barbara'])
-  })
-
-  it('gives the expanded link no card of its own', async () => {
+  it('gives every rendered link a card', async () => {
     mountOnRenderedSection()
     await new Promise(r => setTimeout(r, 150))
 
-    expect(cards().map(c => c.title)).not.toContain('Chapter 2')
+    expect(cards().map(c => c.title)).toEqual(['Grace', 'Alan', 'Edsger', 'Barbara'])
   })
 
   it('places each card level with its link', async () => {
