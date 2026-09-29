@@ -465,7 +465,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
           id="reader-main-content"
           ref="contentRef"
           class="reader-content"
-          :class="{ 'full-width': !showToc }"
+          :class="{ 'toc-hidden': !showToc, 'fills-window': fullWidth }"
           role="region"
           :aria-label="t('reader.content')"
           @scroll="handleScroll"
@@ -814,7 +814,10 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
 
 .reader-content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  /* Wide blocks scroll in their own boxes (features.md > Storyline Panel) */
+  overflow-x: hidden;
   padding: 40px 60px;
   max-width: 800px;
   margin: 0 auto;
@@ -822,8 +825,12 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   overscroll-behavior: contain;
 }
 
-.reader-content.full-width {
+.reader-content.toc-hidden {
   max-width: 900px;
+}
+
+.reader-content.fills-window {
+  max-width: none;
 }
 
 .loading-state,
@@ -1063,21 +1070,13 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   text-decoration: underline;
 }
 
-.section-content :deep(a.wikilink) {
-  color: var(--primary-color);
-  cursor: pointer;
-}
-
-.section-content :deep(a.wikilink.missing) {
-  color: var(--danger-color, #dc2626);
-  opacity: 0.7;
-}
-
+.section-content :deep(a.wikilink),
 .comment-text :deep(a.wikilink) {
   color: var(--primary-color);
   cursor: pointer;
 }
 
+.section-content :deep(a.wikilink.missing),
 .comment-text :deep(a.wikilink.missing) {
   color: var(--danger-color, #dc2626);
   opacity: 0.7;
@@ -1142,7 +1141,10 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
 
 /* Table styles */
 .section-content :deep(table) {
-  width: 100%;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   margin: 1em 0;
 }
