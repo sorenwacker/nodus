@@ -30,7 +30,7 @@ interface LinkedReference {
   target: string
   preview: string
   sectionIndex: number // which section/node this link is in
-  naturalTop: number // the link's offset within the scrolled content
+  naturalTop: number // the link's offset within the text column
   isInStoryline: boolean
   storylineIndex?: number
   isMissing: boolean
@@ -46,8 +46,6 @@ const visibleSections = computed(() => {
 })
 
 const references = ref<LinkedReference[]>([])
-const scrollTop = ref(0)
-let scrollRaf: number | null = null
 
 /**
  * Build the cards from the links the reader renders, so a card exists exactly
@@ -58,6 +56,8 @@ function scanRenderedLinks() {
   if (!container) return
 
   const refs: LinkedReference[] = []
+  // Relative to the text column, which scrolls together with this sidebar,
+  // so the offset does not depend on the scroll position
   const containerTop = container.getBoundingClientRect().top
   const { start, end } = visibleSections.value
 
@@ -87,7 +87,7 @@ function scanRenderedLinks() {
         target,
         preview: preview.replace(/^#.*\n/, '').trim(),
         sectionIndex: nodeIdx,
-        naturalTop: link.getBoundingClientRect().top - containerTop + container.scrollTop,
+        naturalTop: link.getBoundingClientRect().top - containerTop,
         isInStoryline,
         storylineIndex: isInStoryline ? storylineIndex : undefined,
         isMissing: !linkedNode,
@@ -98,19 +98,8 @@ function scanRenderedLinks() {
   references.value = refs
 }
 
-// Scrolling only moves the track: a link's offset within the text does not
-// change when the text scrolls, so nothing is measured per scroll frame
-// (PRODUCT_DESIGN.md > Anchored nodes)
-function syncScroll() {
-  if (scrollRaf) return
-  scrollRaf = requestAnimationFrame(() => {
-    if (props.contentRef) {
-      scrollTop.value = props.contentRef.scrollTop
-    }
-    scrollRaf = null
-  })
-}
-
+// The sidebar shares the text's scroll container, so the browser moves the
+// cards and nothing runs while scrolling (PRODUCT_DESIGN.md > Anchored nodes)
 // Links are measured when the rendered content changes: sections render in
 // batches, math and diagrams fill in later, and the width steps reflow text
 let scanRaf: number | null = null
@@ -125,19 +114,16 @@ function scheduleScan() {
 const mutationObserver = new MutationObserver(scheduleScan)
 const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleScan)
 
-function detach(el: HTMLElement) {
-  el.removeEventListener('scroll', syncScroll)
+function detach() {
   mutationObserver.disconnect()
   resizeObserver?.disconnect()
 }
 
 watch(() => props.contentRef, (el, previous) => {
-  if (previous) detach(previous)
+  if (previous) detach()
   if (!el) return
-  el.addEventListener('scroll', syncScroll)
   mutationObserver.observe(el, { childList: true, subtree: true, characterData: true })
   resizeObserver?.observe(el)
-  syncScroll()
   scheduleScan()
 }, { immediate: true })
 
@@ -145,8 +131,7 @@ watch(() => props.contentRef, (el, previous) => {
 watch(visibleSections, scheduleScan)
 
 onUnmounted(() => {
-  if (props.contentRef) detach(props.contentRef)
-  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+  detach()
   if (scanRaf) cancelAnimationFrame(scanRaf)
 })
 
@@ -235,8 +220,6 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
 
 <template>
   <aside class="references-sidebar">
-    <div class="references-viewport">
-      <div class="references-track" :style="{ transform: `translateY(${-scrollTop}px)` }">
       <!-- Position each reference at the exact height of its wikilink -->
       <div
         v-for="refItem in references"
@@ -280,8 +263,6 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
           </p>
         </template>
       </div>
-      </div>
-    </div>
   </aside>
 </template>
 
@@ -290,25 +271,6 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
   width: 220px;
   position: relative;
   flex-shrink: 0;
-  overflow: hidden;
-}
-
-.references-viewport {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
-}
-
-/* Moved by one transform while scrolling; the cards keep their offsets */
-.references-track {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  will-change: transform;
 }
 
 .reference-card {

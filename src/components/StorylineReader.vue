@@ -59,6 +59,7 @@ const storylineEdges = computed(() => {
 })
 const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
+const textColumnRef = ref<HTMLElement | null>(null)
 // The contents sidebar keeps its state across folding the reader away and
 // back, and across sessions
 const showToc = ref(uiStorage.getReaderTocVisible())
@@ -448,15 +449,16 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
           </nav>
         </aside>
 
-        <!-- Main Content -->
+        <!-- Text and link cards share one scroller, so the browser moves the
+             cards with the text (PRODUCT_DESIGN.md > Anchored nodes) -->
+        <div ref="contentRef" class="reader-scroll" @scroll="handleScroll">
         <div
           id="reader-main-content"
-          ref="contentRef"
+          ref="textColumnRef"
           class="reader-content"
           :class="{ 'toc-hidden': !showToc, 'fills-window': fullWidth }"
           role="region"
           :aria-label="t('reader.content')"
-          @scroll="handleScroll"
         >
           <div v-if="loading" class="loading-state">
             <div class="spinner"></div>
@@ -547,6 +549,20 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
           </template>
         </div>
 
+        <!-- References Sidebar -->
+        <StorylineReferencesSidebar
+          v-if="showReferencesSidebar"
+          :nodes="nodes"
+          :active-index="activeNodeIndex"
+          :content-ref="textColumnRef"
+          @navigate-to-node="(nodeId) => {
+            const idx = nodes.findIndex(n => n.id === nodeId)
+            if (idx >= 0) goToNode(idx)
+          }"
+          @pan-to-canvas="panToEntity"
+        />
+        </div>
+
         <!-- Entity Sidebar -->
         <aside
           v-if="showEntitySidebar && hasEntities"
@@ -561,18 +577,6 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
           />
         </aside>
 
-        <!-- References Sidebar -->
-        <StorylineReferencesSidebar
-          v-if="showReferencesSidebar"
-          :nodes="nodes"
-          :active-index="activeNodeIndex"
-          :content-ref="contentRef"
-          @navigate-to-node="(nodeId) => {
-            const idx = nodes.findIndex(n => n.id === nodeId)
-            if (idx >= 0) goToNode(idx)
-          }"
-          @pan-to-canvas="panToEntity"
-        />
       </div>
 
       <!-- Navigation Footer -->
@@ -764,17 +768,23 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   overscroll-behavior: contain;
 }
 
-.reader-content {
+.reader-scroll {
   flex: 1;
+  display: flex;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   /* Wide blocks scroll in their own boxes (features.md > Storyline Panel) */
   overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.reader-content {
+  flex: 1;
+  min-width: 0;
   padding: 40px 60px;
   max-width: 800px;
   margin: 0 auto;
-  min-height: 0;
-  overscroll-behavior: contain;
 }
 
 .reader-content.toc-hidden {
