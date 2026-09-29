@@ -2046,18 +2046,17 @@ A comment is created the same way from the storyline panel and from the reader. 
 **Required behavior:** A note about a passage belongs at that passage. A comment that floats between sections says only which node it concerns, leaving the reader to work out which sentence provoked it - and the position is lost as soon as the text is edited anywhere above it.
 
 - The anchor is a `[[wikilink]]` written at the point in the text it refers to. The text is the anchor, so it survives editing here, in Obsidian, or in any other editor, and needs no stored offsets that a later edit would silently invalidate.
-- While reading a node at full width, every wikilink expands into a callout carrying the linked node's title and content, at exactly the point where the link sits. At smaller widths links stay inline, because a callout needs room the half-width reader does not have.
-- Expansion is one level deep: the links inside an expanded node stay inline links. A note that expanded its own links would loop on any pair of nodes that reference each other.
-- A link whose target does not exist stays an inline link, marked missing, as it is elsewhere.
-- The links sidebar lists the links as the reader shows them: every inline link gets one card level with it, including the links inside an expanded callout. A link that has expanded into a callout gets no card, because the callout already shows that node. Cards were built from the section's Markdown and placed by counting rendered links, so a callout's links shifted the count, misplaced the section's own cards out of view, and got no cards themselves.
+- The reader shows every wikilink as an inline link, at every width; the links sidebar shows the linked node beside it. Links used to expand into callouts carrying the linked node's content at full width, which inserted whole notes mid-sentence: a chapter referenced inside a parenthesis opened inside the parenthesis.
+- A link whose target does not exist is marked missing, as it is elsewhere.
+- The links sidebar gives every link the reader shows one card, level with it. Cards are built from the rendered links, not from the section's Markdown: they were placed by counting rendered links, so any difference between the two counts misplaced cards out of view.
 - The cards scroll with the text. Links are measured when the rendered content changes, not while scrolling: a link's offset within the text does not change when the text scrolls, and measuring every scroll frame forced a layout per frame and made the cards trail the text. Scrolling moves all cards with one transform.
 - Creating a comment writes such a link at the anchor point, so a comment is an anchored node rather than a separate kind of thing.
 
 ### Reading a single node
 
-**Required behavior:** Reading is currently only reachable through a storyline, so a node that belongs to no storyline cannot be read at all - and anchored nodes are exactly what one wants to read a single node for.
+**Required behavior:** Reading is currently only reachable through a storyline, so a node that belongs to no storyline cannot be read at all.
 
-- Any node can be opened in the reader on its own, showing its text with its anchored nodes expanded, using the same reader the storylines use rather than a second implementation.
+- Any node can be opened in the reader on its own, showing its text at full width, using the same reader the storylines use rather than a second implementation.
 - The single-node reader is reachable from the node itself on the canvas.
 - Storyline operations are unavailable while a single node is being read, because there is no storyline for them to act on. Adding, removing and reordering reached a placeholder storyline built from the node, and the refetch that followed replaced the node with the storyline read before it.
 - The scroll position of a single node is not remembered under a storyline. It was saved under the storyline read before it.
