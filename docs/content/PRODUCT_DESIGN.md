@@ -2049,6 +2049,7 @@ A comment is created the same way from the storyline panel and from the reader. 
 - While reading a node at full width, every wikilink expands into a callout carrying the linked node's title and content, at exactly the point where the link sits. At smaller widths links stay inline, because a callout needs room the half-width reader does not have.
 - Expansion is one level deep: the links inside an expanded node stay inline links. A note that expanded its own links would loop on any pair of nodes that reference each other.
 - A link whose target does not exist stays an inline link, marked missing, as it is elsewhere.
+- The links sidebar lists the links as the reader shows them: every inline link gets one card level with it, including the links inside an expanded callout. A link that has expanded into a callout gets no card, because the callout already shows that node. Cards were built from the section's Markdown and placed by counting rendered links, so a callout's links shifted the count, misplaced the section's own cards out of view, and got no cards themselves.
 - Creating a comment writes such a link at the anchor point, so a comment is an anchored node rather than a separate kind of thing.
 
 ### Reading a single node
