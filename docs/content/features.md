@@ -125,13 +125,12 @@ Create linear narratives through your knowledge graph:
 
 ### Anchored notes and comments
 
-A note about a passage sits at that passage. Write a `[[wikilink]]` where it belongs, and while reading that node at full width the linked node opens as a callout at exactly that point. Narrower reader widths keep links inline, because a callout needs the room.
+A note about a passage sits at that passage. Write a `[[wikilink]]` where it belongs; the reader shows it as an inline link, and the links sidebar (link icon in the reader header, "Show references") shows the linked note beside it.
 
-- Expansion goes one level deep: links inside an expanded note stay links.
-- A link to a node that does not exist stays an inline link, marked as missing.
+- A link to a node that does not exist is marked as missing.
 - Creating a comment writes such a link into the text it comments on, so the comment travels with the passage rather than with a position in the sequence.
 
-To read one node on its own, right-click it on the canvas and choose **Read node**. It opens in the same reader the storylines use, at full width, with its anchored notes expanded.
+To read one node on its own, right-click it on the canvas and choose **Read node**. It opens in the same reader the storylines use, at full width.
 
 ### Agent log
 
