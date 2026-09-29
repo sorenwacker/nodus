@@ -2001,7 +2001,7 @@ A comment is created the same way from the storyline panel and from the reader. 
 - The reader shows every wikilink as an inline link, at every width; the links sidebar shows the linked node beside it. Links used to expand into callouts carrying the linked node's content at full width, which inserted whole notes mid-sentence: a chapter referenced inside a parenthesis opened inside the parenthesis.
 - A link whose target does not exist is marked missing, as it is elsewhere.
 - The links sidebar gives every link the reader shows one card, level with it. Cards are built from the rendered links, not from the section's Markdown: they were placed by counting rendered links, so any difference between the two counts misplaced cards out of view.
-- The cards scroll with the text. Links are measured when the rendered content changes, not while scrolling: a link's offset within the text does not change when the text scrolls, and measuring every scroll frame forced a layout per frame and made the cards trail the text. Scrolling moves all cards with one transform.
+- The cards scroll with the text: they sit in the same scroll container, so the browser moves both together and no script runs while scrolling. Cards moved by script in response to scroll events trailed the natively scrolled text. Links are measured when the rendered content changes, relative to the text column, where their offset does not depend on scrolling.
 - Creating a comment writes such a link at the anchor point, so a comment is an anchored node rather than a separate kind of thing.
 
 ### Reading a single node
