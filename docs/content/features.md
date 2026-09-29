@@ -210,7 +210,8 @@ Each edge is active only at a handle in the middle of that edge, marked on scree
 
 - Push right once: the storyline overview slides open on the right
 - Push right again: the reader opens at half the window, keeping the graph visible, with the last-read storyline (the first storyline initially)
-- Push right a third time: the reader expands to the full window
+- Push right a third time: the reader expands to the full window, and the text spans its whole width instead of a centred column
+- The text pane scrolls vertically only; a wide table, formula or diagram scrolls inside its own box, so a sideways swipe does not shift the text
 - Push left: each push steps back down — full reader to half, half to the overview (or the timelines view, if the reader was opened from there), overview to the plain graph
 - Open layers stay open while you work in them; only a left-edge push or the toolbar book button steps back
 - While a layer is open, stepping deeper requires pressing the pointer against the very edge of the window, so using the panel near the border does not skip ahead
