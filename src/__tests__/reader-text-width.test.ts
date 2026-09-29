@@ -20,11 +20,12 @@ function rule(selector: string): string {
 
 describe('the reader text pane', () => {
   it('scrolls vertically only', () => {
-    const pane = rule('.reader-content')
-    expect(pane).toMatch(/overflow-y:\s*auto/)
-    expect(pane).toMatch(/overflow-x:\s*hidden/)
+    const scroller = rule('.reader-scroll')
+    expect(scroller).toMatch(/overflow-y:\s*auto/)
+    expect(scroller).toMatch(/overflow-x:\s*hidden/)
     // A flex item otherwise grows to its widest child instead of wrapping
-    expect(pane).toMatch(/min-width:\s*0/)
+    expect(scroller).toMatch(/min-width:\s*0/)
+    expect(rule('.reader-content')).toMatch(/min-width:\s*0/)
   })
 
   it('lets a wide table scroll inside its own box', () => {
@@ -35,7 +36,7 @@ describe('the reader text pane', () => {
   })
 
   it('spans the whole reader at the full-window step', () => {
-    const pane = sfc.slice(sfc.indexOf('class="reader-content"'), sfc.indexOf('@scroll="handleScroll"'))
+    const pane = sfc.slice(sfc.indexOf('class="reader-content"'), sfc.indexOf('role="region"'))
     expect(pane).toMatch(/'fills-window':\s*fullWidth/)
     expect(rule('.reader-content.fills-window')).toMatch(/max-width:\s*none/)
   })

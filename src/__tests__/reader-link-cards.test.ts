@@ -9,6 +9,9 @@
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
+import { parse } from '@vue/compiler-sfc'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createPinia, setActivePinia } from 'pinia'
 import { useNodesStore } from '../stores/nodes'
 import { renderMarkdown } from '../services/MarkdownRenderService'
@@ -82,7 +85,7 @@ describe('the reader links sidebar', () => {
     expect(cards().map(c => c.top)).toEqual([1, 2, 3, 4].map(i => SPACING * i))
   })
 
-  it('moves the cards with the text without measuring the links again', async () => {
+  it('runs nothing while the text scrolls', async () => {
     const article = mountOnRenderedSection()
     await new Promise(r => setTimeout(r, 150))
     const content = article.parentElement!
@@ -100,12 +103,23 @@ describe('the reader links sidebar', () => {
     content.dispatchEvent(new Event('scroll'))
     await new Promise(r => setTimeout(r, 50))
 
-    // A link's offset within the text is scroll-invariant; measuring per
-    // scroll frame forced a layout each frame
+    // The cards scroll natively with the text; a card moved by script trails
+    // the native scroll (PRODUCT_DESIGN.md > Anchored nodes)
     expect(measured).toBe(0)
-    // One transform on the track moves every card; the cards keep their offsets
-    expect(wrapper.find('.references-track').attributes('style')).toMatch(/translateY\(-300px\)/)
     expect(cards().map(c => c.top)).toEqual([1, 2, 3, 4].map(i => SPACING * i))
+  })
+
+  it('sits in the scroll container of the text', () => {
+    // Parsed rather than matched as text: containment is the property
+    const { descriptor } = parse(readFileSync(resolve(__dirname, '../components/StorylineReader.vue'), 'utf-8'))
+    type El = { tag?: string; props?: { name: string; value?: { content: string } }[]; children?: El[] }
+    const find = (el: El, test: (e: El) => boolean): El | null =>
+      test(el) ? el : (el.children ?? []).reduce<El | null>((hit, c) => hit ?? find(c, test), null)
+
+    const scroller = find(descriptor.template!.ast as El, e =>
+      !!e.props?.some(p => p.name === 'ref' && p.value?.content === 'contentRef'))
+    expect(scroller, 'the reader scroll container').not.toBeNull()
+    expect(find(scroller!, e => e.tag === 'StorylineReferencesSidebar')).not.toBeNull()
   })
 
   it('measures the links again when the rendered content changes', async () => {
