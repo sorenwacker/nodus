@@ -92,4 +92,44 @@ describe('the reader links sidebar', () => {
 
     expect(cards().map(c => c.top)).toEqual([1, 2, 3, 4].map(i => SPACING * i))
   })
+
+  it('moves the cards with the text without measuring the links again', async () => {
+    const article = mountOnRenderedSection()
+    await new Promise(r => setTimeout(r, 150))
+    const content = article.parentElement!
+
+    let measured = 0
+    article.querySelectorAll('a.wikilink').forEach(link => {
+      const rect = link.getBoundingClientRect
+      link.getBoundingClientRect = () => {
+        measured++
+        return rect()
+      }
+    })
+
+    content.scrollTop = 300
+    content.dispatchEvent(new Event('scroll'))
+    await new Promise(r => setTimeout(r, 50))
+
+    // A link's offset within the text is scroll-invariant; measuring per
+    // scroll frame forced a layout each frame
+    expect(measured).toBe(0)
+    // One transform on the track moves every card; the cards keep their offsets
+    expect(wrapper.find('.references-track').attributes('style')).toMatch(/translateY\(-300px\)/)
+    expect(cards().map(c => c.top)).toEqual([1, 2, 3, 4].map(i => SPACING * i))
+  })
+
+  it('measures the links again when the rendered content changes', async () => {
+    const article = mountOnRenderedSection()
+    await new Promise(r => setTimeout(r, 150))
+
+    const link = document.createElement('a')
+    link.className = 'wikilink'
+    link.dataset.target = 'Grace'
+    link.getBoundingClientRect = () => ({ top: SPACING * 5 }) as DOMRect
+    article.appendChild(link)
+    await new Promise(r => setTimeout(r, 50))
+
+    expect(cards().map(c => c.top)).toEqual([1, 2, 3, 4, 5].map(i => SPACING * i))
+  })
 })

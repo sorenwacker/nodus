@@ -3,7 +3,7 @@
  * Storyline References Sidebar
  * Shows linked documents at the position where they appear in the text
  */
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
 import Icon from './Icon.vue'
@@ -101,7 +101,9 @@ function scanRenderedLinks() {
   references.value = refs
 }
 
-// Listen to content scroll with RAF for smooth updates
+// Scrolling only moves the track: a link's offset within the text does not
+// change when the text scrolls, so nothing is measured per scroll frame
+// (PRODUCT_DESIGN.md > Anchored nodes)
 function syncScroll() {
   if (scrollRaf) return
   scrollRaf = requestAnimationFrame(() => {
@@ -112,32 +114,43 @@ function syncScroll() {
   })
 }
 
-// Set up scroll listener and calculate positions
-watch(() => props.contentRef, (el) => {
-  if (el) {
-    el.addEventListener('scroll', syncScroll)
-    syncScroll()
-    // Delay to ensure content is rendered
-    setTimeout(scanRenderedLinks, 100)
-  }
+// Links are measured when the rendered content changes: sections render in
+// batches, math and diagrams fill in later, and the width steps reflow text
+let scanRaf: number | null = null
+function scheduleScan() {
+  if (scanRaf) return
+  scanRaf = requestAnimationFrame(() => {
+    scanRaf = null
+    scanRenderedLinks()
+  })
+}
+
+const mutationObserver = new MutationObserver(scheduleScan)
+const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleScan)
+
+function detach(el: HTMLElement) {
+  el.removeEventListener('scroll', syncScroll)
+  mutationObserver.disconnect()
+  resizeObserver?.disconnect()
+}
+
+watch(() => props.contentRef, (el, previous) => {
+  if (previous) detach(previous)
+  if (!el) return
+  el.addEventListener('scroll', syncScroll)
+  mutationObserver.observe(el, { childList: true, subtree: true, characterData: true })
+  resizeObserver?.observe(el)
+  syncScroll()
+  scheduleScan()
 }, { immediate: true })
 
-// Recalculate positions when nodes change
-watch(() => props.nodes, () => {
-  setTimeout(scanRenderedLinks, 100)
-}, { deep: true })
+// The scanned range follows the active section
+watch(visibleSections, scheduleScan)
 
-// Rescan on scroll (links may have moved due to lazy loading etc) and when
-// the active section moves the scanned range
-watch([scrollTop, visibleSections], () => {
-  scanRenderedLinks()
-})
-
-onMounted(() => {
-  if (props.contentRef) {
-    props.contentRef.addEventListener('scroll', syncScroll)
-    setTimeout(scanRenderedLinks, 100)
-  }
+onUnmounted(() => {
+  if (props.contentRef) detach(props.contentRef)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+  if (scanRaf) cancelAnimationFrame(scanRaf)
 })
 
 // Card heights
@@ -226,6 +239,7 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
 <template>
   <aside class="references-sidebar">
     <div class="references-viewport">
+      <div class="references-track" :style="{ transform: `translateY(${-scrollTop}px)` }">
       <!-- Position each reference at the exact height of its wikilink -->
       <div
         v-for="refItem in references"
@@ -236,7 +250,7 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
           'is-missing': refItem.isMissing,
           'is-collapsed': isCollapsed(refItem.key)
         }"
-        :style="{ top: (getRefTop(refItem.key) - scrollTop) + 'px' }"
+        :style="{ top: getRefTop(refItem.key) + 'px' }"
         @click="handleRefClick(refItem)"
       >
         <div
@@ -269,6 +283,7 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
           </p>
         </template>
       </div>
+      </div>
     </div>
   </aside>
 </template>
@@ -288,6 +303,15 @@ function handleRefNavigate(e: Event, refItem: LinkedReference) {
   right: 0;
   bottom: 0;
   overflow: hidden;
+}
+
+/* Moved by one transform while scrolling; the cards keep their offsets */
+.references-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  will-change: transform;
 }
 
 .reference-card {
