@@ -6,23 +6,9 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useNodesStore } from '../stores/nodes'
 import { resolveWikilink } from '../lib/wikilink'
-import { matchWikilinks } from '../lib/contentParser'
 import Icon from './Icon.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import type { Node } from '../types'
-
-interface WikilinkMatch {
-  target: string
-  index: number
-  nodeIndex: number // which storyline node this is from
-}
-
-/**
- * Extract wikilinks with their position in the content
- */
-function extractWikilinksWithPosition(content: string, nodeIndex: number): WikilinkMatch[] {
-  return matchWikilinks(content).map(({ target, index }) => ({ target, index, nodeIndex }))
-}
 
 const props = defineProps<{
   nodes: Node[]
@@ -44,7 +30,7 @@ interface LinkedReference {
   target: string
   preview: string
   sectionIndex: number // which section/node this link is in
-  charPosition: number // character position within that section
+  naturalTop: number // the link's offset within the scrolled content
   isInStoryline: boolean
   storylineIndex?: number
   isMissing: boolean
@@ -59,91 +45,60 @@ const visibleSections = computed(() => {
   return { start, end }
 })
 
-// Extract wikilinks only from visible sections for performance
-const references = computed<LinkedReference[]>(() => {
+const references = ref<LinkedReference[]>([])
+const scrollTop = ref(0)
+let scrollRaf: number | null = null
+
+/**
+ * Build the cards from the links the reader renders, so a card exists exactly
+ * where a link is shown: links inside an expanded callout are included, and a
+ * link that expanded into a callout is no longer a link
+ * (PRODUCT_DESIGN.md > Anchored nodes)
+ */
+function scanRenderedLinks() {
+  const container = props.contentRef
+  if (!container) return
+
   const refs: LinkedReference[] = []
+  const containerTop = container.getBoundingClientRect().top
   const { start, end } = visibleSections.value
 
-  for (let nodeIdx = start; nodeIdx <= end; nodeIdx++) {
-    const node = props.nodes[nodeIdx]
-    if (!node?.markdown_content) continue
-    // Skip comment nodes - they don't typically have substantive references
-    if (node.node_type === 'comment') continue
+  container.querySelectorAll('[data-node-index]').forEach(section => {
+    const nodeIdx = parseInt(section.getAttribute('data-node-index') || '0', 10)
+    if (nodeIdx < start || nodeIdx > end) return
+    // Comment nodes don't typically have substantive references
+    if (props.nodes[nodeIdx]?.node_type === 'comment') return
 
-    const content = node.markdown_content
-    const wikilinks = extractWikilinksWithPosition(content, nodeIdx)
+    section.querySelectorAll<HTMLElement>('a.wikilink').forEach((link, linkIdx) => {
+      const target = link.dataset.target
+      if (!target) return
 
-    for (let i = 0; i < wikilinks.length; i++) {
-      const link = wikilinks[i]
-
-      // Resolve the wikilink to a node
-      const linkedNode = resolveWikilink(link.target, {
+      const linkedNode = resolveWikilink(target, {
         nodes: store.filteredNodes,
         frames: store.filteredFrames,
       })
-
-      const isMissing = !linkedNode
-
-      // Check if this node is in the current storyline
       const storylineIndex = linkedNode
         ? props.nodes.findIndex(n => n.id === linkedNode.id)
         : -1
       const isInStoryline = storylineIndex >= 0
-
-      // Get preview text
       const preview = linkedNode?.markdown_content?.slice(0, 150) || ''
 
       refs.push({
-        key: `${nodeIdx}-${i}-${link.target}`,
+        key: `${nodeIdx}-${linkIdx}-${target}`,
         id: linkedNode?.id || null,
-        title: linkedNode?.title || link.target,
-        target: link.target,
+        title: linkedNode?.title || target,
+        target,
         preview: preview.replace(/^#.*\n/, '').trim(),
         sectionIndex: nodeIdx,
-        charPosition: link.index,
+        naturalTop: link.getBoundingClientRect().top - containerTop + container.scrollTop,
         isInStoryline,
         storylineIndex: isInStoryline ? storylineIndex : undefined,
-        isMissing,
+        isMissing: !linkedNode,
       })
-    }
-  }
-
-  return refs
-})
-
-// Track scroll position and wikilink positions
-const scrollTop = ref(0)
-const wikilinkPositions = ref<Map<string, number>>(new Map())
-let scrollRaf: number | null = null
-
-// Calculate wikilink positions from the rendered content
-function updateWikilinkPositions() {
-  if (!props.contentRef) return
-
-  const positions = new Map<string, number>()
-  const containerRect = props.contentRef.getBoundingClientRect()
-
-  // Process each section to match how references are built
-  const sections = props.contentRef.querySelectorAll('[data-node-index]')
-
-  sections.forEach((section) => {
-    const nodeIdx = parseInt(section.getAttribute('data-node-index') || '0', 10)
-    const wikilinks = section.querySelectorAll('a.wikilink')
-
-    wikilinks.forEach((link, linkIdx) => {
-      const target = (link as HTMLElement).dataset.target
-      if (target) {
-        const rect = link.getBoundingClientRect()
-        // Position relative to container + scroll offset
-        const position = rect.top - containerRect.top + props.contentRef!.scrollTop
-        // Key format matches references: nodeIdx-linkIdx-target
-        const key = `${nodeIdx}-${linkIdx}-${target}`
-        positions.set(key, position)
-      }
     })
   })
 
-  wikilinkPositions.value = positions
+  references.value = refs
 }
 
 // Listen to content scroll with RAF for smooth updates
@@ -163,24 +118,25 @@ watch(() => props.contentRef, (el) => {
     el.addEventListener('scroll', syncScroll)
     syncScroll()
     // Delay to ensure content is rendered
-    setTimeout(updateWikilinkPositions, 100)
+    setTimeout(scanRenderedLinks, 100)
   }
 }, { immediate: true })
 
 // Recalculate positions when nodes change
 watch(() => props.nodes, () => {
-  setTimeout(updateWikilinkPositions, 100)
+  setTimeout(scanRenderedLinks, 100)
 }, { deep: true })
 
-// Recalculate on scroll (links may have moved due to lazy loading etc)
-watch(scrollTop, () => {
-  updateWikilinkPositions()
+// Rescan on scroll (links may have moved due to lazy loading etc) and when
+// the active section moves the scanned range
+watch([scrollTop, visibleSections], () => {
+  scanRenderedLinks()
 })
 
 onMounted(() => {
   if (props.contentRef) {
     props.contentRef.addEventListener('scroll', syncScroll)
-    setTimeout(updateWikilinkPositions, 100)
+    setTimeout(scanRenderedLinks, 100)
   }
 })
 
@@ -197,15 +153,11 @@ const hoveredKey = ref<string | null>(null)
 const collapsedCards = computed(() => {
   const collapsed = new Set<string>()
 
-  const sortedRefs = [...references.value].sort((a, b) => {
-    const posA = wikilinkPositions.value.get(a.key) || 0
-    const posB = wikilinkPositions.value.get(b.key) || 0
-    return posA - posB
-  })
+  const sortedRefs = [...references.value].sort((a, b) => a.naturalTop - b.naturalTop)
 
   for (let i = 1; i < sortedRefs.length; i++) {
-    const prevPos = wikilinkPositions.value.get(sortedRefs[i - 1].key) || 0
-    const currPos = wikilinkPositions.value.get(sortedRefs[i].key) || 0
+    const prevPos = sortedRefs[i - 1].naturalTop
+    const currPos = sortedRefs[i].naturalTop
 
     // If too close to previous, collapse both
     if (currPos - prevPos < COLLAPSE_THRESHOLD) {
@@ -221,16 +173,12 @@ const collapsedCards = computed(() => {
 const adjustedPositions = computed(() => {
   const positions = new Map<string, number>()
 
-  const sortedRefs = [...references.value].sort((a, b) => {
-    const posA = wikilinkPositions.value.get(a.key) || 0
-    const posB = wikilinkPositions.value.get(b.key) || 0
-    return posA - posB
-  })
+  const sortedRefs = [...references.value].sort((a, b) => a.naturalTop - b.naturalTop)
 
   let lastBottom = -Infinity
 
   for (const ref of sortedRefs) {
-    const naturalTop = wikilinkPositions.value.get(ref.key) || 0
+    const naturalTop = ref.naturalTop
     const isCollapsed = collapsedCards.value.has(ref.key) && hoveredKey.value !== ref.key
     const cardHeight = isCollapsed ? CARD_HEIGHT_COLLAPSED : CARD_HEIGHT_FULL
 
