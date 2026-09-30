@@ -1,7 +1,7 @@
 # Removing Frames
 
-Status: Draft
-Version: 0.1.0
+Status: Approved 260930
+Version: 0.2.0
 
 ## Overview
 
@@ -32,11 +32,13 @@ Measured at 260929 against the production database, read-only.
 
 A database migration runs once on upgrade:
 
-1. For each frame with a title, its title is added to the `tags` of each of its member nodes.
+1. For each frame with a title, its title is added to the `tags` of each of its member nodes. The Markdown files are not changed: tags set in the app live in the database `tags` column, and the migration writes nowhere else.
 2. Every `frame_id` is cleared and the `frames` table is dropped.
 3. Node positions and file locations are not changed. Nodes stay where they were on the canvas.
 
 The migration reports how many frames it converted and how many nodes it tagged.
+
+A frame title becomes a tag by the hashtag rule (`[a-zA-Z0-9][\w-]*`, at most 50 characters, `src/lib/contentParser.ts`): lowercased; ä, ö, ü and ß transliterated to ae, oe, ue and ss; every other character outside `a-z`, `0-9`, `_` and `-` replaced by a hyphen; runs of hyphens collapsed; leading and trailing hyphens removed; cut to 50 characters. "Definitions (Art. 3)" becomes `definitions-art-3`, "Kapitel 1-30" becomes `kapitel-1-30`. A title that yields no characters adds no tag.
 
 ### Imports that created frames
 
@@ -65,16 +67,18 @@ The migration reports how many frames it converted and how many nodes it tagged.
 
 ## Implementation Order
 
-Each step is one pull request that leaves the app working.
+One pull request, one commit per step, the test suite green after each. The frames table is dropped last: migrations run on every start and the frame code reads the table, so dropping it before the code is gone would break the app.
 
-1. Migration: frame titles become tags, `frame_id` cleared, table dropped, with its test.
-2. Imports: vault, PDF, Zotero and starter content stop creating frames.
-3. Canvas: frame rendering, interaction and frame-aware layout removed.
-4. Agents: MCP frame tools and in-app grouping tools removed or converted to tags.
-5. Gate test and remaining references removed; documentation updated.
+1. Imports: vault, PDF, Zotero and starter content stop creating frames.
+2. Canvas: frame rendering, interaction and frame-aware layout removed.
+3. Agents: MCP frame tools and in-app grouping tools removed or converted to tags.
+4. Backend: frame commands and store removed; the migration converts titles to tags, clears `frame_id` and drops the table; fresh installs no longer create it.
+5. Gate test; documentation updated and this draft removed.
 
-## Open Questions
+## Decisions
 
-1. Should frame titles become tags (proposed), or should the grouping be dropped without a trace?
-2. A frame title such as "Demo Project" is not a valid tag as written. The proposal lowercases it and replaces spaces with hyphens (`demo-project`). Acceptable?
-3. Tags set through the app are stored in the database `tags` column only (`update_node_tags`); they are not written to the Markdown file. Should the migration also write the new tags into each member's frontmatter, so Obsidian sees them? That writes to up to 317 files.
+Answered 260930.
+
+1. Frame titles become tags.
+2. Titles are converted by the rule above.
+3. The migration does not write to Markdown files.
