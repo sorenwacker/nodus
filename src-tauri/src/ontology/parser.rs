@@ -867,7 +867,8 @@ ex:jane a ex:Person ;
     #[test]
     fn test_all_ontologies_summary() {
         use crate::ontology::{
-            transform_to_nodus, transformer::TransformOptions, types::OntologyData,
+            transformer::{transform_to_nodus, TransformOptions},
+            types::OntologyData,
         };
 
         // Expected class counts from README.md
