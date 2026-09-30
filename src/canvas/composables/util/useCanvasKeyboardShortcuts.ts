@@ -27,6 +27,8 @@ export interface UseCanvasKeyboardShortcutsContext {
 
   // Neighborhood mode
   toggleNeighborhoodMode: (nodeId?: string) => void
+  // Physics mode (PRODUCT_DESIGN.md > Physics Mode)
+  togglePhysics: () => void
 
   // Font scale
   fontScale: Ref<number>
@@ -59,6 +61,7 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     layoutNodes,
     fitToContent,
     toggleNeighborhoodMode,
+    togglePhysics,
     fontScale,
     increaseFontScale,
     decreaseFontScale,
@@ -140,6 +143,12 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     if (e.key === 'n' || e.key === 'N') {
       e.preventDefault()
       toggleNeighborhoodMode(selectedNodeIds.value[0])
+    }
+
+    // P key toggles physics mode
+    if ((e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault()
+      togglePhysics()
     }
 
     // Shift+R (without Ctrl/Cmd) resets all node sizes to default.

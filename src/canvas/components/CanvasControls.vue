@@ -23,6 +23,9 @@ defineProps<{
   highlightAllEdges: boolean
   /** Whether bubble mode is active (LOD circles) */
   bubbleModeActive: boolean
+  /** Whether physics mode is running, and whether it can start here */
+  physicsActive: boolean
+  physicsAvailable: boolean
 }>()
 
 const emit = defineEmits<{
@@ -38,6 +41,7 @@ const emit = defineEmits<{
   (e: 'showHelp'): void
   (e: 'toggleHighlightEdges'): void
   (e: 'toggleBubbleMode'): void
+  (e: 'togglePhysics'): void
 }>()
 </script>
 
@@ -237,6 +241,21 @@ const emit = defineEmits<{
         <circle cx="8" cy="8" r="5" />
         <circle cx="16" cy="16" r="4" />
         <circle cx="18" cy="6" r="3" />
+      </svg>
+    </button>
+    <button
+      class="physics-toggle"
+      data-tooltip-pos="top"
+      :class="{ active: physicsActive }"
+      :disabled="!physicsActive && !physicsAvailable"
+      :data-tooltip="physicsActive || physicsAvailable ? t('canvas.controls.physics') : t('canvas.controls.physicsUnavailable')"
+      @click="emit('togglePhysics')"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="2" />
+        <ellipse cx="12" cy="12" rx="10" ry="4" />
+        <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)" />
+        <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)" />
       </svg>
     </button>
     <select

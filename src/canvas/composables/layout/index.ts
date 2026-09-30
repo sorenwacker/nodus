@@ -7,3 +7,4 @@ export {
   useNeighborhoodMode,
   type UseNeighborhoodModeOptions,
 } from './useNeighborhoodMode'
+export { useLivePhysics } from './useLivePhysics'

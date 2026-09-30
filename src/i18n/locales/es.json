@@ -98,6 +98,8 @@
       "hops": "saltos",
       "highlightEdges": "Resaltar todas las aristas - Hacer todas las aristas más visibles",
       "bubbleMode": "Modo burbuja - Mostrar nodos como círculos",
+      "physics": "Modo física - El grafo visible se ordena mientras arrastras (P)",
+      "physicsUnavailable": "Modo física - Acerca la vista o sal de la vista de vecindario: funciona con hasta 800 nodos visibles",
       "help": "Ayuda - Atajos de teclado y uso"
     },
     "search": {
@@ -305,6 +307,7 @@
       "redo": "Rehacer",
       "autoLayout": "Disposición automática",
       "resetSizes": "Restablecer tamaños",
+      "physicsMode": "Activar/desactivar el modo física",
       "importFiles": "Importar .bib .md .pdf",
       "exportYaml": "Exportar grafo como YAML",
       "refreshFiles": "Actualizar desde archivos",

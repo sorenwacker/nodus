@@ -98,6 +98,8 @@
       "hops": "sauts",
       "highlightEdges": "Surligner toutes les arêtes - Rendre toutes les arêtes plus visibles",
       "bubbleMode": "Mode bulle - Afficher les nœuds comme des cercles",
+      "physics": "Mode physique - Le graphe visible s'organise pendant que vous déplacez (P)",
+      "physicsUnavailable": "Mode physique - Zoomez ou quittez la vue de voisinage : fonctionne jusqu'à 800 nœuds visibles",
       "help": "Aide - Raccourcis clavier et utilisation"
     },
     "search": {
@@ -305,6 +307,7 @@
       "redo": "Rétablir",
       "autoLayout": "Disposition automatique",
       "resetSizes": "Réinitialiser les tailles",
+      "physicsMode": "Activer/désactiver le mode physique",
       "importFiles": "Importer .bib .md .pdf",
       "exportYaml": "Exporter le graphe en YAML",
       "refreshFiles": "Actualiser depuis les fichiers",

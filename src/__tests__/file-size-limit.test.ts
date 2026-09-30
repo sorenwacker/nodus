@@ -19,7 +19,7 @@ const LIMIT = 1000
  * file is under the limit. Never raise a number.
  */
 const OVER_LIMIT: Record<string, number> = {
-  'src/canvas/GraphCanvas.vue': 2209,
+  'src/canvas/GraphCanvas.vue': 2146,
   'src/App.vue': 1200,
   'src/lib/templates.ts': 1228,
 }
