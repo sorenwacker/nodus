@@ -6,6 +6,7 @@
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import type { Node } from '../../types'
 import { NODE_DEFAULTS } from '../constants'
+import { screenFloorRadius, MIN_DRAW_RADIUS_PX, MIN_HIT_RADIUS_PX } from '../utils/bubbleRadius'
 
 /** Just what drawing a straight edge needs; avoids importing the edge module. */
 export interface LODEdge {
@@ -63,9 +64,6 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 let animationId: number | null = null
-
-/** Smallest radius, in screen pixels, that a node may be pressed at. */
-const MIN_HIT_RADIUS_PX = 9
 
 const selectedSet = computed(() => new Set(props.selectedNodeIds))
 
@@ -150,7 +148,9 @@ function renderFrame() {
 
   // Draw in layers: regular -> highlighted -> selected (on top)
   const drawNode = (node: Node) => {
-    const r = props.getLODRadius(node.id)
+    // Never below a visible size on screen: a node without edges has the
+    // smallest canvas radius and vanished when zoomed out
+    const r = screenFloorRadius(props.getLODRadius(node.id), props.scale, MIN_DRAW_RADIUS_PX)
     const cx = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2
     const cy = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2
     const isSelected = selectedSet.value.has(node.id)
@@ -222,14 +222,13 @@ function hitTest(e: PointerEvent): string | null {
   // across, and pressing it means landing inside that - which is why nodes
   // stopped being selectable when zoomed out. The target never falls below a
   // clickable size on screen, whatever the drawing does.
-  const minRadius = MIN_HIT_RADIUS_PX / props.scale
 
   // Check nodes in reverse order (top-most first)
   for (let i = nodePositions.value.length - 1; i >= 0; i--) {
     const pos = nodePositions.value[i]
     const dx = x - pos.cx
     const dy = y - pos.cy
-    const r = Math.max(pos.r, minRadius)
+    const r = screenFloorRadius(pos.r, props.scale, MIN_HIT_RADIUS_PX)
     if (dx * dx + dy * dy <= r * r) {
       return pos.id
     }
