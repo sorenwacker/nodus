@@ -646,6 +646,7 @@ Two methods for importing citations from Zotero:
 | `Delete` / `Backspace` | Delete selected nodes/edges |
 | `L` | Force layout (D3-force) |
 | `N` | Toggle neighborhood mode |
+| `P` | Toggle physics mode |
 | `F` | Fit to content |
 | `Shift+R` | Reset all node sizes to default |
 | `Shift+E` | Export graph as YAML (debug) |
@@ -675,6 +676,18 @@ Right-click on a node to access:
 Multi-selection: All context menu actions work on multiple selected nodes.
 
 **Placement:** The menu opens at the pointer and is kept inside the window. When it does not fit below or to the right of the pointer it opens above or to the left instead, so a right-click on a node near the bottom or right edge shows the whole menu rather than running off screen. A menu taller than the window is pinned to the top edge, because the first item must be reachable.
+
+### Physics Mode
+
+**Required behavior:** Physics mode lets the graph arrange itself while the user watches and pulls on it. A layout command computes positions once; physics mode keeps a force simulation running on the canvas, so dragging a node drags its connections along and the rest makes room.
+
+- The mode is off by default and toggled from the canvas controls or with `P`. It is not remembered across sessions: where a node sits is the user's decision, and a simulation that starts on its own would move nodes nobody asked to move.
+- The simulation covers the nodes on screen when the mode is switched on, at most 800 of them; above that the toggle is disabled and says so. Nodes off screen that are connected to them stay fixed and act as anchors, so the visible part keeps its place in the whole graph. Switching the mode off and on again takes the nodes on screen at that moment.
+- Forces: edges pull connected nodes together, nodes within 1200 units repel each other, and cards do not overlap. There is no centring force and repulsion does not reach further, so the graph does not drift and distant nodes do not nudge each other.
+- A dragged node follows the pointer and stays pinned while held; the simulation reheats and the others respond. Releasing the node lets it move again.
+- Positions change in memory while the simulation runs. They are stored once, for the nodes that moved, when the simulation comes to rest or the mode is switched off. Switching the mode on records one undo step, so one Undo restores every position from before the session.
+- With snap-to-grid on, stored positions are snapped; the simulation itself runs unsnapped.
+- The mode is unavailable in neighbourhood mode, whose positions are an overlay that is never stored.
 
 ### Neighborhood Mode
 
