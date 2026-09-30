@@ -150,7 +150,6 @@ watch(() => props.visible, (visible) => {
       v-if="visible && plan && plan.steps"
       class="plan-modal-overlay"
       tabindex="0"
-      @click.self="emit('close')"
       @keydown="onKeydown"
     >
       <div class="plan-modal" @click.stop>
