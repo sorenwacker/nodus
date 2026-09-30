@@ -1318,6 +1318,14 @@ Resetting the default workspace also removes its previous storylines before rese
 - The marks are therefore precomputed as a list and rendered by their own component. A viewport move leaves that list untouched by identity, so the marks are not re-rendered at all; a node move, a resize or a change of selection rebuilds it once.
 - The minimap draws the nodes the canvas is drawing, at the positions the canvas is drawing them. In neighbourhood mode that is the subgraph on screen at its overlay positions: showing the whole workspace there marked a graph that is not on the canvas, and placed the viewport rectangle among coordinates nothing is drawn at.
 
+### Circle size in bubble mode
+
+**Required behavior:** Every node is visible in bubble mode, however far out the view is zoomed.
+
+- A circle's radius grows with the node's edge count on a log scale, in canvas units, so hubs stand out.
+- On screen, no circle is drawn smaller than 4 px in radius, and none can be pressed at less than 9 px. Both floors are applied by one function, so what is drawn and what can be pressed are sized by the same rule.
+- A node without edges had the smallest canvas radius, 5 units, and no screen floor: at 10 % zoom it was half a pixel across, so disconnected nodes were effectively invisible while still clickable.
+
 ### Selected nodes in bubble mode
 
 **Required behavior:** Above the level-of-detail threshold, nodes are circles on a 2D canvas, except selected ones, which render as real cards so their text is readable. A selected node must stay draggable across that swap.
