@@ -910,6 +910,8 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 
 A file moved outside Nodus keeps its node: the watcher records the new path. If recording it fails, the user is told, rather than the node pointing at a path that no longer exists.
 
+Edges are reloaded once per burst of external changes, not once per file: the reload follows the last change of a burst by 300 ms. A reload replaces the edge set, so the canvas re-routes and redraws every edge; when an agent or a sync tool rewrote 150 notes at once, reloading after each file ran that 150 times, and each running Nodus instance kept several cores busy for minutes. Stopping the watcher cancels a reload still waiting.
+
 ### Reading a file and its checksum together
 
 **Required behavior:** The checksum stored against a node is the checksum of the content that node holds. Both come from one read.
