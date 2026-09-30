@@ -129,7 +129,6 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
                 width: 220.0,
                 height: 160.0,
                 z_index: 0,
-                frame_id: None,
                 color_theme,
                 is_collapsed: false,
                 tags: None,
@@ -182,7 +181,6 @@ pub fn transform_to_nodus(data: &OntologyData, options: &TransformOptions) -> Tr
                 width: 200.0,
                 height: 120.0,
                 z_index: 0,
-                frame_id: None,
                 color_theme: Some("#9333ea".to_string()), // Purple for classes
                 is_collapsed: false,
                 tags: None,

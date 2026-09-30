@@ -2,7 +2,6 @@
 //!
 //! Extracted from commands.rs to reduce function complexity.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Collected markdown file with its folder path
@@ -59,34 +58,19 @@ pub fn markdown_files_in_vault(vault_path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<String, usize>) {
-    let mut files = Vec::new();
-    let mut folder_counts: HashMap<String, usize> = HashMap::new();
-
-    for file_path in markdown_files_in_vault(vault_path) {
-        let folder = get_relative_folder(&file_path, vault_path).unwrap_or_default();
-        println!(
-            "  Found: {:?} in folder: '{}'",
-            file_path.file_name(),
-            folder
-        );
-
-        files.push(MarkdownFile {
-            path: file_path,
-            folder: folder.clone(),
-        });
-
-        // Track folder for frame creation
-        *folder_counts.entry(folder).or_insert(0) += 1;
-    }
-
-    println!(
-        "Total files found: {}, folders: {:?}",
-        files.len(),
-        folder_counts.keys().collect::<Vec<_>>()
-    );
-
-    (files, folder_counts)
+pub fn collect_markdown_files(vault_path: &Path) -> Vec<MarkdownFile> {
+    let files: Vec<MarkdownFile> = markdown_files_in_vault(vault_path)
+        .into_iter()
+        .map(|file_path| {
+            let folder = get_relative_folder(&file_path, vault_path).unwrap_or_default();
+            MarkdownFile {
+                path: file_path,
+                folder,
+            }
+        })
+        .collect();
+    println!("Total files found: {}", files.len());
+    files
 }
 
 /// Get relative folder path from vault root (empty string for root)
@@ -231,7 +215,7 @@ mod tests {
         std::fs::create_dir_all(vault.join(".obsidian")).unwrap();
         std::fs::write(vault.join(".obsidian/config.md"), "hidden").unwrap();
 
-        let (files, _) = collect_markdown_files(&vault);
+        let files = collect_markdown_files(&vault);
 
         let names: Vec<String> = files
             .iter()
