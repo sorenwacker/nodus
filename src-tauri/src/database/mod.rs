@@ -14,6 +14,7 @@ pub mod edges;
 pub mod mcp_trust;
 pub mod models;
 pub mod nodes;
+pub mod ontology_pending;
 pub mod remove_frames;
 pub mod wikilinks;
 
@@ -218,6 +219,13 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
             sqlx::query(statement).execute(pool).await?;
         }
     }
+
+    // Ontology relations waiting for an end a later import brings in
+    sqlx::query(include_str!(
+        "../../migrations/014_ontology_pending_relations.sql"
+    ))
+    .execute(pool)
+    .await?;
 
     // Frames are removed; their titles become tags (docs/design/remove-frames.md)
     let (frames, tagged) = remove_frames::run(pool).await?;
