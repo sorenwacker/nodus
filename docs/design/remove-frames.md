@@ -1,7 +1,7 @@
 # Removing Frames
 
-Status: Approved 260930
-Version: 0.2.0
+Status: Implemented 260930
+Version: 0.3.0
 
 ## Overview
 
@@ -33,7 +33,7 @@ Measured at 260929 against the production database, read-only.
 A database migration runs once on upgrade:
 
 1. For each frame with a title, its title is added to the `tags` of each of its member nodes. The Markdown files are not changed: tags set in the app live in the database `tags` column, and the migration writes nowhere else.
-2. Every `frame_id` is cleared and the `frames` table is dropped.
+2. Every `frame_id` is cleared and the `frames` table is emptied. It is not dropped: `nodes.frame_id` has a foreign key to it, and SQLite checks that key on every node insert even when the value is NULL, so with the table gone no node could be written (a test found this before it shipped). Removing the key means rebuilding the `nodes` table with foreign keys off, which risks cascading deletes into edges and storylines for no gain beyond an empty table.
 3. Node positions and file locations are not changed. Nodes stay where they were on the canvas.
 
 The migration reports how many frames it converted and how many nodes it tagged.
@@ -44,15 +44,20 @@ A frame title becomes a tag by the hashtag rule (`[a-zA-Z0-9][\w-]*`, at most 50
 
 | Import | Before | After |
 |--------|--------|-------|
-| Vault import and refresh | One frame per folder | Nodes of one folder are placed as a cluster; the folder remains in each node's file path. No tag is added: the path already records it |
+| Vault import | One frame per folder | Nodes of one folder are placed as a cluster; the folder remains in each node's file path. No tag is added: the path already records it |
+| Refresh | Newcomers placed inside their folder frame | No node is moved |
 | PDF section graph | Section nodes in a frame named after the paper | Section nodes placed as a cluster and tagged with the paper title |
 | Zotero collection | One frame per collection | Citation nodes tagged with the collection name |
 | Starter content | "Demo Project" and "Entity Types" frames | Same nodes, tagged `demo-project` and `entity-types` |
 
 ### Agents
 
-- The 15 MCP frame tools are removed. An agent that grouped nodes into a frame tags them instead, with the existing tag tools.
-- The in-app agent's grouping tools create tags instead of frames.
+- The 15 MCP frame tools are removed. An MCP client tags by id through `update_node` and `batch_update_nodes`.
+- The in-app agent's three frame tools are replaced by `tag_nodes(tag, node_titles)`, which adds the converted tag to each named node and keeps its other tags.
+
+### Moving files
+
+Dropping a node into a folder frame moved its Markdown file into that folder. That was the only way to reach the file-move code, so it is removed with the frames: the file-move commands, the collision dialog, and the watcher's guard against its own moves.
 
 ## Documentation
 
@@ -67,13 +72,15 @@ A frame title becomes a tag by the hashtag rule (`[a-zA-Z0-9][\w-]*`, at most 50
 
 ## Implementation Order
 
-One pull request, one commit per step, the test suite green after each. The frames table is dropped last: migrations run on every start and the frame code reads the table, so dropping it before the code is gone would break the app.
+One pull request. The commits are grouped by layer (frontend and agents, MCP server, backend and migration, documentation). The frame code was removed before the migration empties the table, so no reader of the table remains.
 
-1. Imports: vault, PDF, Zotero and starter content stop creating frames.
-2. Canvas: frame rendering, interaction and frame-aware layout removed.
-3. Agents: MCP frame tools and in-app grouping tools removed or converted to tags.
-4. Backend: frame commands and store removed; the migration converts titles to tags, clears `frame_id` and drops the table; fresh installs no longer create it.
-5. Gate test; documentation updated and this draft removed.
+## Measured Result
+
+Run at 260930 on a copy of the production database: 45 frames removed, 299 nodes gained a tag (20 members already carried their frame's tag), node, edge and storyline-membership counts unchanged (13,915 / 23,775 / 299), node positions identical, integrity and foreign-key checks clean.
+
+## Known Limitation
+
+A file-backed node whose file gains frontmatter tags in another editor has its tags replaced by the frontmatter tags (`useFileSync`), which drops a migrated tag. This predates the removal and applies equally to tags added by hand; 21 framed nodes are file-backed and none carries frontmatter tags today.
 
 ## Decisions
 
