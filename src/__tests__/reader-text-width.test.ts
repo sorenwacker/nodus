@@ -10,7 +10,10 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const sfc = readFileSync(resolve(__dirname, '../components/StorylineReader.vue'), 'utf-8')
+// The component and the stylesheet it scopes for rendered content
+const sfc =
+  readFileSync(resolve(__dirname, '../components/StorylineReader.vue'), 'utf-8') +
+  readFileSync(resolve(__dirname, '../components/storylineReaderContent.css'), 'utf-8')
 
 function rule(selector: string): string {
   const start = sfc.indexOf(`${selector} {`)

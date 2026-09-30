@@ -22,7 +22,6 @@ const OVER_LIMIT: Record<string, number> = {
   'src/canvas/GraphCanvas.vue': 2209,
   'src/App.vue': 1200,
   'src/lib/templates.ts': 1228,
-  'src/components/StorylineReader.vue': 1149,
 }
 
 const EXTENSIONS = ['.ts', '.vue', '.rs']
