@@ -32,6 +32,7 @@ Hashtags in node content become node tags:
 - A `#tag` in the text always creates its tag node and the edge to it. Whether those are drawn is a separate, view-only question answered by the tag filter, which never creates or destroys anything
 - Deleting a `#tag` from the text withdraws it: the tag leaves the node, its edge is deleted, and the tag node goes too once the last note using it lets go
 - A tag added by hand from a card's chips was never in the text, so an edit never withdraws it. Only a tag the previous body carried and the new one does not is taken away
+- Tags are how nodes are grouped. Frames were removed: upgrading gives each node that was in a titled frame that title as a tag, shown as a chip on the card ("Kapitel 1-30" becomes `kapitel-1-30`). The tag is stored with the node, not written into its text, so it creates no tag node
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
 - Whether tag nodes are drawn is remembered between sessions. Hiding them is a view choice, so it neither creates nor deletes anything, and it holds across a restart
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
@@ -45,9 +46,6 @@ YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treate
 - Its fields surface as chips on the node card: tags, the date (or date range), and the OKF lifecycle `status` when it is `draft` or `deprecated` (`stable` is the silent default)
 - Click the date chip (or the "+ Set date" chip on a selected node) to set or change the node's `date` and `date_end` in place — no YAML editing needed
 - Title and tags from frontmatter also feed the node record during vault sync
-
-### Frames
-Group related nodes visually. Frames act as containers that can be moved together with all contained nodes.
 
 ### Selection & Multi-Select
 - Click to select single node
@@ -162,7 +160,7 @@ The backfill only adds a frontmatter block above the existing text. Bodies, `[[w
 
 When a dropped PDF has structure - several sections or a bibliography - Nodus offers to expand it after the document imports. The single node stays either way; the dialog chooses what is added:
 
-- **Sections as nodes.** One node per heading, connected along the document outline, grouped in a frame named after the paper.
+- **Sections as nodes.** One node per heading, connected along the document outline, tagged with the paper's title.
 - **References as citation nodes.** Each bibliography entry becomes a citation node, cited by the paper.
 - **Verify against Semantic Scholar.** Each reference is marked `verified`, `not_found`, or `not_checked` in its frontmatter. A reference is only marked not found when the service answered; if the service is unreachable, the state is not checked - an outage never invalidates your bibliography.
 - **Add references to Zotero.** Shown when the Zotero integration is configured; nothing is written to Zotero without this choice.
