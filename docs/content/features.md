@@ -112,6 +112,16 @@ Focus on a specific node and its connections:
 
 ---
 
+### Physics Mode
+Let the graph arrange itself while you pull on it. Press `P` or use the atom button in the canvas controls.
+
+1. Zoom so the part of the graph you want to arrange is on screen (up to 800 nodes).
+2. Press `P`. Connected nodes pull together, the others make room, and cards stop overlapping.
+3. Drag a node: its connections follow, and the graph settles again when you let go.
+4. Press `P` again to stop. The positions are saved when the graph comes to rest or when you stop.
+
+Nodes off screen stay where they are. One Undo restores every position from before you switched the mode on. The mode is not available in the neighborhood view.
+
 ## Storylines
 
 Create linear narratives through your knowledge graph:
