@@ -10,7 +10,6 @@ import { READ_TOOLS } from './readTools'
 import { WORKSPACE_TOOLS } from './workspaceTools'
 import { NODE_TOOLS } from './nodeTools'
 import { EDGE_TOOLS } from './edgeTools'
-import { FRAME_TOOLS } from './frameTools'
 import { STORYLINE_TOOLS } from './storylineTools'
 import { CANVAS_TOOLS } from './canvasTools'
 
@@ -22,7 +21,6 @@ export const NODUS_TOOLS: McpToolDeclaration[] = [
   ...WORKSPACE_TOOLS,
   ...NODE_TOOLS,
   ...EDGE_TOOLS,
-  ...FRAME_TOOLS,
   ...STORYLINE_TOOLS,
   ...CANVAS_TOOLS,
 ]
