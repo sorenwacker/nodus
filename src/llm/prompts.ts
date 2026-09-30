@@ -41,7 +41,7 @@ NODE RULES:
 - Only create nodes for REAL entities, concepts, or things
 - Do NOT create category nodes like "Functions", "Regions", "Types", "Overview"
 - Do NOT create meta-nodes like "Node 1", "Item 3", or placeholder names
-- If something is a category, make it a GROUP or FRAME, not a node
+- If something is a category, make it a tag (tag_nodes), not a node
 
 EDGE RULES:
 - ALWAYS use semantic labels for edges - never leave blank

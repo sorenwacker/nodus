@@ -67,7 +67,6 @@ export interface Node {
   width: number
   height: number
   z_index: number
-  frame_id: string | null
   color_theme: string | null
   is_collapsed: boolean
   auto_fit?: boolean
@@ -90,19 +89,6 @@ export interface Edge {
   storyline_id: string | null
   created_at: number
   directed: boolean
-}
-
-export interface Frame {
-  id: string
-  title: string
-  parent_frame_id: string | null  // Enables nested frames
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-  color: string | null
-  workspace_id: string | null
-  folder_path: string | null
 }
 
 export interface Workspace {

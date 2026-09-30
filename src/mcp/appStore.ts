@@ -33,7 +33,6 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
     getNode: store.getNode,
     // Workspace scoping: lets each MCP connection target its own workspace
     getAllNodes: () => store.nodes,
-    getAllFrames: () => store.frames,
     getWorkspaces: () => {
       const current = store.currentWorkspaceId ?? 'default'
       return [
@@ -61,19 +60,9 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
     updateEdgeDirected: edgesStore.updateEdgeDirected,
     updateEdgeLabel: edgesStore.updateEdgeLabel,
     updateEdgeColor: edgesStore.updateEdgeColor,
-    // Frame operations
-    getFilteredFrames: () => store.filteredFrames,
-    getFrame: (id: string) => store.filteredFrames.find(f => f.id === id),
-    createFrame: store.createFrame,
-    updateFramePosition: store.updateFramePosition,
-    updateFrameSize: store.updateFrameSize,
-    updateFrameTitle: store.updateFrameTitle,
-    updateFrameColor: store.updateFrameColor,
-    deleteFrame: store.deleteFrame,
-    assignNodesToFrame: store.assignNodesToFrame,
     // Storyline operations
     // All of them, so a scoped connection can filter to its own workspace the
-    // way it already does for nodes and frames
+    // way it already does for nodes
     getAllStorylines: () => storylinesStore.storylines,
     getFilteredStorylines: () => storylinesStore.filteredStorylines,
     getStoryline: (id: string) => storylinesStore.filteredStorylines.find(s => s.id === id),

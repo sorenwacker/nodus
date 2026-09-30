@@ -10,7 +10,6 @@ export {
   edgeToMcp,
   COLOR_NAME_MAP,
   normalizeColor,
-  clampToFrame,
   McpError,
   handleGetGraphSummary,
   handleListNodes,
@@ -48,26 +47,6 @@ export {
   handleCleanupDuplicateEdges,
   handleArrangeRadial,
 } from './edgeHandlers'
-
-// Frame handlers
-export {
-  frameToMcp,
-  handleListFrames,
-  handleGetFrame,
-  handleCreateFrame,
-  handleUpdateFrame,
-  handleDeleteFrame,
-  handleGetNodesInFrame,
-  handleAssignNodeToFrame,
-  handleRemoveNodeFromFrame,
-  handleBatchAssignNodesToFrame,
-  handleBatchMoveFrames,
-  handleBatchResizeFrames,
-  handleFitFrameToContents,
-  handleFitAllFrames,
-  handleCheckFrameOverlaps,
-  handleResolveFrameOverlaps,
-} from './frameHandlers'
 
 // Storyline handlers
 export {

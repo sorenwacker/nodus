@@ -61,7 +61,6 @@ const exploreMode: AgentModeConfig = {
     'think',
     'done',
     // Reading structure, and the research tools the prompt documents
-    'list_frames',
     'list_storylines',
     'research_topic',
     'build_knowledge_base',
@@ -183,12 +182,9 @@ const executeMode: AgentModeConfig = {
     'apply_theme',
     'list_themes',
     'done',
-    // Structure: frames and storylines. Registered and tested but exposed to
-    // no mode until now, so the agent could not group or sequence anything
-    // (PRODUCT_DESIGN.md > Tool reachability)
-    'create_frame',
-    'assign_node_to_frame',
-    'list_frames',
+    // Structure: tag groups and storylines, so the agent can group and
+    // sequence (PRODUCT_DESIGN.md > Tool reachability)
+    'tag_nodes',
     'create_storyline',
     'add_node_to_storyline',
     'list_storylines',

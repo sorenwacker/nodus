@@ -62,11 +62,6 @@
       "deleteEdgeTooltip": "Elimina questo arco",
       "labelSaved": "Etichetta del collegamento salvata"
     },
-    "frame": {
-      "delete": "Elimina cornice",
-      "addFrame": "Aggiungi cornice - Raggruppa nodi selezionati",
-      "clickToPlace": "Clicca sulla tela per posizionare la cornice (Esc per annullare)"
-    },
     "hover": {
       "incoming": "Archi entranti (citato da)",
       "outgoing": "Archi uscenti (cita)",
@@ -103,8 +98,7 @@
       "hops": "salti",
       "highlightEdges": "Evidenzia tutti gli archi - Rendi tutti gli archi più visibili",
       "bubbleMode": "Modalità bolla - Mostra nodi come cerchi",
-      "help": "Aiuto - Scorciatoie da tastiera e utilizzo",
-      "organizeFrames": "Organizza cornici - Attira membri, respingi altri"
+      "help": "Aiuto - Scorciatoie da tastiera e utilizzo"
     },
     "search": {
       "placeholder": "Cerca nodi...",
@@ -346,7 +340,7 @@
     "options": {
       "title": "Opzioni di importazione",
       "entriesFound": "{count} citazione trovata | {count} citazioni trovate",
-      "createFrame": "Crea cornice per la collezione",
+      "tagCollection": "Etichetta le citazioni con il nome della collezione",
       "collectionDetected": "Collezione: {name}",
       "noCollection": "Nessuna collezione rilevata nell'esportazione",
       "importAttachments": "Importa PDF allegati",
@@ -661,20 +655,6 @@
     "showPerfOverlay": "Mostra le misure di prestazione",
     "showPerfOverlayHint": "Tempi di fotogramma sul grafo durante la panoramica o lo zoom, per diagnosticare gli scatti"
   },
-  "fileMove": {
-    "collision": {
-      "title": "Il file esiste già",
-      "message": "Un file con lo stesso nome esiste già nella cartella di destinazione.",
-      "moving": "Spostamento:",
-      "to": "In:",
-      "existing": "Esistente:",
-      "options": "Scegli un'opzione:",
-      "rename": "Rinomina",
-      "renameDesc": "Salva con un nuovo nome",
-      "replace": "Sostituisci",
-      "replaceDesc": "Sovrascrivi il file esistente (non può essere annullato)"
-    }
-  },
   "updates": {
     "available": "Nodus {version} e disponibile",
     "installed": "Hai {version}",
@@ -729,7 +709,7 @@
     "title": "Espandere in un grafo",
     "lead": "Questo documento ha una struttura. Scegli cosa entra nel grafo; il nodo singolo resta comunque.",
     "sections": "{count} sezioni come nodi",
-    "sectionsHint": "Un nodo per titolo, collegati secondo la struttura del documento, raggruppati in una cornice",
+    "sectionsHint": "Un nodo per titolo, collegati secondo la struttura del documento, etichettati con il titolo del documento",
     "references": "{count} riferimenti come nodi di citazione",
     "referencesHint": "Ogni voce della bibliografia diventa un nodo di citazione",
     "verify": "Verifica con Semantic Scholar",

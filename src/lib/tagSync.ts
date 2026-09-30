@@ -130,7 +130,7 @@ export function planTagEdgeRemoval(
 export const MIN_NOTES_FOR_TAG_NODE = 2
 
 /** A node's recorded tags, or none when the field is unset or malformed. */
-function recordedTagsOf(node: { tags?: string | null }): string[] {
+export function recordedTagsOf(node: { tags?: string | null }): string[] {
   if (!node.tags) return []
   try {
     const parsed = JSON.parse(node.tags)

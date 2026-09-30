@@ -3,13 +3,6 @@
  * Orchestrates node layout algorithms and animations
  */
 import { type Ref } from 'vue'
-import { NODE_DEFAULTS } from '../../constants'
-import {
-  pushNodesOutOfFrames,
-  constrainNodesToFrame,
-  type FrameRect,
-  type NodeSize,
-} from './useFrameCollision'
 import {
   createLayoutAnimator,
   animateToPositions as animatePositions,
@@ -27,16 +20,6 @@ interface Node {
   canvas_y: number
   width?: number
   height?: number
-  frame_id?: string | null
-}
-
-interface Frame {
-  id: string
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-  title?: string
 }
 
 interface Edge {
@@ -49,7 +32,6 @@ interface Store {
   getNodes: () => Node[]
   getFilteredNodes: () => Node[]
   getFilteredEdges: () => Edge[]
-  getFilteredFrames: () => Frame[]
   getSelectedNodeIds: () => string[]
   getNode: (id: string) => Node | undefined
   updateNodePosition: (
@@ -60,8 +42,6 @@ interface Store {
   ) => void
   /** Flush one node's in-memory position to the backend */
   persistNodePosition?: (id: string) => void | Promise<void>
-  updateFramePosition: (id: string, x: number, y: number) => void
-  updateFrameSize: (id: string, width: number, height: number) => void
   layoutNodes: (nodeIds?: string[], options?: { centerX: number; centerY: number }) => Promise<void>
 }
 
@@ -107,25 +87,6 @@ export function useLayout(options: UseLayoutOptions) {
   // Flag to prevent concurrent layout operations (rapid clicking)
   let isLayoutInProgress = false
 
-  // Single pending post-layout frame-expansion timer. A new layout run
-  // replaces it, so a stale pass never fires against in-flight positions.
-  let expandFramesTimer: ReturnType<typeof setTimeout> | null = null
-
-  function cancelPendingExpandFrames() {
-    if (expandFramesTimer !== null) {
-      clearTimeout(expandFramesTimer)
-      expandFramesTimer = null
-    }
-  }
-
-  function scheduleExpandFrames(delayMs: number) {
-    cancelPendingExpandFrames()
-    expandFramesTimer = setTimeout(() => {
-      expandFramesTimer = null
-      expandFramesToFitNodes()
-    }, delayMs)
-  }
-
   function stopAnimation() {
     animationState.stop()
   }
@@ -137,132 +98,13 @@ export function useLayout(options: UseLayoutOptions) {
         const node = store.getNodes().find(n => n.id === id)
         return node ? { x: node.canvas_x, y: node.canvas_y } : null
       },
-      // Frames write memory only; the landing positions are stored once when
-      // the animation ends (PRODUCT_DESIGN.md > Persisting animated positions)
+      // Animation frames write memory only; the landing positions are stored
+      // once when the animation ends (PRODUCT_DESIGN.md > Persisting animated positions)
       (id, x, y) => store.updateNodePosition(id, x, y, { skipPersist: true }),
       animationState,
       duration,
       store.persistNodePosition
     )
-  }
-
-  // Helper to get frames for collision detection
-  function getFramesForCollision(): FrameRect[] {
-    return store.getFilteredFrames()
-  }
-
-  // Wrapper for pushNodesOutOfFrames that gets frames from store
-  function pushOutOfFrames(
-    positions: Map<string, { x: number; y: number }>,
-    nodeMap: Map<string, NodeSize>
-  ): Map<string, { x: number; y: number }> {
-    // A node keeps its frame; only foreign frames push it away
-    const frameOfNode = new Map(store.getFilteredNodes().map(n => [n.id, n.frame_id]))
-    return pushNodesOutOfFrames(positions, nodeMap, getFramesForCollision(), frameOfNode)
-  }
-
-  /**
-   * Apply frame constraints to positions - either constrain within a frame or push out of all frames
-   */
-  function applyFrameConstraints(
-    positions: Map<string, { x: number; y: number }>,
-    nodes: Node[],
-    targetFrame?: Frame
-  ): Map<string, { x: number; y: number }> {
-    const nodeMap = new Map(nodes.map(n => [n.id, { width: n.width, height: n.height }]))
-    return targetFrame
-      ? constrainNodesToFrame(positions, nodeMap, targetFrame)
-      : pushOutOfFrames(positions, nodeMap)
-  }
-
-  /**
-   * Expand frames to fit their assigned nodes after layout.
-   * Called after layout to ensure frames contain all their nodes.
-   */
-  async function expandFramesToFitNodes(): Promise<void> {
-    const allNodes = store.getFilteredNodes()
-    const allFrames = store.getFilteredFrames()
-    const frameMap = new Map(allFrames.map(f => [f.id, f]))
-
-    // Group nodes by their frame_id
-    const nodesByFrame = new Map<string, Node[]>()
-    for (const node of allNodes) {
-      if (node.frame_id && frameMap.has(node.frame_id)) {
-        if (!nodesByFrame.has(node.frame_id)) {
-          nodesByFrame.set(node.frame_id, [])
-        }
-        nodesByFrame.get(node.frame_id)!.push(node)
-      }
-    }
-
-    const padding = 30
-
-    // For each frame, expand it to fit all its nodes
-    for (const [frameId, nodes] of nodesByFrame) {
-      const frame = frameMap.get(frameId)!
-
-      // Calculate bounding box of all nodes in this frame
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      for (const node of nodes) {
-        const nodeWidth = node.width || NODE_DEFAULTS.WIDTH
-        const nodeHeight = node.height || NODE_DEFAULTS.HEIGHT
-        minX = Math.min(minX, node.canvas_x)
-        minY = Math.min(minY, node.canvas_y)
-        maxX = Math.max(maxX, node.canvas_x + nodeWidth)
-        maxY = Math.max(maxY, node.canvas_y + nodeHeight)
-      }
-
-      if (!Number.isFinite(minX)) continue
-
-      // Calculate required frame bounds with padding
-      const requiredLeft = minX - padding
-      const requiredTop = minY - padding
-      const requiredRight = maxX + padding
-      const requiredBottom = maxY + padding
-
-      // Expand frame if needed (never shrink)
-      let newFrameX = frame.canvas_x
-      let newFrameY = frame.canvas_y
-      let newFrameWidth = frame.width
-      let newFrameHeight = frame.height
-
-      // Expand left
-      if (requiredLeft < frame.canvas_x) {
-        const expandBy = frame.canvas_x - requiredLeft
-        newFrameX = requiredLeft
-        newFrameWidth += expandBy
-      }
-
-      // Expand top
-      if (requiredTop < frame.canvas_y) {
-        const expandBy = frame.canvas_y - requiredTop
-        newFrameY = requiredTop
-        newFrameHeight += expandBy
-      }
-
-      // Expand right
-      const currentRight = newFrameX + newFrameWidth
-      if (requiredRight > currentRight) {
-        newFrameWidth = requiredRight - newFrameX
-      }
-
-      // Expand bottom
-      const currentBottom = newFrameY + newFrameHeight
-      if (requiredBottom > currentBottom) {
-        newFrameHeight = requiredBottom - newFrameY
-      }
-
-      // Apply frame changes
-      const posChanged = newFrameX !== frame.canvas_x || newFrameY !== frame.canvas_y
-      const sizeChanged = newFrameWidth !== frame.width || newFrameHeight !== frame.height
-
-      if (posChanged) {
-        store.updateFramePosition(frameId, newFrameX, newFrameY)
-      }
-      if (sizeChanged) {
-        store.updateFrameSize(frameId, newFrameWidth, newFrameHeight)
-      }
-    }
   }
 
   /**
@@ -274,8 +116,6 @@ export function useLayout(options: UseLayoutOptions) {
       getNode: store.getNode,
       getFilteredNodes: store.getFilteredNodes,
       getFilteredEdges: store.getFilteredEdges,
-      getFilteredFrames: store.getFilteredFrames,
-      applyFrameConstraints,
     })
 
     if (!result) return
@@ -323,8 +163,6 @@ export function useLayout(options: UseLayoutOptions) {
       ...store,
       getFilteredNodes: () => nodes,
       getFilteredEdges: () => edges,
-      // The overlay draws no frames, so nothing in it may be constrained to one
-      getFilteredFrames: () => [],
       getSelectedNodeIds: () => [],
     }
 
@@ -334,24 +172,18 @@ export function useLayout(options: UseLayoutOptions) {
         getNode: store.getNode,
         getFilteredNodes: () => nodes,
         getFilteredEdges: () => edges,
-        getFilteredFrames: () => [],
-        applyFrameConstraints: positions => positions,
       })
       if (result) overlay.apply(result.targets)
       return
     }
 
-    await executeAutoLayout(layout, undefined, {
+    await executeAutoLayout(layout, {
       store: scopedStore,
       animateToPositions: targets => overlay.apply(targets),
-      applyFrameConstraints: positions => positions,
-      pushOutOfFrames: positions => positions,
-      expandFramesToFitNodes: async () => {},
-      scheduleExpandFrames: () => {},
     })
   }
 
-  async function autoLayout(layout: LayoutType = 'grid', frameId?: string) {
+  async function autoLayout(layout: LayoutType = 'grid') {
     // Prevent concurrent layout operations (rapid clicking)
     if (isLayoutInProgress) {
       console.debug('[Layout] Skipping - layout already in progress')
@@ -373,18 +205,13 @@ export function useLayout(options: UseLayoutOptions) {
       }
 
       pushUndo()
-      // Settle (not freeze) any in-flight animation so frames and their
-      // nodes are never read mid-flight by the new run
+      // Settle (not freeze) any in-flight animation so nodes are never read
+      // mid-flight by the new run
       animationState.settle()
-      cancelPendingExpandFrames()
 
-      await executeAutoLayout(layout, frameId, {
+      await executeAutoLayout(layout, {
         store,
         animateToPositions,
-        applyFrameConstraints,
-        pushOutOfFrames,
-        expandFramesToFitNodes,
-        scheduleExpandFrames,
       })
     } finally {
       isLayoutInProgress = false

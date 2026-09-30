@@ -48,40 +48,20 @@ function reportVaultWriteMissed(node: Node, detail: string): void {
 }
 
 /**
- * Update node position with optional frame containment
+ * Update node position
  */
 export async function updateNodePosition(
   deps: NodeStoreDependencies,
   id: string,
   x: number,
   y: number,
-  options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean; skipPersist?: boolean }
+  options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }
 ): Promise<void> {
-  const { state, framesStore } = deps
+  const { state } = deps
   const node = state.nodes.value.find(n => n.id === id)
   if (node) {
-    let finalX = clampCoord(x)
-    let finalY = clampCoord(y)
-
-    // Enforce frame containment if requested and node is in a frame
-    if (options?.enforceFrame && node.frame_id) {
-      const frame = framesStore.frames.find(f => f.id === node.frame_id)
-      if (frame) {
-        const padding = 20
-        const titleHeight = 50
-        const nodeWidth = node.width || 200
-        const nodeHeight = node.height || 120
-        // Clamp to frame bounds
-        finalX = Math.max(
-          frame.canvas_x + padding,
-          Math.min(frame.canvas_x + frame.width - nodeWidth - padding, finalX)
-        )
-        finalY = Math.max(
-          frame.canvas_y + padding + titleHeight,
-          Math.min(frame.canvas_y + frame.height - nodeHeight - padding, finalY)
-        )
-      }
-    }
+    const finalX = clampCoord(x)
+    const finalY = clampCoord(y)
 
     node.canvas_x = finalX
     node.canvas_y = finalY
@@ -567,7 +547,6 @@ export async function createNode(
       width: data.width || 200,
       height: data.height || 120,
       z_index: 0,
-      frame_id: null,
       color_theme: data.color_theme ?? null,
       is_collapsed: false,
       tags: data.tags ? JSON.stringify(data.tags) : null,

@@ -7,7 +7,7 @@
  * offline (PRODUCT_DESIGN.md > PDF as a graph).
  */
 
-import { upsertFrontmatterField } from './contentParser'
+import { toTag, upsertFrontmatterField } from './contentParser'
 
 /** One heading section of a document */
 export interface DocumentSection {
@@ -150,6 +150,8 @@ export interface PlannedNode {
   title: string
   content: string
   nodeType: 'note' | 'citation'
+  /** Sections carry the paper's tag, which groups them (docs/design/remove-frames.md) */
+  tags?: string[]
   x: number
   y: number
 }
@@ -161,7 +163,7 @@ export interface PlannedEdge {
 }
 
 export interface GraphImportPlan {
-  frameTitle: string
+  documentTitle: string
   rootKey: string
   nodes: PlannedNode[]
   edges: PlannedEdge[]
@@ -224,7 +226,8 @@ export function planGraphImport(
   const content = folded
 
   const root = content[0]
-  const frameTitle = root?.title || 'Imported document'
+  const documentTitle = root?.title || 'Imported document'
+  const documentTag = toTag(documentTitle)
 
   const nodes: PlannedNode[] = []
   const edges: PlannedEdge[] = []
@@ -235,9 +238,10 @@ export function planGraphImport(
     keyByIndex.set(i, key)
     nodes.push({
       key,
-      title: section.title || frameTitle,
+      title: section.title || documentTitle,
       content: section.content,
       nodeType: 'note',
+      tags: documentTag ? [documentTag] : undefined,
       x: origin.x + (i % SECTIONS_PER_ROW) * COLUMN_WIDTH,
       y: origin.y + Math.floor(i / SECTIONS_PER_ROW) * ROW_HEIGHT,
     })
@@ -269,7 +273,7 @@ export function planGraphImport(
     edges.push({ fromKey: rootKey, toKey: key, linkType: 'cites' })
   })
 
-  return { frameTitle, rootKey, nodes, edges }
+  return { documentTitle, rootKey, nodes, edges }
 }
 
 /** Record a verification state in a citation node's frontmatter */

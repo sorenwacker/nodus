@@ -49,8 +49,6 @@ import {
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
 import { useLayout, useNeighborhoodMode } from './composables/layout'
-import { useFrames, useFrameFitting, useFrameOperations } from './composables/frames'
-import { framesStoreAdapter } from './composables/frames/framesStoreAdapter'
 import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
 import { buildAgentToolContext } from './composables/agent/agentToolContext'
 import { useAgentPrompt } from './composables/agent/useAgentPrompt'
@@ -85,7 +83,6 @@ import CanvasEdgePanel from './components/CanvasEdgePanel.vue'
 import CanvasLLMBar from './components/CanvasLLMBar.vue'
 import CanvasHoverTooltip from './components/CanvasHoverTooltip.vue'
 import CanvasMinimap from './components/CanvasMinimap.vue'
-import CanvasFrames from './components/CanvasFrames.vue'
 import CanvasEdgesSVG from './components/CanvasEdgesSVG.vue'
 import CanvasNodeCard from './components/CanvasNodeCard.vue'
 import CanvasPreviewPanel from './components/CanvasPreviewPanel.vue'
@@ -103,7 +100,6 @@ import CanvasLinkPickerModal from './components/CanvasLinkPickerModal.vue'
 import CanvasEmptyState from './components/CanvasEmptyState.vue'
 import AgentTaskPanel from '../components/AgentTaskPanel.vue'
 import FullscreenNodeModal from '../components/FullscreenNodeModal.vue'
-import FileMoveCollisionDialog from '../components/FileMoveCollisionDialog.vue'
 import { usePlanState } from '../llm/planState'
 import { useAgentTasksStore } from '../stores/agentTasks'
 import { useNodeService } from '../composables/useNodeService'
@@ -119,8 +115,6 @@ const {
   pushCreationUndo,
   pushColorUndo,
   pushSizeUndo,
-  pushFramePositionUndo,
-  pushFrameAssignmentUndo,
 } = useUndoHandlers()
 
 // Content renderer is configured via composable
@@ -139,39 +133,6 @@ const nodeService = useNodeService()
 const planState = usePlanState()
 // Destructure refs for template auto-unwrapping
 const { currentPlan: planCurrentPlan, showApprovalModal: planShowApprovalModal } = planState
-
-// File move collision dialog state
-const showCollisionDialog = ref(false)
-const collisionDialogData = ref<{
-  sourceFileName: string
-  targetFolder: string
-  existingFileName: string
-  resolve: (result: { resolution: 'cancel' | 'rename' | 'replace'; newName?: string }) => void
-} | null>(null)
-
-function handleCollisionDialogResolve(resolution: 'cancel' | 'rename' | 'replace', newName?: string) {
-  if (collisionDialogData.value) {
-    collisionDialogData.value.resolve({ resolution, newName })
-  }
-  showCollisionDialog.value = false
-  collisionDialogData.value = null
-}
-
-async function showFileMoveCollisionDialog(
-  sourceFileName: string,
-  targetFolder: string,
-  existingFileName: string
-): Promise<{ resolution: 'cancel' | 'rename' | 'replace'; newName?: string }> {
-  return new Promise((resolve) => {
-    collisionDialogData.value = {
-      sourceFileName,
-      targetFolder,
-      existingFileName,
-      resolve,
-    }
-    showCollisionDialog.value = true
-  })
-}
 
 // Track if we've centered the view initially
 let hasInitiallyCentered = false
@@ -495,7 +456,6 @@ function getVisualNode(nodeId: string) {
 // Node navigation composable
 const nodeNavigation = useNodeNavigation({
   getFilteredNodes: () => store.filteredNodes,
-  getFrames: () => store.filteredFrames,
   getNode: store.getNode,
   getVisualNode,
   selectNode: id => store.selectNode(id),
@@ -578,7 +538,7 @@ const { copySelectedNodes, pasteNodes } = clipboard
 // Content renderer composable - handles markdown, math, mermaid rendering with caching
 const contentRenderer = useContentRenderer({
   getFilteredNodes: () => store.filteredNodes,
-  getFilteredFrames: () => store.filteredFrames, getFontScale: () => displayStore.fontScale,
+  getFontScale: () => displayStore.fontScale,
   // Only what the viewport shows, plus whatever is being edited
   // (PRODUCT_DESIGN.md > Rendering node content)
   getRenderableNodes: () => {
@@ -617,14 +577,11 @@ const previewConnectedNodes = computed(() => {
     .map(({ title, content }) => ({ title, content }))
 })
 
-// Colors currently in use in nodes and frames (for color bar)
+// Colors currently in use in nodes (for color bar)
 // Returns objects with value (stored) and display (shown in dot)
 const colorsInUse = computed(() =>
   colorsInUseFor(
-    [
-      ...store.filteredNodes.map(n => n.color_theme),
-      ...store.filteredFrames.map(f => f.color),
-    ],
+    store.filteredNodes.map(n => n.color_theme),
     nodeColors.value
   )
 )
@@ -694,11 +651,6 @@ const {
 
 // Node border width - scale inversely to maintain constant visual width (2px on screen)
 const nodeBorderWidth = computed(() => {
-  return Math.max(1, 2 / scale.value)
-})
-
-// Frame border width - scale inversely to maintain constant visual width (2px on screen)
-const frameBorderWidth = computed(() => {
   return Math.max(1, 2 / scale.value)
 })
 
@@ -906,59 +858,16 @@ const {
 // Prevent double-click node creation right after drag
 let lastDragEndTime = 0
 
-// Frame operations composable - collision resolution and node organization
-const { resolveFrameCollisions, organizeFrame } = useFrameOperations({
-  store: {
-    get filteredFrames() { return store.filteredFrames },
-    get filteredNodes() { return store.filteredNodes },
-    getNode: store.getNode,
-    updateFramePosition: store.updateFramePosition,
-    updateNodePosition: store.updateNodePosition,
-  },
-})
-
-// Frame operations composable
-const frames = useFrames({
-  store: framesStoreAdapter(store),
-  viewState: {
-    scale,
-    offsetX,
-    offsetY,
-    canvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
-  },
-  screenToCanvas,
-  snapToGrid,
-  resolveFrameCollisions,
-  pushFramePositionUndo,
-  organizeFrameNodes: (frameId: string) => organizeFrame(frameId),
-})
-const {
-  editingFrameId,
-  editFrameTitle,
-  onPointerDown: onFramePointerDown,
-  startResize: startFrameResize,
-  startEditingTitle: startEditingFrameTitle,
-  saveTitle: saveFrameTitleEditing,
-  cancelTitleEditing: cancelFrameTitleEditing,
-  createAtCenter: createFrameAtCenter,
-  createAtPosition: createFrameAtPosition,
-  cancelPlacement: cancelFramePlacement,
-  deleteSelected: deleteSelectedFrame,
-} = frames
-
 // Layout composable
 const layout = useLayout({
   store: {
     getNodes: () => [...store.nodes],
     getFilteredNodes: () => [...store.filteredNodes],
     getFilteredEdges: () => [...store.filteredEdges],
-    getFilteredFrames: () => [...store.filteredFrames],
     getSelectedNodeIds: () => [...store.selectedNodeIds],
     getNode: store.getNode,
     updateNodePosition: store.updateNodePosition,
     persistNodePosition: store.persistNodePosition,
-    updateFramePosition: store.updateFramePosition,
-    updateFrameSize: store.updateFrameSize,
     layoutNodes: store.layoutNodes,
   },
   viewState: {
@@ -975,10 +884,8 @@ async function autoLayoutNodes(
   type: 'grid' | 'horizontal' | 'vertical' | 'force' | 'hierarchical' | 'radial' = 'grid'
 ) {
   isLayouting.value = true
-  const frameId = store.selectedFrameId
   try {
-    // Use autoLayout for all layout types - it handles frame-scoped layouts correctly
-    await layout.autoLayout(type, frameId ?? undefined)
+    await layout.autoLayout(type)
   } finally {
     isLayouting.value = false
   }
@@ -986,13 +893,6 @@ async function autoLayoutNodes(
 function fitToContent() {
   layout.fitToContent()
 }
-
-// Frame fitting composable
-const { fitSelectedFrameToContents } = useFrameFitting({
-  // The frames adapter is a superset of what fitting needs
-  store: framesStoreAdapter(store),
-  pushFrameGeometryUndo: pushFramePositionUndo,
-})
 
 // Auto-fit is per-node (stored on node.auto_fit)
 
@@ -1098,9 +998,6 @@ const pdfGraph = usePdfGraphImport({
     createNode: store.createNode,
     createEdge: store.createEdge,
     updateNodeContent: store.updateNodeContent,
-    createFrame: store.createFrame,
-    assignNodeToFrame: (nodeId: string, frameId: string | null) =>
-      store.assignNodesToFrame([nodeId], frameId),
     getNode: store.getNode,
   },
   llm: { simpleGenerate: (prompt: string) => llm.simpleGenerate(prompt) },
@@ -1138,7 +1035,6 @@ const pdfDrop = usePdfDrop({
     updateNodeTitle: store.updateNodeTitle,
     deleteNode: store.deleteNode,
     createEdge: store.createEdge,
-    createFrame: store.createFrame,
     importOntology: store.importOntology,
     getNodes: () => store.nodes,
     updateNodeColor: store.updateNodeColor,
@@ -1362,27 +1258,14 @@ function onCanvasPointerDown(e: PointerEvent) {
   // A pinch takes the viewport outright; nothing else may act on this press.
   if (beginContact(e)) return
 
-  // Handle frame placement mode
-  if (frames.pendingFramePlacement.value && e.button === 0) {
-    e.preventDefault()
-    const rect = canvasRef.value?.getBoundingClientRect()
-    if (rect) {
-      const canvasX = (e.clientX - rect.left - offsetX.value) / scale.value
-      const canvasY = (e.clientY - rect.top - offsetY.value) / scale.value
-      createFrameAtPosition(canvasX, canvasY)
-    }
-    return
-  }
-
   // Left click/primary touch - start panning or lasso if not on a node
   if (e.button === 0) {
     const target = e.target as HTMLElement
-    // Don't pan if clicking on a node, edge, panel, or frame
+    // Don't pan if clicking on a node, edge, or panel
     if (
       target.closest('.node-card') ||
       target.closest('.edge-line') ||
-      target.closest('.edge-panel') ||
-      target.closest('.canvas-frame')
+      target.closest('.edge-panel')
     ) {
       return
     }
@@ -1418,7 +1301,6 @@ function onCanvasPointerDown(e: PointerEvent) {
       // If barely moved, treat as click and clear selection
       if (dx < 5 && dy < 5) {
         store.selectNode(null)
-        store.selectFrame(null)
         selectedEdge.value = null
       }
       document.removeEventListener('pointerup', onPointerUp)
@@ -1468,66 +1350,6 @@ watch(
   { deep: true }
 )
 
-// Auto-expand frame when node inside it grows beyond boundaries
-function expandFrameToFitNode(nodeId: string, nodeWidth: number, nodeHeight: number, nodeX: number, nodeY: number) {
-  const node = store.getNode(nodeId)
-  if (!node) return
-
-  // Only expand if node has explicit frame_id - don't use spatial check during resize
-  // This prevents accidentally switching frames when frames overlap
-  if (!node.frame_id) return
-
-  const containingFrame = store.filteredFrames.find(f => f.id === node.frame_id)
-  if (!containingFrame) return
-
-  const nodeRight = nodeX + nodeWidth
-  const nodeBottom = nodeY + nodeHeight
-  const padding = 30
-
-  // Calculate new frame bounds to contain the node
-  let newX = containingFrame.canvas_x
-  let newY = containingFrame.canvas_y
-  let newWidth = containingFrame.width
-  let newHeight = containingFrame.height
-
-  // Expand left edge if node extends past it
-  if (nodeX - padding < containingFrame.canvas_x) {
-    const expandBy = containingFrame.canvas_x - (nodeX - padding)
-    newX = nodeX - padding
-    newWidth += expandBy
-  }
-
-  // Expand top edge if node extends past it
-  if (nodeY - padding < containingFrame.canvas_y) {
-    const expandBy = containingFrame.canvas_y - (nodeY - padding)
-    newY = nodeY - padding
-    newHeight += expandBy
-  }
-
-  // Expand right edge if node extends past it
-  const frameRight = newX + newWidth
-  if (nodeRight + padding > frameRight) {
-    newWidth = nodeRight + padding - newX
-  }
-
-  // Expand bottom edge if node extends past it
-  const frameBottom = newY + newHeight
-  if (nodeBottom + padding > frameBottom) {
-    newHeight = nodeBottom + padding - newY
-  }
-
-  // Update frame if changed
-  const posChanged = newX !== containingFrame.canvas_x || newY !== containingFrame.canvas_y
-  const sizeChanged = newWidth !== containingFrame.width || newHeight !== containingFrame.height
-
-  if (posChanged) {
-    store.updateFramePosition(containingFrame.id, newX, newY)
-  }
-  if (sizeChanged) {
-    store.updateFrameSize(containingFrame.id, newWidth, newHeight)
-  }
-}
-
 // Node resizing composable
 const nodeResizing = useNodeResizing({
   store: {
@@ -1552,7 +1374,6 @@ const nodeResizing = useNodeResizing({
   isSemanticZoomCollapsed,
   isLODMode,
   getVisualNode,
-  expandFrameToFitNode,
 })
 const { resizingNode, resizePreview, onResizePointerDown } = nodeResizing
 
@@ -1565,7 +1386,6 @@ const {
   handleNavigateToNode,
 } = useFullscreenModal({
   getFilteredNodes: () => store.filteredNodes,
-  getFilteredFrames: () => store.filteredFrames,
 })
 
 // Node dragging composable
@@ -1585,10 +1405,6 @@ const nodeDragging = useNodeDragging({
     get filteredEdges() {
       return store.filteredEdges
     },
-    get frames() {
-      return store.frames
-    },
-    assignNodesToFrame: store.assignNodesToFrame,
     refreshNodeFromFile: store.refreshNodeFromFile,
     get nodeLayoutVersion() {
       return store.nodeLayoutVersion
@@ -1596,7 +1412,6 @@ const nodeDragging = useNodeDragging({
     set nodeLayoutVersion(v: number) {
       store.nodeLayoutVersion = v
     },
-    updateNodeFilePath: store.updateNodeFilePath,
   },
   scale,
   offset: computed(() => ({ x: offsetX.value, y: offsetY.value })),
@@ -1616,7 +1431,6 @@ const nodeDragging = useNodeDragging({
   layoutNeighborhood: neighborhood.layout,
   pushOverlappingNodesAway,
   pushUndo,
-  pushFrameAssignmentUndo,
   screenToCanvas,
   zoomToNode,
   onEdgePreviewMove,
@@ -1626,11 +1440,6 @@ const nodeDragging = useNodeDragging({
   },
   onFullscreenOpen: openFullscreenNode,
   // File-folder sync
-  checkFileCollision: store.checkFileCollision,
-  moveNodeFile: store.moveNodeFile,
-  markProgrammaticMove: store.markProgrammaticMove,
-  getVaultPath: store.getVaultPath,
-  showCollisionDialog: showFileMoveCollisionDialog,
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
@@ -1698,14 +1507,12 @@ const { visibleEdgeLines, canvasEdges } = useEdgeVisibility({
   getNode: store.getNode,
 })
 
-// Color operations composable - node and frame color updates
-const { updateSelectedNodesColor, updateSelectedFrameColor } = useColorOperations({
+// Color operations composable - node color updates
+const { updateSelectedNodesColor } = useColorOperations({
   store: {
     getNode: store.getNode,
     get selectedNodeIds() { return store.selectedNodeIds },
-    get selectedFrameId() { return store.selectedFrameId },
     updateNodeColor: store.updateNodeColor,
-    updateFrameColor: store.updateFrameColor,
   },
   pushColorUndo,
 })
@@ -1895,22 +1702,17 @@ function startEditingAndSearch(nodeId: string) {
 
 // Keyboard shortcuts composable - handles global canvas shortcuts
 useCanvasKeyboardShortcuts({
-  pendingFramePlacement: frames.pendingFramePlacement,
-  cancelFramePlacement,
   selectedNodeIds: computed(() => store.selectedNodeIds),
   selectedEdge,
-  selectedFrameId: computed(() => store.selectedFrameId),
   deleteSelectedNodes,
   deleteSelectedEdge,
-  deleteSelectedFrame,
   selectAllNodes,
   copySelectedNodes,
   pasteNodes,
   resetAllNodeSizes,
   startEditingAndSearch,
-  layoutNodes: () => store.layoutNodes(undefined, { frameId: store.selectedFrameId ?? undefined }),
+  layoutNodes: () => store.layoutNodes(),
   fitToContent,
-  fitSelectedFrameToContents,
   toggleNeighborhoodMode: neighborhood.toggle,
   fontScale,
   increaseFontScale,
@@ -2025,7 +1827,7 @@ defineExpose({
     <div
       ref="canvasRef"
       class="canvas-viewport"
-      :class="{ panning: isPanning, 'gesture-active': gestureActive, 'frame-placement': frames.pendingFramePlacement.value }"
+      :class="{ panning: isPanning, 'gesture-active': gestureActive }"
       @wheel="onWheel"
       @pointerdown="onCanvasPointerDown"
       @pointermove="onCanvasPointerMove"
@@ -2038,18 +1840,15 @@ defineExpose({
            instead of repainting the whole viewport (canvas-viewport.css) -->
       <div class="canvas-grid" :style="{ transform: gridTransform }"></div>
 
-      <!-- Floating color bar (shown when nodes or frame is selected) -->
+      <!-- Floating color bar (shown when nodes are selected) -->
       <CanvasColorBar
-        v-if="store.selectedNodeIds.length > 0 || store.selectedFrameId"
+        v-if="store.selectedNodeIds.length > 0"
         :colors="nodeColors"
         :colors-in-use="colorsInUse"
         :selected-node-ids="store.selectedNodeIds"
-        :selected-frame-id="store.selectedFrameId"
         :is-collapsed="isSemanticZoomCollapsed"
         :get-node-color="(id: string) => store.filteredNodes.find(n => n.id === id)?.color_theme"
-        :get-frame-color="() => store.filteredFrames.find(f => f.id === store.selectedFrameId)?.color"
         @update-node-color="updateSelectedNodesColor"
-        @update-frame-color="updateSelectedFrameColor"
         @fit-nodes="fitSelectedNodes"
       />
 
@@ -2078,25 +1877,7 @@ defineExpose({
       />
 
       <div class="canvas-content" :style="{ transform }">
-        <!-- Frames (rendered first, below edges) - hidden in neighborhood mode -->
-        <CanvasFrames
-          v-if="!neighborhoodMode"
-          :frames="store.filteredFrames"
-          :selected-frame-id="store.selectedFrameId"
-          :editing-frame-id="editingFrameId"
-          :edit-frame-title="editFrameTitle"
-          :frame-border-width="frameBorderWidth"
-          :scale="scale"
-          @update:edit-frame-title="editFrameTitle = $event"
-          @pointerdown="onFramePointerDown"
-          @dblclick="startEditingFrameTitle"
-          @save-title="saveFrameTitleEditing"
-          @cancel-title="cancelFrameTitleEditing"
-          @delete="deleteSelectedFrame"
-          @start-resize="startFrameResize"
-        />
-
-        <!-- SVG for edges (above frames) -->
+        <!-- SVG for edges -->
         <CanvasEdgesSVG
           :edges="isLODMode ? [] : visibleEdgeLines"
           :simplified="useSimpleEdges"
@@ -2229,7 +2010,6 @@ defineExpose({
         :global-edge-style="globalEdgeStyle"
         :neighborhood-mode="neighborhoodMode"
         :neighborhood-depth="neighborhoodDepth"
-        :pending-frame-placement="frames.pendingFramePlacement.value"
         :highlight-all-edges="highlightAllEdges"
         :bubble-mode-active="isBubbleModeForced"
         @zoom-in="zoomIn" @zoom-out="zoomOut"
@@ -2240,7 +2020,6 @@ defineExpose({
         @cycle-edge-style="cycleEdgeStyle"
         @toggle-neighborhood-mode="neighborhood.toggle()"
         @set-neighborhood-depth="setDepth"
-        @create-frame="createFrameAtCenter"
         @show-help="showHelpModal = true"
         @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
         @toggle-bubble-mode="toggleBubbleMode"
@@ -2257,15 +2036,6 @@ defineExpose({
         @zoom-to-node="(id) => { closeFullscreenNode(); zoomToNode(id, 1) }"
         @render-mermaid="renderMermaidDiagrams"
         @navigate-to-node="handleNavigateToNode"
-      />
-
-      <!-- File Move Collision Dialog -->
-      <FileMoveCollisionDialog
-        v-if="showCollisionDialog && collisionDialogData"
-        :source-file-name="collisionDialogData.sourceFileName"
-        :target-folder="collisionDialogData.targetFolder"
-        :existing-file-name="collisionDialogData.existingFileName"
-        @resolve="handleCollisionDialogResolve"
       />
 
       <!-- Status Bar -->

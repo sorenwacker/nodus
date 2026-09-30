@@ -28,7 +28,6 @@ function node(id: string, x: number, y: number): Node {
     canvas_y: y,
     width: 200,
     height: 120,
-    frame_id: null,
     workspace_id: null,
     created_at: 0,
     updated_at: 0,

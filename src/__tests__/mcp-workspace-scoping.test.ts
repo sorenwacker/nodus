@@ -3,8 +3,8 @@
  * (PRODUCT_DESIGN.md > Workspace scoping for MCP connections).
  *
  * Scoping only the list getters produced a store that contradicted itself:
- * list_frames returned the target workspace's frames while get_frame on those
- * same ids resolved against whichever workspace the user had open.
+ * a list returned the target workspace's items while a lookup of those same
+ * ids resolved against whichever workspace the user had open.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -52,12 +52,6 @@ const ADDRESSED_BY_ID = [
   'updateEdgeDirected',
   'updateEdgeLabel',
   'updateEdgeColor',
-  'updateFramePosition',
-  'updateFrameSize',
-  'updateFrameTitle',
-  'updateFrameColor',
-  'deleteFrame',
-  'assignNodesToFrame',
   'getStorylineNodes',
   'updateStoryline',
   'deleteStoryline',
@@ -74,7 +68,6 @@ const ADDRESSED_BY_ID = [
  */
 const BUILDS_THE_SCOPE = [
   'getAllNodes',
-  'getAllFrames',
   'getAllStorylines',
   'getWorkspaces',
   'loadWorkspaceEdges',
@@ -89,25 +82,25 @@ const scoped = handler.slice(
 describe('the scoped store', () => {
   it('scopes single-entity lookups, not only the lists', () => {
     expect(scoped).toContain('getNode:')
-    expect(scoped).toContain('getFrame:')
+    expect(scoped).toContain('getStoryline:')
   })
 
   it('derives those lookups from its own scoped collections', () => {
     // Deriving them from the app's filtered lists is what let the two drift
     expect(scoped).toMatch(/getNode:.*nodesInScope\(\)/)
-    expect(scoped).toMatch(/getFrame:.*framesInScope\(\)/)
+    expect(scoped).toMatch(/getStoryline:.*storylinesInScope\(\)/)
     expect(scoped).not.toMatch(/getNode:\s*store\.getNode/)
   })
 
   it('keeps the list getters and the lookups on one definition each', () => {
     expect(scoped).toContain('getFilteredNodes: nodesInScope')
-    expect(scoped).toContain('getFilteredFrames: framesInScope')
+    expect(scoped).toContain('getFilteredStorylines: storylinesInScope')
   })
 })
 
 describe('every method of the store', () => {
   // A store that scopes some methods and inherits the rest cannot be read for
-  // what it does: frame creation and every storyline operation were inherited,
+  // what it does: every storyline operation was inherited,
   // so a scoped connection wrote into whichever workspace the user had open
   // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
   it('is scoped, or recorded as not needing to be', () => {
@@ -136,7 +129,7 @@ describe('every method of the store', () => {
 
   it('scopes the writes, not only the reads', () => {
     const scopedNow = new Set(scopedMethods())
-    for (const write of ['createNode', 'createFrame', 'createStoryline']) {
+    for (const write of ['createNode', 'createStoryline']) {
       expect(scopedNow.has(write), `${write} lands in whichever workspace is open`).toBe(true)
     }
   })

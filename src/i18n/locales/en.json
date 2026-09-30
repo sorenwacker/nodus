@@ -67,11 +67,6 @@
       "deleteEdgeTooltip": "Delete this edge",
       "labelSaved": "Edge label saved"
     },
-    "frame": {
-      "delete": "Delete frame",
-      "addFrame": "Add Frame - Group selected nodes",
-      "clickToPlace": "Click on canvas to place frame (Esc to cancel)"
-    },
     "status": {
       "layoutRunning": "Layout running...",
       "stop": "Stop",
@@ -103,8 +98,7 @@
       "neighborhoodDepth": "Neighborhood depth (hops)",
       "hop": "hop",
       "hops": "hops",
-      "help": "Help - Keyboard shortcuts and usage",
-      "organizeFrames": "Organize Frames - Pull members in, push others out"
+      "help": "Help - Keyboard shortcuts and usage"
     },
     "search": {
       "placeholder": "Search nodes...",
@@ -346,7 +340,7 @@
     "options": {
       "title": "Import Options",
       "entriesFound": "{count} citation found | {count} citations found",
-      "createFrame": "Create frame for collection",
+      "tagCollection": "Tag citations with the collection name",
       "collectionDetected": "Collection: {name}",
       "noCollection": "No collection detected in export",
       "importAttachments": "Import attached PDFs",
@@ -661,20 +655,6 @@
     "showPerfOverlay": "Show performance readout",
     "showPerfOverlayHint": "Frame timing over the graph while you pan or zoom, for diagnosing stutter"
   },
-  "fileMove": {
-    "collision": {
-      "title": "File Already Exists",
-      "message": "A file with the same name already exists in the target folder.",
-      "moving": "Moving:",
-      "to": "To:",
-      "existing": "Existing:",
-      "options": "Choose an option:",
-      "rename": "Rename",
-      "renameDesc": "Save with a new name",
-      "replace": "Replace",
-      "replaceDesc": "Overwrite the existing file (cannot be undone)"
-    }
-  },
   "mcp": {
     "connectionRequest": "MCP Connection Request",
     "connectionRequestMessage": "An AI tool is requesting access to your workspace. This will allow it to read and modify your nodes.",
@@ -749,7 +729,7 @@
     "title": "Expand into a graph",
     "lead": "This document has structure. Choose what becomes part of your graph; the single node stays either way.",
     "sections": "{count} sections as nodes",
-    "sectionsHint": "One node per heading, connected along the document outline, grouped in a frame",
+    "sectionsHint": "One node per heading, connected along the document outline, tagged with the paper's title",
     "references": "{count} references as citation nodes",
     "referencesHint": "Each entry in the bibliography becomes a citation node cited by the paper",
     "verify": "Verify against Semantic Scholar",

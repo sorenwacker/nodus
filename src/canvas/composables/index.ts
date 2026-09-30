@@ -115,9 +115,6 @@ export {
   type UseNeighborhoodModeOptions,
 } from './layout'
 
-// Frames: spatial grouping
-export { useFrames, type UseFramesOptions } from './frames'
-
 // Utilities: keyboard shortcuts, undo, PDF, storylines
 export {
   useCanvasKeyboardShortcuts,

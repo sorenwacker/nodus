@@ -1,128 +1,48 @@
 /**
- * Frame and storyline tool registrations for the in-app agent.
+ * Tag and storyline tool registrations for the in-app agent.
  *
- * Frames and storylines are core to the canvas, but only MCP clients could
- * create them: asking the in-app agent to group nodes into a frame, or to
- * thread them into a storyline, had no tool that could do it.
+ * Grouping names a set of nodes with a shared tag. Frames did this by drawing
+ * a box whose stored membership drifted from what it enclosed, and are
+ * removed (docs/design/remove-frames.md).
  *
- * Handles: create_frame, assign_node_to_frame, list_frames,
- *          create_storyline, add_node_to_storyline, list_storylines
+ * Handles: tag_nodes, create_storyline, add_node_to_storyline, list_storylines
  */
 
 import { defineTool, findNodeByTitle } from '../registry'
-
-/** Bounding box around a set of nodes, with room for the frame's chrome */
-function boundsAround(
-  nodes: Array<{ canvas_x: number; canvas_y: number; width?: number; height?: number }>,
-  padding = 60
-): { x: number; y: number; width: number; height: number } {
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const node of nodes) {
-    minX = Math.min(minX, node.canvas_x)
-    minY = Math.min(minY, node.canvas_y)
-    maxX = Math.max(maxX, node.canvas_x + (node.width || 200))
-    maxY = Math.max(maxY, node.canvas_y + (node.height || 100))
-  }
-  return {
-    x: minX - padding,
-    y: minY - padding,
-    width: maxX - minX + padding * 2,
-    height: maxY - minY + padding * 2,
-  }
-}
+import { toTag } from '../../lib/contentParser'
+import { recordedTagsOf } from '../../lib/tagSync'
 
 export function registerGroupingTools(): void {
-  defineTool<{ title: string; node_titles?: string[] }>(
-    'create_frame',
-    'Create a frame (spatial group) on the canvas, optionally sized around the named nodes',
+  defineTool<{ tag: string; node_titles: string[] }>(
+    'tag_nodes',
+    'Group nodes by adding the same tag to each, by title. The name is converted to a valid tag (e.g. "Demo Project" becomes demo-project)',
     {
       type: 'object',
       properties: {
-        title: { type: 'string', description: 'Frame title' },
-        node_titles: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Titles of nodes to enclose; the frame is sized around them and they join it',
-        },
+        tag: { type: 'string', description: 'Group name or tag' },
+        node_titles: { type: 'array', items: { type: 'string' }, description: 'Titles of the nodes to tag' },
       },
-      required: ['title'],
+      required: ['tag', 'node_titles'],
     },
     async (args, ctx) => {
-      if (!ctx.store.createFrame) return 'Error: frames are not available in this context'
+      if (!ctx.store.updateNodeTags) return 'Error: tags are not available in this context'
+      const tag = toTag(args.tag)
+      if (!tag) return `Error: "${args.tag}" contains no characters a tag can use`
 
       const named = (args.node_titles || [])
         .map(t => findNodeByTitle(ctx.store.filteredNodes, t))
         .filter((n): n is NonNullable<typeof n> => Boolean(n))
 
-      const box = named.length > 0
-        ? boundsAround(named)
-        : (() => {
-            const centre = ctx.screenToCanvas(window.innerWidth / 2, window.innerHeight / 2)
-            return { x: centre.x, y: centre.y, width: 600, height: 400 }
-          })()
-
-      const frame = await ctx.store.createFrame(box.x, box.y, box.width, box.height, args.title)
-      if (named.length > 0 && ctx.store.assignNodesToFrame) {
-        ctx.store.assignNodesToFrame(named.map(n => n.id), frame.id)
+      for (const node of named) {
+        const tags = recordedTagsOf(node)
+        if (!tags.includes(tag)) await ctx.store.updateNodeTags(node.id, [...tags, tag])
       }
 
       const missing = (args.node_titles || []).length - named.length
       const note = missing > 0 ? ` (${missing} named node(s) not found)` : ''
-      return `Created frame "${args.title}" with ${named.length} node(s)${note}`
-    },
-    { category: 'crud' }
-  )
-
-  defineTool<{ frame_title: string; node_titles: string[] }>(
-    'assign_node_to_frame',
-    'Put existing nodes into an existing frame, by title',
-    {
-      type: 'object',
-      properties: {
-        frame_title: { type: 'string', description: 'Title of the target frame' },
-        node_titles: { type: 'array', items: { type: 'string' }, description: 'Titles of the nodes to move into it' },
-      },
-      required: ['frame_title', 'node_titles'],
-    },
-    async (args, ctx) => {
-      if (!ctx.store.getFrames || !ctx.store.assignNodesToFrame) {
-        return 'Error: frames are not available in this context'
-      }
-      const frame = ctx.store
-        .getFrames()
-        .find(f => (f.title || '').toLowerCase() === args.frame_title.toLowerCase())
-      if (!frame) return `Error: Frame "${args.frame_title}" not found`
-
-      const named = (args.node_titles || [])
-        .map(t => findNodeByTitle(ctx.store.filteredNodes, t))
-        .filter((n): n is NonNullable<typeof n> => Boolean(n))
-      if (named.length === 0) return 'Error: none of the named nodes were found'
-
-      ctx.store.assignNodesToFrame(named.map(n => n.id), frame.id)
-      return `Moved ${named.length} node(s) into frame "${frame.title}"`
+      return `Tagged ${named.length} node(s) with #${tag}${note}`
     },
     { category: 'update' }
-  )
-
-  defineTool<Record<string, never>>(
-    'list_frames',
-    'List the frames on the canvas with the number of nodes in each',
-    { type: 'object', properties: {} },
-    async (_args, ctx) => {
-      if (!ctx.store.getFrames) return 'Error: frames are not available in this context'
-      const frames = ctx.store.getFrames()
-      if (frames.length === 0) return 'No frames on the canvas'
-      return frames
-        .map(f => {
-          const count = ctx.store.filteredNodes.filter(n => n.frame_id === f.id).length
-          return `${f.title || 'Untitled frame'}: ${count} node(s)`
-        })
-        .join('\n')
-    },
-    { category: 'query' }
   )
 
   defineTool<{ title: string; description?: string; node_titles?: string[] }>(

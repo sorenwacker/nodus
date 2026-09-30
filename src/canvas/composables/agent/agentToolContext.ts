@@ -47,11 +47,7 @@ export function buildAgentToolContext(deps: AgentToolContextDeps): ToolContext {
       updateNodeTags: store.updateNodeTags,
       updateEdgeLabel: store.updateEdgeLabel,
       updateEdgeColor: store.updateEdgeColor,
-      getFrames: () => store.filteredFrames,
-      assignNodesToFrame: store.assignNodesToFrame,
       getStorylines: () => store.filteredStorylines,
-      createFrame: (x: number, y: number, width: number, height: number, title: string) =>
-        store.createFrame(x, y, width, height, title),
       createStoryline: (title: string, description?: string) =>
         store.createStoryline(title, description),
       addNodeToStoryline: (storylineId: string, nodeId: string) =>

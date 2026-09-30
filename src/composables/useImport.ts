@@ -5,7 +5,6 @@
 import { ref } from 'vue'
 import { relativeFolder } from '../lib/vaultPaths'
 import { fileNameFromPath } from '../lib/pdfGraph'
-import { frameSizeToContain, type CanvasRect } from '../lib/geometry'
 import { invoke, readTextFile, refreshWorkspace as refreshWorkspaceApi, setWorkspaceSync } from '../lib/tauri'
 import { parseReferences, citationToMarkdown } from '../lib/bibtex'
 import { storeLogger } from '../lib/logger'
@@ -15,13 +14,11 @@ import type { Node, Edge, OntologyImportResult } from '../types'
 
 export interface ImportDeps {
   getCurrentWorkspaceId: () => string | null
-  getNodes: () => Node[]
   setNodes: (nodes: Node[]) => void
   addNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
   /** The edges store's deduplication, so the import does not carry a second rule */
   deduplicateEdges: (edges: Edge[]) => Edge[]
-  reloadFrames: () => Promise<void>
   createNode: (data: {
     title: string
     markdown_content?: string
@@ -34,335 +31,65 @@ export interface ImportDeps {
     color_theme?: string
   }) => Promise<Node>
   watchVault: (path: string) => Promise<void>
-  // Frame-folder sync dependencies
-  createFrame?: (
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    title: string,
-    workspaceId: string | null,
-    folderPath: string | null,
-    parentFrameId: string | null
-  ) => { id: string }
-  /** Async version of createFrame that waits for database persistence */
-  createFrameAsync?: (
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    title: string,
-    workspaceId: string | null,
-    folderPath: string | null,
-    parentFrameId: string | null
-  ) => Promise<{ id: string }>
-  assignNodesToFrame?: (nodeIds: string[], frameId: string | null) => void
   updateNodePosition?: (id: string, x: number, y: number) => void
-  /** Grow a folder frame that gained nodes (PRODUCT_DESIGN.md > Refreshing a workspace from its files) */
-  updateFrameSize?: (id: string, width: number, height: number) => void
-  getFrames?: () => Array<{ id: string; folder_path: string | null; canvas_x: number; canvas_y: number; width: number; height: number }>
-  getVaultPath?: () => string | null
 }
 
-/**
- * Layout nodes inside a frame in a grid, using actual node sizes, starting at
- * `top`. Returns where each node was placed.
- */
-function layoutNodesInFrame(
-  nodes: Node[],
-  frame: { canvas_x: number; canvas_y: number; width: number; height: number },
-  padding: number,
-  spacing: number,
-  nodesPerRow: number,
-  deps: ImportDeps,
-  top = frame.canvas_y + padding + 40 // +40 for frame title
-): CanvasRect[] {
-  if (!deps.updateNodePosition || nodes.length === 0) return []
-  const placed: CanvasRect[] = []
-
-  // Calculate positions row by row, accounting for actual node heights
-  let currentX = frame.canvas_x + padding
-  let currentY = top
-  let rowMaxHeight = 0
-  let colIndex = 0
-
-  for (const node of nodes) {
-    const nodeWidth = node.width || 200
-    const nodeHeight = node.height || 120
-
-    // Check if we need to wrap to next row
-    if (colIndex >= nodesPerRow) {
-      currentX = frame.canvas_x + padding
-      currentY += rowMaxHeight + spacing
-      rowMaxHeight = 0
-      colIndex = 0
-    }
-
-    // Position the node
-    deps.updateNodePosition(node.id, currentX, currentY)
-    placed.push({ canvas_x: currentX, canvas_y: currentY, width: nodeWidth, height: nodeHeight })
-
-    // Track max height in this row
-    rowMaxHeight = Math.max(rowMaxHeight, nodeHeight)
-
-    // Move X for next node
-    currentX += nodeWidth + spacing
-    colIndex++
-  }
-  return placed
-}
+/** Clusters are laid out in rows of this many, left to right */
+const CLUSTERS_PER_ROW = 3
+const NODES_PER_ROW = 3
+const NODE_SPACING = 30
+const CLUSTER_SPACING = 150
+const ORIGIN = 100
 
 /**
- * Calculate frame size needed to fit nodes in a grid layout
+ * Place each folder's nodes as a cluster: a small grid per folder, the
+ * clusters themselves in rows. The folder stays in each node's file path, so
+ * nothing else records the grouping (docs/design/remove-frames.md).
+ * Returns the number of clusters placed.
  */
-function calculateFrameSizeForNodes(
-  nodes: Node[],
-  padding: number,
-  spacing: number,
-  nodesPerRow: number
-): { width: number; height: number } {
-  if (nodes.length === 0) {
-    return { width: 300, height: 200 }
-  }
+function placeFoldersAsClusters(nodes: Node[], vaultPath: string, deps: ImportDeps): number {
+  if (!deps.updateNodePosition) return 0
 
-  // Group nodes into rows and calculate dimensions
-  const rows: Node[][] = []
-  for (let i = 0; i < nodes.length; i += nodesPerRow) {
-    rows.push(nodes.slice(i, i + nodesPerRow))
-  }
-
-  // Calculate width based on widest row
-  let maxRowWidth = 0
-  for (const row of rows) {
-    let rowWidth = 0
-    for (const node of row) {
-      rowWidth += (node.width || 200) + spacing
-    }
-    rowWidth -= spacing // Remove trailing spacing
-    maxRowWidth = Math.max(maxRowWidth, rowWidth)
-  }
-
-  // Calculate height based on sum of row heights
-  let totalHeight = 0
-  for (const row of rows) {
-    let rowMaxHeight = 0
-    for (const node of row) {
-      rowMaxHeight = Math.max(rowMaxHeight, node.height || 120)
-    }
-    totalHeight += rowMaxHeight + spacing
-  }
-  totalHeight -= spacing // Remove trailing spacing
-
-  return {
-    width: Math.max(300, maxRowWidth + padding * 2),
-    height: Math.max(200, totalHeight + padding * 2 + 40), // +40 for frame title
-  }
-}
-
-/**
- * Extract relative folder path from a file path and vault path
- */
-
-
-/**
- * Create frames from folder structure based on imported nodes
- * Moves nodes into their frames in a grid layout
- * Returns the number of frames created
- */
-async function createFramesFromFolders(
-  nodes: Node[],
-  vaultPath: string,
-  workspaceId: string | null,
-  deps: ImportDeps
-): Promise<number> {
-  // Need either createFrame or createFrameAsync
-  const hasFrameCreation = deps.createFrame || deps.createFrameAsync
-  if (!hasFrameCreation || !deps.assignNodesToFrame) return 0
-
-  // Build map of existing frames by folder path
-  const existingFramesByPath = new Map<string, { id: string; canvas_x: number; canvas_y: number; width: number; height: number }>()
-  const existingFrames = deps.getFrames?.() || []
-  for (const f of existingFrames) {
-    if (f.folder_path) {
-      existingFramesByPath.set(f.folder_path, f as { id: string; canvas_x: number; canvas_y: number; width: number; height: number })
-    }
-  }
-
-  // Build a map of nodes by ID for quick lookup
-  const nodeMap = new Map<string, Node>()
-  for (const node of nodes) {
-    nodeMap.set(node.id, node)
-  }
-
-  // Extract unique folder paths from nodes
-  const folderToNodeIds = new Map<string, string[]>()
-
+  const byFolder = new Map<string, Node[]>()
   for (const node of nodes) {
     if (!node.file_path) continue
     const folder = relativeFolder(node.file_path, vaultPath)
-    if (!folder) continue // Skip root-level files
-
-    if (!folderToNodeIds.has(folder)) {
-      folderToNodeIds.set(folder, [])
-    }
-    folderToNodeIds.get(folder)!.push(node.id)
+    if (!folder) continue // Root-level files keep the position the import gave them
+    byFolder.set(folder, [...(byFolder.get(folder) ?? []), node])
   }
 
-  // Sort folders to process parent folders first (for nesting)
-  const sortedFolders = Array.from(folderToNodeIds.keys()).sort((a, b) => {
-    // path-normalised: folder keys come from getRelativeFolder
-    const depthA = a.split('/').length
-    // path-normalised
-    const depthB = b.split('/').length
-    return depthA - depthB
+  const folders = Array.from(byFolder.keys()).sort()
+  let rowTop = ORIGIN
+  let rowHeight = 0
+  let left = ORIGIN
+
+  folders.forEach((folder, i) => {
+    if (i > 0 && i % CLUSTERS_PER_ROW === 0) {
+      rowTop += rowHeight + CLUSTER_SPACING
+      rowHeight = 0
+      left = ORIGIN
+    }
+    let x = left
+    let y = rowTop
+    let lineHeight = 0
+    let right = left
+    byFolder.get(folder)!.forEach((node, j) => {
+      if (j > 0 && j % NODES_PER_ROW === 0) {
+        x = left
+        y += lineHeight + NODE_SPACING
+        lineHeight = 0
+      }
+      deps.updateNodePosition!(node.id, x, y)
+      const width = node.width || 200
+      lineHeight = Math.max(lineHeight, node.height || 120)
+      right = Math.max(right, x + width)
+      x += width + NODE_SPACING
+    })
+    rowHeight = Math.max(rowHeight, y + lineHeight - rowTop)
+    left = right + CLUSTER_SPACING
   })
 
-  // Create frames for each folder
-  const folderToFrameId = new Map<string, string>()
-  let framesCreated = 0
-
-  // Layout configuration
-  const FRAME_PADDING = 60
-  const NODE_SPACING = 30
-  const NODES_PER_ROW = 3
-  const FRAME_SPACING = 150
-  const FRAMES_PER_ROW = 3
-  const START_X = 100
-  const START_Y = 100
-
-  // Track frame sizes for proper row/column positioning
-  const frameSizes: Array<{ width: number; height: number }> = []
-
-  for (let i = 0; i < sortedFolders.length; i++) {
-    const folderPath = sortedFolders[i]
-    const nodeIds = folderToNodeIds.get(folderPath) || []
-
-    // Check if frame already exists for this folder
-    const existingFrame = existingFramesByPath.get(folderPath)
-    if (existingFrame) {
-      // Only nodes new to the frame are placed; the rest stay where the user
-      // put them (PRODUCT_DESIGN.md > Refreshing a workspace from its files)
-      const held = nodes.filter((n) => n.frame_id === existingFrame.id)
-      const newcomers = nodeIds
-        .map((id) => nodeMap.get(id))
-        .filter((n): n is Node => !!n && n.frame_id !== existingFrame.id)
-      if (newcomers.length === 0) continue
-
-      const heldRects = held.map((n) => ({ canvas_x: n.canvas_x, canvas_y: n.canvas_y, width: n.width || 200, height: n.height || 120 }))
-      const top = held.length > 0 ? Math.max(...heldRects.map((r) => r.canvas_y + r.height)) + NODE_SPACING : undefined
-      const placed = layoutNodesInFrame(newcomers, existingFrame, FRAME_PADDING, NODE_SPACING, NODES_PER_ROW, deps, top)
-      deps.assignNodesToFrame(newcomers.map((n) => n.id), existingFrame.id)
-
-      const size = frameSizeToContain(existingFrame, [...heldRects, ...placed], FRAME_PADDING)
-      if (size && (size.width !== existingFrame.width || size.height !== existingFrame.height)) {
-        deps.updateFrameSize?.(existingFrame.id, size.width, size.height)
-      }
-      continue
-    }
-
-    // path-normalised: getRelativeFolder returns forward slashes
-    const parts = folderPath.split('/')
-    const title = parts[parts.length - 1] // Use folder name as frame title
-
-    // Find parent frame if this is a nested folder
-    let parentFrameId: string | null = null
-    if (parts.length > 1) {
-      const parentPath = parts.slice(0, -1).join('/')
-      parentFrameId = folderToFrameId.get(parentPath) ?? null
-    }
-
-    // Get actual nodes for this folder
-    const folderNodes = nodeIds.map((id) => nodeMap.get(id)).filter((n): n is Node => !!n)
-
-    // Calculate frame size based on actual node sizes
-    const { width: frameWidth, height: frameHeight } = calculateFrameSizeForNodes(
-      folderNodes,
-      FRAME_PADDING,
-      NODE_SPACING,
-      NODES_PER_ROW
-    )
-
-    // Calculate frame position using cumulative positioning
-    // Track row heights for proper vertical spacing
-    const frameIndex = framesCreated
-    const frameCol = frameIndex % FRAMES_PER_ROW
-    const frameRow = Math.floor(frameIndex / FRAMES_PER_ROW)
-
-    // Calculate X position based on previous frames in this row
-    let frameX = START_X
-    for (let c = 0; c < frameCol; c++) {
-      const prevIndex = frameRow * FRAMES_PER_ROW + c
-      if (prevIndex < frameSizes.length) {
-        frameX += frameSizes[prevIndex].width + FRAME_SPACING
-      } else {
-        frameX += 400 + FRAME_SPACING // Default width
-      }
-    }
-
-    // Calculate Y position based on max height of previous rows
-    let frameY = START_Y
-    for (let r = 0; r < frameRow; r++) {
-      let maxRowHeight = 300 // Default height
-      for (let c = 0; c < FRAMES_PER_ROW; c++) {
-        const idx = r * FRAMES_PER_ROW + c
-        if (idx < frameSizes.length) {
-          maxRowHeight = Math.max(maxRowHeight, frameSizes[idx].height)
-        }
-      }
-      frameY += maxRowHeight + FRAME_SPACING
-    }
-
-    // Store this frame's size for future calculations
-    frameSizes.push({ width: frameWidth, height: frameHeight })
-
-    // Use createFrameAsync if available for proper database persistence
-    let frame: { id: string }
-    if (deps.createFrameAsync) {
-      frame = await deps.createFrameAsync(
-        frameX,
-        frameY,
-        frameWidth,
-        frameHeight,
-        title,
-        workspaceId,
-        folderPath,
-        parentFrameId
-      )
-    } else {
-      frame = deps.createFrame!(
-        frameX,
-        frameY,
-        frameWidth,
-        frameHeight,
-        title,
-        workspaceId,
-        folderPath,
-        parentFrameId
-      )
-    }
-
-    folderToFrameId.set(folderPath, frame.id)
-    framesCreated++
-
-    // Move nodes into the frame in a grid layout using actual node sizes
-    if (deps.updateNodePosition && folderNodes.length > 0) {
-      layoutNodesInFrame(
-        folderNodes,
-        { canvas_x: frameX, canvas_y: frameY, width: frameWidth, height: frameHeight },
-        FRAME_PADDING,
-        NODE_SPACING,
-        NODES_PER_ROW,
-        deps
-      )
-    }
-
-    // Assign nodes to this frame
-    if (nodeIds.length > 0) {
-      deps.assignNodesToFrame(nodeIds, frame.id)
-    }
-  }
-
-  return framesCreated
+  return folders.length
 }
 
 export function useImport(deps: ImportDeps) {
@@ -400,13 +127,8 @@ export function useImport(deps: ImportDeps) {
         )
       }
 
-      // Create frames from folder structure if frame creation is available
-      if ((deps.createFrame || deps.createFrameAsync) && deps.assignNodesToFrame && importedNodes.length > 0) {
-        const framesCreated = await createFramesFromFolders(importedNodes, path, workspaceId, deps)
-        if (framesCreated > 0) {
-          storeLogger.info(`Created ${framesCreated} frames from folder structure`)
-        }
-      }
+      const clusters = placeFoldersAsClusters(importedNodes, path, deps)
+      if (clusters > 0) storeLogger.info(`Placed ${clusters} folders as clusters`)
 
       // Fetch all edges to include newly created wikilink edges
       const fetchedEdges = await invoke<Edge[]>('get_edges', { workspaceId })
@@ -414,9 +136,6 @@ export function useImport(deps: ImportDeps) {
       // The edges store's rule, so an import cannot hide an edge the store
       // would keep (PRODUCT_DESIGN.md > One rule, one place)
       deps.setEdges(deps.deduplicateEdges(fetchedEdges))
-
-      // Reload frames to include newly created ones
-      await deps.reloadFrames()
 
       // Enable sync mode for this workspace
       if (workspaceId) {
@@ -573,31 +292,6 @@ export function useImport(deps: ImportDeps) {
   }
 
   /**
-   * Sync frames from folder structure
-   * Creates frames for folders that don't have frames yet
-   */
-  async function syncFramesFromFolders(): Promise<number> {
-    const hasFrameCreation = deps.createFrame || deps.createFrameAsync
-    if (!hasFrameCreation || !deps.assignNodesToFrame || !deps.getVaultPath) {
-      return 0
-    }
-
-    const vaultPath = deps.getVaultPath()
-    if (!vaultPath) return 0
-
-    const nodes = deps.getNodes()
-    const workspaceId = deps.getCurrentWorkspaceId()
-
-    const framesCreated = await createFramesFromFolders(nodes, vaultPath, workspaceId, deps)
-    if (framesCreated > 0) {
-      storeLogger.info(`Created ${framesCreated} frames from folder structure`)
-      notifications$.success('Frames synced', `Created ${framesCreated} frames from folder structure`)
-    }
-
-    return framesCreated
-  }
-
-  /**
    * Refresh workspace files from disk
    */
   async function refreshWorkspace(): Promise<number> {
@@ -607,17 +301,6 @@ export function useImport(deps: ImportDeps) {
       storeLogger.info(`Refreshing workspace: ${workspaceId || 'default'}`)
 
       const updated = await refreshWorkspaceApi(workspaceId)
-
-      // Always sync frames from folder structure
-      const vaultPath = deps.getVaultPath?.()
-      const hasFrameCreation = deps.createFrame || deps.createFrameAsync
-      if (vaultPath && hasFrameCreation && deps.assignNodesToFrame) {
-        const nodes = deps.getNodes()
-        const framesCreated = await createFramesFromFolders(nodes, vaultPath, workspaceId, deps)
-        if (framesCreated > 0) {
-          storeLogger.info(`Created ${framesCreated} frames from folder structure`)
-        }
-      }
 
       // Reload nodes to get updated content
       const fetchedNodes = await invoke<Node[]>('get_nodes')
@@ -668,6 +351,5 @@ export function useImport(deps: ImportDeps) {
     importCitations,
     importOntology,
     refreshWorkspace,
-    syncFramesFromFolders,
   }
 }

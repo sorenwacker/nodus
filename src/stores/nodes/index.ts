@@ -6,7 +6,6 @@
 export type {
   Node,
   Edge,
-  Frame,
   Workspace,
   CreateNodeInput,
   CreateEdgeInput,
@@ -61,25 +60,7 @@ export {
   deduplicateEdges,
 } from './edges'
 
-// Re-export file functions
-export {
-  checkFileCollision,
-  moveNodeFile,
-  updateNodeFilePath,
-  getVaultPath,
-} from './files'
 
-// Re-export frame functions
-export {
-  createFrame,
-  updateFramePosition,
-  updateFrameSize,
-  updateFrameTitle,
-  updateFrameColor,
-  deleteFrame,
-  selectFrame,
-  assignNodesToFrame,
-} from './frames'
 
 // Re-export advanced functions
 export {

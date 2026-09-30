@@ -8,17 +8,11 @@ import { onMounted, onUnmounted, type Ref } from 'vue'
 import { uiStorage } from '../../../lib/storage'
 
 export interface UseCanvasKeyboardShortcutsContext {
-  // Frame operations
-  pendingFramePlacement: Ref<boolean>
-  cancelFramePlacement: () => void
-
   // Node operations
   selectedNodeIds: Ref<string[]>
   selectedEdge: Ref<string | null>
-  selectedFrameId: Ref<string | null>
   deleteSelectedNodes: () => void
   deleteSelectedEdge: () => void
-  deleteSelectedFrame: () => void
   selectAllNodes: () => void
   copySelectedNodes: () => void
   pasteNodes: () => void
@@ -30,7 +24,6 @@ export interface UseCanvasKeyboardShortcutsContext {
   // Layout
   layoutNodes: () => void
   fitToContent: () => void
-  fitSelectedFrameToContents: () => void
 
   // Neighborhood mode
   toggleNeighborhoodMode: (nodeId?: string) => void
@@ -54,14 +47,10 @@ export interface UseCanvasKeyboardShortcutsReturn {
 
 export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContext): UseCanvasKeyboardShortcutsReturn {
   const {
-    pendingFramePlacement,
-    cancelFramePlacement,
     selectedNodeIds,
     selectedEdge,
-    selectedFrameId,
     deleteSelectedNodes,
     deleteSelectedEdge,
-    deleteSelectedFrame,
     selectAllNodes,
     copySelectedNodes,
     pasteNodes,
@@ -69,7 +58,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     startEditingAndSearch,
     layoutNodes,
     fitToContent,
-    fitSelectedFrameToContents,
     toggleNeighborhoodMode,
     fontScale,
     increaseFontScale,
@@ -80,13 +68,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
   } = ctx
 
   function handleKeydown(e: KeyboardEvent) {
-    // Escape cancels frame placement mode
-    if (e.key === 'Escape' && pendingFramePlacement.value) {
-      e.preventDefault()
-      cancelFramePlacement()
-      return
-    }
-
     // Cmd+E exports graph as YAML (works even in inputs)
     if ((e.key === 'e' || e.key === 'E') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault()
@@ -147,10 +128,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       else if (selectedEdge.value) {
         deleteSelectedEdge()
       }
-      // Delete selected frame
-      else if (selectedFrameId.value) {
-        deleteSelectedFrame()
-      }
     }
 
     // L key triggers force layout
@@ -176,12 +153,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       fitToContent()
-    }
-
-    // S key snugs/shrinks selected frame to fit its contents
-    if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey && selectedFrameId.value) {
-      e.preventDefault()
-      fitSelectedFrameToContents()
     }
 
     // Cmd+A / Ctrl+A selects all nodes

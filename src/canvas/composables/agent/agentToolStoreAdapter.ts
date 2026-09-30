@@ -44,10 +44,8 @@ export function agentToolStoreAdapter(
     updateEdgeColor: store.updateEdgeColor,
     updateEdgeLabel: store.updateEdgeLabel,
     createEdge: store.createEdge,
-    // Frames and storylines, for the grouping tools
-    getFrames: () => store.filteredFrames,
-    createFrame: store.createFrame,
-    assignNodesToFrame: store.assignNodesToFrame,
+    // Tags and storylines, for the grouping tools
+    updateNodeTags: store.updateNodeTags,
     getStorylines: () => store.filteredStorylines,
     createStoryline: (title: string, description?: string) =>
       store.createStoryline(title, description),

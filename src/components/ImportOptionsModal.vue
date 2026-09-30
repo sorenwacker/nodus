@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 
 export interface ImportOptions {
-  createFrame: boolean
+  tagCollection: boolean
   importAttachments: boolean
   layout: 'grid' | 'force'
 }
@@ -22,15 +22,15 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-const createFrame = ref(true)
+const tagCollection = ref(true)
 const importAttachments = ref(false)
 const layout = ref<'grid' | 'force'>('grid')
 
-const canCreateFrame = computed(() => !!props.collectionName)
+const canTagCollection = computed(() => !!props.collectionName)
 
 function handleImport() {
   emit('import', {
-    createFrame: canCreateFrame.value && createFrame.value,
+    tagCollection: canTagCollection.value && tagCollection.value,
     importAttachments: importAttachments.value,
     layout: layout.value,
   })
@@ -52,14 +52,14 @@ function handleImport() {
         </p>
 
         <div class="options-section">
-          <label class="option-row" :class="{ disabled: !canCreateFrame }">
+          <label class="option-row" :class="{ disabled: !canTagCollection }">
             <input
-              v-model="createFrame"
+              v-model="tagCollection"
               type="checkbox"
-              :disabled="!canCreateFrame"
+              :disabled="!canTagCollection"
             />
             <div class="option-text">
-              <span class="option-label">{{ t('import.options.createFrame') }}</span>
+              <span class="option-label">{{ t('import.options.tagCollection') }}</span>
               <span v-if="collectionName" class="option-hint">
                 {{ t('import.options.collectionDetected', { name: collectionName }) }}
               </span>

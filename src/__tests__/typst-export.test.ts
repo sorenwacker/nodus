@@ -14,7 +14,6 @@ describe('Typst Export', () => {
     width: 200,
     height: 120,
     z_index: 0,
-    frame_id: null,
     color_theme: null,
     is_collapsed: false,
     tags: null,

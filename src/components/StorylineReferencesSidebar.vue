@@ -73,7 +73,6 @@ function scanRenderedLinks() {
 
       const linkedNode = resolveWikilink(target, {
         nodes: store.filteredNodes,
-        frames: store.filteredFrames,
       })
       const storylineIndex = linkedNode
         ? props.nodes.findIndex(n => n.id === linkedNode.id)
