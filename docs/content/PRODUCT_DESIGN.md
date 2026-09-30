@@ -751,6 +751,15 @@ and the styled appearance. If per-frame routing ever becomes a measured
 bottleneck on very large graphs, gate any simplification behind a node-count
 threshold rather than applying it to all graphs.
 
+### Routing cost
+
+**Required behavior:** Routing runs on every frame of a drag, a zoom, a layout animation and physics mode, so its cost decides whether those move smoothly.
+
+- The lane tracker and the spatial index key their cells by number, not by building a string per cell. Each segment walks every 12 px cell it crosses, often several times while a free lane is sought, and every long edge queries the index over hundreds of 200 px cells; creating a string per cell cost more than the routing itself.
+- Obstacle checks along an edge take their candidates from the spatial index instead of scanning every node.
+- None of this changes a route: a test fingerprints the routes of generated graphs in every edge style and requires them unchanged.
+- Measured with 300 nodes and 500 edges, orthogonal style: 84 ms per full route before, 36 ms after (260930). Timing is not gated by a test, because it varies with machine load; it is still over the 16 ms of a frame at that size, so a layout animation or physics mode on a few hundred visible nodes still drops frames.
+
 ### Themes
 
 YAML-based theme system with SQLite storage. Four built-in themes, plus LLM-generated custom themes.
