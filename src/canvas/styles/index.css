@@ -18,5 +18,5 @@
 /* Edge panel, zoom controls, status bar */
 @import './canvas-panels.css';
 
-/* Magnifier, minimap, frames, context menu, tooltips, preview */
+/* Magnifier, minimap, context menu, tooltips, preview */
 @import './canvas-overlays.css';

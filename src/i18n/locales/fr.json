@@ -62,11 +62,6 @@
       "deleteEdgeTooltip": "Supprimer cette arête",
       "labelSaved": "Étiquette du lien enregistrée"
     },
-    "frame": {
-      "delete": "Supprimer le cadre",
-      "addFrame": "Ajouter un cadre - Grouper les nœuds sélectionnés",
-      "clickToPlace": "Cliquez sur le canevas pour placer le cadre (Échap pour annuler)"
-    },
     "hover": {
       "incoming": "Arêtes entrantes (cité par)",
       "outgoing": "Arêtes sortantes (cite)",
@@ -103,8 +98,7 @@
       "hops": "sauts",
       "highlightEdges": "Surligner toutes les arêtes - Rendre toutes les arêtes plus visibles",
       "bubbleMode": "Mode bulle - Afficher les nœuds comme des cercles",
-      "help": "Aide - Raccourcis clavier et utilisation",
-      "organizeFrames": "Organiser les cadres - Attirer les membres, repousser les autres"
+      "help": "Aide - Raccourcis clavier et utilisation"
     },
     "search": {
       "placeholder": "Rechercher des nœuds...",
@@ -346,7 +340,7 @@
     "options": {
       "title": "Options d'importation",
       "entriesFound": "{count} citation trouvée | {count} citations trouvées",
-      "createFrame": "Créer un cadre pour la collection",
+      "tagCollection": "Étiqueter les citations avec le nom de la collection",
       "collectionDetected": "Collection : {name}",
       "noCollection": "Aucune collection détectée dans l'export",
       "importAttachments": "Importer les PDFs attachés",
@@ -661,20 +655,6 @@
     "showPerfOverlay": "Afficher les mesures de performance",
     "showPerfOverlayHint": "Temps de trame au-dessus du graphe pendant un panoramique ou un zoom, pour diagnostiquer les saccades"
   },
-  "fileMove": {
-    "collision": {
-      "title": "Le fichier existe déjà",
-      "message": "Un fichier avec le même nom existe déjà dans le dossier cible.",
-      "moving": "Déplacement :",
-      "to": "Vers :",
-      "existing": "Existant :",
-      "options": "Choisissez une option :",
-      "rename": "Renommer",
-      "renameDesc": "Enregistrer avec un nouveau nom",
-      "replace": "Remplacer",
-      "replaceDesc": "Écraser le fichier existant (irréversible)"
-    }
-  },
   "updates": {
     "available": "Nodus {version} est disponible",
     "installed": "Vous avez {version}",
@@ -729,7 +709,7 @@
     "title": "Déployer en graphe",
     "lead": "Ce document a une structure. Choisissez ce qui rejoint votre graphe ; le nœud unique reste dans tous les cas.",
     "sections": "{count} sections en nœuds",
-    "sectionsHint": "Un nœud par titre, reliés selon le plan du document, groupés dans un cadre",
+    "sectionsHint": "Un nœud par titre, reliés selon le plan du document, étiquetés avec le titre du document",
     "references": "{count} références en nœuds de citation",
     "referencesHint": "Chaque entrée de la bibliographie devient un nœud de citation",
     "verify": "Vérifier via Semantic Scholar",

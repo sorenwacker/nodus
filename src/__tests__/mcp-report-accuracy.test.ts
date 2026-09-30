@@ -51,15 +51,6 @@ describe('what batch_update reports', () => {
   })
 })
 
-describe('what fit_frame_to_contents reports', () => {
-  it('reports resized only when the size changed', () => {
-    const source = readFileSync(resolve(__dirname, '../mcp/handlers/frameHandlers.ts'), 'utf-8')
-
-    expect(source).not.toContain('return { success: true, resized: true }')
-    expect(source).toContain('after.width !== before.width')
-  })
-})
-
 describe('what batch_move_nodes promises', () => {
   it('does not offer relative offsets it cannot accept', () => {
     // The declarations live in one module per group; this tool is a node write

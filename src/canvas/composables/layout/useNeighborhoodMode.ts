@@ -194,10 +194,6 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
       getNode: store.getNode,
       getFilteredNodes: () => nodes,
       getFilteredEdges: () => edges,
-      // The mode is an overlay and draws no frames, so nothing in it may be
-      // constrained to one.
-      getFilteredFrames: () => [],
-      applyFrameConstraints: positions => positions,
     })
     if (!result) return false
 

@@ -26,6 +26,7 @@ interface GraphImportStore {
     markdown_content: string
     canvas_x: number
     canvas_y: number
+    tags?: string[]
   }) => Promise<{ id: string }>
   createEdge: (data: {
     source_node_id: string
@@ -33,8 +34,6 @@ interface GraphImportStore {
     link_type?: string
   }) => Promise<unknown>
   updateNodeContent: (id: string, content: string) => Promise<void>
-  createFrame?: (x: number, y: number, width: number, height: number, title: string) => { id: string }
-  assignNodeToFrame?: (nodeId: string, frameId: string | null) => void
   /** Current node content, so verification never overwrites an edit made meanwhile */
   getNode?: (id: string) => { markdown_content?: string | null } | undefined
 }
@@ -66,9 +65,6 @@ export interface GraphImportResult {
   citationNodeIds: string[]
   semanticSkipped: number
 }
-
-const FRAME_PADDING = 60
-const FRAME_TITLE_HEIGHT = 50
 
 export function usePdfGraphImport(options: UsePdfGraphImportOptions) {
   const { store, llm, pushCreationUndo } = options
@@ -132,6 +128,7 @@ export function usePdfGraphImport(options: UsePdfGraphImportOptions) {
         markdown_content: planned.content,
         canvas_x: planned.x,
         canvas_y: planned.y,
+        tags: planned.tags,
       })
       idByKey.set(planned.key, node.id)
       created.push(node.id)
@@ -161,10 +158,6 @@ export function usePdfGraphImport(options: UsePdfGraphImportOptions) {
       }
     }
 
-    if (choices.sections) {
-      frameSections(plan, idByKey)
-    }
-
     if (created.length > 0 && pushCreationUndo) pushCreationUndo(created)
 
     // Verification after the structure exists: three states, and an outage is
@@ -187,29 +180,6 @@ export function usePdfGraphImport(options: UsePdfGraphImportOptions) {
     }
 
     return { createdNodeIds: created, citationNodeIds: citationIds, semanticSkipped }
-  }
-
-  /** Group the section nodes in a frame named after the paper */
-  function frameSections(plan: GraphImportPlan, idByKey: Map<string, string>) {
-    if (!store.createFrame || !store.assignNodeToFrame) return
-    const sections = plan.nodes.filter(n => n.nodeType === 'note' && idByKey.has(n.key))
-    if (sections.length === 0) return
-
-    const minX = Math.min(...sections.map(n => n.x))
-    const minY = Math.min(...sections.map(n => n.y))
-    const maxX = Math.max(...sections.map(n => n.x + 260))
-    const maxY = Math.max(...sections.map(n => n.y + 160))
-
-    const frame = store.createFrame(
-      minX - FRAME_PADDING,
-      minY - FRAME_PADDING - FRAME_TITLE_HEIGHT,
-      maxX - minX + FRAME_PADDING * 2,
-      maxY - minY + FRAME_PADDING * 2 + FRAME_TITLE_HEIGHT,
-      plan.frameTitle
-    )
-    for (const section of sections) {
-      store.assignNodeToFrame(idByKey.get(section.key)!, frame.id)
-    }
   }
 
   /** LLM pass per section: claims become nodes linked to their section */

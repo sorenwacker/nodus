@@ -11,7 +11,6 @@ export interface Node {
   canvas_y: number
   width?: number
   height?: number
-  frame_id?: string | null
 }
 
 export interface Edge {
@@ -34,19 +33,6 @@ export interface LayoutStrategyStore {
   updateNodePosition: (id: string, x: number, y: number) => void
 }
 
-export interface LayoutStrategyOptions {
-  /** Re-fit frames around their contents after nodes inside them have moved */
-  expandFramesToFitNodes?: () => Promise<void>
-  store: LayoutStrategyStore
-  viewState: ViewState
-  pushUndo: () => void
-  stopAnimation: () => void
-  animateToPositions: (targets: Map<string, { x: number; y: number }>, duration?: number) => void
-  applyFrameConstraints: (
-    positions: Map<string, { x: number; y: number }>,
-    nodes: Node[]
-  ) => Map<string, { x: number; y: number }>
-}
 /**
  * Fit viewport to show all content
  */

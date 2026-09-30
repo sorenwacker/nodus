@@ -1037,7 +1037,7 @@ export function getStarterNodeConfigs(): StarterNodeConfig[] {
     { key: 'quickNote', canvas_x: 1340, canvas_y: 480, width: 300, height: 150, color_theme: 'rgba(234, 179, 8, 0.18)' },  // yellow (no title)
     { key: 'counterpoint', canvas_x: 1340, canvas_y: 700, width: 380, height: 280, color_theme: 'rgba(249, 115, 22, 0.18)' },  // orange
     { key: 'evidence', canvas_x: 1340, canvas_y: 1040, width: 380, height: 280, color_theme: 'rgba(34, 197, 94, 0.18)' },  // green
-    // Dated project notes (framed and threaded by the demo storyline)
+    // Dated project notes (tagged and threaded by the demo storyline)
     { key: 'projectKickoff', canvas_x: 1860, canvas_y: 180, width: 380, height: 240 },
     { key: 'experimentRun', canvas_x: 1860, canvas_y: 470, width: 380, height: 240 },
     { key: 'keyFindings', canvas_x: 1860, canvas_y: 760, width: 380, height: 240 },
@@ -1045,7 +1045,7 @@ export function getStarterNodeConfigs(): StarterNodeConfig[] {
     { key: 'demoCitation', canvas_x: 2400, canvas_y: 760, width: 400, height: 240, node_type: 'citation' },
     // Comment annotating the research example
     { key: 'demoComment', canvas_x: 1340, canvas_y: 1380, width: 360, height: 140, node_type: 'comment' },
-    // One node per entity type, grouped by the entity frame
+    // One node per entity type, grouped by the entity-types tag
     { key: 'demoCharacter', canvas_x: 1860, canvas_y: 1350, width: 340, height: 170, node_type: 'character' },
     { key: 'demoLocation', canvas_x: 2240, canvas_y: 1350, width: 340, height: 170, node_type: 'location' },
     { key: 'demoTerm', canvas_x: 1860, canvas_y: 1560, width: 340, height: 170, node_type: 'term' },
@@ -1054,37 +1054,19 @@ export function getStarterNodeConfigs(): StarterNodeConfig[] {
 }
 
 /**
- * Starter frame configurations (spatial grouping demo)
+ * Starter tag groups: nodes that belong together share a tag
+ * (docs/design/remove-frames.md)
  */
-export type StarterFrameKey = 'demoProject' | 'entityTypes'
-
-export interface StarterFrameConfig {
-  key: StarterFrameKey
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
+export interface StarterTagGroup {
+  tag: string
   nodeKeys: Array<keyof StarterTemplates>
 }
 
-export function getStarterFrameConfigs(): StarterFrameConfig[] {
+export function getStarterTagGroups(): StarterTagGroup[] {
   return [
-    { key: 'demoProject', canvas_x: 1820, canvas_y: 110, width: 460, height: 950, nodeKeys: ['projectKickoff', 'experimentRun', 'keyFindings'] },
-    { key: 'entityTypes', canvas_x: 1820, canvas_y: 1280, width: 800, height: 500, nodeKeys: ['demoCharacter', 'demoLocation', 'demoTerm', 'demoItem'] },
+    { tag: 'demo-project', nodeKeys: ['projectKickoff', 'experimentRun', 'keyFindings'] },
+    { tag: 'entity-types', nodeKeys: ['demoCharacter', 'demoLocation', 'demoTerm', 'demoItem'] },
   ]
-}
-
-const frameTitles: Record<SupportedLocale, Record<StarterFrameKey, string>> = {
-  en: { demoProject: 'Demo Project', entityTypes: 'Entity Types' },
-  de: { demoProject: 'Demo-Projekt', entityTypes: 'Entitaetstypen' },
-  fr: { demoProject: 'Projet de Demo', entityTypes: "Types d'Entites" },
-  es: { demoProject: 'Proyecto de Demostracion', entityTypes: 'Tipos de Entidad' },
-  it: { demoProject: 'Progetto Demo', entityTypes: 'Tipi di Entita' },
-}
-
-export function getStarterFrameTitle(key: StarterFrameKey, locale: string): string {
-  const supported = locale as SupportedLocale
-  return (frameTitles[supported] || frameTitles.en)[key]
 }
 
 /**

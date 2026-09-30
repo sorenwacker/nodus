@@ -268,10 +268,6 @@ const undoRedo = useUndoRedo({
     restoreNode: store.restoreNode,
     restoreEdge: store.restoreEdge,
     deleteNode: store.deleteNode,
-    // Frame operations for undo
-    getFilteredFrames: () => store.filteredFrames,
-    updateFramePosition: store.updateFramePosition,
-    assignNodesToFrame: store.assignNodesToFrame,
     // Storyline operations for undo
     getStorylineNodeIds: storylinesStore.getStorylineNodeIds,
     reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
@@ -607,9 +603,6 @@ function handleDelete() {
       // A refusal has already been reported by the store, and the node stays
       nodeService.deleteNode(id).catch(() => undefined)
     }
-  } else if (store.selectedFrameId) {
-    store.deleteFrame(store.selectedFrameId)
-    store.selectFrame(null)
   }
 }
 
@@ -721,7 +714,7 @@ async function importVault() {
 
     const imported = await store.importVault(vaultPath.value.trim(), deleteOriginalFiles.value, targetWorkspaceId)
 
-    // Force refresh to ensure frames and edges are visible
+    // Force refresh to ensure edges are visible
     await store.switchWorkspace(store.currentWorkspaceId)
     showImportDialog.value = false
     vaultPath.value = ''

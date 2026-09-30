@@ -67,11 +67,6 @@
       "outgoing": "Ausgehende Kanten (zitiert)",
       "bidirectional": "Bidirektionale Verbindungen"
     },
-    "frame": {
-      "delete": "Rahmen löschen",
-      "addFrame": "Rahmen hinzufügen - Ausgewählte Knoten gruppieren",
-      "clickToPlace": "Auf Leinwand klicken um Rahmen zu platzieren (Esc zum Abbrechen)"
-    },
     "status": {
       "layoutRunning": "Layout wird ausgeführt...",
       "stop": "Stopp",
@@ -103,8 +98,7 @@
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
       "hop": "Schritt",
       "hops": "Schritte",
-      "help": "Hilfe - Tastenkombinationen und Nutzung",
-      "organizeFrames": "Rahmen organisieren - Mitglieder einziehen, andere rausschieben"
+      "help": "Hilfe - Tastenkombinationen und Nutzung"
     },
     "search": {
       "placeholder": "Knoten suchen...",
@@ -346,7 +340,7 @@
     "options": {
       "title": "Importoptionen",
       "entriesFound": "{count} Zitat gefunden | {count} Zitate gefunden",
-      "createFrame": "Rahmen für Sammlung erstellen",
+      "tagCollection": "Zitate mit dem Sammlungsnamen taggen",
       "collectionDetected": "Sammlung: {name}",
       "noCollection": "Keine Sammlung im Export erkannt",
       "importAttachments": "Angehängte PDFs importieren",
@@ -661,20 +655,6 @@
     "showPerfOverlay": "Leistungsanzeige einblenden",
     "showPerfOverlayHint": "Frame-Zeiten über dem Graphen beim Verschieben oder Zoomen, zur Diagnose von Rucklern"
   },
-  "fileMove": {
-    "collision": {
-      "title": "Datei existiert bereits",
-      "message": "Eine Datei mit dem gleichen Namen existiert bereits im Zielordner.",
-      "moving": "Verschiebe:",
-      "to": "Nach:",
-      "existing": "Vorhanden:",
-      "options": "Option wählen:",
-      "rename": "Umbenennen",
-      "renameDesc": "Mit neuem Namen speichern",
-      "replace": "Ersetzen",
-      "replaceDesc": "Vorhandene Datei überschreiben (nicht rückgängig machbar)"
-    }
-  },
   "updates": {
     "available": "Nodus {version} ist verfuegbar",
     "installed": "Installiert: {version}",
@@ -729,7 +709,7 @@
     "title": "Als Graph auffächern",
     "lead": "Dieses Dokument hat Struktur. Wählen Sie, was Teil des Graphen wird; der einzelne Knoten bleibt in jedem Fall.",
     "sections": "{count} Abschnitte als Knoten",
-    "sectionsHint": "Ein Knoten pro Überschrift, entlang der Gliederung verbunden, in einem Rahmen gruppiert",
+    "sectionsHint": "Ein Knoten pro Überschrift, entlang der Gliederung verbunden, mit dem Titel des Dokuments getaggt",
     "references": "{count} Referenzen als Zitatknoten",
     "referencesHint": "Jeder Eintrag im Literaturverzeichnis wird ein Zitatknoten",
     "verify": "Mit Semantic Scholar prüfen",

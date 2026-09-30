@@ -228,15 +228,13 @@ function findBestPosition(
 /**
  * Tetris-style bin packing for grid layout with edge-aware placement.
  * Places connected nodes closer together to minimize total edge length.
- * @param containerWidth Optional max width constraint (e.g., for frame-scoped layouts)
  */
 export function tetrisGridLayout(
   nodes: LayoutNode[],
   edges: LayoutEdge[],
   startX: number,
   startY: number,
-  gap: number,
-  containerWidth?: number
+  gap: number
 ): Map<string, { x: number; y: number }> {
   const targets = new Map<string, { x: number; y: number }>()
 
@@ -256,12 +254,9 @@ export function tetrisGridLayout(
     maxNodeHeight = Math.max(maxNodeHeight, h)
   }
 
-  // Target a roughly square layout, but respect container width if provided
+  // Target a roughly square layout
   const idealSide = Math.sqrt(totalArea) * 1.2
-  let maxWidth = Math.max(idealSide, maxNodeWidth + gap)
-  if (containerWidth !== undefined) {
-    maxWidth = Math.min(maxWidth, containerWidth)
-  }
+  const maxWidth = Math.max(idealSide, maxNodeWidth + gap)
 
   // Sort nodes: prioritize by connectivity (most connected first), then by area
   const sorted = [...nodes].sort((a, b) => {

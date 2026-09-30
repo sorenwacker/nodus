@@ -22,7 +22,6 @@ function note(id: string, title: string, filePath: string | null): Node {
     canvas_y: 0,
     width: 200,
     height: 120,
-    frame_id: null,
   } as Node
 }
 

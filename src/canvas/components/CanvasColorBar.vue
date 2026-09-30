@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * CanvasColorBar - Floating color selection bar
- * Shown when nodes or frames are selected
+ * Shown when nodes are selected
  * Includes preset colors + color picker with recent colors
  */
 import { ref } from 'vue'
@@ -21,15 +21,12 @@ const props = defineProps<{
   colors: ColorOption[]
   colorsInUse: ColorInUse[]
   selectedNodeIds: string[]
-  selectedFrameId: string | null
   isCollapsed: boolean
   getNodeColor: (id: string) => string | null | undefined
-  getFrameColor: () => string | null | undefined
 }>()
 
 const emit = defineEmits<{
   (e: 'update-node-color', color: string | null): void
-  (e: 'update-frame-color', color: string | null): void
   (e: 'fit-nodes'): void
 }>()
 
@@ -38,33 +35,19 @@ const { t } = useI18n()
 const colorPickerRef = ref<HTMLInputElement | null>(null)
 
 function isColorActive(color: ColorOption): boolean {
-  if (props.selectedFrameId) {
-    return props.getFrameColor() === color.display
-  }
   return props.selectedNodeIds.every(id => props.getNodeColor(id) === color.value)
 }
 
 function isInUseColorActive(color: ColorInUse): boolean {
-  if (props.selectedFrameId) {
-    return props.getFrameColor() === color.value
-  }
   return props.selectedNodeIds.every(id => props.getNodeColor(id) === color.value)
 }
 
 function onInUseColorClick(color: ColorInUse) {
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color.value)
-  } else {
-    emit('update-node-color', color.value)
-  }
+  emit('update-node-color', color.value)
 }
 
 function onColorClick(color: ColorOption) {
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color.display)
-  } else {
-    emit('update-node-color', color.value)
-  }
+  emit('update-node-color', color.value)
 }
 
 function openColorPicker() {
@@ -74,17 +57,13 @@ function openColorPicker() {
 function onColorPickerChange(event: Event) {
   const input = event.target as HTMLInputElement
   const color = input.value
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color)
-  } else {
-    emit('update-node-color', color)
-  }
+  emit('update-node-color', color)
 }
 </script>
 
 <template>
   <div class="collapsed-color-bar" @pointerdown.stop @click.stop>
-    <!-- Colors in use (from current nodes and frames) -->
+    <!-- Colors in use (from current nodes) -->
     <template v-if="colorsInUse.length > 0">
       <button
         v-for="color in colorsInUse"
@@ -124,9 +103,9 @@ function onColorPickerChange(event: Event) {
       @input="onColorPickerChange"
     />
 
-    <span v-if="selectedNodeIds.length > 0 && !selectedFrameId" class="color-bar-sep"></span>
+    <span v-if="selectedNodeIds.length > 0" class="color-bar-sep"></span>
     <button
-      v-if="selectedNodeIds.length > 0 && !selectedFrameId"
+      v-if="selectedNodeIds.length > 0"
       class="autofit-toggle"
       :class="{ disabled: isCollapsed }"
       :disabled="isCollapsed"

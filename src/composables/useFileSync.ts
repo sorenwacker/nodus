@@ -3,7 +3,6 @@
  * Manages vault file watching and synchronization
  */
 import { fileNameFromPath } from '../lib/pdfGraph'
-import { relativeFolder } from '../lib/vaultPaths'
 import { ref } from 'vue'
 import {
   invoke,
@@ -16,7 +15,7 @@ import {
 import { storeLogger } from '../lib/logger'
 import { notifications$ } from './useNotifications'
 import { extractFrontmatterTitle, extractFrontmatterTags } from '../lib/extraction'
-import type { Node, FileChangeEvent, Frame } from '../types'
+import type { Node, FileChangeEvent } from '../types'
 
 export interface FileSyncDeps {
   getNodes: () => Node[]
@@ -25,10 +24,6 @@ export interface FileSyncDeps {
   removeNode: (id: string) => void
   getCurrentWorkspaceId: () => string | null
   reloadEdges?: () => Promise<void>
-  // Frame sync dependencies (optional for backward compatibility)
-  getFrames?: () => Frame[]
-  assignNodeToFrame?: (nodeId: string, frameId: string | null) => void
-  getVaultPath?: () => string | null
   // Frontmatter sync (optional)
   updateNodeTitle?: (id: string, title: string) => Promise<void>
   updateNodeTags?: (id: string, tags: string[]) => Promise<void>
@@ -66,80 +61,6 @@ export function useFileSync(deps: FileSyncDeps) {
   const pendingDeletions = new Map<string, PendingDeletion>()
   const MOVE_DETECTION_DELAY = 500 // ms to wait for matching create event
 
-  // Track node IDs being moved programmatically to avoid watcher reacting to our own moves
-  const pendingProgrammaticMoves = new Set<string>()
-
-  /**
-   * Find frame that matches a folder path
-   */
-  function findFrameForFolder(folderPath: string): Frame | undefined {
-    if (!deps.getFrames) return undefined
-    const frames = deps.getFrames()
-    return frames.find((f) => f.folder_path === folderPath)
-  }
-
-  /**
-   * Assign node to frame based on its file path
-   */
-  function assignNodeToFrameByPath(nodeId: string, filePath: string): void {
-    if (!deps.assignNodeToFrame || !deps.getVaultPath) return
-
-    const vaultPath = deps.getVaultPath()
-    const folderPath = relativeFolder(filePath, vaultPath)
-
-    storeLogger.info(`[FileSync] Assigning node to frame - folderPath: "${folderPath}"`)
-
-    // Find frame by exact folder_path match
-    let frame = findFrameForFolder(folderPath)
-
-    // If not found, try to find parent folder frame
-    if (!frame && folderPath) {
-      const frames = deps.getFrames?.() || []
-      // Try to match parent folders
-      // path-normalised: getRelativeFolder returns forward slashes
-      const parts = folderPath.split('/')
-      for (let i = parts.length - 1; i >= 0 && !frame; i--) {
-        const parentPath = parts.slice(0, i + 1).join('/')
-        frame = frames.find((f) => f.folder_path === parentPath)
-        if (frame) {
-          storeLogger.info(`[FileSync] Found parent frame: "${frame.title}" for folder "${parentPath}"`)
-        }
-      }
-    }
-
-    if (frame) {
-      storeLogger.info(`[FileSync] Assigning to frame: "${frame.title}" (${frame.id})`)
-    } else {
-      storeLogger.info(`[FileSync] No frame found for folder: "${folderPath}"`)
-    }
-
-    deps.assignNodeToFrame(nodeId, frame?.id ?? null)
-
-    // Dispatch event to trigger frame expansion in canvas
-    if (frame) {
-      window.dispatchEvent(new CustomEvent('nodus-expand-frames'))
-    }
-  }
-
-  /**
-   * Mark a node as being moved programmatically
-   * Call this before invoking move_node_file to prevent duplicate handling
-   */
-  function markProgrammaticMove(nodeId: string): void {
-    pendingProgrammaticMoves.add(nodeId)
-  }
-
-  /**
-   * Check if a move event should be handled (not a programmatic move)
-   */
-  function shouldHandleMoveEvent(nodeId: string): boolean {
-    if (pendingProgrammaticMoves.has(nodeId)) {
-      pendingProgrammaticMoves.delete(nodeId)
-      return false
-    }
-    return true
-  }
-
   async function watchVault(path: string): Promise<void> {
     await stopWatching()
     storeLogger.info(`[FileSync] Starting vault watcher for: ${path}`)
@@ -169,7 +90,6 @@ export function useFileSync(deps: FileSyncDeps) {
       clearTimeout(pending.timeoutId)
     }
     pendingDeletions.clear()
-    pendingProgrammaticMoves.clear()
     try {
       await invoke('stop_watching')
     } catch {
@@ -200,16 +120,7 @@ export function useFileSync(deps: FileSyncDeps) {
         // Check if this is a move (matching pending deletion by filename)
         const pendingDeletion = pendingDeletions.get(filename)
         if (pendingDeletion) {
-          // Check if this is a programmatic move (initiated by us)
-          if (!shouldHandleMoveEvent(pendingDeletion.nodeId)) {
-            // Skip - this is our programmatic move, already handled
-            clearTimeout(pendingDeletion.timeoutId)
-            pendingDeletions.delete(filename)
-            storeLogger.info(`Skipping programmatic move event for: ${filePath}`)
-            break
-          }
-
-          // This is an external move! Cancel the deletion and update the path
+          // A file moved outside the app: cancel the deletion and update the path
           clearTimeout(pendingDeletion.timeoutId)
           pendingDeletions.delete(filename)
 
@@ -230,8 +141,6 @@ export function useFileSync(deps: FileSyncDeps) {
             )
           }
 
-          // Update frame assignment based on new folder
-          assignNodeToFrameByPath(pendingDeletion.nodeId, filePath)
           break
         }
 
@@ -244,8 +153,6 @@ export function useFileSync(deps: FileSyncDeps) {
             deps.addNode(node)
             storeLogger.info(`Created node from new file: ${filePath}`)
 
-            // Auto-assign to frame based on folder path
-            assignNodeToFrameByPath(node.id, filePath)
           } catch (e) {
             storeLogger.error('Failed to create node from file:', e)
           }
@@ -387,6 +294,5 @@ export function useFileSync(deps: FileSyncDeps) {
     watchVault,
     stopWatching,
     handleFileChange,
-    markProgrammaticMove,
   }
 }

@@ -4,7 +4,7 @@
  * Handles node creation, update, deletion, and graph analysis operations.
  */
 
-import type { Node, Edge, Frame } from '../../types'
+import type { Node, Edge } from '../../types'
 import type { McpNode, McpEdge } from '../types'
 import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface, McpUndoInterface } from '../messageHandler'
@@ -86,40 +86,6 @@ export function normalizeColor(color: string | null): string | null {
   if (!color) return null
   const lower = color.toLowerCase().trim()
   return COLOR_NAME_MAP[lower] || color
-}
-
-/**
- * Clamp a position to keep a node inside its assigned frame
- * Returns the clamped position, or original if node has no frame
- */
-export function clampToFrame(
-  node: Node,
-  targetX: number,
-  targetY: number,
-  getFrame: (id: string) => Frame | undefined
-): { x: number; y: number } {
-  if (!node.frame_id) {
-    return { x: targetX, y: targetY }
-  }
-
-  const frame = getFrame(node.frame_id)
-  if (!frame) {
-    return { x: targetX, y: targetY }
-  }
-
-  const padding = 10
-  const titleHeight = 50
-
-  // Clamp position to keep node inside frame bounds
-  const minX = frame.canvas_x + padding
-  const minY = frame.canvas_y + padding + titleHeight
-  const maxX = frame.canvas_x + frame.width - node.width - padding
-  const maxY = frame.canvas_y + frame.height - node.height - padding
-
-  return {
-    x: Math.max(minX, Math.min(maxX, targetX)),
-    y: Math.max(minY, Math.min(maxY, targetY)),
-  }
 }
 
 /**
@@ -584,9 +550,7 @@ export async function handleUpdateNode(
       positions.set(node.id, { x: node.canvas_x, y: node.canvas_y })
       undo.pushPositionUndo(positions)
     }
-    // Clamp position to keep node inside its frame
-    const clamped = clampToFrame(node, updates.x, updates.y, store.getFrame)
-    await store.updateNodePosition(params.id, clamped.x, clamped.y)
+    await store.updateNodePosition(params.id, updates.x, updates.y)
   }
 
   return { success: true }
@@ -643,8 +607,7 @@ export async function handleBatchUpdateNodes(
       }
 
       if (update.x !== undefined && update.y !== undefined) {
-        const clamped = clampToFrame(node, update.x, update.y, store.getFrame)
-        await store.updateNodePosition(update.id, clamped.x, clamped.y)
+        await store.updateNodePosition(update.id, update.x, update.y)
       }
 
       updated++
@@ -751,9 +714,7 @@ export async function handleBatchMoveNodes(
   for (const move of params.moves) {
     const node = store.getNode(move.id)
     if (node) {
-      // Clamp position to keep node inside its frame
-      const clamped = clampToFrame(node, move.x, move.y, store.getFrame)
-      await store.updateNodePosition(move.id, clamped.x, clamped.y)
+      await store.updateNodePosition(move.id, move.x, move.y)
       count++
     }
   }

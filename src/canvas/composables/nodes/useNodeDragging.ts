@@ -4,10 +4,9 @@
  * Handles node drag interactions including multi-select dragging
  */
 
-import { fileNameFromPath } from '../../../lib/pdfGraph'
 import { isOverStorylinePanel as overStorylinePanel } from '../util/dragDropTarget'
 import { ref, type Ref } from 'vue'
-import type { Node, Frame } from '../../../types'
+import type { Node } from '../../../types'
 
 export interface UseNodeDraggingContext {
   store: {
@@ -19,23 +18,9 @@ export interface UseNodeDraggingContext {
     selectedNodeIds: string[]
     filteredNodes: Node[]
     filteredEdges: Array<{ id: string; source_node_id: string; target_node_id: string }>
-    frames: Frame[]
-    assignNodesToFrame: (nodeIds: string[], frameId: string | null) => void
     refreshNodeFromFile: (id: string) => void
     nodeLayoutVersion: number
-    updateNodeFilePath?: (nodeId: string, filePath: string) => void
   }
-  // File sync dependencies (optional)
-  checkFileCollision?: (nodeId: string, targetFolder: string) => Promise<string | null>
-  moveNodeFile?: (nodeId: string, targetFolder: string, collisionResolution?: string) => Promise<string>
-  markProgrammaticMove?: (nodeId: string) => void
-  getVaultPath?: () => string | null
-  // Collision dialog callback - returns resolution: 'cancel', 'rename:newname', or 'replace'
-  showCollisionDialog?: (
-    sourceFileName: string,
-    targetFolder: string,
-    existingFileName: string
-  ) => Promise<{ resolution: 'cancel' | 'rename' | 'replace'; newName?: string }>
   scale: Ref<number>
   offset: Ref<{ x: number; y: number }>
   canvasRef: Ref<HTMLElement | null>
@@ -54,7 +39,6 @@ export interface UseNodeDraggingContext {
   layoutNeighborhood: (focusId: string) => void
   pushOverlappingNodesAway: (sourceId: string) => void
   pushUndo: () => void
-  pushFrameAssignmentUndo: (assignments: Map<string, string | null>) => void
   screenToCanvas: (clientX: number, clientY: number) => { x: number; y: number }
   zoomToNode: (nodeId: string) => void
   onFullscreenOpen?: (nodeId: string) => void
@@ -267,8 +251,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     // `multiDragInitial` is filled on pointerdown, before any movement, while
     // `draggingNode` is only set once the drag begins. Deriving the list from
     // multiDragInitial alone meant a plain click with several nodes selected
-    // re-evaluated frame membership, pushed an undo entry, and could move .md
-    // files on disk - for a click that moved nothing
+    // was treated as a drag - for a click that moved nothing
     // (PRODUCT_DESIGN.md > Telling a click from a drag)
     const draggedNodeIds = !draggedNodeId
       ? []
@@ -296,157 +279,6 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
           detail: { nodeIds: draggedNodeIds, x: e.clientX, y: e.clientY },
         })
       )
-    }
-
-    // Collision pushing disabled - was causing layout chaos by pushing nodes across frame boundaries
-    // TODO: If re-enabling, must respect frame boundaries (only push nodes in same frame)
-
-    // Assign nodes to frame if dropped inside one
-    // Uses hysteresis for resistance: harder to enter (70%), easier to stay (exit at 20%)
-    for (const nodeId of draggedNodeIds) {
-        const node = store.getNode(nodeId)
-        if (!node) continue
-
-        const nodeWidth = node.width || 200
-        const nodeHeight = node.height || 120
-        const nodeArea = nodeWidth * nodeHeight
-        const currentFrameId = node.frame_id
-        let assignedFrameId: string | null = currentFrameId // Keep current by default
-        let assignedFrame: Frame | undefined
-
-        // Check overlap with current frame first (for exit resistance)
-        if (currentFrameId) {
-          const currentFrame = store.frames.find(f => f.id === currentFrameId)
-          if (currentFrame) {
-            const overlapX = Math.max(
-              0,
-              Math.min(node.canvas_x + nodeWidth, currentFrame.canvas_x + currentFrame.width) -
-                Math.max(node.canvas_x, currentFrame.canvas_x)
-            )
-            const overlapY = Math.max(
-              0,
-              Math.min(node.canvas_y + nodeHeight, currentFrame.canvas_y + currentFrame.height) -
-                Math.max(node.canvas_y, currentFrame.canvas_y)
-            )
-            const overlapArea = overlapX * overlapY
-
-            // Exit resistance: need to drag mostly out (< 20% overlap) to leave frame
-            const overlapRatio = overlapArea / nodeArea
-            if (overlapRatio < 0.2) {
-              assignedFrameId = null // Exiting current frame
-              assignedFrame = undefined
-            } else {
-              // Stay in current frame
-              assignedFrameId = currentFrameId
-              assignedFrame = currentFrame
-            }
-          }
-        }
-
-        // If not in a frame or just exited, check for entering a new frame
-        if (!assignedFrameId) {
-          for (const frame of store.frames) {
-            const overlapX = Math.max(
-              0,
-              Math.min(node.canvas_x + nodeWidth, frame.canvas_x + frame.width) -
-                Math.max(node.canvas_x, frame.canvas_x)
-            )
-            const overlapY = Math.max(
-              0,
-              Math.min(node.canvas_y + nodeHeight, frame.canvas_y + frame.height) -
-                Math.max(node.canvas_y, frame.canvas_y)
-            )
-            const overlapArea = overlapX * overlapY
-
-            // Entry resistance: need significant overlap (70%) to enter a frame
-            const entryRatio = overlapArea / nodeArea
-            if (entryRatio > 0.7) {
-              assignedFrameId = frame.id
-              assignedFrame = frame
-              break
-            }
-          }
-        }
-
-        // Update frame assignment if changed
-        if (node.frame_id !== assignedFrameId) {
-          // Capture the previous frame id BEFORE assigning: assignNodesToFrame
-          // mutates node.frame_id in place, so reading it later (to revert on
-          // cancel/failure) would just read back the new value - a no-op revert.
-          const previousFrameId = node.frame_id ?? null
-
-          // Push undo before changing frame assignment
-          const oldAssignments = new Map<string, string | null>()
-          oldAssignments.set(nodeId, previousFrameId)
-          ctx.pushFrameAssignmentUndo(oldAssignments)
-
-          store.assignNodesToFrame([nodeId], assignedFrameId)
-
-          // Move file to frame's folder if:
-          // 1. Node has a file_path
-          // 2. Target frame has a folder_path
-          // 3. File move function is available
-          if (
-            node.file_path &&
-            ctx.moveNodeFile &&
-            ctx.getVaultPath
-          ) {
-            const vaultPath = ctx.getVaultPath()
-            if (vaultPath) {
-              const targetFolder = assignedFrame?.folder_path
-                ? `${vaultPath}/${assignedFrame.folder_path}`
-                : vaultPath // Move to vault root if no frame or frame has no folder_path
-
-              // Check for collision first if collision check is available
-              const handleFileMove = async () => {
-                let collisionResolution: string | undefined
-
-                // Check if there's a collision
-                if (ctx.checkFileCollision && ctx.showCollisionDialog) {
-                  const collisionFileName = await ctx.checkFileCollision(nodeId, targetFolder)
-
-                  if (collisionFileName) {
-                    // Show dialog and get user's choice
-                    const sourceFileName = fileNameFromPath(node.file_path!) || 'file.md'
-                    const dialogResult = await ctx.showCollisionDialog(
-                      sourceFileName,
-                      targetFolder,
-                      collisionFileName
-                    )
-
-                    if (dialogResult.resolution === 'cancel') {
-                      // User cancelled - revert to the captured previous frame
-                      store.assignNodesToFrame([nodeId], previousFrameId)
-                      return
-                    }
-
-                    if (dialogResult.resolution === 'rename' && dialogResult.newName) {
-                      collisionResolution = dialogResult.newName
-                    } else if (dialogResult.resolution === 'replace') {
-                      collisionResolution = 'replace'
-                    }
-                  }
-                }
-
-                // Mark as programmatic move to prevent watcher from reacting
-                ctx.markProgrammaticMove?.(nodeId)
-
-                // Move file
-                try {
-                  const newPath = await ctx.moveNodeFile!(nodeId, targetFolder, collisionResolution)
-                  store.updateNodeFilePath?.(nodeId, newPath)
-                } catch (err) {
-                  console.error(`Failed to move file for node ${nodeId}:`, err)
-                  // Revert to the captured previous frame on failure
-                  store.assignNodesToFrame([nodeId], previousFrameId)
-                }
-              }
-
-              // Execute file move asynchronously
-              handleFileMove()
-            }
-          }
-        }
     }
 
     // Persist final positions once, now that the live drag (which ran with

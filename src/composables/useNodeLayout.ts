@@ -5,13 +5,12 @@
 
 import { applyForceLayout } from '../canvas/layout'
 import { pushOverlappingNodes as pushNodesApart } from '../lib/nodeCollision'
-import type { Node, Edge, Frame } from '../types'
+import type { Node, Edge } from '../types'
 
 export interface NodeLayoutDeps {
   getNodes: () => Node[]
   getFilteredNodes: () => Node[]
   getFilteredEdges: () => Edge[]
-  getFilteredFrames: () => Frame[]
   updateNodePosition: (id: string, x: number, y: number) => Promise<void>
   updateNodeSize: (id: string, width: number, height: number) => Promise<void>
   incrementLayoutVersion: () => void
@@ -22,8 +21,6 @@ export interface LayoutOptions {
   centerY?: number
   chargeStrength?: number
   linkDistance?: number
-  frameId?: string
-  fitToFrame?: boolean
 }
 
 export function useNodeLayout(deps: NodeLayoutDeps) {
@@ -62,43 +59,10 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
 
   /**
    * Apply force-directed layout to all nodes or a subset
-   * When frameId is provided, layout only nodes inside that frame
-   * Otherwise, nodes inside frames are excluded from layout
    */
   async function layoutNodes(nodeIds?: string[], options?: LayoutOptions) {
-    const frameId = options?.frameId
-    const fitToFrame = options?.fitToFrame ?? true
     const filteredNodes = deps.getFilteredNodes()
-    const filteredFrames = deps.getFilteredFrames()
-    const filteredEdges = deps.getFilteredEdges()
-
-    // Helper to check if a node is inside any frame
-    // frame_id is the single source of truth - no visual overlap fallback
-    const isNodeInAnyFrame = (node: Node): boolean => {
-      return !!node.frame_id
-    }
-
-    let targetNodes: Node[]
-    let targetFrame: Frame | undefined
-
-    if (frameId) {
-      // Frame-scoped layout: only nodes explicitly assigned to this frame via frame_id
-      // Do NOT use visual overlap - that creates inconsistent state
-      targetFrame = filteredFrames.find(f => f.id === frameId)
-      if (!targetFrame) {
-        return
-      }
-
-      targetNodes = filteredNodes.filter(n => n.frame_id === frameId)
-    } else {
-      // Canvas layout: exclude nodes inside frames
-      const allTargetNodes = nodeIds
-        ? filteredNodes.filter(n => nodeIds.includes(n.id))
-        : filteredNodes
-
-      targetNodes = allTargetNodes.filter(n => !isNodeInAnyFrame(n))
-    }
-
+    const targetNodes = nodeIds ? filteredNodes.filter(n => nodeIds.includes(n.id)) : filteredNodes
     if (targetNodes.length === 0) return
 
     const layoutNodesList = targetNodes.map(n => ({
@@ -109,22 +73,12 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
       height: n.height || 120,
     }))
 
-    // Calculate layout center
-    let centerX: number, centerY: number
+    // Centroid of the nodes being laid out
+    const centerX = layoutNodesList.reduce((sum, n) => sum + n.x, 0) / layoutNodesList.length
+    const centerY = layoutNodesList.reduce((sum, n) => sum + n.y, 0) / layoutNodesList.length
 
-    if (targetFrame) {
-      // Center within frame
-      centerX = targetFrame.canvas_x + targetFrame.width / 2
-      centerY = targetFrame.canvas_y + targetFrame.height / 2
-    } else {
-      // Use centroid of nodes being laid out
-      centerX = layoutNodesList.reduce((sum, n) => sum + n.x, 0) / layoutNodesList.length
-      centerY = layoutNodesList.reduce((sum, n) => sum + n.y, 0) / layoutNodesList.length
-    }
-
-    // Get edges between target nodes
     const layoutNodeIds = new Set(targetNodes.map(n => n.id))
-    const layoutEdges = filteredEdges
+    const layoutEdges = deps.getFilteredEdges()
       .filter(e => layoutNodeIds.has(e.source_node_id) && layoutNodeIds.has(e.target_node_id))
       .map(e => ({
         source: e.source_node_id,
@@ -135,62 +89,15 @@ export function useNodeLayout(deps: NodeLayoutDeps) {
     const nodeCount = layoutNodesList.length
     const iterations = nodeCount > 300 ? 150 : nodeCount > 100 ? 250 : 400
 
-    // Adjust charge and link distance for frame-scoped layout
-    let chargeStrength = options?.chargeStrength
-    let linkDistance = options?.linkDistance
-
-    if (targetFrame && !chargeStrength && !linkDistance) {
-      // Tighter layout for frame-scoped
-      const frameArea = targetFrame.width * targetFrame.height
-      const nodeArea = nodeCount * 200 * 120 // Approximate average node size
-      const density = nodeArea / frameArea
-
-      // Stronger repulsion and shorter links for denser layouts
-      chargeStrength = density > 0.5 ? -200 : -300
-      linkDistance = density > 0.5 ? 80 : 120
-    }
-
     const positions = await applyForceLayout(layoutNodesList, layoutEdges, {
       centerX: options?.centerX ?? centerX,
       centerY: options?.centerY ?? centerY,
-      chargeStrength,
-      linkDistance,
+      chargeStrength: options?.chargeStrength,
+      linkDistance: options?.linkDistance,
       iterations,
     })
 
-    // If frame-scoped, constrain positions to frame bounds (preserve node sizes)
-    if (targetFrame && fitToFrame) {
-      const padding = 30
-      const frameLeft = targetFrame.canvas_x + padding
-      const frameTop = targetFrame.canvas_y + padding + 30 // Extra space for title
-      const frameRight = targetFrame.canvas_x + targetFrame.width - padding
-      const frameBottom = targetFrame.canvas_y + targetFrame.height - padding
-
-      // Constrain positions only - preserve existing node sizes
-      const updates: Promise<void>[] = []
-      for (const [id, pos] of positions) {
-        // Get the actual node to use its current size for boundary calculations
-        const node = deps.getNodes().find(n => n.id === id)
-        const nodeWidth = node?.width || 200
-        const nodeHeight = node?.height || 120
-
-        // Constrain position to frame bounds using the node's current size
-        const constrainedX = Math.max(frameLeft, Math.min(frameRight - nodeWidth, pos.x))
-        const constrainedY = Math.max(frameTop, Math.min(frameBottom - nodeHeight, pos.y))
-
-        updates.push(deps.updateNodePosition(id, constrainedX, constrainedY))
-        // Do NOT resize nodes - preserve user's custom sizes
-      }
-      await Promise.all(updates)
-    } else {
-      // Standard position update
-      const updates: Promise<void>[] = []
-      for (const [id, pos] of positions) {
-        updates.push(deps.updateNodePosition(id, pos.x, pos.y))
-      }
-      await Promise.all(updates)
-    }
-
+    await Promise.all([...positions].map(([id, pos]) => deps.updateNodePosition(id, pos.x, pos.y)))
     deps.incrementLayoutVersion()
   }
 

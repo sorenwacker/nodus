@@ -65,7 +65,7 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
       handlers.onResetSizes?.()
     }
 
-    // Delete/Backspace: Delete selected nodes or frames (when not in input)
+    // Delete/Backspace: Delete selected nodes (when not in input)
     if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
       e.preventDefault()
       handlers.onDelete?.()

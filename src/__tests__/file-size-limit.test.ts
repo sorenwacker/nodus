@@ -19,12 +19,10 @@ const LIMIT = 1000
  * file is under the limit. Never raise a number.
  */
 const OVER_LIMIT: Record<string, number> = {
-  'src/canvas/GraphCanvas.vue': 2481,
-  'src/App.vue': 1261,
-  'src/lib/templates.ts': 1246,
-  'src/components/StorylineReader.vue': 1197,
-  'src/__tests__/layoutFrameIntegration.test.ts': 1205,
-  'src/__tests__/frameCollision.test.ts': 1201,
+  'src/canvas/GraphCanvas.vue': 2209,
+  'src/App.vue': 1200,
+  'src/lib/templates.ts': 1228,
+  'src/components/StorylineReader.vue': 1149,
 }
 
 const EXTENSIONS = ['.ts', '.vue', '.rs']

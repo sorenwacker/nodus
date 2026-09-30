@@ -9,7 +9,7 @@ import { ref } from 'vue'
 import { useLayout, type LayoutOverlay } from '../canvas/composables/layout/useLayout'
 import type { Node } from '../types'
 
-function node(id: string, x = 0, y = 0, frameId: string | null = null): Node {
+function node(id: string, x = 0, y = 0): Node {
   return {
     id,
     title: id,
@@ -18,15 +18,14 @@ function node(id: string, x = 0, y = 0, frameId: string | null = null): Node {
     canvas_y: y,
     width: 200,
     height: 120,
-    frame_id: frameId,
   } as unknown as Node
 }
 
-function setup(overlay: LayoutOverlay | null, frameId: string | null = null) {
+function setup(overlay: LayoutOverlay | null) {
   const nodes = [
-    node('hub', 0, 0, frameId),
-    node('a', 0, 0, frameId),
-    node('b', 0, 0, frameId),
+    node('hub'),
+    node('a'),
+    node('b'),
     node('outside', 9999, 9999),
   ]
   const edges = [
@@ -41,12 +40,9 @@ function setup(overlay: LayoutOverlay | null, frameId: string | null = null) {
       getNodes: () => nodes,
       getFilteredNodes: () => nodes,
       getFilteredEdges: () => edges,
-      getFilteredFrames: () => [],
       getSelectedNodeIds: () => [],
       getNode: (id: string) => nodes.find(n => n.id === id),
       updateNodePosition,
-      updateFramePosition: vi.fn(),
-      updateFrameSize: vi.fn(),
       layoutNodes: vi.fn(async () => {}),
     },
     viewState: {
@@ -113,33 +109,6 @@ describe('layout while an overlay is open', () => {
         },
       }
       const { layout } = setup(overlay)
-
-      await layout.autoLayout(layoutType)
-
-      expect(applied.length).toBeGreaterThan(0)
-      const placed = new Set(applied.flatMap(p => [...p.keys()]))
-      expect([...placed].sort()).toEqual(['a', 'b', 'hub'])
-    }
-  )
-
-  it.each(['grid', 'horizontal', 'vertical', 'force', 'hierarchical', 'radial'] as const)(
-    'arranges an overlay whose nodes belong to a frame with the %s layout',
-    async layoutType => {
-      // The overlay draws no frames, so a node's stored frame membership
-      // constrains nothing in it. The grouping pass skipped every node that
-      // carried a frame_id whether or not its frame was shown, so in this mode
-      // a framed neighbour was dropped from the run and, when every neighbour
-      // was framed, the layout placed nothing at all
-      // (PRODUCT_DESIGN.md > Neighborhood Mode).
-      const applied: Map<string, { x: number; y: number }>[] = []
-      const overlay: LayoutOverlay = {
-        nodeIds: new Set(['hub', 'a', 'b']),
-        centerId: 'hub',
-        apply: p => {
-          applied.push(p)
-        },
-      }
-      const { layout } = setup(overlay, 'frame-1')
 
       await layout.autoLayout(layoutType)
 

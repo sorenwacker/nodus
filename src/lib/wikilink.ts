@@ -2,11 +2,10 @@
  * Wikilink resolution utilities
  * Handles finding nodes from wikilink targets like [[folder/note]] or [[note]]
  */
-import type { Node, Frame } from '../types'
+import type { Node } from '../types'
 
 export interface WikilinkResolveOptions {
   nodes: Node[]
-  frames?: Frame[]
 }
 
 /**
@@ -14,14 +13,14 @@ export interface WikilinkResolveOptions {
  * Priority:
  * 1. Exact title match
  * 2. File path match
- * 3. Frame + node title match (e.g., "folder/note" -> frame "folder" + node "note")
- * 4. Filename-only match (fallback, may be ambiguous)
+ * 3. Title match, preferring the node whose file path contains the link's
+ *    folder (e.g. "folder/note")
  */
 export function resolveWikilink(
   target: string,
   options: WikilinkResolveOptions
 ): Node | undefined {
-  const { nodes, frames = [] } = options
+  const { nodes } = options
 
   // Decode HTML entities
   const decodedTarget = target
@@ -41,8 +40,8 @@ export function resolveWikilink(
   if (node) return node
 
   // 2. File path match, anchored to the filename. A loose substring match
-  // here would resolve "note" to "another-note.md" and shadow the more
-  // precise frame+title resolution below.
+  // here would resolve "note" to "another-note.md" and shadow the
+  // folder-aware title match below.
   const targetLower = decodedTarget.toLowerCase()
   node = nodes.find(n => {
     const path = n.file_path?.toLowerCase()
@@ -56,24 +55,7 @@ export function resolveWikilink(
   })
   if (node) return node
 
-  // 3. Frame + node title match
-  if (pathParts.length >= 2) {
-    const framePath = pathParts.slice(0, -1).join('/')
-    const frame = frames.find(f =>
-      f.title.toLowerCase() === framePath.toLowerCase() ||
-      f.folder_path?.toLowerCase().includes(framePath.toLowerCase())
-    )
-    if (frame) {
-      // Find node with matching title inside this frame
-      node = nodes.find(n =>
-        n.title.toLowerCase() === targetWithoutPath.toLowerCase() &&
-        n.frame_id === frame.id
-      )
-      if (node) return node
-    }
-  }
-
-  // 4. Filename-only match with disambiguation
+  // 3. Title match with disambiguation
   const matches = nodes.filter(
     n => n.title.toLowerCase() === targetWithoutPath.toLowerCase()
   )

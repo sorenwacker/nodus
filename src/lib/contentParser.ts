@@ -27,6 +27,26 @@ export function extractHashtags(content: string): string[] {
   return Array.from(tags)
 }
 
+const TRANSLITERATION: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }
+
+/**
+ * Convert a free-text group name into a tag the hashtag rule reads back
+ * whole: lowercased, German letters transliterated, anything else outside
+ * `a-z0-9_-` a hyphen, hyphen runs collapsed, leading `-`/`_` and trailing
+ * `-` removed, cut to the tag length limit. Empty when nothing usable is
+ * left (docs/design/remove-frames.md > Existing data).
+ */
+export function toTag(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[äöüß]/g, c => TRANSLITERATION[c])
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-_]+|-+$/g, '')
+    .slice(0, MAX_HASHTAG_LENGTH)
+    .replace(/-+$/, '')
+}
+
 /**
  * Extract wikilinks from content
  * Matches: [[link]], [[link|display text]]

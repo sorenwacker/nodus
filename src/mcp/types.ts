@@ -104,20 +104,6 @@ export interface McpViewport {
 }
 
 /**
- * Frame data returned by MCP
- */
-export interface McpFrame {
-  id: string
-  title: string
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-  color: string | null
-  parent_frame_id: string | null
-}
-
-/**
  * Storyline data returned by MCP
  * Storylines define ordered sequences of nodes forming narrative paths.
  */

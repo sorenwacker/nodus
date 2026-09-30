@@ -13,8 +13,7 @@ import {
   getStarterNodeConfigs,
   getStarterEdgeConfigs,
   getEdgeLabel,
-  getStarterFrameConfigs,
-  getStarterFrameTitle,
+  getStarterTagGroups,
   getStarterStorylineConfig,
   getStarterStorylineTitle,
   getStarterStorylineDescription,
@@ -50,7 +49,7 @@ export async function switchWorkspace(
   fileSync: FileSyncInterface,
   workspaceId: string | null
 ): Promise<void> {
-  const { state, edgesStore, framesStore, workspaceStore } = deps
+  const { state, edgesStore, workspaceStore } = deps
 
   // Stop any existing file watcher
   await fileSync.stopWatching()
@@ -68,11 +67,8 @@ export async function switchWorkspace(
   }
 
   workspaceStore.switchWorkspace(workspaceId)
-  // Reload edges and frames for the new workspace
-  await Promise.all([
-    edgesStore.initialize(workspaceId),
-    framesStore.initialize(),
-  ])
+  // Reload edges for the new workspace
+  await edgesStore.initialize(workspaceId)
 
   // Start file watcher if workspace has sync enabled and vault path
   if (workspaceId) {
@@ -152,7 +148,7 @@ export async function resetDefaultWorkspace(
   createNodeFn: (data: CreateNodeInput) => Promise<Node>,
   createEdgeFn: (data: CreateEdgeInput) => Promise<import('../../types').Edge>
 ): Promise<void> {
-  const { state, framesStore, storylinesStore } = deps
+  const { state, storylinesStore } = deps
   storeLogger.info('Resetting default workspace to initial state')
 
   // Delete all nodes in the default workspace (workspace_id = null)
@@ -169,12 +165,9 @@ export async function resetDefaultWorkspace(
   state.nodes.value = state.nodes.value.filter(n => n.workspace_id !== null)
   state.selectedNodeIds.value = []
 
-  // Remove previous default-workspace frames and storylines so repeated
-  // resets do not accumulate duplicates
+  // Remove previous default-workspace storylines so repeated resets do not
+  // accumulate duplicates
   const isDefaultWorkspace = (id: string | null | undefined) => !id || id === 'default'
-  for (const frame of [...framesStore.frames.filter(f => isDefaultWorkspace(f.workspace_id))]) {
-    framesStore.deleteFrame(frame.id)
-  }
   for (const storyline of [...storylinesStore.storylines.filter(s => isDefaultWorkspace(s.workspace_id))]) {
     try {
       await storylinesStore.deleteStoryline(storyline.id)
@@ -189,6 +182,10 @@ export async function resetDefaultWorkspace(
   const titles = getStarterTitles(locale)
   const nodeConfigs = getStarterNodeConfigs()
   const edgeConfigs = getStarterEdgeConfigs()
+  const groupTags = new Map<string, string[]>()
+  for (const group of getStarterTagGroups()) {
+    for (const key of group.nodeKeys) groupTags.set(key, [...(groupTags.get(key) ?? []), group.tag])
+  }
 
   // Create starter nodes from configurations
   const createdNodes = new Map<string, Node>()
@@ -202,6 +199,7 @@ export async function resetDefaultWorkspace(
       width: config.width,
       height: config.height,
       color_theme: config.color_theme,
+      tags: groupTags.get(config.key),
     })
     createdNodes.set(config.key, node)
   }
@@ -218,27 +216,6 @@ export async function resetDefaultWorkspace(
         label: getEdgeLabel(config.labelKey, locale),
         directed: config.directed,
       })
-    }
-  }
-
-  // Create demo frames and put their nodes inside (spatial grouping demo)
-  for (const frameConfig of getStarterFrameConfigs()) {
-    const frame = await framesStore.createFrameAsync(
-      frameConfig.canvas_x,
-      frameConfig.canvas_y,
-      frameConfig.width,
-      frameConfig.height,
-      getStarterFrameTitle(frameConfig.key, locale),
-      null
-    )
-    for (const key of frameConfig.nodeKeys) {
-      const node = createdNodes.get(key)
-      if (node) {
-        node.frame_id = frame.id
-        invoke('assign_node_to_frame', { nodeId: node.id, frameId: frame.id }).catch(e =>
-          storeLogger.error(`Failed to assign starter node ${node.id} to frame:`, e)
-        )
-      }
     }
   }
 

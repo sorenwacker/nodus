@@ -10,7 +10,6 @@ import { runHashtagBackfill } from './hashtagBackfill'
 import { notifications$ } from '../../composables/useNotifications'
 import { useStorylinesStore } from '../storylines'
 import { useEdgesStore } from '../edges'
-import { useFramesStore } from '../frames'
 import { useWorkspaceStore } from '../workspaces'
 import { createMockNodes } from '../../lib/mockData'
 import type { Node, NodeStoreState, NodeStoreComputed, NodeStoreDependencies } from './types'
@@ -46,7 +45,6 @@ export function createStoreInstances() {
   return {
     storylinesStore: useStorylinesStore(),
     edgesStore: useEdgesStore(),
-    framesStore: useFramesStore(),
     workspaceStore: useWorkspaceStore(),
   }
 }
@@ -59,12 +57,10 @@ export function createComputedProperties(
   stores: ReturnType<typeof createStoreInstances>
 ): NodeStoreComputed {
   const { nodes, showManualEdges, showStorylineEdges, showWikilinkEdges, showTagEdges } = state
-  const { edgesStore, framesStore, workspaceStore, storylinesStore } = stores
+  const { edgesStore, workspaceStore, storylinesStore } = stores
 
-  // Expose edges and frames from their stores for backwards compatibility
+  // Expose edges from their store for backwards compatibility
   const edges = computed(() => edgesStore.edges)
-  const frames = computed(() => framesStore.frames)
-  const selectedFrameId = computed(() => framesStore.selectedFrameId)
   const workspaces = computed(() => workspaceStore.workspaces)
   const currentWorkspaceId = computed(() => workspaceStore.currentWorkspaceId)
 
@@ -83,15 +79,6 @@ export function createComputedProperties(
         ? nodes.value.filter(n => !n.workspace_id)
         : nodes.value.filter(n => n.workspace_id === wsId)
     return showTagEdges.value ? inWorkspace : inWorkspace.filter(n => n.node_type !== 'tag')
-  })
-
-  const filteredFrames = computed(() => {
-    const wsId = workspaceStore.currentWorkspaceId
-    // Filter frames by workspace, treating null/undefined/"default" as the default workspace
-    if (!wsId || wsId === 'default') {
-      return framesStore.frames.filter(f => !f.workspace_id || f.workspace_id === 'default')
-    }
-    return framesStore.frames.filter(f => f.workspace_id === wsId)
   })
 
   const filteredEdges = computed(() => {
@@ -136,8 +123,6 @@ export function createComputedProperties(
 
   return {
     edges,
-    frames,
-    selectedFrameId,
     workspaces,
     currentWorkspaceId,
     selectedNodeId,
@@ -145,7 +130,6 @@ export function createComputedProperties(
     filteredNodes,
     filteredEdges,
     graphEdges,
-    filteredFrames,
     storylines,
     storylineNodes,
     storylineNodesVersion,
@@ -175,7 +159,7 @@ export async function initializeStore(
   deps: NodeStoreDependencies,
   _createNode: (data: import('./types').CreateNodeInput) => Promise<Node>
 ): Promise<void> {
-  const { state, edgesStore, framesStore, workspaceStore, storylinesStore, computed } = deps
+  const { state, edgesStore, workspaceStore, storylinesStore, computed } = deps
 
   state.loading.value = true
   state.error.value = null
@@ -183,16 +167,13 @@ export async function initializeStore(
     // Initialize workspace store (syncs localStorage with database)
     await workspaceStore.initialize()
 
-    // Initialize edges and frames stores with current workspace
+    // Initialize the edges store with the current workspace
     // Convert "default" to null for backend compatibility
     const currentWorkspace = workspaceStore.currentWorkspaceId
     const workspaceForBackend = currentWorkspace === 'default' ? null : currentWorkspace
     storeLogger.debug(`[Nodes] Current workspace after init: ${currentWorkspace} (backend: ${workspaceForBackend})`)
 
-    await Promise.all([
-      edgesStore.initialize(workspaceForBackend),
-      framesStore.initialize(),
-    ])
+    await edgesStore.initialize(workspaceForBackend)
 
     // Load nodes
     const fetchedNodes = await invoke<Node[]>('get_nodes')

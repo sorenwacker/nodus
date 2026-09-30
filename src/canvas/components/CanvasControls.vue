@@ -19,8 +19,6 @@ defineProps<{
   neighborhoodMode: boolean
   /** Current neighborhood depth (1-5 hops) */
   neighborhoodDepth: number
-  /** Whether frame placement mode is active */
-  pendingFramePlacement: boolean
   /** Whether all edges are highlighted */
   highlightAllEdges: boolean
   /** Whether bubble mode is active (LOD circles) */
@@ -37,7 +35,6 @@ const emit = defineEmits<{
   (e: 'cycleEdgeStyle'): void
   (e: 'toggleNeighborhoodMode'): void
   (e: 'setNeighborhoodDepth', depth: number): void
-  (e: 'createFrame'): void
   (e: 'showHelp'): void
   (e: 'toggleHighlightEdges'): void
   (e: 'toggleBubbleMode'): void
@@ -256,17 +253,6 @@ const emit = defineEmits<{
       <option value="4">4 {{ t('canvas.controls.hops') }}</option>
       <option value="5">5 {{ t('canvas.controls.hops') }}</option>
     </select>
-    <button
-      data-tooltip-pos="top"
-      :data-tooltip="pendingFramePlacement ? t('canvas.frame.clickToPlace') : t('canvas.frame.addFrame')"
-      :class="{ active: pendingFramePlacement }"
-      @click="emit('createFrame')"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <line x1="9" y1="3" x2="9" y2="21" />
-      </svg>
-    </button>
     <button
       data-tooltip-pos="top"
       :data-tooltip="t('canvas.controls.help')"

@@ -61,25 +61,6 @@ import {
   deduplicateEdges as deduplicateEdgesFn,
 } from './nodes/edges'
 
-import {
-  checkFileCollision as checkFileCollisionFn,
-  moveNodeFile as moveNodeFileFn,
-  updateNodeFilePath as updateNodeFilePathFn,
-  getVaultPath as getVaultPathFn,
-} from './nodes/files'
-
-import {
-  createFrame as createFrameFn,
-  updateFramePosition as updateFramePositionFn,
-  persistFramePosition as persistFramePositionFn,
-  updateFrameSize as updateFrameSizeFn,
-  persistFrameSize as persistFrameSizeFn,
-  updateFrameTitle as updateFrameTitleFn,
-  updateFrameColor as updateFrameColorFn,
-  deleteFrame as deleteFrameFn,
-  selectFrame as selectFrameFn,
-  assignNodesToFrame as assignNodesToFrameFn,
-} from './nodes/frames'
 
 import {
   createWorkspace as createWorkspaceFn,
@@ -113,7 +94,6 @@ import {
 import type {
   Node,
   Edge,
-  Frame,
   Workspace,
   CreateNodeInput,
   CreateEdgeInput,
@@ -124,7 +104,7 @@ import type {
 } from '../types'
 
 // Re-export types for consumers
-export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
+export type { Node, Edge, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
 
 export const useNodesStore = defineStore('nodes', () => {
   // Create core state
@@ -133,13 +113,13 @@ export const useNodesStore = defineStore('nodes', () => {
 
   // Create store instances
   const stores = createStoreInstances()
-  const { storylinesStore, edgesStore, framesStore, workspaceStore } = stores
+  const { storylinesStore, edgesStore, workspaceStore } = stores
 
   // Create computed properties
   const computed = createComputedProperties(state, stores)
   const {
-    edges, frames, selectedFrameId, workspaces, currentWorkspaceId,
-    selectedNodeId, selectedNode, filteredNodes, filteredEdges, graphEdges, filteredFrames,
+    edges, workspaces, currentWorkspaceId,
+    selectedNodeId, selectedNode, filteredNodes, filteredEdges, graphEdges,
     storylines, storylineNodes, storylineNodesVersion, filteredStorylines,
   } = computed
 
@@ -185,18 +165,6 @@ export const useNodesStore = defineStore('nodes', () => {
     },
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
     reloadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
-    // Frame sync dependencies for folder-frame sync
-    getFrames: () => framesStore.frames,
-    assignNodeToFrame: (nodeId: string, frameId: string | null) => {
-      const node = nodes.value.find((n) => n.id === nodeId)
-      if (node && node.frame_id !== frameId) {
-        node.frame_id = frameId
-        invoke('assign_node_to_frame', { nodeId, frameId }).catch((e) =>
-          storeLogger.error('Failed to assign node to frame:', e)
-        )
-      }
-    },
-    getVaultPath: () => workspaceStore.currentVaultPath,
     // Frontmatter sync
     updateNodeTitle: async (id: string, title: string) => {
       const node = nodes.value.find(n => n.id === id)
@@ -268,7 +236,7 @@ export const useNodesStore = defineStore('nodes', () => {
     id: string,
     x: number,
     y: number,
-    options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean; skipPersist?: boolean }
+    options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }
   ) {
     await updateNodePositionFn(deps, id, x, y, options)
   }
@@ -362,58 +330,6 @@ export const useNodesStore = defineStore('nodes', () => {
   const cleanupOrphanEdges = () => cleanupOrphanEdgesFn(edgesStore, nodes.value)
   const deduplicateEdges = () => deduplicateEdgesFn(edgesStore)
 
-  // File operations
-  const checkFileCollision = (nodeId: string, targetFolder: string) =>
-    checkFileCollisionFn(nodeId, targetFolder)
-
-  async function moveNodeFile(nodeId: string, targetFolder: string, collisionResolution?: string): Promise<string> {
-    return moveNodeFileFn(deps, nodeId, targetFolder, collisionResolution, updateNodeContent)
-  }
-
-  function updateNodeFilePath(nodeId: string, filePath: string) {
-    updateNodeFilePathFn(nodes.value, nodeId, filePath)
-  }
-
-  function getVaultPath(): string | null {
-    return getVaultPathFn(workspaceStore)
-  }
-
-  // Frame operations
-  function createFrame(
-    x: number,
-    y: number,
-    width = 400,
-    height = 300,
-    title = 'Frame',
-    workspaceId?: string | null
-  ) {
-    return createFrameFn(deps, x, y, width, height, title, workspaceId)
-  }
-
-  const updateFramePosition = (id: string, x: number, y: number, options?: { skipPersist?: boolean }) => updateFramePositionFn(framesStore, id, x, y, options)
-  const persistFramePosition = (id: string) => persistFramePositionFn(framesStore, id)
-  const updateFrameSize = (
-    id: string,
-    width: number,
-    height: number,
-    options?: { skipPersist?: boolean }
-  ) => updateFrameSizeFn(framesStore, id, width, height, options)
-  const persistFrameSize = (id: string) => persistFrameSizeFn(framesStore, id)
-  const updateFrameTitle = (id: string, title: string) => updateFrameTitleFn(framesStore, id, title)
-  const updateFrameColor = (id: string, color: string | null) => updateFrameColorFn(framesStore, id, color)
-
-  function deleteFrame(id: string) {
-    deleteFrameFn(deps, id)
-  }
-
-  function selectFrame(id: string | null) {
-    selectFrameFn(deps, id)
-  }
-
-  function assignNodesToFrame(nodeIds: string[], frameId: string | null) {
-    assignNodesToFrameFn(nodes.value, nodeIds, frameId)
-  }
-
   // Workspace operations
   const createWorkspace = (name: string) => createWorkspaceFn(workspaceStore, name)
 
@@ -468,30 +384,12 @@ export const useNodesStore = defineStore('nodes', () => {
   // Initialize composables that depend on functions defined above
   importComposable = useImport({
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
-    getNodes: () => nodes.value,
     setNodes: (n) => { nodes.value = n },
     addNodes: (n) => { nodes.value.push(...n) },
     setEdges: (e) => { edgesStore.edges.splice(0, edgesStore.edges.length, ...e) },
     deduplicateEdges: (e) => edgesStore.deduplicateEdgesLocal(e),
-    reloadFrames: () => framesStore.initialize(),
     createNode,
     watchVault: (path) => fileSync.watchVault(path),
-    // Frame-folder sync: create frames from folder structure during import
-    createFrame: (x, y, width, height, title, wsId, folderPath, parentFrameId) =>
-      framesStore.createFrame(x, y, width, height, title, wsId, folderPath, parentFrameId),
-    createFrameAsync: (x, y, width, height, title, wsId, folderPath, parentFrameId) =>
-      framesStore.createFrameAsync(x, y, width, height, title, wsId, folderPath, parentFrameId),
-    assignNodesToFrame: (nodeIds, frameId) => {
-      for (const node of nodes.value) {
-        if (nodeIds.includes(node.id) && node.frame_id !== frameId) {
-          node.frame_id = frameId
-          // Persist to backend
-          invoke('assign_node_to_frame', { nodeId: node.id, frameId }).catch((e) =>
-            storeLogger.error('Failed to assign node to frame:', e)
-          )
-        }
-      }
-    },
     updateNodePosition: (id, x, y) => {
       const node = nodes.value.find((n) => n.id === id)
       if (node) {
@@ -503,9 +401,6 @@ export const useNodesStore = defineStore('nodes', () => {
         )
       }
     },
-    updateFrameSize: (id, width, height) => framesStore.updateFrameSize(id, width, height),
-    getFrames: () => framesStore.frames,
-    getVaultPath: () => workspaceStore.currentVaultPath,
   })
 
   tagNodesComposable = useTagNodes({
@@ -521,7 +416,6 @@ export const useNodesStore = defineStore('nodes', () => {
     getNodes: () => nodes.value,
     getFilteredNodes: () => filteredNodes.value,
     getFilteredEdges: () => filteredEdges.value,
-    getFilteredFrames: () => filteredFrames.value,
     updateNodePosition,
     updateNodeSize: async (id, width, height) => {
       // Update without push to avoid infinite recursion
@@ -584,7 +478,6 @@ export const useNodesStore = defineStore('nodes', () => {
     options?: { createClassNodes?: boolean; createIndividualNodes?: boolean; workspaceId?: string; layout?: 'grid' | 'hierarchical' }
   ) => importComposable.importOntology(filePath, options)
   const refreshWorkspace = () => importComposable.refreshWorkspace()
-  const syncFramesFromFolders = () => importComposable.syncFramesFromFolders()
 
   // File sync forwarding
   const watchVault = (path: string) => fileSync.watchVault(path)
@@ -598,8 +491,6 @@ export const useNodesStore = defineStore('nodes', () => {
       centerY?: number
       chargeStrength?: number
       linkDistance?: number
-      frameId?: string
-      fitToFrame?: boolean
     }
   ) => layoutComposable.layoutNodes(nodeIds, options)
 
@@ -615,16 +506,13 @@ export const useNodesStore = defineStore('nodes', () => {
     setEditingNode,
     nodes,
     edges,
-    frames,
     filteredNodes,
     filteredEdges,
     graphEdges,
-    filteredFrames,
     nodeLayoutVersion,
     selectedNodeIds,
     selectedNodeId,
     selectedNode,
-    selectedFrameId,
     loading,
     error,
     // Edge category visibility filters
@@ -670,23 +558,11 @@ export const useNodesStore = defineStore('nodes', () => {
     updateEdgeLabel,
     updateEdgeDirected,
     updateStorylineEdgeColors,
-    // Frame operations
-    createFrame,
-    updateFramePosition,
-    persistFramePosition,
-    persistFrameSize,
-    updateFrameSize,
-    updateFrameTitle,
-    updateFrameColor,
-    deleteFrame,
-    selectFrame,
-    assignNodesToFrame,
     // Import operations
     importVault,
     importCitations,
     importOntology,
     refreshWorkspace,
-    syncFramesFromFolders,
     watchVault,
     stopWatching,
     // Workspace operations
@@ -737,11 +613,5 @@ export const useNodesStore = defineStore('nodes', () => {
     getNodesReferencingEntity,
     createEntityNode,
     linkToEntity,
-    // File-folder sync
-    checkFileCollision,
-    moveNodeFile,
-    updateNodeFilePath,
-    getVaultPath,
-    markProgrammaticMove: fileSync.markProgrammaticMove,
   }
 })

@@ -4,7 +4,7 @@
  * Routes incoming MCP requests to appropriate store methods and returns responses.
  */
 
-import type { Node, Edge, Frame, Storyline } from '../types'
+import type { Node, Edge, Storyline } from '../types'
 import type {
   JsonRpcRequest,
   JsonRpcResponse,
@@ -50,21 +50,6 @@ import {
   handleGetDuplicateEdges,
   handleCleanupDuplicateEdges,
   handleArrangeRadial,
-  handleListFrames,
-  handleGetFrame,
-  handleCreateFrame,
-  handleUpdateFrame,
-  handleDeleteFrame,
-  handleGetNodesInFrame,
-  handleAssignNodeToFrame,
-  handleRemoveNodeFromFrame,
-  handleBatchAssignNodesToFrame,
-  handleBatchMoveFrames,
-  handleBatchResizeFrames,
-  handleFitFrameToContents,
-  handleFitAllFrames,
-  handleCheckFrameOverlaps,
-  handleResolveFrameOverlaps,
   handleListStorylines,
   handleGetStoryline,
   handleGetStorylineNodes,
@@ -90,7 +75,6 @@ export interface McpStoreInterface {
   // Workspace scoping: lets a connection target a workspace other than the
   // one open in the app (parallel agents on parallel workspaces)
   getAllNodes: () => Node[]
-  getAllFrames: () => Frame[]
   getWorkspaces: () => Array<{ id: string; name: string; current: boolean }>
   loadWorkspaceEdges: (workspaceId: string | null) => Promise<Edge[]>
   createEdgeRaw: (data: {
@@ -136,24 +120,6 @@ export interface McpStoreInterface {
   updateEdgeDirected: (id: string, directed: boolean) => Promise<void>
   updateEdgeLabel: (id: string, label: string | null) => Promise<void>
   updateEdgeColor: (id: string, color: string | null) => Promise<void>
-
-  // Frame operations
-  getFilteredFrames: () => Frame[]
-  getFrame: (id: string) => Frame | undefined
-  createFrame: (
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    title: string,
-    workspaceId?: string | null
-  ) => Frame
-  updateFramePosition: (id: string, x: number, y: number) => void
-  updateFrameSize: (id: string, width: number, height: number) => void
-  updateFrameTitle: (id: string, title: string) => void
-  updateFrameColor: (id: string, color: string | null) => void
-  deleteFrame: (id: string) => void
-  assignNodesToFrame: (nodeIds: string[], frameId: string | null) => void
 
   // Storyline operations
   getAllStorylines: () => Storyline[]
@@ -217,14 +183,12 @@ export function createMcpMessageHandler(
     const edges = await store.loadWorkspaceEdges(workspaceId)
 
     // Lookups derive from the scoped collections, never from the app's. When
-    // only the list getters were scoped, list_frames returned this
-    // workspace's frames while get_frame on those same ids failed against
-    // whichever workspace the user had open
+    // only the list getters were scoped, a list returned this workspace's
+    // items while a lookup of those same ids failed against whichever
+    // workspace the user had open
     // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
     const nodesInScope = () =>
       store.getAllNodes().filter(n => (n.workspace_id ?? null) === workspaceId && !n.deleted_at)
-    const framesInScope = () =>
-      store.getAllFrames().filter(f => (f.workspace_id ?? null) === workspaceId)
     const storylinesInScope = () =>
       store.getAllStorylines().filter(s => (s.workspace_id ?? null) === workspaceId)
 
@@ -232,23 +196,17 @@ export function createMcpMessageHandler(
       ...store,
       getFilteredNodes: nodesInScope,
       getFilteredEdges: () => edges,
-      getFilteredFrames: framesInScope,
       getNode: (id: string) => nodesInScope().find(n => n.id === id),
-      getFrame: (id: string) => framesInScope().find(f => f.id === id),
       createNode: data =>
         store.createNode({ ...data, workspace_id: workspaceId === null ? 'default' : workspaceId }),
       // Edge writes bypass the live edge store, which only holds the open
       // workspace's edges
       createEdge: data => store.createEdgeRaw(data),
       deleteEdge: id => store.deleteEdgeRaw(id),
-      // A write lands where the reads come from. Frame creation took the
-      // workspace the user had open, so a scoped connection's frame appeared
-      // in a workspace nobody asked for
+      // A write lands where the reads come from. Storylines are scoped like
+      // nodes and edges: they were read and written through the app's open
+      // workspace throughout
       // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
-      createFrame: (x, y, width, height, title) =>
-        store.createFrame(x, y, width, height, title, workspaceId),
-      // Storylines are scoped like nodes, edges and frames: they were read and
-      // written through the app's open workspace throughout
       getFilteredStorylines: storylinesInScope,
       getStoryline: (id: string) => storylinesInScope().find(s => s.id === id),
       createStoryline: (title, description, color) =>
@@ -495,52 +453,6 @@ export function createMcpMessageHandler(
 
       case 'arrange_radial':
         return handleArrangeRadial(store, params as { center_node_id: string; node_ids?: string[]; radius?: number })
-
-      // Frame operations
-      case 'list_frames':
-        return handleListFrames(store)
-
-      case 'get_frame':
-        return handleGetFrame(store, params as { id: string })
-
-      case 'create_frame':
-        return handleCreateFrame(store, params as { title: string; x?: number; y?: number; width?: number; height?: number; color?: string })
-
-      case 'update_frame':
-        return handleUpdateFrame(store, params as { id: string; updates: { title?: string; x?: number; y?: number; width?: number; height?: number; color?: string | null } })
-
-      case 'delete_frame':
-        return handleDeleteFrame(store, params as { id: string })
-
-      case 'get_nodes_in_frame':
-        return handleGetNodesInFrame(store, params as { frame_id: string })
-
-      case 'assign_node_to_frame':
-        return handleAssignNodeToFrame(store, params as { node_id: string; frame_id: string })
-
-      case 'remove_node_from_frame':
-        return handleRemoveNodeFromFrame(store, params as { node_id: string })
-
-      case 'batch_assign_nodes_to_frame':
-        return handleBatchAssignNodesToFrame(store, params as { node_ids: string[]; frame_id?: string | null })
-
-      case 'batch_move_frames':
-        return handleBatchMoveFrames(store, params as { moves: Array<{ id: string; x: number; y: number }> })
-
-      case 'batch_resize_frames':
-        return handleBatchResizeFrames(store, params as { resizes: Array<{ id: string; width: number; height: number }> })
-
-      case 'fit_frame_to_contents':
-        return handleFitFrameToContents(store, params as { frame_id: string })
-
-      case 'fit_all_frames':
-        return handleFitAllFrames(store)
-
-      case 'check_frame_overlaps':
-        return handleCheckFrameOverlaps(store)
-
-      case 'resolve_frame_overlaps':
-        return handleResolveFrameOverlaps(store)
 
       // Storyline operations
       case 'list_storylines':

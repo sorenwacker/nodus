@@ -10,7 +10,6 @@ export { useThemesStore } from './themes'
 // Domain stores (extracted from useNodesStore)
 export { useWorkspaceStore } from './workspaces'
 export { useEdgesStore } from './edges'
-export { useFramesStore } from './frames'
 
 // Re-export types
-export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput } from './nodes'
+export type { Node, Edge, Workspace, CreateNodeInput, CreateEdgeInput } from './nodes'

@@ -62,11 +62,6 @@
       "deleteEdgeTooltip": "Eliminar esta arista",
       "labelSaved": "Etiqueta de conexión guardada"
     },
-    "frame": {
-      "delete": "Eliminar marco",
-      "addFrame": "Agregar marco - Agrupar nodos seleccionados",
-      "clickToPlace": "Haga clic en el lienzo para colocar el marco (Esc para cancelar)"
-    },
     "hover": {
       "incoming": "Aristas entrantes (citado por)",
       "outgoing": "Aristas salientes (cita)",
@@ -103,8 +98,7 @@
       "hops": "saltos",
       "highlightEdges": "Resaltar todas las aristas - Hacer todas las aristas más visibles",
       "bubbleMode": "Modo burbuja - Mostrar nodos como círculos",
-      "help": "Ayuda - Atajos de teclado y uso",
-      "organizeFrames": "Organizar marcos - Atraer miembros, expulsar otros"
+      "help": "Ayuda - Atajos de teclado y uso"
     },
     "search": {
       "placeholder": "Buscar nodos...",
@@ -346,7 +340,7 @@
     "options": {
       "title": "Opciones de importación",
       "entriesFound": "{count} cita encontrada | {count} citas encontradas",
-      "createFrame": "Crear marco para la colección",
+      "tagCollection": "Etiquetar las citas con el nombre de la colección",
       "collectionDetected": "Colección: {name}",
       "noCollection": "No se detectó colección en la exportación",
       "importAttachments": "Importar PDFs adjuntos",
@@ -661,20 +655,6 @@
     "showPerfOverlay": "Mostrar métricas de rendimiento",
     "showPerfOverlayHint": "Tiempos de fotograma sobre el grafo al desplazar o hacer zoom, para diagnosticar tirones"
   },
-  "fileMove": {
-    "collision": {
-      "title": "El archivo ya existe",
-      "message": "Un archivo con el mismo nombre ya existe en la carpeta de destino.",
-      "moving": "Moviendo:",
-      "to": "A:",
-      "existing": "Existente:",
-      "options": "Elige una opción:",
-      "rename": "Renombrar",
-      "renameDesc": "Guardar con un nuevo nombre",
-      "replace": "Reemplazar",
-      "replaceDesc": "Sobrescribir el archivo existente (no se puede deshacer)"
-    }
-  },
   "updates": {
     "available": "Nodus {version} esta disponible",
     "installed": "Tienes {version}",
@@ -729,7 +709,7 @@
     "title": "Expandir en un grafo",
     "lead": "Este documento tiene estructura. Elige qué pasa a tu grafo; el nodo único se conserva en cualquier caso.",
     "sections": "{count} secciones como nodos",
-    "sectionsHint": "Un nodo por título, conectados según el esquema del documento, agrupados en un marco",
+    "sectionsHint": "Un nodo por título, conectados según el esquema del documento, etiquetados con el título del documento",
     "references": "{count} referencias como nodos de cita",
     "referencesHint": "Cada entrada de la bibliografía se convierte en un nodo de cita",
     "verify": "Verificar con Semantic Scholar",
