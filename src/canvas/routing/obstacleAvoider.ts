@@ -23,6 +23,29 @@ export function setRoutingSpatialIndex(index: SpatialIndex | null): void {
 }
 
 /**
+ * Every node that may touch the box [minX, maxX] x [minY, maxY], edges
+ * included, except the excluded ones: a superset the caller filters with its
+ * own exact test. With the spatial index installed only nearby nodes are
+ * returned; without it, all of them (PRODUCT_DESIGN.md > Routing cost).
+ */
+export function nodesNear(
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+  nodes: NodeRect[] | Map<string, NodeRect>,
+  excludeIds: Set<string>
+): NodeRect[] {
+  if (currentSpatialIndex) {
+    // The index tests with strict inequalities; one unit of slack keeps the
+    // nodes that only touch the box, which callers test inclusively
+    return currentSpatialIndex.queryRegion(minX - 1, minY - 1, maxX + 1, maxY + 1, excludeIds)
+  }
+  const list = nodes instanceof Map ? Array.from(nodes.values()) : nodes
+  return list.filter(node => !(node.id && excludeIds.has(node.id)))
+}
+
+/**
  * Check if a line segment intersects a node rectangle
  */
 export function segmentIntersectsNode(
