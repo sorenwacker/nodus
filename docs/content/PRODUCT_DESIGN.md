@@ -1881,6 +1881,7 @@ Whether the user sees a plan must not depend on the model making a second call. 
 - Creating a plan opens the approval dialog, where its steps can be edited, added to, removed, approved or rejected.
 - `request_approval()` remains for the model to call and opens nothing that is already open.
 - Creating a second plan replaces what the dialog shows rather than opening another.
+- A click outside the dialog does not close it. The dialog appears when the agent has a plan, often while the user is clicking on the canvas, and closing only hid it: the plan stayed pending with no way to reopen it, so the agent waited for an answer the user could no longer give. It closes through its close button or Escape.
 
 ### One creator per plan
 
