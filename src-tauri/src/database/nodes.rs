@@ -15,7 +15,6 @@ pub struct Node {
     pub width: f64,
     pub height: f64,
     pub z_index: i32,
-    pub frame_id: Option<String>,
     pub color_theme: Option<String>,
     pub is_collapsed: bool,
     pub tags: Option<String>,
@@ -113,10 +112,10 @@ pub async fn create_many(pool: &DbPool, nodes: &[Node]) -> Result<(), DatabaseEr
         sqlx::query(
             r#"
             INSERT INTO nodes (id, title, file_path, markdown_content, node_type,
-                canvas_x, canvas_y, width, height, z_index, frame_id,
+                canvas_x, canvas_y, width, height, z_index,
                 color_theme, is_collapsed, tags, workspace_id, checksum,
                 created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&node.id)
@@ -129,7 +128,6 @@ pub async fn create_many(pool: &DbPool, nodes: &[Node]) -> Result<(), DatabaseEr
         .bind(node.width)
         .bind(node.height)
         .bind(node.z_index)
-        .bind(&node.frame_id)
         .bind(&node.color_theme)
         .bind(node.is_collapsed)
         .bind(&node.tags)
@@ -360,21 +358,6 @@ pub async fn update_tags(pool: &DbPool, id: &str, tags: &[String]) -> Result<(),
         serde_json::to_string(tags).map_err(|e| DatabaseError::Migration(e.to_string()))?;
     sqlx::query("UPDATE nodes SET tags = ?, updated_at = ? WHERE id = ?")
         .bind(&tags_json)
-        .bind(now)
-        .bind(id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
-pub async fn update_frame_id(
-    pool: &DbPool,
-    id: &str,
-    frame_id: Option<&str>,
-) -> Result<(), DatabaseError> {
-    let now = chrono::Utc::now().timestamp();
-    sqlx::query("UPDATE nodes SET frame_id = ?, updated_at = ? WHERE id = ?")
-        .bind(frame_id)
         .bind(now)
         .bind(id)
         .execute(pool)
