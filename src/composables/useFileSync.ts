@@ -61,6 +61,21 @@ export function useFileSync(deps: FileSyncDeps) {
   const pendingDeletions = new Map<string, PendingDeletion>()
   const MOVE_DETECTION_DELAY = 500 // ms to wait for matching create event
 
+  // One edge reload per burst of changes: a reload re-routes and redraws every
+  // edge, and a tool rewriting 150 notes reloaded 150 times
+  // (PRODUCT_DESIGN.md > File Watcher Logic)
+  const EDGE_RELOAD_DELAY = 300
+  let edgeReloadTimer: ReturnType<typeof setTimeout> | null = null
+
+  function scheduleEdgeReload(): void {
+    if (!deps.reloadEdges) return
+    if (edgeReloadTimer) clearTimeout(edgeReloadTimer)
+    edgeReloadTimer = setTimeout(() => {
+      edgeReloadTimer = null
+      void deps.reloadEdges?.().catch(e => storeLogger.error('[FileSync] Failed to reload edges:', e))
+    }, EDGE_RELOAD_DELAY)
+  }
+
   async function watchVault(path: string): Promise<void> {
     await stopWatching()
     storeLogger.info(`[FileSync] Starting vault watcher for: ${path}`)
@@ -90,6 +105,10 @@ export function useFileSync(deps: FileSyncDeps) {
       clearTimeout(pending.timeoutId)
     }
     pendingDeletions.clear()
+    if (edgeReloadTimer) {
+      clearTimeout(edgeReloadTimer)
+      edgeReloadTimer = null
+    }
     try {
       await invoke('stop_watching')
     } catch {
@@ -237,12 +256,9 @@ export function useFileSync(deps: FileSyncDeps) {
             const edgesCreated = await syncNodeWikilinks(node.id)
             storeLogger.info(`[FileSync] syncNodeWikilinks returned: ${edgesCreated} new edges`)
 
-            // Always reload edges to reflect both additions and deletions
-            if (deps.reloadEdges) {
-              storeLogger.info(`[FileSync] Reloading edges...`)
-              await deps.reloadEdges()
-              storeLogger.info(`[FileSync] Edges reloaded`)
-            }
+            // Reload edges to reflect both additions and deletions, once the
+            // burst this change belongs to has settled
+            scheduleEdgeReload()
 
             if (edgesCreated > 0) {
               notifications$.info('External change', `${edgesCreated} new link${edgesCreated > 1 ? 's' : ''} detected`)
