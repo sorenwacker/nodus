@@ -612,6 +612,13 @@ Drag and drop files directly onto the canvas to import them. Supported formats:
 - Nodes are auto-laid out after import
 - RDF properties become edges between nodes
 
+**Ontologies split across files:** An ontology is often published as several files that refer to each other's classes (OBOE: `oboe-core`, `oboe-characteristics`, `oboe-standards`). Importing them one at a time must give the same graph as importing them together.
+
+- A relation's ends are looked up in the import and among the nodes already in the workspace, matched by the URI each class or individual note records. A `subClassOf` from a class in this file to a class imported earlier becomes an edge.
+- A relation whose end is not in the workspace yet is kept as pending for that workspace, and becomes an edge when a later import brings that end in. Import order does not matter.
+- A class or individual already in the workspace is not created again; re-importing a file adds only what is missing, and an edge that already exists is not duplicated. Re-importing is therefore how a workspace imported before this behaviour gets its missing edges.
+- The importer skipped every relation whose end was outside the file being imported. Importing OBOE's three files separately left 266 `subClassOf` relations without an edge and 217 of the workspace's 299 nodes without any edge (measured 260930).
+
 ### Zotero Integration
 
 Two methods for importing citations from Zotero:

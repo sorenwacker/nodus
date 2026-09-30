@@ -251,6 +251,18 @@ Timelines live along the bottom of the window: dwelling the pointer at the botto
 
 ---
 
+### Importing an ontology
+Drop an ontology file (`.ttl`, `.rdf`, `.owl`, `.jsonld`) on the canvas to import its classes and, optionally, its individuals as nodes, with their relations as edges.
+
+An ontology published as several files (for example OBOE's `oboe-core`, `oboe-characteristics` and `oboe-standards`) can be imported one file at a time, in any order: a class that refers to a class from another file is linked once both are in the workspace.
+
+To add the links missing from an ontology imported before this worked:
+
+1. Open the workspace that holds the ontology.
+2. Drop the ontology's files on the canvas again.
+
+Classes already in the workspace are not created again and existing edges are not duplicated, so only the missing links are added.
+
 ## Math with Typst
 
 Native Typst integration for fast mathematical typesetting:
