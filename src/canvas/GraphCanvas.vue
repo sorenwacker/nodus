@@ -31,6 +31,7 @@ import {
   useCanvasEntityLinking,
   useCanvasNodeStyle,
   useColorOperations,
+  useNodeFitNow,
 } from './composables/nodes'
 import {
   useEdgeManipulation,
@@ -48,7 +49,7 @@ import {
   type AgentContext,
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
-import { useLayout, useNeighborhoodMode } from './composables/layout'
+import { useLayout, useNeighborhoodMode, useLivePhysics } from './composables/layout'
 import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
 import { buildAgentToolContext } from './composables/agent/agentToolContext'
 import { useAgentPrompt } from './composables/agent/useAgentPrompt'
@@ -1443,6 +1444,18 @@ const nodeDragging = useNodeDragging({
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
+// Physics mode: a live force simulation over the visible nodes (PRODUCT_DESIGN.md > Physics Mode)
+const physics = useLivePhysics({
+  getVisibleNodes: () => visibleNodes.value, getNodes: () => store.filteredNodes, getEdges: () => store.filteredEdges,
+  getDraggingNodeId: () => draggingNode.value, isBlocked: () => neighborhoodMode.value,
+  updateNodePosition: store.updateNodePosition, snap: snapToGrid, pushUndo,
+  requestFrame: cb => requestAnimationFrame(cb), cancelFrame: id => cancelAnimationFrame(id as number),
+})
+watch(draggingNode, id => id && physics.reheat())
+// Its positions belong to this workspace and view; leaving either stores them
+watch([neighborhoodMode, () => store.currentWorkspaceId], () => physics.stop())
+onUnmounted(physics.stop)
+
 // Edge styling composable - handles colors, styles, stroke width, and theme-aware highlighting
 const edgeStyling = useEdgeStyling({
   store: {
@@ -1517,90 +1530,12 @@ const { updateSelectedNodesColor } = useColorOperations({
   pushColorUndo,
 })
 
-async function fitSelectedNodes() {
-  // Selected nodes are always included in visibleNodes via viewport culling,
-  // so they're guaranteed to be in the DOM when zoomed in
-  if (store.selectedNodeIds.length === 0) return
-
-  // Capture old sizes for undo
-  const oldSizes = new Map<string, { width: number; height: number; x: number; y: number }>()
-  for (const nodeId of store.selectedNodeIds) {
-    const node = store.getNode(nodeId)
-    if (node) {
-      oldSizes.set(nodeId, {
-        width: node.width || NODE_DEFAULTS.WIDTH,
-        height: node.height || NODE_DEFAULTS.HEIGHT,
-        x: node.canvas_x,
-        y: node.canvas_y,
-      })
-    }
-  }
-
-  // Fit all selected nodes to their content sequentially
-  for (const nodeId of store.selectedNodeIds) {
-    await fitNodeNow(nodeId)
-  }
-
-  // Push undo if any sizes were captured
-  if (oldSizes.size > 0) {
-    pushSizeUndo(oldSizes)
-  }
-}
-
-// One-shot fit to content (does NOT enable auto_fit)
-async function fitNodeNow(nodeId: string): Promise<void> {
-  // Exit edit mode first to measure rendered view, not textarea
-  const wasEditing = editingNodeId.value === nodeId
-  if (wasEditing) {
-    // Save content directly
-    store.updateNodeContent(nodeId, editContent.value)
-    // Clear editing state
-    editingNodeId.value = null
-    editContent.value = ''
-  }
-
-  // Force update rendered content for this node
-  const node = store.getNode(nodeId)
-  if (node) {
-    nodeRenderedContent.value = {
-      ...nodeRenderedContent.value,
-      [nodeId]: renderMarkdown(node.markdown_content),
-    }
-  }
-
-  // Wait for Vue to render the view mode content and render math
-  await nextTick()
-  await renderTypstMath()
-  await nextTick()
-
-  // Poll until .node-content exists (max 500ms)
-  const cardEl = document.querySelector(`[data-node-id="${nodeId}"]`)
-  if (!cardEl) return
-
-  return new Promise<void>(resolve => {
-    let attempts = 0
-    const waitForContent = () => {
-      const contentEl = cardEl.querySelector('.node-content')
-      const editorEl = cardEl.querySelector('.inline-editor')
-
-      if (contentEl && !editorEl) {
-        // Content element exists, editor gone - safe to measure
-        renderMermaidDiagrams()
-        setTimeout(() => {
-          fitNodeToContent(nodeId)
-          resolve()
-        }, 100)
-      } else if (attempts < 10) {
-        attempts++
-        setTimeout(waitForContent, 50)
-      } else {
-        // Timeout - resolve anyway
-        resolve()
-      }
-    }
-    waitForContent()
-  })
-}
+const { fitSelectedNodes, fitNodeNow } = useNodeFitNow({
+  getNode: store.getNode, getSelectedNodeIds: () => store.selectedNodeIds, getEditingNodeId: () => editingNodeId.value,
+  finishEditing: nodeId => { store.updateNodeContent(nodeId, editContent.value); editingNodeId.value = null; editContent.value = '' },
+  setRenderedContent: (nodeId, html) => { nodeRenderedContent.value = { ...nodeRenderedContent.value, [nodeId]: html } },
+  renderMarkdown, renderTypstMath, renderMermaidDiagrams, fitNodeToContent, pushSizeUndo,
+})
 
 // Selection actions composable - select all and delete
 const { selectAllNodes, deleteSelectedNodes } = useSelectionActions({
@@ -1714,6 +1649,7 @@ useCanvasKeyboardShortcuts({
   layoutNodes: () => store.layoutNodes(),
   fitToContent,
   toggleNeighborhoodMode: neighborhood.toggle,
+  togglePhysics: () => void physics.toggle(),
   fontScale,
   increaseFontScale,
   decreaseFontScale,
@@ -2012,6 +1948,7 @@ defineExpose({
         :neighborhood-depth="neighborhoodDepth"
         :highlight-all-edges="highlightAllEdges"
         :bubble-mode-active="isBubbleModeForced"
+        :physics-active="physics.active.value" :physics-available="physics.available.value" @toggle-physics="physics.toggle()"
         @zoom-in="zoomIn" @zoom-out="zoomOut"
         @fit-to-content="fitToContent"
         @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
