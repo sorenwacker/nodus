@@ -2,6 +2,32 @@
 
 All notable changes to Nodus are documented in this file.
 
+## [1.6.0-rc.10] - 2026-10-01
+
+### Added
+- Physics mode (`P`, or the atom button in the canvas controls) keeps a force simulation running in bubble mode: connected nodes pull together, the others make room, and a dragged bubble pulls its connections along. It runs in a Web Worker on up to 2000 visible nodes, one step per painted frame, and the bubble canvas paints circles and straight edges from the worker's position array, so nothing is written to the store or routed while nodes move. Positions are stored once, when the simulation rests, when the mode is switched off or when bubble mode is left; one Undo restores them. A layout command, Undo or a change from another window ends the mode without storing its copy of the positions
+- The status bar says when a threshold hides edges, with the count and which threshold, so edges never disappear without explanation
+
+### Changed
+- Ontology classes are linked across separately imported files. A relation to a class that an earlier import created is resolved against the workspace by its URI, and one to a class not yet imported is kept and resolved when that file arrives; re-importing a file adds nothing twice
+- Edges are drawn as direct lines while a layout animation moves the nodes, and routed in their style once when it ends
+- Each layout animation frame moves its nodes in one batch. Written one node at a time, a frame with 333 moving cards in a 1000-node workspace cost 10.9 ms in store writes alone; as one batch it costs 0.8 ms
+- Edge routing keys its lane and spatial-index cells by number instead of by string, about twice as fast (84 ms to 36 ms for 300 nodes and 500 edges in the orthogonal style); routes are unchanged
+- The grid layout indexes the cards it has placed, so a 500-node layout takes about 1 s instead of 10; positions are unchanged
+- External file changes reload edges once per burst instead of once per file
+- The search box is centred in the window
+- The full-window reader uses the whole window, and its link cards are built from the rendered links and scroll with the text
+
+### Removed
+- Frames. Their stored membership drifted from what the canvas showed when a frame was resized. Each frame's title becomes a tag on its members, and the MCP frame tools are replaced by tagging
+
+### Fixed
+- Physics mode no longer freezes the app: per-frame store writes and edge routing are gone from its frame loop (see Added)
+- A bubble held during physics mode stays hovered until it is released. The pointer ran ahead of the simulated circle, so hover flickered, which switched the dimming of every other edge, toggled the tooltip and, above the edge hover threshold, showed and hid the edges themselves
+- A node without edges stays visible in bubble mode when zoomed out: circles are drawn at least 4 px in radius on screen and pressable at 9 px
+- A click outside the plan dialog no longer closes it and strands the pending plan
+- Reader links stay inline, so linked notes no longer break a sentence
+
 ## [1.6.0-rc.9] - 2026-09-17
 
 ### Fixed
