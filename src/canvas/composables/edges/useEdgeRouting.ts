@@ -73,6 +73,12 @@ export interface UseEdgeRoutingContext {
    * (PRODUCT_DESIGN.md > Re-routing edges during an interaction).
    */
   isDragging?: Ref<boolean>
+  /**
+   * A layout animation or physics mode is moving the nodes. Edges are drawn as
+   * direct lines meanwhile and routed in their style when the motion ends
+   * (PRODUCT_DESIGN.md > Routing while a layout or physics moves the nodes).
+   */
+  isMoving?: Ref<boolean>
 }
 
 export interface UseEdgeRoutingReturn {
@@ -92,6 +98,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     edgeStyleMap,
     getNodeHeight,
     isDragging,
+    isMoving,
   } = ctx
 
   // Combined flag for deferring expensive routing
@@ -222,7 +229,10 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         .filter((e): e is NonNullable<typeof e> => e !== null) as EdgeLine[]
     }
 
-    const style = globalEdgeStyle.value
+    // The style edges are routed in on this recompute: direct lines while a
+    // layout or physics moves every node each frame. It is part of both keys,
+    // so the end of the motion routes the edges in their style again
+    const style = isMoving?.value ? 'direct' : globalEdgeStyle.value
 
     // Everything below is a pure function of the edge list, the node geometry,
     // and the style inputs keyed here. Same key, same product.

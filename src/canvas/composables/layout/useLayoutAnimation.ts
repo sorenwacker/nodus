@@ -2,9 +2,12 @@
  * Layout animation utilities
  * Smooth animation of nodes to target positions
  */
+import { ref, type Ref } from 'vue'
 
 export interface LayoutAnimationState {
   animationId: number | null
+  /** True while frames are being animated; edges route cheaply meanwhile */
+  running: Ref<boolean>
   stop: () => void
   /**
    * Complete the in-flight animation instantly: apply all remaining targets
@@ -28,12 +31,14 @@ export function easeOutCubic(t: number): number {
 export function createLayoutAnimator(): LayoutAnimationState {
   let animationId: number | null = null
   let pending: LayoutAnimationState['pending'] = null
+  const running = ref(false)
 
   function stop() {
     if (animationId !== null) {
       cancelAnimationFrame(animationId)
       animationId = null
     }
+    running.value = false
   }
 
   function settle() {
@@ -52,7 +57,9 @@ export function createLayoutAnimator(): LayoutAnimationState {
     },
     set animationId(id: number | null) {
       animationId = id
+      running.value = id !== null
     },
+    running,
     get pending() {
       return pending
     },

@@ -185,6 +185,19 @@ describe('physics mode', () => {
     expect(w.physics.active.value).toBe(false)
   })
 
+  it('reports running while it moves nodes, and not at rest or when stopped', async () => {
+    // Edges route cheaply while it runs (PRODUCT_DESIGN.md > Routing while a layout or physics moves the nodes)
+    const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0)], edges: [['a', 'b']] })
+    await w.physics.start()
+    expect(w.physics.running.value).toBe(true)
+    w.step(2000)
+    expect(w.physics.running.value).toBe(false)
+    w.physics.reheat()
+    expect(w.physics.running.value).toBe(true)
+    w.physics.stop()
+    expect(w.physics.running.value).toBe(false)
+  })
+
   it('toggles', async () => {
     const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0)], edges: [['a', 'b']] })
     await w.physics.toggle()

@@ -59,6 +59,8 @@ interface SimNode extends SimulationNodeDatum {
 
 export interface LivePhysics {
   active: Ref<boolean>
+  /** The simulation is moving nodes (active and not at rest) */
+  running: Ref<boolean>
   available: ComputedRef<boolean>
   start: () => Promise<void>
   stop: () => void
@@ -69,6 +71,7 @@ export interface LivePhysics {
 
 export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
   const active = ref(false)
+  const running = ref(false)
   const available = computed(() => !deps.isBlocked() && deps.getVisibleNodes().length <= PHYSICS_MAX_NODES)
 
   let simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> | null = null
@@ -130,6 +133,7 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
   }
 
   function schedule() {
+    running.value = true
     if (frame === null) frame = deps.requestFrame(tick)
   }
 
@@ -163,6 +167,7 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
     if (dragging || simulation.alpha() >= simulation.alphaMin()) {
       schedule()
     } else {
+      running.value = false
       storeMoved()
     }
   }
@@ -195,6 +200,7 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
       frame = null
     }
     storeMoved()
+    running.value = false
     active.value = false
     simulation = null
     simNodes = []
@@ -205,5 +211,5 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
     else await start()
   }
 
-  return { active, available, start, stop, toggle, reheat }
+  return { active, running, available, start, stop, toggle, reheat }
 }
