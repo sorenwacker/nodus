@@ -40,6 +40,8 @@ interface Store {
     y: number,
     options?: { skipPersist?: boolean; skipLayoutTrigger?: boolean }
   ) => void
+  /** Move many nodes in memory as one batch, for one animation frame */
+  setNodePositionsInMemory: (positions: Map<string, { x: number; y: number }>) => void
   /** Flush one node's in-memory position to the backend */
   persistNodePosition?: (id: string) => void | Promise<void>
   layoutNodes: (nodeIds?: string[], options?: { centerX: number; centerY: number }) => Promise<void>
@@ -95,12 +97,12 @@ export function useLayout(options: UseLayoutOptions) {
     animatePositions(
       targets,
       (id: string) => {
-        const node = store.getNodes().find(n => n.id === id)
+        const node = store.getNode(id)
         return node ? { x: node.canvas_x, y: node.canvas_y } : null
       },
-      // Animation frames write memory only; the landing positions are stored
-      // once when the animation ends (PRODUCT_DESIGN.md > Persisting animated positions)
-      (id, x, y) => store.updateNodePosition(id, x, y, { skipPersist: true }),
+      // Animation frames write memory only, one batch each; the landing positions
+      // are stored once when the animation ends (PRODUCT_DESIGN.md > Persisting animated positions)
+      positions => store.setNodePositionsInMemory(positions),
       animationState,
       duration,
       store.persistNodePosition

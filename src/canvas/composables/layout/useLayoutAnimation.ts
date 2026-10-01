@@ -15,7 +15,7 @@ export interface LayoutAnimationState {
    * one, so state is never left mid-flight between a frame and its nodes.
    */
   settle: () => void
-  pending: { targets: Map<string, { x: number; y: number }>; update: (id: string, x: number, y: number) => void } | null
+  pending: { targets: Map<string, { x: number; y: number }>; apply: (positions: Map<string, { x: number; y: number }>) => void } | null
 }
 
 /**
@@ -44,9 +44,7 @@ export function createLayoutAnimator(): LayoutAnimationState {
   function settle() {
     stop()
     if (pending) {
-      for (const [id, pos] of pending.targets) {
-        pending.update(id, pos.x, pos.y)
-      }
+      pending.apply(pending.targets)
       pending = null
     }
   }
@@ -77,7 +75,12 @@ export function createLayoutAnimator(): LayoutAnimationState {
 export function animateToPositions(
   targets: Map<string, { x: number; y: number }>,
   getNodePosition: (id: string) => { x: number; y: number } | null,
-  updateNodePosition: (id: string, x: number, y: number) => void,
+  /**
+   * Apply one frame's positions, all at once. Applied node by node, each write
+   * searched the node list and changed the layout version on its own
+   * (PRODUCT_DESIGN.md > Persisting animated positions).
+   */
+  applyFrame: (positions: Map<string, { x: number; y: number }>) => void,
   state: LayoutAnimationState,
   duration = 400,
   /**
@@ -88,7 +91,7 @@ export function animateToPositions(
   persistNodePosition?: (id: string) => void | Promise<void>
 ): void {
   state.stop()
-  state.pending = { targets, update: updateNodePosition }
+  state.pending = { targets, apply: applyFrame }
 
   const startTime = performance.now()
   const startPositions = new Map<string, { x: number; y: number }>()
@@ -105,14 +108,14 @@ export function animateToPositions(
     const progress = Math.min(elapsed / duration, 1)
     const eased = easeOutCubic(progress)
 
+    const frame = new Map<string, { x: number; y: number }>()
     for (const [id, target] of targets) {
       const start = startPositions.get(id)
       if (start) {
-        const x = start.x + (target.x - start.x) * eased
-        const y = start.y + (target.y - start.y) * eased
-        updateNodePosition(id, x, y)
+        frame.set(id, { x: start.x + (target.x - start.x) * eased, y: start.y + (target.y - start.y) * eased })
       }
     }
+    applyFrame(frame)
 
     if (progress < 1) {
       state.animationId = requestAnimationFrame(animate)
