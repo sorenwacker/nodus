@@ -83,6 +83,27 @@ export async function updateNodePosition(
 }
 
 /**
+ * Move many nodes in memory at once, for one animation frame: one lookup map
+ * and one layout version change, however many nodes move
+ * (PRODUCT_DESIGN.md > Persisting animated positions).
+ */
+export function setNodePositionsInMemory(
+  deps: NodeStoreDependencies,
+  positions: Map<string, { x: number; y: number }>
+): void {
+  const { state } = deps
+  let moved = false
+  for (const node of state.nodes.value) {
+    const pos = positions.get(node.id)
+    if (!pos) continue
+    node.canvas_x = clampCoord(pos.x)
+    node.canvas_y = clampCoord(pos.y)
+    moved = true
+  }
+  if (moved) state.nodeLayoutVersion.value++
+}
+
+/**
  * Persist a node's current in-memory position to the backend. Used to flush
  * positions after a drag that ran with skipPersist.
  */
