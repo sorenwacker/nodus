@@ -3,6 +3,7 @@
  * (PRODUCT_DESIGN.md > Physics Mode).
  */
 import { describe, it, expect, vi } from 'vitest'
+import { ref, nextTick } from 'vue'
 import { useLivePhysics, PHYSICS_MAX_NODES, type PhysicsNode } from '../canvas/composables/layout/useLivePhysics'
 import { createInProcessEngine, createWorkerEngine, handlePhysicsMessage, type PhysicsWorkerLike } from '../canvas/composables/layout/physicsEngine'
 
@@ -32,8 +33,11 @@ function setup(options: {
     n.canvas_x = x
     n.canvas_y = y
     stored.push(id)
+    layoutVersion.value++
   })
   const pushUndo = vi.fn()
+  // The store's layout version: every position write changes it
+  const layoutVersion = ref(0)
 
   const physics = useLivePhysics({
     getVisibleNodes: () => options.visible,
@@ -47,6 +51,7 @@ function setup(options: {
     requestFrame: cb => frames.push(cb),
     cancelFrame: () => {},
     toCanvasPoint: (x, y) => ({ x, y }),
+    getLayoutVersion: () => layoutVersion.value,
     createEngine: async init => {
       const engine = await createInProcessEngine(init)
       return {
@@ -87,6 +92,13 @@ function setup(options: {
     pushUndo,
     updateNodePosition,
     frames,
+    /** Something other than the simulation moves a node, as a layout does */
+    moveElsewhere: (id: string, x: number, y: number) => {
+      const n = byId.get(id)!
+      n.canvas_x = x
+      n.canvas_y = y
+      layoutVersion.value++
+    },
     steps: () => steps,
     maxInFlight: () => maxInFlight,
   }
@@ -227,6 +239,30 @@ describe('physics mode', () => {
     window.dispatchEvent(new MouseEvent('pointerup'))
     await w.step(30)
     expect(w.live('a').x).not.toBe(-2500)
+  })
+
+  it('yields to a layout: ends without storing its own copy over the new positions', async () => {
+    const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0)], edges: [['a', 'b']] })
+    await w.physics.start()
+    await w.step(10)
+    w.moveElsewhere('a', 777, 888)
+    await nextTick()
+    expect(w.physics.active.value).toBe(false)
+    expect(w.physics.live.value).toBeNull()
+    expect(w.stored).toEqual([])
+    expect([w.byId.get('a')!.canvas_x, w.byId.get('a')!.canvas_y]).toEqual([777, 888])
+  })
+
+  it('yields to a layout run while it rests', async () => {
+    const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0)], edges: [['a', 'b']] })
+    await w.physics.start()
+    await w.step(2000)
+    await nextTick()
+    expect(w.physics.active.value, 'its own store at rest is not a move from elsewhere').toBe(true)
+    w.moveElsewhere('b', 5, 5)
+    await nextTick()
+    expect(w.physics.active.value).toBe(false)
+    expect([w.byId.get('b')!.canvas_x, w.byId.get('b')!.canvas_y]).toEqual([5, 5])
   })
 
   it('does not start where it is blocked (outside bubble mode, or in neighbourhood mode)', async () => {
