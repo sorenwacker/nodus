@@ -1943,6 +1943,7 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 **Required behavior:** A layout animation moves nodes for the duration of the animation; only where they land needs storing. Writing every intermediate position issued one database write and one IPC call per node per frame - roughly 18,000 for a 600ms animation of 500 nodes, of which 500 mattered. This is the same defect the drag path already solved with `skipPersist`, and the animation must use it too.
 
 - Frames update in-memory positions only.
+- A frame applies all of its positions as one batch: the moving nodes are looked up through one map and the layout version changes once. Applied one node at a time, every write searched the whole node list and announced its own layout change; with 333 cards moving in a 1000-node workspace that cost 10.9 ms per frame (261001), two thirds of a 60 fps frame before any card moved on screen, and the animation stuttered.
 - The final positions are persisted once, when the animation completes.
 - An animation superseded by another persists what it reached, so a position is never left unsaved.
 
