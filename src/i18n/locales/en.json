@@ -73,6 +73,8 @@
       "perfMode": "PERF",
       "nodes": "nodes",
       "edges": "edges",
+      "edgesHiddenHover": "{count} edges hidden: above the hover threshold of {threshold}. Hover or select a note, or raise Edge Hover Threshold in Settings",
+      "edgesHiddenLimit": "{count} edges hidden: above the edge limit of {threshold} in Canvas settings",
       "hideAgentLog": "Hide agent log",
       "showAgentLog": "Show agent log",
       "log": "Log",

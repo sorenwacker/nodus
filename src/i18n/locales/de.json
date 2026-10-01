@@ -73,6 +73,8 @@
       "perfMode": "PERF",
       "nodes": "Knoten",
       "edges": "Kanten",
+      "edgesHiddenHover": "{count} Kanten ausgeblendet: über der Hover-Schwelle von {threshold}. Notiz überfahren oder auswählen, oder die Kanten-Hover-Schwelle in den Einstellungen erhöhen",
+      "edgesHiddenLimit": "{count} Kanten ausgeblendet: über dem Kantenlimit von {threshold} in den Canvas-Einstellungen",
       "hideAgentLog": "Agenten-Protokoll verbergen",
       "showAgentLog": "Agenten-Protokoll anzeigen",
       "log": "Log",

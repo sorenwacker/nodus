@@ -73,6 +73,8 @@
       "perfMode": "PERF",
       "nodes": "nœuds",
       "edges": "arêtes",
+      "edgesHiddenHover": "{count} arêtes masquées : au-delà du seuil de survol de {threshold}. Survolez ou sélectionnez une note, ou augmentez le seuil dans les Paramètres",
+      "edgesHiddenLimit": "{count} arêtes masquées : au-delà de la limite de {threshold} dans les paramètres du canevas",
       "hideAgentLog": "Masquer le journal de l'agent",
       "showAgentLog": "Afficher le journal de l'agent",
       "log": "Journal",

@@ -73,6 +73,8 @@
       "perfMode": "PERF",
       "nodes": "nodos",
       "edges": "aristas",
+      "edgesHiddenHover": "{count} aristas ocultas: por encima del umbral de {threshold}. Pasa el cursor o selecciona una nota, o aumenta el umbral en Ajustes",
+      "edgesHiddenLimit": "{count} aristas ocultas: por encima del límite de {threshold} en los ajustes del lienzo",
       "hideAgentLog": "Ocultar registro del agente",
       "showAgentLog": "Mostrar registro del agente",
       "log": "Registro",
