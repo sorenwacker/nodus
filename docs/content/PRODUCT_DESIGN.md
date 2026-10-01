@@ -751,6 +751,16 @@ and the styled appearance. If per-frame routing ever becomes a measured
 bottleneck on very large graphs, gate any simplification behind a node-count
 threshold rather than applying it to all graphs.
 
+**Routing while a layout or physics moves the nodes (required behavior):** A
+layout animation and physics mode move every node on every frame, which a drag
+does not. Routing every edge in its style on each of those frames cost 117 ms
+per frame at 300 nodes in the orthogonal style (36 ms after the routing work
+under Routing cost), so a layout reached its end in one or two frames and
+looked like a jump, and physics mode stuttered. While a layout animation or the
+physics simulation is moving nodes, edges are drawn as direct lines between
+the cards; when the motion ends they are routed once in their style. A drag
+keeps live styled routing as described above.
+
 ### Routing cost
 
 **Required behavior:** Routing runs on every frame of a drag, a zoom, a layout animation and physics mode, so its cost decides whether those move smoothly.
