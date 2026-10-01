@@ -223,6 +223,8 @@ export function useLayout(options: UseLayoutOptions) {
   }
 
   return {
+    /** A layout animation is moving the nodes */
+    isAnimating: animationState.running,
     stopAnimation,
     animateToPositions,
     autoLayout,

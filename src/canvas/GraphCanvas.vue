@@ -1496,7 +1496,7 @@ const { edgeLines } = useEdgeRouting({
   globalEdgeStyle,
   edgeStyleMap,
   getNodeHeight,
-  isDragging: isDraggingRef,
+  isDragging: isDraggingRef, isMoving: computed(() => layout.isAnimating.value || physics.running.value),
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties
