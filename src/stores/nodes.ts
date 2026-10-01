@@ -172,7 +172,8 @@ export const useNodesStore = defineStore('nodes', () => {
       if (node) {
         node.title = title
         node.updated_at = Date.now()
-        await invoke('update_node_title', { id, title })
+        const filePath = await invoke<string | null>('update_node_title', { id, title })
+        if (filePath) node.file_path = filePath
       }
     },
     updateNodeTags: async (id: string, tags: string[]) => {

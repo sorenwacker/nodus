@@ -160,12 +160,7 @@ pub async fn create_file_for_node(node_id: String) -> Result<String, String> {
 
     let vault_path = workspace.vault_path.ok_or("Workspace has no vault path")?;
 
-    // Create file path - sanitize title to prevent path traversal
-    let safe_title = node
-        .title
-        .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
-        .replace("..", "_"); // Prevent directory traversal
-    let file_path = std::path::Path::new(&vault_path).join(format!("{}.md", safe_title));
+    let file_path = std::path::Path::new(&vault_path).join(file_name_for_title(&node.title));
 
     // Verify the resolved path is within the vault (defense in depth)
     let canonical_vault = std::path::Path::new(&vault_path)
@@ -195,6 +190,17 @@ pub async fn create_file_for_node(node_id: String) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
 
     Ok(file_path_str)
+}
+
+/// The file name a node's title maps to, for files Nodus creates and for
+/// files it renames with their node: path separators and characters that
+/// are not portable across file systems become underscores, and `..` is
+/// collapsed so a title cannot climb out of the vault.
+pub(crate) fn file_name_for_title(title: &str) -> String {
+    let safe_title = title
+        .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
+        .replace("..", "_");
+    format!("{}.md", safe_title)
 }
 
 /// Export all nodes without files to the vault as .md files
@@ -399,5 +405,15 @@ mod tests {
                 .await
                 .expect("hash");
         assert_eq!(hash, None, "a failed sync is left for the next pass");
+    }
+
+    #[test]
+    fn file_name_for_title_substitutes_path_characters() {
+        assert_eq!(super::file_name_for_title("A/B: C?"), "A_B_ C_.md");
+        assert_eq!(super::file_name_for_title("up..dir"), "up_dir.md");
+        assert_eq!(
+            super::file_name_for_title("L\u{e9}onie Bentsink"),
+            "L\u{e9}onie Bentsink.md"
+        );
     }
 }

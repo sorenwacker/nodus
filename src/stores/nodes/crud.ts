@@ -448,7 +448,10 @@ export async function updateNodeTitle(
     node.title = trimmedTitle
     node.updated_at = Date.now()
     try {
-      await invoke('update_node_title', { id, title: trimmedTitle })
+      // The backend renames the node's vault file with it and answers with
+      // the file's new path, or null when nothing moved
+      const filePath = await invoke<string | null>('update_node_title', { id, title: trimmedTitle })
+      if (filePath) node.file_path = filePath
     } catch (e) {
       console.error('Failed to update title:', e)
     }
