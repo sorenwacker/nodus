@@ -252,15 +252,31 @@ function hitTest(e: PointerEvent): string | null {
 }
 
 let localHoveredId: string | null = null
+/**
+ * A pressed node stays hovered until release. A simulated node is painted a
+ * frame or two after the pointer moves, so the pointer runs ahead of it, and
+ * hover read from the pointer flickered on and off (PRODUCT_DESIGN.md > Physics Mode).
+ */
+let held = false
+
+function releaseHold() {
+  held = false
+  window.removeEventListener('pointerup', releaseHold)
+  window.removeEventListener('pointercancel', releaseHold)
+}
 
 function onPointerDown(e: PointerEvent) {
   const nodeId = hitTest(e)
   if (nodeId) {
+    held = true
+    window.addEventListener('pointerup', releaseHold)
+    window.addEventListener('pointercancel', releaseHold)
     emit('node-pointerdown', e, nodeId)
   }
 }
 
 function onPointerMove(e: PointerEvent) {
+  if (held) return
   const nodeId = hitTest(e)
   if (nodeId !== localHoveredId) {
     if (localHoveredId) {
@@ -274,6 +290,7 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerLeave() {
+  if (held) return
   if (localHoveredId) {
     emit('node-pointerleave')
     localHoveredId = null
@@ -371,6 +388,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', resize)
+  releaseHold()
   if (animationId) cancelAnimationFrame(animationId)
 })
 </script>
