@@ -304,7 +304,8 @@ Changes sync between Nodus and your vault folder:
 - Edit in Nodus → updates Obsidian vault
 - Edit in Obsidian → updates Nodus canvas
 - File watcher detects external changes
-- With sync disabled, edits change only the Nodus database; vault files are never written
+- Renaming a node in Nodus renames its vault file to the new title, with the same character substitutions Nodus applies when it creates a file; the file's content, frontmatter included, is left as it is. If another file already carries the target name, the node keeps its current file name. The rename is invisible to the watcher, so it is never read back as a deleted note and a new one
+- With sync disabled, edits change only the Nodus database; vault files are never written or renamed
 
 ### Workspace Separation
 Each imported vault becomes a separate workspace, keeping projects organized.

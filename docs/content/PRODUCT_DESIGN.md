@@ -921,8 +921,11 @@ The Rust backend uses the `notify` crate to watch the Obsidian vault:
 | File edited in Nodus | After save | Update file on disk AND checksum (prevent loop) |
 | New file added | No matching `file_path` | Create new node, run through parser |
 | File deleted | `file_path` exists, file gone | Soft delete node |
+| Node renamed in Nodus | After the title save | Rename the file to the new title's file name; the watcher's checksum entry is moved to the new path first, so the removal and creation it then sees are not events |
 
 A file moved outside Nodus keeps its node: the watcher records the new path. If recording it fails, the user is told, rather than the node pointing at a path that no longer exists.
+
+A node renamed in Nodus takes its file with it. The file name follows the rule used for files Nodus creates, so the same title yields the same name on both paths. The content is not rewritten and the checksum travels with the file. The rename is skipped, and the node keeps its path, when sync is off for the file, when the new title maps to the current name, or when another file already holds the target name; the frontend learns the outcome from the title command's answer, which carries the new path or nothing. Renaming the file naively would have been read back as a deleted note and a new one: the move detection matches on file name, which a rename changes by definition.
 
 Edges are reloaded once per burst of external changes, not once per file: the reload follows the last change of a burst by 300 ms. A reload replaces the edge set, so the canvas re-routes and redraws every edge; when an agent or a sync tool rewrote 150 notes at once, reloading after each file ran that 150 times, and each running Nodus instance kept several cores busy for minutes. Stopping the watcher cancels a reload still waiting.
 

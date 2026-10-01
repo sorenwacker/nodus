@@ -203,20 +203,89 @@ async fn file_write_allowed(pool: &database::DbPool, node: &Node, path: &std::pa
     })
 }
 
+/// Rename a node. Returns the new path of its vault file when the file was
+/// renamed with it (features.md > Bi-directional Sync).
 #[tauri::command]
-pub async fn update_node_title(id: String, title: String) -> Result<(), String> {
+pub async fn update_node_title(
+    id: String,
+    title: String,
+    watcher_state: tauri::State<'_, super::WatcherState>,
+) -> Result<Option<String>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    database::nodes::update_title(pool, &id, &title)
+    let before_rename = |old: &std::path::Path, new: &std::path::Path| {
+        if let Some(watcher) = watcher_state.0.lock().unwrap().as_ref() {
+            watcher.remap_path(old, new);
+        }
+    };
+    update_node_title_impl(pool, &id, &title, &before_rename).await
+}
+
+pub(crate) async fn update_node_title_impl(
+    pool: &database::DbPool,
+    id: &str,
+    title: &str,
+    before_rename: &(dyn Fn(&std::path::Path, &std::path::Path) + Sync),
+) -> Result<Option<String>, String> {
+    database::nodes::update_title(pool, id, title)
         .await
         .map_err(|e| e.to_string())?;
 
+    let Some(node) = database::nodes::get_by_id(pool, id)
+        .await
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(None);
+    };
+
+    let renamed = rename_synced_file(pool, &node, before_rename).await?;
+
     // The new title may satisfy links elsewhere that dangled until now
-    if let Ok(Some(node)) = database::nodes::get_by_id(pool, &id).await {
-        if let Err(e) = super::wikilinks::resolve_pending_links_to(pool, &node).await {
-            eprintln!("[UpdateTitle] pending link resolution failed: {}", e);
-        }
+    if let Err(e) = super::wikilinks::resolve_pending_links_to(pool, &node).await {
+        eprintln!("[UpdateTitle] pending link resolution failed: {}", e);
     }
-    Ok(())
+    Ok(renamed)
+}
+
+/// Move a node's vault file to the name its new title maps to. Nothing moves
+/// when sync is off for the file, when the name is already the current one,
+/// or when another file holds the target name; the node then keeps its path.
+async fn rename_synced_file(
+    pool: &database::DbPool,
+    node: &Node,
+    before_rename: &(dyn Fn(&std::path::Path, &std::path::Path) + Sync),
+) -> Result<Option<String>, String> {
+    let Some(ref file_path) = node.file_path else {
+        return Ok(None);
+    };
+    let path = std::path::Path::new(file_path);
+    if !path.exists() || !file_write_allowed(pool, node, path).await {
+        return Ok(None);
+    }
+    let new_name = super::node_files::file_name_for_title(&node.title);
+    if path
+        .file_name()
+        .is_some_and(|current| current == new_name.as_str())
+    {
+        return Ok(None);
+    }
+    let new_path = path.with_file_name(&new_name);
+    if new_path.exists() {
+        return Ok(None);
+    }
+
+    before_rename(path, &new_path);
+    std::fs::rename(path, &new_path).map_err(|e| e.to_string())?;
+
+    // The content did not change, so the checksum travels with the file
+    let checksum = match node.checksum.clone() {
+        Some(checksum) => checksum,
+        None => crate::checksum::compute_file(&new_path).map_err(|e| e.to_string())?,
+    };
+    let new_path_str = new_path.to_string_lossy().to_string();
+    database::nodes::update_file_path(pool, &node.id, &new_path_str, &checksum)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(Some(new_path_str))
 }
 
 #[tauri::command]
@@ -494,5 +563,129 @@ mod tests {
 
         assert!(result.is_some());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "changed");
+    }
+
+    #[tokio::test]
+    async fn renaming_a_node_renames_its_synced_file() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("---\ntype: Note\n---\noriginal");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        let renamed = update_node_title_impl(&pool, "n", "New Title", &|_, _| {})
+            .await
+            .unwrap();
+
+        let expected = vault.path().join("New Title.md");
+        let expected_str = expected.to_string_lossy().to_string();
+        assert_eq!(renamed, Some(expected_str.clone()));
+        assert!(
+            !std::path::Path::new(&file).exists(),
+            "the old file is gone"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&expected).unwrap(),
+            "---\ntype: Note\n---\noriginal",
+            "content and frontmatter travel unchanged"
+        );
+        let node = database::nodes::get_by_id(&pool, "n")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(node.title, "New Title");
+        assert_eq!(node.file_path, Some(expected_str));
+    }
+
+    #[tokio::test]
+    async fn renaming_with_sync_off_leaves_the_file_where_it_is() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("original");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), false).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        let renamed = update_node_title_impl(&pool, "n", "New Title", &|_, _| {})
+            .await
+            .unwrap();
+
+        assert_eq!(renamed, None);
+        assert!(std::path::Path::new(&file).exists());
+        let node = database::nodes::get_by_id(&pool, "n")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(node.title, "New Title");
+        assert_eq!(node.file_path, Some(file));
+    }
+
+    #[tokio::test]
+    async fn renaming_keeps_the_file_when_the_target_name_is_taken() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("original");
+        let taken = vault.path().join("Taken.md");
+        std::fs::write(&taken, "someone else").unwrap();
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        let renamed = update_node_title_impl(&pool, "n", "Taken", &|_, _| {})
+            .await
+            .unwrap();
+
+        assert_eq!(renamed, None);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
+        assert_eq!(std::fs::read_to_string(&taken).unwrap(), "someone else");
+        let node = database::nodes::get_by_id(&pool, "n")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(node.title, "Taken");
+        assert_eq!(node.file_path, Some(file));
+    }
+
+    #[tokio::test]
+    async fn renaming_tells_the_caller_the_paths_before_the_file_moves() {
+        use std::sync::{Arc, Mutex};
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("original");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+        // (old path, new path, old existed, new existed) at the moment of the call
+        type Seen = Option<(std::path::PathBuf, std::path::PathBuf, bool, bool)>;
+        let seen: Arc<Mutex<Seen>> = Arc::new(Mutex::new(None));
+        let record = seen.clone();
+
+        update_node_title_impl(&pool, "n", "Moved", &move |old, new| {
+            *record.lock().unwrap() = Some((
+                old.to_path_buf(),
+                new.to_path_buf(),
+                old.exists(),
+                new.exists(),
+            ));
+        })
+        .await
+        .unwrap();
+
+        let (old, new, old_existed, new_existed) = seen.lock().unwrap().clone().unwrap();
+        assert_eq!(old, std::path::PathBuf::from(&file));
+        assert_eq!(new, vault.path().join("Moved.md"));
+        assert!(
+            old_existed && !new_existed,
+            "the callback runs before the move"
+        );
+    }
+
+    #[tokio::test]
+    async fn renaming_to_the_current_file_name_moves_nothing() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("original");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "n", &file, Some("ws")).await;
+
+        let renamed =
+            update_node_title_impl(&pool, "n", "note", &|_, _| panic!("no move expected"))
+                .await
+                .unwrap();
+
+        assert_eq!(renamed, None);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
     }
 }
