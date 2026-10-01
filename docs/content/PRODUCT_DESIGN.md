@@ -760,6 +760,14 @@ threshold rather than applying it to all graphs.
 - None of this changes a route: a test fingerprints the routes of generated graphs in every edge style and requires them unchanged.
 - Measured with 300 nodes and 500 edges, orthogonal style: 84 ms per full route before, 36 ms after (260930). Timing is not gated by a test, because it varies with machine load; it is still over the 16 ms of a frame at that size, so a layout animation or physics mode on a few hundred visible nodes still drops frames.
 
+### Grid layout cost
+
+**Required behavior:** The grid layout (up to 500 nodes; above that a simpler fast grid is used) packs cards tightly and keeps connected cards close. Its search considers, for each card, positions next to every placed card and in the gaps between pairs of them.
+
+- Each candidate position was tested for overlap against every placed card, and every candidate was built before most were thrown away. The cost grew with roughly the fourth power of the node count: 1.3 s at 300 nodes, 9.5 s at 500, about 100 s at 800 (measured 260930), and the canvas waited that long before anything moved.
+- Overlap is now tested against the cards in the same grid cells only, candidates are tested as they are generated, and distances to connected cards are summed over those cards only: 0.27 s at 300 nodes, 1.1 s at 500.
+- No card moves as a result: a test fingerprints the layout of generated graphs and requires it unchanged. The remaining cost is the search over pairs of placed cards, which decides where gaps are filled.
+
 ### Themes
 
 YAML-based theme system with SQLite storage. Four built-in themes, plus LLM-generated custom themes.
