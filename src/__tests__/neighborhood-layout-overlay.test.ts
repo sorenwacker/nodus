@@ -43,6 +43,7 @@ function setup(overlay: LayoutOverlay | null) {
       getSelectedNodeIds: () => [],
       getNode: (id: string) => nodes.find(n => n.id === id),
       updateNodePosition,
+      setNodePositionsInMemory: vi.fn(),
       layoutNodes: vi.fn(async () => {}),
     },
     viewState: {
@@ -53,7 +54,7 @@ function setup(overlay: LayoutOverlay | null) {
     },
     pushUndo,
     getOverlay: () => overlay,
-  } as never)
+  })
 
   return { layout, updateNodePosition, pushUndo }
 }
