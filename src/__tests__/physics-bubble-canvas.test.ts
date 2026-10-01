@@ -61,6 +61,28 @@ describe('the bubble canvas during physics mode', () => {
   })
 })
 
+describe('hover while a node is held', () => {
+  function move(wrapper: ReturnType<typeof mountCanvas>, x: number, y: number) {
+    wrapper.find('canvas').element.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y, bubbles: true }))
+  }
+
+  it('keeps the pressed node hovered while the pointer runs ahead of it, until release', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mountCanvas(null)
+    move(wrapper, 100, 60)
+    press(wrapper, 100, 60)
+    move(wrapper, 400, 400) // off the circle, which has not caught up yet
+    move(wrapper, 100, 60)
+    move(wrapper, 400, 400)
+    expect(wrapper.emitted('node-pointerleave')).toBeUndefined()
+    expect(wrapper.emitted('node-pointerenter')).toHaveLength(1)
+
+    window.dispatchEvent(new MouseEvent('pointerup'))
+    move(wrapper, 400, 400)
+    expect(wrapper.emitted('node-pointerleave')).toHaveLength(1)
+  })
+})
+
 describe('the canvas wiring', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/canvas/GraphCanvas.vue'), 'utf8')
 
