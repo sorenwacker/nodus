@@ -98,7 +98,7 @@
       "neighborhoodView": "Neighborhood View - Show only selected node and neighbors (N)",
       "bubbleMode": "Bubble Mode - Show nodes as circles",
       "physics": "Physics Mode - Let the visible graph arrange itself while you drag (P)",
-      "physicsUnavailable": "Physics Mode - Zoom in or leave neighborhood view: runs on up to 800 visible nodes",
+      "physicsUnavailable": "Physics Mode - Bubble mode only, outside the neighborhood view, up to 2000 visible nodes",
       "neighborhoodDepth": "Neighborhood depth (hops)",
       "hop": "hop",
       "hops": "hops",

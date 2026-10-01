@@ -101,7 +101,7 @@
       "highlightEdges": "Evidenzia tutti gli archi - Rendi tutti gli archi più visibili",
       "bubbleMode": "Modalità bolla - Mostra nodi come cerchi",
       "physics": "Modalità fisica - Il grafo visibile si dispone mentre trascini (P)",
-      "physicsUnavailable": "Modalità fisica - Ingrandisci o esci dalla vista vicinato: funziona con fino a 800 nodi visibili",
+      "physicsUnavailable": "Modalità fisica - Solo in modalità bolle, fuori dalla vista vicinato, fino a 2000 nodi visibili",
       "help": "Aiuto - Scorciatoie da tastiera e utilizzo"
     },
     "search": {

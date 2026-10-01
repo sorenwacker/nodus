@@ -49,7 +49,7 @@ import {
   type AgentContext,
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
-import { useLayout, useNeighborhoodMode, useLivePhysics } from './composables/layout'
+import { useLayout, useNeighborhoodMode, useLivePhysics, createWorkerEngine } from './composables/layout'
 import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
 import { buildAgentToolContext } from './composables/agent/agentToolContext'
 import { useAgentPrompt } from './composables/agent/useAgentPrompt'
@@ -1444,16 +1444,16 @@ const nodeDragging = useNodeDragging({
 })
 const { draggingNode, onNodePointerDown } = nodeDragging
 
-// Physics mode: a live force simulation over the visible nodes (PRODUCT_DESIGN.md > Physics Mode)
+// Physics mode: a live force simulation over the visible bubbles (PRODUCT_DESIGN.md > Physics Mode)
 const physics = useLivePhysics({
   getVisibleNodes: () => visibleNodes.value, getNodes: () => store.filteredNodes, getEdges: () => store.filteredEdges,
-  getDraggingNodeId: () => draggingNode.value, isBlocked: () => neighborhoodMode.value,
-  updateNodePosition: store.updateNodePosition, snap: snapToGrid, pushUndo,
+  getRadius: getLODRadius, isBlocked: () => neighborhoodMode.value || !isLODMode.value,
+  updateNodePosition: store.updateNodePosition, snap: snapToGrid, pushUndo, toCanvasPoint: screenToCanvas,
   requestFrame: cb => requestAnimationFrame(cb), cancelFrame: id => cancelAnimationFrame(id as number),
+  createEngine: createWorkerEngine,
 })
-watch(draggingNode, id => id && physics.reheat())
-// Its positions belong to this workspace and view; leaving either stores them
-watch([neighborhoodMode, () => store.currentWorkspaceId], () => physics.stop())
+// Its positions belong to this workspace and bubble view; leaving any stores them
+watch([neighborhoodMode, isLODMode, () => store.currentWorkspaceId], () => physics.stop())
 onUnmounted(physics.stop)
 
 // Edge styling composable - handles colors, styles, stroke width, and theme-aware highlighting
@@ -1496,7 +1496,7 @@ const { edgeLines } = useEdgeRouting({
   globalEdgeStyle,
   edgeStyleMap,
   getNodeHeight,
-  isDragging: isDraggingRef, isMoving: computed(() => layout.isAnimating.value || physics.running.value),
+  isDragging: isDraggingRef, isMoving: computed(() => layout.isAnimating.value),
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties
@@ -1802,8 +1802,8 @@ defineExpose({
         :highlighted-node-ids="highlightedNodeIds"
         :dragging-node-id="draggingNode"
         :hovered-node-id="hoveredNodeId"
-        :get-l-o-d-radius="getLODRadius" :on-render-time="(ms: number) => recordPerfSpan('canvas draw', ms)"
-        @node-pointerdown="onNodePointerDown"
+        :get-l-o-d-radius="getLODRadius" :live-positions="physics.live.value" :on-render-time="(ms: number) => recordPerfSpan('canvas draw', ms)"
+        @node-pointerdown="(e: PointerEvent, id: string) => physics.active.value ? physics.grabWithPointer(e, id) : onNodePointerDown(e, id)"
         @node-pointerenter="onNodePointerEnter"
         @node-pointerleave="onNodePointerLeave"
         @node-dblclick="handleNodeDoubleClick"

@@ -74,9 +74,9 @@ export interface UseEdgeRoutingContext {
    */
   isDragging?: Ref<boolean>
   /**
-   * A layout animation or physics mode is moving the nodes. Edges are drawn as
+   * A layout animation is moving the nodes. Edges are drawn as
    * direct lines meanwhile and routed in their style when the motion ends
-   * (PRODUCT_DESIGN.md > Routing while a layout or physics moves the nodes).
+   * (PRODUCT_DESIGN.md > Routing while a layout moves the nodes).
    */
   isMoving?: Ref<boolean>
 }
@@ -230,7 +230,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     }
 
     // The style edges are routed in on this recompute: direct lines while a
-    // layout or physics moves every node each frame. It is part of both keys,
+    // layout moves every node each frame. It is part of both keys,
     // so the end of the motion routes the edges in their style again
     const style = isMoving?.value ? 'direct' : globalEdgeStyle.value
 

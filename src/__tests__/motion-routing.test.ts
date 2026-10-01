@@ -1,7 +1,7 @@
 /**
- * While a layout or physics moves the nodes, edges are drawn as direct lines
+ * While a layout moves the nodes, edges are drawn as direct lines
  * and routed in their style once the motion ends
- * (PRODUCT_DESIGN.md > Routing while a layout or physics moves the nodes).
+ * (PRODUCT_DESIGN.md > Routing while a layout moves the nodes).
  */
 import { describe, it, expect, vi } from 'vitest'
 import { ref, computed } from 'vue'
@@ -39,7 +39,7 @@ function setup() {
 }
 
 describe('routing while nodes move', () => {
-  it('draws a direct line while a layout or physics moves the nodes', () => {
+  it('draws a direct line while a layout moves the nodes', () => {
     const { moving, points } = setup()
     expect(points(), 'precondition: the style bends').toBeGreaterThan(2)
     moving.value = true

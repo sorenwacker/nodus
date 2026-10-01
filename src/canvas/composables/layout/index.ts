@@ -8,3 +8,4 @@ export {
   type UseNeighborhoodModeOptions,
 } from './useNeighborhoodMode'
 export { useLivePhysics } from './useLivePhysics'
+export { createWorkerEngine } from './physicsEngine'

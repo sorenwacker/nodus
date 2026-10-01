@@ -101,7 +101,7 @@
       "highlightEdges": "Resaltar todas las aristas - Hacer todas las aristas más visibles",
       "bubbleMode": "Modo burbuja - Mostrar nodos como círculos",
       "physics": "Modo física - El grafo visible se ordena mientras arrastras (P)",
-      "physicsUnavailable": "Modo física - Acerca la vista o sal de la vista de vecindario: funciona con hasta 800 nodos visibles",
+      "physicsUnavailable": "Modo física - Solo en modo burbuja, fuera de la vista de vecindario, hasta 2000 nodos visibles",
       "help": "Ayuda - Atajos de teclado y uso"
     },
     "search": {
