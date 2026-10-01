@@ -689,10 +689,12 @@ Multi-selection: All context menu actions work on multiple selected nodes.
 **Required behavior:** Physics mode lets the graph arrange itself while the user watches and pulls on it. A layout command computes positions once; physics mode keeps a force simulation running on the canvas, so dragging a node drags its connections along and the rest makes room.
 
 - The mode is off by default and toggled from the canvas controls or with `P`. It is not remembered across sessions: where a node sits is the user's decision, and a simulation that starts on its own would move nodes nobody asked to move.
-- The simulation covers the nodes on screen when the mode is switched on, at most 800 of them; above that the toggle is disabled and says so. Nodes off screen that are connected to them stay fixed and act as anchors, so the visible part keeps its place in the whole graph. Switching the mode off and on again takes the nodes on screen at that moment.
-- Forces: edges pull connected nodes together, nodes within 1200 units repel each other, and cards do not overlap. There is no centring force and repulsion does not reach further, so the graph does not drift and distant nodes do not nudge each other.
+- It runs in bubble mode only. Cards are DOM elements with routed edges, and moving hundreds of them every frame re-runs card layout and the edge pipeline each time; bubbles are circles and straight lines on one 2D canvas. Leaving bubble mode switches the mode off and stores the positions.
+- The simulation covers the nodes on screen when the mode is switched on, at most 2000 of them; above that the toggle is disabled and says so. Nodes off screen that are connected to them stay fixed and act as anchors, so the visible part keeps its place in the whole graph. Switching the mode off and on again takes the nodes on screen at that moment.
+- Forces: edges pull connected nodes together, nodes within 1200 units repel each other, and nodes do not overlap. There is no centring force and repulsion does not reach further, so the graph does not drift and distant nodes do not nudge each other.
 - A dragged node follows the pointer and stays pinned while held; the simulation reheats and the others respond. Releasing the node lets it move again.
-- Positions change in memory while the simulation runs. They are stored once, for the nodes that moved, when the simulation comes to rest or the mode is switched off. Switching the mode on records one undo step, so one Undo restores every position from before the session.
+- The simulation runs in a Web Worker, so a slow step never blocks input. Each step returns the node centres as one flat array (`Float64Array`, x and y per node), and the bubble canvas paints circles and straight edges from that array directly: no store write, no reactive update and no edge routing happens while the nodes move. One step is requested per painted frame, so the simulation never runs ahead of the display.
+- Positions are written to the store once, for the nodes that moved, when the simulation comes to rest or the mode is switched off; edges are routed again at that moment. Switching the mode on records one undo step, so one Undo restores every position from before the session.
 - With snap-to-grid on, stored positions are snapped; the simulation itself runs unsnapped.
 - The mode is unavailable in neighbourhood mode, whose positions are an overlay that is never stored.
 
@@ -751,24 +753,16 @@ and the styled appearance. If per-frame routing ever becomes a measured
 bottleneck on very large graphs, gate any simplification behind a node-count
 threshold rather than applying it to all graphs.
 
-**Routing while a layout or physics moves the nodes (required behavior):** A
-layout animation and physics mode move every node on every frame, which a drag
-does not. Routing every edge in its style on each of those frames cost 117 ms
-per frame at 300 nodes in the orthogonal style (36 ms after the routing work
-under Routing cost), so a layout reached its end in one or two frames and
-looked like a jump, and physics mode stuttered. While a layout animation or the
-physics simulation is moving nodes, edges are drawn as direct lines between
-the cards; when the motion ends they are routed once in their style. A drag
-keeps live styled routing as described above.
+**Routing while a layout moves the nodes (required behavior):** A layout animation moves every node on every frame, which a drag does not. Routing every edge in its style on each of those frames cost 117 ms per frame at 300 nodes in the orthogonal style (36 ms after the routing work under Routing cost), so a layout reached its end in one or two frames and looked like a jump. While a layout animation is moving nodes, edges are drawn as direct lines between the cards; when the motion ends they are routed once in their style. A drag keeps live styled routing as described above. Physics mode does not route while it runs at all (Physics Mode).
 
 ### Routing cost
 
-**Required behavior:** Routing runs on every frame of a drag, a zoom, a layout animation and physics mode, so its cost decides whether those move smoothly.
+**Required behavior:** Routing runs on every frame of a drag, a zoom and a layout animation, so its cost decides whether those move smoothly.
 
 - The lane tracker and the spatial index key their cells by number, not by building a string per cell. Each segment walks every 12 px cell it crosses, often several times while a free lane is sought, and every long edge queries the index over hundreds of 200 px cells; creating a string per cell cost more than the routing itself.
 - Obstacle checks along an edge take their candidates from the spatial index instead of scanning every node.
 - None of this changes a route: a test fingerprints the routes of generated graphs in every edge style and requires them unchanged.
-- Measured with 300 nodes and 500 edges, orthogonal style: 84 ms per full route before, 36 ms after (260930). Timing is not gated by a test, because it varies with machine load; it is still over the 16 ms of a frame at that size, so a layout animation or physics mode on a few hundred visible nodes still drops frames.
+- Measured with 300 nodes and 500 edges, orthogonal style: 84 ms per full route before, 36 ms after (260930). Timing is not gated by a test, because it varies with machine load; it is still over the 16 ms of a frame at that size, so a layout animation on a few hundred visible nodes still drops frames.
 
 ### Grid layout cost
 
