@@ -122,7 +122,7 @@ Let the graph arrange itself while you pull on it. Press `P` or use the atom but
 3. Drag a node: its connections follow, and the graph settles again when you let go.
 4. Press `P` again to stop. The positions are saved when the graph comes to rest, when you stop, or when you leave bubble mode.
 
-Nodes off screen stay where they are. One Undo restores every position from before you switched the mode on. The mode is not available in the neighborhood view. While nodes are moving, edges are drawn as straight lines between the bubbles; they are routed in their style again when the motion stops.
+Nodes off screen stay where they are. One Undo restores every position from before you switched the mode on. Running a layout command or Undo switches the mode off. The mode is not available in the neighborhood view. While nodes are moving, edges are drawn as straight lines between the bubbles; they are routed in their style again when the motion stops.
 
 ## Storylines
 

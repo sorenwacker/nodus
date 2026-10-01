@@ -696,6 +696,7 @@ Multi-selection: All context menu actions work on multiple selected nodes.
 - The simulation runs in a Web Worker, so a slow step never blocks input. Each step returns the node centres as one flat array (`Float64Array`, x and y per node), and the bubble canvas paints circles and straight edges from that array directly: no store write, no reactive update and no edge routing happens while the nodes move. One step is requested per painted frame, so the simulation never runs ahead of the display.
 - Positions are written to the store once, for the nodes that moved, when the simulation comes to rest or the mode is switched off; edges are routed again at that moment. Switching the mode on records one undo step, so one Undo restores every position from before the session.
 - With snap-to-grid on, stored positions are snapped; the simulation itself runs unsnapped.
+- Anything else that moves nodes while the mode is on - a layout command, Undo, a change from another window - ends the mode without storing the simulation's positions. The simulation holds its own copy of every position and the bubble canvas paints that copy, so a layout run during the mode changed the store but nothing on screen moved, and switching the mode off then stored the simulation's copy over the layout.
 - The mode is unavailable in neighbourhood mode, whose positions are an overlay that is never stored.
 
 ### Neighborhood Mode
