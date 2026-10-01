@@ -50,8 +50,18 @@ export interface CanvasEdge {
   color: string
 }
 
+/** Edges a threshold keeps off the canvas, so the canvas can say so */
+export interface HiddenEdges {
+  count: number
+  threshold: number
+  /** 'hover': shown only around a hovered or selected note; 'limit': hidden above a total */
+  reason: 'hover' | 'limit'
+}
+
 export interface UseEdgeVisibilityReturn {
   visibleEdgeLines: ComputedRef<VisibleEdgeLine[]>
+  /** Set while a threshold hides every edge (PRODUCT_DESIGN.md > Showing edges only around the focus) */
+  hiddenEdges: ComputedRef<HiddenEdges | null>
   canvasEdges: ComputedRef<CanvasEdge[]>
 }
 
@@ -95,24 +105,10 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
   const displayStore = useDisplayStore()
   const { edgeHoverThreshold: displayEdgeThreshold } = storeToRefs(displayStore)
 
-  const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
-    // Check user's edge hide threshold (from canvas settings)
-    // 0 = disabled (show all edges), any other value = hide when count exceeds it
-    const hideThreshold = edgeHideThreshold?.value ?? 0
-    const totalEdges = totalEdgeCount.value
-
-    // If user set a hide threshold > 0 and edge count exceeds it, hide all
-    if (hideThreshold > 0 && totalEdges > hideThreshold) {
-      return []
-    }
-
+  // The edges the settings and the viewport let through, before the focus rule
+  const candidateEdges = computed((): EdgeLine[] => {
     let edges = edgeLines.value
     const visIds = visibleNodeIds.value
-    const hovered = hoveredNodeId.value
-    const selectedNodes = Array.isArray(selectedNodeIds.value) ? selectedNodeIds.value : selectedNodeIds.value
-    // O(1) membership for the per-edge loops below (this computed is hover-hot,
-    // so an Array.includes scan per edge is O(edges x selected))
-    const selectedSet = new Set(selectedNodes)
 
     // Filter out wikilink edges if user setting is enabled
     if (hideWikilinkEdges.value) {
@@ -135,6 +131,44 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         return visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
       })
     }
+
+    return edges
+  })
+
+  const focusActive = () => {
+    const selected = selectedNodeIds.value
+    return !!hoveredNodeId.value || (Array.isArray(selected) && selected.length > 0)
+  }
+
+  const hiddenEdges = computed((): HiddenEdges | null => {
+    const hideThreshold = edgeHideThreshold?.value ?? 0
+    if (hideThreshold > 0 && totalEdgeCount.value > hideThreshold) {
+      return { count: totalEdgeCount.value, threshold: hideThreshold, reason: 'limit' }
+    }
+    const count = candidateEdges.value.length
+    if (count > displayEdgeThreshold.value && !focusActive()) {
+      return { count, threshold: displayEdgeThreshold.value, reason: 'hover' }
+    }
+    return null
+  })
+
+  const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
+    // Check user's edge hide threshold (from canvas settings)
+    // 0 = disabled (show all edges), any other value = hide when count exceeds it
+    const hideThreshold = edgeHideThreshold?.value ?? 0
+    const totalEdges = totalEdgeCount.value
+
+    // If user set a hide threshold > 0 and edge count exceeds it, hide all
+    if (hideThreshold > 0 && totalEdges > hideThreshold) {
+      return []
+    }
+
+    let edges = candidateEdges.value
+    const hovered = hoveredNodeId.value
+    const selectedNodes = Array.isArray(selectedNodeIds.value) ? selectedNodeIds.value : selectedNodeIds.value
+    // O(1) membership for the per-edge loops below (this computed is hover-hot,
+    // so an Array.includes scan per edge is O(edges x selected))
+    const selectedSet = new Set(selectedNodes)
 
     // Build neighbor set for 2-hop edge display
     // Neighbors are nodes directly connected to hovered/selected nodes
@@ -273,6 +307,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
   return {
     visibleEdgeLines,
+    hiddenEdges,
     canvasEdges,
   }
 }

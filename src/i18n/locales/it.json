@@ -73,6 +73,8 @@
       "perfMode": "PERF",
       "nodes": "nodi",
       "edges": "archi",
+      "edgesHiddenHover": "{count} archi nascosti: sopra la soglia di {threshold}. Passa sopra o seleziona una nota, o aumenta la soglia nelle Impostazioni",
+      "edgesHiddenLimit": "{count} archi nascosti: sopra il limite di {threshold} nelle impostazioni della tela",
       "hideAgentLog": "Nascondi registro agente",
       "showAgentLog": "Mostra registro agente",
       "log": "Registro",

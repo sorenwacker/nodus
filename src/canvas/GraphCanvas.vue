@@ -1500,7 +1500,7 @@ const { edgeLines } = useEdgeRouting({
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties
-const { visibleEdgeLines, canvasEdges } = useEdgeVisibility({
+const { visibleEdgeLines, canvasEdges, hiddenEdges } = useEdgeVisibility({
   edgeLines,
   totalEdgeCount: computed(() => store.filteredEdges.length),
   visibleNodeIds,
@@ -1980,7 +1980,7 @@ defineExpose({
         :visible-node-count="visibleNodes.length"
         :total-node-count="store.filteredNodes.length"
         :visible-edge-count="visibleEdgeLines.length"
-        :total-edge-count="store.filteredEdges.length"
+        :total-edge-count="store.filteredEdges.length" :hidden-edges="hiddenEdges"
         :is-layouting="isLayouting"
         :is-large-graph="isLargeGraph"
         :is-pdf-processing="pdfDrop.isProcessing.value"
