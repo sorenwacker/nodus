@@ -73,6 +73,10 @@ describe('the canvas wiring', () => {
     expect(source).toMatch(/:live-positions="physics\.live\.value"/)
   })
 
+  it('sees every position write, so a layout or Undo ends the mode', () => {
+    expect(source).toMatch(/getLayoutVersion: \(\) => store\.nodeLayoutVersion/)
+  })
+
   it('runs the simulation in a worker', () => {
     expect(source).toMatch(/createEngine: createWorkerEngine/)
   })

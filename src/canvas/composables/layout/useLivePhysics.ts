@@ -7,7 +7,7 @@
  * as one array for the bubble canvas to paint from; the store is written once,
  * when the simulation rests or the mode is switched off.
  */
-import { ref, shallowRef, computed, type Ref, type ShallowRef, type ComputedRef } from 'vue'
+import { ref, shallowRef, computed, watch, type Ref, type ShallowRef, type ComputedRef } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import type { CreatePhysicsEngine, PhysicsEngine, StepInput } from './physicsEngine'
 
@@ -47,6 +47,8 @@ export interface LivePhysicsDeps {
   requestFrame: (callback: () => void) => unknown
   cancelFrame: (handle: unknown) => void
   createEngine: CreatePhysicsEngine
+  /** Changes whenever any node position is written, by anyone */
+  getLayoutVersion: () => number
   /** Screen point to canvas units */
   toCanvasPoint: (clientX: number, clientY: number) => { x: number; y: number }
 }
@@ -91,6 +93,15 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
   let pinned: StepInput['pinned'] = null
   /** Distinguishes a session from the one before, so a late step result is dropped */
   let session = 0
+  /** The layout version after the simulation's own last write */
+  let ownVersion = 0
+
+  // Anything else that moves nodes ends the mode, unstored: the simulation's
+  // copy of the positions would hide the move and then overwrite it
+  // (PRODUCT_DESIGN.md > Physics Mode)
+  watch(deps.getLayoutVersion, version => {
+    if (active.value && version !== ownVersion) end(false)
+  })
 
   async function start(): Promise<void> {
     if (active.value || !available.value) return
@@ -124,6 +135,7 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
     }
 
     deps.pushUndo()
+    ownVersion = deps.getLayoutVersion()
     const mine = ++session
     const created = await deps.createEngine({ xy: xy.slice(), radius, anchor, links: Int32Array.from(links) })
     if (mine !== session) {
@@ -173,6 +185,7 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
       m.storedX = x
       m.storedY = y
     })
+    ownVersion = deps.getLayoutVersion()
   }
 
   function grab(id: string, at: { x: number; y: number }) {
@@ -212,12 +225,16 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
   }
 
   function stop() {
+    end(true)
+  }
+
+  function end(store: boolean) {
     if (!active.value) return
     if (frame !== null) {
       deps.cancelFrame(frame)
       frame = null
     }
-    storeMoved()
+    if (store) storeMoved()
     session++
     engine?.dispose()
     engine = null

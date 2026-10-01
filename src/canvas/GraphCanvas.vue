@@ -1450,7 +1450,7 @@ const physics = useLivePhysics({
   getRadius: getLODRadius, isBlocked: () => neighborhoodMode.value || !isLODMode.value,
   updateNodePosition: store.updateNodePosition, snap: snapToGrid, pushUndo, toCanvasPoint: screenToCanvas,
   requestFrame: cb => requestAnimationFrame(cb), cancelFrame: id => cancelAnimationFrame(id as number),
-  createEngine: createWorkerEngine,
+  createEngine: createWorkerEngine, getLayoutVersion: () => store.nodeLayoutVersion,
 })
 // Its positions belong to this workspace and bubble view; leaving any stores them
 watch([neighborhoodMode, isLODMode, () => store.currentWorkspaceId], () => physics.stop())
