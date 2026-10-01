@@ -48,54 +48,92 @@ function buildAdjacencyMap(
 }
 
 /**
- * Check if a rectangle overlaps with any placed rectangles
+ * The placed rectangles, bucketed by grid cell for overlap tests.
+ *
+ * Every candidate position was tested against every placed rectangle, and a
+ * node's candidates grow with the square of what is placed, so the layout cost
+ * grew with the fourth power of the node count: 2 s at 300 nodes, 100 s at 800
+ * (PRODUCT_DESIGN.md > Grid layout cost). Each rectangle is filed under the
+ * cells its gap-extended extent covers, so a query returns every rectangle
+ * that can overlap, and the original test decides.
  */
-function checkOverlap(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  gap: number,
-  placed: PlacedRect[]
-): boolean {
-  for (const rect of placed) {
-    if (x < rect.x + rect.w + gap &&
-        x + w + gap > rect.x &&
-        y < rect.y + rect.h + gap &&
-        y + h + gap > rect.y) {
-      return true
+class PlacedIndex {
+  readonly all: PlacedRect[] = []
+  private cells = new Map<number, Map<number, PlacedRect[]>>()
+
+  constructor(
+    private readonly cellSize: number,
+    private readonly gap: number
+  ) {}
+
+  add(rect: PlacedRect): void {
+    this.all.push(rect)
+    const c0 = Math.floor(rect.x / this.cellSize)
+    const c1 = Math.floor((rect.x + rect.w + this.gap) / this.cellSize)
+    const r0 = Math.floor(rect.y / this.cellSize)
+    const r1 = Math.floor((rect.y + rect.h + this.gap) / this.cellSize)
+    for (let r = r0; r <= r1; r++) {
+      let row = this.cells.get(r)
+      if (!row) {
+        row = new Map()
+        this.cells.set(r, row)
+      }
+      for (let c = c0; c <= c1; c++) {
+        const list = row.get(c)
+        if (list) list.push(rect)
+        else row.set(c, [rect])
+      }
     }
   }
-  return false
+
+  /** Whether a w x h box at (x, y) comes within `gap` of a placed rectangle */
+  overlaps(x: number, y: number, w: number, h: number): boolean {
+    const gap = this.gap
+    const c0 = Math.floor(x / this.cellSize)
+    const c1 = Math.floor((x + w + gap) / this.cellSize)
+    const r0 = Math.floor(y / this.cellSize)
+    const r1 = Math.floor((y + h + gap) / this.cellSize)
+    for (let r = r0; r <= r1; r++) {
+      const row = this.cells.get(r)
+      if (!row) continue
+      for (let c = c0; c <= c1; c++) {
+        const list = row.get(c)
+        if (!list) continue
+        for (const rect of list) {
+          if (x < rect.x + rect.w + gap &&
+              x + w + gap > rect.x &&
+              y < rect.y + rect.h + gap &&
+              y + h + gap > rect.y) {
+            return true
+          }
+        }
+      }
+    }
+    return false
+  }
 }
 
 /**
  * Calculate average distance to connected placed nodes
  */
 function calculateDistanceToConnected(
-  nodeId: string,
   x: number,
   y: number,
   w: number,
   h: number,
-  adjacency: Map<string, Set<string>>,
-  placed: PlacedRect[]
+  connectedPlaced: PlacedRect[]
 ): number {
-  const connected = adjacency.get(nodeId)
-  if (!connected || connected.size === 0) return 0
-
   let totalDist = 0
   let count = 0
   const cx = x + w / 2
   const cy = y + h / 2
 
-  for (const rect of placed) {
-    if (connected.has(rect.id)) {
-      const rcx = rect.x + rect.w / 2
-      const rcy = rect.y + rect.h / 2
-      totalDist += Math.sqrt((cx - rcx) ** 2 + (cy - rcy) ** 2)
-      count++
-    }
+  // In placement order, so the sum is the same floating-point sum as before
+  for (const rect of connectedPlaced) {
+    const rcx = rect.x + rect.w / 2
+    const rcy = rect.y + rect.h / 2
+    totalDist += Math.sqrt((cx - rcx) ** 2 + (cy - rcy) ** 2)
+    count++
   }
 
   return count > 0 ? totalDist / count : 0
@@ -113,9 +151,10 @@ function findBestPosition(
   startY: number,
   maxWidth: number,
   gap: number,
-  placed: PlacedRect[],
+  index: PlacedIndex,
   adjacency: Map<string, Set<string>>
 ): { x: number; y: number } {
+  const placed = index.all
   interface Candidate {
     x: number
     y: number
@@ -124,7 +163,22 @@ function findBestPosition(
     fillsGap: boolean
   }
 
-  const candidates: Candidate[] = []
+  // Candidates are tested as they are generated and only valid ones kept, in
+  // generation order: the same list the old generate-then-filter produced,
+  // without allocating the invalid ones (most of them)
+  const connected = adjacency.get(nodeId)
+  const connectedPlaced = connected && connected.size > 0 ? placed.filter(r => connected.has(r.id)) : []
+  const validCandidates: Candidate[] = []
+  const candidates = {
+    push(cand: Candidate): void {
+      if (cand.x >= startX && cand.y >= startY &&
+          cand.x + w <= startX + maxWidth &&
+          !index.overlaps(cand.x, cand.y, w, h)) {
+        cand.edgeScore = calculateDistanceToConnected(cand.x, cand.y, w, h, connectedPlaced)
+        validCandidates.push(cand)
+      }
+    },
+  }
 
   // Start position
   candidates.push({ x: startX, y: startY, packScore: 0, edgeScore: 0, fillsGap: false })
@@ -177,24 +231,13 @@ function findBestPosition(
   // Also try positions aligned with existing rectangle edges
   for (const rect of placed) {
     // Try aligning left edge
-    if (!checkOverlap(rect.x, rect.y + rect.h + gap, w, h, gap, placed)) {
+    if (!index.overlaps(rect.x, rect.y + rect.h + gap, w, h)) {
       candidates.push({ x: rect.x, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rect.x, edgeScore: 0, fillsGap: false })
     }
     // Try aligning right edge
     const rightAligned = rect.x + rect.w - w
-    if (rightAligned >= startX && !checkOverlap(rightAligned, rect.y + rect.h + gap, w, h, gap, placed)) {
+    if (rightAligned >= startX && !index.overlaps(rightAligned, rect.y + rect.h + gap, w, h)) {
       candidates.push({ x: rightAligned, y: rect.y + rect.h + gap, packScore: (rect.y + rect.h + gap) * 10000 + rightAligned, edgeScore: 0, fillsGap: false })
-    }
-  }
-
-  // Filter valid candidates and calculate edge scores
-  const validCandidates: Candidate[] = []
-  for (const cand of candidates) {
-    if (cand.x >= startX && cand.y >= startY &&
-        cand.x + w <= startX + maxWidth &&
-        !checkOverlap(cand.x, cand.y, w, h, gap, placed)) {
-      cand.edgeScore = calculateDistanceToConnected(nodeId, cand.x, cand.y, w, h, adjacency, placed)
-      validCandidates.push(cand)
     }
   }
 
@@ -268,15 +311,15 @@ export function tetrisGridLayout(
     return areaB - areaA
   })
 
-  // Track placed rectangles
-  const placed: PlacedRect[] = []
+  // Track placed rectangles; cells as large as the largest card
+  const index = new PlacedIndex(Math.max(maxNodeWidth, maxNodeHeight) + gap, gap)
 
   for (const node of sorted) {
     const w = node.width || NODE_DEFAULTS.WIDTH
     const h = node.height || NODE_DEFAULTS.HEIGHT
-    const pos = findBestPosition(node.id, w, h, startX, startY, maxWidth, gap, placed, adjacency)
+    const pos = findBestPosition(node.id, w, h, startX, startY, maxWidth, gap, index, adjacency)
     targets.set(node.id, pos)
-    placed.push({ id: node.id, x: pos.x, y: pos.y, w, h })
+    index.add({ id: node.id, x: pos.x, y: pos.y, w, h })
   }
 
   return targets
