@@ -1737,6 +1737,8 @@ Above its own threshold, the canvas draws only the edges touching what is hovere
 
 This was gated on the unrelated "hide all edges above N" setting, which defaults to 0 - so the path could never run in a default install, and a user who set that setting to 5000 silently also enabled hover-only rendering above 1500, which is not what the setting says.
 
+When a threshold hides edges, the status bar says so: how many edges are hidden, which threshold hides them and what brings them back (hovering or selecting a note for the hover threshold, raising the setting for either). A canvas with no edges and no explanation reads as edges having been lost: a workspace that grew from 375 to 978 edges in an afternoon crossed a hover threshold of 500, and every edge disappeared at once.
+
 ### How far out zoom goes
 
 The zoom-out floor comes from the content rather than a constant. A fixed floor serves every workspace the same number, and the number that lets a very large layout fit lets a mid-size one shrink to an unusable smudge while a pan crosses hundreds of canvas pixels per mouse pixel.
