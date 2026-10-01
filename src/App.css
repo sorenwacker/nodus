@@ -6,10 +6,11 @@
   background: var(--bg-canvas);
 }
 
+/* Equal side columns keep the search box centred in the window (PRODUCT_DESIGN.md > Toolbar) */
 .toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   padding: 8px 16px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
@@ -124,6 +125,7 @@
 .toolbar-actions {
   display: flex;
   gap: 8px;
+  justify-self: end;
 }
 
 .toolbar-btn {
@@ -151,7 +153,6 @@
 }
 
 .toolbar-center {
-  flex: 1;
   display: flex;
   justify-content: center;
   padding: 0 20px;
