@@ -98,7 +98,7 @@
       "neighborhoodView": "Nachbarschaftsansicht - Nur ausgewählten Knoten und Nachbarn anzeigen (N)",
       "bubbleMode": "Blasenmodus - Knoten als Kreise anzeigen",
       "physics": "Physikmodus - Der sichtbare Graph ordnet sich beim Ziehen selbst an (P)",
-      "physicsUnavailable": "Physikmodus - Hineinzoomen oder Nachbarschaftsansicht verlassen: läuft mit bis zu 800 sichtbaren Knoten",
+      "physicsUnavailable": "Physikmodus - Nur im Blasenmodus, außerhalb der Nachbarschaftsansicht, mit bis zu 2000 sichtbaren Knoten",
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
       "hop": "Schritt",
       "hops": "Schritte",

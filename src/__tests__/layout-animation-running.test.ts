@@ -1,6 +1,6 @@
 /**
  * The layout animator reports when it is moving nodes, so edges can route
- * cheaply meanwhile (PRODUCT_DESIGN.md > Routing while a layout or physics moves the nodes).
+ * cheaply meanwhile (PRODUCT_DESIGN.md > Routing while a layout moves the nodes).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createLayoutAnimator, animateToPositions } from '../canvas/composables/layout/useLayoutAnimation'

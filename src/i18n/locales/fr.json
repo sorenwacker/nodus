@@ -101,7 +101,7 @@
       "highlightEdges": "Surligner toutes les arêtes - Rendre toutes les arêtes plus visibles",
       "bubbleMode": "Mode bulle - Afficher les nœuds comme des cercles",
       "physics": "Mode physique - Le graphe visible s'organise pendant que vous déplacez (P)",
-      "physicsUnavailable": "Mode physique - Zoomez ou quittez la vue de voisinage : fonctionne jusqu'à 800 nœuds visibles",
+      "physicsUnavailable": "Mode physique - En mode bulles uniquement, hors de la vue de voisinage, jusqu'à 2000 nœuds visibles",
       "help": "Aide - Raccourcis clavier et utilisation"
     },
     "search": {

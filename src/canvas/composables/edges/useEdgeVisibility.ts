@@ -43,6 +43,8 @@ export interface UseEdgeVisibilityContext {
 /** Edge geometry with its colour resolved, and nothing about what is hovered. */
 export interface CanvasEdge {
   id: string
+  source: string
+  target: string
   x1: number
   y1: number
   x2: number
@@ -297,6 +299,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
   const canvasEdges = computed((): CanvasEdge[] =>
     edgeLines.value.map(e => ({
       id: e.id,
+      source: e.source_node_id,
+      target: e.target_node_id,
       x1: e.x1,
       y1: e.y1,
       x2: e.x2,
