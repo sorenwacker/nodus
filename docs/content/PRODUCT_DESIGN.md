@@ -668,6 +668,7 @@ Two methods for importing citations from Zotero:
 
 - A `<select>` takes the intrinsic width of its widest option. A workspace named "Lorenz workshop - Beyond Models: Sustainable AI Infrastructure as a Scientific Instrument" stretched the selector across the toolbar and pushed the search box and the icons past the right edge of the window.
 - The name is data, so no care in the markup prevents it: the control carries a maximum width. It still opens at full width when clicked, so long names stay readable where it matters.
+- The search box is centred in the window. The toolbar is a three-column grid whose two side columns share the remaining width equally; centred in the space between the left and right groups, as before, it sat off-centre by half the difference of their widths. Where the left group is wider than its share, its column grows and the search box moves right rather than overlapping it.
 
 ### Context Menu
 
