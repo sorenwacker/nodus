@@ -1992,6 +1992,15 @@ Its guard against making a connection twice checks the edges the application hol
 
 A tag node is looked up in the workspace of the node being tagged. Reusing a tag node from another workspace linked nodes across workspaces, where no view shows the link.
 
+### One tag node under concurrent callers
+
+A tag has one tag node per workspace however many callers ask for it at once.
+
+Finding a tag node and creating it when absent are two steps with a wait between them: the node exists in the application only once the database has answered. Two passes that connect tags can run at the same time - loading a workspace starts one, and the body scan that finishes after it starts another - and an edit can tag a note while either runs. Each caller looked, found nothing, and created a node, so a tag new to the workspace got two nodes with the same title, one holding a single edge and the other the rest.
+
+- A creation in progress is shared: a caller asking for a tag whose node is being created waits for that node instead of creating another.
+- Creations are distinguished by workspace and by the tag compared without regard to case, the same identity the lookup uses.
+
 ### Creating a comment
 
 A comment is created the same way from the storyline panel and from the reader. It carries the type the user chose and the meta header that records it, and it is anchored into the node it comments on. The panel wrote neither and did not anchor, so a question or a todo created there was shown as a plain note.
