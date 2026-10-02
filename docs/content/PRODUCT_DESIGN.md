@@ -2001,6 +2001,17 @@ Its guard against making a connection twice checks the edges the application hol
 
 A tag node is looked up in the workspace of the node being tagged. Reusing a tag node from another workspace linked nodes across workspaces, where no view shows the link.
 
+### Tags are not read from code
+
+A `#word` inside a fenced code block or an inline code span is literal text, not a tag.
+
+The scan read the whole body. A Mermaid diagram styles its nodes with colour codes (`classDef process fill:#f3e5f5`), so each colour became a tag on the note, and two notes with diagrams shared those tags and were joined through tag nodes named after colours.
+
+- A fenced block opens on a line starting with three or more backticks or tildes and closes on a line of the same character at least as long; an unclosed block runs to the end of the text. An inline span is delimited by equal runs of backticks and does not cross a blank line.
+- Tags recorded before this rule are withdrawn when their workspace is loaded or switched to: a recorded tag that the note's text holds only inside code leaves the note, its `tagged` edge is deleted, and the tag node goes when nothing else uses it. Measured on the vault this was written against (11,471 notes with content): 16 recorded tags on 5 notes.
+- The withdrawal is limited to the open workspace, whose edges are loaded, so a tag and its edge leave together. It runs before the pass that connects tags, so that pass does not connect a tag about to be withdrawn.
+- A tag added by hand that the text also holds only inside code is withdrawn as well; the two cannot be told apart from the stored data.
+
 ### One tag node under concurrent callers
 
 A tag has one tag node per workspace however many callers ask for it at once.
