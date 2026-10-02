@@ -6,6 +6,7 @@ All notable changes to Nodus are documented in this file.
 
 ### Fixed
 - A tag gets one tag node when several callers ask for it at once. Loading a workspace and the body scan that follows it each start a pass that connects tags; both found no node for a tag new to the workspace and both created one, leaving two nodes with the same title. A creation in progress is now shared. Settings > Canvas > Repair Tag Nodes merges the duplicates already stored
+- The agent prompt field is emptied when the prompt is sent. It was emptied only when the run ended, so during the run it showed the text already standing in the transcript. A run that fails with an error puts the text back
 
 ## [1.6.0-rc.11] - 2026-10-02
 
