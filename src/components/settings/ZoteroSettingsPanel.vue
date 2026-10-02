@@ -39,7 +39,8 @@ const cloudImportProgress = ref<{ current: number; total: number; item: string }
 
 // Citation graph options
 const createStubs = ref(true)
-const citationGraphResult = ref<{ edges: number; stubs: number } | null>(null)
+const citationGraphResult = ref<{ edges: number; stubs: number; stoppedAt: number | null; total: number } | null>(null)
+const stoppingBuild = ref(false)
 
 // Import state
 const importingCollection = ref<string | null>(null)
@@ -264,13 +265,23 @@ async function importAllLocalItems() {
 // Build citation graph
 async function buildGraph() {
   citationGraphResult.value = null
+  stoppingBuild.value = false
   const result = await citationGraph.buildCitationGraph({
     createStubs: createStubs.value,
   })
+  stoppingBuild.value = false
   citationGraphResult.value = {
     edges: result.edgesCreated,
     stubs: result.stubNodesCreated,
+    stoppedAt: result.cancelled ? result.papersProcessed : null,
+    total: citationGraph.progress.value?.total ?? result.papersProcessed,
   }
+}
+
+// The build ends before its next paper; the one in progress is finished
+function stopGraph() {
+  stoppingBuild.value = true
+  citationGraph.cancelBuild()
 }
 </script>
 
@@ -363,6 +374,14 @@ async function buildGraph() {
       >
         {{ citationGraph.isBuilding.value ? t('settings.zotero.citationGraph.building') : t('settings.zotero.citationGraph.build') }}
       </button>
+      <button
+        v-if="citationGraph.isBuilding.value"
+        class="build-btn stop-build-btn"
+        :disabled="stoppingBuild"
+        @click="stopGraph"
+      >
+        {{ stoppingBuild ? t('settings.zotero.citationGraph.stopping') : t('settings.zotero.citationGraph.stop') }}
+      </button>
 
       <!-- Build Progress -->
       <div v-if="citationGraph.progress.value && citationGraph.isBuilding.value" class="import-progress">
@@ -374,6 +393,7 @@ async function buildGraph() {
         </div>
         <span class="progress-text">
           {{ t(`settings.zotero.citationGraph.${citationGraph.progress.value.phase}`) }}
+          {{ t('settings.zotero.citationGraph.position', { current: citationGraph.progress.value.current, total: citationGraph.progress.value.total }) }}
           <template v-if="citationGraph.progress.value.currentPaper">
             - {{ citationGraph.progress.value.currentPaper }}
           </template>
@@ -382,6 +402,9 @@ async function buildGraph() {
 
       <!-- Result -->
       <div v-if="citationGraphResult" class="result-message">
+        <template v-if="citationGraphResult.stoppedAt !== null">
+          {{ t('settings.zotero.citationGraph.stopped', { current: citationGraphResult.stoppedAt, total: citationGraphResult.total }) }}
+        </template>
         {{ t('settings.zotero.citationGraph.result', { edges: citationGraphResult.edges, stubs: citationGraphResult.stubs }) }}
       </div>
     </div>
@@ -867,6 +890,11 @@ async function buildGraph() {
 
 .build-btn:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.stop-build-btn {
+  margin-left: 8px;
+  background: var(--danger-color);
 }
 
 .build-btn:disabled {
