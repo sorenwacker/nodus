@@ -36,6 +36,7 @@ Hashtags in node content become node tags:
 - Settings > Canvas > Repair Tag Nodes also deletes tag nodes that no note is connected to, left behind by deletions made before this rule
 - A tag added by hand from a card's chips was never in the text, so an edit never withdraws it. Only a tag the previous body carried and the new one does not is taken away
 - Tags are how nodes are grouped. Frames were removed: upgrading gives each node that was in a titled frame that title as a tag, shown as a chip on the card ("Kapitel 1-30" becomes `kapitel-1-30`). The tag is stored with the node, not written into its text; like any tag shared by two or more notes, it is drawn as a tag node connected to them when the workspace loads
+- The node preview panel lists the tags as chips beside the date chip, each with its remove button inside the chip, and the row wraps when they do not fit on one line
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
 - Whether tag nodes are drawn is remembered between sessions. Hiding them is a view choice, so it neither creates nor deletes anything, and it holds across a restart
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers

@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- Tags in the node preview panel are drawn as chips. Their class names had no styles, so each tag appeared at body size with its remove button on a line of its own
 - Selecting a node in neighbourhood mode opens its preview panel when its card is collapsed or drawn as a bubble. The mode had been excluded from the rule that opens the preview, so a click showed nothing of the node
 
 ## [1.6.0-rc.13] - 2026-10-02
