@@ -39,12 +39,17 @@ export function useAgentPrompt(ctx: AgentPromptContext) {
 
     ctx.isLoading.value = true
     runSelection.value = [...ctx.getSelectedNodeIds()]
+    // Emptied now, not when the run ends: the transcript shows the prompt from
+    // here on, and a field still holding it reads as a prompt that was not sent
+    // (PRODUCT_DESIGN.md > The prompt field after sending)
+    ctx.prompt.value = ''
 
     let result: { status: string } | undefined
     try {
       result = await ctx.run(prompt)
-      ctx.prompt.value = ''
     } catch (e) {
+      // Put back so it can be sent again, unless something was typed since
+      if (!ctx.prompt.value) ctx.prompt.value = prompt
       ctx.reportError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
       ctx.isLoading.value = false
