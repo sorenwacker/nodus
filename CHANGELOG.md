@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- The MCP server starts when built from source. Its tool index imported the tool groups without the `.js` extension, which `tsc` accepts and Node does not resolve, so a freshly built server stopped at startup and no MCP client could connect
 - A tag gets one tag node when several callers ask for it at once. Loading a workspace and the body scan that follows it each start a pass that connects tags; both found no node for a tag new to the workspace and both created one, leaving two nodes with the same title. A creation in progress is now shared. Settings > Canvas > Repair Tag Nodes merges the duplicates already stored
 - A tag node is deleted with the last notes that used it. Deleting a note left its tag node behind as an unconnected node. Settings > Canvas > Repair Tag Nodes deletes the ones already left behind in the open workspace
 - The Zotero connection works in the installed application. Its requests, and the Wikipedia requests of the agent research tool, were made by the web view to hosts its content security policy does not list, so they worked in a development build and were refused once packaged. They now go through the backend
