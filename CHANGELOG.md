@@ -4,6 +4,8 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0-rc.11] - 2026-10-02
+
 ### Fixed
 - Renaming a node renames its vault file. The file kept the old title as its name, so a vault read in Obsidian showed the spelling a node had when it was imported, and Nodus itself went on writing into the stale file. The rename reuses the file naming of files Nodus creates, keeps the file's content and frontmatter, leaves the name alone when another file already has it, and is hidden from the watcher so that the frontend does not take it for a deleted note and a new one. With sync off nothing on disk changes.
 
