@@ -523,12 +523,6 @@
     },
     "zotero": {
       "description": "Zitate aus Zotero importieren und Zitationsgraphen erstellen",
-      "library": "Zotero-Bibliothek",
-      "detect": "Zotero erkennen",
-      "detecting": "Erkennung...",
-      "detectHint": "Lokale Zotero-Installation automatisch erkennen",
-      "connected": "Verbunden",
-      "disconnect": "Trennen",
       "collections": "Sammlungen",
       "loading": "Sammlungen werden geladen...",
       "noCollections": "Keine Sammlungen gefunden",
