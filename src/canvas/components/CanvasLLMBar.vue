@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import CanvasChatTranscript from './CanvasChatTranscript.vue'
+import Icon from '../../components/Icon.vue'
 import type { ChatTurn } from '../../llm/chatTranscript'
 
 const { t } = useI18n()
@@ -79,9 +80,7 @@ async function copyLog(log: string[]) {
           </svg>
         </button>
         <button class="log-btn" :title="t('canvas.agent.clearLog')" @click="$emit('clear-log')">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
+          <Icon name="trash" :size="12" />
         </button>
       </div>
       <div v-for="(line, i) in agentLog" :key="i" class="log-line">{{ line }}</div>
