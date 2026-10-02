@@ -6,6 +6,7 @@ All notable changes to Nodus are documented in this file.
 
 ### Fixed
 - A tag gets one tag node when several callers ask for it at once. Loading a workspace and the body scan that follows it each start a pass that connects tags; both found no node for a tag new to the workspace and both created one, leaving two nodes with the same title. A creation in progress is now shared. Settings > Canvas > Repair Tag Nodes merges the duplicates already stored
+- A tag node is deleted with the last notes that used it. Deleting a note left its tag node behind as an unconnected node. Settings > Canvas > Repair Tag Nodes deletes the ones already left behind in the open workspace
 - The Zotero connection works in the installed application. Its requests, and the Wikipedia requests of the agent research tool, were made by the web view to hosts its content security policy does not list, so they worked in a development build and were refused once packaged. They now go through the backend
 - Text inside a fenced code block or an inline code span is not read for tags. The colour codes of a Mermaid diagram (`fill:#f3e5f5`) became tags, tag nodes and edges between every note with a diagram. Loading or switching to a workspace withdraws the recorded tags its notes hold only inside code, with their edges and the tag nodes they leave empty
 - Clearing the agent log is drawn with a bin. The standalone log panel drew the same cross for clearing and for closing, side by side, so its header read as two close buttons
