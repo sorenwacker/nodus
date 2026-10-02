@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Changed
+- The Zotero settings no longer say the connection synchronises both ways. Importing and adding to Zotero are single actions; the hint and the documentation now say so, and the documentation describes the Web API connection in place of the removed local detection
 - Double-clicking a section's text in the storyline reader edits it, as double-clicking its title does. A double-click on a link inside the text keeps its own meaning
 
 ### Fixed

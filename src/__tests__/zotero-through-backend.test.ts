@@ -54,3 +54,16 @@ describe('Zotero requests in the packaged application', () => {
     await expect(new ZoteroWebApi().getCollections()).rejects.toThrow('403')
   })
 })
+
+describe('what the Zotero panel says about the connection', () => {
+  it('does not promise synchronisation, in any language', async () => {
+    // Import and export are single actions; the hint said "sync bidirectionally"
+    const { readFileSync, readdirSync } = await import('fs')
+    const { join } = await import('path')
+    const dir = join(__dirname, '..', 'i18n', 'locales')
+    for (const file of readdirSync(dir).filter(name => name.endsWith('.json'))) {
+      const hint: string = JSON.parse(readFileSync(join(dir, file), 'utf8')).settings.zotero.cloud.hint
+      expect(hint, file).not.toMatch(/bidire|bidirekt/i)
+    }
+  })
+})

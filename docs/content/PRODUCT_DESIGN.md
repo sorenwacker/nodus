@@ -621,7 +621,7 @@ Drag and drop files directly onto the canvas to import them. Supported formats:
 
 ### Zotero Integration
 
-Two methods for importing citations from Zotero:
+Two methods for bringing citations in from Zotero:
 
 **Method 1: File Drop (Export/Import)**
 1. In Zotero: Right-click collection → Export Collection → CSL-JSON (Better BibTeX recommended)
@@ -632,10 +632,12 @@ Two methods for importing citations from Zotero:
    - Layout choice (grid/force)
 4. Citation nodes created in a grid
 
-**Method 2: Direct Library Access (Settings)**
-1. Settings → Zotero → Detect (auto-detects local Zotero installation)
-2. Browse collections with item counts
-3. (Future: Click to import collection directly)
+**Method 2: Zotero Web API (Settings)**
+1. Settings → Zotero → enter the Zotero user ID and an API key, then test the connection
+2. Import one collection, or all items, into the open workspace as citation nodes
+3. Selected citation nodes can be added to the library as new items ("Add to Zotero"); an item whose DOI is already there is skipped
+
+Both directions are single actions: nothing is synchronised, an existing Zotero item is never changed, and only the personal library is reached. The steps are in `features.md` > Zotero Integration.
 
 **Supported Formats:**
 - CSL-JSON (Zotero native, Better BibTeX extended)
