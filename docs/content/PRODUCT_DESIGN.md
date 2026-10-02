@@ -2033,6 +2033,15 @@ A comment is created the same way from the storyline panel and from the reader. 
 - Link-local addresses and cloud metadata services are refused however they are written: as an IPv4 literal, an IPv6 literal, an IPv4-mapped IPv6 literal, or a hostname that resolves to one. The check applies to the address the request connects to, so a name that resolves differently on a second lookup cannot pass it.
 - Localhost stays reachable, because local model providers (Ollama, LM Studio) and the Zotero API run there.
 
+### Requests to outside services go through the backend
+
+**Required behavior:** A request to a service outside the application is made by the backend HTTP command, not by the web view.
+
+The web view of the packaged application connects only to the hosts its content security policy lists. The Zotero Web API and the Wikipedia requests of the agent's research tool were made with the web view's own `fetch` to hosts the policy does not list, so they worked in a development build, which carries no such policy, and were refused in the installed application.
+
+- The frontend reaches outside services through one function, which hands the request to the backend when running in the packaged application.
+- A direct `fetch` is permitted only in the files a gate test lists, each for a host the policy names: the local Ollama server and the Semantic Scholar API.
+
 ### Workspace scoping for MCP connections
 
 **Required behavior:** A connection scoped to a workspace sees that workspace, consistently. Scoping only the list getters produced a store that contradicted itself: a listing returned the target workspace's items while a lookup of those same ids failed, because it resolved against whichever workspace the user happened to have open.
