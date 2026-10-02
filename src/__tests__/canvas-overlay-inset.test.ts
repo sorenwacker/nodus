@@ -68,6 +68,9 @@ describe('canvas overlay inset contract', () => {
       ['.frame-header', 'moves with the viewport, not the window'],
       // The control that unfolds the panel; it belongs at the window corner
       ['.agent-toggle-corner', 'is the panel toggle and must stay put'],
+      // Centred in the free part of the canvas; --bar-left carries the inset
+      // (colour-bar-placement.test.ts checks that it does)
+      ['.collapsed-color-bar', 'is centred between both insets, not anchored to an edge'],
     ])
 
     const offenders: string[] = []
@@ -114,6 +117,8 @@ describe('canvas overlay inset contract', () => {
     // The panel is on the left; insetting the minimap or zoom controls pushes
     // them away from the edge for no reason
     for (const { file, block } of insetRuleBlocks()) {
+      // An overlay centred between both insets reads both by design
+      if (!/(^|\n)\s*right:/.test(block)) continue
       expect(
         block.includes('var(--canvas-chat-inset'),
         `${file}: right-anchored overlay must not use the left panel inset`
