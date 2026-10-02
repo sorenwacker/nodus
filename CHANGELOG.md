@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- In bubble mode a node no longer stays hovered, with its edges thick and highlighted, after the pointer is released over the preview panel. The release did not reach the canvas, which went on treating the node as held and ignored the pointer
 - The colour bar is centred in the free part of the canvas and wraps there. It was centred on the whole canvas, so with the reader open it ran under the reader, and it lay over the minimap
 - Tags in the node preview panel are drawn as chips. Their class names had no styles, so each tag appeared at body size with its remove button on a line of its own
 - Selecting a node in neighbourhood mode opens its preview panel when its card is collapsed or drawn as a bubble. The mode had been excluded from the rule that opens the preview, so a click showed nothing of the node
