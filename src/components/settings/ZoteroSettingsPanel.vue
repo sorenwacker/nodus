@@ -4,6 +4,7 @@
  * Configures local Zotero library and Zotero Cloud API integration
  */
 import { ref, watch, computed } from 'vue'
+import { httpFetch } from '../../llm/providers/http'
 import { useI18n } from 'vue-i18n'
 import { useZotero } from '../../composables/useZotero'
 import { useCitationGraph } from '../../composables/useCitationGraph'
@@ -66,7 +67,7 @@ async function testCloudConnection() {
   cloudStatus.value = 'testing'
   cloudError.value = null
   try {
-    const response = await fetch(
+    const response = await httpFetch(
       `https://api.zotero.org/users/${zoteroUserId.value}/collections?limit=1`,
       {
         headers: {

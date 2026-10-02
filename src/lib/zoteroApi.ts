@@ -5,6 +5,7 @@
  * Allows exporting citations created in Nodus to Zotero.
  */
 import { zoteroStorage } from './storage'
+import { httpFetch } from '../llm/providers/http'
 
 // Zotero API types
 export interface ZoteroApiCollection {
@@ -100,7 +101,7 @@ export class ZoteroWebApi {
       headers['Content-Type'] = 'application/json'
     }
 
-    const response = await fetch(url, {
+    const response = await httpFetch(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
