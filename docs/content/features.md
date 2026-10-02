@@ -331,6 +331,20 @@ Fetch citations for papers with DOIs:
 - Automatically creates nodes for referenced papers
 - Builds citation network on your canvas
 
+### Citation Graph
+Connect the papers on the canvas by who cites whom.
+
+**Prerequisite:** the open workspace holds citation nodes with a DOI or a Semantic Scholar id, for example from a Zotero or BibTeX import. Papers without either are skipped.
+
+1. Open Settings > Zotero > Citation Graph.
+2. Leave "Create stub nodes for missing papers" on to add a stub node for a cited paper that is not on the canvas, at most 10 per paper; switch it off to connect only the papers already there.
+3. Select "Build Citation Graph".
+4. To end the build early, select "Stop". The build ends before the next paper, and the edges and stub nodes created so far are kept.
+
+**Result:** a `cites` edge joins each pair of papers on the canvas where one cites the other, and the panel reports the number of edges and stub nodes created.
+
+The build asks Semantic Scholar for each paper, its references and its citations: at least three requests per paper, at least 3 seconds apart, and longer when the service limits the rate, so 100 papers take 15 minutes or more. The progress line shows the paper being processed and its position (`12 of 130`). Answers are kept for 24 hours, so a build that was stopped and started again does not repeat the requests it already made.
+
 ### BibTeX Import
 Import `.bib` files directly to create citation nodes with:
 
