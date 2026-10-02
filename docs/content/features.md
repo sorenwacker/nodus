@@ -134,6 +134,7 @@ Create linear narratives through your knowledge graph:
 
 - Order nodes into a sequence
 - Navigate through storyline in reader mode
+- Edit a section where you read it: double-click its text or its title, then save with Cmd/Ctrl+Enter or by clicking away, or cancel with Escape
 - Export storylines as documents
 - Color-code storyline edges
 
