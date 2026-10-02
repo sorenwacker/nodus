@@ -1676,6 +1676,18 @@ The MCP server kept a second palette of its own: eight saturated hex values. The
 - The node palette holds seven colours and no grey, so grey is not offered for a node. It stays available where it already works.
 - The row of colours in use offers only what the presets do not. Its purpose is to reach a colour the palette does not carry, so listing a colour that is already a swatch directly below it repeats the same choice twice and crowds out the custom ones it exists for. A colour the current theme's palette does not offer still belongs there, because in that theme it is not otherwise reachable. When every colour in use is a preset the row is empty and disappears, separator included.
 
+
+### A node's colour is a colour or nothing
+
+A node's stored colour is a value a stylesheet accepts as a colour, or it is empty. Nothing else is stored, and nothing else is painted.
+
+The MCP colour tools declared their colour parameter as a string and described resetting as "or null", so a caller sent the word `null`. It was stored as the colour. The card background is the colour layered over the surface, and a background written with a word that is not a colour is discarded when it is computed, which leaves the card with no background at all: the card was see-through and the edges behind it showed.
+
+- Resetting a colour over MCP takes JSON `null`, an empty string or the word `null`; all three store an empty colour. A value that is neither a colour name the tools offer nor a colour value is refused with an error rather than stored.
+- The store refuses to write a colour that is not a colour value, whoever asks, and writes an empty colour instead.
+- A node already holding such a value is reset to an empty colour when the application loads. Measured on the vault this was written against: 4 nodes, all holding `null`.
+- The card background is built only from a colour value, so a card is never left without a background.
+
 ### Finding nodes by colour
 
 A colour name and its hex value are the same colour. Writes normalise a name before storing it, so reads normalise too - comparing the raw input meant every query by name, which is how the tool documents itself, matched nothing.
