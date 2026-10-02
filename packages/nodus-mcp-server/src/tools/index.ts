@@ -6,12 +6,12 @@
  * are the seams it is cut along.
  */
 import type { McpToolDeclaration } from './types'
-import { READ_TOOLS } from './readTools'
-import { WORKSPACE_TOOLS } from './workspaceTools'
-import { NODE_TOOLS } from './nodeTools'
-import { EDGE_TOOLS } from './edgeTools'
-import { STORYLINE_TOOLS } from './storylineTools'
-import { CANVAS_TOOLS } from './canvasTools'
+import { READ_TOOLS } from './readTools.js'
+import { WORKSPACE_TOOLS } from './workspaceTools.js'
+import { NODE_TOOLS } from './nodeTools.js'
+import { EDGE_TOOLS } from './edgeTools.js'
+import { STORYLINE_TOOLS } from './storylineTools.js'
+import { CANVAS_TOOLS } from './canvasTools.js'
 
 export type { McpToolDeclaration } from './types'
 
