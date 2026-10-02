@@ -7,7 +7,7 @@
  * take them: what an edit may withdraw is exactly what the previous body held
  * and the new one does not (docs/content/features.md > Tags).
  */
-import { extractHashtags } from './contentParser'
+import { extractHashtags, hashtagsOnlyInCode } from './contentParser'
 
 export interface TagChange {
   /** The node's tags after the edit. */
@@ -47,6 +47,88 @@ export function planTagChange(
     added,
     removed,
   }
+}
+
+/** The fields of a note the withdrawal of code tags reads */
+export interface TaggedNote {
+  id: string
+  node_type?: string
+  markdown_content?: string | null
+  tags?: string | null
+}
+
+export interface CodeTagWithdrawal {
+  id: string
+  /** The note's tags without the withdrawn ones. */
+  tags: string[]
+  /** Recorded tags the text holds only inside code. */
+  removed: string[]
+}
+
+/**
+ * Find the recorded tags that were read out of code before code was excluded.
+ *
+ * Only a tag the text holds inside code and nowhere else is withdrawn; one the
+ * text does not mention was set by hand or by frontmatter and stays
+ * (PRODUCT_DESIGN.md > Tags are not read from code).
+ *
+ * Args:
+ *   notes: The notes to consider. Tag nodes and notes without text are skipped.
+ *
+ * Returns:
+ *   One entry per note whose tags would change.
+ */
+export function planCodeTagWithdrawal(notes: TaggedNote[]): CodeTagWithdrawal[] {
+  const plan: CodeTagWithdrawal[] = []
+  for (const note of notes) {
+    if (note.node_type === 'tag' || !note.markdown_content || !note.tags) continue
+    let recorded: unknown
+    try {
+      recorded = JSON.parse(note.tags)
+    } catch {
+      continue
+    }
+    if (!Array.isArray(recorded) || recorded.length === 0) continue
+    const tags = recorded.filter((tag): tag is string => typeof tag === 'string')
+    const inCode = new Set(hashtagsOnlyInCode(note.markdown_content))
+    const removed = tags.filter(tag => inCode.has(tag))
+    if (removed.length === 0) continue
+    plan.push({ id: note.id, tags: tags.filter(tag => !inCode.has(tag)), removed })
+  }
+  return plan
+}
+
+/**
+ * Withdraw the tags that were read out of code, with their edges.
+ *
+ * The tags are written before the edges go, so a pass connecting tags meanwhile
+ * does not see a tag whose edge has just been deleted. A note that cannot be
+ * written keeps its edges and does not stop the rest.
+ *
+ * Args:
+ *   notes: The notes of the workspace whose edges are loaded.
+ *   persist: Writes one note's tags.
+ *   removeEdges: Deletes a note's edges to the named tags, and emptied tag nodes.
+ *
+ * Returns:
+ *   The number of notes whose tags were written.
+ */
+export async function withdrawCodeTags(
+  notes: TaggedNote[],
+  persist: (id: string, tags: string[]) => Promise<void>,
+  removeEdges: (id: string, removed: string[]) => Promise<void>
+): Promise<number> {
+  let written = 0
+  for (const entry of planCodeTagWithdrawal(notes)) {
+    try {
+      await persist(entry.id, entry.tags)
+      written++
+      await removeEdges(entry.id, entry.removed)
+    } catch {
+      // One unwritable note must not stop the rest of the pass
+    }
+  }
+  return written
 }
 
 export interface TagEdge {
