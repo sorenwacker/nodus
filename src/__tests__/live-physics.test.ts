@@ -39,7 +39,11 @@ function setup(options: {
   // The store's layout version: every position write changes it
   const layoutVersion = ref(0)
 
+  // Changes whenever a node or an edge is added or removed
+  const graphKey = ref(0)
+
   const physics = useLivePhysics({
+    getGraphKey: () => graphKey.value,
     getVisibleNodes: () => options.visible,
     getNodes: () => all,
     getEdges: () => (options.edges ?? []).map(([s, t]) => ({ source_node_id: s, target_node_id: t })),
@@ -101,6 +105,24 @@ function setup(options: {
     },
     steps: () => steps,
     maxInFlight: () => maxInFlight,
+    /** A node arrives, as when an MCP client creates one: a position write too */
+    addNode: (n: PhysicsNode) => {
+      options.visible.push(n)
+      all.push(n)
+      byId.set(n.id, n)
+      layoutVersion.value++
+      graphKey.value++
+    },
+    addEdge: (source: string, target: string) => {
+      options.edges = [...(options.edges ?? []), [source, target]]
+      graphKey.value++
+    },
+    removeNode: (id: string) => {
+      for (const list of [options.visible, all]) list.splice(list.findIndex(n => n.id === id), 1)
+      byId.delete(id)
+      layoutVersion.value++
+      graphKey.value++
+    },
   }
 }
 
@@ -265,6 +287,67 @@ describe('physics mode', () => {
     expect([w.byId.get('b')!.canvas_x, w.byId.get('b')!.canvas_y]).toEqual([5, 5])
   })
 
+  it('takes in a node and an edge added while it runs, and goes on', async () => {
+    const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0)], edges: [['a', 'b']] })
+    await w.physics.start()
+    await w.step(400)
+    const settled = w.live('b')
+
+    w.addNode(node('c', 9000, 0))
+    w.addEdge('b', 'c')
+    await nextTick()
+    await flush()
+
+    expect(w.physics.active.value).toBe(true)
+    expect(w.physics.running.value).toBe(true)
+    const before = distance(w.live('b'), w.live('c'))
+    await w.step(400)
+    expect(distance(w.live('b'), w.live('c'))).toBeLessThan(before)
+    // b carries on from where the simulation had it, not from where it started
+    expect(Math.abs(settled.x - 3100)).toBeGreaterThan(50)
+    expect(w.pushUndo).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the positions reached so far when the graph changes', async () => {
+    const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0)], edges: [['a', 'b']] })
+    await w.physics.start()
+    await w.step(30)
+    const reached = w.live('b')
+
+    w.addNode(node('c', 9000, 5000))
+    await nextTick()
+    await flush()
+
+    expect(w.stored).toContain('b')
+    expect(w.live('b').x).toBeCloseTo(reached.x, 0)
+  })
+
+  it('carries on without a node that was deleted, and stores nothing for it', async () => {
+    const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0), node('c', 0, 3000)], edges: [['a', 'b'], ['a', 'c']] })
+    await w.physics.start()
+    await w.step(10)
+
+    w.removeNode('c')
+    await nextTick()
+    await flush()
+
+    expect(w.physics.active.value).toBe(true)
+    expect(w.physics.live.value!.index.has('c')).toBe(false)
+    expect(w.stored).not.toContain('c')
+  })
+
+  it('ends and stores when a change leaves more nodes on screen than it runs on', async () => {
+    const w = setup({ visible: [node('a', 0, 0), node('b', 300, 0)], edges: [['a', 'b']] })
+    await w.physics.start()
+    await w.step(10)
+    for (let i = 0; i < PHYSICS_MAX_NODES; i++) w.addNode(node(`x${i}`, i * 500, 9000))
+    await nextTick()
+    await flush()
+
+    expect(w.physics.active.value).toBe(false)
+    expect(w.stored).toContain('b')
+  })
+
   it('does not start where it is blocked (outside bubble mode, or in neighbourhood mode)', async () => {
     const w = setup({ visible: [node('a', 0, 0), node('b', 3000, 0)], edges: [['a', 'b']], blocked: true })
     expect(w.physics.available.value).toBe(false)
@@ -337,5 +420,27 @@ describe('the worker engine', () => {
     expect(Math.abs(result.xy[2] - result.xy[0])).toBeLessThan(1500)
     engine.dispose()
     expect(worker.terminated).toBe(true)
+  })
+})
+
+describe('the graph key', () => {
+  it('changes when a node or an edge is added or removed, not when one moves', async () => {
+    const { graphKey } = await import('../canvas/composables/layout/useLivePhysics')
+    const nodes = [{ id: 'a', canvas_x: 0 }, { id: 'b', canvas_x: 5 }]
+    const edges = [{ id: 'e1' }]
+    const key = graphKey(nodes, edges)
+
+    const moved = [{ id: 'a', canvas_x: 900 }, { id: 'b', canvas_x: 5 }]
+    expect(graphKey(moved, edges)).toBe(key)
+    expect(graphKey([...nodes, { id: 'c', canvas_x: 0 }], edges)).not.toBe(key)
+    expect(graphKey(nodes, [])).not.toBe(key)
+    expect(graphKey(nodes, [{ id: 'e2' }])).not.toBe(key)
+  })
+
+  it('is what the canvas hands the simulation', async () => {
+    const { readFileSync } = await import('fs')
+    const { join } = await import('path')
+    const source = readFileSync(join(__dirname, '..', 'canvas', 'GraphCanvas.vue'), 'utf8')
+    expect(source).toContain('getGraphKey: () => graphKey(store.filteredNodes, store.filteredEdges)')
   })
 })

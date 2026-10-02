@@ -50,7 +50,7 @@ import {
   type AgentContext,
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
-import { useLayout, useNeighborhoodMode, useLivePhysics, createWorkerEngine } from './composables/layout'
+import { useLayout, useNeighborhoodMode, useLivePhysics, createWorkerEngine, graphKey } from './composables/layout'
 import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
 import { buildAgentToolContext } from './composables/agent/agentToolContext'
 import { useAgentPrompt } from './composables/agent/useAgentPrompt'
@@ -1448,7 +1448,7 @@ const physics = useLivePhysics({
   getRadius: getLODRadius, isBlocked: () => neighborhoodMode.value || !isLODMode.value,
   updateNodePosition: store.updateNodePosition, snap: snapToGrid, pushUndo, toCanvasPoint: screenToCanvas,
   requestFrame: cb => requestAnimationFrame(cb), cancelFrame: id => cancelAnimationFrame(id as number),
-  createEngine: createWorkerEngine, getLayoutVersion: () => store.nodeLayoutVersion,
+  createEngine: createWorkerEngine, getLayoutVersion: () => store.nodeLayoutVersion, getGraphKey: () => graphKey(store.filteredNodes, store.filteredEdges),
 })
 // Its positions belong to this workspace and bubble view; leaving any stores them
 watch([neighborhoodMode, isLODMode, () => store.currentWorkspaceId], () => physics.stop())
