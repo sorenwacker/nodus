@@ -4,6 +4,8 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0-rc.12] - 2026-10-02
+
 ### Fixed
 - A tag gets one tag node when several callers ask for it at once. Loading a workspace and the body scan that follows it each start a pass that connects tags; both found no node for a tag new to the workspace and both created one, leaving two nodes with the same title. A creation in progress is now shared. Settings > Canvas > Repair Tag Nodes merges the duplicates already stored
 - The agent is instructed to answer a question about the notes directly: read what the answer needs, then reply, with no plan, approval or web research. Every mode described building, and the default mode prescribed research and a plan for any request, so a plain question took nine tool calls
