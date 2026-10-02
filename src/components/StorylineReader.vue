@@ -24,6 +24,7 @@ import { useStorylineReaderComments } from '../composables/useStorylineReaderCom
 import { useStorylineReaderEntities } from '../composables/useStorylineReaderEntities'
 import type { Node, Storyline, CommentType } from '../types'
 import { COMMENT_STYLES } from '../types'
+import { doubleClickEditsSection } from '../lib/readerEditGesture'
 
 const { t } = useI18n()
 
@@ -87,8 +88,8 @@ function goToHeading(sectionIndex: number, headingIndex: number) {
   container.scrollTo({ top: top - 12, behavior: 'smooth' })
 }
 
-// Inline section editing, from a double-click on a section title - not on the
-// body, where that gesture selects a word (PRODUCT_DESIGN.md > Editing)
+// Inline section editing, from a double-click on a section's title or text
+// (PRODUCT_DESIGN.md > Editing in the reader)
 const editingSectionId = ref<string | null>(null)
 const editingText = ref('')
 const editingLockError = ref<string | null>(null)
@@ -537,6 +538,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
                     class="section-content"
                     :title="t('storyline.editHint')"
                     @click="handleContentClick"
+                    @dblclick="doubleClickEditsSection($event.target) && startSectionEdit(node)"
                     v-html="getRenderedContent(node.id) || ''"
                   ></div>
                   <p v-if="editingLockError" class="section-lock-error">
