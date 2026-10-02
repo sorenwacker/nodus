@@ -539,7 +539,7 @@
       "importAll": "Import All Items",
       "cloud": {
         "title": "Zotero Cloud",
-        "hint": "Connect to Zotero Cloud to sync citations bidirectionally",
+        "hint": "Import references from your Zotero library and add references to it. Nothing is synchronised",
         "userId": "User ID",
         "userIdPlaceholder": "Your Zotero user ID (numeric)",
         "apiKey": "API Key",

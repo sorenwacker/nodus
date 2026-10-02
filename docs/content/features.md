@@ -320,11 +320,42 @@ Each imported vault becomes a separate workspace, keeping projects organized.
 ## Citation Management
 
 ### Zotero Integration
-Connect to your local Zotero database:
+Nodus exchanges references with a Zotero library through the Zotero Web API. Each direction is a single action you start; nothing is synchronised afterwards, so a later change on one side does not reach the other.
 
-- Browse and import collections
-- DOI extraction and linking
-- Create citation nodes with metadata
+Nodus reads the library as it is stored on zotero.org, not the local Zotero database: items and collections that the Zotero desktop application has not yet synced are not visible. It reaches your personal library only, not group libraries, and the same account serves every workspace.
+
+#### Connect to Zotero
+
+**Prerequisite:** a Zotero account whose library is synced to zotero.org.
+
+1. Open `zotero.org/settings/keys` and create a private API key. Allow library access; allow write access only if you want to add references from Nodus.
+2. Note the numeric user ID shown on the same page.
+3. In Nodus, open Settings > Zotero.
+4. Enter the user ID and the API key under "Zotero Cloud".
+5. Select "Test connection".
+
+**Result:** the status shows "Connected" and the collections of the library are listed. A library without collections lists none; its items can still be imported.
+
+A key without write access is enough for importing and makes "Add to Zotero" fail without changing the library.
+
+#### Import references
+
+1. Open the workspace that should receive the references.
+2. Open Settings > Zotero.
+3. Select "Import" beside a collection, or "Import All Items" for the whole library.
+
+**Result:** each top-level item becomes a citation node in the open workspace, with its title, authors, date, journal, DOI and abstract, and the Zotero item key in its frontmatter (`zotero_key`). Attachments and notes are not imported. The nodes are laid out in a grid and are not connected; see Citation Graph below for connecting them. Importing the same items again creates the nodes again.
+
+#### Add references to Zotero
+
+**Prerequisite:** the API key has write access.
+
+1. Select one or more citation nodes on the canvas.
+2. Right-click and select "Add to Zotero".
+
+**Result:** each selected node becomes a new item at the top level of the library. A node whose DOI already exists in the library is skipped and counted as a duplicate; a node without content is skipped. An existing Zotero item is never changed or deleted. If the library cannot be read, nothing is added, because duplicates could not be checked.
+
+Dropping a PDF offers the same step for its extracted references ("Add references to Zotero").
 
 ### Semantic Scholar Integration
 Fetch citations for papers with DOIs:

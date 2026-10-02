@@ -538,7 +538,7 @@
       "importing": "Importando",
       "cloud": {
         "title": "Zotero Cloud",
-        "hint": "Conectar con Zotero Cloud para sincronizar citas bidireccionalmente",
+        "hint": "Importar referencias de tu biblioteca de Zotero y añadir referencias a ella. No se sincroniza nada",
         "userId": "ID de usuario",
         "userIdPlaceholder": "Tu ID de usuario de Zotero (numérico)",
         "apiKey": "Clave API",
