@@ -555,7 +555,7 @@
         "title": "Grafo citazioni",
         "build": "Costruisci grafo citazioni",
         "building": "Costruzione...",
-        "hint": "Scopri relazioni di citazione usando Semantic Scholar",
+        "hint": "Interroga Semantic Scholar per riferimenti e citazioni di ogni articolo: almeno tre richieste per articolo, a 3 secondi di distanza",
         "scanning": "Analisi articoli...",
         "fetching": "Recupero citazioni...",
         "creating": "Creazione archi...",
@@ -563,7 +563,11 @@
         "result": "{edges} archi e {stubs} nodi provvisori creati",
         "noPapers": "Nessun articolo con DOI trovato",
         "createStubs": "Crea nodi provvisori per articoli mancanti",
-        "stubsHint": "I nodi provvisori mostrano i link di citazione ad articoli non presenti nella tua libreria"
+        "stubsHint": "I nodi provvisori mostrano i link di citazione ad articoli non presenti nella tua libreria",
+        "stop": "Ferma",
+        "stopping": "Arresto dopo questo articolo...",
+        "position": "({current} di {total})",
+        "stopped": "Fermato dopo {current} articoli su {total}."
       },
       "export": {
         "toZotero": "Salva in Zotero",

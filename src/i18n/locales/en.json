@@ -556,7 +556,7 @@
         "title": "Citation Graph",
         "build": "Build Citation Graph",
         "building": "Building...",
-        "hint": "Discover citation relationships using Semantic Scholar",
+        "hint": "Look up each paper's references and citations on Semantic Scholar: at least three requests per paper, 3 seconds apart",
         "scanning": "Scanning papers...",
         "fetching": "Fetching citations...",
         "creating": "Creating edges...",
@@ -564,7 +564,11 @@
         "result": "Created {edges} edges and {stubs} stub nodes",
         "noPapers": "No papers with DOI found",
         "createStubs": "Create stub nodes for missing papers",
-        "stubsHint": "Stub nodes show citation links to papers not in your library"
+        "stubsHint": "Stub nodes show citation links to papers not in your library",
+        "stop": "Stop",
+        "stopping": "Stopping after this paper...",
+        "position": "({current} of {total})",
+        "stopped": "Stopped after {current} of {total} papers."
       },
       "export": {
         "toZotero": "Save to Zotero",

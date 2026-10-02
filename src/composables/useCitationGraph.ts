@@ -61,6 +61,10 @@ export interface CitationGraphResult {
   edgesCreated: number
   stubNodesCreated: number
   errors: string[]
+  /** Papers the build got through, out of those with a DOI or Semantic Scholar id */
+  papersProcessed: number
+  /** True when the build was stopped before its last paper */
+  cancelled: boolean
 }
 
 export interface UseCitationGraphContext {
@@ -88,6 +92,8 @@ function formatStubContent(ref: SemanticScholarReference): string {
 export function useCitationGraph(ctx: UseCitationGraphContext) {
   const progress = ref<CitationGraphProgress | null>(null)
   const isBuilding = ref(false)
+  /** Set by cancelBuild; the build loop ends before its next paper */
+  let buildCancelled = false
   const isFetchingCitations = ref(false)
   const fetchCancelled = ref(false)
   const fetchProgress = ref<{ current: number; total: number; paperTitle: string; paperIndex?: number; paperCount?: number } | null>(null)
@@ -371,9 +377,11 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
     const cacheOnly = options?.cacheOnly ?? false
 
     isBuilding.value = true
+    buildCancelled = false
     const errors: string[] = []
     let edgesCreated = 0
     let stubNodesCreated = 0
+    let papersProcessed = 0
 
     const nodes = ctx.getNodes()
     const workspaceId = ctx.getCurrentWorkspaceId()
@@ -387,7 +395,13 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
     if (papersToProcess.length === 0) {
       isBuilding.value = false
-      return { edgesCreated: 0, stubNodesCreated: 0, errors: ['No papers with DOI or Semantic Scholar ID found'] }
+      return {
+        edgesCreated: 0,
+        stubNodesCreated: 0,
+        errors: ['No papers with DOI or Semantic Scholar ID found'],
+        papersProcessed: 0,
+        cancelled: false,
+      }
     }
 
     progress.value = {
@@ -403,6 +417,10 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
     // Process each node
     for (let i = 0; i < papersToProcess.length; i++) {
+      // A stop takes effect between papers: what the current one created stays
+      // whole (docs/content/features.md > Citation Graph)
+      if (buildCancelled) break
+      papersProcessed = i + 1
       const node = papersToProcess[i]
       const doi = extractDOI(node.markdown_content)
       const ssId = extractSemanticScholarId(node.markdown_content)
@@ -530,7 +548,7 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
     progress.value = {
       phase: 'done',
-      current: papersToProcess.length,
+      current: papersProcessed,
       total: papersToProcess.length,
       currentPaper: '',
       errors,
@@ -542,15 +560,17 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
       edgesCreated,
       stubNodesCreated,
       errors,
+      papersProcessed,
+      cancelled: buildCancelled,
     }
   }
 
   /**
-   * Cancel building (best effort)
+   * Stop the build before its next paper. The paper in progress is finished,
+   * so the request already under way and what it creates are not cut off.
    */
   function cancelBuild() {
-    isBuilding.value = false
-    progress.value = null
+    buildCancelled = true
   }
 
   /**

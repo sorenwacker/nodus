@@ -555,7 +555,7 @@
         "title": "Grafo de citas",
         "build": "Construir grafo de citas",
         "building": "Construyendo...",
-        "hint": "Descubrir relaciones de citación usando Semantic Scholar",
+        "hint": "Consultar en Semantic Scholar las referencias y citas de cada artículo: al menos tres solicitudes por artículo, con 3 segundos de separación",
         "scanning": "Analizando artículos...",
         "fetching": "Obteniendo citas...",
         "creating": "Creando aristas...",
@@ -563,7 +563,11 @@
         "result": "{edges} aristas y {stubs} nodos provisionales creados",
         "noPapers": "No se encontraron artículos con DOI",
         "createStubs": "Crear nodos provisionales para artículos faltantes",
-        "stubsHint": "Los nodos provisionales muestran enlaces de citas a artículos que no están en tu biblioteca"
+        "stubsHint": "Los nodos provisionales muestran enlaces de citas a artículos que no están en tu biblioteca",
+        "stop": "Detener",
+        "stopping": "Deteniendo tras este artículo...",
+        "position": "({current} de {total})",
+        "stopped": "Detenido tras {current} de {total} artículos."
       },
       "export": {
         "toZotero": "Guardar en Zotero",

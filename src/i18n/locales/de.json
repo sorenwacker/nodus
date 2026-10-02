@@ -555,7 +555,7 @@
         "title": "Zitationsgraph",
         "build": "Zitationsgraph erstellen",
         "building": "Erstelle...",
-        "hint": "Zitationsbeziehungen mit Semantic Scholar entdecken",
+        "hint": "Referenzen und Zitationen jedes Artikels bei Semantic Scholar abfragen: mindestens drei Anfragen pro Artikel im Abstand von 3 Sekunden",
         "scanning": "Scanne Paper...",
         "fetching": "Hole Zitate...",
         "creating": "Erstelle Kanten...",
@@ -563,7 +563,11 @@
         "result": "{edges} Kanten und {stubs} Stub-Knoten erstellt",
         "noPapers": "Keine Paper mit DOI gefunden",
         "createStubs": "Stub-Knoten für fehlende Paper erstellen",
-        "stubsHint": "Stub-Knoten zeigen Zitationslinks zu Papern die nicht in Ihrer Bibliothek sind"
+        "stubsHint": "Stub-Knoten zeigen Zitationslinks zu Papern die nicht in Ihrer Bibliothek sind",
+        "stop": "Stopp",
+        "stopping": "Stoppt nach diesem Artikel...",
+        "position": "({current} von {total})",
+        "stopped": "Nach {current} von {total} Artikeln gestoppt."
       },
       "export": {
         "toZotero": "In Zotero speichern",

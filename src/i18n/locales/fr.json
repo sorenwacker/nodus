@@ -555,7 +555,7 @@
         "title": "Graphe de citations",
         "build": "Construire le graphe de citations",
         "building": "Construction...",
-        "hint": "Découvrir les relations de citation avec Semantic Scholar",
+        "hint": "Interroger Semantic Scholar sur les références et citations de chaque article : au moins trois requêtes par article, espacées de 3 secondes",
         "scanning": "Analyse des articles...",
         "fetching": "Récupération des citations...",
         "creating": "Création des arêtes...",
@@ -563,7 +563,11 @@
         "result": "{edges} arêtes et {stubs} nœuds provisoires créés",
         "noPapers": "Aucun article avec DOI trouvé",
         "createStubs": "Créer des nœuds provisoires pour les articles manquants",
-        "stubsHint": "Les nœuds provisoires montrent les liens de citation vers des articles absents de votre bibliothèque"
+        "stubsHint": "Les nœuds provisoires montrent les liens de citation vers des articles absents de votre bibliothèque",
+        "stop": "Arrêter",
+        "stopping": "Arrêt après cet article...",
+        "position": "({current} sur {total})",
+        "stopped": "Arrêté après {current} articles sur {total}."
       },
       "export": {
         "toZotero": "Enregistrer dans Zotero",
