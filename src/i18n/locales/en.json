@@ -654,9 +654,9 @@
     "okfBackfillApply": "Add frontmatter to {count} files",
     "okfBackfilling": "Writing...",
     "repairTagNodes": "Repair Tag Nodes",
-    "repairTagNodesHint": "Merge tag nodes that duplicate each other and restore a missing # prefix",
+    "repairTagNodesHint": "Merge tag nodes that duplicate each other, restore a missing # prefix, and delete tag nodes no note uses",
     "repairTagNodesNone": "Tag nodes are already consistent",
-    "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted",
+    "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted, {removed} unused removed",
     "showPerfOverlay": "Show performance readout",
     "showPerfOverlayHint": "Frame timing over the graph while you pan or zoom, for diagnosing stutter"
   },

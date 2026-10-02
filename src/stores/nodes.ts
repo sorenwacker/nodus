@@ -16,7 +16,7 @@ import { useNodeEditLocking } from '../composables/useNodeEditLocking'
 import { useNodeLayout } from '../composables/useNodeLayout'
 import { useEntityOperations } from '../composables/useEntityOperations'
 import { storeLogger } from '../lib/logger'
-import { planTagEdgeRemoval, withdrawCodeTags } from '../lib/tagSync'
+import { planTagEdgeRemoval, withdrawCodeTags, tagNodesTaggedBy, emptiedTagNodes } from '../lib/tagSync'
 
 // Import from submodules
 import {
@@ -324,15 +324,32 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function deleteNode(id: string) {
+    const tagNodeIds = tagNodesTaggedBy([id], edgesStore.edges)
     await deleteNodeFn(deps, id)
+    await deleteEmptiedTagNodes(tagNodeIds)
   }
 
   async function deleteNodes(ids: string[]) {
+    const tagNodeIds = tagNodesTaggedBy(ids, edgesStore.edges)
     await deleteNodesFn(deps, ids)
+    await deleteEmptiedTagNodes(tagNodeIds)
+  }
+
+  /**
+   * Delete the tag nodes that deleted notes were the last to use. Deleting a
+   * note left its tag node behind as an unconnected node
+   * (docs/content/features.md > Tags).
+   */
+  async function deleteEmptiedTagNodes(tagNodeIds: string[]) {
+    for (const tagNodeId of emptiedTagNodes(tagNodeIds, nodes.value, edgesStore.edges)) {
+      await deleteNodeFn(deps, tagNodeId)
+    }
   }
 
   async function restoreNode(node: Node) {
     await restoreNodeFn(nodes, node)
+    // Its tag node may have gone with it; reconnect what its tags call for
+    if (node.node_type !== 'tag') syncTagEdgesIfEnabled()
   }
 
   // Edge operations
@@ -344,7 +361,15 @@ export const useNodesStore = defineStore('nodes', () => {
     )
   }
 
-  const restoreEdge = (edge: Edge) => restoreEdgeFn(edgesStore, edge)
+  /**
+   * Restore an edge, unless a node it joined no longer exists: a tag node that
+   * went with its last note is not brought back by undoing the note's deletion
+   * (docs/content/features.md > Tags).
+   */
+  const restoreEdge = (edge: Edge) => {
+    const present = (id: string) => nodes.value.some(n => n.id === id)
+    if (present(edge.source_node_id) && present(edge.target_node_id)) restoreEdgeFn(edgesStore, edge)
+  }
   const updateEdgeLinkType = (id: string, linkType: string) => updateEdgeLinkTypeFn(edgesStore, id, linkType)
   const updateEdgeColor = (id: string, color: string | null) => updateEdgeColorFn(edgesStore, id, color)
   const updateEdgeLabel = (id: string, label: string | null) => updateEdgeLabelFn(edgesStore, id, label)

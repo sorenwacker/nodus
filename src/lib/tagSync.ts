@@ -199,6 +199,38 @@ export function planTagEdgeRemoval(
   return { edgeIds, orphanTagNodeIds }
 }
 
+/** The tag nodes that the given notes are connected to by a `tagged` edge. */
+export function tagNodesTaggedBy(noteIds: string[], edges: TagEdge[]): string[] {
+  const ids = new Set(noteIds)
+  return [
+    ...new Set(
+      edges.filter(e => e.link_type === 'tagged' && ids.has(e.source_node_id)).map(e => e.target_node_id)
+    ),
+  ]
+}
+
+/**
+ * Of the candidate tag nodes, those no existing note is connected to.
+ *
+ * An edge counts only while the note at its other end exists: a deleted note
+ * can leave its edge behind, and that edge uses nothing.
+ *
+ * Args:
+ *   candidateIds: Tag nodes to check, typically those of notes just deleted.
+ *   nodes: The nodes that exist now.
+ *   edges: The edges that exist now.
+ *
+ * Returns:
+ *   The candidates that still exist and that nothing uses.
+ */
+export function emptiedTagNodes(candidateIds: string[], nodes: TagNode[], edges: TagEdge[]): string[] {
+  const existing = new Set(nodes.map(n => n.id))
+  const used = new Set(
+    edges.filter(e => e.link_type === 'tagged' && existing.has(e.source_node_id)).map(e => e.target_node_id)
+  )
+  return candidateIds.filter(id => existing.has(id) && !used.has(id))
+}
+
 /**
  * How many notes must share a tag before it is worth a node of its own.
  *

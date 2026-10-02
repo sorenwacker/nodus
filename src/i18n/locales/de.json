@@ -654,9 +654,9 @@
     "hideWikilinkEdges": "[[Wikilink]]-Kanten ausblenden",
     "hideWikilinkEdgesHint": "Kanten ausblenden, die automatisch aus [[Links]] im Knoteninhalt entstehen",
     "repairTagNodes": "Tag-Knoten reparieren",
-    "repairTagNodesHint": "Doppelte Tag-Knoten zusammenführen und fehlendes #-Präfix wiederherstellen",
+    "repairTagNodesHint": "Doppelte Tag-Knoten zusammenführen, fehlendes #-Präfix wiederherstellen und ungenutzte Tag-Knoten löschen",
     "repairTagNodesNone": "Tag-Knoten sind bereits konsistent",
-    "repairTagNodesResult": "{merged} zusammengeführt, {renamed} umbenannt, {edges} Kanten angepasst",
+    "repairTagNodesResult": "{merged} zusammengeführt, {renamed} umbenannt, {edges} Kanten angepasst, {removed} ungenutzte entfernt",
     "showPerfOverlay": "Leistungsanzeige einblenden",
     "showPerfOverlayHint": "Frame-Zeiten über dem Graphen beim Verschieben oder Zoomen, zur Diagnose von Rucklern"
   },
