@@ -1696,6 +1696,16 @@ The MCP server kept a second palette of its own: eight saturated hex values. The
 - The row of colours in use offers only what the presets do not. Its purpose is to reach a colour the palette does not carry, so listing a colour that is already a swatch directly below it repeats the same choice twice and crowds out the custom ones it exists for. A colour the current theme's palette does not offer still belongs there, because in that theme it is not otherwise reachable. When every colour in use is a preset the row is empty and disappears, separator included.
 
 
+### Placing the colour bar
+
+The colour bar, shown while nodes are selected, is centred in the part of the canvas that is left free.
+
+Other layers cover the canvas: the agent panel and the node preview panel from the left, the storyline reader from the right, the minimap in the top right corner. The bar was centred on the whole canvas, so with the reader open its right half ran under the reader, and it lay over the minimap.
+
+- The free part runs from the right edge of the agent panel and of the preview panel, when shown, to the left edge of the minimap, when shown, and of the reader.
+- The bar is centred in that part and no wider than it; when its colours do not fit on one line they wrap onto the next.
+- The bar follows the reader as it slides, in step with the minimap.
+
 ### A node's colour is a colour or nothing
 
 A node's stored colour is a value a stylesheet accepts as a colour, or it is empty. Nothing else is stored, and nothing else is painted.
