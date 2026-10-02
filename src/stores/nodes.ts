@@ -346,7 +346,13 @@ export const useNodesStore = defineStore('nodes', () => {
    */
   async function deleteEmptiedTagNodes(tagNodeIds: string[]) {
     for (const tagNodeId of emptiedTagNodes(tagNodeIds, nodes.value, edgesStore.edges)) {
-      await deleteNodeFn(deps, tagNodeId)
+      // The notes are already gone; a tag node that cannot be deleted stays
+      // for Repair Tag Nodes and must not turn the deletion into a failure
+      try {
+        await deleteNodeFn(deps, tagNodeId)
+      } catch (e) {
+        storeLogger.error('[Tags] Could not delete an emptied tag node:', e)
+      }
     }
   }
 

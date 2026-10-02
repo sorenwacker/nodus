@@ -114,6 +114,18 @@ describe('deleting notes in the store', () => {
     expect(invokeMock).not.toHaveBeenCalledWith('delete_node', { id: 'kept' })
   })
 
+  it('still deletes the notes when their tag node cannot be deleted', async () => {
+    const store = await storeWith([note('a'), tagNode('stuck')], [tagged('e1', 'a', 'stuck')])
+    invokeMock.mockImplementation(async (command: string, args?: { ids?: string[] }) => {
+      if (command === 'delete_nodes') return args?.ids ?? []
+      throw new Error('database is locked')
+    })
+
+    await expect(store.deleteNodes(['a'])).resolves.toBeUndefined()
+
+    expect(store.nodes.map(n => n.id)).toEqual(['stuck'])
+  })
+
   it('does the same for a single deletion', async () => {
     const store = await storeWith([note('a'), tagNode('gone')], [tagged('e1', 'a', 'gone')])
 
