@@ -71,8 +71,8 @@ async function repairTagNodes() {
   repairState.value = 'running'
   repairReport.value = ''
   try {
-    const plan = planTagNodeRepair(store.nodes, store.edges)
-    if (plan.merges.length === 0 && plan.renames.length === 0) {
+    const plan = planTagNodeRepair(store.nodes, store.edges, store.currentWorkspaceId)
+    if (plan.merges.length === 0 && plan.renames.length === 0 && plan.unusedIds.length === 0) {
       repairReport.value = t('settings.repairTagNodesNone')
       return
     }
@@ -88,6 +88,7 @@ async function repairTagNodes() {
       merged: result.merged,
       renamed: result.renamed,
       edges: result.edgesRepointed + result.edgesDeleted,
+      removed: result.removedUnused,
     })
   } finally {
     repairState.value = 'idle'

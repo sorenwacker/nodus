@@ -654,9 +654,9 @@
     "hideWikilinkEdges": "Masquer les liens [[wikilink]]",
     "hideWikilinkEdgesHint": "Masque les liens générés depuis les [[liens]] du contenu",
     "repairTagNodes": "Réparer les nœuds d'étiquette",
-    "repairTagNodesHint": "Fusionner les nœuds d'étiquette en double et restaurer le préfixe # manquant",
+    "repairTagNodesHint": "Fusionner les nœuds d'étiquette en double, restaurer le préfixe # manquant et supprimer ceux qu'aucune note n'utilise",
     "repairTagNodesNone": "Les nœuds d'étiquette sont déjà cohérents",
-    "repairTagNodesResult": "{merged} fusionnés, {renamed} renommés, {edges} arêtes ajustées",
+    "repairTagNodesResult": "{merged} fusionnés, {renamed} renommés, {edges} arêtes ajustées, {removed} inutilisés supprimés",
     "showPerfOverlay": "Afficher les mesures de performance",
     "showPerfOverlayHint": "Temps de trame au-dessus du graphe pendant un panoramique ou un zoom, pour diagnostiquer les saccades"
   },

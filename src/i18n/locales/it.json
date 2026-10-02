@@ -654,9 +654,9 @@
     "hideWikilinkEdges": "Nascondi collegamenti [[wikilink]]",
     "hideWikilinkEdgesHint": "Nascondi i collegamenti generati dai [[link]] nel contenuto",
     "repairTagNodes": "Ripara i nodi tag",
-    "repairTagNodesHint": "Unisci i nodi tag duplicati e ripristina il prefisso # mancante",
+    "repairTagNodesHint": "Unisci i nodi tag duplicati, ripristina il prefisso # mancante ed elimina quelli che nessuna nota usa",
     "repairTagNodesNone": "I nodi tag sono già coerenti",
-    "repairTagNodesResult": "{merged} uniti, {renamed} rinominati, {edges} archi adattati",
+    "repairTagNodesResult": "{merged} uniti, {renamed} rinominati, {edges} archi adattati, {removed} inutilizzati rimossi",
     "showPerfOverlay": "Mostra le misure di prestazione",
     "showPerfOverlayHint": "Tempi di fotogramma sul grafo durante la panoramica o lo zoom, per diagnosticare gli scatti"
   },
