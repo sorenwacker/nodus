@@ -18,6 +18,7 @@ import {
   useCanvasZoom,
   useCanvasDisplay,
   usePreviewPanel,
+  contentUnreadableOnCanvas,
 } from './composables/viewport'
 import {
   useNodeClipboard,
@@ -431,9 +432,6 @@ watch(
   }
 )
 
-
-// Expose functions with original names for compatibility
-
 // Handle double-click on node: navigate in neighborhood mode, zoom when zoomed out, otherwise edit
 function handleNodeDoubleClick(nodeId: string) {
   // In neighborhood mode, double-click navigates to clicked node's neighborhood
@@ -474,7 +472,7 @@ const contextMenuVisibleRef = ref(false)
 // Preview panel composable - auto-shows when single node selected while zoomed out
 const previewPanel = usePreviewPanel({
   selectedNodeIds: computed(() => store.selectedNodeIds),
-  isSemanticZoomCollapsed: computed(() => (isSemanticZoomCollapsed.value || isLODMode.value) && !neighborhoodMode.value),
+  isSemanticZoomCollapsed: computed(() => contentUnreadableOnCanvas(isSemanticZoomCollapsed.value, isLODMode.value)),
   contextMenuVisible: contextMenuVisibleRef,
   getNode: store.getNode,
   zoomToNode,

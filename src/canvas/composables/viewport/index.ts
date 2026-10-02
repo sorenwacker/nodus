@@ -24,6 +24,7 @@ export {
 } from './useViewState'
 export {
   usePreviewPanel,
+  contentUnreadableOnCanvas,
   type UsePreviewPanelContext,
   type UsePreviewPanelReturn,
 } from './usePreviewPanel'
