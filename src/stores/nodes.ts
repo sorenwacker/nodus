@@ -16,7 +16,7 @@ import { useNodeEditLocking } from '../composables/useNodeEditLocking'
 import { useNodeLayout } from '../composables/useNodeLayout'
 import { useEntityOperations } from '../composables/useEntityOperations'
 import { storeLogger } from '../lib/logger'
-import { planTagEdgeRemoval } from '../lib/tagSync'
+import { planTagEdgeRemoval, withdrawCodeTags } from '../lib/tagSync'
 
 // Import from submodules
 import {
@@ -203,7 +203,23 @@ export const useNodesStore = defineStore('nodes', () => {
     // unconnected, and nothing else puts that right - the whole-vault sync used
     // to run only when the setting was toggled
     // (docs/content/features.md > Tags).
-    syncTagEdgesIfEnabled()
+    // Tags read out of code go first, so the pass does not connect one that is
+    // about to be withdrawn (PRODUCT_DESIGN.md > Tags are not read from code)
+    withdrawTagsReadFromCode().finally(() => syncTagEdgesIfEnabled())
+  }
+
+  /**
+   * Withdraw the recorded tags the open workspace's notes hold only inside
+   * code, with their edges. The open workspace, because its edges are the ones
+   * loaded (PRODUCT_DESIGN.md > Tags are not read from code).
+   */
+  async function withdrawTagsReadFromCode() {
+    try {
+      const written = await withdrawCodeTags(filteredNodes.value, updateNodeTags, removeTagEdges)
+      if (written > 0) storeLogger.debug(`[Tags] Withdrew tags read from code on ${written} nodes`)
+    } catch (e) {
+      storeLogger.error('[Tags] Withdrawing tags read from code failed:', e)
+    }
   }
 
   /**
@@ -341,6 +357,7 @@ export const useNodesStore = defineStore('nodes', () => {
 
   async function switchWorkspace(workspaceId: string | null) {
     await switchWorkspaceFn(deps, fileSync, workspaceId)
+    await withdrawTagsReadFromCode()
   }
 
   const deleteWorkspace = (id: string, deleteFiles?: boolean) => deleteWorkspaceFn(workspaceStore, id, deleteFiles)

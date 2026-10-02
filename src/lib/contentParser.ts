@@ -6,17 +6,46 @@
 const MAX_HASHTAG_COUNT = 50
 const MAX_HASHTAG_LENGTH = 50
 
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/
+/** An inline code span: equal runs of backticks, not crossing a blank line */
+const INLINE_CODE = /(?<!`)(`+)(?!`)(?:(?!\n[ \t]*\n)[\s\S])*?[^`]\1(?!`)/g
+
 /**
- * Extract hashtags from content
- * Matches: #word, #multi-word-tag, #CamelCase, #123numeric
- * Limited to prevent abuse
+ * The text with its code removed: fenced blocks and inline code spans hold
+ * literal text, where a `#word` is not a tag
+ * (PRODUCT_DESIGN.md > Tags are not read from code).
  */
-export function extractHashtags(content: string): string[] {
+function withoutCode(content: string): string {
+  const kept: string[] = []
+  let fence: string | null = null
+  for (const line of content.split('\n')) {
+    if (fence) {
+      // Closed by a line of the same character, at least as long, and nothing else
+      const closing = line.trim()
+      if (closing.length >= fence.length && closing === fence[0].repeat(closing.length) && /^ {0,3}\S/.test(line)) {
+        fence = null
+      }
+      kept.push('')
+      continue
+    }
+    const open = FENCE_OPEN.exec(line)
+    if (open) {
+      fence = open[1]
+      kept.push('')
+      continue
+    }
+    kept.push(line)
+  }
+  return kept.join('\n').replace(INLINE_CODE, ' ')
+}
+
+/** Every `#word` in a text, in order of first appearance, up to a count */
+function scanHashtags(text: string, limit: number): string[] {
   const hashtagRegex = /#([a-zA-Z0-9][\w-]*)/g
   const tags = new Set<string>()
   let match
   let count = 0
-  while ((match = hashtagRegex.exec(content)) !== null && count < MAX_HASHTAG_COUNT) {
+  while ((match = hashtagRegex.exec(text)) !== null && count < limit) {
     const tag = match[1]
     // Skip tags that are too long
     if (tag.length <= MAX_HASHTAG_LENGTH) {
@@ -25,6 +54,25 @@ export function extractHashtags(content: string): string[] {
     }
   }
   return Array.from(tags)
+}
+
+/**
+ * Extract hashtags from content
+ * Matches: #word, #multi-word-tag, #CamelCase, #123numeric
+ * Text inside code is not read. Limited to prevent abuse
+ */
+export function extractHashtags(content: string): string[] {
+  return scanHashtags(withoutCode(content), MAX_HASHTAG_COUNT)
+}
+
+/**
+ * The `#word`s a text holds inside code and nowhere else. These were read as
+ * tags before code was excluded, so a recorded tag among them is withdrawn
+ * (PRODUCT_DESIGN.md > Tags are not read from code).
+ */
+export function hashtagsOnlyInCode(content: string): string[] {
+  const outside = new Set(scanHashtags(withoutCode(content), Infinity))
+  return scanHashtags(content, Infinity).filter(tag => !outside.has(tag))
 }
 
 const TRANSLITERATION: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }
