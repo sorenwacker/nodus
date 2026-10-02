@@ -523,12 +523,6 @@
     },
     "zotero": {
       "description": "Importar citas desde Zotero y construir grafos de citaciones",
-      "library": "Biblioteca Zotero",
-      "detect": "Detectar Zotero",
-      "detecting": "Detectando...",
-      "detectHint": "Detectar automáticamente la instalación local de Zotero",
-      "connected": "Conectado",
-      "disconnect": "Desconectar",
       "collections": "Colecciones",
       "loading": "Cargando colecciones...",
       "noCollections": "No se encontraron colecciones",

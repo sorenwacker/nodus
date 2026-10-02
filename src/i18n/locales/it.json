@@ -523,12 +523,6 @@
     },
     "zotero": {
       "description": "Importa citazioni da Zotero e costruisci grafi di citazioni",
-      "library": "Libreria Zotero",
-      "detect": "Rileva Zotero",
-      "detecting": "Rilevamento...",
-      "detectHint": "Rileva automaticamente l'installazione locale di Zotero",
-      "connected": "Connesso",
-      "disconnect": "Disconnetti",
       "collections": "Collezioni",
       "loading": "Caricamento collezioni...",
       "noCollections": "Nessuna collezione trovata",
