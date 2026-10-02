@@ -1673,6 +1673,13 @@ A name the request router accepts is one the server advertises, and the reverse.
 - Every case the router handles names an advertised tool, and every advertised tool is routed.
 - A gate compares the two lists, so they cannot drift apart.
 
+### An import the built MCP server can resolve
+
+The MCP server is compiled by `tsc` and run by Node as an ES module. Node resolves a relative import specifier literally, so `./readTools` is not found where `./readTools.js` is, and `tsc` copies the specifier as written without reporting it. The tool index imported its six tool groups without the extension; the build succeeded and the server stopped at startup, so no client could connect.
+
+- A relative import or re-export that survives compilation ends in `.js`. Type-only statements are erased and are exempt.
+- A gate reads the server's source for such imports, so a build that cannot start fails the tests instead.
+
 ### The colour a node is given
 
 A colour set through a tool is the colour the interface offers. The canvas stores a node's colour as a translucent tint and layers it over the surface, so a card keeps its depth and reads the same in light and dark themes, which the palettes are paired to convert between. Anything that needs the colour solid converts it where it is used, as the timeline marks do.

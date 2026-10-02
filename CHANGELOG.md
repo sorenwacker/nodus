@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- The MCP server starts when built from source. Its tool index imported the tool groups without the `.js` extension, which `tsc` accepts and Node does not resolve, so a freshly built server stopped at startup and no MCP client could connect
 - Building the citation graph can be stopped. The panel had no stop control and the cancel function set a flag the build never read, so a build over 130 papers ran its 20 minutes of Semantic Scholar requests to the end. Stop ends the build before the next paper and keeps what was created; the progress line shows the position (`12 of 130`)
 
 ## [1.6.0-rc.12] - 2026-10-02
