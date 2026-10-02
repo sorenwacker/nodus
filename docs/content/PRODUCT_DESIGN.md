@@ -1501,6 +1501,15 @@ The capture reaches every surface a tool reads its targets from. It was handed t
 
 A run paused for approval keeps its capture, because the resumed execution is the same run and must act on the same nodes.
 
+### The prompt field after sending
+
+Sending a prompt empties the prompt field at once. The prompt is shown in the transcript from that moment, so the field has nothing left to say.
+
+The field was emptied only when the run ended. For the length of the run it showed, disabled, the text already standing in the transcript above it, which reads as a prompt that was not sent.
+
+- The field is emptied when the run starts, not when it ends.
+- A run that fails with an error puts the text back, so it can be sent again without retyping. Text is only put back into an empty field.
+
 ### Dropping a node on the storyline panel
 
 Releasing a drag over the storyline panel adds the node to a storyline instead of moving it on the canvas. The drag handler has to know whether the pointer is over the panel, and the panel is what knows.
