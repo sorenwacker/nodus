@@ -222,8 +222,8 @@ export const NODE_TOOLS: McpToolDeclaration[] = [
           description: 'The node ID',
         },
         color: {
-          type: 'string',
-          description: 'Color name: red, orange, yellow, green, blue, purple, pink, or null to reset',
+          type: ['string', 'null'],
+          description: 'Color name (red, orange, yellow, green, blue, purple, pink, gray) or a hex value. JSON null or an empty string resets the color',
         },
       },
       required: ['id', 'color'],
@@ -241,8 +241,8 @@ export const NODE_TOOLS: McpToolDeclaration[] = [
           description: 'Array of node IDs to color',
         },
         color: {
-          type: 'string',
-          description: 'Color name: red, orange, yellow, green, blue, purple, pink, or null to reset',
+          type: ['string', 'null'],
+          description: 'Color name (red, orange, yellow, green, blue, purple, pink, gray) or a hex value. JSON null or an empty string resets the color',
         },
       },
       required: ['node_ids', 'color'],

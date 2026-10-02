@@ -3,6 +3,7 @@
  */
 
 import type { Ref } from 'vue'
+import { isColorValue } from '../../lib/colorValue'
 import { syncWikilinks } from './wikilinkSync'
 import { invoke, isTauri } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
@@ -468,14 +469,34 @@ export async function updateNodeColor(
 ): Promise<void> {
   const node = nodes.value.find(n => n.id === id)
   if (node) {
-    node.color_theme = color
+    // Only a colour value is stored; anything else leaves the card without a
+    // background (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+    const stored = color && isColorValue(color) ? color : null
+    node.color_theme = stored
     node.updated_at = Date.now()
     try {
-      await invoke('update_node_color', { id, color })
+      await invoke('update_node_color', { id, color: stored })
     } catch (e) {
       console.error('Failed to update color:', e)
     }
   }
+}
+
+/**
+ * Reset the nodes whose stored colour is not a colour value.
+ *
+ * Args:
+ *   nodes: The loaded nodes, corrected in place.
+ *
+ * Returns:
+ *   The number of nodes reset. None on a vault already consistent.
+ */
+export async function resetInvalidNodeColors(nodes: Ref<Node[]>): Promise<number> {
+  const invalid = nodes.value.filter(n => n.color_theme && !isColorValue(n.color_theme))
+  for (const node of invalid) {
+    await updateNodeColor(nodes, node.id, null)
+  }
+  return invalid.length
 }
 
 /**
