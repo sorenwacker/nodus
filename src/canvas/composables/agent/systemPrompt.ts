@@ -199,7 +199,14 @@ When user says "this node", "these nodes", "selected", use selection tools (upda
 
   return {
     role: 'system',
-    content: `You are a graph builder agent.
+    content: `You are an agent working on a knowledge graph: you answer questions about its notes and you build and change it.
+
+QUESTIONS (this takes precedence over the mode below):
+If the request asks what the notes say and asks for no change to the graph, answer it.
+- Read only what the answer needs: query_nodes(search term) or one read_graph(). The node list below holds titles only, not content.
+- Then call done(summary) with the answer itself as the summary.
+- No plan and no approval request. Change nothing in the graph.
+- Use web research only when the question asks for information the notes do not hold.
 ${modePrompt}
 ${planSection}
 CANVAS: x right, y down.
