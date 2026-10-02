@@ -4,6 +4,9 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Double-clicking a section's text in the storyline reader edits it, as double-clicking its title does. A double-click on a link inside the text keeps its own meaning
+
 ### Fixed
 - Physics mode takes in nodes and edges added or removed while it runs, for example by an MCP client: the simulation keeps what it reached, is rebuilt on the graph as it now is and reheats. Creating or deleting a node used to end the mode and discard the simulated positions
 - In bubble mode a node no longer stays hovered, with its edges thick and highlighted, after the pointer is released over the preview panel. The release did not reach the canvas, which went on treating the node as held and ignored the pointer

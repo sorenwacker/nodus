@@ -1308,7 +1308,8 @@ Resetting the default workspace also removes its previous storylines before rese
 
 **Required behavior:** Reading is where the gaps show, so the reader is where the fix should happen. Leaving the reader to edit a paragraph and coming back loses the place and the flow.
 
-- Double-click a section's text to edit that node's markdown in place. Save with **Cmd/Ctrl+Enter** or by clicking away; cancel with **Escape**.
+- Double-click a section's text or its title to edit that node's markdown in place. Save with **Cmd/Ctrl+Enter** or by clicking away; cancel with **Escape**.
+- A double-click on a link or a control inside the text keeps its own meaning and does not open the editor. For a time only the title took the gesture, to keep double-click word selection in the body; the body went on saying "Double-click to edit" and did nothing, which is the worse of the two. Text in the body is selected by dragging.
 - Saving writes through the same store path as canvas editing, so file sync, undo and the anchored-wikilink rendering behave identically. The section re-renders on save.
 - Editing acquires the node's file lock first, exactly as the canvas does. If the file is locked by another program, the reader says so and the text stays read-only; it must never silently fork a locked file.
 - One section edits at a time. Starting an edit in another section saves the current one first.
