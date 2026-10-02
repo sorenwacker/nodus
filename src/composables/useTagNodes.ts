@@ -30,6 +30,12 @@ function sameWorkspace(id: string | null | undefined): string | null {
 }
 
 export function useTagNodes(deps: TagNodeDeps) {
+  // Creations in progress, by workspace and tag. A tag node is in the store
+  // only once the database has answered, so two callers asking at once both
+  // found nothing and both created one
+  // (PRODUCT_DESIGN.md > One tag node under concurrent callers)
+  const creating = new Map<string, Promise<Node>>()
+
   /**
    * Find or create a tag node for a given tag name.
    * Tag nodes have node_type: 'tag', small size, and primary color background.
@@ -58,6 +64,12 @@ export function useTagNodes(deps: TagNodeDeps) {
       return existingTagNode
     }
 
+    const key = JSON.stringify([workspaceId, normalizedTag])
+    const inProgress = creating.get(key)
+    if (inProgress) {
+      return inProgress
+    }
+
     // Calculate position near the first node using this tag
     let x = 100
     let y = 100
@@ -68,18 +80,21 @@ export function useTagNodes(deps: TagNodeDeps) {
     }
 
     // Create tag node with title prefixed with # for display
-    const tagNode = await deps.createNode({
-      title: `#${tagName}`,
-      node_type: 'tag',
-      canvas_x: x,
-      canvas_y: y,
-      width: 70,
-      height: 22,
-      // Explicit, so the store does not fall back to the open workspace
-      workspace_id: workspaceId ?? 'default',
-    })
+    const creation = deps
+      .createNode({
+        title: `#${tagName}`,
+        node_type: 'tag',
+        canvas_x: x,
+        canvas_y: y,
+        width: 70,
+        height: 22,
+        // Explicit, so the store does not fall back to the open workspace
+        workspace_id: workspaceId ?? 'default',
+      })
+      .finally(() => creating.delete(key))
+    creating.set(key, creation)
 
-    return tagNode
+    return creation
   }
 
   /**

@@ -62,6 +62,85 @@ describe('tag node identity', () => {
 })
 
 /**
+ * A tag has one node however many callers ask for it at once
+ * (PRODUCT_DESIGN.md > One tag node under concurrent callers).
+ *
+ * The node exists in the application only once the database has answered, so
+ * two tag-connecting passes running together both found nothing and both
+ * created a node.
+ */
+describe('tag node identity under concurrent callers', () => {
+  /** A createNode that, like the database, adds the node only when it answers */
+  function deferredHarness() {
+    const nodes: Node[] = [
+      { id: 'a', title: 'a', node_type: 'note', workspace_id: 'w1', canvas_x: 0, canvas_y: 0, width: 200 } as Node,
+      { id: 'b', title: 'b', node_type: 'note', workspace_id: 'w1', canvas_x: 0, canvas_y: 0, width: 200 } as Node,
+      { id: 'c', title: 'c', node_type: 'note', workspace_id: 'w2', canvas_x: 0, canvas_y: 0, width: 200 } as Node,
+    ]
+    const createNode = vi.fn(async (data: Record<string, unknown>) => {
+      await Promise.resolve()
+      const node = { id: `t${nodes.length + 1}`, ...data } as unknown as Node
+      nodes.push(node)
+      return node
+    })
+    const createEdge = vi.fn().mockResolvedValue(undefined)
+    const tags = useTagNodes({
+      getNodes: () => nodes,
+      getCurrentWorkspaceId: () => 'w1',
+      getEdges: () => [],
+      createNode: createNode as never,
+      createEdge: createEdge as never,
+    } as never)
+    return { nodes, tags, createNode, createEdge }
+  }
+
+  it('creates one node when two callers ask for a new tag at once', async () => {
+    const h = deferredHarness()
+
+    const [first, second] = await Promise.all([
+      h.tags.getOrCreateTagNode('potato', 'a'),
+      h.tags.getOrCreateTagNode('Potato', 'b'),
+    ])
+
+    expect(h.createNode).toHaveBeenCalledTimes(1)
+    expect(second.id).toBe(first.id)
+  })
+
+  it('connects both notes to the one node when two passes overlap', async () => {
+    const h = deferredHarness()
+
+    await Promise.all([h.tags.createTagEdges('a', ['potato']), h.tags.createTagEdges('b', ['potato'])])
+
+    expect(h.nodes.filter(n => n.node_type === 'tag')).toHaveLength(1)
+    const targets = h.createEdge.mock.calls.map(call => (call[0] as { target_node_id: string }).target_node_id)
+    expect(new Set(targets).size).toBe(1)
+    expect(targets).toHaveLength(2)
+  })
+
+  it('still creates a node per workspace when the same tag is asked for in two at once', async () => {
+    const h = deferredHarness()
+
+    const [inFirst, inSecond] = await Promise.all([
+      h.tags.getOrCreateTagNode('potato', 'a'),
+      h.tags.getOrCreateTagNode('potato', 'c'),
+    ])
+
+    expect(inSecond.id).not.toBe(inFirst.id)
+    expect(h.createNode).toHaveBeenCalledTimes(2)
+  })
+
+  it('creates the node again after a failed creation', async () => {
+    const h = deferredHarness()
+    h.createNode.mockRejectedValueOnce(new Error('database refused'))
+
+    await expect(h.tags.getOrCreateTagNode('potato', 'a')).rejects.toThrow('database refused')
+    const retried = await h.tags.getOrCreateTagNode('potato', 'a')
+
+    expect(retried.title).toBe('#potato')
+  })
+})
+
+/**
  * A tag node belongs to a workspace
  * (PRODUCT_DESIGN.md > Tag nodes belong to a workspace).
  *
