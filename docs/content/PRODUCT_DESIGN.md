@@ -2046,6 +2046,7 @@ A comment is created the same way from the storyline panel and from the reader. 
 
 - One line per call, with arguments summarised rather than dumped, so a run of fifty calls stays readable.
 - A failed call is marked as failed with its error, since a silent line reads as success.
+- Clearing the log is drawn with a bin, in the standalone log panel and in the agent panel alike; a cross means closing. The standalone panel drew the same cross for both, side by side, so the header read as two close buttons and the one that discards the log could not be told from the one that hides it.
 
 ### Tool reachability
 
