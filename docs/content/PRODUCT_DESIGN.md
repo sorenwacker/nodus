@@ -1491,6 +1491,17 @@ The model writes markdown, and the transcript renders it. Interpolating the text
 
 The reply passes through the same renderer the canvas uses, so it crosses the sanitisation boundary: a model's output is untrusted text like any other.
 
+### Answering a question
+
+A request that asks what the notes say, and asks for no change, is answered: the agent reads what the answer needs and replies.
+
+Every mode's instructions described building. The default mode told the model to read the graph, research on the web, synthesize, draft a plan and request approval, whatever the request was, so a plain question about the workspace set off that whole sequence: nine tool calls and still running, for a question the notes answer.
+
+- The instructions state the rule ahead of the mode's method and say it takes precedence over it.
+- For a question the agent makes at most the reads the answer needs - a search of the notes or one reading of the graph - and then gives the answer as its final message. It makes no plan, requests no approval, changes nothing, and uses web research only when the question asks for information the notes do not hold.
+- Whether a request is a question is the model's judgement, stated in the instructions; the request is not classified by pattern matching (Classifying what the user wrote).
+- The rule is an instruction to the model, so it lowers the number of calls without bounding it. The gate test checks that every mode's instructions carry the rule, not what a model does with it.
+
 ### What the agent acts on
 
 A run acts on the nodes that were selected when the user asked. The selection is captured when the run starts and released when it ends.
