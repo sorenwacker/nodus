@@ -194,14 +194,12 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     }
 
     // Apply color theme background if set
-    if (node.color_theme) {
-      const bg = getNodeBackground(node.color_theme)
-      if (bg) {
-        style.background = bg
-        // Tag nodes use background color for border too
-        if (isTagNode) {
-          style.borderColor = bg
-        }
+    const bg = node.color_theme ? getNodeBackground(node.color_theme) : undefined
+    if (bg) {
+      style.background = bg
+      // Tag nodes use background color for border too
+      if (isTagNode) {
+        style.borderColor = bg
       }
     } else if (!isTagNode && isSemanticZoomCollapsed.value && !selectedNodeIds.value.includes(node.id)) {
       // Collapsed non-selected nodes get canvas background

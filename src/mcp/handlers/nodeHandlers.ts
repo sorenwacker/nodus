@@ -5,6 +5,7 @@
  */
 
 import type { Node, Edge } from '../../types'
+import { isColorValue } from '../../lib/colorValue'
 import type { McpNode, McpEdge } from '../types'
 import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface, McpUndoInterface } from '../messageHandler'
@@ -85,7 +86,17 @@ export const COLOR_NAME_MAP: Record<string, string> = {
 export function normalizeColor(color: string | null): string | null {
   if (!color) return null
   const lower = color.toLowerCase().trim()
-  return COLOR_NAME_MAP[lower] || color
+  // The word a caller sends when a schema says "or null" of a string
+  // (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+  if (!lower || lower === 'null') return null
+  if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower]
+  if (!isColorValue(color)) {
+    throw new McpError(
+      JsonRpcErrorCodes.INVALID_PARAMS,
+      `Not a color: "${color}". Use one of ${Object.keys(COLOR_NAME_MAP).join(', ')}, a hex or rgba value, or null to reset.`
+    )
+  }
+  return color.trim()
 }
 
 /**

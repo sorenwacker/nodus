@@ -42,6 +42,7 @@ import {
   updateNodeContent as updateNodeContentFn,
   updateNodeTitle as updateNodeTitleFn,
   updateNodeTags as updateNodeTagsFn,
+  resetInvalidNodeColors as resetInvalidNodeColorsFn,
   updateNodeColor as updateNodeColorFn,
   moveNodesToWorkspace as moveNodesToWorkspaceFn,
   createNode as createNodeFn,
@@ -198,6 +199,9 @@ export const useNodesStore = defineStore('nodes', () => {
 
   async function initialize() {
     await initializeStore(deps, createNode)
+    // Not awaited: it writes only the nodes holding a value that is not a colour
+    // (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+    resetInvalidNodeColorsFn(nodes).catch(e => storeLogger.error('[Nodes] Colour reset failed:', e))
     // Tags can arrive without their edges: the load-time body scan writes them,
     // and an agent can set a node's tags over MCP. Both leave a node tagged and
     // unconnected, and nothing else puts that right - the whole-vault sync used
