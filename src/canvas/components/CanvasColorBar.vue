@@ -118,12 +118,25 @@ function onColorPickerChange(event: Event) {
 </template>
 
 <style scoped>
+/* Centred in the part of the canvas left free: the agent panel and the preview
+   panel cover it from the left, the reader and the minimap from the right
+   (PRODUCT_DESIGN.md > Placing the colour bar) */
 .collapsed-color-bar {
+  --bar-left: calc(var(--canvas-chat-inset, 0px) + var(--bar-preview-inset, 0px) + 8px);
+  --bar-right: calc(var(--canvas-right-inset, 0px) + var(--bar-minimap-inset, 0px) + 8px);
   position: absolute;
   top: 8px;
-  left: 50%;
+  left: calc(var(--bar-left) + (100% - var(--bar-left) - var(--bar-right)) / 2);
   transform: translateX(-50%);
+  max-width: calc(100% - var(--bar-left) - var(--bar-right));
+  min-width: 120px;
+  box-sizing: border-box;
+  /* Follows the agent panel and the reader as they slide, and tracks the
+     pointer (0s) while either separator is dragged */
+  transition: left var(--chat-inset-duration, var(--inset-duration, var(--step-duration, 0.3s))) var(--step-ease, ease);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
@@ -132,6 +145,16 @@ function onColorPickerChange(event: Event) {
   border-radius: 20px;
   box-shadow: 0 2px 8px var(--shadow-sm);
   z-index: 60;
+}
+
+/* The preview panel: 16px from the edge and 480px wide, while it is shown */
+.canvas-viewport:has(.node-preview-panel) .collapsed-color-bar {
+  --bar-preview-inset: 504px;
+}
+
+/* The minimap: 150px in the top right corner, while it is shown */
+.canvas-viewport:has(.minimap) .collapsed-color-bar {
+  --bar-minimap-inset: 164px;
 }
 
 .color-dot {
