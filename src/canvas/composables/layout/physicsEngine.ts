@@ -57,6 +57,11 @@ interface SimNode extends SimulationNodeDatum {
   r: number
 }
 
+interface SimLink extends SimulationLinkDatum<SimNode> {
+  /** The length the edge is pulled to */
+  length: number
+}
+
 /** The groups of nodes that edges connect, each as node indices; a node without an edge is in none */
 function connectedGroups(count: number, links: Int32Array): number[][] {
   const parent = Array.from({ length: count }, (_, i) => i)
@@ -130,8 +135,16 @@ function createSimulationCore(init: PhysicsInit) {
     const y = init.xy[2 * i + 1]
     nodes.push({ index: i, x, y, r: init.radius[i], ...(init.anchor[i] ? { fx: x, fy: y } : {}) })
   }
-  const links: SimulationLinkDatum<SimNode>[] = []
-  for (let i = 0; i < init.links.length; i += 2) links.push({ source: init.links[i], target: init.links[i + 1] })
+  const links: SimLink[] = []
+  for (let i = 0; i < init.links.length; i += 2) {
+    const source = init.links[i]
+    const target = init.links[i + 1]
+    // An edge to an anchor is a tether: it keeps its length, so the anchor
+    // holds its neighbour where it is instead of reeling it in
+    const tether = init.anchor[source] || init.anchor[target]
+    const apart = Math.hypot(nodes[source].x! - nodes[target].x!, nodes[source].y! - nodes[target].y!)
+    links.push({ source, target, length: tether ? Math.max(LINK_DISTANCE, apart) : LINK_DISTANCE })
+  }
 
   let pinnedIndex: number | null = null
 
@@ -145,8 +158,8 @@ function createSimulationCore(init: PhysicsInit) {
   const everyNode = [Array.from({ length: count }, (_, i) => i)]
   const groupsNothingHolds = () => groups.filter((group, g) => !anchored[g] && (pinnedIndex === null || !group.includes(pinnedIndex)))
 
-  const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(nodes)
-    .force('link', withoutNetPush(forceLink<SimNode, SimulationLinkDatum<SimNode>>(links).distance(LINK_DISTANCE), groupsNothingHolds))
+  const simulation: Simulation<SimNode, SimLink> = forceSimulation(nodes)
+    .force('link', withoutNetPush(forceLink<SimNode, SimLink>(links).distance(link => link.length), groupsNothingHolds))
     .force('charge', withoutNetPush(forceManyBody<SimNode>().strength(CHARGE_STRENGTH).distanceMax(CHARGE_RANGE), () => everyNode))
     .force('collide', withoutNetPush(forceCollide<SimNode>(n => n.r + COLLIDE_PADDING), () => everyNode))
     // Stepped on request below, not by d3's own timer

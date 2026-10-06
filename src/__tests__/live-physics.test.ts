@@ -158,7 +158,7 @@ describe('physics mode', () => {
     expect(w.live('a')).toEqual({ x: 5100, y: -3940 })
   })
 
-  it('keeps an off-screen neighbour fixed as an anchor', async () => {
+  it('keeps an off-screen neighbour fixed as an anchor, which holds its neighbour in place', async () => {
     const w = setup({
       visible: [node('a', 0, 0)],
       offscreen: [node('far', 4000, 0)],
@@ -167,7 +167,8 @@ describe('physics mode', () => {
     await w.physics.start()
     await w.step(120)
     expect(w.live('far')).toEqual({ x: 4100, y: 60 })
-    expect(w.live('a').x).toBeGreaterThan(100)
+    expect(w.live('a').x).toBeCloseTo(100, 0)
+    expect(w.live('a').y).toBeCloseTo(60, 0)
   })
 
   it('writes nothing to the store while it runs', async () => {

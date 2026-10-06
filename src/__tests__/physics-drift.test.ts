@@ -121,8 +121,13 @@ describe('physics mode drift', () => {
     graph.radius.push(20)
     graph.anchor.push(1)
     graph.links.push(0, count)
-    const rested = await reheat(graph, 1)
-    expect(centre(rested, 0, count).x - centre(graph.xy, 0, count).x).toBeGreaterThan(200)
+    const engine = await createInProcessEngine(toInit(graph))
+    // Drag the hub away from the anchor, its group with it, then let go
+    let dragged: Float64Array = new Float64Array()
+    for (let i = 0; i < 300; i++) dragged = (await engine.step({ pinned: { index: 0, x: -3000, y: 0 } })).xy
+    const rested = Array.from(await runToRest(engine))
+    expect(centre(Array.from(dragged), 0, count).x).toBeLessThan(-2000)
+    expect(centre(rested, 0, count).x - centre(Array.from(dragged), 0, count).x).toBeGreaterThan(300)
     expect([rested[2 * count], rested[2 * count + 1]]).toEqual([4000, 0])
   })
 
@@ -132,5 +137,29 @@ describe('physics mode drift', () => {
     let xy: Float64Array = new Float64Array()
     for (let i = 0; i < 300; i++) xy = (await engine.step({ pinned: { index: 0, x: 3000, y: 0 } })).xy
     expect(centre(Array.from(xy)).x - centre(graph.xy).x).toBeGreaterThan(1000)
+  })
+})
+
+describe('physics mode anchors', () => {
+  /** One simulated node at the origin, joined to an anchor at the given distance */
+  const tethered = (distance: number): Graph => ({ xy: [0, 0, distance, 0], radius: [20, 20], anchor: [0, 1], links: [0, 1] })
+
+  it('does not reel a node in toward a distant anchor', async () => {
+    const graph = tethered(5000)
+    const rested = await reheat(graph, 3)
+    expect(Math.hypot(rested[0], rested[1])).toBeLessThan(1)
+    expect([rested[2], rested[3]]).toEqual([5000, 0])
+  })
+
+  it('keeps a node the common edge length away from an anchor that is nearer', async () => {
+    const rested = await reheat(tethered(100), 1)
+    expect(100 - rested[0]).toBeGreaterThan(200)
+  })
+
+  it('pulls a node back to the length of its tether when it was dragged away', async () => {
+    const engine = await createInProcessEngine(toInit(tethered(5000)))
+    for (let i = 0; i < 100; i++) await engine.step({ pinned: { index: 0, x: -2000, y: 0 } })
+    const rested = await runToRest(engine)
+    expect(Math.abs(Math.hypot(5000 - rested[0], rested[1]) - 5000)).toBeLessThan(250)
   })
 })
