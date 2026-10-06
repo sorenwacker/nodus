@@ -11,6 +11,7 @@ import {
   forceLink,
   forceManyBody,
   forceCollide,
+  type Force,
   type Simulation,
   type SimulationNodeDatum,
   type SimulationLinkDatum,
@@ -56,6 +57,70 @@ interface SimNode extends SimulationNodeDatum {
   r: number
 }
 
+/** The groups of nodes that edges connect, each as node indices; a node without an edge is in none */
+function connectedGroups(count: number, links: Int32Array): number[][] {
+  const parent = Array.from({ length: count }, (_, i) => i)
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]]
+      i = parent[i]
+    }
+    return i
+  }
+  for (let i = 0; i < links.length; i += 2) parent[find(links[i])] = find(links[i + 1])
+  const byRoot = new Map<number, number[]>()
+  for (let i = 0; i < count; i++) {
+    const root = find(i)
+    const group = byRoot.get(root)
+    if (group) group.push(i)
+    else byRoot.set(root, [i])
+  }
+  return [...byRoot.values()].filter(group => group.length > 1)
+}
+
+/**
+ * A force that rearranges each of the given groups without moving the group as
+ * a whole: what it adds to the mean velocity of a group is taken out again.
+ * d3's edge and collision forces move the two nodes of a pair by unequal
+ * shares, which leaves a remainder that pushes the whole graph one way.
+ */
+function withoutNetPush(force: Force<SimNode, undefined>, groups: () => number[][]): Force<SimNode, undefined> {
+  let nodes: SimNode[] = []
+  let before = new Float64Array(0)
+  const wrapped = (alpha: number) => {
+    const held = groups()
+    if (held.length === 0) {
+      force(alpha)
+      return
+    }
+    for (let i = 0; i < nodes.length; i++) {
+      before[2 * i] = nodes[i].vx!
+      before[2 * i + 1] = nodes[i].vy!
+    }
+    force(alpha)
+    for (const group of held) {
+      let dx = 0
+      let dy = 0
+      for (const i of group) {
+        dx += nodes[i].vx! - before[2 * i]
+        dy += nodes[i].vy! - before[2 * i + 1]
+      }
+      dx /= group.length
+      dy /= group.length
+      for (const i of group) {
+        nodes[i].vx! -= dx
+        nodes[i].vy! -= dy
+      }
+    }
+  }
+  wrapped.initialize = (initialNodes: SimNode[], random: () => number) => {
+    nodes = initialNodes
+    before = new Float64Array(2 * initialNodes.length)
+    force.initialize?.(initialNodes, random)
+  }
+  return wrapped
+}
+
 /** One simulation, stepped on request */
 function createSimulationCore(init: PhysicsInit) {
   const count = init.radius.length
@@ -68,14 +133,24 @@ function createSimulationCore(init: PhysicsInit) {
   const links: SimulationLinkDatum<SimNode>[] = []
   for (let i = 0; i < init.links.length; i += 2) links.push({ source: init.links[i], target: init.links[i + 1] })
 
+  let pinnedIndex: number | null = null
+
+  // Forces between nodes must not move them as a whole
+  // (PRODUCT_DESIGN.md > Physics Mode). An anchor or the held node pulls on
+  // its group for real, so the edges of a group that has one keep their net
+  // pull. A push between two nodes is equal and opposite whoever they are, so
+  // repulsion and collision are balanced over every node, fixed ones included
+  const groups = connectedGroups(count, init.links)
+  const anchored = groups.map(group => group.some(i => init.anchor[i]))
+  const everyNode = [Array.from({ length: count }, (_, i) => i)]
+  const groupsNothingHolds = () => groups.filter((group, g) => !anchored[g] && (pinnedIndex === null || !group.includes(pinnedIndex)))
+
   const simulation: Simulation<SimNode, SimulationLinkDatum<SimNode>> = forceSimulation(nodes)
-    .force('link', forceLink<SimNode, SimulationLinkDatum<SimNode>>(links).distance(LINK_DISTANCE))
-    .force('charge', forceManyBody<SimNode>().strength(CHARGE_STRENGTH).distanceMax(CHARGE_RANGE))
-    .force('collide', forceCollide<SimNode>(n => n.r + COLLIDE_PADDING))
+    .force('link', withoutNetPush(forceLink<SimNode, SimulationLinkDatum<SimNode>>(links).distance(LINK_DISTANCE), groupsNothingHolds))
+    .force('charge', withoutNetPush(forceManyBody<SimNode>().strength(CHARGE_STRENGTH).distanceMax(CHARGE_RANGE), () => everyNode))
+    .force('collide', withoutNetPush(forceCollide<SimNode>(n => n.r + COLLIDE_PADDING), () => everyNode))
     // Stepped on request below, not by d3's own timer
     .stop()
-
-  let pinnedIndex: number | null = null
 
   function step(input: StepInput): StepResult {
     const pinned = input.pinned
