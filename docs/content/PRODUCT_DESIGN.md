@@ -687,6 +687,8 @@ Right-click on a node to access:
 
 Multi-selection: All context menu actions work on multiple selected nodes.
 
+**Bubble mode:** A right-click on a bubble opens the same menu as a right-click on a card, and a right-click on empty canvas closes it. The bubble canvas reports which node was pressed, since a bubble is a painted circle and not an element; the viewport around it answers only the right-clicks the bubble canvas has not answered. Treating every right-click that did not land on a card element as a click elsewhere closed the menu in the same event that had opened it, so in bubble mode it never appeared.
+
 **Placement:** The menu opens at the pointer and is kept inside the window. When it does not fit below or to the right of the pointer it opens above or to the left instead, so a right-click on a node near the bottom or right edge shows the whole menu rather than running off screen. A menu taller than the window is pinned to the top edge, because the first item must be reachable.
 
 ### Physics Mode
