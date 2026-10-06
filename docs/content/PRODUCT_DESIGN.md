@@ -641,6 +641,8 @@ Two methods for bringing citations in from Zotero:
 
 Both directions are single actions: nothing is synchronised, an existing Zotero item is never changed, and only the personal library is reached. The steps are in `features.md` > Zotero Integration.
 
+**Adding to Zotero from an agent (required behavior):** The `add_to_zotero` tool takes node ids and adds each named node to the library as a new top-level item. It is the context-menu action under another name: both call one function, so their rules cannot differ. A node whose DOI is already in the library is skipped and counted as a duplicate, a node without content is skipped, nothing is added when the library cannot be read, and no existing item is changed or deleted. An id that names no node is reported in the result and affects nothing else. The tool returns the counts of added, duplicate and skipped nodes with any errors, and the app shows the toast the menu action shows, so an addition made by an agent is visible to the user. It needs an API key with write access. The tool exists on both agent surfaces: the MCP server, where a connection scoped to a workspace names nodes of that workspace, and the in-app agent in execute mode.
+
 **Supported Formats:**
 - CSL-JSON (Zotero native, Better BibTeX extended)
 - BibTeX (.bib)
@@ -1120,6 +1122,7 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 | `create_nodes_batch(nodes)` | Create or update multiple nodes. Handles any size array by processing in chunks |
 | `update_node(title, new_content, date, date_end, tags)` | Update ONE node: content, date or tags. For multiple nodes use batch_update |
 | `update_edge(from_title, to_title, label, color)` | Update an edge label or color by specifying the connected node titles |
+| `add_to_zotero(node_ids)` | Add nodes to the user's Zotero library as new items; a DOI already in the library is not added again |
 | `update_title(title)` | Change the note title |
 | `update_content(content)` | Update the note content with new text. THIS SAVES YOUR WORK |
 | `append_content(text)` | Append text to the end of the note |

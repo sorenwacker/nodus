@@ -357,6 +357,8 @@ A key without write access is enough for importing and makes "Add to Zotero" fai
 
 Dropping a PDF offers the same step for its extracted references ("Add references to Zotero").
 
+An agent can take the same step: the `add_to_zotero` tool, available to MCP clients and to the in-app agent, takes the ids of the nodes to add and follows the same rules.
+
 ### Semantic Scholar Integration
 Fetch citations for papers with DOIs:
 
