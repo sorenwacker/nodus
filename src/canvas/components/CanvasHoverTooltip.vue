@@ -83,9 +83,7 @@ const displayTitle = computed(() =>
 
     <!-- eslint-disable-next-line vue/no-v-html -->
     <div v-if="renderedContent" class="hover-tooltip-content" v-html="renderedContent"></div>
-    <div v-else-if="content" class="hover-tooltip-content">
-      {{ content }}{{ content.length >= 200 ? '...' : '' }}
-    </div>
+    <div v-else-if="content" class="hover-tooltip-content hover-tooltip-plain">{{ content }}{{ content.length >= 200 ? '...' : '' }}</div>
   </div>
 </template>
 
@@ -157,6 +155,11 @@ const displayTitle = computed(() =>
   word-break: break-word;
   flex: 1;
   overflow: hidden;
+}
+
+/* Plain-text fallback: line breaks are the only structure it has */
+.hover-tooltip-plain {
+  white-space: pre-wrap;
 }
 
 /* Markdown content styles (using :deep for v-html content) */
