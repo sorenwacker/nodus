@@ -205,6 +205,8 @@ const executeMode: AgentModeConfig = {
     'color_regex',
     // Edge editing, which the MCP surface has always had
     'update_edge',
+    // Writes to the user's Zotero library, so only once a plan is approved
+    'add_to_zotero',
   ],
   systemPromptAddition: `
 MODE: EXECUTE (Approved)

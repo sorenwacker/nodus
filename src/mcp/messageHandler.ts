@@ -158,12 +158,23 @@ export interface McpUndoInterface {
 }
 
 /**
+ * Adding nodes to the Zotero library, supplied by the application
+ * (PRODUCT_DESIGN.md > Adding to Zotero from an agent)
+ */
+export interface McpZoteroInterface {
+  addNodes: (
+    nodes: Array<Pick<Node, 'title' | 'markdown_content'>>
+  ) => Promise<{ added: number; duplicates: number; skipped: number; errors: string[] }>
+}
+
+/**
  * Create an MCP message handler with store access
  */
 export function createMcpMessageHandler(
   store: McpStoreInterface,
   viewport?: McpViewportInterface,
-  undo?: McpUndoInterface
+  undo?: McpUndoInterface,
+  zotero?: McpZoteroInterface
 ) {
   // Workspace each connection targets; absent = follow the open workspace.
   // The stored value uses null for the default workspace.
@@ -482,6 +493,10 @@ export function createMcpMessageHandler(
       case 'reorder_storyline_nodes':
         return handleReorderStorylineNodes(store, params as { storyline_id: string; node_ids: string[] })
 
+      // Zotero
+      case 'add_to_zotero':
+        return localHandleAddToZotero(store, params as { node_ids?: unknown })
+
       // Canvas operations
       case 'get_viewport':
         return localHandleGetViewport()
@@ -495,6 +510,27 @@ export function createMcpMessageHandler(
           `Method not found: ${request.method}`
         )
     }
+  }
+
+  /** Add the named nodes of the connection's workspace to the Zotero library */
+  async function localHandleAddToZotero(scopedStore: McpStoreInterface, params: { node_ids?: unknown }) {
+    const ids = params.node_ids
+    if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => typeof id !== 'string')) {
+      throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, 'node_ids (a non-empty array of node ids) required')
+    }
+    if (!zotero) {
+      throw new McpError(JsonRpcErrorCodes.INTERNAL_ERROR, 'Adding to Zotero is not available in this application')
+    }
+    const nodes: Node[] = []
+    const errors: string[] = []
+    for (const id of ids as string[]) {
+      const node = scopedStore.getNode(id)
+      if (node) nodes.push(node)
+      else errors.push(`Node not found: ${id}`)
+    }
+    if (nodes.length === 0) return { added: 0, duplicates: 0, skipped: 0, errors }
+    const report = await zotero.addNodes(nodes)
+    return { added: report.added, duplicates: report.duplicates, skipped: report.skipped, errors: [...errors, ...report.errors] }
   }
 
   // Local viewport handlers (not extracted since they need viewport closure)

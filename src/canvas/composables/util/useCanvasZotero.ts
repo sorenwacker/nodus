@@ -21,12 +21,31 @@ export interface UseCanvasZoteroContext {
   showToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void
 }
 
+/** What adding nodes to Zotero came to */
+export interface ZoteroAddReport {
+  added: number
+  /** Nodes whose DOI is already in the library */
+  duplicates: number
+  /** Nodes without content */
+  skipped: number
+  errors: string[]
+}
+
+/** The part of a node that becomes a Zotero item */
+export type ZoteroCandidate = Pick<Node, 'title' | 'markdown_content'>
+
 /**
  * Return type for useCanvasZotero
  */
 export interface UseCanvasZoteroReturn {
   /** Zotero composable instance */
   zotero: ReturnType<typeof useZotero>
+  /**
+   * Add nodes to the Zotero library and say what happened, in a toast and in
+   * the returned counts. The context-menu action and the add_to_zotero tools
+   * all go through here (PRODUCT_DESIGN.md > Adding to Zotero from an agent)
+   */
+  addNodesToZotero: (nodes: ZoteroCandidate[]) => Promise<ZoteroAddReport>
   /** Handle adding selected nodes to Zotero */
   handleAddToZotero: () => Promise<void>
 }
@@ -54,6 +73,10 @@ export function useCanvasZotero(ctx: UseCanvasZoteroContext): UseCanvasZoteroRet
 
     if (nodes.length === 0) return
 
+    await addNodesToZotero(nodes)
+  }
+
+  async function addNodesToZotero(nodes: ZoteroCandidate[]): Promise<ZoteroAddReport> {
     const result = await zotero.addNodesToZotero(nodes)
 
     if (result.cancelled) {
@@ -76,10 +99,12 @@ export function useCanvasZotero(ctx: UseCanvasZoteroContext): UseCanvasZoteroRet
     if (result.errors.length > 0) {
       showToast?.(result.errors[0], 'error')
     }
+    return { added: result.added, duplicates: result.duplicates, skipped: result.skipped, errors: result.errors }
   }
 
   return {
     zotero,
+    addNodesToZotero,
     handleAddToZotero,
   }
 }

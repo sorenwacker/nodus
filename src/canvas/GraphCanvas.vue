@@ -804,7 +804,7 @@ const {
 } = citationFetch
 
 // Zotero integration composable
-const { zotero, handleAddToZotero } = useCanvasZotero({
+const { zotero, addNodesToZotero, handleAddToZotero } = useCanvasZotero({
   store: {
     getNode: store.getNode,
   },
@@ -1022,7 +1022,7 @@ async function handleGraphImport(choices: {
     const nodes = result.citationNodeIds
       .map((id: string) => store.getNode(id))
       .filter((n: Node | undefined): n is Node => n !== undefined)
-    await zotero.addNodesToZotero(nodes)
+    await addNodesToZotero(nodes)
   }
 }
 
@@ -1129,6 +1129,7 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     service: nodeService ?? undefined,
     getRunSelection: () => runSelection.value,
     getEditingNodeId: () => editingNodeId.value,
+    addNodesToZotero,
   })
 
   // Try extracted executor (handles simple tools)
@@ -1692,6 +1693,7 @@ function getViewport() {
 defineExpose({
   focusNode,
   getViewport,
+  addNodesToZotero,
 })
 </script>
 

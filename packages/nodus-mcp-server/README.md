@@ -59,6 +59,10 @@ Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%
 - **update_edge** - Update an edge (label, directed)
 - **delete_edge** - Delete an edge
 
+### Zotero
+
+- **add_to_zotero** - Add nodes to the Zotero library as new items; DOIs already in the library are skipped
+
 ### Canvas Operations
 
 - **get_viewport** - Get current canvas viewport position and zoom

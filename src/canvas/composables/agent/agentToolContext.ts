@@ -29,6 +29,7 @@ export interface AgentToolContextDeps {
   /** The selection captured when the run started, or null between runs. */
   getRunSelection: () => string[] | null
   getEditingNodeId: () => string | null
+  addNodesToZotero?: ToolContext['addNodesToZotero']
 }
 
 export function buildAgentToolContext(deps: AgentToolContextDeps): ToolContext {
@@ -63,6 +64,7 @@ export function buildAgentToolContext(deps: AgentToolContextDeps): ToolContext {
     service: deps.service,
     // The canvas owns its layout and supplies it; the tool does not reach for it
     applyForceLayout,
+    addNodesToZotero: deps.addNodesToZotero,
     selectedNodeIds: deps.getRunSelection() ?? store.selectedNodeIds,
     editingNodeId: deps.getEditingNodeId(),
   }

@@ -64,6 +64,14 @@ export interface ToolContext {
     edges: Array<{ source: string; target: string }>,
     options?: { centerX?: number; centerY?: number; iterations?: number }
   ) => Promise<Map<string, { x: number; y: number }>>
+  /**
+   * Add nodes to the Zotero library. Supplied by whoever composes the
+   * application, as the same function the context-menu action calls
+   * (PRODUCT_DESIGN.md > Adding to Zotero from an agent).
+   */
+  addNodesToZotero?: (
+    nodes: Array<Pick<Node, 'title' | 'markdown_content'>>
+  ) => Promise<{ added: number; duplicates: number; skipped: number; errors: string[] }>
   // Selection state for selection-aware tools
   selectedNodeIds?: string[]
   editingNodeId?: string | null

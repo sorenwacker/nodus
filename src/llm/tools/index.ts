@@ -20,6 +20,7 @@ import { registerNodeEditTools } from './nodeEditTools'
 import { registerSelectionTools } from './selectionTools'
 import { registerKnowledgeBaseTools } from './knowledgeBaseTools'
 import { registerGroupingTools } from './groupingTools'
+import { registerZoteroTools } from './zoteroTools'
 
 export { resetPositionCounter } from './nodeTools'
 
@@ -47,6 +48,7 @@ export function registerCoreTools(): void {
   registerSelectionTools()
   registerKnowledgeBaseTools()
   registerGroupingTools()
+  registerZoteroTools()
 }
 
 // Ensure tools are registered before exporting

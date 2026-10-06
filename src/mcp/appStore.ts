@@ -9,8 +9,33 @@
  * Everything it needs is passed in. Reaching for the stores here would give
  * the boundary a hidden dependency that no caller could substitute.
  */
-import type { McpStoreInterface } from './messageHandler'
+import type { Ref } from 'vue'
+import type { McpStoreInterface, McpViewportInterface, McpZoteroInterface } from './messageHandler'
 import type { Edge } from '../types'
+
+/** What the canvas component exposes for MCP requests */
+export interface McpCanvas {
+  focusNode: (id: string) => void
+  getViewport: () => { x: number; y: number; zoom: number }
+  addNodesToZotero: McpZoteroInterface['addNodes']
+}
+
+/**
+ * The canvas's part of the MCP interfaces. The canvas mounts after the server
+ * is set up and can be absent, so each request reads the reference when it
+ * arrives.
+ */
+export function canvasMcpAccess(canvas: Ref<McpCanvas | null>): { viewport: McpViewportInterface; zotero: McpZoteroInterface } {
+  return {
+    viewport: {
+      getViewport: () => canvas.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
+      focusNode: (id: string) => canvas.value?.focusNode(id),
+    },
+    zotero: {
+      addNodes: nodes => canvas.value?.addNodesToZotero(nodes) ?? Promise.reject(new Error('The canvas is not open')),
+    },
+  }
+}
 
 type NodesStore = ReturnType<typeof import('../stores/nodes').useNodesStore>
 type EdgesStore = ReturnType<typeof import('../stores/edges').useEdgesStore>
