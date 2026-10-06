@@ -263,12 +263,22 @@ export function useCanvasEventHandlers(
   }
 
   /**
+   * Right-clicks the bubble canvas has answered. A bubble is a painted circle,
+   * not an element, so the viewport's own handler cannot tell a right-click on
+   * one from a click elsewhere and would close the menu it had just opened
+   * (PRODUCT_DESIGN.md > Context Menu)
+   */
+  const answeredByBubbleCanvas = new WeakSet<MouseEvent>()
+
+  /**
    * Handle right-click context menu
    *
    * Opens context menu on node or closes if clicking elsewhere.
    */
   function onContextMenu(e: MouseEvent) {
     e.preventDefault()
+    // The bubble canvas sits inside the viewport and has answered this one
+    if (answeredByBubbleCanvas.has(e)) return
 
     // Check if clicking on a node
     const target = e.target as HTMLElement
@@ -303,6 +313,7 @@ export function useCanvasEventHandlers(
    * Handle context menu on LOD canvas node
    */
   function onLODNodeContextMenu(e: MouseEvent, nodeId: string) {
+    answeredByBubbleCanvas.add(e)
     suppressPreviewPanel()
     contextMenu.open(e, nodeId)
     if (!getSelectedNodeIds().includes(nodeId)) {
@@ -313,7 +324,8 @@ export function useCanvasEventHandlers(
   /**
    * Handle context menu on LOD canvas background
    */
-  function onLODCanvasContextMenu(_e: MouseEvent) {
+  function onLODCanvasContextMenu(e: MouseEvent) {
+    answeredByBubbleCanvas.add(e)
     contextMenu.close()
   }
 
