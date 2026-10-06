@@ -1854,6 +1854,10 @@ An undirected edge has no arrowhead at any zoom level. Above the level-of-detail
 
 A marker id is derived from a colour by removing everything that is not a letter or digit. Stripping only `#` assumed hex, and an `rgba(...)` colour produced an id whose spaces, commas and parentheses are invalid in both an `id` and a `url(#...)` reference, so arrowheads vanished while hovering a colour-tinted node. The marker definition and the reference derive the id from the same function, because they must agree.
 
+### The line under an arrowhead
+
+**Required behavior:** An arrowhead ends the line: the visible line stops inside the base of the head, and the tip of the head marks where the edge arrives. A line keeps a constant thickness on screen, so in canvas units it widens as the view zooms out, while the head had a fixed size of 20 canvas units and was drawn over the last 20 units of the line. Zoomed out, the line was wider than the pointed end of the head and its square end showed through the tip, so a head looked like two barbs on a blunt bar. The head is therefore at least four widths of a highlighted line, and never smaller than the 20 units it has at normal zoom, and the stroked line ends a tenth of the way into the head. The tip lies the arrow offset beyond the end of the routed path, which for an edge arriving at right angles is the border of the node. Routing is unchanged: the routers, the hit area and the label use the full path, and only the visible stroke of an edge that carries a head is shortened, by moving the last point of the path back along its final direction. A final segment shorter than the head keeps a stub, so the head keeps its direction.
+
 ### Rendering queued diagrams
 
 A diagram render that arrives while another is in flight is queued with the container it asked for. Replaying the in-flight call's own container rendered that view twice and left the queued caller's diagrams unrendered.
