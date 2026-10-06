@@ -8,6 +8,7 @@
     "noResults": "Nessun risultato trovato"
   },
   "canvas": {
+    "printFailed": "Impossibile stampare la tela: {error}",
     "agent": {
       "placeholder": "Chiedi informazioni sul grafo...",
       "placeholderSelected": "Chiedi sui nodi selezionati...",
@@ -102,6 +103,7 @@
       "bubbleMode": "Modalità bolla - Mostra nodi come cerchi",
       "physics": "Modalità fisica - Il grafo visibile si dispone mentre trascini (P)",
       "physicsUnavailable": "Modalità fisica - Solo in modalità bolle, fuori dalla vista vicinato, fino a 2000 nodi visibili",
+      "printToPdf": "Stampa in PDF - I nodi selezionati, o tutti, su una pagina",
       "help": "Aiuto - Scorciatoie da tastiera e utilizzo"
     },
     "search": {
@@ -762,6 +764,7 @@
     "noOtherWorkspaces": "Nessun altro spazio di lavoro",
     "readNode": "Leggi il nodo",
     "exportSelection": "Esporta selezione...",
+    "printToPdf": "Stampa in PDF",
     "defaultWorkspace": "Predefinito"
   },
   "reader": {

@@ -8,6 +8,7 @@
     "noResults": "Keine Ergebnisse gefunden"
   },
   "canvas": {
+    "printFailed": "Die Leinwand konnte nicht gedruckt werden: {error}",
     "agent": {
       "placeholder": "Frage zum Graph stellen...",
       "placeholderSelected": "Frage zu ausgewählten Knoten stellen...",
@@ -99,6 +100,7 @@
       "bubbleMode": "Blasenmodus - Knoten als Kreise anzeigen",
       "physics": "Physikmodus - Der sichtbare Graph ordnet sich beim Ziehen selbst an (P)",
       "physicsUnavailable": "Physikmodus - Nur im Blasenmodus, außerhalb der Nachbarschaftsansicht, mit bis zu 2000 sichtbaren Knoten",
+      "printToPdf": "Als PDF drucken - Die ausgewählten oder alle Knoten auf einer Seite",
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
       "hop": "Schritt",
       "hops": "Schritte",
@@ -762,6 +764,7 @@
     "noOtherWorkspaces": "Keine weiteren Arbeitsbereiche",
     "readNode": "Knoten lesen",
     "exportSelection": "Auswahl exportieren ...",
+    "printToPdf": "Als PDF drucken",
     "defaultWorkspace": "Standard"
   },
   "reader": {

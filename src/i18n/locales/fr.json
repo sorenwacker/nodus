@@ -8,6 +8,7 @@
     "noResults": "Aucun résultat trouvé"
   },
   "canvas": {
+    "printFailed": "Impossible d'imprimer le canevas : {error}",
     "agent": {
       "placeholder": "Poser une question sur le graphe...",
       "placeholderSelected": "Question sur les nœuds sélectionnés...",
@@ -102,6 +103,7 @@
       "bubbleMode": "Mode bulle - Afficher les nœuds comme des cercles",
       "physics": "Mode physique - Le graphe visible s'organise pendant que vous déplacez (P)",
       "physicsUnavailable": "Mode physique - En mode bulles uniquement, hors de la vue de voisinage, jusqu'à 2000 nœuds visibles",
+      "printToPdf": "Imprimer en PDF - Les nœuds sélectionnés, ou tous, sur une page",
       "help": "Aide - Raccourcis clavier et utilisation"
     },
     "search": {
@@ -762,6 +764,7 @@
     "noOtherWorkspaces": "Aucun autre espace de travail",
     "readNode": "Lire le nœud",
     "exportSelection": "Exporter la sélection...",
+    "printToPdf": "Imprimer en PDF",
     "defaultWorkspace": "Par défaut"
   },
   "reader": {

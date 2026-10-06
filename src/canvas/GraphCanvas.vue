@@ -65,7 +65,7 @@ import {
   useCanvasSettings,
   useCanvasEventHandlers,
   useCanvasTheme,
-  useCanvasZotero,
+  useCanvasZotero, useCanvasPrint,
   useFullscreenModal,
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
@@ -756,7 +756,7 @@ function openExportForSelection(nodeIds: string[]) {
     .map(id => store.nodes.find(n => n.id === id))
     .filter((n): n is Node => n !== undefined)
 }
-
+const { printToPdf } = useCanvasPrint({ getNodes: () => store.filteredNodes, getEdges: () => store.filteredEdges, reportFailure: error => showToast?.(t('canvas.printFailed', { error }), 'error') })
 // Context menu composable
 const contextMenu = useContextMenu({
   getSelectedNodeIds: () => store.selectedNodeIds,
@@ -1948,7 +1948,7 @@ defineExpose({
         :neighborhood-depth="neighborhoodDepth"
         :highlight-all-edges="highlightAllEdges"
         :bubble-mode-active="isBubbleModeForced"
-        :physics-active="physics.active.value" :physics-available="physics.available.value" @toggle-physics="physics.toggle()"
+        :physics-active="physics.active.value" :physics-available="physics.available.value" @toggle-physics="physics.toggle()" @print-to-pdf="printToPdf(store.selectedNodeIds)"
         @zoom-in="zoomIn" @zoom-out="zoomOut"
         @fit-to-content="fitToContent"
         @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
@@ -2036,7 +2036,7 @@ defineExpose({
         @zoom-to-node="zoomToNodeDefault"
         @open-link-picker="openLinkPicker"
         @delete-nodes="deleteSelectedNodes(contextMenu.affectedNodeIds.value)"
-        @export-selection="openExportForSelection(contextMenu.affectedNodeIds.value)"
+        @export-selection="openExportForSelection(contextMenu.affectedNodeIds.value)" @print-to-pdf="printToPdf(contextMenu.affectedNodeIds.value)"
         @read-node="contextMenuNodeId && displayStore.readNode(contextMenuNodeId)"
         @add-to-storyline="addNodeToStoryline"
         @create-storyline="createStorylineFromNode"

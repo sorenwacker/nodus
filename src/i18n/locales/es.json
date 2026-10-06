@@ -8,6 +8,7 @@
     "noResults": "No se encontraron resultados"
   },
   "canvas": {
+    "printFailed": "No se pudo imprimir el lienzo: {error}",
     "agent": {
       "placeholder": "Preguntar sobre el grafo...",
       "placeholderSelected": "Preguntar sobre nodos seleccionados...",
@@ -102,6 +103,7 @@
       "bubbleMode": "Modo burbuja - Mostrar nodos como círculos",
       "physics": "Modo física - El grafo visible se ordena mientras arrastras (P)",
       "physicsUnavailable": "Modo física - Solo en modo burbuja, fuera de la vista de vecindario, hasta 2000 nodos visibles",
+      "printToPdf": "Imprimir en PDF - Los nodos seleccionados, o todos, en una página",
       "help": "Ayuda - Atajos de teclado y uso"
     },
     "search": {
@@ -762,6 +764,7 @@
     "noOtherWorkspaces": "No hay otros espacios de trabajo",
     "readNode": "Leer el nodo",
     "exportSelection": "Exportar la selección...",
+    "printToPdf": "Imprimir en PDF",
     "defaultWorkspace": "Predeterminado"
   },
   "reader": {

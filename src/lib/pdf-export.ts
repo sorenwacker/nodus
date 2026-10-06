@@ -49,10 +49,11 @@ export async function exportToPdf(
   edges: Edge[],
   options: Partial<PdfExportOptions> = {}
 ): Promise<Uint8Array> {
-  // Generate Typst source
-  const typstSource = exportToTypst(nodes, edges, options)
+  return compileTypstToPdf(exportToTypst(nodes, edges, options))
+}
 
-  // Initialize Typst compiler
+/** Compile Typst source to PDF bytes */
+export async function compileTypstToPdf(typstSource: string): Promise<Uint8Array> {
   await initTypst()
 
   if (!$typst) {

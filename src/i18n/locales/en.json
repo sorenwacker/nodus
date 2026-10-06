@@ -8,6 +8,7 @@
     "noResults": "No results found"
   },
   "canvas": {
+    "printFailed": "Could not print the canvas: {error}",
     "agent": {
       "placeholder": "Ask about the graph...",
       "placeholderSelected": "Ask about selected nodes...",
@@ -99,6 +100,7 @@
       "bubbleMode": "Bubble Mode - Show nodes as circles",
       "physics": "Physics Mode - Let the visible graph arrange itself while you drag (P)",
       "physicsUnavailable": "Physics Mode - Bubble mode only, outside the neighborhood view, up to 2000 visible nodes",
+      "printToPdf": "Print to PDF - The selected nodes, or all nodes, on one page",
       "neighborhoodDepth": "Neighborhood depth (hops)",
       "hop": "hop",
       "hops": "hops",
@@ -762,6 +764,7 @@
     "noOtherWorkspaces": "No other workspaces",
     "readNode": "Read node",
     "exportSelection": "Export selection...",
+    "printToPdf": "Print to PDF",
     "defaultWorkspace": "Default"
   },
   "reader": {

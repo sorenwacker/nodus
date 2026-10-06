@@ -32,6 +32,7 @@ const emit = defineEmits<{
   (e: 'open-link-picker'): void
   (e: 'delete-nodes'): void
   (e: 'export-selection'): void
+  (e: 'print-to-pdf'): void
   (e: 'read-node'): void
   (e: 'add-to-storyline', storylineId: string): void
   (e: 'create-storyline'): void
@@ -147,6 +148,11 @@ function handleReadNode() {
 
 function handleExportSelection() {
   emit('export-selection')
+  emit('close')
+}
+
+function handlePrintToPdf() {
+  emit('print-to-pdf')
   emit('close')
 }
 
@@ -419,6 +425,15 @@ function handleCreateEntity(type: EntityNodeType) {
         <polyline points="14 2 14 8 20 8"/>
       </svg>
       <span>{{ t('contextMenu.exportSelection') }}</span>
+    </div>
+
+    <div class="context-menu-item" @click="handlePrintToPdf">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      <span>{{ t('contextMenu.printToPdf') }}</span>
     </div>
 
     <div class="context-menu-divider"></div>

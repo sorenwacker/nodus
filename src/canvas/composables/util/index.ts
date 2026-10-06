@@ -51,3 +51,4 @@ export {
   type UseFullscreenModalContext,
   type UseFullscreenModalReturn,
 } from './useFullscreenModal'
+export { useCanvasPrint, type UseCanvasPrintContext } from './useCanvasPrint'
