@@ -474,14 +474,14 @@ Every provider answers the question the same way, through one shared probe:
 - Only edges with both ends among the printed nodes are drawn; an edge to a node that is not printed would point at nothing. An edge is a straight line from border to border, with an arrowhead when it is directed and a label when it has one. Routed paths are not used: they avoid nodes that may not be printed, and they exist only for the part of the canvas that is on screen.
 - No interaction state is printed: no selection border, hover highlight, dimming, grid or overlay. Colours are those of the light theme, with a node's own colour as its tint, whichever theme is active. A card whose colour is dark gets light text. The typeface is the one the compiler carries, a serif, not the canvas typeface.
 - Content is printed as text. Headings, bold, italic, code and list items keep their formatting; quote markers, rules and the separator row of a table are left out; math, images, diagrams and table rows appear as their source.
-- The page is compiled before the save dialog opens, so a page that cannot be produced leaves no file behind.
+- The page is compiled, by the backend compiler that document export uses, before the save dialog opens, so a page that cannot be produced leaves no file behind.
 - The action is in the context menu of a node, for the nodes the menu acts on, and in the canvas controls, for the selection or else for all nodes.
 
 ### Document export
 
 **Required behavior:** Everything in Nodus moves thinking onto the canvas; export is the only path that takes finished work back off it. Without it a completed argument has to be retyped somewhere else to become a document, which is where the tool stops being useful and the user goes back to a word processor.
 
-Two formats, one code path: the Typst source is generated first and PDF is that source compiled by the Typst WASM the application already loads for math.
+Two formats, one code path: the Typst source is generated first and PDF is that source compiled by the Typst compiler in the backend, the one that renders math, with the fonts it bundles. The compiler that runs in the web view is not used for PDF: it could not be loaded there, and it fetches its fonts from a content delivery network that the application's content security policy does not allow and an offline machine cannot reach, so every PDF export failed. A test that replaced the compiler with a stub reported it as working; the backend compiler is tested on real source.
 
 | Format | Purpose |
 |--------|---------|
