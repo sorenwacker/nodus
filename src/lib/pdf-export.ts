@@ -1,36 +1,11 @@
 /**
  * PDF Export
- * Compiles Typst documents to PDF using the WASM compiler
+ * Compiles Typst documents to PDF with the backend's Typst compiler
  */
 
 import type { Node, Edge } from '../types'
 import { exportToTypst, type ExportOptions as TypstExportOptions } from './typst-export'
-
-// Typst instance (lazy loaded)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let $typst: any = null
-let initPromise: Promise<void> | null = null
-
-/**
- * Initialize the Typst compiler (lazy load WASM)
- */
-async function initTypst(): Promise<void> {
-  if ($typst) return
-  if (initPromise) return initPromise
-
-  initPromise = (async () => {
-    try {
-      const module = await import('@myriaddreamin/typst.ts')
-      $typst = module.$typst
-      console.log('[PDF Export] Typst compiler initialized')
-    } catch (e) {
-      console.error('[PDF Export] Failed to initialize Typst:', e)
-      throw e
-    }
-  })()
-
-  return initPromise
-}
+import { compileTypstPdf } from './tauri'
 
 export interface PdfExportOptions extends TypstExportOptions {
   /** Output filename (without extension) */
@@ -52,26 +27,16 @@ export async function exportToPdf(
   return compileTypstToPdf(exportToTypst(nodes, edges, options))
 }
 
-/** Compile Typst source to PDF bytes */
+/**
+ * Compile Typst source to PDF bytes. The backend compiles: the compiler in the
+ * web view cannot be loaded there and fetches its fonts from a network the
+ * application may not reach (PRODUCT_DESIGN.md > Document export)
+ */
 export async function compileTypstToPdf(typstSource: string): Promise<Uint8Array> {
-  await initTypst()
-
-  if (!$typst) {
-    throw new Error('Typst compiler not available')
-  }
-
   try {
-    // Compile to PDF
-    const pdf = await $typst.pdf({ mainContent: typstSource })
-
-    if (!pdf) {
-      throw new Error('PDF compilation failed - no output')
-    }
-
-    return pdf
+    return await compileTypstPdf(typstSource)
   } catch (e) {
-    console.error('[PDF Export] Compilation error:', e)
-    throw new Error(`PDF compilation failed: ${e}`)
+    throw new Error(`PDF compilation failed: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 

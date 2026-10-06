@@ -55,6 +55,7 @@ html-escape = "0.2"
 # Typst for math rendering
 typst = "0.12"
 typst-svg = "0.12"
+typst-pdf = "0.12"
 typst-assets = { version = "0.12", features = ["fonts"] }
 comemo = "0.4"
 once_cell = "1.19"

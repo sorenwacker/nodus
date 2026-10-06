@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Node, Edge } from '../types'
 
-// Mock the Typst module
-vi.mock('@myriaddreamin/typst.ts', () => ({
-  $typst: {
-    pdf: vi.fn().mockResolvedValue(new Uint8Array([0x25, 0x50, 0x44, 0x46])), // %PDF magic bytes
-  },
-}))
+// The backend compiles; what it is asked to compile is checked here, and that
+// it compiles real source is tested in src-tauri/src/typst_render.rs
+const compileTypstPdf = vi.hoisted(() => vi.fn())
+vi.mock('../lib/tauri', () => ({ compileTypstPdf }))
 
 // Import after mocking
 import { exportToPdf, downloadTypst } from '../lib/pdf-export'
 import { exportToTypst } from '../lib/typst-export'
 
 describe('PDF Export', () => {
+  beforeEach(() => {
+    compileTypstPdf.mockReset().mockResolvedValue(new Uint8Array([0x25, 0x50, 0x44, 0x46])) // %PDF magic bytes
+  })
+
   const createNode = (overrides: Partial<Node> = {}): Node => ({
     id: '1',
     title: 'Test Node',
@@ -42,6 +44,17 @@ describe('PDF Export', () => {
 
       expect(pdf).toBeInstanceOf(Uint8Array)
       expect(pdf.length).toBeGreaterThan(0)
+    })
+
+    it('hands the generated Typst source to the backend compiler', async () => {
+      const nodes = [createNode()]
+      await exportToPdf(nodes, [], { title: 'My Research' })
+      expect(compileTypstPdf).toHaveBeenLastCalledWith(exportToTypst(nodes, [], { title: 'My Research' }))
+    })
+
+    it('says that compilation failed, and why', async () => {
+      compileTypstPdf.mockRejectedValueOnce('unknown variable: x')
+      await expect(exportToPdf([createNode()], [])).rejects.toThrow('PDF compilation failed: unknown variable: x')
     })
 
     it('should include title and author in export', async () => {
