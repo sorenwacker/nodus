@@ -464,6 +464,19 @@ Every provider answers the question the same way, through one shared probe:
 
 **Known limitation:** a highlight can only be imported when the PDF stores the highlighted text with the annotation, which annotators such as Zotero and Acrobat do and some, notably macOS Preview, do not. Recovering the text for the rest means locating it geometrically in the page content stream, which is not implemented. Highlights whose text cannot be recovered are reported as such rather than imported as empty nodes.
 
+### Printing the canvas
+
+**Required behavior:** "Print to PDF" produces a picture of the canvas, where document export produces a text. It prints the selected nodes, or every node of the workspace when nothing is selected, and not merely the nodes on screen.
+
+- One page, sized to the bounding box of the printed nodes plus a margin, with one canvas unit as one point. A fixed paper size would shrink a large graph until nothing could be read; a page of the graph's own size is printed or scaled by whatever opens it.
+- The page is vector: text stays sharp and can be searched and copied.
+- Each node is drawn as a card at its stored position and size, whatever the zoom level or bubble mode shows, with its title and as much of its content as fits; the rest is clipped, as on the canvas. A tag node is drawn with its title alone.
+- Only edges with both ends among the printed nodes are drawn; an edge to a node that is not printed would point at nothing. An edge is a straight line from border to border, with an arrowhead when it is directed and a label when it has one. Routed paths are not used: they avoid nodes that may not be printed, and they exist only for the part of the canvas that is on screen.
+- No interaction state is printed: no selection border, hover highlight, dimming, grid or overlay. Colours are those of the light theme, with a node's own colour as its tint, whichever theme is active. A card whose colour is dark gets light text. The typeface is the one the compiler carries, a serif, not the canvas typeface.
+- Content is printed as text. Headings, bold, italic, code and list items keep their formatting; quote markers, rules and the separator row of a table are left out; math, images, diagrams and table rows appear as their source.
+- The page is compiled before the save dialog opens, so a page that cannot be produced leaves no file behind.
+- The action is in the context menu of a node, for the nodes the menu acts on, and in the canvas controls, for the selection or else for all nodes.
+
 ### Document export
 
 **Required behavior:** Everything in Nodus moves thinking onto the canvas; export is the only path that takes finished work back off it. Without it a completed argument has to be retyped somewhere else to become a document, which is where the tool stops being useful and the user goes back to a word processor.

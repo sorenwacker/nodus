@@ -461,6 +461,15 @@ Export canvas as Typst document for further editing.
 ### PDF Generation
 Generate PDFs directly using Typst compilation.
 
+### Print to PDF
+Save the canvas as a picture on one PDF page.
+
+1. Select the nodes to print, or select none to print every node of the workspace.
+2. Select "Print to PDF" in the canvas controls, or right-click a node and select "Print to PDF".
+3. Choose where to save the file.
+
+**Result:** a single vector page as large as the printed nodes, showing each as a card with its title and content, joined by the edges that run between them. Selection and hover highlights are not printed, and the light theme's colours are used. Math, images and diagrams are printed as their source text.
+
 ### Markdown Export
 Export nodes as standard Markdown files.
 
