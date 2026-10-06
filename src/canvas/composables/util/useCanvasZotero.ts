@@ -4,7 +4,9 @@
  * Handles adding nodes to Zotero from the context menu.
  * Wraps the useZotero composable with UI feedback.
  */
+import { computed, type ComputedRef } from 'vue'
 import { useZotero } from '../../../composables/useZotero'
+import { isCitationNode } from '../../../lib/citationNodes'
 import type { Node } from '../../../types'
 
 /**
@@ -32,7 +34,7 @@ export interface ZoteroAddReport {
 }
 
 /** The part of a node that becomes a Zotero item */
-export type ZoteroCandidate = Pick<Node, 'title' | 'markdown_content'>
+export type ZoteroCandidate = Pick<Node, 'title' | 'markdown_content' | 'node_type'>
 
 /**
  * Return type for useCanvasZotero
@@ -46,6 +48,8 @@ export interface UseCanvasZoteroReturn {
    * all go through here (PRODUCT_DESIGN.md > Adding to Zotero from an agent)
    */
   addNodesToZotero: (nodes: ZoteroCandidate[]) => Promise<ZoteroAddReport>
+  /** How many of the nodes the context menu acts on Zotero takes */
+  citationNodeCount: ComputedRef<number>
   /** Handle adding selected nodes to Zotero */
   handleAddToZotero: () => Promise<void>
 }
@@ -67,16 +71,27 @@ export function useCanvasZotero(ctx: UseCanvasZoteroContext): UseCanvasZoteroRet
     const affectedIds = getAffectedNodeIds()
     if (affectedIds.length === 0) return
 
+    // The menu offers the action for the citation nodes of the selection
     const nodes = affectedIds
       .map(id => store.getNode(id))
-      .filter((n): n is Node => n !== undefined)
+      .filter((n): n is Node => n !== undefined && isCitationNode(n))
 
     if (nodes.length === 0) return
 
     await addNodesToZotero(nodes)
   }
 
-  async function addNodesToZotero(nodes: ZoteroCandidate[]): Promise<ZoteroAddReport> {
+  const citationNodeCount = computed(
+    () => getAffectedNodeIds().filter(id => { const n = store.getNode(id); return n !== undefined && isCitationNode(n) }).length
+  )
+
+  async function addNodesToZotero(candidates: ZoteroCandidate[]): Promise<ZoteroAddReport> {
+    // A note that mentions a DOI is a note, not a reference
+    // (PRODUCT_DESIGN.md > Zotero takes citation nodes)
+    const nodes = candidates.filter(isCitationNode)
+    const refused = candidates.filter(n => !isCitationNode(n)).map(n => `Not a citation node: ${n.title}`)
+    if (nodes.length === 0) return { added: 0, duplicates: 0, skipped: 0, errors: refused }
+
     const result = await zotero.addNodesToZotero(nodes)
 
     if (result.cancelled) {
@@ -96,15 +111,17 @@ export function useCanvasZotero(ctx: UseCanvasZoteroContext): UseCanvasZoteroRet
     } else if (result.skipped > 0) {
       showToast?.(`No items added - ${result.skipped} node(s) had no content`, 'warning')
     }
-    if (result.errors.length > 0) {
-      showToast?.(result.errors[0], 'error')
+    const errors = [...refused, ...result.errors]
+    if (errors.length > 0) {
+      showToast?.(errors[0], 'error')
     }
-    return { added: result.added, duplicates: result.duplicates, skipped: result.skipped, errors: result.errors }
+    return { added: result.added, duplicates: result.duplicates, skipped: result.skipped, errors }
   }
 
   return {
     zotero,
     addNodesToZotero,
+    citationNodeCount,
     handleAddToZotero,
   }
 }

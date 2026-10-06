@@ -19,6 +19,8 @@ const props = defineProps<{
   currentWorkspaceId: string | null
   hasDOI?: boolean
   doiCount?: number // Number of selected nodes with DOIs
+  /** Number of selected nodes Zotero takes: citations and citation stubs */
+  citationNodeCount?: number
 }>()
 
 const { t } = useI18n()
@@ -302,16 +304,18 @@ function handleCreateEntity(type: EntityNodeType) {
         </svg>
         <span>{{ t('contextMenu.fetchBoth') }}{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
       </div>
-      <div class="context-menu-item" @click="handleAddToZotero">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-          <line x1="12" y1="6" x2="12" y2="14"/>
-          <line x1="8" y1="10" x2="16" y2="10"/>
-        </svg>
-        <span>{{ t('contextMenu.addToZotero') }}{{ doiCount > 1 ? ` (${doiCount})` : '' }}</span>
-      </div>
     </template>
+
+    <!-- Add to Zotero (for citation nodes, PRODUCT_DESIGN.md > Zotero takes citation nodes) -->
+    <div v-if="citationNodeCount && citationNodeCount > 0" class="context-menu-item" @click="handleAddToZotero">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        <line x1="12" y1="6" x2="12" y2="14"/>
+        <line x1="8" y1="10" x2="16" y2="10"/>
+      </svg>
+      <span>{{ t('contextMenu.addToZotero') }}{{ citationNodeCount > 1 ? ` (${citationNodeCount})` : '' }}</span>
+    </div>
 
     <div class="context-menu-divider"></div>
 

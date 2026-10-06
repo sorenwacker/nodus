@@ -252,6 +252,7 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
           const newNode = await ctx.createNode({
             title: ref.title,
+            node_type: 'citation',
             markdown_content: content,
             canvas_x: pos.x,
             canvas_y: pos.y,
@@ -305,6 +306,7 @@ export function useCitationGraph(ctx: UseCitationGraphContext) {
 
           const newNode = await ctx.createNode({
             title: cit.title,
+            node_type: 'citation',
             markdown_content: content,
             canvas_x: pos.x,
             canvas_y: pos.y,

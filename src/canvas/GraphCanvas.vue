@@ -804,7 +804,7 @@ const {
 } = citationFetch
 
 // Zotero integration composable
-const { zotero, addNodesToZotero, handleAddToZotero } = useCanvasZotero({
+const { zotero, addNodesToZotero, citationNodeCount, handleAddToZotero } = useCanvasZotero({
   store: {
     getNode: store.getNode,
   },
@@ -2030,7 +2030,7 @@ defineExpose({
         :entities="store.getEntities()"
         :current-workspace-id="store.currentWorkspaceId"
         :has-d-o-i="contextMenuNodeHasDOI"
-        :doi-count="contextMenuDOICount"
+        :doi-count="contextMenuDOICount" :citation-node-count="citationNodeCount"
         @close="closeContextMenu"
         @fit-to-content="fitNodeNow"
         @zoom-to-node="zoomToNodeDefault"

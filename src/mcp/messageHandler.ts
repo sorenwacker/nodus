@@ -163,7 +163,7 @@ export interface McpUndoInterface {
  */
 export interface McpZoteroInterface {
   addNodes: (
-    nodes: Array<Pick<Node, 'title' | 'markdown_content'>>
+    nodes: Array<Pick<Node, 'title' | 'markdown_content' | 'node_type'>>
   ) => Promise<{ added: number; duplicates: number; skipped: number; errors: string[] }>
 }
 
