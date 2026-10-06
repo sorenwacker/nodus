@@ -353,6 +353,8 @@ A key without write access is enough for importing and makes "Add to Zotero" fai
 1. Select one or more citation nodes on the canvas.
 2. Right-click and select "Add to Zotero".
 
+The action is offered when the selection holds a citation node or a citation stub, and adds only those: notes in the same selection are left out.
+
 **Result:** each selected node becomes a new item at the top level of the library. A node whose DOI already exists in the library is skipped and counted as a duplicate; a node without content is skipped. An existing Zotero item is never changed or deleted. If the library cannot be read, nothing is added, because duplicates could not be checked.
 
 Dropping a PDF offers the same step for its extracted references ("Add references to Zotero").
@@ -363,7 +365,7 @@ An agent can take the same step: the `add_to_zotero` tool, available to MCP clie
 Fetch citations for papers with DOIs:
 
 - Right-click citation nodes and select "Fetch Citations"
-- Automatically creates nodes for referenced papers
+- Creates a citation node for each referenced or citing paper that is not on the canvas yet
 - Builds citation network on your canvas
 
 ### Citation Graph
