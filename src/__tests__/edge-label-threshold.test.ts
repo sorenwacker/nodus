@@ -16,6 +16,7 @@ function makeEdge(overrides: Partial<VisibleEdgeLine> = {}): VisibleEdgeLine {
     labelX: 50,
     labelY: 50,
     path: 'M0,0 L100,100',
+    linePath: 'M0,0 L100,100',
     style: 'straight',
     strokeWidth: 2,
     hitX1: 0,
