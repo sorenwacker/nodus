@@ -63,6 +63,13 @@ Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%
 
 - **add_to_zotero** - Add nodes to the Zotero library as new items; DOIs already in the library are skipped
 
+### Workspaces
+
+- **list_workspaces** - List all workspaces; the one open in the app is marked
+- **set_workspace** - Scope this connection to a workspace by id or name
+- **get_workspace** - Show which workspace this connection is scoped to
+- **create_workspace** - Create an empty workspace; a name already in use is rejected
+
 ### Canvas Operations
 
 - **get_viewport** - Get current canvas viewport position and zoom
