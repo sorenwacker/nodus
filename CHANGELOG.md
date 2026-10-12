@@ -4,11 +4,32 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0-rc.14] - 2026-10-12
+
+### Added
+- Print to PDF: the selected nodes, or every node of the workspace when nothing is selected, as one vector page sized to the printed nodes. Each node is drawn as a card at its stored position with its title and the content that fits; only edges between printed nodes are drawn
+- A test message in Settings > AI: an editable prompt sent through the same queue, provider, streaming and retries as agent work. The panel shows the reply as it streams, then the time to the first byte, the total time, the length and the attempt count, or the failure text the agent would have shown, so a provider that passes the status check but cannot finish an answer is found there and not in a run
+- The agent has a `read_node` tool that returns one note's full content by title, in every mode. Asked what a note was about, the agent had found it by search and then had no way to read it except reading the whole graph in one request, which the provider's gateway timed out on
+- The `add_to_zotero` tool, for MCP clients and the in-app agent, adds the named nodes to the Zotero library through the same function as the context-menu action, with the same rules
+
 ### Changed
+- The agent's chat requests stream, as generation already did. Buffered, the answer after a long read looked like a stalled connection to the gateway in front of the model and was cut; streamed tool calls arrive as fragments and are joined into whole calls
+- A transient provider failure is retried after about 5, 15 and 45 seconds instead of 1 and 2, since a backend that stalls does so for longer than a second. Each retry is written to the run's transcript and log, stopping the run interrupts the wait, and a connection the gateway drops mid-body is retried like a timeout
+- A request failure that ends a run states how many attempts were made and how long they took, so a stall of a minute per attempt no longer reads like a refusal that came at once
+- The agent's search of the notes shows a preview of each hit's content next to its title, and a plural search term also finds its singular, so "FIPs" finds a note titled "FIP". The agent is instructed to search and then read the hits, and to read the whole graph only for a question about the graph as a whole
+- "Enable Streaming" is gone from the AI settings. It saved a value that no provider read
+- Papers brought in by Fetch Citations and Fetch References are stored as citation nodes, and Add to Zotero takes citation nodes and stubs only: a note that mentions a DOI is a note, not a reference. The menu offers the action when the selection holds at least one such node
+- PDFs are compiled by the backend Typst compiler with its bundled fonts, the one that renders math, before the save dialog opens. The compiler in the web view could not be loaded and fetched its fonts from a network the application's content security policy does not allow
+- An arrowhead ends the line: the visible line stops inside the base of the head. Zoomed out, the line was wider than the head's tip and showed through it
 - The Zotero settings no longer say the connection synchronises both ways. Importing and adding to Zotero are single actions; the hint and the documentation now say so, and the documentation describes the Web API connection in place of the removed local detection
 - Double-clicking a section's text in the storyline reader edits it, as double-clicking its title does. A double-click on a link inside the text keeps its own meaning
 
 ### Fixed
+- Deleting a note no longer fails when the tag node it emptied cannot be deleted; the note is deleted and the tag node is left for the repair action
+- A right-click on a bubble opens the context menu, as a right-click on a card does. The viewport closed the menu in the same event that opened it
+- Edges to off-screen anchors in physics mode keep their length instead of reeling their neighbours in across the canvas
+- Physics mode no longer pushes the whole graph one way on every reheat: the forces between simulated nodes rearrange them and never carry the graph off as a whole
+- The hover tooltip no longer turns every line break of a rendered note into an empty line; its spacing comes from the block margins alone
 - Physics mode takes in nodes and edges added or removed while it runs, for example by an MCP client: the simulation keeps what it reached, is rebuilt on the graph as it now is and reheats. Creating or deleting a node used to end the mode and discard the simulated positions
 - In bubble mode a node no longer stays hovered, with its edges thick and highlighted, after the pointer is released over the preview panel. The release did not reach the canvas, which went on treating the node as held and ignored the pointer
 - The colour bar is centred in the free part of the canvas and wraps there. It was centred on the whole canvas, so with the reader open it ran under the reader, and it lay over the minimap
