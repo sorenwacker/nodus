@@ -27,7 +27,11 @@ interface GenerateRequest extends BaseRequest {
   onProgress?: (textSoFar: string) => void
 }
 
+/** Reports an attempt that failed and will be tried again after the wait */
+export type RetryListener = (attempt: number, error: Error, delayMs: number) => void
+
 interface ChatRequest extends BaseRequest {
+  onRetry?: RetryListener
   type: 'chat'
   messages: ChatMessage[]
   tools?: LLMTool[]
@@ -44,6 +48,8 @@ export interface QueueStats {
 
 class LLMQueue {
   private queue: QueuedRequest[] = []
+  /** Ends the wait of a retry when the current request is cancelled */
+  private abort: AbortController | null = null
   private processing = ref(false)
   private currentRequest = ref<string | null>(null)
   private stats = ref({ totalProcessed: 0, totalFailed: 0 })
@@ -79,13 +85,18 @@ class LLMQueue {
   /**
    * Chat with tools (queued)
    */
-  async chat(messages: ChatMessage[], tools?: LLMTool[]): Promise<{ message: ChatMessage }> {
+  async chat(
+    messages: ChatMessage[],
+    tools?: LLMTool[],
+    options?: { onRetry?: RetryListener }
+  ): Promise<{ message: ChatMessage }> {
     return new Promise((resolve, reject) => {
       const request: ChatRequest = {
         id: crypto.randomUUID(),
         type: 'chat',
         messages,
         tools,
+        onRetry: options?.onRetry,
         priority: 10, // Chat gets higher priority
         resolve: resolve as (value: unknown) => void,
         reject,
@@ -117,6 +128,7 @@ class LLMQueue {
 
     this.processing.value = true
     this.cancelled = false
+    this.abort = new AbortController()
     const request = this.queue.shift()!
     this.currentRequest.value = request.id
 
@@ -135,8 +147,7 @@ class LLMQueue {
             })
           },
           {
-            maxRetries: 2,
-            initialDelayMs: 1000,
+            signal: this.abort.signal,
             onRetry: (attempt, error, delayMs) => {
               console.log(`[LLM Queue] Retry ${attempt} after ${delayMs}ms: ${error.message}`)
             },
@@ -165,10 +176,12 @@ class LLMQueue {
             })
           },
           {
-            maxRetries: 2,
-            initialDelayMs: 1000,
+            signal: this.abort.signal,
+            // The caller sees the retry too, so a failing provider looks
+            // different from a crash (PRODUCT_DESIGN.md > Retrying a provider failure)
             onRetry: (attempt, error, delayMs) => {
               console.log(`[LLM Queue] Retry ${attempt} after ${delayMs}ms: ${error.message}`)
+              request.onRetry?.(attempt, error, delayMs)
             },
           }
         )
@@ -199,6 +212,7 @@ class LLMQueue {
    */
   cancel() {
     this.cancelled = true
+    this.abort?.abort()
 
     // Reject all pending
     for (const request of this.queue) {
@@ -212,6 +226,7 @@ class LLMQueue {
    */
   cancelCurrent() {
     this.cancelled = true
+    this.abort?.abort()
   }
 
   /**

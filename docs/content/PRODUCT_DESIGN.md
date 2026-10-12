@@ -339,6 +339,7 @@ The integral is: $ integral_a^b f(x) dif x $
 **Required behavior:** A response that arrives as one buffered body is indistinguishable from a stalled connection while the model is still generating, and gateways cut it. Streaming keeps bytes flowing.
 
 - Generation requests ask the provider to stream, and the backend forwards each chunk to the interface as it arrives rather than accumulating the whole body.
+- Chat requests with tools, which is every request an agent run makes, stream as well. Only generation streamed at first, so the agent's requests still arrived as one body: an agent that had searched the notes and read the one it needed then asked for the answer, and the gateway in front of the model gave up on that buffered answer with a 504 while the two shorter requests before it had gone through. A streamed tool call arrives as fragments, one per delta, each carrying the index of the call it belongs to; the fragments are joined by index into whole calls, so a call whose name arrives in one delta and whose arguments arrive over the next twenty is one call.
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
@@ -1651,6 +1652,9 @@ A gateway timeout was missing from the list. Something between the application a
 
 - A gateway status - it timed out, or it could not reach the model - is retried like the other transient ones.
 - A status with no body says what the status means, rather than showing an empty body as if the provider had said nothing worth repeating.
+- The retries wait for the backend to recover: about 5, 15 and 45 seconds, rather than 1 and 2. A backend that stalls does so for longer than a second or two, so three attempts within three seconds all landed in the same stall and the user saw one failure. The waits are the same for every transient status, since none of them clears in a second.
+- Each retry is written to the run's transcript as an action on the current turn, naming the failure and the wait, so a provider that is failing looks different from an application that crashed. Before, the retries were written to the browser console only and the user saw a single final error.
+- Stopping the run interrupts the wait. A retry that is waiting 45 seconds would otherwise keep the run alive that long after the user pressed stop.
 
 ### Reporting a provider failure
 

@@ -372,7 +372,15 @@ export function useAgentRunner(ctx: AgentContext) {
 
       try {
         // Use the queue for all LLM calls with filtered tools
-        const data = await llmQueue.chat(messages as ChatMessage[], tools)
+        const data = await llmQueue.chat(messages as ChatMessage[], tools, {
+          // A failing provider looks different from a crash
+          // (PRODUCT_DESIGN.md > Retrying a provider failure)
+          onRetry: (attempt, error, delayMs) => {
+            const wait = Math.round(delayMs / 1000)
+            ctx.log.value.push(`> Provider failed: ${error.message}. Retrying in ${wait} s (attempt ${attempt})`)
+            recordAction(ctx.transcript.value, `Provider failed (${error.message}); retry ${attempt} in ${wait} s`)
+          },
+        })
         const msg = data.message
 
         messages.push(msg)
