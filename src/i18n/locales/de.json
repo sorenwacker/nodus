@@ -128,9 +128,13 @@
     },
     "connected": "Verbunden mit {provider}",
     "connectionFailed": "Verbindung zum Anbieter fehlgeschlagen",
-    "streaming": {
-      "label": "Streaming aktivieren",
-      "hint": "Antworten Token für Token streamen (erfordert Anbieterunterstützung)"
+    "testMessage": {
+      "label": "Testnachricht",
+      "hint": "Sendet diesen Prompt wie der Agent an den Anbieter und zeigt Antwort und Zeiten.",
+      "defaultPrompt": "Antworte mit einem kurzen Satz: Was ist ein Wissensgraph?",
+      "send": "Senden",
+      "sending": "Wird gesendet...",
+      "timing": "Erstes Byte nach {firstByte} s, fertig nach {total} s, {chars} Zeichen, {attempts} Versuch(e)"
     },
     "apiKey": {
       "label": "API-Schlüssel",

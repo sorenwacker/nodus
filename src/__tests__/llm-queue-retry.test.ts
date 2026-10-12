@@ -5,8 +5,14 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 
 const chat = vi.fn()
+const generate = vi.fn()
 vi.mock('../llm/providers', () => ({
-  providerRegistry: { getActiveProvider: () => ({ chat: (...args: unknown[]) => chat(...args) }) },
+  providerRegistry: {
+    getActiveProvider: () => ({
+      chat: (...args: unknown[]) => chat(...args),
+      generate: (...args: unknown[]) => generate(...args),
+    }),
+  },
 }))
 
 import { llmQueue } from '../llm/queue'
@@ -49,5 +55,26 @@ describe('a chat request through the queue', () => {
 
     await expect(pending).rejects.toThrow('Cancelled')
     expect(chat).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a generate request through the queue', () => {
+  beforeEach(() => {
+    generate.mockReset()
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('reports a retry to the caller and then returns the text', async () => {
+    vi.useFakeTimers()
+    generate
+      .mockRejectedValueOnce(new Error('API error 504: the gateway timed out waiting for the model'))
+      .mockResolvedValueOnce({ content: 'ok' })
+    const retries: number[] = []
+
+    const pending = llmQueue.generate('hi', undefined, 0, undefined, { onRetry: attempt => retries.push(attempt) })
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    expect(await pending).toBe('ok')
+    expect(retries).toEqual([1])
   })
 })

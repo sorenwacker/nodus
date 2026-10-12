@@ -156,6 +156,24 @@ describe('a chat request with tools', () => {
     ])
   })
 
+  it('reports the text so far on every chunk, so a caller can time the first byte', async () => {
+    // Only Ollama reported progress; this provider streamed and said nothing until the end
+    mockHttpStreamFetch.mockImplementation(async (_url: string, options: { onChunk: (c: string) => void }) => {
+      options.onChunk('data: {"choices":[{"delta":{"content":"A knowledge"}}]}\n\n')
+      options.onChunk('data: {"choices":[{"delta":{"content":" graph"}}]}\n\n')
+      options.onChunk('data: [DONE]\n\n')
+      return 200
+    })
+    const provider = new OpenAICompatibleProvider()
+    provider.configure({ baseUrl: 'http://localhost:1234/v1', model: 'm' })
+    const seen: string[] = []
+
+    const result = await provider.generate({ prompt: 'hi', onProgress: text => seen.push(text) })
+
+    expect(seen).toEqual(['A knowledge', 'A knowledge graph'])
+    expect(result.content).toBe('A knowledge graph')
+  })
+
   it('returns the text of a reply without tool calls', async () => {
     mockHttpStreamFetch.mockImplementation(async (_url: string, options: { onChunk: (c: string) => void }) => {
       options.onChunk('data: {"choices":[{"delta":{"content":"A FIP records"}}]}\n\ndata: [DONE]\n\n')

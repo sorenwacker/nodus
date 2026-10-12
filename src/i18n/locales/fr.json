@@ -128,9 +128,13 @@
     },
     "connected": "Connecté à {provider}",
     "connectionFailed": "Échec de la connexion au fournisseur",
-    "streaming": {
-      "label": "Activer le streaming",
-      "hint": "Streamer les réponses token par token (nécessite le support du fournisseur)"
+    "testMessage": {
+      "label": "Message de test",
+      "hint": "Envoie cette invite au fournisseur comme le fait l'agent et affiche la réponse et ses délais.",
+      "defaultPrompt": "Réponds en une courte phrase : qu'est-ce qu'un graphe de connaissances ?",
+      "send": "Envoyer",
+      "sending": "Envoi...",
+      "timing": "Premier octet après {firstByte} s, terminé en {total} s, {chars} caractères, {attempts} tentative(s)"
     },
     "apiKey": {
       "label": "Clé API",
