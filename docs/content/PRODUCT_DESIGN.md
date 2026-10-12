@@ -1663,6 +1663,7 @@ A failed request says what the provider said. The message the API returned was p
 - The parsed message survives to the caller.
 - A failure that is not a connection failure is not reported as one. A malformed chunk from a running server was reported as "Cannot connect to Ollama. Start it with: ollama serve", which sends the user to start a server that is already running.
 - Availability is decided by the one shared probe, for every provider. Three providers delegate to it and one re-implemented it by hand, so a change to the shared rule would have skipped that provider silently.
+- A request failure that ends a run says how many attempts were made and how long they took, as in "after 4 attempts over 4 min 50 s" or "on the first attempt, after 62 s". A transcript that showed only the final status could not say whether the retries had run at all, and a stall of a minute per attempt looked the same as a refusal that came at once. Stopping the run is not a failure and carries no such note.
 
 ### Reading an event stream
 
