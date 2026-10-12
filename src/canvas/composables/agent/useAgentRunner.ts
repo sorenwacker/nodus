@@ -11,7 +11,7 @@
 import { ref, type Ref } from 'vue'
 import type { ChatMessage, AgentTask, ToolDefinition, AgentMode, AgentPlan } from '../../../llm/types'
 import { llmQueue } from '../../../llm/queue'
-import { errorLog } from '../../../llm/agentLog'
+import { errorLog, describeRequestFailure } from '../../../llm/agentLog'
 import { describeToolCall } from '../../../lib/toolCallSummary'
 import {
   appendUserTurn,
@@ -372,15 +372,22 @@ export function useAgentRunner(ctx: AgentContext) {
 
       try {
         // Use the queue for all LLM calls with filtered tools
-        const data = await llmQueue.chat(messages as ChatMessage[], tools, {
-          // A failing provider looks different from a crash
-          // (PRODUCT_DESIGN.md > Retrying a provider failure)
-          onRetry: (attempt, error, delayMs) => {
-            const wait = Math.round(delayMs / 1000)
-            ctx.log.value.push(`> Provider failed: ${error.message}. Retrying in ${wait} s (attempt ${attempt})`)
-            recordAction(ctx.transcript.value, `Provider failed (${error.message}); retry ${attempt} in ${wait} s`)
-          },
-        })
+        const requestStarted = Date.now()
+        let attempts = 1
+        const data = await llmQueue
+          .chat(messages as ChatMessage[], tools, {
+            // A failing provider looks different from a crash
+            // (PRODUCT_DESIGN.md > Retrying a provider failure)
+            onRetry: (attempt, error, delayMs) => {
+              attempts = attempt + 1
+              const wait = Math.round(delayMs / 1000)
+              ctx.log.value.push(`> Provider failed: ${error.message}. Retrying in ${wait} s (attempt ${attempt})`)
+              recordAction(ctx.transcript.value, `Provider failed (${error.message}); retry ${attempt} in ${wait} s`)
+            },
+          })
+          .catch(e => {
+            throw describeRequestFailure(e, attempts, Date.now() - requestStarted)
+          })
         const msg = data.message
 
         messages.push(msg)

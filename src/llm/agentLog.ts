@@ -19,3 +19,28 @@ export function errorLog(message: string): string {
 export function isErrorLog(line: string): boolean {
   return line.startsWith(ERROR_MARKER)
 }
+
+/** "62 s" or "4 min 50 s" */
+function describeElapsed(ms: number): string {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds} s`
+  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`
+}
+
+/**
+ * The failure of a request, with how many attempts were made and how long
+ * they took, so a stall of a minute per attempt does not read like a refusal
+ * that came at once (PRODUCT_DESIGN.md > Reporting a provider failure). A
+ * stop is not a failure and is returned as it came.
+ */
+export function describeRequestFailure(error: unknown, attempts: number, elapsedMs: number): Error {
+  const original = error instanceof Error ? error : new Error(String(error))
+  if (original.name === 'AbortError' || original.message === 'Cancelled') return original
+  const detail =
+    attempts > 1
+      ? `after ${attempts} attempts over ${describeElapsed(elapsedMs)}`
+      : `on the first attempt, after ${describeElapsed(elapsedMs)}`
+  const described = new Error(`${original.message} (${detail})`)
+  described.name = original.name
+  return described
+}
