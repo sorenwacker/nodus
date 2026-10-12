@@ -11,6 +11,9 @@ import { withRetry } from './retry'
 
 type RequestType = 'generate' | 'chat'
 
+/** Reports an attempt that failed and will be tried again after the wait */
+export type RetryListener = (attempt: number, error: Error, delayMs: number) => void
+
 interface BaseRequest {
   id: string
   type: RequestType
@@ -21,14 +24,12 @@ interface BaseRequest {
 }
 
 interface GenerateRequest extends BaseRequest {
+  onRetry?: RetryListener
   type: 'generate'
   prompt: string
   system?: string
   onProgress?: (textSoFar: string) => void
 }
-
-/** Reports an attempt that failed and will be tried again after the wait */
-export type RetryListener = (attempt: number, error: Error, delayMs: number) => void
 
 interface ChatRequest extends BaseRequest {
   onRetry?: RetryListener
@@ -62,7 +63,8 @@ class LLMQueue {
     prompt: string,
     system?: string,
     priority = 0,
-    onProgress?: (textSoFar: string) => void
+    onProgress?: (textSoFar: string) => void,
+    options?: { onRetry?: RetryListener }
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const request: GenerateRequest = {
@@ -71,6 +73,7 @@ class LLMQueue {
         prompt,
         system,
         onProgress,
+        onRetry: options?.onRetry,
         priority,
         resolve: resolve as (value: unknown) => void,
         reject,
@@ -150,6 +153,7 @@ class LLMQueue {
             signal: this.abort.signal,
             onRetry: (attempt, error, delayMs) => {
               console.log(`[LLM Queue] Retry ${attempt} after ${delayMs}ms: ${error.message}`)
+              request.onRetry?.(attempt, error, delayMs)
             },
           }
         )

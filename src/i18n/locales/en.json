@@ -128,9 +128,13 @@
     },
     "connected": "Connected to {provider}",
     "connectionFailed": "Failed to connect to provider",
-    "streaming": {
-      "label": "Enable Streaming",
-      "hint": "Stream responses token-by-token (requires provider support)"
+    "testMessage": {
+      "label": "Test message",
+      "hint": "Sends this prompt to the provider the way the agent does and shows the reply and its timing.",
+      "defaultPrompt": "Reply with one short sentence: what is a knowledge graph?",
+      "send": "Send",
+      "sending": "Sending...",
+      "timing": "First byte after {firstByte} s, finished in {total} s, {chars} characters, {attempts} attempt(s)"
     },
     "apiKey": {
       "label": "API Key",

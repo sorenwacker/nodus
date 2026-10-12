@@ -201,7 +201,11 @@ export class OpenAICompatibleProvider implements ILLMProvider {
       connectTimeout: this.timeout,
       onChunk: chunk => {
         raw += chunk
+        const before = sse.text().length
         sse.push(chunk)
+        // Reported per chunk so a caller can time the first byte
+        // (PRODUCT_DESIGN.md > Sending a test message)
+        if (sse.text().length > before) options.onProgress?.(sse.text())
       },
     })
 

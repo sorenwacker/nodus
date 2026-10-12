@@ -10,11 +10,13 @@ import { providerRegistry } from '../../llm/providers'
 import type { ProviderModel } from '../../llm/providers'
 import { DEFAULT_SYSTEM_PROMPT, DEFAULT_AGENT_PROMPT } from '../../llm/prompts'
 import { notifications$ } from '../../composables/useNotifications'
+import { useProviderTestMessage } from '../../llm/providerTestMessage'
 
 const { t } = useI18n()
 
-// Streaming toggle
-const llmStreaming = ref(llmStorage.getLLMStreaming())
+// A real prompt through the same path as agent work
+// (PRODUCT_DESIGN.md > Sending a test message)
+const testMessage = useProviderTestMessage(t('llm.testMessage.defaultPrompt'))
 
 // Provider settings
 const providers = providerRegistry.getProviders()
@@ -291,9 +293,6 @@ watch(selectedProvider, saveActiveProvider)
 watch(llmSystemPrompt, saveSystemPrompt)
 watch(llmAgentPrompt, saveAgentPrompt)
 watch([maxTokens, contextWindow, timeout, selectedModel], saveProviderConfig)
-watch(llmStreaming, (value) => {
-  llmStorage.setLLMStreaming(value)
-})
 
 // Debounced fetches
 let fetchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -347,13 +346,26 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Streaming toggle -->
+    <!-- Test message: a real prompt through the same path as agent work -->
     <div class="setting-group">
-      <label class="checkbox-label">
-        <input v-model="llmStreaming" type="checkbox" />
-        {{ t('llm.streaming.label') }}
-      </label>
-      <span class="hint">{{ t('llm.streaming.hint') }}</span>
+      <label>{{ t('llm.testMessage.label') }}</label>
+      <textarea v-model="testMessage.prompt.value" rows="2" />
+      <div class="test-message-row">
+        <button class="text-btn" :disabled="testMessage.running.value" @click="testMessage.send()">
+          {{ testMessage.running.value ? t('llm.testMessage.sending') : t('llm.testMessage.send') }}
+        </button>
+        <span v-if="testMessage.result.value" class="hint">
+          {{ t('llm.testMessage.timing', {
+            firstByte: testMessage.result.value.firstByteMs === null ? '-' : (testMessage.result.value.firstByteMs / 1000).toFixed(1),
+            total: (testMessage.result.value.totalMs / 1000).toFixed(1),
+            chars: testMessage.result.value.reply.length,
+            attempts: testMessage.result.value.attempts,
+          }) }}
+        </span>
+      </div>
+      <p v-if="testMessage.reply.value" class="test-message-reply">{{ testMessage.reply.value }}</p>
+      <p v-if="testMessage.error.value" class="provider-error">{{ testMessage.error.value }}</p>
+      <span v-if="!testMessage.result.value && !testMessage.error.value" class="hint">{{ t('llm.testMessage.hint') }}</span>
     </div>
 
     <!-- API Key -->
@@ -585,6 +597,24 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.test-message-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.test-message-reply {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 6px;
+  background: var(--bg-canvas, #f4f4f5);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--text-main, #18181b);
+}
+
 .provider-error {
   margin: 6px 0 0;
   font-size: 11px;
