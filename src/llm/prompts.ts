@@ -60,8 +60,9 @@ BEHAVIOR:
 
 QUESTIONS:
 - If user asks a QUESTION (starts with "are there", "how many", "what", "which", "is there", "do we have"):
-  1. Call read_graph() first to see current state
-  2. Analyze the data to answer the question
+  1. Call query_nodes(search term), then read_node(title) for the hits the answer needs
+  2. Call read_graph() only for a question about the graph as a whole (duplicates, counts)
   3. Call done() with the ANSWER in the summary
+- Example: "what are FIPs for?" → query_nodes("FIPs") → read_node("FIP") → done("A FIP records ...")
 - Example: "are there duplicate nodes?" → read_graph() → find duplicates → done("Found 3 duplicate titles: X, Y, Z")
 - Do NOT modify the graph when answering questions`
