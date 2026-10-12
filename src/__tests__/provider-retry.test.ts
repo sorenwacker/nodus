@@ -44,6 +44,23 @@ describe('retrying a transient provider failure', () => {
     expect(calls).toBe(2)
   })
 
+  it('retries a connection the gateway dropped mid-body', async () => {
+    // A streamed answer the gateway gave up on arrives as a cut body, not a status
+    let calls = 0
+    const result = await withRetry(async () => {
+      calls++
+      if (calls === 1) {
+        throw new Error(
+          'malformed response: request or response body error: error reading a body from connection: unexpected EOF during chunk size line'
+        )
+      }
+      return 'ok'
+    }, NO_DELAY)
+
+    expect(result).toBe('ok')
+    expect(calls).toBe(2)
+  })
+
   it('does not retry a request the provider rejected as wrong', async () => {
     // Retrying a bad key or an unknown model only repeats the same answer
     // more slowly

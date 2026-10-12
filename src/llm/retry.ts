@@ -46,6 +46,10 @@ const DEFAULT_OPTIONS: RetryOptions = {
     '504',
     '502',
     '429',
+    // A streamed body the gateway cut while waiting for the model: it arrives
+    // as a read error, with no status to match
+    'unexpected EOF',
+    'error reading a body',
   ],
 }
 
