@@ -6,9 +6,22 @@
  * (PRODUCT_DESIGN.md > Streaming responses).
  */
 
+interface ToolCallDelta {
+  index?: number
+  id?: string
+  type?: 'function'
+  function?: { name?: string; arguments?: string }
+}
+
 interface StreamDelta {
-  choices?: Array<{ delta?: { content?: string } }>
+  choices?: Array<{ delta?: { content?: string; tool_calls?: ToolCallDelta[] } }>
   error?: { message?: string } | string
+}
+
+export interface StreamedToolCall {
+  id?: string
+  type: 'function'
+  function: { name: string; arguments: string }
 }
 
 export interface SseAccumulator {
@@ -21,6 +34,13 @@ export interface SseAccumulator {
   flush(): void
   /** The message assembled so far */
   text(): string
+  /**
+   * The tool calls assembled so far. A call arrives as fragments, each with
+   * the index of the call it belongs to; they are joined by index so a name in
+   * one delta and arguments over many deltas make one call
+   * (PRODUCT_DESIGN.md > Streaming responses).
+   */
+  toolCalls(): StreamedToolCall[]
   /** Whether the stream reported that it finished */
   done(): boolean
   /** An error the stream carried in place of content, if any */
@@ -37,6 +57,7 @@ const EVENT_BOUNDARY = /\r\n\r\n|\n\n|\r\r/
 export function createSseAccumulator(): SseAccumulator {
   let buffer = ''
   let content = ''
+  const calls = new Map<number, StreamedToolCall>()
   let finished = false
   let failure: string | null = null
 
@@ -64,7 +85,17 @@ export function createSseAccumulator(): SseAccumulator {
     for (const choice of parsed.choices ?? []) {
       // A delta without content announces the role or a stop reason
       if (choice.delta?.content) content += choice.delta.content
+      for (const fragment of choice.delta?.tool_calls ?? []) joinFragment(fragment)
     }
+  }
+
+  function joinFragment(fragment: ToolCallDelta) {
+    const index = fragment.index ?? 0
+    const call = calls.get(index) ?? { type: 'function', function: { name: '', arguments: '' } }
+    if (fragment.id) call.id = fragment.id
+    if (fragment.function?.name) call.function.name += fragment.function.name
+    if (fragment.function?.arguments) call.function.arguments += fragment.function.arguments
+    calls.set(index, call)
   }
 
   function dispatchBlock(block: string) {
@@ -93,6 +124,11 @@ export function createSseAccumulator(): SseAccumulator {
       if (remaining.trim()) dispatchBlock(remaining)
     },
     text: () => content,
+    toolCalls: () =>
+      [...calls.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, call]) => call)
+        .filter(call => call.function.name),
     done: () => finished,
     error: () => failure,
   }
