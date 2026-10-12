@@ -30,6 +30,7 @@ const exploreMode: AgentModeConfig = {
   toolWhitelist: [
     // Reading
     'read_graph',
+    'read_node',
     'query_nodes',
     // Research
     'web_search',
@@ -100,6 +101,7 @@ const planMode: AgentModeConfig = {
   toolWhitelist: [
     // Reading
     'read_graph',
+    'read_node',
     'get_connected_components',
     'query_nodes',
     // Research (read-only)
@@ -123,7 +125,7 @@ to create, edit, delete, connect, or lay out nodes. Nothing happens to the user'
 graph until they approve your plan.
 
 METHODOLOGY:
-1. read_graph() / query_nodes() to see what already exists
+1. query_nodes() and read_node() to see what already exists; read_graph() for the whole
 2. wikipedia_search(), fetch_wikipedia(), research() to gather information
 3. validate_claim() / check_completeness() as needed
 4. think() to synthesize
@@ -146,6 +148,7 @@ const executeMode: AgentModeConfig = {
   maxIterations: 500,
   toolWhitelist: [
     'read_graph',
+    'read_node',
     'get_connected_components',
     'create_node',
     'create_edge',

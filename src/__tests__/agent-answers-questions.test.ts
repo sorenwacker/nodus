@@ -54,3 +54,18 @@ describe('the instructions for a question', () => {
     expect(promptFor('plan')).not.toContain('You are a graph builder agent.')
   })
 })
+
+describe('the reads a question is answered from', () => {
+  it('search the notes, then read the hits, and read the whole graph only for a question about the whole', () => {
+    const prompt = promptFor('plan')
+    const rule = prompt.slice(prompt.indexOf('QUESTIONS'), prompt.indexOf('MODE: PLAN'))
+
+    expect(rule).toContain('query_nodes(search term)')
+    expect(rule).toContain('read_node(title)')
+    expect(rule).toMatch(/read_graph\(\) only for a question about the graph as a whole/)
+  })
+
+  it('no longer tell the model to read the whole graph first', () => {
+    expect(promptFor('plan')).not.toMatch(/read_graph\(\) first/)
+  })
+})

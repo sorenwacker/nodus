@@ -1167,7 +1167,8 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 |------|-------------|
 | `read_graph(mode, include_content, max_content_length)` | Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full" |
 | `get_connected_components()` | How many separate groups the graph falls into, and which nodes are in each. Without it, a claim that the graph is connected can only be a guess |
-| `query_nodes(filter)` | Query nodes from database. Returns list of {title, content} for planning |
+| `query_nodes(filter)` | Search node titles and content. Returns each hit with a preview of its content; the search term also matches the other number of a plural ("FIPs" finds "FIP") |
+| `read_node(title)` | Read one node's full content by title. For a question about one note, this follows a search in place of reading the whole graph |
 | `for_each_node(filter, action, template)` | Process nodes: set/append content with templates, or use LLM to generate/transform content |
 | `check_completeness(topic, findings)` | Assess if research on a topic is complete. Returns coverage score and suggests follow-up queries if gaps exist |
 
@@ -1528,9 +1529,20 @@ A request that asks what the notes say, and asks for no change, is answered: the
 Every mode's instructions described building. The default mode told the model to read the graph, research on the web, synthesize, draft a plan and request approval, whatever the request was, so a plain question about the workspace set off that whole sequence: nine tool calls and still running, for a question the notes answer.
 
 - The instructions state the rule ahead of the mode's method and say it takes precedence over it.
-- For a question the agent makes at most the reads the answer needs - a search of the notes or one reading of the graph - and then gives the answer as its final message. It makes no plan, requests no approval, changes nothing, and uses web research only when the question asks for information the notes do not hold.
+- For a question the agent makes at most the reads the answer needs - a search of the notes, then the notes the search turned up, or one reading of the graph for a question about the graph as a whole - and then gives the answer as its final message. It makes no plan, requests no approval, changes nothing, and uses web research only when the question asks for information the notes do not hold.
 - Whether a request is a question is the model's judgement, stated in the instructions; the request is not classified by pattern matching (Classifying what the user wrote).
 - The rule is an instruction to the model, so it lowers the number of calls without bounding it. The gate test checks that every mode's instructions carry the rule, not what a model does with it.
+
+#### Reading the note the question is about
+
+A question about one note is answered from that note. The agent searches the notes with `query_nodes`, reads the hits it needs with `read_node`, and answers.
+
+Asked what one note's subject was for, the agent searched, found the note, and then had no way to read it: the search returned titles only, and the agent had no tool that reads one node. Its only path to the content was `read_graph` in full mode, which sent all 216 notes of the workspace with content in one request, and the provider's gateway gave up waiting for the model. The instructions had also told the model to read the whole graph first for any question.
+
+- `read_node(title)` returns one node's full content and is available in every mode. A title that names no node is reported, so the model can search again rather than guess.
+- `query_nodes` returns a preview of each hit's content next to its title, so the model can pick the relevant hit without a second call per node.
+- The search term matches the other number of a plural: "FIPs" finds a note titled "FIP" and "FIP" finds "FIPs". The term is matched as typed and, when it ends in a plural suffix, as its stem, provided the stem is at least three characters long so a short word does not match everything. Nothing is inferred beyond that; a term in another language or an irregular plural is matched as typed.
+- The instructions say to search and then read the hits, and to read the whole graph only for a question about the graph as a whole, such as duplicates or counts.
 
 ### What the agent acts on
 

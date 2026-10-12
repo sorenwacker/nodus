@@ -1,10 +1,10 @@
 /**
  * Query tool registrations
  *
- * Handles: read_graph, query_nodes, get_connected_components
+ * Handles: read_graph, read_node, query_nodes, get_connected_components
  */
 
-import { defineTool } from '../registry'
+import { defineTool, findNodeByTitle } from '../registry'
 import { handleGetConnectedComponents } from '../../mcp/handlers/nodeHandlers'
 
 export function registerQueryTools(): void {
@@ -167,9 +167,30 @@ ${edgeDescriptions.length > 0 ? edgeDescriptions.join('\n') : '  (none)'}${trunc
     { category: 'query' }
   )
 
+  defineTool<{ title: string }>(
+    'read_node',
+    'Read one node\'s full content by title. After query_nodes, read the hits the answer needs instead of the whole graph.',
+    {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Exact node title (case-insensitive)' },
+      },
+      required: ['title'],
+    },
+    async (args, ctx) => {
+      const node = findNodeByTitle(ctx.store.filteredNodes, args.title)
+      if (!node) {
+        return `No node titled "${args.title}". Use query_nodes("search term") to find the title.`
+      }
+      const content = node.markdown_content?.trim()
+      return content ? `"${node.title}":\n${content}` : `"${node.title}" has no content.`
+    },
+    { category: 'query' }
+  )
+
   defineTool<{ filter: string }>(
     'query_nodes',
-    'Query nodes from database. Returns list of {title, content} for planning.',
+    'Search node titles and content. Returns each hit with a preview of its content; a plural term also finds its singular. Read a hit in full with read_node.',
     {
       type: 'object',
       properties: {
@@ -186,21 +207,48 @@ ${edgeDescriptions.length > 0 ? edgeDescriptions.join('\n') : '  (none)'}${trunc
       } else if (filter === 'has_content') {
         nodes = nodes.filter(n => n.markdown_content?.trim())
       } else if (filter && filter !== 'all') {
-        const term = filter.toLowerCase()
-        nodes = nodes.filter(n =>
-          n.title.toLowerCase().includes(term) ||
-          n.markdown_content?.toLowerCase().includes(term)
-        )
+        const matches = termMatcher(filter)
+        nodes = nodes.filter(n => matches(n.title) || matches(n.markdown_content || ''))
       }
 
-      const result = nodes.map(n => ({
-        title: n.title,
-        has_content: !!n.markdown_content?.trim(),
-        preview: (n.markdown_content || '').slice(0, 50),
-      }))
+      const lines = nodes.map(n => {
+        const content = (n.markdown_content || '').trim()
+        if (!content) return `- ${n.title} (empty)`
+        const preview = content.length > PREVIEW_CHARS ? `${content.slice(0, PREVIEW_CHARS)}...` : content
+        return `- ${n.title} - ${preview.replace(/\s+/g, ' ')}`
+      })
 
-      return `Found ${result.length} nodes:\n${result.map(n => `- ${n.title}${n.has_content ? '' : ' (empty)'}`).join('\n')}`
+      return `Found ${lines.length} nodes:\n${lines.join('\n')}`
     },
     { category: 'query' }
   )
+}
+
+/** Chars of content shown per hit: enough to tell the hits apart without a read per node */
+const PREVIEW_CHARS = 120
+
+/** A stem shorter than this would match almost anything ("bus" -> "bu") */
+const MIN_STEM_LENGTH = 3
+
+/**
+ * Match a search term as typed and, when it ends in a plural suffix, as its
+ * stem, so "FIPs" finds a note titled "FIP" (PRODUCT_DESIGN.md > Reading the
+ * note the question is about). The stem is a substring of the plural, so the
+ * singular term already finds the plural.
+ */
+function termMatcher(filter: string): (text: string) => boolean {
+  const term = filter.toLowerCase()
+  const stem = pluralStem(term)
+  const variants = stem && stem.length >= MIN_STEM_LENGTH ? [term, stem] : [term]
+  return text => {
+    const lower = text.toLowerCase()
+    return variants.some(v => lower.includes(v))
+  }
+}
+
+function pluralStem(term: string): string | null {
+  if (term.endsWith('ies')) return `${term.slice(0, -3)}y`
+  if (term.endsWith('es')) return term.slice(0, -2)
+  if (term.endsWith('s')) return term.slice(0, -1)
+  return null
 }
