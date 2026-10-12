@@ -83,3 +83,56 @@ describe('a retry during a run', () => {
     expect(assistant?.text).toContain('A FIP records choices.')
   })
 })
+
+describe('a request failure that ends the run', () => {
+  beforeEach(() => {
+    chat.mockReset()
+  })
+
+  it('says how many attempts were made and how long they took', async () => {
+    const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
+    const ctx = makeContext()
+    const runner = useAgentRunner(ctx as never)
+    const gateway = new Error('API error 504: the gateway timed out waiting for the model')
+
+    chat.mockImplementation(async (_m: unknown, _t: unknown, options?: { onRetry?: (attempt: number, error: Error, delayMs: number) => void }) => {
+      options?.onRetry?.(1, gateway, 5_000)
+      options?.onRetry?.(2, gateway, 15_000)
+      throw gateway
+    })
+
+    void runner.run('what is a FIP for?')
+    await settle()
+
+    const assistant = ctx.transcript.value.find(t => t.role === 'assistant')
+    expect(assistant?.text).toMatch(/504.*after 3 attempts over \d+ s/)
+    expect(ctx.log.value.join('\n')).toMatch(/after 3 attempts over \d+ s/)
+  })
+
+  it('says when the first attempt was the only one', async () => {
+    const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
+    const ctx = makeContext()
+    const runner = useAgentRunner(ctx as never)
+    chat.mockRejectedValue(new Error('API error 401: invalid api key'))
+
+    void runner.run('what is a FIP for?')
+    await settle()
+
+    const assistant = ctx.transcript.value.find(t => t.role === 'assistant')
+    expect(assistant?.text).toMatch(/401.*on the first attempt, after \d+ s/)
+  })
+
+  it('does not annotate a stop', async () => {
+    const { useAgentRunner } = await import('../canvas/composables/agent/useAgentRunner')
+    const ctx = makeContext()
+    const runner = useAgentRunner(ctx as never)
+    chat.mockRejectedValue(new Error('Cancelled'))
+
+    void runner.run('what is a FIP for?')
+    await settle()
+
+    const assistant = ctx.transcript.value.find(t => t.role === 'assistant')
+    expect(assistant?.text).toContain('Stopped')
+    expect(assistant?.text).not.toMatch(/attempt/)
+  })
+})
