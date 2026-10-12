@@ -341,6 +341,7 @@ The integral is: $ integral_a^b f(x) dif x $
 - Generation requests ask the provider to stream, and the backend forwards each chunk to the interface as it arrives rather than accumulating the whole body.
 - Chat requests with tools, which is every request an agent run makes, stream as well. Only generation streamed at first, so the agent's requests still arrived as one body: an agent that had searched the notes and read the one it needed then asked for the answer, and the gateway in front of the model gave up on that buffered answer with a 504 while the two shorter requests before it had gone through. A streamed tool call arrives as fragments, one per delta, each carrying the index of the call it belongs to; the fragments are joined by index into whole calls, so a call whose name arrives in one delta and whose arguments arrive over the next twenty is one call.
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
+- There is no streaming switch in the settings. One existed, and saved a value that no provider read, so it promised control over something it did not touch.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
 ### Localisation
@@ -411,6 +412,16 @@ Every provider answers the question the same way, through one shared probe:
 - The endpoint is the one used for work, with the **configured** model. A model listing answers whenever the server is up, including when the configured model was never pulled or the account cannot reach it. Probing a hardcoded model tests something the user never chose.
 - Any failing status means unavailable. Reading "any status other than 401" as online showed green beside a model that answered nothing.
 - The reason is recorded on the provider and declared on the interface, because "could not be reached", "refused the key" and "no such model" call for different fixes. Reaching into one implementation's field with a cast left the other three reporting nothing.
+
+### Sending a test message
+
+**Required behavior:** The status light says whether the provider accepts a one-token request. It cannot say whether the provider can finish a written answer, which is what every agent run needs, and a provider that passes the probe but cuts every answer is found only by running the agent and reading its failure. The AI settings offer a test message: a real prompt, sent the way the agent sends its work, with the reply and its timing shown in place.
+
+- The panel holds an editable prompt with a default that asks for one short sentence, and a button that sends it. One request is in flight at a time; the button is disabled while it runs.
+- The request goes through the queue to the configured provider, streamed, with the same retries as agent work. What the test measures is what the agent gets.
+- The panel shows the reply as it streams in, then the time to the first byte, the total time, and the length of the reply in characters. Time to first byte separates a model that is slow to start from one that is slow to write, which call for different fixes.
+- A failure shows the message the agent would have shown, including the attempt count and elapsed time, so a provider that cannot finish a sentence is diagnosed here rather than in a run.
+- Progress is reported by every streaming provider. Only Ollama reported it; the OpenAI-compatible provider streamed but told the caller nothing until the end, so a test could not have timed its first byte.
 
 ### PDF text cleanup
 
