@@ -1655,6 +1655,7 @@ A gateway timeout was missing from the list. Something between the application a
 - The retries wait for the backend to recover: about 5, 15 and 45 seconds, rather than 1 and 2. A backend that stalls does so for longer than a second or two, so three attempts within three seconds all landed in the same stall and the user saw one failure. The waits are the same for every transient status, since none of them clears in a second.
 - Each retry is written to the run's transcript as an action on the current turn, naming the failure and the wait, so a provider that is failing looks different from an application that crashed. Before, the retries were written to the browser console only and the user saw a single final error.
 - Stopping the run interrupts the wait. A retry that is waiting 45 seconds would otherwise keep the run alive that long after the user pressed stop.
+- A connection the gateway drops mid-body is transient and is retried. Once chat requests streamed, a gateway that had answered 504 to a buffered request instead sent the response headers, waited for the model, and closed the connection, which reaches the application as a body read ending in an unexpected end of file. The text carries no status and matched none of the retry patterns, so the run ended on the first drop.
 
 ### Reporting a provider failure
 
