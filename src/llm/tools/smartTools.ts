@@ -1,7 +1,7 @@
 /**
  * Smart (LLM-powered) tool registrations
  *
- * Handles: smart_move, smart_connect, smart_color, color_matching
+ * Handles: smart_move, smart_layout, smart_connect, smart_color, color_matching
  */
 
 import { defineTool } from '../registry'
@@ -21,6 +21,21 @@ export function registerSmartTools(): void {
       // This tool requires external LLM calls - the canvas dispatcher only
       // falls through to the real implementation on __UNHANDLED__
       return `__UNHANDLED__:smart_move`
+    },
+    { category: 'smart' }
+  )
+
+  defineTool<{ instruction?: string }>(
+    'smart_layout',
+    'Arrange the selected nodes (or all visible nodes) into regions by meaning. The LLM proposes thematic groups and assigns each node to one.',
+    {
+      type: 'object',
+      properties: {
+        instruction: { type: 'string', description: 'Optional grouping criterion: "by research method", "chronologically"' },
+      },
+    },
+    async (_args, _ctx) => {
+      return `__UNHANDLED__:smart_layout`
     },
     { category: 'smart' }
   )

@@ -13,7 +13,9 @@ import type { AgentTask, AgentPlan } from '../../../llm/types'
 import {
   batchClassifyForMove,
   batchClassifyForConnect,
+  proposeAndClassifyGroups,
 } from '../../../llm/batchClassifier'
+import { arrangeGroups } from '../../layout/semanticGroupLayout'
 import {
   executeRegisteredTool,
   hasToolHandler,
@@ -239,6 +241,44 @@ export function useLLMTools(ctx: LLMToolsContext) {
           groupX += spacing
         }
         return `Moved ${moved} nodes into ${groups.size} groups`
+      }
+
+      case 'smart_layout': {
+        const visible = store.getFilteredNodes()
+        const selected = new Set(store.selectedNodeIds ?? [])
+        const nodes = selected.size > 0 ? visible.filter(n => selected.has(n.id)) : visible
+        if (nodes.length === 0) return 'No nodes to arrange'
+        log(`> Smart layout: ${nodes.length} nodes`)
+        const agentWasRunning = !isCancelled()
+
+        const { groups, assignment } = await proposeAndClassifyGroups(
+          nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
+          (args.instruction as string) || '',
+          llmQueue,
+          // From the canvas controls no agent run is in progress, and a stop
+          // flag that is already down would end the run before it classifies
+          { log, isCancelled: agentWasRunning ? isCancelled : undefined }
+        )
+        if (groups.length === 0) return 'The model proposed no groups; nothing was moved'
+
+        const order = [...groups, 'other']
+        const members = new Map(order.map(g => [g, [] as typeof nodes]))
+        for (const node of nodes) members.get(assignment.get(node.id) ?? 'other')!.push(node)
+
+        const origin = {
+          x: Math.min(...nodes.map(n => n.canvas_x)),
+          y: Math.min(...nodes.map(n => n.canvas_y)),
+        }
+        const positions = arrangeGroups(
+          order.map(name => ({
+            name,
+            nodes: members.get(name)!.map(n => ({ id: n.id, width: n.width || 200, height: n.height || 120 })),
+          })),
+          origin
+        )
+        await Promise.all([...positions].map(([id, p]) => store.updateNodePosition(id, p.x, p.y)))
+        const used = order.filter(g => members.get(g)!.length > 0)
+        return `Arranged ${positions.size} nodes in ${used.length} groups: ${used.join(', ')}`
       }
 
       case 'smart_connect': {

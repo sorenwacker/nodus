@@ -92,6 +92,7 @@
       "forceLayout": "Kraftbasiertes Layout - Nach Verbindungen anordnen",
       "hierarchicalLayout": "Hierarchisches Layout - Als Baum anordnen (für DAGs/Ontologien)",
       "radialLayout": "Radiales Layout - Nachbarn in konzentrischen Kreisen um ausgewählten Knoten anordnen",
+      "smartLayout": "Intelligentes Layout - Ausgewählte oder alle Knoten mit dem KI-Modell nach Bedeutung gruppieren",
       "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
       "edgeStyle": "Kantenform",
       "highlightEdges": "Alle Kanten hervorheben - Alle Kanten sichtbarer machen",

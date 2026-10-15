@@ -26,6 +26,8 @@ defineProps<{
   /** Whether physics mode is running, and whether it can start here */
   physicsActive: boolean
   physicsAvailable: boolean
+  /** Whether an AI provider is enabled, which smart layout needs */
+  smartLayoutAvailable?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,6 +36,7 @@ const emit = defineEmits<{
   (e: 'fitToContent'): void
   (e: 'toggleGridLock'): void
   (e: 'layout', type: 'grid' | 'force' | 'hierarchical' | 'radial'): void
+  (e: 'smartLayout'): void
   (e: 'fitNodesToContent'): void
   (e: 'cycleEdgeStyle'): void
   (e: 'toggleNeighborhoodMode'): void
@@ -131,6 +134,20 @@ const emit = defineEmits<{
         <circle cx="19" cy="12" r="2" />
         <circle cx="12" cy="19" r="2" />
         <circle cx="5" cy="12" r="2" />
+      </svg>
+    </button>
+    <button
+      v-if="smartLayoutAvailable"
+      class="smart-layout"
+      data-tooltip-pos="top"
+      :data-tooltip="t('canvas.controls.smartLayout')"
+      @click="emit('smartLayout')"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="8" height="8" rx="1" />
+        <rect x="14" y="3" width="8" height="8" rx="1" />
+        <rect x="2" y="15" width="8" height="6" rx="1" />
+        <path d="M18 14l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" />
       </svg>
     </button>
     <button data-tooltip-pos="top" :data-tooltip="t('canvas.controls.fitNodesToContent')" @click="emit('fitNodesToContent')">

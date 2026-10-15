@@ -128,6 +128,17 @@ Let the graph arrange itself while you pull on it. Press `P` or use the atom but
 
 Nodes off screen stay where they are. One Undo restores every position from before you switched the mode on. Running a layout command or Undo switches the mode off. The mode is not available in the neighborhood view. While nodes are moving, edges are drawn as straight lines between the bubbles; they are routed in their style again when the motion stops.
 
+### Smart Layout
+Arrange nodes by meaning rather than by edges. A language model sorts the nodes into thematic groups by their title and content; each group is placed in its own region, laid out as a compact grid. Edges are not considered.
+
+**Prerequisite:** an AI provider is configured and the AI features are enabled.
+
+1. Select the nodes to arrange. With nothing selected, all visible nodes are arranged.
+2. Click the smart layout button in the canvas controls, or ask the agent, for example "arrange these by research method". The agent passes your wording as the grouping criterion; the button lets the model choose the groups.
+3. The nodes move into one region per group. Groups the model lists next to each other are placed next to each other.
+
+One Undo restores every position. Nodes the model does not assign to a group are collected in a group named "other". The layout is never run automatically, including when the app starts or a workspace opens.
+
 ## Storylines
 
 Create linear narratives through your knowledge graph:

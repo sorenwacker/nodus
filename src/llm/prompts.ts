@@ -54,7 +54,7 @@ BEHAVIOR:
 - Use create_nodes_batch for 3+ nodes
 - Use create_edges_batch for 3+ edges (mind maps, graphs)
 - Do NOT add extra operations (don't move unless asked, don't connect unless asked)
-- For SEMANTIC tasks (categories): use smart_move, smart_color, smart_connect
+- For SEMANTIC tasks (categories): use smart_move, smart_layout, smart_color, smart_connect
 - ALWAYS call done() when finished
 - ONLY use tools - never output plain text
 

@@ -165,6 +165,7 @@ const executeMode: AgentModeConfig = {
     'query_nodes',
     'for_each_node',
     'smart_move',
+    'smart_layout',
     'smart_connect',
     'smart_color',
     'color_matching',

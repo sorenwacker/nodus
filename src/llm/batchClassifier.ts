@@ -63,6 +63,11 @@ export async function batchClassifyNodes(
     }
   }
 
+  if (isCancelled?.()) {
+    log?.('> Stopped before classification')
+    return results
+  }
+
   if (nodesNeedingLLM.length === 0) {
     log?.(`> All ${nodes.length} nodes matched by tags`)
     return results
@@ -244,4 +249,33 @@ export async function batchClassifyForConnect(
   }
 
   return batchClassifyNodes(nodes, categories, llmQueue, options)
+}
+
+/**
+ * Let the model propose thematic groups for a set of nodes, then classify
+ * each node into one of them (features.md > Smart Layout).
+ *
+ * Returns the groups in the order the model listed them, related ones
+ * adjacent, and the node-to-group assignment.
+ */
+export async function proposeAndClassifyGroups(
+  nodes: Array<{ id: string; title: string; markdown_content?: string | null }>,
+  instruction: string,
+  llmQueue: LLMQueueInterface,
+  options: BatchClassifierOptions = {}
+): Promise<{ groups: string[]; assignment: Map<string, string> }> {
+  const titles = nodes.slice(0, 200).map(n => `- ${n.title}`).join('\n')
+  const criterion = instruction ? `Group them ${instruction}.` : 'Group them by topic.'
+  const prompt = `Propose between 2 and 8 thematic groups for these notes. ${criterion}
+List related groups next to each other.
+
+Notes:
+${titles}
+
+Respond with ONLY the group names separated by commas:`
+  const response = await llmQueue.generate(prompt)
+  const groups = [...new Set((response || '').toLowerCase().split(/[,\n]+/).map(g => g.trim()).filter(g => g.length > 1))]
+  options.log?.(`> Groups: ${groups.join(', ')}`)
+  if (groups.length === 0) return { groups, assignment: new Map() }
+  return { groups, assignment: await batchClassifyNodes(nodes, groups, llmQueue, options) }
 }
