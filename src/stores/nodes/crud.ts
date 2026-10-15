@@ -8,7 +8,7 @@ import { syncWikilinks } from './wikilinkSync'
 import { invoke, isTauri } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { notifications$ } from '../../composables/useNotifications'
-import { recordContentBefore } from './undoRecorder'
+import { asOneUndoStep, recordContentBefore } from './undoRecorder'
 import { generateShortId } from '../../lib/ids'
 import { planTagChange } from '../../lib/tagSync'
 
@@ -435,28 +435,49 @@ export async function updateNodeTags(
   }
 }
 
+/** What the backend answers a rename with */
+interface TitleUpdate {
+  filePath: string | null
+  relinked: Array<{ id: string; content: string }>
+}
+
 /**
- * Update node title
+ * Update node title.
+ *
+ * The backend renames the node's vault file and rewrites the links to the
+ * node in the notes linking to it; the title and those notes form one undo
+ * step (features.md > Wikilink Edges).
  */
 export async function updateNodeTitle(
   nodes: Ref<Node[]>,
   id: string,
-  title: string
+  title: string,
+  options?: { skipUndo?: boolean }
 ): Promise<void> {
   const trimmedTitle = title.trim()
   const node = nodes.value.find(n => n.id === id)
-  if (node) {
+  if (!node) return
+  const record = (n: Node) => {
+    if (!options?.skipUndo) recordContentBefore({ nodeId: n.id, content: n.markdown_content, title: n.title })
+  }
+  await asOneUndoStep(async () => {
+    if (node.title !== trimmedTitle) record(node)
     node.title = trimmedTitle
     node.updated_at = Date.now()
     try {
-      // The backend renames the node's vault file with it and answers with
-      // the file's new path, or null when nothing moved
-      const filePath = await invoke<string | null>('update_node_title', { id, title: trimmedTitle })
-      if (filePath) node.file_path = filePath
+      const update = await invoke<TitleUpdate>('update_node_title', { id, title: trimmedTitle })
+      if (update.filePath) node.file_path = update.filePath
+      for (const { id: linkerId, content } of update.relinked) {
+        const linker = nodes.value.find(n => n.id === linkerId)
+        if (!linker) continue
+        record(linker)
+        linker.markdown_content = content
+        linker.updated_at = Date.now()
+      }
     } catch (e) {
       console.error('Failed to update title:', e)
     }
-  }
+  })
 }
 
 /**
