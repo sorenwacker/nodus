@@ -144,6 +144,7 @@ const BASELINE_AGENT_ONLY: Record<string, string> = {
   smart_color: 'baseline debt: no MCP counterpart yet',
   smart_connect: 'baseline debt: no MCP counterpart yet',
   smart_move: 'baseline debt: no MCP counterpart yet',
+  smart_layout: 'classifies with the app\'s configured AI provider; an MCP client already is a model and can call batch_move_nodes',
   summarize_selected: 'baseline debt: no MCP counterpart yet',
   update_content: 'baseline debt: no MCP counterpart yet',
   update_selected_content: 'baseline debt: no MCP counterpart yet',

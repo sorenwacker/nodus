@@ -1952,7 +1952,7 @@ defineExpose({
         @zoom-in="zoomIn" @zoom-out="zoomOut"
         @fit-to-content="fitToContent"
         @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
-        @layout="autoLayoutNodes"
+        :smart-layout-available="llmEnabled" @layout="autoLayoutNodes" @smart-layout="llmTools.executeLLMTool('smart_layout', {})"
         @fit-nodes-to-content="fitAllNodesToContent"
         @cycle-edge-style="cycleEdgeStyle"
         @toggle-neighborhood-mode="neighborhood.toggle()"

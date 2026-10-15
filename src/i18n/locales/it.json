@@ -92,6 +92,7 @@
       "forceLayout": "Layout a forza - Disponi per connessioni",
       "hierarchicalLayout": "Layout gerarchico - Disponi come albero (per DAG/ontologie)",
       "radialLayout": "Layout radiale - Disponi i vicini in cerchi concentrici attorno al nodo selezionato",
+      "smartLayout": "Layout intelligente - Raggruppa i nodi selezionati o tutti per significato con il modello IA",
       "fitNodesToContent": "Adatta nodi al contenuto - Ridimensiona tutti i nodi",
       "edgeStyle": "Stile archi",
       "magnifier": "Lente - Mostra vista ingrandita quando rimpicciolito",
