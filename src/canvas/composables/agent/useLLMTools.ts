@@ -249,12 +249,15 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const nodes = selected.size > 0 ? visible.filter(n => selected.has(n.id)) : visible
         if (nodes.length === 0) return 'No nodes to arrange'
         log(`> Smart layout: ${nodes.length} nodes`)
+        const agentWasRunning = !isCancelled()
 
         const { groups, assignment } = await proposeAndClassifyGroups(
           nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
           (args.instruction as string) || '',
           llmQueue,
-          { log, isCancelled }
+          // From the canvas controls no agent run is in progress, and a stop
+          // flag that is already down would end the run before it classifies
+          { log, isCancelled: agentWasRunning ? isCancelled : undefined }
         )
         if (groups.length === 0) return 'The model proposed no groups; nothing was moved'
 

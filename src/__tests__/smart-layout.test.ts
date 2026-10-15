@@ -57,7 +57,7 @@ describe('arrangeGroups', () => {
   })
 })
 
-function createContext(selected: string[]): { ctx: LLMToolsContext; moved: Map<string, { x: number; y: number }> } {
+function createContext(selected: string[], agentRunning = true): { ctx: LLMToolsContext; moved: Map<string, { x: number; y: number }> } {
   const nodes = [
     { id: '1', title: 'Survey methods', markdown_content: '', canvas_x: 0, canvas_y: 0 },
     { id: '2', title: 'Interview study', markdown_content: '', canvas_x: 0, canvas_y: 0 },
@@ -86,7 +86,7 @@ function createContext(selected: string[]): { ctx: LLMToolsContext; moved: Map<s
       }),
     },
     log: vi.fn(),
-    isRunning: ref(true),
+    isRunning: ref(agentRunning),
   } as unknown as LLMToolsContext
   return { ctx, moved }
 }
@@ -97,6 +97,13 @@ describe('the smart_layout tool', () => {
     const result = await useLLMTools(ctx).executeLLMTool('smart_layout', {})
     expect(moved.size).toBe(4)
     expect(result).toContain('2 groups')
+  })
+
+  it('groups the nodes when started from the canvas controls, outside an agent run', async () => {
+    const { ctx, moved } = createContext([], false)
+    const result = await useLLMTools(ctx).executeLLMTool('smart_layout', {})
+    expect(result).toContain('2 groups')
+    expect(moved.get('3')!.x).not.toBe(moved.get('1')!.x)
   })
 
   it('moves only the selection when there is one', async () => {
