@@ -235,7 +235,7 @@ TOOLS:
 - for_each_node(action, template, filter?): UPDATE existing nodes. action="llm" generates content. template="What is {title}?" uses variables.
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}].
 - smart_move(instruction): Move nodes by semantic criteria.
-- smart_layout(instruction?): Arrange selected or all visible nodes into regions by meaning. Use for "layout by topic".
+- smart_layout(instruction?): Arrange selected or all visible nodes as a hierarchy from node kind and connections. Use for "smart layout", "hierarchical layout by meaning".
 - smart_color(instruction): Color nodes by semantic criteria.
 - color_matching(pattern, color): SEMANTIC coloring - classify by meaning (e.g., "person", "question", "organization"). NOT for text patterns.
 - color_regex(regex, color, field?): REGEX coloring - match text patterns on title. Use ^x for "starts with x", x$ for "ends with x", foo for "contains foo".

@@ -92,7 +92,7 @@
       "forceLayout": "Disposición por fuerza - Ordenar por conexiones",
       "hierarchicalLayout": "Disposición jerárquica - Ordenar como árbol (para DAGs/ontologías)",
       "radialLayout": "Disposición radial - Ordenar vecinos en círculos concéntricos alrededor del nodo seleccionado",
-      "smartLayout": "Disposición inteligente - Agrupar los nodos seleccionados o todos por significado con el modelo de IA",
+      "smartLayout": "Disposición inteligente - Ordenar los nodos seleccionados o todos como jerarquía con el modelo de IA",
       "fitNodesToContent": "Ajustar nodos al contenido - Redimensionar todos los nodos",
       "edgeStyle": "Estilo de aristas",
       "magnifier": "Lupa - Mostrar vista ampliada al alejar",
