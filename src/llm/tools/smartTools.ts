@@ -27,11 +27,11 @@ export function registerSmartTools(): void {
 
   defineTool<{ instruction?: string }>(
     'smart_layout',
-    'Arrange the selected nodes (or all visible nodes) into regions by meaning. The LLM proposes thematic groups and assigns each node to one.',
+    'Arrange the selected nodes (or all visible nodes) as a top-down tree. Node kinds are ranked broad to specific and each node goes under its most specific broader neighbour.',
     {
       type: 'object',
       properties: {
-        instruction: { type: 'string', description: 'Optional grouping criterion: "by research method", "chronologically"' },
+        instruction: { type: 'string', description: 'Optional guidance for the hierarchy: "sources at the top"' },
       },
     },
     async (_args, _ctx) => {

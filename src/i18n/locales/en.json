@@ -92,7 +92,7 @@
       "forceLayout": "Force Layout - Arrange by connections",
       "hierarchicalLayout": "Hierarchical Layout - Arrange as tree (for DAGs/ontologies)",
       "radialLayout": "Radial Layout - Arrange neighbors in concentric circles around selected node",
-      "smartLayout": "Smart Layout - Group selected or all nodes by meaning using the AI model",
+      "smartLayout": "Smart Layout - Arrange selected or all nodes as a hierarchy using the AI model",
       "fitNodesToContent": "Fit Nodes to Content - Resize all nodes to show full content",
       "edgeStyle": "Edge Style",
       "highlightEdges": "Highlight All Edges - Make all edges more visible",

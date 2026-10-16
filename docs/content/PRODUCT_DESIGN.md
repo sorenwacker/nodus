@@ -1203,7 +1203,7 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 |------|-------------|
 | `auto_layout(layout, sort)` | Arrange nodes in a layout |
 | `smart_move(instruction)` | Move nodes based on semantic criteria. LLM reasons about each node. Use for "move cars left, animals right" |
-| `smart_layout(instruction?)` | Arrange the selected or all visible nodes into one region per thematic group the LLM proposes. See features.md > Smart Layout |
+| `smart_layout(instruction?)` | Arrange the selected or all visible nodes as a top-down tree from node kind and connections. See features.md > Smart Layout |
 | `smart_connect(groups)` | Connect nodes within semantic groups. E.g., "connect animals together, connect cars together, but not across" |
 | `smart_color(instruction)` | Color nodes into multiple categories based on what they represent. LLM semantically classifies each node |
 | `color_matching(pattern, color)` | Color nodes by SEMANTIC criterion (what nodes represent). Use for categories like "person", "organization", "question". NOT for text patterns - use color_regex instead |
