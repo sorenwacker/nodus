@@ -106,6 +106,21 @@ describe('the smart_layout tool', () => {
     expect(moved.get('3')!.x).not.toBe(moved.get('1')!.x)
   })
 
+  it('reports how the run ended in the log', async () => {
+    const { ctx } = createContext([])
+    await useLLMTools(ctx).executeLLMTool('smart_layout', {})
+    const lines = (ctx.log as ReturnType<typeof vi.fn>).mock.calls.map(c => c[0] as string)
+    expect(lines.at(-1)).toContain('Arranged 4 nodes')
+  })
+
+  it('reports a failed model call instead of ending silently', async () => {
+    const { ctx, moved } = createContext([])
+    ;(ctx.llmQueue.generate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('provider timed out'))
+    const result = await useLLMTools(ctx).executeLLMTool('smart_layout', {})
+    expect(result).toContain('provider timed out')
+    expect(moved.size).toBe(0)
+  })
+
   it('moves only the selection when there is one', async () => {
     const { ctx, moved } = createContext(['1', '3'])
     await useLLMTools(ctx).executeLLMTool('smart_layout', {})
