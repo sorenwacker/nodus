@@ -129,15 +129,23 @@ Let the graph arrange itself while you pull on it. Press `P` or use the atom but
 Nodes off screen stay where they are. One Undo restores every position from before you switched the mode on. Running a layout command or Undo switches the mode off. The mode is not available in the neighborhood view. While nodes are moving, edges are drawn as straight lines between the bubbles; they are routed in their style again when the motion stops.
 
 ### Smart Layout
-Arrange nodes by meaning rather than by edges. A language model sorts the nodes into thematic groups by their title and content; each group is placed in its own region, laid out as a compact grid. Edges are not considered.
+Arrange nodes as a tree from broad to specific. The tree is built from each node's kind (its node type: tag, term, note, citation, ...) and its connections, with a language model deciding the order of the kinds and the parent of each node where the graph leaves a choice. The tree is drawn top-down with the hierarchical layout algorithm.
 
 **Prerequisite:** an AI provider is configured and the AI features are enabled.
 
 1. Select the nodes to arrange. With nothing selected, all visible nodes are arranged.
-2. Click the smart layout button in the canvas controls, or ask the agent, for example "arrange these by research method". The agent passes your wording as the grouping criterion; the button lets the model choose the groups.
-3. The nodes move into one region per group. Groups the model lists next to each other are placed next to each other.
+2. Click the smart layout button in the canvas controls, or ask the agent, for example "arrange these with the sources at the top". The agent passes your wording to the model; the button lets the model decide.
+3. The nodes move into a top-down tree: broader nodes above, the nodes that belong to them below.
 
-One Undo restores every position. Nodes the model does not assign to a group are collected in a group named "other". The layout is never run automatically, including when the app starts or a workspace opens.
+How the tree is built:
+
+- **Rank of kinds.** The model receives the kinds present with example titles and orders them from broad to specific, for example tag above term above note above citation. With a single kind no request is made. Among nodes of the same kind, the node with more connections ranks broader.
+- **Parent of a node.** A node's parent is one of its connected neighbours of broader rank. With one such neighbour the choice is made without the model; with several, the model picks the most specific one the node belongs under, so a note goes under `#prohibited-ai-practices-art-5` rather than under `#ai-act`.
+- **Few requests.** One short request orders the kinds; the nodes with several candidate parents are sent together, up to 80 per request, instead of one request per node.
+- **Other edges.** Edges that are not parent links stay drawn but do not affect positions.
+- **Separate trees** are placed side by side. Nodes without a connection are placed in rows below the trees.
+
+One Undo restores every position. The log shows how the run ended. The layout is never run automatically, including when the app starts or a workspace opens.
 
 ## Storylines
 
