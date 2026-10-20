@@ -219,7 +219,10 @@
     "default": "Standard",
     "switch": "Arbeitsbereich wechseln",
     "filter": "Arbeitsbereiche filtern...",
-    "recent": "zuletzt",
+    "sortBy": "Arbeitsbereiche sortieren",
+    "sortUsed": "Zuletzt verwendet",
+    "sortName": "Name",
+    "sortCreated": "Erstellt",
     "noMatch": "Kein passender Arbeitsbereich"
   },
   "onboarding": {

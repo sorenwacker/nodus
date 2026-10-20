@@ -219,7 +219,10 @@
     "default": "Predefinito",
     "switch": "Cambia spazio di lavoro",
     "filter": "Filtra spazi...",
-    "recent": "recente",
+    "sortBy": "Ordina spazi",
+    "sortUsed": "Ultimo uso",
+    "sortName": "Nome",
+    "sortCreated": "Creazione",
     "noMatch": "Nessuno spazio corrispondente"
   },
   "onboarding": {
