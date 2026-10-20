@@ -8,7 +8,8 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import type { Node, Edge } from '../../../types'
 
 export interface UseNodeHoverContext {
-  scale: Ref<number>
+  /** True while cards are collapsed to their titles by semantic zoom. */
+  isCollapsed: Ref<boolean> | ComputedRef<boolean>
   isLODMode: ComputedRef<boolean>
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
   filteredEdges: Ref<Edge[]> | ComputedRef<Edge[]>
@@ -49,7 +50,7 @@ export interface UseNodeHoverReturn {
 }
 
 export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
-  const { scale, isLODMode, selectedNodeIds, filteredEdges, getNode, hoverTooltipEnabled, isPanning } = ctx
+  const { isCollapsed, isLODMode, selectedNodeIds, filteredEdges, getNode, hoverTooltipEnabled, isPanning } = ctx
 
   const hoveredNodeId = ref<string | null>(null)
   const hoverMousePos = ref({ x: 0, y: 0 })
@@ -57,14 +58,15 @@ export function useNodeHover(ctx: UseNodeHoverContext): UseNodeHoverReturn {
   // External hover state (from storyline panel, etc.)
   const externalHoveredNode = ref<Node | null>(null)
 
-  // Tooltip for zoomed-out hover - shows node info when scale is low or in LOD mode
+  // Shown where the card does not show its content: collapsed by semantic
+  // zoom, or drawn in dense mode (PRODUCT_DESIGN.md > Hover tooltip visibility)
   // Also shows when triggered externally (e.g., from storyline panel)
   // Can be disabled via settings
   const showHoverTooltip = computed(() => {
     if (hoverTooltipEnabled && !hoverTooltipEnabled.value) return false
-    // Show for external hover regardless of scale
+    // Show for external hover regardless of zoom
     if (externalHoveredNode.value) return true
-    return !!hoveredNodeId.value && (scale.value < 0.5 || isLODMode.value)
+    return !!hoveredNodeId.value && (isCollapsed.value || isLODMode.value)
   })
 
   const hoveredNode = computed(() => {

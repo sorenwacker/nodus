@@ -711,7 +711,7 @@ const { selectedNodeIds: storeSelectedNodeIds, filteredEdges: storeFilteredEdges
 
 // Node hover composable - handles hover state, tooltips, and active node tracking
 const nodeHover = useNodeHover({
-  scale,
+  isCollapsed: isSemanticZoomCollapsed,
   isLODMode,
   selectedNodeIds: storeSelectedNodeIds,
   filteredEdges: storeFilteredEdges,
