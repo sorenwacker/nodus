@@ -4,6 +4,16 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0-rc.15] - 2026-10-21
+
+### Added
+- Smart layout arranges the notes of a workspace as a tree built from each note's kind and its connections, so related notes land in one region without edges having to be drawn first. A run uses a few model calls rather than one per 15 notes, and the log states how the run ended
+- The workspace list can be sorted by last use, by name or by creation date, from a menu next to the filter field. The choice is remembered, and last use covers every workspace that has been opened from the list, not only the latest eight
+
+### Changed
+- Renaming a note rewrites the wikilinks that point to it, so the notes linking to it keep working
+- The hover tooltip appears whenever cards are collapsed to their titles, following the semantic zoom threshold. It had used a fixed limit of 50% zoom, so with a higher threshold collapsed cards showed no hover information
+
 ## [1.6.0-rc.14] - 2026-10-12
 
 ### Added
