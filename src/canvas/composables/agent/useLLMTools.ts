@@ -251,15 +251,28 @@ export function useLLMTools(ctx: LLMToolsContext) {
         log(`> Smart layout: ${nodes.length} nodes`)
         const agentWasRunning = !isCancelled()
 
-        const { groups, assignment } = await proposeAndClassifyGroups(
-          nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
-          (args.instruction as string) || '',
-          llmQueue,
-          // From the canvas controls no agent run is in progress, and a stop
-          // flag that is already down would end the run before it classifies
-          { log, isCancelled: agentWasRunning ? isCancelled : undefined }
-        )
-        if (groups.length === 0) return 'The model proposed no groups; nothing was moved'
+        let grouping: Awaited<ReturnType<typeof proposeAndClassifyGroups>>
+        try {
+          grouping = await proposeAndClassifyGroups(
+            nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
+            (args.instruction as string) || '',
+            llmQueue,
+            // From the canvas controls no agent run is in progress, and a stop
+            // flag that is already down would end the run before it classifies
+            { log, isCancelled: agentWasRunning ? isCancelled : undefined }
+          )
+        } catch (e) {
+          // The canvas button discards the return value; the log is where a
+          // failure must show
+          const failure = `Smart layout failed, nothing was moved: ${e instanceof Error ? e.message : e}`
+          log(`> ${failure}`)
+          return failure
+        }
+        const { groups, assignment } = grouping
+        if (groups.length === 0) {
+          log('> The model proposed no groups; nothing was moved')
+          return 'The model proposed no groups; nothing was moved'
+        }
 
         const order = [...groups, 'other']
         const members = new Map(order.map(g => [g, [] as typeof nodes]))
@@ -278,7 +291,9 @@ export function useLLMTools(ctx: LLMToolsContext) {
         )
         await Promise.all([...positions].map(([id, p]) => store.updateNodePosition(id, p.x, p.y)))
         const used = order.filter(g => members.get(g)!.length > 0)
-        return `Arranged ${positions.size} nodes in ${used.length} groups: ${used.join(', ')}`
+        const summary = `Arranged ${positions.size} nodes in ${used.length} groups: ${used.join(', ')}`
+        log(`> ${summary}`)
+        return summary
       }
 
       case 'smart_connect': {
