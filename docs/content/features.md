@@ -94,6 +94,7 @@ Writing `[[link]]` in a node's content creates a wikilink edge to the referenced
 - Links resolve by note title, by relative path (`[[folder/note]]`), and with section anchors (`[[note#section]]`)
 - A pair already connected by a manual edge does not receive a parallel wikilink edge
 - Removing the link removes the wikilink edge; manual edges are kept
+- Renaming a node rewrites the links to it in every note that has a wikilink edge to it, so the edges and the `.md` files stay consistent. The link keeps its form: `[[Old]]` becomes `[[New]]`, `[[Old|alias]]` becomes `[[New|alias]]`, `[[Old#section]]` becomes `[[New#section]]`, and `[[folder/Old]]` becomes `[[folder/New]]`. Plain text that mentions the old title is not changed. A rewritten note's file is written only while folder sync is active for it, as with any content edit. One Undo restores the title and every rewritten link.
 
 ### Edge Routing
 Multiple routing styles for visual clarity:
