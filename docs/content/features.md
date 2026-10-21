@@ -335,6 +335,8 @@ Changes sync between Nodus and your vault folder:
 ### Workspace Separation
 Each imported vault becomes a separate workspace, keeping projects organized.
 
+The workspace switcher in the toolbar lists workspaces by last use, by name or by creation date; choose the order from the menu next to the filter field. Nodus remembers the choice.
+
 ---
 
 ## Citation Management

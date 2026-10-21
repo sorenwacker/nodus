@@ -2069,11 +2069,16 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 
 ### Choosing a workspace
 
-**Required behavior:** The workspace list is searchable, ordered by what the user touched most recently, and says how large each workspace is.
+**Required behavior:** The workspace list is searchable, sortable by last use, name or creation date, and says how large each workspace is.
 
 - The workspace scopes the canvas, search, the agent's context and file sync, so choosing one is the most consequential control in the toolbar. A plain dropdown of every workspace in creation order stops being usable somewhere around a dozen entries; this installation has thirty-seven.
 - Typing filters the list by name, ignoring case and accents. The keyboard alone can reach any workspace: arrows move, Enter switches, Escape closes.
-- Recently opened workspaces come first, in the order they were last opened, and the rest follow alphabetically. Recency is the only ordering that reflects how the list is actually used, and alphabetical order underneath keeps a workspace findable when it has not been opened before.
+- A sort control in the list header offers three orders, and the chosen one is remembered across sessions:
+    - **Last used** (default): workspaces in the order they were last opened, most recent first, then the never-opened ones by name. Every opened workspace is tracked, not only the latest few, so the order covers the whole list. Recency reflects how the list is actually used; the name order underneath keeps a workspace findable before it has been opened.
+    - **Name**: alphabetical, ignoring case and accents, as the filter does.
+    - **Created**: newest first, by the workspace's stored creation date, so a workspace made yesterday is at the top even if it was never opened.
+- Last use is recorded in the app's local storage when a workspace is chosen in the switcher. Opening a workspace through MCP or the agent does not count as a use.
+- Filtering narrows the list and keeps the chosen order.
 - Each row carries its node count, taken from the nodes already in memory rather than a query, so the list says which workspaces hold work and which are empty.
 
 ### Workspace settings

@@ -2,7 +2,7 @@
 /**
  * Picks the workspace: a button that opens a searchable list.
  *
- * Recently opened first, then the rest by name, each row carrying its node
+ * Sorted by last use, name or creation date, each row carrying its node
  * count. The keyboard alone can reach any workspace
  * (PRODUCT_DESIGN.md > Choosing a workspace).
  */
@@ -13,7 +13,7 @@ import { useWorkspaceSwitcher } from '../composables/useWorkspaceSwitcher'
 const { t } = useI18n()
 
 const props = defineProps<{
-  workspaces: Array<{ id: string; name: string }>
+  workspaces: Array<{ id: string; name: string; created_at: number }>
   nodes: Array<{ workspace_id: string | null }>
   currentWorkspaceId: string | null
 }>()
@@ -27,8 +27,18 @@ const switcher = useWorkspaceSwitcher({
   nodes: computed(() => props.nodes),
   currentWorkspaceId: computed(() => props.currentWorkspaceId),
 })
-const { query, isOpen, highlighted, highlightedId, rows, remember, moveHighlight, open, close } =
-  switcher
+const {
+  query,
+  isOpen,
+  highlighted,
+  highlightedId,
+  rows,
+  sortOrder,
+  remember,
+  moveHighlight,
+  open,
+  close,
+} = switcher
 
 const currentName = computed(
   () => props.workspaces.find(w => w.id === props.currentWorkspaceId)?.name ?? t('workspace.default')
@@ -83,14 +93,21 @@ function onKeydown(e: KeyboardEvent) {
     <div v-if="isOpen" class="switcher-backdrop" @click="close()"></div>
 
     <div v-if="isOpen" class="switcher-panel">
-      <input
-        ref="filterInput"
-        v-model="query"
-        type="text"
-        class="switcher-filter"
-        :placeholder="t('workspace.filter')"
-        @keydown="onKeydown"
-      />
+      <div class="switcher-header">
+        <input
+          ref="filterInput"
+          v-model="query"
+          type="text"
+          class="switcher-filter"
+          :placeholder="t('workspace.filter')"
+          @keydown="onKeydown"
+        />
+        <select v-model="sortOrder" class="switcher-sort" :aria-label="t('workspace.sortBy')">
+          <option value="used">{{ t('workspace.sortUsed') }}</option>
+          <option value="name">{{ t('workspace.sortName') }}</option>
+          <option value="created">{{ t('workspace.sortCreated') }}</option>
+        </select>
+      </div>
       <ul class="switcher-list" role="listbox">
         <li
           v-for="(row, index) in rows"
@@ -103,7 +120,6 @@ function onKeydown(e: KeyboardEvent) {
           @mouseenter="highlighted = index"
         >
           <span class="row-name">{{ row.name }}</span>
-          <span v-if="row.isRecent" class="row-recent">{{ t('workspace.recent') }}</span>
           <span class="row-count">{{ row.nodeCount }}</span>
         </li>
         <li v-if="rows.length === 0" class="switcher-empty">{{ t('workspace.noMatch') }}</li>
@@ -214,11 +230,28 @@ function onKeydown(e: KeyboardEvent) {
   white-space: nowrap;
 }
 
-.row-recent {
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+.switcher-header {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding-right: 0.4rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.switcher-header .switcher-filter {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+
+.switcher-sort {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.8rem;
 }
 
 .row-count {

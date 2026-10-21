@@ -219,7 +219,10 @@
     "default": "Default",
     "switch": "Switch workspace",
     "filter": "Filter workspaces...",
-    "recent": "recent",
+    "sortBy": "Sort workspaces",
+    "sortUsed": "Last used",
+    "sortName": "Name",
+    "sortCreated": "Created",
     "noMatch": "No workspace matches"
   },
   "onboarding": {

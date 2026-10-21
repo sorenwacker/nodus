@@ -219,7 +219,10 @@
     "default": "Predeterminado",
     "switch": "Cambiar de espacio",
     "filter": "Filtrar espacios...",
-    "recent": "reciente",
+    "sortBy": "Ordenar espacios",
+    "sortUsed": "Ultimo uso",
+    "sortName": "Nombre",
+    "sortCreated": "Creacion",
     "noMatch": "Ningun espacio coincide"
   },
   "onboarding": {

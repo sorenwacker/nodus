@@ -11,7 +11,8 @@ import { ref } from 'vue'
 import { useWorkspaceSwitcher } from '../composables/useWorkspaceSwitcher'
 
 function setup(names: string[]) {
-  const workspaces = ref(names.map((name, i) => ({ id: `w${i}`, name })))
+  // Created in list order, so the last name is the newest workspace
+  const workspaces = ref(names.map((name, i) => ({ id: `w${i}`, name, created_at: 1000 + i })))
   const nodes = ref([
     { workspace_id: 'w0' },
     { workspace_id: 'w0' },
@@ -87,5 +88,52 @@ describe('choosing a workspace', () => {
     workspaces.value = workspaces.value.filter(w => w.id !== 'w1')
 
     expect(switcher.rows.value.map(r => r.id)).toEqual(['w0'])
+  })
+
+  it('tracks every opened workspace, not only the latest few', () => {
+    const names = Array.from({ length: 12 }, (_, i) => `Space ${String(i).padStart(2, '0')}`)
+    const { switcher } = setup(names)
+
+    for (let i = 0; i < 12; i++) switcher.remember(`w${i}`)
+
+    expect(switcher.rows.value.map(r => r.id)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `w${11 - i}`)
+    )
+  })
+
+  it('sorts by name when asked, ignoring when each was opened', () => {
+    const { switcher } = setup(['Tulip', 'genomics', 'Ärzte', 'CropXR'])
+    switcher.remember('w0')
+
+    switcher.sortOrder.value = 'name'
+
+    expect(switcher.rows.value.map(r => r.name)).toEqual(['Ärzte', 'CropXR', 'genomics', 'Tulip'])
+  })
+
+  it('sorts newest first by creation date when asked', () => {
+    const { switcher } = setup(['Tulip', 'Genomics', 'CropXR'])
+    switcher.remember('w0')
+
+    switcher.sortOrder.value = 'created'
+
+    expect(switcher.rows.value.map(r => r.name)).toEqual(['CropXR', 'Genomics', 'Tulip'])
+  })
+
+  it('keeps the chosen order while filtering', () => {
+    const { switcher } = setup(['Kubernetes', 'Tulip', 'kubectl'])
+    switcher.sortOrder.value = 'created'
+    switcher.query.value = 'kub'
+
+    expect(switcher.rows.value.map(r => r.name)).toEqual(['kubectl', 'Kubernetes'])
+  })
+
+  it('remembers the chosen order across sessions', () => {
+    setup(['Tulip']).switcher.sortOrder.value = 'created'
+
+    expect(setup(['Tulip']).switcher.sortOrder.value).toBe('created')
+  })
+
+  it('sorts by last use when nothing was chosen', () => {
+    expect(setup(['Tulip']).switcher.sortOrder.value).toBe('used')
   })
 })
