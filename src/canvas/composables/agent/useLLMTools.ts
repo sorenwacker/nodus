@@ -13,9 +13,9 @@ import type { AgentTask, AgentPlan } from '../../../llm/types'
 import {
   batchClassifyForMove,
   batchClassifyForConnect,
-  proposeAndClassifyGroups,
 } from '../../../llm/batchClassifier'
-import { arrangeGroups } from '../../layout/semanticGroupLayout'
+import { parentCandidates, layoutForest } from '../../layout/smartHierarchy'
+import { orderKinds, chooseParents, type ParentChoice } from '../../../llm/hierarchyPlanner'
 import {
   executeRegisteredTool,
   hasToolHandler,
@@ -249,18 +249,30 @@ export function useLLMTools(ctx: LLMToolsContext) {
         const nodes = selected.size > 0 ? visible.filter(n => selected.has(n.id)) : visible
         if (nodes.length === 0) return 'No nodes to arrange'
         log(`> Smart layout: ${nodes.length} nodes`)
-        const agentWasRunning = !isCancelled()
+        const instruction = (args.instruction as string) || ''
+        const items = nodes.map(n => ({
+          id: n.id, title: n.title, kind: n.node_type || 'note', width: n.width || 200, height: n.height || 120,
+        }))
+        const titleOf = new Map(items.map(n => [n.id, n.title]))
 
-        let grouping: Awaited<ReturnType<typeof proposeAndClassifyGroups>>
+        let parents: Map<string, string>
         try {
-          grouping = await proposeAndClassifyGroups(
-            nodes.map(n => ({ id: n.id, title: n.title, markdown_content: n.markdown_content })),
-            (args.instruction as string) || '',
-            llmQueue,
-            // From the canvas controls no agent run is in progress, and a stop
-            // flag that is already down would end the run before it classifies
-            { log, isCancelled: agentWasRunning ? isCancelled : undefined }
+          const examples = new Map<string, string[]>()
+          for (const n of items) examples.set(n.kind, [...(examples.get(n.kind) ?? []), n.title])
+          const kindOrder = await orderKinds(
+            [...examples].map(([kind, titles]) => ({ kind, examples: titles })), instruction, llmQueue, log
           )
+          const candidates = parentCandidates(items, store.getFilteredEdges(), kindOrder)
+          parents = new Map()
+          const open: ParentChoice[] = []
+          for (const [id, options] of candidates) {
+            if (options.length === 1) parents.set(id, options[0])
+            else if (options.length > 1) {
+              open.push({ id, title: titleOf.get(id)!, candidates: options.slice(0, 26).map(o => ({ id: o, title: titleOf.get(o)! })) })
+            }
+          }
+          log(`> ${parents.size} parents from the graph, ${open.length} for the model`)
+          for (const [id, parent] of await chooseParents(open, instruction, llmQueue, log)) parents.set(id, parent)
         } catch (e) {
           // The canvas button discards the return value; the log is where a
           // failure must show
@@ -268,30 +280,15 @@ export function useLLMTools(ctx: LLMToolsContext) {
           log(`> ${failure}`)
           return failure
         }
-        const { groups, assignment } = grouping
-        if (groups.length === 0) {
-          log('> The model proposed no groups; nothing was moved')
-          return 'The model proposed no groups; nothing was moved'
-        }
-
-        const order = [...groups, 'other']
-        const members = new Map(order.map(g => [g, [] as typeof nodes]))
-        for (const node of nodes) members.get(assignment.get(node.id) ?? 'other')!.push(node)
 
         const origin = {
           x: Math.min(...nodes.map(n => n.canvas_x)),
           y: Math.min(...nodes.map(n => n.canvas_y)),
         }
-        const positions = arrangeGroups(
-          order.map(name => ({
-            name,
-            nodes: members.get(name)!.map(n => ({ id: n.id, width: n.width || 200, height: n.height || 120 })),
-          })),
-          origin
-        )
+        const positions = layoutForest(items, parents, origin)
         await Promise.all([...positions].map(([id, p]) => store.updateNodePosition(id, p.x, p.y)))
-        const used = order.filter(g => members.get(g)!.length > 0)
-        const summary = `Arranged ${positions.size} nodes in ${used.length} groups: ${used.join(', ')}`
+        const roots = new Set(items.filter(n => !parents.has(n.id) && [...parents.values()].includes(n.id)).map(n => n.id))
+        const summary = `Arranged ${positions.size} nodes in ${roots.size} trees`
         log(`> ${summary}`)
         return summary
       }
