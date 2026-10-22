@@ -39,6 +39,7 @@ export {
   handleGetEdges,
   handleCreateEdge,
   handleUpdateEdge,
+  handleBatchUpdateEdges,
   handleDeleteEdge,
   handleBatchCreateEdges,
   handleBatchDeleteEdges,
