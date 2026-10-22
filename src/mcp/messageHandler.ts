@@ -5,6 +5,7 @@
  */
 
 import type { Node, Edge, Storyline } from '../types'
+import { cleanWorkspaceName } from '../lib/workspaceName'
 import type {
   JsonRpcRequest,
   JsonRpcResponse,
@@ -76,6 +77,7 @@ export interface McpStoreInterface {
   // one open in the app (parallel agents on parallel workspaces)
   getAllNodes: () => Node[]
   getWorkspaces: () => Array<{ id: string; name: string; current: boolean }>
+  createWorkspace: (name: string) => Promise<{ id: string; name: string }>
   loadWorkspaceEdges: (workspaceId: string | null) => Promise<Edge[]>
   createEdgeRaw: (data: {
     source_node_id: string
@@ -296,6 +298,24 @@ export function createMcpMessageHandler(
         }
         const id = scopedTo === null ? 'default' : scopedTo
         return { scoped: true, workspace: store.getWorkspaces().find(w => w.id === id)?.name }
+      }
+
+      // PRODUCT_DESIGN.md > MCP Server > Creating a workspace
+      case 'create_workspace': {
+        const name = typeof params.name === 'string' ? cleanWorkspaceName(params.name) : ''
+        if (!name) {
+          throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, 'name required')
+        }
+        // set_workspace resolves a name to the first match, so a second
+        // workspace with the same name could not be reached by name
+        if (resolveWorkspace(name)) {
+          throw new McpError(
+            JsonRpcErrorCodes.INVALID_PARAMS,
+            `A workspace named "${name}" already exists`
+          )
+        }
+        const created = await store.createWorkspace(name)
+        return { id: created.id, name: created.name }
       }
     }
 

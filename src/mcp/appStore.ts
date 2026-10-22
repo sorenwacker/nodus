@@ -65,6 +65,7 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
         ...store.workspaces.map(w => ({ id: w.id, name: w.name, current: w.id === current })),
       ]
     },
+    createWorkspace: store.createWorkspace,
     loadWorkspaceEdges: workspaceId => invoke<Edge[]>('get_edges', { workspaceId }),
     createEdgeRaw: data => invoke<Edge>('create_edge', { input: data }),
     deleteEdgeRaw: id => invoke('delete_edge', { id }).then(() => undefined),

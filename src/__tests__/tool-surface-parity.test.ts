@@ -36,6 +36,7 @@ function agentToolNames(): string[] {
  * needs plumbing the in-app agent gets implicitly from the running app.
  */
 const INTENTIONAL_MCP_ONLY: Record<string, string> = {
+  create_workspace: 'the in-app agent acts on the workspace and view the user already has open',
   focus_node: 'the in-app agent acts on the workspace and view the user already has open',
   get_viewport: 'the in-app agent acts on the workspace and view the user already has open',
   get_workspace: 'the in-app agent acts on the workspace and view the user already has open',

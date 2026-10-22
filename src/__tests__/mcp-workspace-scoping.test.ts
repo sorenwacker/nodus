@@ -74,6 +74,13 @@ const BUILDS_THE_SCOPE = [
   'createEdgeRaw',
   'deleteEdgeRaw',
 ]
+
+/**
+ * Methods that act on the set of workspaces rather than inside one. A scope
+ * selects a workspace; it has nothing to say about adding another.
+ */
+const ACTS_ON_THE_WORKSPACE_LIST = ['createWorkspace']
+
 const scoped = handler.slice(
   handler.indexOf('async function scopedStoreFor'),
   handler.indexOf('/** Forget a connection')
@@ -104,7 +111,7 @@ describe('every method of the store', () => {
   // so a scoped connection wrote into whichever workspace the user had open
   // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
   it('is scoped, or recorded as not needing to be', () => {
-    const accounted = new Set([...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE])
+    const accounted = new Set([...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE, ...ACTS_ON_THE_WORKSPACE_LIST])
     const unaccounted = interfaceMethods().filter(name => !accounted.has(name))
 
     expect(unaccounted, 'inherited from the app store without a reason').toEqual([])
@@ -112,7 +119,7 @@ describe('every method of the store', () => {
 
   it('appears in one group only', () => {
     const seen = new Map<string, number>()
-    for (const name of [...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE]) {
+    for (const name of [...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE, ...ACTS_ON_THE_WORKSPACE_LIST]) {
       seen.set(name, (seen.get(name) ?? 0) + 1)
     }
     const twice = [...seen].filter(([, count]) => count > 1).map(([name]) => name)
@@ -122,7 +129,7 @@ describe('every method of the store', () => {
 
   it('keeps the ledger free of methods the interface no longer has', () => {
     const declared = new Set(interfaceMethods())
-    const stale = [...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE].filter(name => !declared.has(name))
+    const stale = [...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE, ...ACTS_ON_THE_WORKSPACE_LIST].filter(name => !declared.has(name))
 
     expect(stale, 'recorded, but no longer on the interface').toEqual([])
   })
