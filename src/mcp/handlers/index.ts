@@ -23,6 +23,7 @@ export {
   handleGetRootNodes,
   handleGetHubNodes,
   handleGetNodesByColor,
+  handleGetNodesByTag,
   handleCreateNode,
   handleUpdateNode,
   handleBatchUpdateNodes,
