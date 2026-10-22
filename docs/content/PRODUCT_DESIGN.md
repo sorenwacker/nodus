@@ -2212,6 +2212,14 @@ The web view of the packaged application connects only to the hosts its content 
 - Storylines are scoped like nodes and edges. They were read and written through the application's open workspace throughout, so a scoped connection listed the wrong workspace's storylines and created its own in the wrong place.
 - A store that scopes some of its methods and inherits the rest cannot be read for what it does. Each method is either scoped or recorded as independent of the workspace, and a gate holds the list.
 
+### Creating an edge by node titles
+
+**Required behavior:** An MCP client can create an edge by naming its endpoints by title, so a small addition does not need an id lookup for each end. Ids stay the precise address: a title names a node only when it names exactly one.
+
+- `create_edge` takes `source_title` and `target_title` as alternatives to `source_node_id` and `target_node_id`. Each end may be given either way, and an id and a title may be mixed.
+- A title matches a node of the connection's workspace by its whole title, ignoring case and surrounding whitespace. A title no node has is an invalid-parameters error, and a title several nodes share is one too, listing the ids it names, so the client can choose rather than have one chosen for it.
+- An end given neither way is an invalid-parameters error.
+
 ### Deleting a merged wikilink edge
 
 **Required behavior:** A merged wikilink edge is undirected because both nodes link to each other; it stands for two wikilinks, one in each file. Deleting it removed the link from the source's content only, so the next wikilink sync saw the surviving link in the other file and recreated the edge - the user deleted it and it came back.
