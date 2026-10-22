@@ -170,7 +170,7 @@ export const NODE_TOOLS: McpToolDeclaration[] = [
   {
     name: 'batch_update_nodes',
     description:
-      'Update several nodes at once: title, content or position. Each entry names the node by id and carries only the fields to change.',
+      'Update several nodes at once: title, content or position. Each entry names the node by id and carries only the fields to change. A large batch stops before the request times out and lists the ids it did not attempt under not_attempted; resend those.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -246,6 +246,14 @@ export const NODE_TOOLS: McpToolDeclaration[] = [
         },
       },
       required: ['node_ids', 'color'],
+    },
+  },
+  {
+    name: 'rebuild_tag_nodes',
+    description: 'Regenerate the tag nodes and tagged edges of the workspace open in the app from the notes\' tags: merge duplicate tag nodes, restore a missing #, delete tag nodes no note uses, then connect every tag shared by two or more notes. Reports what changed. Refused on a connection scoped to another workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
     },
   },
   {

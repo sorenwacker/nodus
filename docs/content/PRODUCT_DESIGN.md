@@ -383,6 +383,14 @@ Two consequences this prevents. Duplicate checking against a library that could 
 
 A partial result is treated the same way: a paged lookup whose later page fails throws rather than returning the pages gathered so far, because a partial list cannot be told from a complete one.
 
+### A batch that ends before the request times out
+
+**Required behavior:** A batch request answers within the server's request timeout, and what it reports is what happened. A batch of 19 node bodies outran the server's 30 second timeout: the client was told the request timed out while the app went on writing, so the result was unknown until the client diffed a fresh listing.
+
+- `batch_update_nodes` works through its items in order and stops starting new ones once a time budget below the server's timeout is used up. The item in progress is finished, never abandoned.
+- The result lists the ids not attempted under `not_attempted`, beside the counts of updated and failed items and the per-item errors, so the client knows exactly which items to resend. `success` is true only when every item was attempted and none failed.
+- The budget is bound to the server's timeout by a gate, so lengthening one without the other fails a test. Nothing writes after the response has been sent.
+
 ### Reporting MCP server failures
 
 Starting the MCP server can fail for an ordinary reason: the port is already in use. The settings panel says so, and the stored "enabled" flag records what the user asked for and got, so a failed start is not retried on the next launch.
@@ -1734,9 +1742,24 @@ A failure says what went wrong, and its code says what kind of failure it was.
 - "Not connected" covers three situations - never reached, dropped, and waiting for approval - and each says which, because the advice differs.
 - A rejection is recognised by the code and the state it carries, never by the words in its message. The text was matched against "reject", "denied" and "declined", so a refusal phrased any other way read as a wait. The refusal names no request to settle, so the connection itself records it: every later call then says the user refused, rather than that approval is still pending.
 
+### Reading edges by label
+
+**Required behavior:** An MCP client can find the edges with a given label, the edges with none, and the vocabulary of labels in use, without dumping every edge and joining against a node dump. Finding four unlabelled edges among 280, and the 80 distinct labels they carried, needed a full dump and a script.
+
+- `get_edges` filters by `label`, matched exactly after trimming, and by `unlabelled_only`, which keeps edges whose label is null or blank. Both combine with the existing `node_id` filter and the limit and offset.
+- `get_edges` with `include_titles` adds `source_title` and `target_title` to each edge, so a small edge query reads on its own. Without it the result is unchanged, since titles enlarge a full dump.
+- `get_edge_labels` returns each distinct label with the number of edges carrying it, most frequent first, and the number of unlabelled edges. Labels are distinguished exactly, so `Supports` and `supports` are listed as two entries: the census exists to show such inconsistencies, not to hide them.
+
 ### A result keyed by what identifies a node
 
 A result that maps to nodes is keyed by the node's id. Titles are not unique, and keying by title silently merges the nodes that share one: the adjacency list came back with fewer entries than the graph has nodes, and which of them survived depended on the order they were walked. The tool's own description already promised ids.
+
+### Listing nodes by field and by tag
+
+**Required behavior:** An MCP client can shape a node listing to what it needs and can read the nodes carrying a tag directly. A listing of 134 notes with every field overran the client's context, while the compact form lacked the degree, so a tag-driven audit needed a full dump of nodes and edges and a script.
+
+- `list_nodes` takes `fields`, a list of the node fields to return. `id` is always present. `degree`, the number of edges at the node in the workspace, is a field like any other, computed only when asked for. A field name the node does not have is an invalid-parameters error naming the known fields, so a typo does not silently return less.
+- `get_nodes_by_tag` returns the nodes whose recorded tags include the given tag, matched without the leading hash and without regard to case, as the tag nodes match. Tag nodes are not themselves listed. It takes the same `fields`, and returns id, title and tags by default.
 
 ### A routed tool is an advertised tool
 
@@ -1744,6 +1767,14 @@ A name the request router accepts is one the server advertises, and the reverse.
 
 - Every case the router handles names an advertised tool, and every advertised tool is routed.
 - A gate compares the two lists, so they cannot drift apart.
+
+### Tag nodes over MCP
+
+**Required behavior:** An MCP client can see the tags of a workspace with the tag nodes that stand for them, and can regenerate those nodes and their edges from the notes' tags. After a client deleted one tag node it had no way to tell what else had changed, and no way to put the tag layer back other than guessing.
+
+- `list_tags` lists every tag in use, with the number of notes recording it, the id of its tag node when one is drawn, and the number of `tagged` edges at that node. A tag node that no note records any more is listed too, with no notes, so an orphan is visible. Most used first.
+- `rebuild_tag_nodes` runs the tag node repair that Settings > Canvas > Repair Tag Nodes runs - merging duplicates, restoring a missing hash, deleting tag nodes no note uses - and then connects every shared tag as loading the workspace does. It reports what it changed: tag nodes merged, renamed and removed, edges repointed, deleted and added.
+- The rebuild acts on the workspace open in the app, because the edges it reads and connects are the ones the app has loaded. A connection scoped to another workspace is refused with an error that names both workspaces, rather than silently rebuilding the wrong one. The settings panel and the MCP tool share one repair function, so the two cannot drift.
 
 ### An import the built MCP server can resolve
 

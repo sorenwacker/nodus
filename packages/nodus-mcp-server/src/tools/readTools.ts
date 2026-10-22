@@ -15,13 +15,18 @@ export const READ_TOOLS: McpToolDeclaration[] = [
   },
   {
     name: 'list_nodes',
-    description: 'List nodes in the current workspace. Returns compact node metadata (id, title, type). Use limit/offset for large graphs.',
+    description: 'List nodes in the current workspace. Returns compact node metadata (id, title, type, position, size, tags, dates). Use limit/offset for large graphs, and fields to return only what you need.',
     inputSchema: {
       type: 'object',
       properties: {
         include_content: {
           type: 'boolean',
           description: 'Include markdown content. Default: false. Warning: can be large.',
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Return only these fields, plus id. Any of: title, node_type, canvas_x, canvas_y, width, height, markdown_content, tags, date, date_end, created_at, updated_at, degree (number of edges at the node).',
         },
         limit: {
           type: 'number',
@@ -140,6 +145,33 @@ export const READ_TOOLS: McpToolDeclaration[] = [
     },
   },
   {
+    name: 'get_nodes_by_tag',
+    description: 'Find the nodes carrying a tag. The tag matches without its leading # and regardless of case; tag nodes themselves are not listed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tag: {
+          type: 'string',
+          description: 'The tag name, with or without the leading #',
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Return only these fields, plus id, as in list_nodes. Default: title, tags.',
+        },
+      },
+      required: ['tag'],
+    },
+  },
+  {
+    name: 'list_tags',
+    description: 'List every tag in use, most used first, with the number of notes recording it, the id of its tag node when one is drawn, and the tagged edges at that node. A tag node no note uses is listed with 0 notes.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'get_nodes_by_color',
     description: 'Find all nodes with a specific color.',
     inputSchema: {
@@ -154,14 +186,34 @@ export const READ_TOOLS: McpToolDeclaration[] = [
     },
   },
   {
+    name: 'get_edge_labels',
+    description: 'Count the edges carrying each distinct label, most frequent first, and the unlabelled edges. Use it to see the label vocabulary before relabelling.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'get_edges',
-    description: 'Get edges (connections) between nodes. Use limit/offset for large graphs, or filter by node_id.',
+    description: 'Get edges (connections) between nodes. Use limit/offset for large graphs, or filter by node_id, by label, or to unlabelled edges. include_titles adds the endpoint titles.',
     inputSchema: {
       type: 'object',
       properties: {
         node_id: {
           type: 'string',
           description: 'Only return edges connected to this node.',
+        },
+        label: {
+          type: 'string',
+          description: 'Only return edges with exactly this label.',
+        },
+        unlabelled_only: {
+          type: 'boolean',
+          description: 'Only return edges with no label. Default: false.',
+        },
+        include_titles: {
+          type: 'boolean',
+          description: 'Add source_title and target_title to each edge. Default: false.',
         },
         limit: {
           type: 'number',

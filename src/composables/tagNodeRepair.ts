@@ -181,3 +181,42 @@ export async function runTagNodeRepair(
 
   return result
 }
+
+/** What the repair needs of the nodes store, as the settings panel and MCP both hold it */
+export interface TagNodeRepairStore {
+  nodes: Node[]
+  edges: Edge[]
+  currentWorkspaceId: string | null
+  createEdge: (data: { source_node_id: string; target_node_id: string; link_type: string }) => Promise<unknown>
+  deleteEdge: (id: string) => Promise<void>
+  deleteNode: (id: string) => Promise<void>
+  updateNodeTitle: (id: string, title: string) => Promise<void>
+}
+
+/**
+ * Survey the store's tag nodes and apply what they need.
+ *
+ * One function for the settings panel and the MCP tool, so the two cannot
+ * drift (PRODUCT_DESIGN.md > Tag nodes over MCP).
+ *
+ * Args:
+ *   store: The nodes store, or anything holding the same members.
+ *
+ * Returns:
+ *   What was changed, or null when the vault was healthy and nothing was
+ *   written.
+ */
+export async function repairTagNodes(store: TagNodeRepairStore): Promise<TagNodeRepairResult | null> {
+  const plan = planTagNodeRepair(store.nodes, store.edges, store.currentWorkspaceId)
+  if (plan.merges.length === 0 && plan.renames.length === 0 && plan.unusedIds.length === 0) {
+    return null
+  }
+  return runTagNodeRepair(plan, {
+    createTaggedEdge: async (sourceNodeId, targetNodeId) => {
+      await store.createEdge({ source_node_id: sourceNodeId, target_node_id: targetNodeId, link_type: 'tagged' })
+    },
+    deleteEdge: id => store.deleteEdge(id),
+    deleteNode: id => store.deleteNode(id),
+    renameNode: (id, title) => store.updateNodeTitle(id, title),
+  })
+}

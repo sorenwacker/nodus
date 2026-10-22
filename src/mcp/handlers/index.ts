@@ -23,9 +23,11 @@ export {
   handleGetRootNodes,
   handleGetHubNodes,
   handleGetNodesByColor,
+  handleGetNodesByTag,
   handleCreateNode,
   handleUpdateNode,
   handleBatchUpdateNodes,
+  BATCH_TIME_BUDGET_MS,
   handleDeleteNode,
   handleResizeNode,
   handleBatchResizeNodes,
@@ -37,6 +39,7 @@ export {
 // Edge handlers
 export {
   handleGetEdges,
+  handleGetEdgeLabels,
   handleCreateEdge,
   handleUpdateEdge,
   handleBatchUpdateEdges,
@@ -62,3 +65,6 @@ export {
   handleRemoveNodeFromStoryline,
   handleReorderStorylineNodes,
 } from './storylineHandlers'
+
+// Tag handlers
+export { handleListTags, handleRebuildTagNodes } from './tagHandlers'

@@ -82,6 +82,16 @@ export interface McpNode {
   updated_at: number
 }
 
+/** What rebuild_tag_nodes changed (PRODUCT_DESIGN.md > Tag nodes over MCP) */
+export interface McpTagNodeRebuild {
+  merged: number
+  renamed: number
+  removed_unused: number
+  edges_repointed: number
+  edges_deleted: number
+  edges_added: number
+}
+
 /**
  * Edge data returned by MCP
  */
@@ -92,6 +102,9 @@ export interface McpEdge {
   label: string | null
   link_type: string
   directed: boolean
+  /** Endpoint titles, present only when a read asks for them */
+  source_title?: string
+  target_title?: string
 }
 
 /**
