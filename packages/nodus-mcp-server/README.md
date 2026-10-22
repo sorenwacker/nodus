@@ -45,7 +45,8 @@ Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%
 - **list_nodes** - List all nodes in the current workspace
 - **get_node** - Get a specific node by ID with full content
 - **search_nodes** - Search nodes by title or content
-- **get_edges** - Get all edges (connections) between nodes
+- **get_edges** - Get edges between nodes; filter by node, by label, or to unlabelled edges only, and optionally include the endpoint titles
+- **get_edge_labels** - Count the edges carrying each distinct label, and the unlabelled ones
 
 ### Write Operations
 

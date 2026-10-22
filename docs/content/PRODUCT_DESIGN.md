@@ -1734,6 +1734,14 @@ A failure says what went wrong, and its code says what kind of failure it was.
 - "Not connected" covers three situations - never reached, dropped, and waiting for approval - and each says which, because the advice differs.
 - A rejection is recognised by the code and the state it carries, never by the words in its message. The text was matched against "reject", "denied" and "declined", so a refusal phrased any other way read as a wait. The refusal names no request to settle, so the connection itself records it: every later call then says the user refused, rather than that approval is still pending.
 
+### Reading edges by label
+
+**Required behavior:** An MCP client can find the edges with a given label, the edges with none, and the vocabulary of labels in use, without dumping every edge and joining against a node dump. Finding four unlabelled edges among 280, and the 80 distinct labels they carried, needed a full dump and a script.
+
+- `get_edges` filters by `label`, matched exactly after trimming, and by `unlabelled_only`, which keeps edges whose label is null or blank. Both combine with the existing `node_id` filter and the limit and offset.
+- `get_edges` with `include_titles` adds `source_title` and `target_title` to each edge, so a small edge query reads on its own. Without it the result is unchanged, since titles enlarge a full dump.
+- `get_edge_labels` returns each distinct label with the number of edges carrying it, most frequent first, and the number of unlabelled edges. Labels are distinguished exactly, so `Supports` and `supports` are listed as two entries: the census exists to show such inconsistencies, not to hide them.
+
 ### A result keyed by what identifies a node
 
 A result that maps to nodes is keyed by the node's id. Titles are not unique, and keying by title silently merges the nodes that share one: the adjacency list came back with fewer entries than the graph has nodes, and which of them survived depended on the order they were walked. The tool's own description already promised ids.
