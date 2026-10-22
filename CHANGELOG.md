@@ -4,6 +4,41 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-22
+
+Summary of 1.6.0-rc.1 to rc.15; the candidate sections in CHANGELOG.md give the detail and the measurements behind each change.
+
+### Added
+- Smart layout arranges a workspace as a tree built from each note's kind and its connections, so related notes land in one region without drawing edges first. The log states how a run ended, and one Undo restores every position
+- Physics mode (`P`) keeps a force simulation running in bubble mode, in a Web Worker on up to 2000 visible nodes; positions are stored once, when the simulation rests or the mode ends
+- Print to PDF of the selected nodes, or of the whole workspace, as one vector page
+- The workspace list is searchable, shows each workspace's node count, and sorts by last use, name or creation date
+- A `#tag` in a note always creates its tag node and edge; loading a workspace scans every body for tags. A tag gets a node of its own once at least two notes share it
+- Settings > Canvas > Repair Tag Nodes merges duplicate tag nodes and removes tag nodes no note uses
+- Settings > AI has a test message that runs through the same queue, provider and retries as agent work and reports timing and failures
+- The agent has a `read_node` tool; MCP clients and the agent have `add_to_zotero`
+- An optional performance readout reports frame timing while panning or zooming
+
+### Changed
+- Renaming a note renames its vault file and rewrites the wikilinks that point to it
+- Neighbourhood mode arranges its subgraph with the canvas layout algorithms, and the layout controls act on the subgraph while it is open
+- Frames are removed. Each frame's title becomes a tag on its members, and the MCP frame tools are replaced by tagging
+- The hover tooltip appears whenever cards are collapsed, following the semantic zoom threshold
+- A collapsed card chooses the largest type size at which its title fits instead of a fixed size
+- Agent chat requests stream, transient provider failures are retried after about 5, 15 and 45 seconds, and a failure states how many attempts were made
+- The agent answers a question about the notes directly, without a plan or web research
+- Ontology classes are linked across separately imported files
+- Rendering: card content is capped by card size, cards mount a few per frame during a gesture, edge glow is dropped while the view moves, and edges are drawn as straight lines during layout animations
+- Zotero and Wikipedia requests go through the backend, so they work in the installed application
+
+### Fixed
+- Data safety, from a review of the whole codebase: an external file change is never written over the note open in the editor; a save that reaches the database but not the vault file is reported; a create or delete the backend refused leaves the canvas unchanged; a node whose record cannot be read is not deleted
+- Tags: one tag node per tag under concurrent creation; tag nodes are deleted with the last note using them; text inside code is not read for tags; tags connect only within the open workspace
+- MCP: the server starts when built from source; connections scoped to a workspace create their content there; a colour reset no longer leaves a card transparent
+- Building the citation graph can be stopped
+- Context menus open where they fit; a long workspace name no longer pushes the toolbar off screen; the view zooms out far enough to reach the collapsed overview
+
+
 ## [1.6.0-rc.15] - 2026-10-21
 
 ### Added
