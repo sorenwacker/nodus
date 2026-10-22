@@ -121,7 +121,7 @@ export const useNodesStore = defineStore('nodes', () => {
   const computed = createComputedProperties(state, stores)
   const {
     edges, workspaces, currentWorkspaceId,
-    selectedNodeId, selectedNode, filteredNodes, filteredEdges, graphEdges,
+    selectedNodeId, selectedNode, graphNodes, filteredNodes, filteredEdges, graphEdges,
     storylines, storylineNodes, storylineNodesVersion, filteredStorylines,
   } = computed
 
@@ -558,6 +558,7 @@ export const useNodesStore = defineStore('nodes', () => {
     setEditingNode,
     nodes,
     edges,
+    graphNodes,
     filteredNodes,
     filteredEdges,
     graphEdges,
