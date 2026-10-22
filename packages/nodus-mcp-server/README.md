@@ -54,6 +54,7 @@ Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%
 
 - **create_node** - Create a new node
 - **update_node** - Update an existing node (title, content, position)
+- **batch_update_nodes** - Update several nodes in one call; a batch that would outrun the request timeout stops in time and lists the ids it did not attempt, to be resent
 - **delete_node** - Delete a node
 - **rebuild_tag_nodes** - Regenerate the tag nodes and tagged edges of the open workspace from the notes' tags: merge duplicates, drop unused tag nodes, and connect every shared tag
 
