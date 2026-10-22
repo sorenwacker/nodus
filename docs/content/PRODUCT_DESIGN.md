@@ -2155,6 +2155,14 @@ The web view of the packaged application connects only to the hosts its content 
 - The frontend reaches outside services through one function, which hands the request to the backend when running in the packaged application.
 - A direct `fetch` is permitted only in the files a gate test lists, each for a host the policy names: the local Ollama server and the Semantic Scholar API.
 
+### MCP reads are independent of the canvas layers
+
+**Required behavior:** An MCP connection reads the graph as data: the nodes and edges of its workspace, whatever the canvas is currently drawing. The edge reads already ignored the layer toggles, but the node reads went through the canvas filter, which hides tag nodes while the tag layer is off, and the edge reads were derived from those nodes. With the layer hidden, the default, an unscoped connection listed no tag nodes and no `tagged` edges, and reported a graph without a tag type.
+
+- The store exposes the workspace's nodes as data, independent of the tag layer toggle, beside the nodes it draws. The graph edges as data derive from the data nodes, not from the drawn ones.
+- The MCP adapter reads nodes and edges from the data views. The layer toggles change what the canvas draws and nothing an MCP client sees.
+- A scoped connection already read the workspace's nodes directly; the unscoped one now reads the same set for the open workspace.
+
 ### Workspace scoping for MCP connections
 
 **Required behavior:** A connection scoped to a workspace sees that workspace, consistently. Scoping only the list getters produced a store that contradicted itself: a listing returned the target workspace's items while a lookup of those same ids failed, because it resolved against whichever workspace the user happened to have open.
