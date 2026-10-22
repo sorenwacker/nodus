@@ -92,6 +92,7 @@
       "forceLayout": "Kraftbasiertes Layout - Nach Verbindungen anordnen",
       "hierarchicalLayout": "Hierarchisches Layout - Als Baum anordnen (für DAGs/Ontologien)",
       "radialLayout": "Radiales Layout - Nachbarn in konzentrischen Kreisen um ausgewählten Knoten anordnen",
+      "smartLayout": "Intelligentes Layout - Ausgewählte oder alle Knoten mit dem KI-Modell als Hierarchie anordnen",
       "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
       "edgeStyle": "Kantenform",
       "highlightEdges": "Alle Kanten hervorheben - Alle Kanten sichtbarer machen",
@@ -128,9 +129,13 @@
     },
     "connected": "Verbunden mit {provider}",
     "connectionFailed": "Verbindung zum Anbieter fehlgeschlagen",
-    "streaming": {
-      "label": "Streaming aktivieren",
-      "hint": "Antworten Token für Token streamen (erfordert Anbieterunterstützung)"
+    "testMessage": {
+      "label": "Testnachricht",
+      "hint": "Sendet diesen Prompt wie der Agent an den Anbieter und zeigt Antwort und Zeiten.",
+      "defaultPrompt": "Antworte mit einem kurzen Satz: Was ist ein Wissensgraph?",
+      "send": "Senden",
+      "sending": "Wird gesendet...",
+      "timing": "Erstes Byte nach {firstByte} s, fertig nach {total} s, {chars} Zeichen, {attempts} Versuch(e)"
     },
     "apiKey": {
       "label": "API-Schlüssel",
@@ -214,7 +219,10 @@
     "default": "Standard",
     "switch": "Arbeitsbereich wechseln",
     "filter": "Arbeitsbereiche filtern...",
-    "recent": "zuletzt",
+    "sortBy": "Arbeitsbereiche sortieren",
+    "sortUsed": "Zuletzt verwendet",
+    "sortName": "Name",
+    "sortCreated": "Erstellt",
     "noMatch": "Kein passender Arbeitsbereich"
   },
   "onboarding": {

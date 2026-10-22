@@ -339,7 +339,9 @@ The integral is: $ integral_a^b f(x) dif x $
 **Required behavior:** A response that arrives as one buffered body is indistinguishable from a stalled connection while the model is still generating, and gateways cut it. Streaming keeps bytes flowing.
 
 - Generation requests ask the provider to stream, and the backend forwards each chunk to the interface as it arrives rather than accumulating the whole body.
+- Chat requests with tools, which is every request an agent run makes, stream as well. Only generation streamed at first, so the agent's requests still arrived as one body: an agent that had searched the notes and read the one it needed then asked for the answer, and the gateway in front of the model gave up on that buffered answer with a 504 while the two shorter requests before it had gone through. A streamed tool call arrives as fragments, one per delta, each carrying the index of the call it belongs to; the fragments are joined by index into whole calls, so a call whose name arrives in one delta and whose arguments arrive over the next twenty is one call.
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
+- There is no streaming switch in the settings. One existed, and saved a value that no provider read, so it promised control over something it did not touch.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
 ### Localisation
@@ -410,6 +412,16 @@ Every provider answers the question the same way, through one shared probe:
 - The endpoint is the one used for work, with the **configured** model. A model listing answers whenever the server is up, including when the configured model was never pulled or the account cannot reach it. Probing a hardcoded model tests something the user never chose.
 - Any failing status means unavailable. Reading "any status other than 401" as online showed green beside a model that answered nothing.
 - The reason is recorded on the provider and declared on the interface, because "could not be reached", "refused the key" and "no such model" call for different fixes. Reaching into one implementation's field with a cast left the other three reporting nothing.
+
+### Sending a test message
+
+**Required behavior:** The status light says whether the provider accepts a one-token request. It cannot say whether the provider can finish a written answer, which is what every agent run needs, and a provider that passes the probe but cuts every answer is found only by running the agent and reading its failure. The AI settings offer a test message: a real prompt, sent the way the agent sends its work, with the reply and its timing shown in place.
+
+- The panel holds an editable prompt with a default that asks for one short sentence, and a button that sends it. One request is in flight at a time; the button is disabled while it runs.
+- The request goes through the queue to the configured provider, streamed, with the same retries as agent work. What the test measures is what the agent gets.
+- The panel shows the reply as it streams in, then the time to the first byte, the total time, and the length of the reply in characters. Time to first byte separates a model that is slow to start from one that is slow to write, which call for different fixes.
+- A failure shows the message the agent would have shown, including the attempt count and elapsed time, so a provider that cannot finish a sentence is diagnosed here rather than in a run.
+- Progress is reported by every streaming provider. Only Ollama reported it; the OpenAI-compatible provider streamed but told the caller nothing until the end, so a test could not have timed its first byte.
 
 ### PDF text cleanup
 
@@ -568,6 +580,8 @@ view. The threshold is a display setting (`edgeLabelZoomThreshold`, range 0–1,
 default 0.5) configurable via a slider in Settings > Appearance next to the
 semantic zoom threshold; setting it to 0 keeps labels visible at every zoom
 level.
+
+**Hover tooltip visibility (required behavior):** The tooltip appears exactly when the hovered card does not show its content: below the semantic zoom threshold, where cards collapse to titles, or in dense mode. It reads the same collapse state as the cards, so the two cannot disagree. A fixed limit of 50% zoom had been used instead, so a threshold set to 100% collapsed cards at 80% zoom while hovering them showed nothing. With the threshold at 0, cards never collapse and the tooltip appears only in dense mode.
 
 **Hover tooltip content (required behavior):** Hovering a node while zoomed out, or a bead on a timeline, opens a tooltip with the node's title, its edge counts and the start of the note. The note is shown as rendered Markdown, and its vertical spacing comes only from the block margins the tooltip defines for paragraphs, headings and lists. Line breaks in the rendered HTML are not content: the renderer emits one between every pair of block elements, and a container that preserves whitespace turns each into an empty line, which enlarged every gap and reduced how much of the note fits in the tooltip's fixed height. Whitespace is preserved only in the plain-text fallback shown when no rendered content exists, where line breaks are the only structure the text has. The tooltip is styled in its component alone; a gate test fails if another stylesheet declares rules for the tooltip's own elements or if the rendered-content container preserves whitespace.
 
@@ -1167,7 +1181,8 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 |------|-------------|
 | `read_graph(mode, include_content, max_content_length)` | Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full" |
 | `get_connected_components()` | How many separate groups the graph falls into, and which nodes are in each. Without it, a claim that the graph is connected can only be a guess |
-| `query_nodes(filter)` | Query nodes from database. Returns list of {title, content} for planning |
+| `query_nodes(filter)` | Search node titles and content. Returns each hit with a preview of its content; the search term also matches the other number of a plural ("FIPs" finds "FIP") |
+| `read_node(title)` | Read one node's full content by title. For a question about one note, this follows a search in place of reading the whole graph |
 | `for_each_node(filter, action, template)` | Process nodes: set/append content with templates, or use LLM to generate/transform content |
 | `check_completeness(topic, findings)` | Assess if research on a topic is complete. Returns coverage score and suggests follow-up queries if gaps exist |
 
@@ -1190,6 +1205,7 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 |------|-------------|
 | `auto_layout(layout, sort)` | Arrange nodes in a layout |
 | `smart_move(instruction)` | Move nodes based on semantic criteria. LLM reasons about each node. Use for "move cars left, animals right" |
+| `smart_layout(instruction?)` | Arrange the selected or all visible nodes as a top-down tree from node kind and connections. See features.md > Smart Layout |
 | `smart_connect(groups)` | Connect nodes within semantic groups. E.g., "connect animals together, connect cars together, but not across" |
 | `smart_color(instruction)` | Color nodes into multiple categories based on what they represent. LLM semantically classifies each node |
 | `color_matching(pattern, color)` | Color nodes by SEMANTIC criterion (what nodes represent). Use for categories like "person", "organization", "question". NOT for text patterns - use color_regex instead |
@@ -1426,6 +1442,8 @@ Side padding is narrow at this type size. With 24px each side, a default card le
 
 The card therefore chooses the largest type size, up to the base size, at which the whole title fits the lines its height allows. Only a title too long for the smallest readable size is truncated, which makes the ellipsis rare and meaningful again. The line budget and the type size are chosen together, because each depends on the other: a smaller size yields more lines and more characters a line.
 
+Whether a title fits is decided the way the browser wraps it: word by word, with each word's width measured at the title's font, weight and letter spacing. Counting characters assumed a title could break anywhere and that every glyph had an average width, so a title of three medium words, such as "DataCite Metadata Schema", was judged to fit two lines at full size and was cut on the third. A word wider than a whole line is broken across lines, as the stylesheet's `overflow-wrap: break-word` does.
+
 The budget subtracts the border the card actually draws. The collapsed card's border is written inline from the zoom, so it is not the 2px the stylesheet declares; assuming the declared value overestimated the height available at every zoom where cards are collapsed.
 
 ### A write the backend refused
@@ -1528,9 +1546,20 @@ A request that asks what the notes say, and asks for no change, is answered: the
 Every mode's instructions described building. The default mode told the model to read the graph, research on the web, synthesize, draft a plan and request approval, whatever the request was, so a plain question about the workspace set off that whole sequence: nine tool calls and still running, for a question the notes answer.
 
 - The instructions state the rule ahead of the mode's method and say it takes precedence over it.
-- For a question the agent makes at most the reads the answer needs - a search of the notes or one reading of the graph - and then gives the answer as its final message. It makes no plan, requests no approval, changes nothing, and uses web research only when the question asks for information the notes do not hold.
+- For a question the agent makes at most the reads the answer needs - a search of the notes, then the notes the search turned up, or one reading of the graph for a question about the graph as a whole - and then gives the answer as its final message. It makes no plan, requests no approval, changes nothing, and uses web research only when the question asks for information the notes do not hold.
 - Whether a request is a question is the model's judgement, stated in the instructions; the request is not classified by pattern matching (Classifying what the user wrote).
 - The rule is an instruction to the model, so it lowers the number of calls without bounding it. The gate test checks that every mode's instructions carry the rule, not what a model does with it.
+
+#### Reading the note the question is about
+
+A question about one note is answered from that note. The agent searches the notes with `query_nodes`, reads the hits it needs with `read_node`, and answers.
+
+Asked what one note's subject was for, the agent searched, found the note, and then had no way to read it: the search returned titles only, and the agent had no tool that reads one node. Its only path to the content was `read_graph` in full mode, which sent all 216 notes of the workspace with content in one request, and the provider's gateway gave up waiting for the model. The instructions had also told the model to read the whole graph first for any question.
+
+- `read_node(title)` returns one node's full content and is available in every mode. A title that names no node is reported, so the model can search again rather than guess.
+- `query_nodes` returns a preview of each hit's content next to its title, so the model can pick the relevant hit without a second call per node.
+- The search term matches the other number of a plural: "FIPs" finds a note titled "FIP" and "FIP" finds "FIPs". The term is matched as typed and, when it ends in a plural suffix, as its stem, provided the stem is at least three characters long so a short word does not match everything. Nothing is inferred beyond that; a term in another language or an irregular plural is matched as typed.
+- The instructions say to search and then read the hits, and to read the whole graph only for a question about the graph as a whole, such as duplicates or counts.
 
 ### What the agent acts on
 
@@ -1639,6 +1668,10 @@ A gateway timeout was missing from the list. Something between the application a
 
 - A gateway status - it timed out, or it could not reach the model - is retried like the other transient ones.
 - A status with no body says what the status means, rather than showing an empty body as if the provider had said nothing worth repeating.
+- The retries wait for the backend to recover: about 5, 15 and 45 seconds, rather than 1 and 2. A backend that stalls does so for longer than a second or two, so three attempts within three seconds all landed in the same stall and the user saw one failure. The waits are the same for every transient status, since none of them clears in a second.
+- Each retry is written to the run's transcript as an action on the current turn, naming the failure and the wait, so a provider that is failing looks different from an application that crashed. Before, the retries were written to the browser console only and the user saw a single final error.
+- Stopping the run interrupts the wait. A retry that is waiting 45 seconds would otherwise keep the run alive that long after the user pressed stop.
+- A connection the gateway drops mid-body is transient and is retried. Once chat requests streamed, a gateway that had answered 504 to a buffered request instead sent the response headers, waited for the model, and closed the connection, which reaches the application as a body read ending in an unexpected end of file. The text carries no status and matched none of the retry patterns, so the run ended on the first drop.
 
 ### Reporting a provider failure
 
@@ -1647,6 +1680,7 @@ A failed request says what the provider said. The message the API returned was p
 - The parsed message survives to the caller.
 - A failure that is not a connection failure is not reported as one. A malformed chunk from a running server was reported as "Cannot connect to Ollama. Start it with: ollama serve", which sends the user to start a server that is already running.
 - Availability is decided by the one shared probe, for every provider. Three providers delegate to it and one re-implemented it by hand, so a change to the shared rule would have skipped that provider silently.
+- A request failure that ends a run says how many attempts were made and how long they took, as in "after 4 attempts over 4 min 50 s" or "on the first attempt, after 62 s". A transcript that showed only the final status could not say whether the retries had run at all, and a stall of a minute per attempt looked the same as a refusal that came at once. Stopping the run is not a failure and carries no such note.
 
 ### Reading an event stream
 
@@ -2037,11 +2071,16 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 
 ### Choosing a workspace
 
-**Required behavior:** The workspace list is searchable, ordered by what the user touched most recently, and says how large each workspace is.
+**Required behavior:** The workspace list is searchable, sortable by last use, name or creation date, and says how large each workspace is.
 
 - The workspace scopes the canvas, search, the agent's context and file sync, so choosing one is the most consequential control in the toolbar. A plain dropdown of every workspace in creation order stops being usable somewhere around a dozen entries; this installation has thirty-seven.
 - Typing filters the list by name, ignoring case and accents. The keyboard alone can reach any workspace: arrows move, Enter switches, Escape closes.
-- Recently opened workspaces come first, in the order they were last opened, and the rest follow alphabetically. Recency is the only ordering that reflects how the list is actually used, and alphabetical order underneath keeps a workspace findable when it has not been opened before.
+- A sort control in the list header offers three orders, and the chosen one is remembered across sessions:
+    - **Last used** (default): workspaces in the order they were last opened, most recent first, then the never-opened ones by name. Every opened workspace is tracked, not only the latest few, so the order covers the whole list. Recency reflects how the list is actually used; the name order underneath keeps a workspace findable before it has been opened.
+    - **Name**: alphabetical, ignoring case and accents, as the filter does.
+    - **Created**: newest first, by the workspace's stored creation date, so a workspace made yesterday is at the top even if it was never opened.
+- Last use is recorded in the app's local storage when a workspace is chosen in the switcher. Opening a workspace through MCP or the agent does not count as a use.
+- Filtering narrows the list and keeps the chosen order.
 - Each row carries its node count, taken from the nodes already in memory rather than a query, so the list says which workspaces hold work and which are empty.
 
 ### Workspace settings

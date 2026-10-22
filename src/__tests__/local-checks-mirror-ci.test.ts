@@ -105,3 +105,30 @@ for (const script of ['scripts/ci-check.sh', 'scripts/pre-commit']) {
     }
   })
 }
+
+describe('the release gate runs what CI runs', () => {
+  // A tag can be cut from a commit that never went through a pull request, so
+  // the release test job is the only gate it passes (development.md >
+  // Continuous integration and releases)
+  const release = parse(read('.github/workflows/release.yml')) as { jobs: Record<string, CiJob> }
+  const steps = release.jobs.test.steps
+  const commands = steps.flatMap(step =>
+    (step.run ?? '')
+      .split('\n')
+      .map(line => ({ command: normalise(line.trim()), directory: step['working-directory'] ?? '.' }))
+  )
+
+  for (const check of ciChecks()) {
+    it(`runs "${check.command}" from ${check.directory}`, () => {
+      const found = commands.some(c => c.command === check.command && c.directory === check.directory)
+      expect(found, `release.yml test job never runs "${check.command}" in ${check.directory}`).toBe(true)
+    })
+  }
+})
+
+describe('platform builds', () => {
+  it('run from the release tag only, not on every push', () => {
+    const workflow = read('.github/workflows/ci.yml')
+    expect(workflow.includes('tauri-apps/tauri-action'), 'ci.yml builds the app').toBe(false)
+  })
+})

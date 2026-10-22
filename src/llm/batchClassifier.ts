@@ -63,6 +63,11 @@ export async function batchClassifyNodes(
     }
   }
 
+  if (isCancelled?.()) {
+    log?.('> Stopped before classification')
+    return results
+  }
+
   if (nodesNeedingLLM.length === 0) {
     log?.(`> All ${nodes.length} nodes matched by tags`)
     return results
@@ -245,3 +250,4 @@ export async function batchClassifyForConnect(
 
   return batchClassifyNodes(nodes, categories, llmQueue, options)
 }
+

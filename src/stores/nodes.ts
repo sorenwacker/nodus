@@ -168,15 +168,9 @@ export const useNodesStore = defineStore('nodes', () => {
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
     reloadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
     // Frontmatter sync
-    updateNodeTitle: async (id: string, title: string) => {
-      const node = nodes.value.find(n => n.id === id)
-      if (node) {
-        node.title = title
-        node.updated_at = Date.now()
-        const filePath = await invoke<string | null>('update_node_title', { id, title })
-        if (filePath) node.file_path = filePath
-      }
-    },
+    // A title changed in the file is an outside edit: it relinks like any
+    // rename, but is not an undo step of this app
+    updateNodeTitle: (id: string, title: string) => updateNodeTitleFn(nodes, id, title, { skipUndo: true }),
     updateNodeTags: async (id: string, tags: string[]) => {
       const node = nodes.value.find(n => n.id === id)
       if (node) {
@@ -307,8 +301,8 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  async function updateNodeTitle(id: string, title: string) {
-    await updateNodeTitleFn(nodes, id, title)
+  async function updateNodeTitle(id: string, title: string, options?: { skipUndo?: boolean }) {
+    await updateNodeTitleFn(nodes, id, title, options)
   }
 
   async function updateNodeTags(id: string, tags: string[]) {

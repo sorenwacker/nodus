@@ -94,6 +94,18 @@ jobs:
       - name: Lint frontend
         run: npm run lint
 
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      # tsc type-checks the MCP server files the root suite never imports
+      - name: Install MCP server dependencies
+        run: npm ci
+        working-directory: packages/nodus-mcp-server
+
+      - name: Build MCP server
+        run: npm run build
+        working-directory: packages/nodus-mcp-server
+
       - name: Build frontend
         run: npm run build
 

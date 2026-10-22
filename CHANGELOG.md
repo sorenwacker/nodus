@@ -4,11 +4,77 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-22
+
+Summary of 1.6.0-rc.1 to rc.15; the candidate sections in CHANGELOG.md give the detail and the measurements behind each change.
+
+### Added
+- Smart layout arranges a workspace as a tree built from each note's kind and its connections, so related notes land in one region without drawing edges first. The log states how a run ended, and one Undo restores every position
+- Physics mode (`P`) keeps a force simulation running in bubble mode, in a Web Worker on up to 2000 visible nodes; positions are stored once, when the simulation rests or the mode ends
+- Print to PDF of the selected nodes, or of the whole workspace, as one vector page
+- The workspace list is searchable, shows each workspace's node count, and sorts by last use, name or creation date
+- A `#tag` in a note always creates its tag node and edge; loading a workspace scans every body for tags. A tag gets a node of its own once at least two notes share it
+- Settings > Canvas > Repair Tag Nodes merges duplicate tag nodes and removes tag nodes no note uses
+- Settings > AI has a test message that runs through the same queue, provider and retries as agent work and reports timing and failures
+- The agent has a `read_node` tool; MCP clients and the agent have `add_to_zotero`
+- An optional performance readout reports frame timing while panning or zooming
+
 ### Changed
+- Renaming a note renames its vault file and rewrites the wikilinks that point to it
+- Neighbourhood mode arranges its subgraph with the canvas layout algorithms, and the layout controls act on the subgraph while it is open
+- Frames are removed. Each frame's title becomes a tag on its members, and the MCP frame tools are replaced by tagging
+- The hover tooltip appears whenever cards are collapsed, following the semantic zoom threshold
+- A collapsed card chooses the largest type size at which its title fits instead of a fixed size
+- Agent chat requests stream, transient provider failures are retried after about 5, 15 and 45 seconds, and a failure states how many attempts were made
+- The agent answers a question about the notes directly, without a plan or web research
+- Ontology classes are linked across separately imported files
+- Rendering: card content is capped by card size, cards mount a few per frame during a gesture, edge glow is dropped while the view moves, and edges are drawn as straight lines during layout animations
+- Zotero and Wikipedia requests go through the backend, so they work in the installed application
+
+### Fixed
+- Data safety, from a review of the whole codebase: an external file change is never written over the note open in the editor; a save that reaches the database but not the vault file is reported; a create or delete the backend refused leaves the canvas unchanged; a node whose record cannot be read is not deleted
+- Tags: one tag node per tag under concurrent creation; tag nodes are deleted with the last note using them; text inside code is not read for tags; tags connect only within the open workspace
+- MCP: the server starts when built from source; connections scoped to a workspace create their content there; a colour reset no longer leaves a card transparent
+- Building the citation graph can be stopped
+- Context menus open where they fit; a long workspace name no longer pushes the toolbar off screen; the view zooms out far enough to reach the collapsed overview
+
+
+## [1.6.0-rc.15] - 2026-10-21
+
+### Added
+- Smart layout arranges the notes of a workspace as a tree built from each note's kind and its connections, so related notes land in one region without edges having to be drawn first. A run uses a few model calls rather than one per 15 notes, and the log states how the run ended
+- The workspace list can be sorted by last use, by name or by creation date, from a menu next to the filter field. The choice is remembered, and last use covers every workspace that has been opened from the list, not only the latest eight
+
+### Changed
+- Renaming a note rewrites the wikilinks that point to it, so the notes linking to it keep working
+- The hover tooltip appears whenever cards are collapsed to their titles, following the semantic zoom threshold. It had used a fixed limit of 50% zoom, so with a higher threshold collapsed cards showed no hover information
+
+## [1.6.0-rc.14] - 2026-10-12
+
+### Added
+- Print to PDF: the selected nodes, or every node of the workspace when nothing is selected, as one vector page sized to the printed nodes. Each node is drawn as a card at its stored position with its title and the content that fits; only edges between printed nodes are drawn
+- A test message in Settings > AI: an editable prompt sent through the same queue, provider, streaming and retries as agent work. The panel shows the reply as it streams, then the time to the first byte, the total time, the length and the attempt count, or the failure text the agent would have shown, so a provider that passes the status check but cannot finish an answer is found there and not in a run
+- The agent has a `read_node` tool that returns one note's full content by title, in every mode. Asked what a note was about, the agent had found it by search and then had no way to read it except reading the whole graph in one request, which the provider's gateway timed out on
+- The `add_to_zotero` tool, for MCP clients and the in-app agent, adds the named nodes to the Zotero library through the same function as the context-menu action, with the same rules
+
+### Changed
+- The agent's chat requests stream, as generation already did. Buffered, the answer after a long read looked like a stalled connection to the gateway in front of the model and was cut; streamed tool calls arrive as fragments and are joined into whole calls
+- A transient provider failure is retried after about 5, 15 and 45 seconds instead of 1 and 2, since a backend that stalls does so for longer than a second. Each retry is written to the run's transcript and log, stopping the run interrupts the wait, and a connection the gateway drops mid-body is retried like a timeout
+- A request failure that ends a run states how many attempts were made and how long they took, so a stall of a minute per attempt no longer reads like a refusal that came at once
+- The agent's search of the notes shows a preview of each hit's content next to its title, and a plural search term also finds its singular, so "FIPs" finds a note titled "FIP". The agent is instructed to search and then read the hits, and to read the whole graph only for a question about the graph as a whole
+- "Enable Streaming" is gone from the AI settings. It saved a value that no provider read
+- Papers brought in by Fetch Citations and Fetch References are stored as citation nodes, and Add to Zotero takes citation nodes and stubs only: a note that mentions a DOI is a note, not a reference. The menu offers the action when the selection holds at least one such node
+- PDFs are compiled by the backend Typst compiler with its bundled fonts, the one that renders math, before the save dialog opens. The compiler in the web view could not be loaded and fetched its fonts from a network the application's content security policy does not allow
+- An arrowhead ends the line: the visible line stops inside the base of the head. Zoomed out, the line was wider than the head's tip and showed through it
 - The Zotero settings no longer say the connection synchronises both ways. Importing and adding to Zotero are single actions; the hint and the documentation now say so, and the documentation describes the Web API connection in place of the removed local detection
 - Double-clicking a section's text in the storyline reader edits it, as double-clicking its title does. A double-click on a link inside the text keeps its own meaning
 
 ### Fixed
+- Deleting a note no longer fails when the tag node it emptied cannot be deleted; the note is deleted and the tag node is left for the repair action
+- A right-click on a bubble opens the context menu, as a right-click on a card does. The viewport closed the menu in the same event that opened it
+- Edges to off-screen anchors in physics mode keep their length instead of reeling their neighbours in across the canvas
+- Physics mode no longer pushes the whole graph one way on every reheat: the forces between simulated nodes rearrange them and never carry the graph off as a whole
+- The hover tooltip no longer turns every line break of a rendered note into an empty line; its spacing comes from the block margins alone
 - Physics mode takes in nodes and edges added or removed while it runs, for example by an MCP client: the simulation keeps what it reached, is rebuilt on the graph as it now is and reheats. Creating or deleting a node used to end the mode and discard the simulated positions
 - In bubble mode a node no longer stays hovered, with its edges thick and highlighted, after the pointer is released over the preview panel. The release did not reach the canvas, which went on treating the node as held and ignored the pointer
 - The colour bar is centred in the free part of the canvas and wraps there. It was centred on the whole canvas, so with the reader open it ran under the reader, and it lay over the minimap

@@ -203,7 +203,7 @@ When user says "this node", "these nodes", "selected", use selection tools (upda
 
 QUESTIONS (this takes precedence over the mode below):
 If the request asks what the notes say and asks for no change to the graph, answer it.
-- Read only what the answer needs: query_nodes(search term) or one read_graph(). The node list below holds titles only, not content.
+- Read only what the answer needs: query_nodes(search term), then read_node(title) for the hits the answer needs. Call read_graph() only for a question about the graph as a whole, such as duplicates or counts. The node list below holds titles only, not content.
 - Then call done(summary) with the answer itself as the summary.
 - No plan and no approval request. Change nothing in the graph.
 - Use web research only when the question asks for information the notes do not hold.
@@ -235,6 +235,7 @@ TOOLS:
 - for_each_node(action, template, filter?): UPDATE existing nodes. action="llm" generates content. template="What is {title}?" uses variables.
 - batch_update(updates): Update multiple nodes. [{title, set_title?, set_content?, x?, y?}].
 - smart_move(instruction): Move nodes by semantic criteria.
+- smart_layout(instruction?): Arrange selected or all visible nodes as a hierarchy from node kind and connections. Use for "smart layout", "hierarchical layout by meaning".
 - smart_color(instruction): Color nodes by semantic criteria.
 - color_matching(pattern, color): SEMANTIC coloring - classify by meaning (e.g., "person", "question", "organization"). NOT for text patterns.
 - color_regex(regex, color, field?): REGEX coloring - match text patterns on title. Use ^x for "starts with x", x$ for "ends with x", foo for "contains foo".

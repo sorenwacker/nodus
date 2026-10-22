@@ -92,6 +92,7 @@
       "forceLayout": "Disposición por fuerza - Ordenar por conexiones",
       "hierarchicalLayout": "Disposición jerárquica - Ordenar como árbol (para DAGs/ontologías)",
       "radialLayout": "Disposición radial - Ordenar vecinos en círculos concéntricos alrededor del nodo seleccionado",
+      "smartLayout": "Disposición inteligente - Ordenar los nodos seleccionados o todos como jerarquía con el modelo de IA",
       "fitNodesToContent": "Ajustar nodos al contenido - Redimensionar todos los nodos",
       "edgeStyle": "Estilo de aristas",
       "magnifier": "Lupa - Mostrar vista ampliada al alejar",
@@ -128,9 +129,13 @@
     },
     "connected": "Conectado a {provider}",
     "connectionFailed": "Error al conectar con el proveedor",
-    "streaming": {
-      "label": "Habilitar streaming",
-      "hint": "Transmitir respuestas token por token (requiere soporte del proveedor)"
+    "testMessage": {
+      "label": "Mensaje de prueba",
+      "hint": "Envía este prompt al proveedor como lo hace el agente y muestra la respuesta y sus tiempos.",
+      "defaultPrompt": "Responde con una frase corta: ¿qué es un grafo de conocimiento?",
+      "send": "Enviar",
+      "sending": "Enviando...",
+      "timing": "Primer byte tras {firstByte} s, terminado en {total} s, {chars} caracteres, {attempts} intento(s)"
     },
     "apiKey": {
       "label": "Clave API",
@@ -214,7 +219,10 @@
     "default": "Predeterminado",
     "switch": "Cambiar de espacio",
     "filter": "Filtrar espacios...",
-    "recent": "reciente",
+    "sortBy": "Ordenar espacios",
+    "sortUsed": "Ultimo uso",
+    "sortName": "Nombre",
+    "sortCreated": "Creacion",
     "noMatch": "Ningun espacio coincide"
   },
   "onboarding": {

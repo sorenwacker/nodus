@@ -8,6 +8,7 @@ import type { Ref, ComputedRef } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import { getNodeBackground as getNodeBackgroundUtil } from '../../utils/nodeColors'
 import { nodeDisplayTitle } from '../../utils/nodeDisplayTitle'
+import { measureTitleText, wrappedLineCount, type MeasureTitle } from '../../utils/collapsedTitleFit'
 
 /**
  * Node shape for style computation
@@ -45,6 +46,8 @@ export interface UseCanvasNodeStyleContext {
    * (PRODUCT_DESIGN.md > Collapsed node titles).
    */
   fontScale?: Ref<number>
+  /** Measures collapsed title text; defaults to a 2D canvas measurement. */
+  measureTitle?: MeasureTitle
   /** Currently resizing node ID (or null) */
   resizingNode: Ref<string | null>
   /** Preview state during resize */
@@ -92,6 +95,7 @@ export interface UseCanvasNodeStyleReturn {
 export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNodeStyleReturn {
   const {
     fontScale,
+    measureTitle = measureTitleText,
     resizingNode,
     resizePreview,
     nodeZOrder,
@@ -149,8 +153,6 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     const COLLAPSED_SIDE_PADDING = 10
     /** Smallest type the collapsed title may shrink to before it is truncated. */
     const MIN_COLLAPSED_FONT = 11
-    /** Mean advance of a bold sans glyph, as a fraction of the type size. */
-    const AVG_CHAR_EM = 0.52
     const textScale = fontScale?.value ?? 1
     // The border the card actually draws, not the 2px the stylesheet declares:
     // it is written inline from the zoom, so at every scale where cards are
@@ -170,10 +172,9 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     for (let size = COLLAPSED_FONT; size >= MIN_COLLAPSED_FONT; size--) {
       const lineBox = size * textScale * COLLAPSED_LINE_HEIGHT
       const lines = Math.max(1, Math.floor(availableHeight / lineBox))
-      const perLine = Math.max(1, Math.floor(availableWidth / (size * textScale * AVG_CHAR_EM)))
       titleSize = size
       titleLines = lines
-      if (Math.ceil(renderedTitle.length / perLine) <= lines) break
+      if (wrappedLineCount(renderedTitle, availableWidth, size * textScale, measureTitle) <= lines) break
     }
 
     const style: Record<string, string> = {

@@ -711,7 +711,7 @@ const { selectedNodeIds: storeSelectedNodeIds, filteredEdges: storeFilteredEdges
 
 // Node hover composable - handles hover state, tooltips, and active node tracking
 const nodeHover = useNodeHover({
-  scale,
+  isCollapsed: isSemanticZoomCollapsed,
   isLODMode,
   selectedNodeIds: storeSelectedNodeIds,
   filteredEdges: storeFilteredEdges,
@@ -1948,11 +1948,11 @@ defineExpose({
         :neighborhood-depth="neighborhoodDepth"
         :highlight-all-edges="highlightAllEdges"
         :bubble-mode-active="isBubbleModeForced"
-        :physics-active="physics.active.value" :physics-available="physics.available.value" @toggle-physics="physics.toggle()" @print-to-pdf="printToPdf(store.selectedNodeIds)"
-        @zoom-in="zoomIn" @zoom-out="zoomOut"
+        :physics-active="physics.active.value" :physics-available="physics.available.value" :smart-layout-available="llmEnabled" @toggle-physics="physics.toggle()"
+        @print-to-pdf="printToPdf(store.selectedNodeIds)" @zoom-in="zoomIn"
+        @zoom-out="zoomOut"
         @fit-to-content="fitToContent"
-        @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
-        @layout="autoLayoutNodes"
+        @toggle-grid-lock="gridLockEnabled = !gridLockEnabled" @layout="autoLayoutNodes" @smart-layout="llmTools.executeLLMTool('smart_layout', {})"
         @fit-nodes-to-content="fitAllNodesToContent"
         @cycle-edge-style="cycleEdgeStyle"
         @toggle-neighborhood-mode="neighborhood.toggle()"

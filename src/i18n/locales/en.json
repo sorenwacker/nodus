@@ -92,6 +92,7 @@
       "forceLayout": "Force Layout - Arrange by connections",
       "hierarchicalLayout": "Hierarchical Layout - Arrange as tree (for DAGs/ontologies)",
       "radialLayout": "Radial Layout - Arrange neighbors in concentric circles around selected node",
+      "smartLayout": "Smart Layout - Arrange selected or all nodes as a hierarchy using the AI model",
       "fitNodesToContent": "Fit Nodes to Content - Resize all nodes to show full content",
       "edgeStyle": "Edge Style",
       "highlightEdges": "Highlight All Edges - Make all edges more visible",
@@ -128,9 +129,13 @@
     },
     "connected": "Connected to {provider}",
     "connectionFailed": "Failed to connect to provider",
-    "streaming": {
-      "label": "Enable Streaming",
-      "hint": "Stream responses token-by-token (requires provider support)"
+    "testMessage": {
+      "label": "Test message",
+      "hint": "Sends this prompt to the provider the way the agent does and shows the reply and its timing.",
+      "defaultPrompt": "Reply with one short sentence: what is a knowledge graph?",
+      "send": "Send",
+      "sending": "Sending...",
+      "timing": "First byte after {firstByte} s, finished in {total} s, {chars} characters, {attempts} attempt(s)"
     },
     "apiKey": {
       "label": "API Key",
@@ -214,7 +219,10 @@
     "default": "Default",
     "switch": "Switch workspace",
     "filter": "Filter workspaces...",
-    "recent": "recent",
+    "sortBy": "Sort workspaces",
+    "sortUsed": "Last used",
+    "sortName": "Name",
+    "sortCreated": "Created",
     "noMatch": "No workspace matches"
   },
   "onboarding": {

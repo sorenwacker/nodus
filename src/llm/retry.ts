@@ -17,13 +17,20 @@ export interface RetryOptions {
   retryableErrors?: string[]
   /** Callback for logging retry attempts */
   onRetry?: (attempt: number, error: Error, delayMs: number) => void
+  /** Ends a wait between attempts early, rejecting with "Cancelled" */
+  signal?: AbortSignal
 }
 
+/**
+ * Waits of about 5, 15 and 45 seconds. A backend that stalls does so for
+ * longer than a second or two, so attempts a second apart all landed in the
+ * same stall (PRODUCT_DESIGN.md > Retrying a provider failure).
+ */
 const DEFAULT_OPTIONS: RetryOptions = {
   maxRetries: 3,
-  initialDelayMs: 1000,
-  maxDelayMs: 30000,
-  backoffMultiplier: 2,
+  initialDelayMs: 5000,
+  maxDelayMs: 45000,
+  backoffMultiplier: 3,
   retryableErrors: [
     'ECONNRESET',
     'ETIMEDOUT',
@@ -39,6 +46,10 @@ const DEFAULT_OPTIONS: RetryOptions = {
     '504',
     '502',
     '429',
+    // A streamed body the gateway cut while waiting for the model: it arrives
+    // as a read error, with no status to match
+    'unexpected EOF',
+    'error reading a body',
   ],
 }
 
@@ -71,8 +82,22 @@ function calculateBackoff(
 /**
  * Sleep for a specified duration
  */
-export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('Cancelled'))
+      return
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    function onAbort() {
+      clearTimeout(timer)
+      reject(new Error('Cancelled'))
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 /**
@@ -113,8 +138,8 @@ export async function withRetry<T>(
       // Notify about retry
       opts.onRetry?.(attempt + 1, error, delayMs)
 
-      // Wait before retrying
-      await sleep(delayMs)
+      // Wait before retrying; stopping the run ends the wait
+      await sleep(delayMs, opts.signal)
     }
   }
 

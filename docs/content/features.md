@@ -94,6 +94,7 @@ Writing `[[link]]` in a node's content creates a wikilink edge to the referenced
 - Links resolve by note title, by relative path (`[[folder/note]]`), and with section anchors (`[[note#section]]`)
 - A pair already connected by a manual edge does not receive a parallel wikilink edge
 - Removing the link removes the wikilink edge; manual edges are kept
+- Renaming a node rewrites the links to it in every note that has a wikilink edge to it, so the edges and the `.md` files stay consistent. The link keeps its form: `[[Old]]` becomes `[[New]]`, `[[Old|alias]]` becomes `[[New|alias]]`, `[[Old#section]]` becomes `[[New#section]]`, and `[[folder/Old]]` becomes `[[folder/New]]`. Plain text that mentions the old title is not changed. A rewritten note's file is written only while folder sync is active for it, as with any content edit. One Undo restores the title and every rewritten link.
 
 ### Edge Routing
 Multiple routing styles for visual clarity:
@@ -127,6 +128,25 @@ Let the graph arrange itself while you pull on it. Press `P` or use the atom but
 4. Press `P` again to stop. The positions are saved when the graph comes to rest, when you stop, or when you leave bubble mode.
 
 Nodes off screen stay where they are. One Undo restores every position from before you switched the mode on. Running a layout command or Undo switches the mode off. The mode is not available in the neighborhood view. While nodes are moving, edges are drawn as straight lines between the bubbles; they are routed in their style again when the motion stops.
+
+### Smart Layout
+Arrange nodes as a tree from broad to specific. The tree is built from each node's kind (its node type: tag, term, note, citation, ...) and its connections, with a language model deciding the order of the kinds and the parent of each node where the graph leaves a choice. The tree is drawn top-down with the hierarchical layout algorithm.
+
+**Prerequisite:** an AI provider is configured and the AI features are enabled.
+
+1. Select the nodes to arrange. With nothing selected, all visible nodes are arranged.
+2. Click the smart layout button in the canvas controls, or ask the agent, for example "arrange these with the sources at the top". The agent passes your wording to the model; the button lets the model decide.
+3. The nodes move into a top-down tree: broader nodes above, the nodes that belong to them below.
+
+How the tree is built:
+
+- **Rank of kinds.** The model receives the kinds present with example titles and orders them from broad to specific, for example tag above term above note above citation. With a single kind no request is made. Among nodes of the same kind, the node with more connections ranks broader.
+- **Parent of a node.** A node's parent is one of its connected neighbours of broader rank. With one such neighbour the choice is made without the model; with several, the model picks the most specific one the node belongs under, so a note goes under `#prohibited-ai-practices-art-5` rather than under `#ai-act`.
+- **Few requests.** One short request orders the kinds; the nodes with several candidate parents are sent together, up to 80 per request, instead of one request per node.
+- **Other edges.** Edges that are not parent links stay drawn but do not affect positions.
+- **Separate trees** are placed side by side. Nodes without a connection are placed in rows below the trees.
+
+One Undo restores every position. The log shows how the run ended. The layout is never run automatically, including when the app starts or a workspace opens.
 
 ## Storylines
 
@@ -314,6 +334,8 @@ Changes sync between Nodus and your vault folder:
 
 ### Workspace Separation
 Each imported vault becomes a separate workspace, keeping projects organized.
+
+The workspace switcher in the toolbar lists workspaces by last use, by name or by creation date; choose the order from the menu next to the filter field. Nodus remembers the choice.
 
 ---
 
