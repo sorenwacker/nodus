@@ -44,6 +44,7 @@ import {
   handleGetEdges,
   handleCreateEdge,
   handleUpdateEdge,
+  handleBatchUpdateEdges,
   handleDeleteEdge,
   handleBatchCreateEdges,
   handleBatchDeleteEdges,
@@ -462,6 +463,12 @@ export function createMcpMessageHandler(
             label?: string
             directed?: boolean
           }
+        )
+
+      case 'batch_update_edges':
+        return handleBatchUpdateEdges(
+          store,
+          params as { updates: Array<{ id: string; label?: string; directed?: boolean; color?: string }> }
         )
 
       case 'delete_edge':

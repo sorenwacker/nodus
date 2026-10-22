@@ -66,6 +66,30 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
     },
   },
   {
+    name: 'batch_update_edges',
+    description: 'Update the label, direction, or color of many edges in one call. Every item is attempted; the result counts updated and failed edges and lists each failure with its edge id.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        updates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'The edge ID to update' },
+              label: { type: 'string', description: 'New label; empty string clears it' },
+              directed: { type: 'boolean', description: 'Whether the edge is directed' },
+              color: { type: 'string', description: 'Edge color as a name or hex value; empty string clears it' },
+            },
+            required: ['id'],
+          },
+          description: 'Array of edge updates',
+        },
+      },
+      required: ['updates'],
+    },
+  },
+  {
     name: 'delete_edge',
     description: 'Delete an edge from the workspace.',
     inputSchema: {

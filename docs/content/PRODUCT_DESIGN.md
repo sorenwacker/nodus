@@ -1716,6 +1716,14 @@ The MCP server outlives any one Nodus session, so it reconnects. A tool call att
 
 Each queued paper carries the direction it was queued for. The direction used to be read once when the run began, from a value a later request overwrote: papers queued mid-run were fetched in whichever direction the run started with, and papers already queued could have their direction changed under them.
 
+### Updating edges in batches
+
+**Required behavior:** An MCP client can change the label, direction, or color of many edges in one request. Edges could be created and deleted in batches but only updated one at a time, so relabelling a workspace's edges took one round trip per edge: 63 edges took 63 calls.
+
+- `batch_update_edges` takes a list of updates, each naming an edge by id with any of `label`, `directed`, and `color`. An empty label or color clears it, as in `update_edge`.
+- Every item is attempted. The result counts the edges updated and failed and lists each failure with the edge id and the reason, as `batch_update_nodes` does, so an edge that does not exist does not stop the rest and is not silently skipped.
+- `success` is true only when no item failed.
+
 ### Reporting MCP errors
 
 A failure says what went wrong, and its code says what kind of failure it was.

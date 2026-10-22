@@ -102,6 +102,38 @@ export async function handleUpdateEdge(
   return { success: true }
 }
 
+/**
+ * Update the label, direction, or color of many edges in one request.
+ *
+ * Every item is attempted, and each failure is reported with its edge id, as
+ * batch_update_nodes does; edges could be created and deleted in batches but
+ * only updated one at a time (PRODUCT_DESIGN.md > Updating edges in batches).
+ */
+export async function handleBatchUpdateEdges(
+  store: McpStoreInterface,
+  params: { updates: Array<{ id: string; label?: string; directed?: boolean; color?: string }> }
+): Promise<{ success: boolean; updated: number; failed: number; errors?: Array<{ id: string; error: string }> }> {
+  let updated = 0
+  const errors: Array<{ id: string; error: string }> = []
+
+  for (const update of params.updates) {
+    try {
+      await handleUpdateEdge(store, update)
+      updated++
+    } catch (e) {
+      errors.push({ id: update.id, error: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  const result: { success: boolean; updated: number; failed: number; errors?: Array<{ id: string; error: string }> } = {
+    success: errors.length === 0,
+    updated,
+    failed: errors.length,
+  }
+  if (errors.length > 0) result.errors = errors
+  return result
+}
+
 export async function handleDeleteEdge(
   store: McpStoreInterface,
   params: { id: string }
