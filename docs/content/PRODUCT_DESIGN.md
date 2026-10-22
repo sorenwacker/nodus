@@ -1442,6 +1442,8 @@ Side padding is narrow at this type size. With 24px each side, a default card le
 
 The card therefore chooses the largest type size, up to the base size, at which the whole title fits the lines its height allows. Only a title too long for the smallest readable size is truncated, which makes the ellipsis rare and meaningful again. The line budget and the type size are chosen together, because each depends on the other: a smaller size yields more lines and more characters a line.
 
+Whether a title fits is decided the way the browser wraps it: word by word, with each word's width measured at the title's font, weight and letter spacing. Counting characters assumed a title could break anywhere and that every glyph had an average width, so a title of three medium words, such as "DataCite Metadata Schema", was judged to fit two lines at full size and was cut on the third. A word wider than a whole line is broken across lines, as the stylesheet's `overflow-wrap: break-word` does.
+
 The budget subtracts the border the card actually draws. The collapsed card's border is written inline from the zoom, so it is not the 2px the stylesheet declares; assuming the declared value overestimated the height available at every zoom where cards are collapsed.
 
 ### A write the backend refused
