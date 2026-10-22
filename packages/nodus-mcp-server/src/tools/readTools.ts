@@ -15,13 +15,18 @@ export const READ_TOOLS: McpToolDeclaration[] = [
   },
   {
     name: 'list_nodes',
-    description: 'List nodes in the current workspace. Returns compact node metadata (id, title, type). Use limit/offset for large graphs.',
+    description: 'List nodes in the current workspace. Returns compact node metadata (id, title, type, position, size, tags, dates). Use limit/offset for large graphs, and fields to return only what you need.',
     inputSchema: {
       type: 'object',
       properties: {
         include_content: {
           type: 'boolean',
           description: 'Include markdown content. Default: false. Warning: can be large.',
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Return only these fields, plus id. Any of: title, node_type, canvas_x, canvas_y, width, height, markdown_content, tags, date, date_end, created_at, updated_at, degree (number of edges at the node).',
         },
         limit: {
           type: 'number',
@@ -137,6 +142,25 @@ export const READ_TOOLS: McpToolDeclaration[] = [
           description: 'Max nodes to return. Default: 10',
         },
       },
+    },
+  },
+  {
+    name: 'get_nodes_by_tag',
+    description: 'Find the nodes carrying a tag. The tag matches without its leading # and regardless of case; tag nodes themselves are not listed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tag: {
+          type: 'string',
+          description: 'The tag name, with or without the leading #',
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Return only these fields, plus id, as in list_nodes. Default: title, tags.',
+        },
+      },
+      required: ['tag'],
     },
   },
   {

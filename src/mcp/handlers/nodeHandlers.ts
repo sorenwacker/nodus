@@ -11,6 +11,7 @@ import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface, McpUndoInterface } from '../messageHandler'
 import { withDateFields } from '../../lib/contentParser'
 import { extractFrontmatterField } from '../../lib/timelineDates'
+import { recordedTagsOf } from '../../lib/tagSync'
 
 /**
  * Convert internal Node to MCP format
@@ -155,16 +156,101 @@ export function handleGetGraphSummary(store: McpStoreInterface): {
   }
 }
 
+/** The fields a shaped listing may ask for: those of a node, and its degree */
+const LISTABLE_FIELDS = [
+  'title',
+  'node_type',
+  'canvas_x',
+  'canvas_y',
+  'width',
+  'height',
+  'markdown_content',
+  'tags',
+  'date',
+  'date_end',
+  'created_at',
+  'updated_at',
+  'degree',
+] as const
+
+type ListableField = (typeof LISTABLE_FIELDS)[number]
+
+/** Edges at each node, over both ends */
+function degreesOf(edges: Edge[]): Map<string, number> {
+  const degrees = new Map<string, number>()
+  for (const edge of edges) {
+    degrees.set(edge.source_node_id, (degrees.get(edge.source_node_id) ?? 0) + 1)
+    degrees.set(edge.target_node_id, (degrees.get(edge.target_node_id) ?? 0) + 1)
+  }
+  return degrees
+}
+
+/**
+ * Reduce nodes to the requested fields, with the id always present.
+ *
+ * A field the node does not have is an error naming the known fields, so a
+ * typo does not silently return less
+ * (PRODUCT_DESIGN.md > Listing nodes by field and by tag).
+ */
+function shapeNodes(
+  store: McpStoreInterface,
+  nodes: Node[],
+  fields: string[]
+): Array<Record<string, unknown>> {
+  const unknown = fields.filter((f) => !(LISTABLE_FIELDS as readonly string[]).includes(f))
+  if (unknown.length > 0) {
+    throw new McpError(
+      JsonRpcErrorCodes.INVALID_PARAMS,
+      `Unknown fields: ${unknown.join(', ')}. Known fields: id, ${LISTABLE_FIELDS.join(', ')}`
+    )
+  }
+  const wanted = fields as ListableField[]
+  const degrees = wanted.includes('degree') ? degreesOf(store.getFilteredEdges()) : undefined
+
+  return nodes.map((node) => {
+    const full = nodeToMcp(node, wanted.includes('markdown_content')) as unknown as Record<string, unknown>
+    const shaped: Record<string, unknown> = { id: node.id }
+    for (const field of wanted) {
+      if (field === 'degree') shaped.degree = degrees!.get(node.id) ?? 0
+      else if (field in full) shaped[field] = full[field]
+    }
+    return shaped
+  })
+}
+
 export function handleListNodes(
   store: McpStoreInterface,
-  params: { include_content?: boolean; limit?: number; offset?: number }
-): McpNode[] {
+  params: { include_content?: boolean; fields?: string[]; limit?: number; offset?: number }
+): McpNode[] | Array<Record<string, unknown>> {
   const limit = params.limit ?? 50
   const offset = params.offset ?? 0
+  const page = store.getFilteredNodes().slice(offset, offset + limit)
 
-  return store.getFilteredNodes()
-    .slice(offset, offset + limit)
-    .map((node) => nodeToMcp(node, params.include_content))
+  if (params.fields) return shapeNodes(store, page, params.fields)
+  return page.map((node) => nodeToMcp(node, params.include_content))
+}
+
+/**
+ * The nodes carrying a tag, matched as the tag nodes match: without the
+ * leading hash and without regard to case. Tag nodes are not listed
+ * (PRODUCT_DESIGN.md > Listing nodes by field and by tag).
+ */
+export function handleGetNodesByTag(
+  store: McpStoreInterface,
+  params: { tag?: string; fields?: string[] }
+): Array<Record<string, unknown>> {
+  if (typeof params.tag !== 'string' || !params.tag.trim()) {
+    throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, 'tag required')
+  }
+  const wanted = params.tag.trim().replace(/^#/, '').toLowerCase()
+  const nodes = store
+    .getFilteredNodes()
+    .filter(
+      (node) =>
+        node.node_type !== 'tag' &&
+        recordedTagsOf(node).some((tag) => tag.replace(/^#/, '').toLowerCase() === wanted)
+    )
+  return shapeNodes(store, nodes, params.fields ?? ['title', 'tags'])
 }
 
 export function handleGetNode(store: McpStoreInterface, params: { id: string }): McpNode {

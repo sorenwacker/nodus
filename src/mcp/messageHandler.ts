@@ -32,6 +32,7 @@ import {
   handleGetRootNodes,
   handleGetHubNodes,
   handleGetNodesByColor,
+  handleGetNodesByTag,
   handleCreateNode,
   handleUpdateNode,
   handleBatchUpdateNodes,
@@ -346,7 +347,10 @@ export function createMcpMessageHandler(
         return handleGetGraphSummary(store)
 
       case 'list_nodes':
-        return handleListNodes(store, params as { include_content?: boolean; limit?: number; offset?: number })
+        return handleListNodes(
+          store,
+          params as { include_content?: boolean; fields?: string[]; limit?: number; offset?: number }
+        )
 
       case 'get_node':
         return handleGetNode(store, params as { id: string })
@@ -377,6 +381,9 @@ export function createMcpMessageHandler(
 
       case 'get_nodes_by_color':
         return handleGetNodesByColor(store, params as { color: string })
+
+      case 'get_nodes_by_tag':
+        return handleGetNodesByTag(store, params as { tag?: string; fields?: string[] })
 
       case 'get_edges':
         return handleGetEdges(

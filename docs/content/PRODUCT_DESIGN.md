@@ -1746,6 +1746,13 @@ A failure says what went wrong, and its code says what kind of failure it was.
 
 A result that maps to nodes is keyed by the node's id. Titles are not unique, and keying by title silently merges the nodes that share one: the adjacency list came back with fewer entries than the graph has nodes, and which of them survived depended on the order they were walked. The tool's own description already promised ids.
 
+### Listing nodes by field and by tag
+
+**Required behavior:** An MCP client can shape a node listing to what it needs and can read the nodes carrying a tag directly. A listing of 134 notes with every field overran the client's context, while the compact form lacked the degree, so a tag-driven audit needed a full dump of nodes and edges and a script.
+
+- `list_nodes` takes `fields`, a list of the node fields to return. `id` is always present. `degree`, the number of edges at the node in the workspace, is a field like any other, computed only when asked for. A field name the node does not have is an invalid-parameters error naming the known fields, so a typo does not silently return less.
+- `get_nodes_by_tag` returns the nodes whose recorded tags include the given tag, matched without the leading hash and without regard to case, as the tag nodes match. Tag nodes are not themselves listed. It takes the same `fields`, and returns id, title and tags by default.
+
 ### A routed tool is an advertised tool
 
 A name the request router accepts is one the server advertises, and the reverse. A name routed but never advertised answers a request no client can send, which is a handler kept alive by nothing; three were in that state.
