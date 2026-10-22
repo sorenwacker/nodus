@@ -203,9 +203,9 @@ const FIELD_EXCEPTIONS: Record<string, { mcpOnly?: string[]; agentOnly?: string[
     reason: 'the agent works in the workspace the user has open',
   },
   create_edge: {
-    mcpOnly: ['source_node_id', 'target_node_id', 'label', 'directed', 'weight', 'color', 'link_type'],
+    mcpOnly: ['source_node_id', 'target_node_id', 'source_title', 'target_title', 'label', 'directed', 'weight', 'color', 'link_type'],
     agentOnly: ['from_title', 'to_title', 'type'],
-    reason: 'MCP addresses nodes by id; the app addresses by title',
+    reason: 'MCP addresses nodes by id, or by title under its own field names; the app addresses nodes by title',
   },
   update_edge: {
     mcpOnly: ['id', 'label', 'link_type', 'directed', 'color', 'weight'],

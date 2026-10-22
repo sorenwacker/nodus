@@ -502,11 +502,14 @@ export function createMcpMessageHandler(
         return handleCreateEdge(
           store,
           params as {
-            source_node_id: string
-            target_node_id: string
+            source_node_id?: string
+            target_node_id?: string
+            source_title?: string
+            target_title?: string
             label?: string
             link_type?: string
             directed?: boolean
+            color?: string
           }
         )
 

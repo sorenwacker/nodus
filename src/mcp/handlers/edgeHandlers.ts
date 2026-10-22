@@ -86,34 +86,63 @@ export function handleGetEdgeLabels(
   return { labels, unlabelled }
 }
 
+/**
+ * The id of an edge end given by id or by title.
+ *
+ * A title names a node only when it names exactly one; several sharing it are
+ * listed so the client can choose
+ * (PRODUCT_DESIGN.md > Creating an edge by node titles).
+ */
+function resolveEndpoint(
+  store: McpStoreInterface,
+  role: 'source' | 'target',
+  id: string | undefined,
+  title: string | undefined
+): string {
+  if (id !== undefined) {
+    if (!store.getNode(id)) {
+      throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, `${role === 'source' ? 'Source' : 'Target'} node not found: ${id}`)
+    }
+    return id
+  }
+
+  if (title === undefined || !title.trim()) {
+    throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, `${role}_node_id or ${role}_title required`)
+  }
+
+  const wanted = title.trim().toLowerCase()
+  const matches = store.getFilteredNodes().filter((n) => n.title.trim().toLowerCase() === wanted)
+  if (matches.length === 0) {
+    throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, `No node titled "${title.trim()}" for ${role}_title`)
+  }
+  if (matches.length > 1) {
+    throw new McpError(
+      JsonRpcErrorCodes.INVALID_PARAMS,
+      `${role}_title "${title.trim()}" names ${matches.length} nodes (${matches.map((n) => n.id).join(', ')}); use ${role}_node_id`
+    )
+  }
+  return matches[0].id
+}
+
 export async function handleCreateEdge(
   store: McpStoreInterface,
   params: {
-    source_node_id: string
-    target_node_id: string
+    source_node_id?: string
+    target_node_id?: string
+    source_title?: string
+    target_title?: string
     label?: string
     link_type?: string
     directed?: boolean
     color?: string
   }
 ): Promise<{ id: string }> {
-  // Validate nodes exist
-  if (!store.getNode(params.source_node_id)) {
-    throw new McpError(
-      JsonRpcErrorCodes.INVALID_PARAMS,
-      `Source node not found: ${params.source_node_id}`
-    )
-  }
-  if (!store.getNode(params.target_node_id)) {
-    throw new McpError(
-      JsonRpcErrorCodes.INVALID_PARAMS,
-      `Target node not found: ${params.target_node_id}`
-    )
-  }
+  const sourceId = resolveEndpoint(store, 'source', params.source_node_id, params.source_title)
+  const targetId = resolveEndpoint(store, 'target', params.target_node_id, params.target_title)
 
   const edge = await store.createEdge({
-    source_node_id: params.source_node_id,
-    target_node_id: params.target_node_id,
+    source_node_id: sourceId,
+    target_node_id: targetId,
     label: params.label,
     link_type: params.link_type || 'related',
     directed: params.directed ?? true,

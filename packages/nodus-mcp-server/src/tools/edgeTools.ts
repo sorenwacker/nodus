@@ -7,7 +7,7 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
   // Edge operations
   {
     name: 'create_edge',
-    description: 'Create an edge (connection) between two nodes.',
+    description: 'Create an edge (connection) between two nodes. Name each end by id, or by title when exactly one node has that title.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -18,6 +18,14 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
         target_node_id: {
           type: 'string',
           description: 'Target node ID',
+        },
+        source_title: {
+          type: 'string',
+          description: 'Source node title, instead of source_node_id. Must name exactly one node.',
+        },
+        target_title: {
+          type: 'string',
+          description: 'Target node title, instead of target_node_id. Must name exactly one node.',
         },
         label: {
           type: 'string',
@@ -36,7 +44,6 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
           description: 'Edge color as a name or hex value (optional)',
         },
       },
-      required: ['source_node_id', 'target_node_id'],
     },
   },
   {
