@@ -42,7 +42,8 @@ Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%
 
 ### Read Operations
 
-- **list_nodes** - List all nodes in the current workspace
+- **list_nodes** - List nodes in the current workspace; `fields` picks which fields to return, and `degree` is available as a field
+- **get_nodes_by_tag** - List the nodes carrying a tag
 - **get_node** - Get a specific node by ID with full content
 - **search_nodes** - Search nodes by title or content
 - **get_edges** - Get edges between nodes; filter by node, by label, or to unlabelled edges only, and optionally include the endpoint titles
