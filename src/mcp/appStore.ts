@@ -53,7 +53,10 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
   const { store, edgesStore, storylinesStore, invoke } = deps
 
   return {
-    getFilteredNodes: () => store.filteredNodes,
+    // The graph as data, not as drawn: the canvas filter hides tag nodes while
+    // the tag layer is off, and that is a view choice
+    // (PRODUCT_DESIGN.md > MCP reads are independent of the canvas layers)
+    getFilteredNodes: () => store.graphNodes,
     getFilteredEdges: () => store.graphEdges,
     getNode: store.getNode,
     // Workspace scoping: lets each MCP connection target its own workspace
