@@ -57,6 +57,7 @@ Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%
 
 - **create_edge** - Create a connection between two nodes
 - **update_edge** - Update an edge (label, directed)
+- **batch_update_edges** - Update the label, direction, or color of many edges in one call, with a result per edge
 - **delete_edge** - Delete an edge
 
 ### Zotero
