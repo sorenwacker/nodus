@@ -43,6 +43,7 @@ Hashtags in node content become node tags:
 - A tag becomes a tag node once at least two notes share it. One node per distinct tag put 606 tag nodes into a workspace holding 360 real ones, and 542 of them - 89% - were reachable from a single note or none: a tag used once labels that note rather than linking it to anything, and its card already shows it as a chip. What earns a node is a tag that joins notes together
 - Loading a workspace connects any node whose tags have no edges, so tags that arrived without them - from the body scan, or from an agent setting a node's tags over MCP - are shown like any other. An existing connection is never duplicated, so a connected workspace costs nothing
 - Settings > Canvas > Repair Tag Nodes merges tag nodes that duplicate each other and restores a missing # prefix, left behind by an earlier lookup that compared a bare name against a title stored with its hash
+- An MCP client can do the same without the settings panel: `list_tags` reports every tag in use with its note count, its tag node if one is drawn and the edges at that node, and `rebuild_tag_nodes` runs the repair and then connects every shared tag, as loading the workspace does. Deleting a tag node over MCP is recoverable that way instead of by guessing
 
 YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treated as structured node metadata, never as text:
 

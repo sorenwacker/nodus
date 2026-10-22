@@ -1760,6 +1760,14 @@ A name the request router accepts is one the server advertises, and the reverse.
 - Every case the router handles names an advertised tool, and every advertised tool is routed.
 - A gate compares the two lists, so they cannot drift apart.
 
+### Tag nodes over MCP
+
+**Required behavior:** An MCP client can see the tags of a workspace with the tag nodes that stand for them, and can regenerate those nodes and their edges from the notes' tags. After a client deleted one tag node it had no way to tell what else had changed, and no way to put the tag layer back other than guessing.
+
+- `list_tags` lists every tag in use, with the number of notes recording it, the id of its tag node when one is drawn, and the number of `tagged` edges at that node. A tag node that no note records any more is listed too, with no notes, so an orphan is visible. Most used first.
+- `rebuild_tag_nodes` runs the tag node repair that Settings > Canvas > Repair Tag Nodes runs - merging duplicates, restoring a missing hash, deleting tag nodes no note uses - and then connects every shared tag as loading the workspace does. It reports what it changed: tag nodes merged, renamed and removed, edges repointed, deleted and added.
+- The rebuild acts on the workspace open in the app, because the edges it reads and connects are the ones the app has loaded. A connection scoped to another workspace is refused with an error that names both workspaces, rather than silently rebuilding the wrong one. The settings panel and the MCP tool share one repair function, so the two cannot drift.
+
 ### An import the built MCP server can resolve
 
 The MCP server is compiled by `tsc` and run by Node as an ES module. Node resolves a relative import specifier literally, so `./readTools` is not found where `./readTools.js` is, and `tsc` copies the specifier as written without reporting it. The tool index imported its six tool groups without the extension; the build succeeded and the server stopped at startup, so no client could connect.
