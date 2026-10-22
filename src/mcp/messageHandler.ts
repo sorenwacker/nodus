@@ -10,6 +10,7 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpViewport,
+  McpTagNodeRebuild,
 } from './types'
 import {
   createSuccessResponse,
@@ -63,6 +64,8 @@ import {
   handleAddNodeToStoryline,
   handleRemoveNodeFromStoryline,
   handleReorderStorylineNodes,
+  handleListTags,
+  handleRebuildTagNodes,
 } from './handlers'
 
 /**
@@ -125,6 +128,10 @@ export interface McpStoreInterface {
   updateEdgeDirected: (id: string, directed: boolean) => Promise<void>
   updateEdgeLabel: (id: string, label: string | null) => Promise<void>
   updateEdgeColor: (id: string, color: string | null) => Promise<void>
+
+  // Tag nodes: repair and reconnect the open workspace's tag layer
+  // (PRODUCT_DESIGN.md > Tag nodes over MCP)
+  rebuildTagNodes: () => Promise<McpTagNodeRebuild>
 
   // Storyline operations
   getAllStorylines: () => Storyline[]
@@ -208,6 +215,26 @@ export function createMcpMessageHandler(
     const storylinesInScope = () =>
       store.getAllStorylines().filter(s => (s.workspace_id ?? null) === workspaceId)
 
+    // The rebuild reads and connects the edges the app has loaded, which are
+    // the open workspace's. For any other workspace it would act on the wrong
+    // one, so it is refused with both names
+    // (PRODUCT_DESIGN.md > Tag nodes over MCP)
+    const rebuildTagNodesInScope = () => {
+      const workspaces = store.getWorkspaces()
+      const open = workspaces.find(w => w.current)
+      const openId = !open || open.id === 'default' ? null : open.id
+      if (openId !== workspaceId) {
+        const target = workspaces.find(w => (w.id === 'default' ? null : w.id) === workspaceId)
+        throw new McpError(
+          JsonRpcErrorCodes.INVALID_PARAMS,
+          `rebuild_tag_nodes acts on the workspace open in the app (${open?.name ?? 'Default'}); ` +
+            `this connection is scoped to ${target?.name ?? workspaceId}. ` +
+            'Open that workspace in the app, or use an unscoped connection'
+        )
+      }
+      return store.rebuildTagNodes()
+    }
+
     return {
       ...store,
       getFilteredNodes: nodesInScope,
@@ -227,6 +254,7 @@ export function createMcpMessageHandler(
       getStoryline: (id: string) => storylinesInScope().find(s => s.id === id),
       createStoryline: (title, description, color) =>
         store.createStoryline(title, description, color, workspaceId),
+      rebuildTagNodes: rebuildTagNodesInScope,
     }
   }
 
@@ -384,6 +412,12 @@ export function createMcpMessageHandler(
 
       case 'get_nodes_by_tag':
         return handleGetNodesByTag(store, params as { tag?: string; fields?: string[] })
+
+      case 'list_tags':
+        return handleListTags(store)
+
+      case 'rebuild_tag_nodes':
+        return handleRebuildTagNodes(store)
 
       case 'get_edges':
         return handleGetEdges(

@@ -164,6 +164,14 @@ export const READ_TOOLS: McpToolDeclaration[] = [
     },
   },
   {
+    name: 'list_tags',
+    description: 'List every tag in use, most used first, with the number of notes recording it, the id of its tag node when one is drawn, and the tagged edges at that node. A tag node no note uses is listed with 0 notes.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'get_nodes_by_color',
     description: 'Find all nodes with a specific color.',
     inputSchema: {

@@ -48,12 +48,14 @@ Add to `~/.config/claude/claude_desktop_config.json` (Linux/macOS) or `%APPDATA%
 - **search_nodes** - Search nodes by title or content
 - **get_edges** - Get edges between nodes; filter by node, by label, or to unlabelled edges only, and optionally include the endpoint titles
 - **get_edge_labels** - Count the edges carrying each distinct label, and the unlabelled ones
+- **list_tags** - List every tag in use with its note count, its tag node if one is drawn, and the edges at that node
 
 ### Write Operations
 
 - **create_node** - Create a new node
 - **update_node** - Update an existing node (title, content, position)
 - **delete_node** - Delete a node
+- **rebuild_tag_nodes** - Regenerate the tag nodes and tagged edges of the open workspace from the notes' tags: merge duplicates, drop unused tag nodes, and connect every shared tag
 
 ### Edge Operations
 
