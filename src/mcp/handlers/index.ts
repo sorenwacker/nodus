@@ -37,6 +37,7 @@ export {
 // Edge handlers
 export {
   handleGetEdges,
+  handleGetEdgeLabels,
   handleCreateEdge,
   handleUpdateEdge,
   handleBatchUpdateEdges,

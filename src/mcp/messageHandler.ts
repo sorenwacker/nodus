@@ -42,6 +42,7 @@ import {
   handleSetNodeColor,
   handleBatchSetNodeColors,
   handleGetEdges,
+  handleGetEdgeLabels,
   handleCreateEdge,
   handleUpdateEdge,
   handleBatchUpdateEdges,
@@ -378,7 +379,20 @@ export function createMcpMessageHandler(
         return handleGetNodesByColor(store, params as { color: string })
 
       case 'get_edges':
-        return handleGetEdges(store, params as { node_id?: string; limit?: number; offset?: number })
+        return handleGetEdges(
+          store,
+          params as {
+            node_id?: string
+            label?: string
+            unlabelled_only?: boolean
+            include_titles?: boolean
+            limit?: number
+            offset?: number
+          }
+        )
+
+      case 'get_edge_labels':
+        return handleGetEdgeLabels(store)
 
       // Write operations
       case 'create_node':

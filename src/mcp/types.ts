@@ -92,6 +92,9 @@ export interface McpEdge {
   label: string | null
   link_type: string
   directed: boolean
+  /** Endpoint titles, present only when a read asks for them */
+  source_title?: string
+  target_title?: string
 }
 
 /**

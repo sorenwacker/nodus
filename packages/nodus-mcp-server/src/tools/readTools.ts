@@ -154,14 +154,34 @@ export const READ_TOOLS: McpToolDeclaration[] = [
     },
   },
   {
+    name: 'get_edge_labels',
+    description: 'Count the edges carrying each distinct label, most frequent first, and the unlabelled edges. Use it to see the label vocabulary before relabelling.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'get_edges',
-    description: 'Get edges (connections) between nodes. Use limit/offset for large graphs, or filter by node_id.',
+    description: 'Get edges (connections) between nodes. Use limit/offset for large graphs, or filter by node_id, by label, or to unlabelled edges. include_titles adds the endpoint titles.',
     inputSchema: {
       type: 'object',
       properties: {
         node_id: {
           type: 'string',
           description: 'Only return edges connected to this node.',
+        },
+        label: {
+          type: 'string',
+          description: 'Only return edges with exactly this label.',
+        },
+        unlabelled_only: {
+          type: 'boolean',
+          description: 'Only return edges with no label. Default: false.',
+        },
+        include_titles: {
+          type: 'boolean',
+          description: 'Add source_title and target_title to each edge. Default: false.',
         },
         limit: {
           type: 'number',

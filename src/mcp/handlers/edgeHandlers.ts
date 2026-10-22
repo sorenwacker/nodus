@@ -11,23 +11,79 @@ import { JsonRpcErrorCodes } from '../types'
 import type { McpStoreInterface } from '../messageHandler'
 import { edgeToMcp, McpError } from './nodeHandlers'
 
+/** An edge with no label, or a blank one */
+function isUnlabelled(edge: Edge): boolean {
+  return !edge.label || edge.label.trim() === ''
+}
+
+/**
+ * Edges, filtered by node, by exact label, or to unlabelled ones, with the
+ * endpoint titles on request (PRODUCT_DESIGN.md > Reading edges by label).
+ */
 export function handleGetEdges(
   store: McpStoreInterface,
-  params: { node_id?: string; limit?: number; offset?: number }
+  params: {
+    node_id?: string
+    label?: string
+    unlabelled_only?: boolean
+    include_titles?: boolean
+    limit?: number
+    offset?: number
+  }
 ): McpEdge[] {
   const limit = params.limit ?? 100
   const offset = params.offset ?? 0
 
   let edges = store.getFilteredEdges()
 
-  // Filter by node if specified
   if (params.node_id) {
     edges = edges.filter(
       (e) => e.source_node_id === params.node_id || e.target_node_id === params.node_id
     )
   }
 
-  return edges.slice(offset, offset + limit).map(edgeToMcp)
+  if (params.label !== undefined) {
+    const wanted = params.label.trim()
+    edges = edges.filter((e) => (e.label ?? '').trim() === wanted)
+  }
+
+  if (params.unlabelled_only) {
+    edges = edges.filter(isUnlabelled)
+  }
+
+  const page = edges.slice(offset, offset + limit).map(edgeToMcp)
+  if (!params.include_titles) return page
+
+  return page.map((edge) => ({
+    ...edge,
+    source_title: store.getNode(edge.source_node_id)?.title,
+    target_title: store.getNode(edge.target_node_id)?.title,
+  }))
+}
+
+/**
+ * The labels in use and how many edges carry each, most frequent first, with
+ * the number of unlabelled edges. Labels are told apart exactly, so a
+ * differently cased duplicate shows as its own entry
+ * (PRODUCT_DESIGN.md > Reading edges by label).
+ */
+export function handleGetEdgeLabels(
+  store: McpStoreInterface
+): { labels: Array<{ label: string; count: number }>; unlabelled: number } {
+  const counts = new Map<string, number>()
+  let unlabelled = 0
+  for (const edge of store.getFilteredEdges()) {
+    if (isUnlabelled(edge)) {
+      unlabelled++
+      continue
+    }
+    const label = edge.label!.trim()
+    counts.set(label, (counts.get(label) ?? 0) + 1)
+  }
+  const labels = [...counts].map(([label, count]) => ({ label, count }))
+  // Stable, so labels with equal counts keep their order of first appearance
+  labels.sort((a, b) => b.count - a.count)
+  return { labels, unlabelled }
 }
 
 export async function handleCreateEdge(

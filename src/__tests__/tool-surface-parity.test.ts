@@ -39,6 +39,8 @@ const INTENTIONAL_MCP_ONLY: Record<string, string> = {
   create_workspace: 'the in-app agent acts on the workspace and view the user already has open',
   batch_update_edges:
     'a bulk update of edges addressed by id; the in-app agent addresses one edge at a time by its endpoint titles through update_edge',
+  get_edge_labels:
+    'a count per edge label for a client that cannot see the canvas; the in-app agent\'s user sees the labels drawn on the edges',
   focus_node: 'the in-app agent acts on the workspace and view the user already has open',
   get_viewport: 'the in-app agent acts on the workspace and view the user already has open',
   get_workspace: 'the in-app agent acts on the workspace and view the user already has open',
