@@ -8,7 +8,7 @@ import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { canvasStorage, perfStorage, tagStorage } from '../../lib/storage'
 import { useNodesStore } from '../../stores/nodes'
-import { planTagNodeRepair, runTagNodeRepair } from '../../composables/tagNodeRepair'
+import { repairTagNodes as runRepair } from '../../composables/tagNodeRepair'
 
 const { t } = useI18n()
 const store = useNodesStore()
@@ -71,19 +71,11 @@ async function repairTagNodes() {
   repairState.value = 'running'
   repairReport.value = ''
   try {
-    const plan = planTagNodeRepair(store.nodes, store.edges, store.currentWorkspaceId)
-    if (plan.merges.length === 0 && plan.renames.length === 0 && plan.unusedIds.length === 0) {
+    const result = await runRepair(store)
+    if (!result) {
       repairReport.value = t('settings.repairTagNodesNone')
       return
     }
-    const result = await runTagNodeRepair(plan, {
-      createTaggedEdge: async (sourceNodeId, targetNodeId) => {
-        await store.createEdge({ source_node_id: sourceNodeId, target_node_id: targetNodeId, link_type: 'tagged' })
-      },
-      deleteEdge: id => store.deleteEdge(id),
-      deleteNode: id => store.deleteNode(id),
-      renameNode: (id, title) => store.updateNodeTitle(id, title),
-    })
     repairReport.value = t('settings.repairTagNodesResult', {
       merged: result.merged,
       renamed: result.renamed,

@@ -64,3 +64,6 @@ export {
   handleRemoveNodeFromStoryline,
   handleReorderStorylineNodes,
 } from './storylineHandlers'
+
+// Tag handlers
+export { handleListTags, handleRebuildTagNodes } from './tagHandlers'

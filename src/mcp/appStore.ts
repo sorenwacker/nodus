@@ -12,6 +12,7 @@
 import type { Ref } from 'vue'
 import type { McpStoreInterface, McpViewportInterface, McpZoteroInterface } from './messageHandler'
 import type { Edge } from '../types'
+import { repairTagNodes } from '../composables/tagNodeRepair'
 
 /** What the canvas component exposes for MCP requests */
 export interface McpCanvas {
@@ -89,6 +90,27 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
     updateEdgeDirected: edgesStore.updateEdgeDirected,
     updateEdgeLabel: edgesStore.updateEdgeLabel,
     updateEdgeColor: edgesStore.updateEdgeColor,
+    // The repair the settings panel runs, then the connection pass that
+    // loading the workspace runs (PRODUCT_DESIGN.md > Tag nodes over MCP)
+    rebuildTagNodes: async () => {
+      const repair = (await repairTagNodes(store)) ?? {
+        merged: 0,
+        renamed: 0,
+        removedUnused: 0,
+        edgesRepointed: 0,
+        edgesDeleted: 0,
+      }
+      const before = edgesStore.edges.length
+      await store.syncAllTagNodes()
+      return {
+        merged: repair.merged,
+        renamed: repair.renamed,
+        removed_unused: repair.removedUnused,
+        edges_repointed: repair.edgesRepointed,
+        edges_deleted: repair.edgesDeleted,
+        edges_added: edgesStore.edges.length - before,
+      }
+    },
     // Storyline operations
     // All of them, so a scoped connection can filter to its own workspace the
     // way it already does for nodes
