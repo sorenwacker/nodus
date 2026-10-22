@@ -170,7 +170,7 @@ export const NODE_TOOLS: McpToolDeclaration[] = [
   {
     name: 'batch_update_nodes',
     description:
-      'Update several nodes at once: title, content or position. Each entry names the node by id and carries only the fields to change.',
+      'Update several nodes at once: title, content or position. Each entry names the node by id and carries only the fields to change. A large batch stops before the request times out and lists the ids it did not attempt under not_attempted; resend those.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -27,6 +27,7 @@ export {
   handleCreateNode,
   handleUpdateNode,
   handleBatchUpdateNodes,
+  BATCH_TIME_BUDGET_MS,
   handleDeleteNode,
   handleResizeNode,
   handleBatchResizeNodes,

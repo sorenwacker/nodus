@@ -653,6 +653,40 @@ export async function handleUpdateNode(
   return { success: true }
 }
 
+/**
+ * How long a batch may keep starting items. The MCP server rejects a pending
+ * request after 30 seconds; the budget leaves room for the item in progress
+ * and the round trip, and a gate keeps the two in step
+ * (PRODUCT_DESIGN.md > A batch that ends before the request times out).
+ */
+export const BATCH_TIME_BUDGET_MS = 20_000
+
+/** The clock a batch measures its budget against; injectable for tests */
+export interface BatchClock {
+  now: () => number
+  budgetMs: number
+}
+
+const WALL_CLOCK: BatchClock = { now: Date.now, budgetMs: BATCH_TIME_BUDGET_MS }
+
+export interface BatchUpdateResult {
+  success: boolean
+  updated: number
+  failed: number
+  errors?: Array<{ id: string; error: string }>
+  /** Ids not started because the time budget was spent; resend these */
+  not_attempted?: string[]
+}
+
+/**
+ * Update several nodes, stopping before the server's request timeout.
+ *
+ * A batch of 19 bodies outran the timeout: the client was told the request
+ * timed out while the app went on writing. Items are started only while the
+ * budget lasts; the item in progress is always finished, and the ids never
+ * started are reported so the client can resend exactly those
+ * (PRODUCT_DESIGN.md > A batch that ends before the request times out).
+ */
 export async function handleBatchUpdateNodes(
   store: McpStoreInterface,
   undo: McpUndoInterface | undefined,
@@ -664,11 +698,14 @@ export async function handleBatchUpdateNodes(
       x?: number
       y?: number
     }>
-  }
-): Promise<{ success: boolean; updated: number; failed: number; errors?: Array<{ id: string; error: string }> }> {
+  },
+  clock: BatchClock = WALL_CLOCK
+): Promise<BatchUpdateResult> {
   let updated = 0
   let failed = 0
   const errors: Array<{ id: string; error: string }> = []
+  const notAttempted: string[] = []
+  const started = clock.now()
 
   // Capture positions for undo before any changes
   if (undo) {
@@ -687,6 +724,11 @@ export async function handleBatchUpdateNodes(
   }
 
   for (const update of params.updates) {
+    if (clock.now() - started >= clock.budgetMs) {
+      notAttempted.push(update.id)
+      continue
+    }
+
     const node = store.getNode(update.id)
     if (!node) {
       failed++
@@ -714,14 +756,17 @@ export async function handleBatchUpdateNodes(
     }
   }
 
-  const result: { success: boolean; updated: number; failed: number; errors?: Array<{ id: string; error: string }> } = {
-    success: failed === 0,
+  const result: BatchUpdateResult = {
+    success: failed === 0 && notAttempted.length === 0,
     updated,
     failed,
   }
 
   if (errors.length > 0) {
     result.errors = errors
+  }
+  if (notAttempted.length > 0) {
+    result.not_attempted = notAttempted
   }
 
   return result
