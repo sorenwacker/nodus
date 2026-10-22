@@ -383,6 +383,14 @@ Two consequences this prevents. Duplicate checking against a library that could 
 
 A partial result is treated the same way: a paged lookup whose later page fails throws rather than returning the pages gathered so far, because a partial list cannot be told from a complete one.
 
+### A batch that ends before the request times out
+
+**Required behavior:** A batch request answers within the server's request timeout, and what it reports is what happened. A batch of 19 node bodies outran the server's 30 second timeout: the client was told the request timed out while the app went on writing, so the result was unknown until the client diffed a fresh listing.
+
+- `batch_update_nodes` works through its items in order and stops starting new ones once a time budget below the server's timeout is used up. The item in progress is finished, never abandoned.
+- The result lists the ids not attempted under `not_attempted`, beside the counts of updated and failed items and the per-item errors, so the client knows exactly which items to resend. `success` is true only when every item was attempted and none failed.
+- The budget is bound to the server's timeout by a gate, so lengthening one without the other fails a test. Nothing writes after the response has been sent.
+
 ### Reporting MCP server failures
 
 Starting the MCP server can fail for an ordinary reason: the port is already in use. The settings panel says so, and the stored "enabled" flag records what the user asked for and got, so a failed start is not retried on the next launch.
