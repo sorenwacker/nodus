@@ -5,7 +5,6 @@
 export {
   useCanvasKeyboardShortcuts,
   type UseCanvasKeyboardShortcutsContext,
-  type UseCanvasKeyboardShortcutsReturn,
 } from './useCanvasKeyboardShortcuts'
 export {
   usePdfDrop,

@@ -43,11 +43,8 @@ export interface UseCanvasKeyboardShortcutsContext {
   showHelp: () => void
 }
 
-export interface UseCanvasKeyboardShortcutsReturn {
-  // No exposed state needed - all event-based
-}
-
-export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContext): UseCanvasKeyboardShortcutsReturn {
+// Exposes no state: every shortcut acts through the context's callbacks
+export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContext): void {
   const {
     selectedNodeIds,
     selectedEdge,
@@ -221,6 +218,4 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
   onUnmounted(() => {
     window.removeEventListener('keydown', handleKeydown)
   })
-
-  return {}
 }
