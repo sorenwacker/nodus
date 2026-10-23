@@ -20,7 +20,7 @@ import { useNodesStore } from '../stores/nodes'
 
 const props = withDefaults(defineProps<{
   /** Raw markdown content to render */
-  content: string | null
+  content?: string | null
   /** Additional CSS class for the container */
   contentClass?: string
 }>(), {

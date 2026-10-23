@@ -26,7 +26,7 @@ make dev
 |---------|-------------|
 | `make dev` | Start development server |
 | `npm test` | Run tests |
-| `npm run lint` | Lint code |
+| `npm run lint` | Lint the frontend with ESLint 9 (see Linting) |
 | `npm run build` | Build frontend |
 | `npm run tauri build` | Build for production |
 | `cargo test` | Run Rust tests (in src-tauri/) |
@@ -35,6 +35,10 @@ make dev
 | `scripts/setup-hooks.sh` | Install the pre-commit hook, which runs the CI checks for the parts of the tree a commit touches |
 | `scripts/ci-check.sh` | Run every check CI runs, on the whole tree |
 | `make rc` | Cut the next release candidate: bump to `X.Y.Z-rc.N+1`, commit, tag and push |
+
+## Linting
+
+`eslint.config.js` is an ESLint 9 flat config. It applies the recommended rule sets of ESLint, typescript-eslint and eslint-plugin-vue to `src/**/*.ts` and `src/**/*.vue`, parses `.vue` files with vue-eslint-parser and their script blocks with the typescript-eslint parser, and ends with eslint-config-prettier so no rule contradicts Prettier. Unused function arguments are allowed when their name starts with an underscore, and `v-html` is a warning rather than an error. The pre-commit hook and CI run the same `npm run lint`, so a finding fails the commit and the build alike.
 
 ## Project Structure
 
