@@ -37,7 +37,7 @@
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.6.0",
     "vue": "^3.5.44",
-    "vue-i18n": "^11.3.0",
+    "vue-i18n": "^11.4.14",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
