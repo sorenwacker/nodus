@@ -396,7 +396,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       setRoutingSpatialIndex(spatialIndex)
 
       try {
-        routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle)
+        routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle, { sourceAssignments, targetAssignments })
         cachedRoutedEdges.value = routedEdges
         if (!mustRerouteLive()) {
           lastRoutingKey.value = routingKey
