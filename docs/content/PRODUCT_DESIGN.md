@@ -276,7 +276,7 @@ Users don't abandon Obsidian — they enhance it with Nodus.
 | Decision | Rationale |
 |----------|-----------|
 | Only dated nodes are placed | Positions are facts, not guesses; no interpolation, no sequence fallback. Undated nodes simply do not appear |
-| Dates live in frontmatter (`date:`, `date_end:`) | Files stay the source of truth; Obsidian/OKF compatible; the in-app date editor (node card chip, preview panel) writes the same fields |
+| Dates live in frontmatter (`date:`, `date_end:`) | Dates are part of the note's text, not a separate column; Obsidian/OKF compatible; the in-app date editor (node card chip, preview panel) writes the same fields |
 | Broken axis | Large empty stretches between event clusters are abbreviated with a marked break; gap detection compares against both span share and median spacing so even spreads never fragment |
 | Per-segment label detail | Each axis segment labels itself at its own scale — years, months, days, or clock times — so a one-hour narrative and a millennium can share one axis |
 | Plot fills its container | The axis is laid out to the measured width of the plot column, not a fixed one. A fixed 980px plot was wrong at every width except by coincidence: in a narrow window it overflowed into a horizontal scroll with the last tick pressed against the border, and in a wide one it left dead space to the right. The fixed width remains the fallback for when no measurement is available, so the axis never collapses |
@@ -2447,7 +2447,7 @@ tools:
 | Canvas | **DOM + SVG + Canvas 2D** | DOM cards for text and editing, SVG edges, a 2D canvas above the LOD threshold |
 | Desktop | **Tauri v2** | Small binary (~10MB), Rust security, native WebView |
 | Database | **SQLite** via `sqlx` | Embedded, WAL mode, no server to run |
-| Content | **.md files** | Text content in Markdown files, NOT in SQLite |
+| Content | **SQLite**, mirrored to .md files | SQLite holds every node's text; a node with a file is kept in sync with it (see Storage of node text) |
 | State | Pinia | Vue standard |
 | Math | **@myriaddreamin/typst.ts** | Typst WASM, sub-second rendering |
 | Editor | Plain `textarea` overlay | Markdown edited as text; rendered separately, with Typst and Mermaid blocks |
@@ -2776,10 +2776,19 @@ If user edits in Nodus (SQLite) AND Obsidian (.md) simultaneously → **data cor
 | Strategy | Implementation |
 |----------|----------------|
 | **File Locking** | Rust backend acquires lock on .md when open in Nodus |
-| **Separation of Concerns** | SQLite for metadata/positions only; .md files for content |
+| **One primary store** | SQLite holds text, metadata and positions; a node's file is a synced copy, written under an exclusive lock |
 | **CRDTs for Canvas Only** | A CRDT layer would sync node positions, NOT text content |
 
-**Critical Rule:** Do NOT store CRDT binary data in the `markdown_content` column. Keep text in .md files.
+**Critical Rule:** Do NOT store CRDT binary data in the `markdown_content` column. It holds the node's Markdown text only.
+
+#### Storage of node text
+
+**Required behavior:** SQLite is the primary store for node text, as it is for metadata, positions and edges. The app reads a node's text from the `markdown_content` column.
+
+- A node may have no file. Nodes created by an ontology import, and notes imported with "delete originals", exist only in SQLite.
+- A node with a file is kept in sync both ways. An edit in Nodus is written to the file under an exclusive lock. An external edit, detected by checksum, updates the node.
+- The `markdown_content` column holds Markdown text only, never CRDT binary data.
+- Earlier versions of this document said text lived only in .md files while the schema and the sync rules stored it in SQLite. The code has always followed the schema; this section states it as the rule.
 
 #### 2. Obsidian Canvas Drift
 
