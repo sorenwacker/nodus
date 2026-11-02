@@ -47,4 +47,24 @@ describe('the layout animator', () => {
     state.settle()
     expect(state.running.value).toBe(false)
   })
+
+  it('stores the positions of an animation that is settled before it ends', () => {
+    // PRODUCT_DESIGN.md > Persisting animated positions
+    const state = createLayoutAnimator()
+    const persist = vi.fn()
+    const targets = new Map([['a', { x: 100, y: 0 }], ['b', { x: 5, y: 5 }]])
+    animateToPositions(targets, () => ({ x: 0, y: 0 }), () => {}, state, 1000, persist)
+    state.settle()
+    expect(persist.mock.calls.map(c => c[0]).sort()).toEqual(['a', 'b'])
+  })
+
+  it('stores what a superseded animation reached when a new one starts without settling', async () => {
+    vi.useFakeTimers()
+    const state = createLayoutAnimator()
+    const persist = vi.fn()
+    animateToPositions(new Map([['a', { x: 100, y: 0 }]]), () => ({ x: 0, y: 0 }), () => {}, state, 1000, persist)
+    await vi.advanceTimersByTimeAsync(100)
+    animateToPositions(new Map([['b', { x: 50, y: 0 }]]), () => ({ x: 0, y: 0 }), () => {}, state, 1000, persist)
+    expect(persist).toHaveBeenCalledWith('a')
+  })
 })

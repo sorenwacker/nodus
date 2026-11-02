@@ -15,7 +15,23 @@ export interface LayoutAnimationState {
    * one, so state is never left mid-flight between a frame and its nodes.
    */
   settle: () => void
-  pending: { targets: Map<string, { x: number; y: number }>; apply: (positions: Map<string, { x: number; y: number }>) => void } | null
+  pending: PendingAnimation | null
+}
+
+/** The in-flight animation: where it is heading, and how to apply and store positions */
+export interface PendingAnimation {
+  targets: Map<string, { x: number; y: number }>
+  apply: (positions: Map<string, { x: number; y: number }>) => void
+  persist?: (id: string) => void | Promise<void>
+}
+
+/**
+ * Store the positions of every node an animation moves
+ * (PRODUCT_DESIGN.md > Persisting animated positions).
+ */
+function persistAll(animation: PendingAnimation) {
+  if (!animation.persist) return
+  for (const [id] of animation.targets) void animation.persist(id)
 }
 
 /**
@@ -44,8 +60,10 @@ export function createLayoutAnimator(): LayoutAnimationState {
   function settle() {
     stop()
     if (pending) {
-      pending.apply(pending.targets)
+      const settled = pending
       pending = null
+      settled.apply(settled.targets)
+      persistAll(settled)
     }
   }
 
@@ -91,7 +109,11 @@ export function animateToPositions(
   persistNodePosition?: (id: string) => void | Promise<void>
 ): void {
   state.stop()
-  state.pending = { targets, apply: applyFrame }
+  // A superseded animation stores what it reached, so no position is left
+  // unsaved (PRODUCT_DESIGN.md > Persisting animated positions)
+  if (state.pending) persistAll(state.pending)
+  const animation: PendingAnimation = { targets, apply: applyFrame, persist: persistNodePosition }
+  state.pending = animation
 
   const startTime = performance.now()
   const startPositions = new Map<string, { x: number; y: number }>()
@@ -123,9 +145,7 @@ export function animateToPositions(
       state.animationId = null
       state.pending = null
       // Where they landed is the only position worth storing
-      if (persistNodePosition) {
-        for (const [id] of targets) void persistNodePosition(id)
-      }
+      persistAll(animation)
     }
   }
 
