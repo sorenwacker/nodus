@@ -152,10 +152,17 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     saveWorkspacesToStorage()
   }
 
-  async function deleteWorkspace(id: string, deleteFiles?: boolean) {
+  /**
+   * Delete a workspace, and optionally its nodes' files.
+   *
+   * @returns The files that could not be deleted and remain on disk
+   *   (PRODUCT_DESIGN.md > Workspace settings)
+   */
+  async function deleteWorkspace(id: string, deleteFiles?: boolean): Promise<string[]> {
+    let remaining: string[] = []
     // Delete from database (and optionally files)
     try {
-      await invoke('delete_workspace', { id, deleteFiles: deleteFiles ?? false })
+      remaining = (await invoke<string[]>('delete_workspace', { id, deleteFiles: deleteFiles ?? false })) ?? []
     } catch (e) {
       storeLogger.error('Failed to delete workspace from database:', e)
       // Continue with local deletion anyway
@@ -167,6 +174,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
       currentWorkspaceId.value = null
     }
     saveWorkspacesToStorage()
+    return remaining
   }
 
   async function renameWorkspace(id: string, newName: string) {

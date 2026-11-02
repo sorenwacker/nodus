@@ -31,7 +31,7 @@ export { routeDiagonal, validateDiagonalPath, type DiagonalRouteParams, type Dia
 export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, type OrthogonalRouteResult } from './orthogonalRouter'
 
 // Internal imports
-import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side } from './types'
+import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side, PortAssignment } from './types'
 import { getPortPoint, getStandoff } from './geometry'
 import { analyzeEdges, assignPorts, calculatePortOffset } from './portAssignment'
 import { GridTracker } from './gridTracker'
@@ -224,13 +224,21 @@ export function adjustPathEndpointForArrow(
 }
 
 /**
- * Route all edges with proper port spreading, grid tracking, and obstacle avoidance
+ * Route all edges with proper port spreading, grid tracking, and obstacle avoidance.
+ *
+ * @param ports - Port assignments to route from. A caller that derives other
+ *   geometry from ports (hit areas, labels) passes the ones it used, so the
+ *   drawn line starts and ends at the same points. The canvas passes the
+ *   assignments it reordered to reduce crossings
+ *   (PRODUCT_DESIGN.md > Reducing edge crossings). Without them the ports
+ *   are spread in the order assignPorts meets the edges.
  */
 export function routeAllEdges(
   edges: EdgeDef[],
   nodes: NodeRect[],
   nodeMap: Map<string, NodeRect>,
-  style: EdgeStyle = 'orthogonal'
+  style: EdgeStyle = 'orthogonal',
+  ports?: { sourceAssignments: Map<string, PortAssignment>; targetAssignments: Map<string, PortAssignment> }
 ): Map<string, RoutedEdge> {
   const result = new Map<string, RoutedEdge>()
 
@@ -238,7 +246,7 @@ export function routeAllEdges(
   const edgeInfos = analyzeEdges(edges, nodeMap)
 
   // Assign port indices for spreading
-  const { sourceAssignments, targetAssignments } = assignPorts(edgeInfos)
+  const { sourceAssignments, targetAssignments } = ports ?? assignPorts(edgeInfos)
 
   // Create grid tracker for edge overlap prevention (PCB-style lane routing)
   // Grid size determines minimum spacing between parallel edges

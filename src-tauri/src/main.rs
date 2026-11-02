@@ -328,7 +328,6 @@ fn main() {
             commands::create_node_from_file,
             commands::sync_node_wikilinks,
             commands::sync_all_wikilinks,
-            commands::create_file_for_node,
             commands::export_nodes_to_files,
             commands::export_okf_bundle,
             commands::survey_okf_backfill,

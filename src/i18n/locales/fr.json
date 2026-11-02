@@ -482,6 +482,7 @@
     "workspaceCreateFailed": "Échec de la création de l'espace de travail",
     "workspaceUpdated": "Espace de travail mis à jour",
     "workspaceDeleted": "Espace de travail \"{name}\" supprimé",
+    "workspaceFilesRemain": "Espace de travail \"{name}\" supprimé, mais {count} fichiers n'ont pas pu être supprimés et restent sur le disque",
     "cannotDeleteDefault": "Impossible de supprimer l'espace de travail par défaut",
     "workspaceReset": "Espace de travail réinitialisé au contenu de démarrage",
     "importSuccess": "{count} noeuds importés",

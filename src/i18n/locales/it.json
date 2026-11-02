@@ -482,6 +482,7 @@
     "workspaceCreateFailed": "Impossibile creare lo spazio di lavoro",
     "workspaceUpdated": "Spazio di lavoro aggiornato",
     "workspaceDeleted": "Spazio di lavoro \"{name}\" eliminato",
+    "workspaceFilesRemain": "Spazio di lavoro \"{name}\" eliminato, ma {count} file non sono stati eliminati e restano sul disco",
     "cannotDeleteDefault": "Impossibile eliminare lo spazio di lavoro predefinito",
     "workspaceReset": "Spazio di lavoro reimpostato al contenuto iniziale",
     "importSuccess": "{count} nodi importati",

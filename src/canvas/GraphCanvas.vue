@@ -1091,7 +1091,7 @@ const markerHandlers = useMarkerHandlers({
 })
 
 // LLM tools composable for handling LLM-dependent tools
-const { sendPrompt: sendGraphPrompt, runSelection } = useAgentPrompt({
+const { sendPrompt: sendGraphPrompt, runSelection, releaseRunSelectionUnlessPaused } = useAgentPrompt({
   prompt: graphPrompt,
   isLoading: isGraphLLMLoading,
   getSelectedNodeIds: () => store.selectedNodeIds,
@@ -1213,8 +1213,8 @@ function stopAgent() {
 const planHandlers = usePlanHandlers({
   planState,
   agentRunner,
-  agentLog,
-  agentTasksStore,
+  agentLog, agentTasksStore,
+  onResumeSettled: releaseRunSelectionUnlessPaused,
 })
 const {
   handlePlanApprove,
@@ -1531,7 +1531,7 @@ const { updateSelectedNodesColor } = useColorOperations({
 
 const { fitSelectedNodes, fitNodeNow } = useNodeFitNow({
   getNode: store.getNode, getSelectedNodeIds: () => store.selectedNodeIds, getEditingNodeId: () => editingNodeId.value,
-  finishEditing: nodeId => { store.updateNodeContent(nodeId, editContent.value); editingNodeId.value = null; editContent.value = '' },
+  finishEditing: () => nodeEditor.saveEditing(),
   setRenderedContent: (nodeId, html) => { nodeRenderedContent.value = { ...nodeRenderedContent.value, [nodeId]: html } },
   renderMarkdown, renderTypstMath, renderMermaidDiagrams, fitNodeToContent, pushSizeUndo,
 })

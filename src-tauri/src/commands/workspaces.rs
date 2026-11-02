@@ -83,44 +83,44 @@ pub async fn get_workspaces() -> Result<Vec<Workspace>, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Delete a workspace, and with `delete_files` permanently delete its nodes'
+/// files, as the delete dialog warns.
+///
+/// Returns the files that could not be deleted. The workspace is deleted
+/// regardless; the caller tells the user which files remain on disk
+/// (PRODUCT_DESIGN.md > Workspace settings).
 #[tauri::command]
-pub async fn delete_workspace(id: String, delete_files: Option<bool>) -> Result<(), String> {
+pub async fn delete_workspace(
+    id: String,
+    delete_files: Option<bool>,
+) -> Result<Vec<String>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
 
-    // If delete_files is true, delete all files associated with nodes in this workspace
+    let mut failed = Vec::new();
     if delete_files.unwrap_or(false) {
-        let nodes = database::nodes::get_all(pool)
+        let paths = database::nodes::file_paths_in_workspace(pool, &id)
             .await
             .map_err(|e| e.to_string())?;
-        let mut deleted_count = 0;
-
-        for node in nodes {
-            if node.workspace_id.as_deref() == Some(&id) {
-                if let Some(file_path) = &node.file_path {
-                    let path = std::path::Path::new(file_path);
-                    if path.exists() {
-                        match std::fs::remove_file(path) {
-                            Ok(_) => {
-                                deleted_count += 1;
-                                println!("Deleted file: {:?}", path);
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to delete {:?}: {}", path, e);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if deleted_count > 0 {
-            println!("Deleted {} files from workspace {}", deleted_count, id);
-        }
+        failed = remove_node_files(&paths);
     }
 
     database::workspaces::delete(pool, &id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(failed)
+}
+
+/// Remove each file, returning the paths that exist but could not be removed.
+/// A path with no file behind it is not a failure: it is already gone.
+fn remove_node_files(paths: &[String]) -> Vec<String> {
+    paths
+        .iter()
+        .filter(|path| {
+            let path = std::path::Path::new(path);
+            path.exists() && std::fs::remove_file(path).is_err()
+        })
+        .cloned()
+        .collect()
 }
 
 /// Read file content from disk (for on-demand sync)
@@ -182,5 +182,32 @@ mod tests {
         assert_eq!(read.content, "one\ntwo\n");
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A file that cannot be removed is reported, never only logged
+    /// (PRODUCT_DESIGN.md > Workspace settings).
+    #[cfg(unix)]
+    #[test]
+    fn reports_the_files_it_could_not_remove() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let removable = dir.path().join("gone.md");
+        std::fs::write(&removable, "a").unwrap();
+        let locked_dir = dir.path().join("locked");
+        std::fs::create_dir(&locked_dir).unwrap();
+        let stuck = locked_dir.join("stuck.md");
+        std::fs::write(&stuck, "b").unwrap();
+        std::fs::set_permissions(&locked_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let missing = dir.path().join("never-existed.md");
+
+        let paths: Vec<String> = [&removable, &stuck, &missing]
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        let failed = remove_node_files(&paths);
+
+        std::fs::set_permissions(&locked_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(!removable.exists());
+        assert_eq!(failed, vec![stuck.to_string_lossy().to_string()]);
     }
 }

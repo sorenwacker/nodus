@@ -15,6 +15,11 @@ export interface UsePlanHandlersContext {
   agentRunner: ReturnType<typeof useAgentRunner>
   agentLog: Ref<string[]>
   agentTasksStore: ReturnType<typeof useAgentTasksStore>
+  /**
+   * Told how a resumed run returned, so the selection the run captured is
+   * released once it truly ends (PRODUCT_DESIGN.md > What the agent acts on)
+   */
+  onResumeSettled: (result: { status: string } | undefined) => void
 }
 
 export interface UsePlanHandlersReturn {
@@ -27,7 +32,16 @@ export interface UsePlanHandlersReturn {
 }
 
 export function usePlanHandlers(ctx: UsePlanHandlersContext): UsePlanHandlersReturn {
-  const { planState, agentRunner, agentLog, agentTasksStore } = ctx
+  const { planState, agentRunner, agentLog, agentTasksStore, onResumeSettled } = ctx
+
+  async function resumeRun(...args: Parameters<typeof agentRunner.resume>): Promise<void> {
+    let result: { status: string } | undefined
+    try {
+      result = await agentRunner.resume(...args)
+    } finally {
+      onResumeSettled(result)
+    }
+  }
 
   async function handlePlanApprove() {
     console.log('[usePlanHandlers] handlePlanApprove called')
@@ -51,7 +65,7 @@ export function usePlanHandlers(ctx: UsePlanHandlersContext): UsePlanHandlersRet
         // The runner is handed the plan rather than reaching for it: its
         // prompt is rebuilt around what the user approved
         // (PRODUCT_DESIGN.md > The prompt of an approved run carries its plan)
-        await agentRunner.resume({ approved: true }, planState.currentPlan.value)
+        await resumeRun({ approved: true }, planState.currentPlan.value)
       }
     }
   }
@@ -61,7 +75,7 @@ export function usePlanHandlers(ctx: UsePlanHandlersContext): UsePlanHandlersRet
     planState.rejectPlan(reason)
     agentLog.value.push(`> Plan rejected${reason ? ': ' + reason : ''}`)
     // Resume agent to revise plan
-    agentRunner.resume({ approved: false, message: reason })
+    void resumeRun({ approved: false, message: reason })
   }
 
   function handlePlanModify(stepId: string, newDescription: string) {

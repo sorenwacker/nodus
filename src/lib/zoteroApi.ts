@@ -238,25 +238,6 @@ export class ZoteroWebApi {
     throw new Error('Unknown error creating item')
   }
 
-  /**
-   * Add item to collection
-   */
-  async addToCollection(itemKey: string, collectionKey: string): Promise<void> {
-    // First get the item
-    const item = await this.request<ZoteroApiItem>('GET', `/items/${itemKey}`)
-
-    // Update collections
-    const collections = item.collections || []
-    if (!collections.includes(collectionKey)) {
-      collections.push(collectionKey)
-    }
-
-    // Patch the item
-    await this.request<void>('PATCH', `/items/${itemKey}`, {
-      collections,
-    })
-  }
-
 }
 
 /**

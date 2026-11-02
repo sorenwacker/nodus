@@ -2130,6 +2130,7 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 - Restoring a deleted workspace restores its vault path and its sync setting.
 - The description field is removed. No workspace description is stored anywhere, so text typed there was discarded on save.
 - A rename that fails is reported. A new workspace is opened only after it has been created.
+- Deleting a workspace with "Keep original markdown files" unchecked permanently deletes the files of its nodes, as the dialog warns. A file that cannot be deleted is reported: the workspace is still deleted, and the notice names how many files remain on disk. Failures used to reach only the log, so the user was told the workspace and its files were gone while some files remained.
 
 ### What a card's chip row shows
 

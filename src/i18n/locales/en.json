@@ -482,6 +482,7 @@
     "workspaceCreateFailed": "Failed to create workspace",
     "workspaceUpdated": "Workspace updated",
     "workspaceDeleted": "Deleted workspace \"{name}\"",
+    "workspaceFilesRemain": "Deleted workspace \"{name}\", but {count} files could not be deleted and remain on disk",
     "cannotDeleteDefault": "Cannot delete default workspace",
     "workspaceReset": "Default workspace reset to starter content",
     "importSuccess": "Imported {count} nodes",

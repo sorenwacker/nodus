@@ -482,6 +482,7 @@
     "workspaceCreateFailed": "Arbeitsbereich konnte nicht erstellt werden",
     "workspaceUpdated": "Arbeitsbereich aktualisiert",
     "workspaceDeleted": "Arbeitsbereich \"{name}\" gelöscht",
+    "workspaceFilesRemain": "Arbeitsbereich \"{name}\" gelöscht, aber {count} Dateien konnten nicht gelöscht werden und liegen noch auf der Festplatte",
     "cannotDeleteDefault": "Standard-Arbeitsbereich kann nicht gelöscht werden",
     "workspaceReset": "Standard-Arbeitsbereich auf Startinhalt zurückgesetzt",
     "importSuccess": "{count} Knoten importiert",

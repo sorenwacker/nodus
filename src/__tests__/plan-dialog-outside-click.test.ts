@@ -40,4 +40,20 @@ describe('the plan dialog', () => {
     await dialog.find('.close-btn').trigger('click')
     expect(dialog.emitted('close')).toHaveLength(1)
   })
+
+  it('stays open when Escape cancels a step edit', async () => {
+    const dialog = mountDialog()
+    await dialog.find('.btn-icon').trigger('click')
+    await dialog.find('.step-edit .step-input').trigger('keydown', { key: 'Escape' })
+    expect(dialog.find('.step-edit').exists()).toBe(false)
+    expect(dialog.emitted('close')).toBeUndefined()
+  })
+
+  it('stays open when Escape cancels a new step', async () => {
+    const dialog = mountDialog()
+    await dialog.find('.btn-add-step').trigger('click')
+    await dialog.find('.add-step-form .step-input').trigger('keydown', { key: 'Escape' })
+    expect(dialog.find('.add-step-form').exists()).toBe(false)
+    expect(dialog.emitted('close')).toBeUndefined()
+  })
 })

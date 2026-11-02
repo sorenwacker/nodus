@@ -564,10 +564,10 @@ async function confirmDeleteWorkspace() {
   const name = editingWorkspace.value.name
   const keepFiles = deleteWorkspaceKeepFiles.value
 
-  await store.deleteWorkspace(id, !keepFiles)
+  const remaining = await store.deleteWorkspace(id, !keepFiles)
   showDeleteWorkspaceDialog.value = false
   showWorkspaceEditor.value = false
-  showToast(t('toasts.workspaceDeleted', { name }), 'info')
+  showToast(remaining.length ? t('toasts.workspaceFilesRemain', { name, count: remaining.length }) : t('toasts.workspaceDeleted', { name }), remaining.length ? 'error' : 'info')
 }
 
 async function resetDefaultWorkspace() {
