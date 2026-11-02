@@ -1531,7 +1531,7 @@ const { updateSelectedNodesColor } = useColorOperations({
 
 const { fitSelectedNodes, fitNodeNow } = useNodeFitNow({
   getNode: store.getNode, getSelectedNodeIds: () => store.selectedNodeIds, getEditingNodeId: () => editingNodeId.value,
-  finishEditing: nodeId => { store.updateNodeContent(nodeId, editContent.value); editingNodeId.value = null; editContent.value = '' },
+  finishEditing: () => nodeEditor.saveEditing(),
   setRenderedContent: (nodeId, html) => { nodeRenderedContent.value = { ...nodeRenderedContent.value, [nodeId]: html } },
   renderMarkdown, renderTypstMath, renderMermaidDiagrams, fitNodeToContent, pushSizeUndo,
 })
