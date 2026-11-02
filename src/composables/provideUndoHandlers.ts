@@ -19,8 +19,6 @@ const HANDLER_NAMES = [
   'pushCreationUndo',
   'pushColorUndo',
   'pushSizeUndo',
-  'pushFramePositionUndo',
-  'pushFrameAssignmentUndo',
   'pushStorylineNodesUndo',
 ] as const
 

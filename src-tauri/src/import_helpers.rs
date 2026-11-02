@@ -2,7 +2,6 @@
 //!
 //! Extracted from commands.rs to reduce function complexity.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Collected markdown file with its folder path
@@ -59,34 +58,19 @@ pub fn markdown_files_in_vault(vault_path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-pub fn collect_markdown_files(vault_path: &Path) -> (Vec<MarkdownFile>, HashMap<String, usize>) {
-    let mut files = Vec::new();
-    let mut folder_counts: HashMap<String, usize> = HashMap::new();
-
-    for file_path in markdown_files_in_vault(vault_path) {
-        let folder = get_relative_folder(&file_path, vault_path).unwrap_or_default();
-        println!(
-            "  Found: {:?} in folder: '{}'",
-            file_path.file_name(),
-            folder
-        );
-
-        files.push(MarkdownFile {
-            path: file_path,
-            folder: folder.clone(),
-        });
-
-        // Track folder for frame creation
-        *folder_counts.entry(folder).or_insert(0) += 1;
-    }
-
-    println!(
-        "Total files found: {}, folders: {:?}",
-        files.len(),
-        folder_counts.keys().collect::<Vec<_>>()
-    );
-
-    (files, folder_counts)
+pub fn collect_markdown_files(vault_path: &Path) -> Vec<MarkdownFile> {
+    let files: Vec<MarkdownFile> = markdown_files_in_vault(vault_path)
+        .into_iter()
+        .map(|file_path| {
+            let folder = get_relative_folder(&file_path, vault_path).unwrap_or_default();
+            MarkdownFile {
+                path: file_path,
+                folder,
+            }
+        })
+        .collect();
+    println!("Total files found: {}", files.len());
+    files
 }
 
 /// Get relative folder path from vault root (empty string for root)
@@ -147,9 +131,48 @@ pub fn remove_wikilinks_to_target(content: &str, target_title: &str) -> String {
     .to_string()
 }
 
+/// Point wikilinks at a renamed target, keeping folder, section and alias
+///
+/// `[[old]]` → `[[new]]`, `[[old|a]]` → `[[new|a]]`, `[[old#s]]` → `[[new#s]]`,
+/// `[[dir/old]]` → `[[dir/new]]`. Matching is case-insensitive, as link
+/// resolution is.
+pub fn rename_wikilinks(content: &str, old_title: &str, new_title: &str) -> String {
+    let old_lower = old_title.to_lowercase();
+    let re = regex::Regex::new(r"\[\[([^\]|#]*/)?([^\]|#/]+)(#[^\]|]*)?(\|[^\]]+)?\]\]").unwrap();
+    re.replace_all(content, |caps: &regex::Captures| {
+        if caps[2].trim().to_lowercase() != old_lower {
+            return caps[0].to_string();
+        }
+        let folder = caps.get(1).map_or("", |m| m.as_str());
+        let section = caps.get(3).map_or("", |m| m.as_str());
+        let alias = caps.get(4).map_or("", |m| m.as_str());
+        format!("[[{folder}{new_title}{section}{alias}]]")
+    })
+    .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A rename keeps every link form pointing at the node
+    /// (features.md > Wikilink Edges).
+    #[test]
+    fn renaming_a_target_rewrites_each_link_form() {
+        let content = "[[Old]] [[old|alias]] [[Old#Part]] [[dir/Old]] [[Other]] Old";
+        assert_eq!(
+            rename_wikilinks(content, "Old", "New"),
+            "[[New]] [[New|alias]] [[New#Part]] [[dir/New]] [[Other]] Old"
+        );
+    }
+
+    #[test]
+    fn renaming_leaves_content_without_the_link_untouched() {
+        assert_eq!(
+            rename_wikilinks("[[Older]] text", "Old", "New"),
+            "[[Older]] text"
+        );
+    }
 
     /// A vault folder whose own name starts with a dot is still a vault.
     ///
@@ -231,7 +254,7 @@ mod tests {
         std::fs::create_dir_all(vault.join(".obsidian")).unwrap();
         std::fs::write(vault.join(".obsidian/config.md"), "hidden").unwrap();
 
-        let (files, _) = collect_markdown_files(&vault);
+        let files = collect_markdown_files(&vault);
 
         let names: Vec<String> = files
             .iter()

@@ -241,7 +241,6 @@ mod tests {
             width: 200.0,
             height: 120.0,
             z_index: 0,
-            frame_id: None,
             color_theme: None,
             is_collapsed: false,
             tags: None,

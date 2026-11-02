@@ -30,6 +30,7 @@ const exploreMode: AgentModeConfig = {
   toolWhitelist: [
     // Reading
     'read_graph',
+    'read_node',
     'query_nodes',
     // Research
     'web_search',
@@ -61,7 +62,6 @@ const exploreMode: AgentModeConfig = {
     'think',
     'done',
     // Reading structure, and the research tools the prompt documents
-    'list_frames',
     'list_storylines',
     'research_topic',
     'build_knowledge_base',
@@ -101,6 +101,7 @@ const planMode: AgentModeConfig = {
   toolWhitelist: [
     // Reading
     'read_graph',
+    'read_node',
     'get_connected_components',
     'query_nodes',
     // Research (read-only)
@@ -124,7 +125,7 @@ to create, edit, delete, connect, or lay out nodes. Nothing happens to the user'
 graph until they approve your plan.
 
 METHODOLOGY:
-1. read_graph() / query_nodes() to see what already exists
+1. query_nodes() and read_node() to see what already exists; read_graph() for the whole
 2. wikipedia_search(), fetch_wikipedia(), research() to gather information
 3. validate_claim() / check_completeness() as needed
 4. think() to synthesize
@@ -147,6 +148,7 @@ const executeMode: AgentModeConfig = {
   maxIterations: 500,
   toolWhitelist: [
     'read_graph',
+    'read_node',
     'get_connected_components',
     'create_node',
     'create_edge',
@@ -163,6 +165,7 @@ const executeMode: AgentModeConfig = {
     'query_nodes',
     'for_each_node',
     'smart_move',
+    'smart_layout',
     'smart_connect',
     'smart_color',
     'color_matching',
@@ -183,12 +186,9 @@ const executeMode: AgentModeConfig = {
     'apply_theme',
     'list_themes',
     'done',
-    // Structure: frames and storylines. Registered and tested but exposed to
-    // no mode until now, so the agent could not group or sequence anything
-    // (PRODUCT_DESIGN.md > Tool reachability)
-    'create_frame',
-    'assign_node_to_frame',
-    'list_frames',
+    // Structure: tag groups and storylines, so the agent can group and
+    // sequence (PRODUCT_DESIGN.md > Tool reachability)
+    'tag_nodes',
     'create_storyline',
     'add_node_to_storyline',
     'list_storylines',
@@ -209,6 +209,8 @@ const executeMode: AgentModeConfig = {
     'color_regex',
     // Edge editing, which the MCP surface has always had
     'update_edge',
+    // Writes to the user's Zotero library, so only once a plan is approved
+    'add_to_zotero',
   ],
   systemPromptAddition: `
 MODE: EXECUTE (Approved)

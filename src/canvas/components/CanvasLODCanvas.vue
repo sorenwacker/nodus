@@ -5,11 +5,15 @@
  */
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import type { Node } from '../../types'
+import type { LivePositions } from '../composables/layout/useLivePhysics'
 import { NODE_DEFAULTS } from '../constants'
+import { screenFloorRadius, MIN_DRAW_RADIUS_PX, MIN_HIT_RADIUS_PX } from '../utils/bubbleRadius'
 
 /** Just what drawing a straight edge needs; avoids importing the edge module. */
 export interface LODEdge {
   id: string
+  source: string
+  target: string
   x1: number
   y1: number
   x2: number
@@ -46,6 +50,12 @@ const props = defineProps<{
   draggingNodeId: string | null
   hoveredNodeId: string | null
   getLODRadius: (nodeId: string) => number
+  /**
+   * Node centres from the physics simulation while it runs. Circles, straight
+   * edges and hit tests read them in place of the stored positions, so a
+   * simulation frame repaints without a store write (PRODUCT_DESIGN.md > Physics Mode).
+   */
+  livePositions?: LivePositions | null
   /** Reports how long one draw took, for the performance readout. */
   onRenderTime?: (ms: number) => void
 }>()
@@ -64,25 +74,18 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 let animationId: number | null = null
 
-/** Smallest radius, in screen pixels, that a node may be pressed at. */
-const MIN_HIT_RADIUS_PX = 9
-
 const selectedSet = computed(() => new Set(props.selectedNodeIds))
 
-// Build spatial lookup for hit testing
-const nodePositions = computed(() => {
-  const positions: Array<{ id: string; cx: number; cy: number; r: number }> = []
-  for (const node of props.nodes) {
-    const r = props.getLODRadius(node.id)
-    positions.push({
-      id: node.id,
-      cx: node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2,
-      cy: node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2,
-      r,
-    })
+/** Where a node's centre is drawn: the simulation's, else the stored one */
+function centreOf(node: Node): { x: number; y: number } {
+  const live = props.livePositions
+  const i = live?.index.get(node.id)
+  if (live && i !== undefined) return { x: live.xy[2 * i], y: live.xy[2 * i + 1] }
+  return {
+    x: node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2,
+    y: node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2,
   }
-  return positions
-})
+}
 
 function render() {
   const started = performance.now()
@@ -116,14 +119,24 @@ function renderFrame() {
     // another line in the mesh. The contrast comes from the rest receding -
     // and only while something is actually lit, so the ordinary view keeps
     // its normal weight.
+    const live = props.livePositions
     for (const edge of props.edges) {
       const isLit = lit.has(edge.id)
+      // While the simulation runs, an edge is a straight line between centres
+      const s = live?.index.get(edge.source)
+      const t = live?.index.get(edge.target)
+      const moving = live && s !== undefined && t !== undefined
       ctx.globalAlpha = isLit ? 1 : anyLit ? 0.12 : 0.35
       ctx.strokeStyle = isLit ? props.highlightColor : edge.color
       ctx.lineWidth = isLit ? width * 2.2 : width
       ctx.beginPath()
-      ctx.moveTo(edge.x1, edge.y1)
-      ctx.lineTo(edge.x2, edge.y2)
+      if (moving) {
+        ctx.moveTo(live.xy[2 * s], live.xy[2 * s + 1])
+        ctx.lineTo(live.xy[2 * t], live.xy[2 * t + 1])
+      } else {
+        ctx.moveTo(edge.x1, edge.y1)
+        ctx.lineTo(edge.x2, edge.y2)
+      }
       ctx.stroke()
     }
     ctx.globalAlpha = 1
@@ -150,9 +163,10 @@ function renderFrame() {
 
   // Draw in layers: regular -> highlighted -> selected (on top)
   const drawNode = (node: Node) => {
-    const r = props.getLODRadius(node.id)
-    const cx = node.canvas_x + (node.width || NODE_DEFAULTS.WIDTH) / 2
-    const cy = node.canvas_y + (node.height || NODE_DEFAULTS.HEIGHT) / 2
+    // Never below a visible size on screen: a node without edges has the
+    // smallest canvas radius and vanished when zoomed out
+    const r = screenFloorRadius(props.getLODRadius(node.id), props.scale, MIN_DRAW_RADIUS_PX)
+    const { x: cx, y: cy } = centreOf(node)
     const isSelected = selectedSet.value.has(node.id)
     const isDragging = props.draggingNodeId === node.id
     const isHovered = props.hoveredNodeId === node.id
@@ -222,31 +236,50 @@ function hitTest(e: PointerEvent): string | null {
   // across, and pressing it means landing inside that - which is why nodes
   // stopped being selectable when zoomed out. The target never falls below a
   // clickable size on screen, whatever the drawing does.
-  const minRadius = MIN_HIT_RADIUS_PX / props.scale
 
   // Check nodes in reverse order (top-most first)
-  for (let i = nodePositions.value.length - 1; i >= 0; i--) {
-    const pos = nodePositions.value[i]
-    const dx = x - pos.cx
-    const dy = y - pos.cy
-    const r = Math.max(pos.r, minRadius)
+  for (let i = props.nodes.length - 1; i >= 0; i--) {
+    const node = props.nodes[i]
+    const centre = centreOf(node)
+    const dx = x - centre.x
+    const dy = y - centre.y
+    const r = screenFloorRadius(props.getLODRadius(node.id), props.scale, MIN_HIT_RADIUS_PX)
     if (dx * dx + dy * dy <= r * r) {
-      return pos.id
+      return node.id
     }
   }
   return null
 }
 
 let localHoveredId: string | null = null
+/**
+ * A pressed node stays hovered until release. A simulated node is painted a
+ * frame or two after the pointer moves, so the pointer runs ahead of it, and
+ * hover read from the pointer flickered on and off (PRODUCT_DESIGN.md > Physics Mode).
+ */
+let held = false
+
+function releaseHold() {
+  held = false
+  window.removeEventListener('pointerup', releaseHold, true)
+  window.removeEventListener('pointercancel', releaseHold, true)
+}
 
 function onPointerDown(e: PointerEvent) {
   const nodeId = hitTest(e)
   if (nodeId) {
+    held = true
+    // In the capture phase: the press selects the node, which opens the preview
+    // panel, and the panel stops pointerup. A release landing on it never
+    // reached a bubbling listener, so the node stayed hovered for good
+    window.addEventListener('pointerup', releaseHold, true)
+    window.addEventListener('pointercancel', releaseHold, true)
     emit('node-pointerdown', e, nodeId)
   }
 }
 
 function onPointerMove(e: PointerEvent) {
+  if (held) return
   const nodeId = hitTest(e)
   if (nodeId !== localHoveredId) {
     if (localHoveredId) {
@@ -260,6 +293,7 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerLeave() {
+  if (held) return
   if (localHoveredId) {
     emit('node-pointerleave')
     localHoveredId = null
@@ -337,6 +371,8 @@ watch(
     // listed here, no repaint was scheduled and the canvas kept drawing the
     // previous highlight set (PRODUCT_DESIGN.md > Repainting above the LOD threshold)
     () => props.highlightedNodeIds,
+    // A physics step: new centres, painted on the next frame
+    () => props.livePositions,
   ],
   () => {
     if (animationId) cancelAnimationFrame(animationId)
@@ -355,6 +391,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', resize)
+  releaseHold()
   if (animationId) cancelAnimationFrame(animationId)
 })
 </script>

@@ -8,6 +8,7 @@ import { dropPositionToLogical, fileNameFromPath } from '../../../lib/pdfGraph'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { parseReferences, citationToMarkdown, type BibEntry } from '../../../lib/bibtex'
+import { toTag } from '../../../lib/contentParser'
 import {
   toHighlightImports,
   highlightNodeContent,
@@ -42,15 +43,6 @@ export interface PendingBibImport {
 // connection (PRODUCT_DESIGN.md > PDF text cleanup)
 const MAX_CLEANUP_SIZE = 4000
 
-interface Frame {
-  id: string
-  title: string
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-}
-
 interface Store {
   createNode: (data: {
     title: string
@@ -58,6 +50,7 @@ interface Store {
     markdown_content: string
     canvas_x: number
     canvas_y: number
+    tags?: string[]
   }) => Promise<{ id: string }>
   updateNodeContent: (id: string, content: string) => Promise<void>
   /** Node an AI task is writing into; drives the canvas working pulse. */
@@ -73,7 +66,6 @@ interface Store {
     filePath: string,
     options?: { createClassNodes?: boolean; layout?: 'grid' | 'hierarchical' }
   ) => Promise<{ nodesCreated: number; edgesCreated: number; nodeIds: string[] }>
-  createFrame?: (x: number, y: number, width: number, height: number, title: string) => Frame
   /** Existing nodes, read to avoid importing the same highlight twice */
   getNodes?: () => { markdown_content?: string | null }[]
   updateNodeColor?: (id: string, color: string) => Promise<void>
@@ -464,21 +456,6 @@ ${preprocessed}`
   }
 
   /**
-   * Calculate frame dimensions for a grid of nodes
-   */
-  function calculateFrameDimensions(nodeCount: number, nodeSpacing: number, nodesPerRow: number) {
-    const cols = Math.min(nodeCount, nodesPerRow)
-    const rows = Math.ceil(nodeCount / nodesPerRow)
-    const framePadding = 40
-    const titleHeight = 30
-
-    return {
-      width: cols * nodeSpacing + framePadding,
-      height: rows * nodeSpacing + framePadding + titleHeight,
-    }
-  }
-
-  /**
    * Preview a BibTeX/CSL-JSON file for import options modal
    * Parses the file and prepares the pending import state
    */
@@ -519,7 +496,7 @@ ${preprocessed}`
   /**
    * Confirm pending bib import with options
    */
-  async function confirmBibImport(options: { createFrame: boolean; importAttachments: boolean; layout: 'grid' | 'force' }) {
+  async function confirmBibImport(options: { tagCollection: boolean; importAttachments: boolean; layout: 'grid' | 'force' }) {
     const pending = pendingBibImport.value
     if (!pending) return { count: 0, collectionName: null }
 
@@ -527,7 +504,7 @@ ${preprocessed}`
     pendingBibImport.value = null
 
     return processBibDrop(pending.filePath, pending.x, pending.y, {
-      createFrame: options.createFrame,
+      tagCollection: options.tagCollection,
     })
   }
 
@@ -541,13 +518,13 @@ ${preprocessed}`
 
   /**
    * Process a dropped BibTeX/CSL-JSON file - create citation nodes
-   * Optionally creates a frame for the collection
+   * Optionally tags the citations with their collection's name
    */
   async function processBibDrop(
     filePath: string,
     x: number,
     y: number,
-    options?: { createFrame?: boolean }
+    options?: { tagCollection?: boolean }
   ) {
     const rawFilename = fileNameFromPath(filePath) || 'Citations'
     const filename = sanitizeFilename(rawFilename)
@@ -567,24 +544,12 @@ ${preprocessed}`
 
       // Detect collection name from first entry (Zotero exports include this)
       const collectionName = entries[0]?.collections?.[0] || null
-      const shouldCreateFrame = options?.createFrame !== false && store.createFrame && collectionName
+      const collectionTag = options?.tagCollection !== false && collectionName ? toTag(collectionName) : ''
 
       processingStatus.value = `Creating ${entries.length} citation nodes...`
 
       const nodeSpacing = 250
       const nodesPerRow = 4
-
-      // Calculate frame dimensions and position nodes inside
-      let nodeStartX = x
-      let nodeStartY = y
-
-      if (shouldCreateFrame && store.createFrame) {
-        const { width, height } = calculateFrameDimensions(entries.length, nodeSpacing, nodesPerRow)
-        store.createFrame(x, y, width, height, collectionName)
-        // Offset nodes to be inside the frame (account for frame title)
-        nodeStartX = x + 20
-        nodeStartY = y + 50
-      }
 
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i]
@@ -595,8 +560,9 @@ ${preprocessed}`
           title: entry.title || entry.key,
           node_type: 'citation',
           markdown_content: citationToMarkdown(entry),
-          canvas_x: nodeStartX + col * nodeSpacing,
-          canvas_y: nodeStartY + row * nodeSpacing,
+          canvas_x: x + col * nodeSpacing,
+          canvas_y: y + row * nodeSpacing,
+          tags: collectionTag ? [collectionTag] : undefined,
         })
         lastImportNodeIds.push(node.id)
       }

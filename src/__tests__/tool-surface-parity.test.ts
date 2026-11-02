@@ -36,6 +36,16 @@ function agentToolNames(): string[] {
  * needs plumbing the in-app agent gets implicitly from the running app.
  */
 const INTENTIONAL_MCP_ONLY: Record<string, string> = {
+  create_workspace: 'the in-app agent acts on the workspace and view the user already has open',
+  batch_update_edges:
+    'a bulk update of edges addressed by id; the in-app agent addresses one edge at a time by its endpoint titles through update_edge',
+  get_edge_labels:
+    'a count per edge label for a client that cannot see the canvas; the in-app agent\'s user sees the labels drawn on the edges',
+  get_nodes_by_tag:
+    'reads the nodes carrying a tag for a client that works on the graph as data; the in-app agent sets tags through tag_nodes and has no read by tag',
+  list_tags:
+    'a tag census with the tag nodes behind it for a client that cannot see the canvas; the in-app user sees the tag chips and tag nodes drawn',
+  rebuild_tag_nodes: 'the in-app user runs the same repair from Settings > Canvas > Repair Tag Nodes',
   focus_node: 'the in-app agent acts on the workspace and view the user already has open',
   get_viewport: 'the in-app agent acts on the workspace and view the user already has open',
   get_workspace: 'the in-app agent acts on the workspace and view the user already has open',
@@ -48,6 +58,8 @@ const INTENTIONAL_MCP_ONLY: Record<string, string> = {
  * conversation, not to a remote graph API.
  */
 const INTENTIONAL_AGENT_ONLY: Record<string, string> = {
+  tag_nodes:
+    'grouping by title for the in-app agent; MCP clients set tags by id through update_node and batch_update_nodes',
   check_progress: 'loop control, planning or memory: belongs to a conversation, not a remote API',
   clear_stack: 'loop control, planning or memory: belongs to a conversation, not a remote API',
   complete_goal: 'loop control, planning or memory: belongs to a conversation, not a remote API',
@@ -73,45 +85,33 @@ const BASELINE_MCP_ONLY: Record<string, string> = {
     'the in-app agent has batch_update, which names its targets by title rather than id',
   cleanup_duplicate_edges: 'graph maintenance: no in-app agent counterpart yet',
   arrange_radial: 'baseline debt: no in-app agent counterpart yet',
-  batch_assign_nodes_to_frame: 'baseline debt: no in-app agent counterpart yet',
   batch_create_edges: 'baseline debt: no in-app agent counterpart yet',
   batch_delete_edges: 'baseline debt: no in-app agent counterpart yet',
-  batch_move_frames: 'baseline debt: no in-app agent counterpart yet',
   batch_move_nodes: 'baseline debt: no in-app agent counterpart yet',
-  batch_resize_frames: 'baseline debt: no in-app agent counterpart yet',
   batch_resize_nodes: 'baseline debt: no in-app agent counterpart yet',
   batch_set_node_colors: 'baseline debt: no in-app agent counterpart yet',
-  check_frame_overlaps: 'baseline debt: no in-app agent counterpart yet',
   get_duplicate_edges: 'graph maintenance: no in-app agent counterpart yet',
   delete_edge: 'baseline debt: no in-app agent counterpart yet',
   delete_edges_for_node: 'baseline debt: no in-app agent counterpart yet',
-  delete_frame: 'baseline debt: no in-app agent counterpart yet',
   delete_storyline: 'baseline debt: no in-app agent counterpart yet',
-  fit_all_frames: 'baseline debt: no in-app agent counterpart yet',
-  fit_frame_to_contents: 'baseline debt: no in-app agent counterpart yet',
   get_edges: 'baseline debt: no in-app agent counterpart yet',
-  get_frame: 'baseline debt: no in-app agent counterpart yet',
   get_graph_structure: 'baseline debt: no in-app agent counterpart yet',
   get_graph_summary: 'baseline debt: no in-app agent counterpart yet',
   get_hub_nodes: 'baseline debt: no in-app agent counterpart yet',
   get_leaf_nodes: 'baseline debt: no in-app agent counterpart yet',
-  get_node: 'baseline debt: no in-app agent counterpart yet',
+  get_node: 'the in-app agent has read_node, which names its target by title rather than id',
   get_node_neighbors: 'baseline debt: no in-app agent counterpart yet',
   get_nodes_by_color: 'baseline debt: no in-app agent counterpart yet',
-  get_nodes_in_frame: 'baseline debt: no in-app agent counterpart yet',
   get_orphan_nodes: 'baseline debt: no in-app agent counterpart yet',
   get_root_nodes: 'baseline debt: no in-app agent counterpart yet',
   get_storyline: 'baseline debt: no in-app agent counterpart yet',
   get_storyline_nodes: 'baseline debt: no in-app agent counterpart yet',
   list_nodes: 'baseline debt: no in-app agent counterpart yet',
-  remove_node_from_frame: 'baseline debt: no in-app agent counterpart yet',
   remove_node_from_storyline: 'baseline debt: no in-app agent counterpart yet',
   reorder_storyline_nodes: 'baseline debt: no in-app agent counterpart yet',
   resize_node: 'baseline debt: no in-app agent counterpart yet',
-  resolve_frame_overlaps: 'baseline debt: no in-app agent counterpart yet',
   search_nodes: 'baseline debt: no in-app agent counterpart yet',
   set_node_color: 'baseline debt: no in-app agent counterpart yet',
-  update_frame: 'baseline debt: no in-app agent counterpart yet',
   update_storyline: 'baseline debt: no in-app agent counterpart yet',
 }
 
@@ -146,6 +146,7 @@ const BASELINE_AGENT_ONLY: Record<string, string> = {
   move_node: 'baseline debt: no MCP counterpart yet',
   query_nodes: 'baseline debt: no MCP counterpart yet',
   read_graph: 'baseline debt: no MCP counterpart yet',
+  read_node: 'MCP clients read one node by id through get_node',
   rename_selected: 'baseline debt: no MCP counterpart yet',
   research: 'baseline debt: no MCP counterpart yet',
   research_topic: 'baseline debt: no MCP counterpart yet',
@@ -153,6 +154,7 @@ const BASELINE_AGENT_ONLY: Record<string, string> = {
   smart_color: 'baseline debt: no MCP counterpart yet',
   smart_connect: 'baseline debt: no MCP counterpart yet',
   smart_move: 'baseline debt: no MCP counterpart yet',
+  smart_layout: 'classifies with the app\'s configured AI provider; an MCP client already is a model and can call batch_move_nodes',
   summarize_selected: 'baseline debt: no MCP counterpart yet',
   update_content: 'baseline debt: no MCP counterpart yet',
   update_selected_content: 'baseline debt: no MCP counterpart yet',
@@ -186,17 +188,6 @@ const FIELD_EXCEPTIONS: Record<string, { mcpOnly?: string[]; agentOnly?: string[
     agentOnly: ['title'],
     reason: 'MCP addresses nodes by id; the app addresses by title',
   },
-  create_frame: {
-    mcpOnly: ['x', 'y', 'width', 'height', 'color', 'workspace_id', 'parent_frame_id', 'folder_path'],
-    agentOnly: ['node_titles'],
-    reason:
-      'MCP places frames by coordinates; the agent sizes a frame around the nodes it is asked to enclose',
-  },
-  assign_node_to_frame: {
-    mcpOnly: ['node_id', 'frame_id'],
-    agentOnly: ['frame_title', 'node_titles'],
-    reason: 'MCP addresses by id and one node at a time; the agent addresses by title in batches',
-  },
   create_storyline: {
     mcpOnly: ['color', 'workspace_id'],
     agentOnly: ['node_titles'],
@@ -207,18 +198,14 @@ const FIELD_EXCEPTIONS: Record<string, { mcpOnly?: string[]; agentOnly?: string[
     agentOnly: ['storyline_title', 'node_titles'],
     reason: 'MCP addresses by id and one node at a time; the agent addresses by title in batches',
   },
-  list_frames: {
-    mcpOnly: ['workspace_id'],
-    reason: 'the agent works in the workspace the user has open',
-  },
   list_storylines: {
     mcpOnly: ['workspace_id'],
     reason: 'the agent works in the workspace the user has open',
   },
   create_edge: {
-    mcpOnly: ['source_node_id', 'target_node_id', 'label', 'directed', 'weight', 'color', 'link_type'],
+    mcpOnly: ['source_node_id', 'target_node_id', 'source_title', 'target_title', 'label', 'directed', 'weight', 'color', 'link_type'],
     agentOnly: ['from_title', 'to_title', 'type'],
-    reason: 'MCP addresses nodes by id; the app addresses by title',
+    reason: 'MCP addresses nodes by id, or by title under its own field names; the app addresses nodes by title',
   },
   update_edge: {
     mcpOnly: ['id', 'label', 'link_type', 'directed', 'color', 'weight'],

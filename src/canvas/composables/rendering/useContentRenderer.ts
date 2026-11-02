@@ -12,7 +12,7 @@ import {
   reinitializeMermaid,
   type RenderOptions,
 } from '../../../services/MarkdownRenderService'
-import type { Node, Frame } from '../../../types'
+import type { Node } from '../../../types'
 import { capForCard, previewForCard } from '../../../lib/cardPreview'
 
 export interface UseContentRendererOptions {
@@ -23,14 +23,13 @@ export interface UseContentRendererOptions {
    * nobody is looking at (PRODUCT_DESIGN.md > Rendering node content).
    */
   getRenderableNodes?: () => Node[]
-  getFilteredFrames?: () => Frame[]
   /** The user's font scale: larger text fits less of a document on a card. */
   getFontScale?: () => number
   debounceMs?: number
 }
 
 export function useContentRenderer(options: UseContentRendererOptions) {
-  const { getFilteredNodes, getFilteredFrames, getFontScale, debounceMs = 50 } = options
+  const { getFilteredNodes, getFontScale, debounceMs = 50 } = options
   // Falls back to the whole workspace when no viewport set is supplied
   const renderableNodes = options.getRenderableNodes ?? getFilteredNodes
 
@@ -59,10 +58,9 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       return markdownCache.get(content)!
     }
 
-    // Build wikilink checker from current nodes/frames
+    // Build wikilink checker from current nodes
     const wikilinkExists = (target: string): boolean => {
       const nodes = getFilteredNodes()
-      const frames = getFilteredFrames?.() || []
       const targetLower = target.toLowerCase()
       // wikilink-target: uses '/' on every platform
       const pathParts = target.split('/')
@@ -74,20 +72,7 @@ export function useContentRenderer(options: UseContentRendererOptions) {
       // 2. File path match
       if (nodes.some(n => n.file_path?.toLowerCase().includes(targetLower))) return true
 
-      // 3. Frame + node title match
-      if (pathParts.length >= 2) {
-        const framePath = pathParts.slice(0, -1).join('/')
-        const frame = frames.find(f =>
-          f.title.toLowerCase() === framePath.toLowerCase() ||
-          f.folder_path?.toLowerCase().includes(framePath.toLowerCase())
-        )
-        if (frame && nodes.some(n =>
-          n.title.toLowerCase() === targetWithoutPath.toLowerCase() &&
-          n.frame_id === frame.id
-        )) return true
-      }
-
-      // 4. Filename-only match
+      // 3. Filename-only match
       return nodes.some(n => n.title.toLowerCase() === targetWithoutPath.toLowerCase())
     }
 

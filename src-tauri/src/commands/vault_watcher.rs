@@ -167,7 +167,6 @@ pub(crate) async fn sync_missing_files_impl(
             width: 200.0,
             height: 120.0,
             z_index: 0,
-            frame_id: None,
             color_theme: None,
             is_collapsed: false,
             tags: None,
@@ -386,77 +385,16 @@ pub(crate) async fn import_vault_impl(
     // stopping the import (PRODUCT_DESIGN.md > Importing a vault)
     let mut skipped_files: Vec<SkippedFile> = Vec::new();
 
-    // Track folders and their frames
-    // Key: relative folder path, Value: (frame_id, frame_x, frame_y)
-    let mut folder_frames: std::collections::HashMap<String, (String, f64, f64)> =
-        std::collections::HashMap::new();
+    // Folders are not grouped here: the frontend places each folder's notes
+    // as a cluster once they exist (docs/design/remove-frames.md)
+    let collected_files = import_helpers::collect_markdown_files(&path);
 
-    // First pass: collect all files and create frames for folders
-    let now = chrono::Utc::now().timestamp_millis();
-    let (collected_files, folder_counts) = import_helpers::collect_markdown_files(&path);
-    let files_to_import: Vec<(PathBuf, String)> = collected_files
-        .into_iter()
-        .map(|f| (f.path, f.folder))
-        .collect();
-
-    // Create frames for non-root folders with multiple files
-    let mut frame_count = 0;
-    for (folder, count) in folder_counts {
-        // Skip root folder (empty string) and single-file folders
-        if folder.is_empty() || count < 2 {
-            continue;
-        }
-
-        // Check if frame already exists
-        let frame_title = folder.split('/').next_back().unwrap_or(&folder);
-        if let Ok(Some(existing)) =
-            database::frames::get_by_title_and_workspace(pool, frame_title, workspace_id.as_deref())
-                .await
-        {
-            // Use existing frame's position
-            folder_frames.insert(folder, (existing.id, existing.canvas_x, existing.canvas_y));
-            continue;
-        }
-
-        // Create new frame with size based on node count
-        let frame_id = uuid::Uuid::new_v4().to_string();
-        let frame_x = (frame_count % layout_config::FRAME_COLS) as f64
-            * layout_config::FRAME_SPACING
-            + layout_config::FRAME_ORIGIN;
-        let frame_y = (frame_count / layout_config::FRAME_COLS) as f64
-            * layout_config::FRAME_SPACING
-            + layout_config::FRAME_ORIGIN;
-        let (frame_width, frame_height) = layout_config::calculate_frame_size(count);
-
-        let frame = database::frames::Frame {
-            id: frame_id.clone(),
-            title: frame_title.to_string(),
-            parent_frame_id: None,
-            canvas_x: frame_x,
-            canvas_y: frame_y,
-            width: frame_width,
-            height: frame_height,
-            color: None,
-            workspace_id: workspace_id.clone(),
-            folder_path: Some(folder.clone()),
-            created_at: now,
-            updated_at: now,
-        };
-
-        if database::frames::create(pool, &frame).await.is_ok() {
-            // Store frame position for node placement
-            folder_frames.insert(folder, (frame_id, frame_x, frame_y));
-            frame_count += 1;
-        }
-    }
-
-    // Second pass: import files and assign to frames
-    let mut folder_node_counts: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
     // Track files to delete after successful import
     let mut files_to_delete: Vec<PathBuf> = Vec::new();
 
-    for (file_path, folder) in files_to_import {
+    for file in collected_files {
+        let file_path = file.path;
+        let folder = file.folder;
         let file_path_str = file_path.to_string_lossy().to_string();
 
         // Check if this file is already imported
@@ -495,33 +433,14 @@ pub(crate) async fn import_vault_impl(
         // Compute checksum
         let checksum = crate::checksum::compute_string(&content);
 
-        // Get frame info for this folder (frame_id, frame_x, frame_y)
-        let frame_info = folder_frames.get(&folder).cloned();
-        let frame_id = frame_info.as_ref().map(|(fid, _, _)| fid.clone());
-
-        // Calculate position within frame or on canvas
-        let node_idx = folder_node_counts.entry(folder.clone()).or_insert(0);
-        let (initial_x, initial_y) = if let Some((_, frame_x, frame_y)) = frame_info {
-            // Position within frame using stored frame position
-            let x = frame_x
-                + layout_config::FRAME_NODE_X_OFFSET
-                + (*node_idx % layout_config::FRAME_NODE_COLS) as f64
-                    * layout_config::FRAME_NODE_SPACING;
-            let y = frame_y
-                + layout_config::FRAME_NODE_Y_OFFSET
-                + (*node_idx / layout_config::FRAME_NODE_COLS) as f64
-                    * layout_config::FRAME_NODE_ROW_HEIGHT;
-            (x, y)
-        } else {
-            // Root folder nodes - grid layout
-            let idx = nodes.len();
-            let x = (idx % layout_config::ROOT_NODE_COLS) as f64 * layout_config::ROOT_NODE_SPACING
-                + layout_config::ROOT_NODE_ORIGIN;
-            let y = (idx / layout_config::ROOT_NODE_COLS) as f64 * layout_config::ROOT_NODE_SPACING
-                + layout_config::ROOT_NODE_ORIGIN;
-            (x, y)
-        };
-        *node_idx += 1;
+        // Grid position; the frontend then clusters the notes by folder
+        let idx = nodes.len();
+        let initial_x = (idx % layout_config::ROOT_NODE_COLS) as f64
+            * layout_config::ROOT_NODE_SPACING
+            + layout_config::ROOT_NODE_ORIGIN;
+        let initial_y = (idx / layout_config::ROOT_NODE_COLS) as f64
+            * layout_config::ROOT_NODE_SPACING
+            + layout_config::ROOT_NODE_ORIGIN;
 
         let now_ts = chrono::Utc::now().timestamp();
         let node_id = uuid::Uuid::new_v4().to_string();
@@ -545,7 +464,6 @@ pub(crate) async fn import_vault_impl(
             width: layout_config::NODE_WIDTH,
             height: layout_config::NODE_HEIGHT,
             z_index: 0,
-            frame_id: frame_id.clone(),
             color_theme: None,
             is_collapsed: false,
             tags: None,
@@ -615,9 +533,18 @@ pub(crate) async fn import_vault_impl(
         println!("Deleted {} original files after import", deleted_count);
     }
 
-    println!("Import complete: {} nodes imported, {} skipped, {} edges created, {} frames created, {} duplicates removed{}",
-             nodes.len(), skipped, edge_count, frame_count, duplicates_removed,
-             if should_delete { format!(", {} files deleted", deleted_count) } else { String::new() });
+    println!(
+        "Import complete: {} nodes imported, {} skipped, {} edges created, {} duplicates removed{}",
+        nodes.len(),
+        skipped,
+        edge_count,
+        duplicates_removed,
+        if should_delete {
+            format!(", {} files deleted", deleted_count)
+        } else {
+            String::new()
+        }
+    );
 
     Ok(ImportResult {
         nodes,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { HiddenEdges } from '../composables/edges/useEdgeVisibility'
 /**
  * CanvasStatusBar - displays canvas statistics and status indicators
  * Shows node/edge counts, layout status, performance mode, and shortcuts hint
@@ -40,6 +41,8 @@ defineProps<{
   llmEnabled: boolean
   /** Whether file watcher is active */
   isWatching?: boolean
+  /** Edges a threshold hides, so the bar can say so (PRODUCT_DESIGN.md > Showing edges only around the focus) */
+  hiddenEdges?: HiddenEdges | null
 }>()
 
 const emit = defineEmits<{
@@ -61,6 +64,12 @@ const emit = defineEmits<{
     <span>{{ visibleNodeCount }}/{{ totalNodeCount }} {{ t('canvas.status.nodes') }}</span>
     <span class="sep">|</span>
     <span>{{ visibleEdgeCount }}/{{ totalEdgeCount }} {{ t('canvas.status.edges') }}</span>
+    <template v-if="hiddenEdges">
+      <span class="sep">|</span>
+      <span class="hidden-edges-notice">
+        {{ t(hiddenEdges.reason === 'hover' ? 'canvas.status.edgesHiddenHover' : 'canvas.status.edgesHiddenLimit', { count: hiddenEdges.count, threshold: hiddenEdges.threshold }) }}
+      </span>
+    </template>
     <template v-if="mcpIsRunning">
       <span class="sep">|</span>
       <span class="mcp-status" :class="{ connected: mcpConnectionCount > 0 }">
@@ -178,5 +187,8 @@ const emit = defineEmits<{
 
 .mcp-status.connected {
   background: #22c55e;
+}
+.hidden-edges-notice {
+  color: var(--warning-color, #f59e0b);
 }
 </style>

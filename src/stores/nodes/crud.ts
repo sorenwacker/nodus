@@ -3,11 +3,12 @@
  */
 
 import type { Ref } from 'vue'
+import { isColorValue } from '../../lib/colorValue'
 import { syncWikilinks } from './wikilinkSync'
 import { invoke, isTauri } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { notifications$ } from '../../composables/useNotifications'
-import { recordContentBefore } from './undoRecorder'
+import { asOneUndoStep, recordContentBefore } from './undoRecorder'
 import { generateShortId } from '../../lib/ids'
 import { planTagChange } from '../../lib/tagSync'
 
@@ -48,40 +49,20 @@ function reportVaultWriteMissed(node: Node, detail: string): void {
 }
 
 /**
- * Update node position with optional frame containment
+ * Update node position
  */
 export async function updateNodePosition(
   deps: NodeStoreDependencies,
   id: string,
   x: number,
   y: number,
-  options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean; skipPersist?: boolean }
+  options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }
 ): Promise<void> {
-  const { state, framesStore } = deps
+  const { state } = deps
   const node = state.nodes.value.find(n => n.id === id)
   if (node) {
-    let finalX = clampCoord(x)
-    let finalY = clampCoord(y)
-
-    // Enforce frame containment if requested and node is in a frame
-    if (options?.enforceFrame && node.frame_id) {
-      const frame = framesStore.frames.find(f => f.id === node.frame_id)
-      if (frame) {
-        const padding = 20
-        const titleHeight = 50
-        const nodeWidth = node.width || 200
-        const nodeHeight = node.height || 120
-        // Clamp to frame bounds
-        finalX = Math.max(
-          frame.canvas_x + padding,
-          Math.min(frame.canvas_x + frame.width - nodeWidth - padding, finalX)
-        )
-        finalY = Math.max(
-          frame.canvas_y + padding + titleHeight,
-          Math.min(frame.canvas_y + frame.height - nodeHeight - padding, finalY)
-        )
-      }
-    }
+    const finalX = clampCoord(x)
+    const finalY = clampCoord(y)
 
     node.canvas_x = finalX
     node.canvas_y = finalY
@@ -100,6 +81,27 @@ export async function updateNodePosition(
       console.error('Failed to update position:', e)
     }
   }
+}
+
+/**
+ * Move many nodes in memory at once, for one animation frame: one lookup map
+ * and one layout version change, however many nodes move
+ * (PRODUCT_DESIGN.md > Persisting animated positions).
+ */
+export function setNodePositionsInMemory(
+  deps: NodeStoreDependencies,
+  positions: Map<string, { x: number; y: number }>
+): void {
+  const { state } = deps
+  let moved = false
+  for (const node of state.nodes.value) {
+    const pos = positions.get(node.id)
+    if (!pos) continue
+    node.canvas_x = clampCoord(pos.x)
+    node.canvas_y = clampCoord(pos.y)
+    moved = true
+  }
+  if (moved) state.nodeLayoutVersion.value++
 }
 
 /**
@@ -433,25 +435,49 @@ export async function updateNodeTags(
   }
 }
 
+/** What the backend answers a rename with */
+interface TitleUpdate {
+  filePath: string | null
+  relinked: Array<{ id: string; content: string }>
+}
+
 /**
- * Update node title
+ * Update node title.
+ *
+ * The backend renames the node's vault file and rewrites the links to the
+ * node in the notes linking to it; the title and those notes form one undo
+ * step (features.md > Wikilink Edges).
  */
 export async function updateNodeTitle(
   nodes: Ref<Node[]>,
   id: string,
-  title: string
+  title: string,
+  options?: { skipUndo?: boolean }
 ): Promise<void> {
   const trimmedTitle = title.trim()
   const node = nodes.value.find(n => n.id === id)
-  if (node) {
+  if (!node) return
+  const record = (n: Node) => {
+    if (!options?.skipUndo) recordContentBefore({ nodeId: n.id, content: n.markdown_content, title: n.title })
+  }
+  await asOneUndoStep(async () => {
+    if (node.title !== trimmedTitle) record(node)
     node.title = trimmedTitle
     node.updated_at = Date.now()
     try {
-      await invoke('update_node_title', { id, title: trimmedTitle })
+      const update = await invoke<TitleUpdate>('update_node_title', { id, title: trimmedTitle })
+      if (update.filePath) node.file_path = update.filePath
+      for (const { id: linkerId, content } of update.relinked) {
+        const linker = nodes.value.find(n => n.id === linkerId)
+        if (!linker) continue
+        record(linker)
+        linker.markdown_content = content
+        linker.updated_at = Date.now()
+      }
     } catch (e) {
       console.error('Failed to update title:', e)
     }
-  }
+  })
 }
 
 /**
@@ -464,14 +490,34 @@ export async function updateNodeColor(
 ): Promise<void> {
   const node = nodes.value.find(n => n.id === id)
   if (node) {
-    node.color_theme = color
+    // Only a colour value is stored; anything else leaves the card without a
+    // background (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+    const stored = color && isColorValue(color) ? color : null
+    node.color_theme = stored
     node.updated_at = Date.now()
     try {
-      await invoke('update_node_color', { id, color })
+      await invoke('update_node_color', { id, color: stored })
     } catch (e) {
       console.error('Failed to update color:', e)
     }
   }
+}
+
+/**
+ * Reset the nodes whose stored colour is not a colour value.
+ *
+ * Args:
+ *   nodes: The loaded nodes, corrected in place.
+ *
+ * Returns:
+ *   The number of nodes reset. None on a vault already consistent.
+ */
+export async function resetInvalidNodeColors(nodes: Ref<Node[]>): Promise<number> {
+  const invalid = nodes.value.filter(n => n.color_theme && !isColorValue(n.color_theme))
+  for (const node of invalid) {
+    await updateNodeColor(nodes, node.id, null)
+  }
+  return invalid.length
 }
 
 /**
@@ -567,7 +613,6 @@ export async function createNode(
       width: data.width || 200,
       height: data.height || 120,
       z_index: 0,
-      frame_id: null,
       color_theme: data.color_theme ?? null,
       is_collapsed: false,
       tags: data.tags ? JSON.stringify(data.tags) : null,

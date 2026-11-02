@@ -231,7 +231,6 @@ function handleLinkPickerSelect(nodeId: string) {
 function handleWikilinkClick(target: string) {
   const linkedNode = resolveWikilink(target, {
     nodes: store.nodes,
-    frames: store.filteredFrames,
   })
   if (linkedNode) {
     emit('navigateToNode', linkedNode.id)

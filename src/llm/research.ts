@@ -14,6 +14,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import { httpFetch } from './providers/http'
 import { stripHtmlTags } from '../lib/sanitize'
 import type { ResearchResult } from './types'
 import type { Node } from '../types'
@@ -167,7 +168,7 @@ export async function searchWikipedia(
 
     const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=${maxResults}`
 
-    const resp = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) })
+    const resp = await httpFetch(searchUrl, { connectTimeout: 10000 })
     if (!resp.ok) return []
 
     const data = await resp.json()
@@ -205,7 +206,7 @@ export async function fetchWikipediaArticle(
 
     const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=false&explaintext=true&format=json&origin=*`
 
-    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) })
+    const resp = await httpFetch(url, { connectTimeout: 15000 })
     if (!resp.ok) return null
 
     const data = await resp.json()
@@ -257,7 +258,7 @@ export async function fetchWikipediaArticle(
 async function fetchWikipediaArticleDirect(title: string): Promise<string | null> {
   try {
     const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=false&explaintext=true&format=json&origin=*`
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    const resp = await httpFetch(url, { connectTimeout: 10000 })
     if (!resp.ok) return null
 
     const data = await resp.json()

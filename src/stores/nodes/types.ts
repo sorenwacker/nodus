@@ -6,7 +6,6 @@ import type { Ref, ComputedRef } from 'vue'
 import type {
   Node,
   Edge,
-  Frame,
   Workspace,
   CreateNodeInput,
   CreateEdgeInput,
@@ -19,7 +18,6 @@ import type {
 export type {
   Node,
   Edge,
-  Frame,
   Workspace,
   CreateNodeInput,
   CreateEdgeInput,
@@ -51,16 +49,14 @@ export interface NodeStoreState {
  */
 export interface NodeStoreComputed {
   edges: ComputedRef<Edge[]>
-  frames: ComputedRef<Frame[]>
-  selectedFrameId: ComputedRef<string | null>
   workspaces: ComputedRef<Workspace[]>
   currentWorkspaceId: ComputedRef<string | null>
   selectedNodeId: ComputedRef<string | null>
   selectedNode: ComputedRef<Node | undefined>
+  graphNodes: ComputedRef<Node[]>
   filteredNodes: ComputedRef<Node[]>
   filteredEdges: ComputedRef<Edge[]>
   graphEdges: ComputedRef<Edge[]>
-  filteredFrames: ComputedRef<Frame[]>
   storylines: ComputedRef<Storyline[]>
   storylineNodes: ComputedRef<Map<string, string[]>>
   storylineNodesVersion: ComputedRef<number>
@@ -74,7 +70,6 @@ export interface NodeStoreDependencies {
   state: NodeStoreState
   computed: NodeStoreComputed
   edgesStore: ReturnType<typeof import('../edges').useEdgesStore>
-  framesStore: ReturnType<typeof import('../frames').useFramesStore>
   workspaceStore: ReturnType<typeof import('../workspaces').useWorkspaceStore>
   storylinesStore: ReturnType<typeof import('../storylines').useStorylinesStore>
 }
@@ -85,5 +80,4 @@ export interface NodeStoreDependencies {
 export interface FileSyncInterface {
   watchVault: (path: string) => Promise<void>
   stopWatching: () => Promise<void>
-  markProgrammaticMove: (nodeId: string) => void
 }

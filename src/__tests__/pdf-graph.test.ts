@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { toTag } from '../lib/contentParser'
 import {
   splitIntoSections,
   findReferencesSection,
@@ -129,7 +130,7 @@ describe('planning the graph', () => {
   const sections = splitIntoSections(PAPER)
   const refs = parseReferenceEntries(findReferencesSection(sections)!.content)
 
-  it('plans one node per content section inside one frame', () => {
+  it('plans one node per content section', () => {
     const plan = planGraphImport(sections, refs, { x: 100, y: 200 })
 
     const titles = plan.nodes.map(n => n.title)
@@ -140,7 +141,19 @@ describe('planning the graph', () => {
     expect(chapter.content).toContain('compute-intensive')
     // The references section is not a content node; its entries become citations
     expect(titles).not.toContain('References')
-    expect(plan.frameTitle).toContain('LCDB 2.0')
+    expect(plan.documentTitle).toContain('LCDB 2.0')
+  })
+
+  it('tags every section with the paper, and no citation', () => {
+    // The tag replaces the frame that grouped a paper's sections
+    // (docs/design/remove-frames.md > Imports that created frames)
+    const plan = planGraphImport(sections, refs, { x: 0, y: 0 })
+    const tag = toTag(plan.documentTitle)
+
+    expect(tag).not.toBe('')
+    for (const node of plan.nodes) {
+      expect(node.tags ?? [], node.title).toEqual(node.nodeType === 'note' ? [tag] : [])
+    }
   })
 
   it('follows the document tree with edges', () => {

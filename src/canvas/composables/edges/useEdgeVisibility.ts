@@ -8,8 +8,20 @@ import { computed, ref, type Ref, type ComputedRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { EdgeLine } from './useEdgeRouting'
 import { useDisplayStore } from '../../../stores/display'
+import { HIGHLIGHT_WIDTH_FACTOR, lineUnderArrowHead } from '../../routing/arrowHead'
+
+/**
+ * The path to stroke for an edge: the routed path, ending under the arrowhead
+ * where the edge carries one (PRODUCT_DESIGN.md > The line under an arrowhead).
+ * An undirected, bidirectional or short edge has no head and keeps its full path.
+ */
+export function strokedPath(edge: Pick<EdgeLine, 'path' | 'isBidirectional' | 'isShortEdge'>, strokeWidth: number): string {
+  return edge.isBidirectional || edge.isShortEdge ? edge.path : lineUnderArrowHead(edge.path, strokeWidth)
+}
 
 export interface VisibleEdgeLine extends EdgeLine {
+  /** The path to stroke: `path`, ending under the arrowhead where the edge carries one */
+  linePath: string
   isHighlighted: boolean
   isSelected: boolean
   isNeighborEdge: boolean
@@ -43,6 +55,8 @@ export interface UseEdgeVisibilityContext {
 /** Edge geometry with its colour resolved, and nothing about what is hovered. */
 export interface CanvasEdge {
   id: string
+  source: string
+  target: string
   x1: number
   y1: number
   x2: number
@@ -50,8 +64,18 @@ export interface CanvasEdge {
   color: string
 }
 
+/** Edges a threshold keeps off the canvas, so the canvas can say so */
+export interface HiddenEdges {
+  count: number
+  threshold: number
+  /** 'hover': shown only around a hovered or selected note; 'limit': hidden above a total */
+  reason: 'hover' | 'limit'
+}
+
 export interface UseEdgeVisibilityReturn {
   visibleEdgeLines: ComputedRef<VisibleEdgeLine[]>
+  /** Set while a threshold hides every edge (PRODUCT_DESIGN.md > Showing edges only around the focus) */
+  hiddenEdges: ComputedRef<HiddenEdges | null>
   canvasEdges: ComputedRef<CanvasEdge[]>
 }
 
@@ -95,24 +119,10 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
   const displayStore = useDisplayStore()
   const { edgeHoverThreshold: displayEdgeThreshold } = storeToRefs(displayStore)
 
-  const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
-    // Check user's edge hide threshold (from canvas settings)
-    // 0 = disabled (show all edges), any other value = hide when count exceeds it
-    const hideThreshold = edgeHideThreshold?.value ?? 0
-    const totalEdges = totalEdgeCount.value
-
-    // If user set a hide threshold > 0 and edge count exceeds it, hide all
-    if (hideThreshold > 0 && totalEdges > hideThreshold) {
-      return []
-    }
-
+  // The edges the settings and the viewport let through, before the focus rule
+  const candidateEdges = computed((): EdgeLine[] => {
     let edges = edgeLines.value
     const visIds = visibleNodeIds.value
-    const hovered = hoveredNodeId.value
-    const selectedNodes = Array.isArray(selectedNodeIds.value) ? selectedNodeIds.value : selectedNodeIds.value
-    // O(1) membership for the per-edge loops below (this computed is hover-hot,
-    // so an Array.includes scan per edge is O(edges x selected))
-    const selectedSet = new Set(selectedNodes)
 
     // Filter out wikilink edges if user setting is enabled
     if (hideWikilinkEdges.value) {
@@ -135,6 +145,44 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
         return visIds.has(e.source_node_id) || visIds.has(e.target_node_id)
       })
     }
+
+    return edges
+  })
+
+  const focusActive = () => {
+    const selected = selectedNodeIds.value
+    return !!hoveredNodeId.value || (Array.isArray(selected) && selected.length > 0)
+  }
+
+  const hiddenEdges = computed((): HiddenEdges | null => {
+    const hideThreshold = edgeHideThreshold?.value ?? 0
+    if (hideThreshold > 0 && totalEdgeCount.value > hideThreshold) {
+      return { count: totalEdgeCount.value, threshold: hideThreshold, reason: 'limit' }
+    }
+    const count = candidateEdges.value.length
+    if (count > displayEdgeThreshold.value && !focusActive()) {
+      return { count, threshold: displayEdgeThreshold.value, reason: 'hover' }
+    }
+    return null
+  })
+
+  const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
+    // Check user's edge hide threshold (from canvas settings)
+    // 0 = disabled (show all edges), any other value = hide when count exceeds it
+    const hideThreshold = edgeHideThreshold?.value ?? 0
+    const totalEdges = totalEdgeCount.value
+
+    // If user set a hide threshold > 0 and edge count exceeds it, hide all
+    if (hideThreshold > 0 && totalEdges > hideThreshold) {
+      return []
+    }
+
+    let edges = candidateEdges.value
+    const hovered = hoveredNodeId.value
+    const selectedNodes = Array.isArray(selectedNodeIds.value) ? selectedNodeIds.value : selectedNodeIds.value
+    // O(1) membership for the per-edge loops below (this computed is hover-hot,
+    // so an Array.includes scan per edge is O(edges x selected))
+    const selectedSet = new Set(selectedNodes)
 
     // Build neighbor set for 2-hop edge display
     // Neighbors are nodes directly connected to hovered/selected nodes
@@ -196,7 +244,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       // Use getEdgeColor for theme-aware color remapping
       const color = getEdgeColor({ link_type: e.link_type || '', color: e.color })
       // Simple stroke width: base for normal, slightly thicker for selected/highlighted
-      const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * 1.3 : baseStrokeWidth
+      const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * HIGHLIGHT_WIDTH_FACTOR : baseStrokeWidth
 
       // Get highlight color based on whether connected node is selected or just hovered
       // When "highlight all edges" is on, keep original color - don't change to highlight color
@@ -227,6 +275,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
       return {
         ...e,
+        linePath: strokedPath(e, baseStrokeWidth),
         isHighlighted,
         isSelected,
         isNeighborEdge,
@@ -263,6 +312,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
   const canvasEdges = computed((): CanvasEdge[] =>
     edgeLines.value.map(e => ({
       id: e.id,
+      source: e.source_node_id,
+      target: e.target_node_id,
       x1: e.x1,
       y1: e.y1,
       x2: e.x2,
@@ -273,6 +324,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
   return {
     visibleEdgeLines,
+    hiddenEdges,
     canvasEdges,
   }
 }

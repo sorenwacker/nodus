@@ -101,6 +101,11 @@ export async function saveExportFile(
   })
 }
 
+/** Compile Typst source to PDF bytes in the backend, with its bundled fonts */
+export async function compileTypstPdf(source: string): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<number[]>('compile_typst_pdf', { source }))
+}
+
 export async function extractPdfText(path: string): Promise<string> {
   return invoke<string>('extract_pdf_text', { path })
 }

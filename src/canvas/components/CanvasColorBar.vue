@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * CanvasColorBar - Floating color selection bar
- * Shown when nodes or frames are selected
+ * Shown when nodes are selected
  * Includes preset colors + color picker with recent colors
  */
 import { ref } from 'vue'
@@ -21,15 +21,12 @@ const props = defineProps<{
   colors: ColorOption[]
   colorsInUse: ColorInUse[]
   selectedNodeIds: string[]
-  selectedFrameId: string | null
   isCollapsed: boolean
   getNodeColor: (id: string) => string | null | undefined
-  getFrameColor: () => string | null | undefined
 }>()
 
 const emit = defineEmits<{
   (e: 'update-node-color', color: string | null): void
-  (e: 'update-frame-color', color: string | null): void
   (e: 'fit-nodes'): void
 }>()
 
@@ -38,33 +35,19 @@ const { t } = useI18n()
 const colorPickerRef = ref<HTMLInputElement | null>(null)
 
 function isColorActive(color: ColorOption): boolean {
-  if (props.selectedFrameId) {
-    return props.getFrameColor() === color.display
-  }
   return props.selectedNodeIds.every(id => props.getNodeColor(id) === color.value)
 }
 
 function isInUseColorActive(color: ColorInUse): boolean {
-  if (props.selectedFrameId) {
-    return props.getFrameColor() === color.value
-  }
   return props.selectedNodeIds.every(id => props.getNodeColor(id) === color.value)
 }
 
 function onInUseColorClick(color: ColorInUse) {
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color.value)
-  } else {
-    emit('update-node-color', color.value)
-  }
+  emit('update-node-color', color.value)
 }
 
 function onColorClick(color: ColorOption) {
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color.display)
-  } else {
-    emit('update-node-color', color.value)
-  }
+  emit('update-node-color', color.value)
 }
 
 function openColorPicker() {
@@ -74,17 +57,13 @@ function openColorPicker() {
 function onColorPickerChange(event: Event) {
   const input = event.target as HTMLInputElement
   const color = input.value
-  if (props.selectedFrameId) {
-    emit('update-frame-color', color)
-  } else {
-    emit('update-node-color', color)
-  }
+  emit('update-node-color', color)
 }
 </script>
 
 <template>
   <div class="collapsed-color-bar" @pointerdown.stop @click.stop>
-    <!-- Colors in use (from current nodes and frames) -->
+    <!-- Colors in use (from current nodes) -->
     <template v-if="colorsInUse.length > 0">
       <button
         v-for="color in colorsInUse"
@@ -124,9 +103,9 @@ function onColorPickerChange(event: Event) {
       @input="onColorPickerChange"
     />
 
-    <span v-if="selectedNodeIds.length > 0 && !selectedFrameId" class="color-bar-sep"></span>
+    <span v-if="selectedNodeIds.length > 0" class="color-bar-sep"></span>
     <button
-      v-if="selectedNodeIds.length > 0 && !selectedFrameId"
+      v-if="selectedNodeIds.length > 0"
       class="autofit-toggle"
       :class="{ disabled: isCollapsed }"
       :disabled="isCollapsed"
@@ -139,12 +118,25 @@ function onColorPickerChange(event: Event) {
 </template>
 
 <style scoped>
+/* Centred in the part of the canvas left free: the agent panel and the preview
+   panel cover it from the left, the reader and the minimap from the right
+   (PRODUCT_DESIGN.md > Placing the colour bar) */
 .collapsed-color-bar {
+  --bar-left: calc(var(--canvas-chat-inset, 0px) + var(--bar-preview-inset, 0px) + 8px);
+  --bar-right: calc(var(--canvas-right-inset, 0px) + var(--bar-minimap-inset, 0px) + 8px);
   position: absolute;
   top: 8px;
-  left: 50%;
+  left: calc(var(--bar-left) + (100% - var(--bar-left) - var(--bar-right)) / 2);
   transform: translateX(-50%);
+  max-width: calc(100% - var(--bar-left) - var(--bar-right));
+  min-width: 120px;
+  box-sizing: border-box;
+  /* Follows the agent panel and the reader as they slide, and tracks the
+     pointer (0s) while either separator is dragged */
+  transition: left var(--chat-inset-duration, var(--inset-duration, var(--step-duration, 0.3s))) var(--step-ease, ease);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
@@ -153,6 +145,16 @@ function onColorPickerChange(event: Event) {
   border-radius: 20px;
   box-shadow: 0 2px 8px var(--shadow-sm);
   z-index: 60;
+}
+
+/* The preview panel: 16px from the edge and 480px wide, while it is shown */
+.canvas-viewport:has(.node-preview-panel) .collapsed-color-bar {
+  --bar-preview-inset: 504px;
+}
+
+/* The minimap: 150px in the top right corner, while it is shown */
+.canvas-viewport:has(.minimap) .collapsed-color-bar {
+  --bar-minimap-inset: 164px;
 }
 
 .color-dot {

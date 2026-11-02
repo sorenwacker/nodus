@@ -8,6 +8,7 @@
     "noResults": "No se encontraron resultados"
   },
   "canvas": {
+    "printFailed": "No se pudo imprimir el lienzo: {error}",
     "agent": {
       "placeholder": "Preguntar sobre el grafo...",
       "placeholderSelected": "Preguntar sobre nodos seleccionados...",
@@ -62,11 +63,6 @@
       "deleteEdgeTooltip": "Eliminar esta arista",
       "labelSaved": "Etiqueta de conexión guardada"
     },
-    "frame": {
-      "delete": "Eliminar marco",
-      "addFrame": "Agregar marco - Agrupar nodos seleccionados",
-      "clickToPlace": "Haga clic en el lienzo para colocar el marco (Esc para cancelar)"
-    },
     "hover": {
       "incoming": "Aristas entrantes (citado por)",
       "outgoing": "Aristas salientes (cita)",
@@ -78,6 +74,8 @@
       "perfMode": "PERF",
       "nodes": "nodos",
       "edges": "aristas",
+      "edgesHiddenHover": "{count} aristas ocultas: por encima del umbral de {threshold}. Pasa el cursor o selecciona una nota, o aumenta el umbral en Ajustes",
+      "edgesHiddenLimit": "{count} aristas ocultas: por encima del límite de {threshold} en los ajustes del lienzo",
       "hideAgentLog": "Ocultar registro del agente",
       "showAgentLog": "Mostrar registro del agente",
       "log": "Registro",
@@ -94,6 +92,7 @@
       "forceLayout": "Disposición por fuerza - Ordenar por conexiones",
       "hierarchicalLayout": "Disposición jerárquica - Ordenar como árbol (para DAGs/ontologías)",
       "radialLayout": "Disposición radial - Ordenar vecinos en círculos concéntricos alrededor del nodo seleccionado",
+      "smartLayout": "Disposición inteligente - Ordenar los nodos seleccionados o todos como jerarquía con el modelo de IA",
       "fitNodesToContent": "Ajustar nodos al contenido - Redimensionar todos los nodos",
       "edgeStyle": "Estilo de aristas",
       "magnifier": "Lupa - Mostrar vista ampliada al alejar",
@@ -103,8 +102,10 @@
       "hops": "saltos",
       "highlightEdges": "Resaltar todas las aristas - Hacer todas las aristas más visibles",
       "bubbleMode": "Modo burbuja - Mostrar nodos como círculos",
-      "help": "Ayuda - Atajos de teclado y uso",
-      "organizeFrames": "Organizar marcos - Atraer miembros, expulsar otros"
+      "physics": "Modo física - El grafo visible se ordena mientras arrastras (P)",
+      "physicsUnavailable": "Modo física - Solo en modo burbuja, fuera de la vista de vecindario, hasta 2000 nodos visibles",
+      "printToPdf": "Imprimir en PDF - Los nodos seleccionados, o todos, en una página",
+      "help": "Ayuda - Atajos de teclado y uso"
     },
     "search": {
       "placeholder": "Buscar nodos...",
@@ -128,9 +129,13 @@
     },
     "connected": "Conectado a {provider}",
     "connectionFailed": "Error al conectar con el proveedor",
-    "streaming": {
-      "label": "Habilitar streaming",
-      "hint": "Transmitir respuestas token por token (requiere soporte del proveedor)"
+    "testMessage": {
+      "label": "Mensaje de prueba",
+      "hint": "Envía este prompt al proveedor como lo hace el agente y muestra la respuesta y sus tiempos.",
+      "defaultPrompt": "Responde con una frase corta: ¿qué es un grafo de conocimiento?",
+      "send": "Enviar",
+      "sending": "Enviando...",
+      "timing": "Primer byte tras {firstByte} s, terminado en {total} s, {chars} caracteres, {attempts} intento(s)"
     },
     "apiKey": {
       "label": "Clave API",
@@ -214,7 +219,10 @@
     "default": "Predeterminado",
     "switch": "Cambiar de espacio",
     "filter": "Filtrar espacios...",
-    "recent": "reciente",
+    "sortBy": "Ordenar espacios",
+    "sortUsed": "Ultimo uso",
+    "sortName": "Nombre",
+    "sortCreated": "Creacion",
     "noMatch": "Ningun espacio coincide"
   },
   "onboarding": {
@@ -311,6 +319,7 @@
       "redo": "Rehacer",
       "autoLayout": "Disposición automática",
       "resetSizes": "Restablecer tamaños",
+      "physicsMode": "Activar/desactivar el modo física",
       "importFiles": "Importar .bib .md .pdf",
       "exportYaml": "Exportar grafo como YAML",
       "refreshFiles": "Actualizar desde archivos",
@@ -346,7 +355,7 @@
     "options": {
       "title": "Opciones de importación",
       "entriesFound": "{count} cita encontrada | {count} citas encontradas",
-      "createFrame": "Crear marco para la colección",
+      "tagCollection": "Etiquetar las citas con el nombre de la colección",
       "collectionDetected": "Colección: {name}",
       "noCollection": "No se detectó colección en la exportación",
       "importAttachments": "Importar PDFs adjuntos",
@@ -473,6 +482,7 @@
     "workspaceCreateFailed": "Error al crear el espacio de trabajo",
     "workspaceUpdated": "Espacio de trabajo actualizado",
     "workspaceDeleted": "Espacio de trabajo \"{name}\" eliminado",
+    "workspaceFilesRemain": "Espacio de trabajo \"{name}\" eliminado, pero {count} archivos no se pudieron eliminar y siguen en el disco",
     "cannotDeleteDefault": "No se puede eliminar el espacio de trabajo predeterminado",
     "workspaceReset": "Espacio de trabajo restablecido al contenido inicial",
     "importSuccess": "{count} nodos importados",
@@ -524,12 +534,6 @@
     },
     "zotero": {
       "description": "Importar citas desde Zotero y construir grafos de citaciones",
-      "library": "Biblioteca Zotero",
-      "detect": "Detectar Zotero",
-      "detecting": "Detectando...",
-      "detectHint": "Detectar automáticamente la instalación local de Zotero",
-      "connected": "Conectado",
-      "disconnect": "Desconectar",
       "collections": "Colecciones",
       "loading": "Cargando colecciones...",
       "noCollections": "No se encontraron colecciones",
@@ -539,7 +543,7 @@
       "importing": "Importando",
       "cloud": {
         "title": "Zotero Cloud",
-        "hint": "Conectar con Zotero Cloud para sincronizar citas bidireccionalmente",
+        "hint": "Importar referencias de tu biblioteca de Zotero y añadir referencias a ella. No se sincroniza nada",
         "userId": "ID de usuario",
         "userIdPlaceholder": "Tu ID de usuario de Zotero (numérico)",
         "apiKey": "Clave API",
@@ -556,7 +560,7 @@
         "title": "Grafo de citas",
         "build": "Construir grafo de citas",
         "building": "Construyendo...",
-        "hint": "Descubrir relaciones de citación usando Semantic Scholar",
+        "hint": "Consultar en Semantic Scholar las referencias y citas de cada artículo: al menos tres solicitudes por artículo, con 3 segundos de separación",
         "scanning": "Analizando artículos...",
         "fetching": "Obteniendo citas...",
         "creating": "Creando aristas...",
@@ -564,7 +568,11 @@
         "result": "{edges} aristas y {stubs} nodos provisionales creados",
         "noPapers": "No se encontraron artículos con DOI",
         "createStubs": "Crear nodos provisionales para artículos faltantes",
-        "stubsHint": "Los nodos provisionales muestran enlaces de citas a artículos que no están en tu biblioteca"
+        "stubsHint": "Los nodos provisionales muestran enlaces de citas a artículos que no están en tu biblioteca",
+        "stop": "Detener",
+        "stopping": "Deteniendo tras este artículo...",
+        "position": "({current} de {total})",
+        "stopped": "Detenido tras {current} de {total} artículos."
       },
       "export": {
         "toZotero": "Guardar en Zotero",
@@ -655,25 +663,11 @@
     "hideWikilinkEdges": "Ocultar conexiones de [[wikilink]]",
     "hideWikilinkEdgesHint": "Oculta las conexiones generadas a partir de [[enlaces]] en el contenido",
     "repairTagNodes": "Reparar nodos de etiqueta",
-    "repairTagNodesHint": "Fusionar nodos de etiqueta duplicados y restaurar el prefijo # que falte",
+    "repairTagNodesHint": "Fusionar nodos de etiqueta duplicados, restaurar el prefijo # que falte y eliminar los que ninguna nota usa",
     "repairTagNodesNone": "Los nodos de etiqueta ya son coherentes",
-    "repairTagNodesResult": "{merged} fusionados, {renamed} renombrados, {edges} aristas ajustadas",
+    "repairTagNodesResult": "{merged} fusionados, {renamed} renombrados, {edges} aristas ajustadas, {removed} sin uso eliminados",
     "showPerfOverlay": "Mostrar métricas de rendimiento",
     "showPerfOverlayHint": "Tiempos de fotograma sobre el grafo al desplazar o hacer zoom, para diagnosticar tirones"
-  },
-  "fileMove": {
-    "collision": {
-      "title": "El archivo ya existe",
-      "message": "Un archivo con el mismo nombre ya existe en la carpeta de destino.",
-      "moving": "Moviendo:",
-      "to": "A:",
-      "existing": "Existente:",
-      "options": "Elige una opción:",
-      "rename": "Renombrar",
-      "renameDesc": "Guardar con un nuevo nombre",
-      "replace": "Reemplazar",
-      "replaceDesc": "Sobrescribir el archivo existente (no se puede deshacer)"
-    }
   },
   "updates": {
     "available": "Nodus {version} esta disponible",
@@ -729,7 +723,7 @@
     "title": "Expandir en un grafo",
     "lead": "Este documento tiene estructura. Elige qué pasa a tu grafo; el nodo único se conserva en cualquier caso.",
     "sections": "{count} secciones como nodos",
-    "sectionsHint": "Un nodo por título, conectados según el esquema del documento, agrupados en un marco",
+    "sectionsHint": "Un nodo por título, conectados según el esquema del documento, etiquetados con el título del documento",
     "references": "{count} referencias como nodos de cita",
     "referencesHint": "Cada entrada de la bibliografía se convierte en un nodo de cita",
     "verify": "Verificar con Semantic Scholar",
@@ -779,6 +773,7 @@
     "noOtherWorkspaces": "No hay otros espacios de trabajo",
     "readNode": "Leer el nodo",
     "exportSelection": "Exportar la selección...",
+    "printToPdf": "Imprimir en PDF",
     "defaultWorkspace": "Predeterminado"
   },
   "reader": {

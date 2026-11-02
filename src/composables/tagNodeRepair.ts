@@ -8,6 +8,7 @@
  * "#Paradigm" twice in one workspace (docs/content/features.md > Tags).
  */
 import type { Edge, Node } from '../types'
+import { emptiedTagNodes } from '../lib/tagSync'
 
 export interface TagNodeMerge {
   /** The tag node that survives. */
@@ -32,6 +33,8 @@ export interface TagNodeRename {
 export interface TagNodeRepairPlan {
   merges: TagNodeMerge[]
   renames: TagNodeRename[]
+  /** Tag nodes of the open workspace that no note is connected to. */
+  unusedIds: string[]
 }
 
 /** A tag's identity: its name without the hash, case folded. */
@@ -49,12 +52,20 @@ function tagKey(node: Node): string {
  *
  * Args:
  *   nodes: Every node. Anything that is not a tag node is ignored.
- *   edges: Every edge. Only `tagged` edges are considered.
+ *   edges: The loaded edges, which are the open workspace's. Only `tagged`
+ *     edges are considered.
+ *   openWorkspaceId: The workspace whose edges are loaded. A tag node is only
+ *     judged unused there: elsewhere its edges are not in view, and it would
+ *     look unused when it is not.
  *
  * Returns:
- *   The merges and renames needed. Empty on a healthy vault.
+ *   The merges, renames and deletions needed. Empty on a healthy vault.
  */
-export function planTagNodeRepair(nodes: Node[], edges: Edge[]): TagNodeRepairPlan {
+export function planTagNodeRepair(
+  nodes: Node[],
+  edges: Edge[],
+  openWorkspaceId: string | null
+): TagNodeRepairPlan {
   const tagNodes = nodes.filter(n => n.node_type === 'tag')
   const groups = new Map<string, Node[]>()
 
@@ -98,7 +109,14 @@ export function planTagNodeRepair(nodes: Node[], edges: Edge[]): TagNodeRepairPl
     .filter(n => !merged.has(n.id) && !n.title.startsWith('#'))
     .map(n => ({ id: n.id, title: `#${n.title}` }))
 
-  return { merges, renames }
+  // The unnamed workspace is stored as null and named "default"
+  const workspaceOf = (id: string | null | undefined) => (!id || id === 'default' ? null : id)
+  const candidates = tagNodes
+    .filter(n => !merged.has(n.id) && workspaceOf(n.workspace_id) === workspaceOf(openWorkspaceId))
+    .map(n => n.id)
+  const unusedIds = emptiedTagNodes(candidates, nodes, edges)
+
+  return { merges, renames, unusedIds }
 }
 
 export interface TagNodeRepairDeps {
@@ -113,6 +131,7 @@ export interface TagNodeRepairResult {
   edgesRepointed: number
   edgesDeleted: number
   renamed: number
+  removedUnused: number
 }
 
 /**
@@ -132,7 +151,7 @@ export async function runTagNodeRepair(
   plan: TagNodeRepairPlan,
   deps: TagNodeRepairDeps
 ): Promise<TagNodeRepairResult> {
-  const result: TagNodeRepairResult = { merged: 0, edgesRepointed: 0, edgesDeleted: 0, renamed: 0 }
+  const result: TagNodeRepairResult = { merged: 0, edgesRepointed: 0, edgesDeleted: 0, renamed: 0, removedUnused: 0 }
 
   for (const merge of plan.merges) {
     for (const edge of merge.repointEdges) {
@@ -155,5 +174,49 @@ export async function runTagNodeRepair(
     result.renamed++
   }
 
+  for (const nodeId of plan.unusedIds) {
+    await deps.deleteNode(nodeId)
+    result.removedUnused++
+  }
+
   return result
+}
+
+/** What the repair needs of the nodes store, as the settings panel and MCP both hold it */
+export interface TagNodeRepairStore {
+  nodes: Node[]
+  edges: Edge[]
+  currentWorkspaceId: string | null
+  createEdge: (data: { source_node_id: string; target_node_id: string; link_type: string }) => Promise<unknown>
+  deleteEdge: (id: string) => Promise<void>
+  deleteNode: (id: string) => Promise<void>
+  updateNodeTitle: (id: string, title: string) => Promise<void>
+}
+
+/**
+ * Survey the store's tag nodes and apply what they need.
+ *
+ * One function for the settings panel and the MCP tool, so the two cannot
+ * drift (PRODUCT_DESIGN.md > Tag nodes over MCP).
+ *
+ * Args:
+ *   store: The nodes store, or anything holding the same members.
+ *
+ * Returns:
+ *   What was changed, or null when the vault was healthy and nothing was
+ *   written.
+ */
+export async function repairTagNodes(store: TagNodeRepairStore): Promise<TagNodeRepairResult | null> {
+  const plan = planTagNodeRepair(store.nodes, store.edges, store.currentWorkspaceId)
+  if (plan.merges.length === 0 && plan.renames.length === 0 && plan.unusedIds.length === 0) {
+    return null
+  }
+  return runTagNodeRepair(plan, {
+    createTaggedEdge: async (sourceNodeId, targetNodeId) => {
+      await store.createEdge({ source_node_id: sourceNodeId, target_node_id: targetNodeId, link_type: 'tagged' })
+    },
+    deleteEdge: id => store.deleteEdge(id),
+    deleteNode: id => store.deleteNode(id),
+    renameNode: (id, title) => store.updateNodeTitle(id, title),
+  })
 }

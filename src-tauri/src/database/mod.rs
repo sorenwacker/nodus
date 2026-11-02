@@ -11,13 +11,15 @@ use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
 pub mod edges;
+pub mod fetched_papers;
 pub mod mcp_trust;
 pub mod models;
 pub mod nodes;
+pub mod ontology_pending;
+pub mod remove_frames;
 pub mod wikilinks;
 
 // Re-export submodules for backward compatibility
-pub use models::frames;
 pub use models::storylines;
 pub use models::themes;
 pub use models::workspaces;
@@ -189,14 +191,13 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     )
     .await?;
 
-    // Add folder_path column to frames for folder-frame sync
+    // The frames table is kept, empty, as the target of a foreign key on the
+    // nodes table (docs/design/remove-frames.md > Existing data)
     run_add_column_migration(
         pool,
         include_str!("../../migrations/010_frame_folder_path.sql"),
     )
     .await?;
-
-    // Add parent_frame_id column for nested frames support
     run_add_column_migration(pool, include_str!("../../migrations/011_frame_parent.sql")).await?;
 
     // Trusted MCP clients (persisted connection approval)
@@ -218,6 +219,26 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
         if !statement.is_empty() {
             sqlx::query(statement).execute(pool).await?;
         }
+    }
+
+    // Ontology relations waiting for an end a later import brings in
+    sqlx::query(include_str!(
+        "../../migrations/014_ontology_pending_relations.sql"
+    ))
+    .execute(pool)
+    .await?;
+
+    // Frames are removed; their titles become tags (docs/design/remove-frames.md)
+    let (frames, tagged) = remove_frames::run(pool).await?;
+    if frames > 0 {
+        println!("Removed {frames} frames; {tagged} nodes gained a tag from their frame's title");
+    }
+
+    // Papers fetched from Semantic Scholar were stored as notes
+    // (docs/content/PRODUCT_DESIGN.md > Zotero takes citation nodes)
+    let converted = fetched_papers::run(pool).await?;
+    if converted > 0 {
+        println!("Converted {converted} fetched papers from notes to citation nodes");
     }
 
     Ok(())
@@ -644,7 +665,6 @@ mod tests {
             width: 200.0,
             height: 120.0,
             z_index: 0,
-            frame_id: None,
             color_theme: None,
             is_collapsed: false,
             tags: None,

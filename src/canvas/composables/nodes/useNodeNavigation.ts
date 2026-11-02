@@ -1,7 +1,7 @@
 import { type Ref } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import { resolveWikilink } from '../../../lib/wikilink'
-import type { Node, Frame } from '../../../types'
+import type { Node } from '../../../types'
 
 export interface NodeLike {
   id: string
@@ -14,8 +14,6 @@ export interface NodeLike {
 
 export interface NodeNavigationDeps {
   getFilteredNodes: () => Node[]
-  /** Frames, so a link naming a folder resolves inside it */
-  getFrames?: () => Frame[]
   getNode: (id: string) => { id: string; canvas_x: number; canvas_y: number; width?: number; height?: number } | undefined
   getVisualNode: (id: string) => { id: string; canvas_x: number; canvas_y: number; width?: number; height?: number } | undefined
   selectNode: (id: string) => void
@@ -43,7 +41,6 @@ export function useNodeNavigation(deps: NodeNavigationDeps) {
     // wherever it is followed (PRODUCT_DESIGN.md > Syncing wikilink edges)
     let targetNode: NodeLike | undefined = resolveWikilink(title, {
       nodes,
-      frames: deps.getFrames?.() ?? [],
     })
 
     // A title written with hyphens for a note whose title has spaces: the

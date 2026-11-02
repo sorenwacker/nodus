@@ -21,7 +21,7 @@ The build artifacts for a given version are also attached to its [GitHub release
 - **Papers as graphs** - A dropped PDF can become one note or a graph of them: sections along the document outline, bibliography entries as citation notes, each reference checked against Semantic Scholar. A reference the service cannot be asked about is reported as unchecked rather than missing.
 - **Highlights** - Highlights in a dropped PDF become notes, coloured to match and linked to the document they came from.
 - **Storylines** - Order a subset of notes into a sequence and read it as a continuous document, or export it as PDF or Typst source.
-- **Citations** - Zotero library sync and BibTeX import.
+- **Citations** - Import references from a Zotero library or a BibTeX file, add references to Zotero, and connect papers by who cites whom.
 - **Language models** - Local models through Ollama, or a cloud provider. The model works through the same tools you do, and asks before changing the graph.
 - **MCP server** - Other AI tools can read and edit the graph over the Model Context Protocol.
 - **Local only** - No account, no sync service. The data is on your disk.

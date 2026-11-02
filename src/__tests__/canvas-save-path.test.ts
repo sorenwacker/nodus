@@ -26,7 +26,6 @@ function makeNode(content: string, autoFit = false): Node {
     width: 200,
     height: 120,
     z_index: 0,
-    frame_id: null,
     color_theme: null,
     is_collapsed: false,
     tags: null,
@@ -147,6 +146,18 @@ describe('GraphCanvas wiring', () => {
   it('hands the event handlers the node editor save, not a store writer', () => {
     expect(start).toBeGreaterThan(-1)
     expect(block).toContain('saveEditor: nodeEditor.saveEditing')
+    expect(block).not.toContain('updateNodeContent')
+  })
+})
+
+describe('fit-now save path', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/canvas/GraphCanvas.vue'), 'utf8')
+  const start = source.indexOf('useNodeFitNow({')
+  const block = source.slice(start, source.indexOf('})', start))
+
+  it('closes an open editor through the node editor save, which keeps the frontmatter and releases the lock', () => {
+    expect(start).toBeGreaterThan(-1)
+    expect(block).toContain('nodeEditor.saveEditing()')
     expect(block).not.toContain('updateNodeContent')
   })
 })

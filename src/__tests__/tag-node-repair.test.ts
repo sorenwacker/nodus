@@ -23,7 +23,8 @@ describe('planTagNodeRepair', () => {
   it('merges tag nodes that differ only by hash or case', () => {
     const plan = planTagNodeRepair(
       [tag('t1', '#test'), tag('t2', 'test'), note('n1')],
-      [tagged('e1', 'n1', 't2')]
+      [tagged('e1', 'n1', 't2')],
+      null
     )
     expect(plan.merges).toHaveLength(1)
     expect(plan.merges[0].keepId).toBe('t1')
@@ -32,32 +33,33 @@ describe('planTagNodeRepair', () => {
   })
 
   it('does not merge the same tag in different workspaces', () => {
-    const plan = planTagNodeRepair([tag('t1', '#test', 'w1'), tag('t2', '#test', 'w2')], [])
+    const plan = planTagNodeRepair([tag('t1', '#test', 'w1'), tag('t2', '#test', 'w2')], [], null)
     expect(plan.merges).toEqual([])
   })
 
   it('gives a tag node back its hash', () => {
-    const plan = planTagNodeRepair([tag('t1', 'lonely')], [])
+    const plan = planTagNodeRepair([tag('t1', 'lonely')], [], null)
     expect(plan.renames).toEqual([{ id: 't1', title: '#lonely' }])
   })
 
   it('drops an edge that would duplicate one the kept node already has', () => {
     const plan = planTagNodeRepair(
       [tag('t1', '#test'), tag('t2', 'test'), note('n1')],
-      [tagged('e1', 'n1', 't1'), tagged('e2', 'n1', 't2')]
+      [tagged('e1', 'n1', 't1'), tagged('e2', 'n1', 't2')],
+      null
     )
     expect(plan.merges[0].repointEdges).toEqual([])
     expect(plan.merges[0].deleteEdgeIds).toEqual(['e2'])
   })
 
   it('leaves a healthy vault alone', () => {
-    const plan = planTagNodeRepair([tag('t1', '#a'), tag('t2', '#b'), note('n1')], [tagged('e1', 'n1', 't1')])
+    const plan = planTagNodeRepair([tag('t1', '#a'), tag('t2', '#b'), note('n1')], [tagged('e1', 'n1', 't1')], null)
     expect(plan.merges).toEqual([])
     expect(plan.renames).toEqual([])
   })
 
   it('ignores nodes that are not tag nodes', () => {
-    expect(planTagNodeRepair([note('n1'), note('n2')], []).merges).toEqual([])
+    expect(planTagNodeRepair([note('n1'), note('n2')], [], null).merges).toEqual([])
   })
 })
 
@@ -76,6 +78,7 @@ describe('runTagNodeRepair', () => {
           },
         ],
         renames: [{ id: 't1', title: '#test' }],
+        unusedIds: [],
       },
       {
         createTaggedEdge: async (source, target) => {
@@ -96,6 +99,6 @@ describe('runTagNodeRepair', () => {
     // The replacement edge exists before the node it replaced points at is gone
     expect(order.indexOf('create:n1->t1')).toBeLessThan(order.indexOf('deleteEdge:e1'))
     expect(order.indexOf('deleteEdge:e1')).toBeLessThan(order.indexOf('deleteNode:t2'))
-    expect(result).toEqual({ merged: 1, edgesRepointed: 1, edgesDeleted: 1, renamed: 1 })
+    expect(result).toEqual({ merged: 1, edgesRepointed: 1, edgesDeleted: 1, renamed: 1, removedUnused: 0 })
   })
 })

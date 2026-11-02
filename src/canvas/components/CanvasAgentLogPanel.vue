@@ -5,6 +5,7 @@
  */
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useI18n } from 'vue-i18n'
+import Icon from '../../components/Icon.vue'
 
 const props = defineProps<{
   log: string[]
@@ -47,16 +48,7 @@ async function copyLog() {
           </svg>
         </button>
         <button class="log-btn" :title="t('agentLog.clear')" @click="emit('clear')">
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
+          <Icon name="trash" :size="12" />
         </button>
         <button class="log-btn" :title="t('common.close')" @click="emit('close')">
           <svg

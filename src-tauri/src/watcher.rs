@@ -164,6 +164,14 @@ impl VaultWatcher {
         Ok(())
     }
 
+    /// Record a rename Nodus is about to make itself, so the events it
+    /// raises are swallowed: the old path is no longer tracked when its
+    /// removal arrives, and the new path already carries the checksum of
+    /// the unchanged content when its creation arrives.
+    pub fn remap_path(&self, old: &Path, new: &Path) {
+        remap_checksum(&self.checksums, old, new);
+    }
+
     /// Scan existing files and compute checksums
     fn scan_existing_files(&self) -> Result<(), WatcherError> {
         let mut checksums = self.checksums.lock().unwrap();
@@ -201,6 +209,19 @@ pub enum ChangeType {
     Created,
     Modified,
     Deleted,
+}
+
+/// Move a tracked file's checksum from `old` to `new`. Called before the
+/// file itself moves; see `VaultWatcher::remap_path`.
+pub(crate) fn remap_checksum(
+    checksums: &Arc<Mutex<HashMap<PathBuf, String>>>,
+    old: &Path,
+    new: &Path,
+) {
+    let mut checksums = checksums.lock().unwrap();
+    if let Some(hash) = checksums.remove(old) {
+        checksums.insert(new.to_path_buf(), hash);
+    }
 }
 
 /// Detect type of change by comparing checksums
@@ -736,5 +757,27 @@ mod tests {
         // File should be removed from tracking
         let cs = checksums.lock().unwrap();
         assert!(!cs.contains_key(&file_path));
+    }
+
+    #[test]
+    fn remap_checksum_hides_a_rename_made_by_nodus() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("old.md");
+        let new = dir.path().join("new.md");
+        fs::write(&old, "same").unwrap();
+        let checksums: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(HashMap::new()));
+        assert!(detect_change(&old, &checksums).is_some(), "registered");
+
+        remap_checksum(&checksums, &old, &new);
+        fs::rename(&old, &new).unwrap();
+
+        assert!(
+            detect_change(&old, &checksums).is_none(),
+            "no deletion is reported"
+        );
+        assert!(
+            detect_change(&new, &checksums).is_none(),
+            "no creation is reported"
+        );
     }
 }

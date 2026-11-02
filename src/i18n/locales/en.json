@@ -8,6 +8,7 @@
     "noResults": "No results found"
   },
   "canvas": {
+    "printFailed": "Could not print the canvas: {error}",
     "agent": {
       "placeholder": "Ask about the graph...",
       "placeholderSelected": "Ask about selected nodes...",
@@ -67,17 +68,14 @@
       "deleteEdgeTooltip": "Delete this edge",
       "labelSaved": "Edge label saved"
     },
-    "frame": {
-      "delete": "Delete frame",
-      "addFrame": "Add Frame - Group selected nodes",
-      "clickToPlace": "Click on canvas to place frame (Esc to cancel)"
-    },
     "status": {
       "layoutRunning": "Layout running...",
       "stop": "Stop",
       "perfMode": "PERF",
       "nodes": "nodes",
       "edges": "edges",
+      "edgesHiddenHover": "{count} edges hidden: above the hover threshold of {threshold}. Hover or select a note, or raise Edge Hover Threshold in Settings",
+      "edgesHiddenLimit": "{count} edges hidden: above the edge limit of {threshold} in Canvas settings",
       "hideAgentLog": "Hide agent log",
       "showAgentLog": "Show agent log",
       "log": "Log",
@@ -94,17 +92,20 @@
       "forceLayout": "Force Layout - Arrange by connections",
       "hierarchicalLayout": "Hierarchical Layout - Arrange as tree (for DAGs/ontologies)",
       "radialLayout": "Radial Layout - Arrange neighbors in concentric circles around selected node",
+      "smartLayout": "Smart Layout - Arrange selected or all nodes as a hierarchy using the AI model",
       "fitNodesToContent": "Fit Nodes to Content - Resize all nodes to show full content",
       "edgeStyle": "Edge Style",
       "highlightEdges": "Highlight All Edges - Make all edges more visible",
       "magnifier": "Magnifier - Show magnified view when zoomed out",
       "neighborhoodView": "Neighborhood View - Show only selected node and neighbors (N)",
       "bubbleMode": "Bubble Mode - Show nodes as circles",
+      "physics": "Physics Mode - Let the visible graph arrange itself while you drag (P)",
+      "physicsUnavailable": "Physics Mode - Bubble mode only, outside the neighborhood view, up to 2000 visible nodes",
+      "printToPdf": "Print to PDF - The selected nodes, or all nodes, on one page",
       "neighborhoodDepth": "Neighborhood depth (hops)",
       "hop": "hop",
       "hops": "hops",
-      "help": "Help - Keyboard shortcuts and usage",
-      "organizeFrames": "Organize Frames - Pull members in, push others out"
+      "help": "Help - Keyboard shortcuts and usage"
     },
     "search": {
       "placeholder": "Search nodes...",
@@ -128,9 +129,13 @@
     },
     "connected": "Connected to {provider}",
     "connectionFailed": "Failed to connect to provider",
-    "streaming": {
-      "label": "Enable Streaming",
-      "hint": "Stream responses token-by-token (requires provider support)"
+    "testMessage": {
+      "label": "Test message",
+      "hint": "Sends this prompt to the provider the way the agent does and shows the reply and its timing.",
+      "defaultPrompt": "Reply with one short sentence: what is a knowledge graph?",
+      "send": "Send",
+      "sending": "Sending...",
+      "timing": "First byte after {firstByte} s, finished in {total} s, {chars} characters, {attempts} attempt(s)"
     },
     "apiKey": {
       "label": "API Key",
@@ -214,7 +219,10 @@
     "default": "Default",
     "switch": "Switch workspace",
     "filter": "Filter workspaces...",
-    "recent": "recent",
+    "sortBy": "Sort workspaces",
+    "sortUsed": "Last used",
+    "sortName": "Name",
+    "sortCreated": "Created",
     "noMatch": "No workspace matches"
   },
   "onboarding": {
@@ -311,6 +319,7 @@
       "redo": "Redo",
       "autoLayout": "Auto-layout nodes",
       "resetSizes": "Reset all node sizes",
+      "physicsMode": "Toggle physics mode",
       "importFiles": "Import .bib .md .pdf",
       "exportYaml": "Export graph as YAML",
       "refreshFiles": "Refresh from files",
@@ -346,7 +355,7 @@
     "options": {
       "title": "Import Options",
       "entriesFound": "{count} citation found | {count} citations found",
-      "createFrame": "Create frame for collection",
+      "tagCollection": "Tag citations with the collection name",
       "collectionDetected": "Collection: {name}",
       "noCollection": "No collection detected in export",
       "importAttachments": "Import attached PDFs",
@@ -473,6 +482,7 @@
     "workspaceCreateFailed": "Failed to create workspace",
     "workspaceUpdated": "Workspace updated",
     "workspaceDeleted": "Deleted workspace \"{name}\"",
+    "workspaceFilesRemain": "Deleted workspace \"{name}\", but {count} files could not be deleted and remain on disk",
     "cannotDeleteDefault": "Cannot delete default workspace",
     "workspaceReset": "Default workspace reset to starter content",
     "importSuccess": "Imported {count} nodes",
@@ -524,12 +534,6 @@
     },
     "zotero": {
       "description": "Import citations from Zotero and build citation graphs",
-      "library": "Zotero Library",
-      "detect": "Detect Zotero",
-      "detecting": "Detecting...",
-      "detectHint": "Auto-detect local Zotero installation",
-      "connected": "Connected",
-      "disconnect": "Disconnect",
       "collections": "Collections",
       "loading": "Loading collections...",
       "noCollections": "No collections found",
@@ -540,7 +544,7 @@
       "importAll": "Import All Items",
       "cloud": {
         "title": "Zotero Cloud",
-        "hint": "Connect to Zotero Cloud to sync citations bidirectionally",
+        "hint": "Import references from your Zotero library and add references to it. Nothing is synchronised",
         "userId": "User ID",
         "userIdPlaceholder": "Your Zotero user ID (numeric)",
         "apiKey": "API Key",
@@ -557,7 +561,7 @@
         "title": "Citation Graph",
         "build": "Build Citation Graph",
         "building": "Building...",
-        "hint": "Discover citation relationships using Semantic Scholar",
+        "hint": "Look up each paper's references and citations on Semantic Scholar: at least three requests per paper, 3 seconds apart",
         "scanning": "Scanning papers...",
         "fetching": "Fetching citations...",
         "creating": "Creating edges...",
@@ -565,7 +569,11 @@
         "result": "Created {edges} edges and {stubs} stub nodes",
         "noPapers": "No papers with DOI found",
         "createStubs": "Create stub nodes for missing papers",
-        "stubsHint": "Stub nodes show citation links to papers not in your library"
+        "stubsHint": "Stub nodes show citation links to papers not in your library",
+        "stop": "Stop",
+        "stopping": "Stopping after this paper...",
+        "position": "({current} of {total})",
+        "stopped": "Stopped after {current} of {total} papers."
       },
       "export": {
         "toZotero": "Save to Zotero",
@@ -655,25 +663,11 @@
     "okfBackfillApply": "Add frontmatter to {count} files",
     "okfBackfilling": "Writing...",
     "repairTagNodes": "Repair Tag Nodes",
-    "repairTagNodesHint": "Merge tag nodes that duplicate each other and restore a missing # prefix",
+    "repairTagNodesHint": "Merge tag nodes that duplicate each other, restore a missing # prefix, and delete tag nodes no note uses",
     "repairTagNodesNone": "Tag nodes are already consistent",
-    "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted",
+    "repairTagNodesResult": "Merged {merged}, renamed {renamed}, {edges} edges adjusted, {removed} unused removed",
     "showPerfOverlay": "Show performance readout",
     "showPerfOverlayHint": "Frame timing over the graph while you pan or zoom, for diagnosing stutter"
-  },
-  "fileMove": {
-    "collision": {
-      "title": "File Already Exists",
-      "message": "A file with the same name already exists in the target folder.",
-      "moving": "Moving:",
-      "to": "To:",
-      "existing": "Existing:",
-      "options": "Choose an option:",
-      "rename": "Rename",
-      "renameDesc": "Save with a new name",
-      "replace": "Replace",
-      "replaceDesc": "Overwrite the existing file (cannot be undone)"
-    }
   },
   "mcp": {
     "connectionRequest": "MCP Connection Request",
@@ -749,7 +743,7 @@
     "title": "Expand into a graph",
     "lead": "This document has structure. Choose what becomes part of your graph; the single node stays either way.",
     "sections": "{count} sections as nodes",
-    "sectionsHint": "One node per heading, connected along the document outline, grouped in a frame",
+    "sectionsHint": "One node per heading, connected along the document outline, tagged with the paper's title",
     "references": "{count} references as citation nodes",
     "referencesHint": "Each entry in the bibliography becomes a citation node cited by the paper",
     "verify": "Verify against Semantic Scholar",
@@ -779,6 +773,7 @@
     "noOtherWorkspaces": "No other workspaces",
     "readNode": "Read node",
     "exportSelection": "Export selection...",
+    "printToPdf": "Print to PDF",
     "defaultWorkspace": "Default"
   },
   "reader": {

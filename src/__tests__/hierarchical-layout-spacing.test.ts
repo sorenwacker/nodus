@@ -88,25 +88,19 @@ describe('hierarchical layout spacing', () => {
       getNodes: () => nodes,
       getFilteredNodes: () => nodes,
       getFilteredEdges: () => edges,
-      getFilteredFrames: () => [],
       getSelectedNodeIds: () => [],
       updateNodePosition: (id, x, y) => {
         const n = nodes.find(n => n.id === id)!
         n.canvas_x = x
         n.canvas_y = y
       },
-      updateFramePosition: () => {},
-      updateFrameSize: () => {},
     }
 
-    await executeAutoLayout('hierarchical', undefined, {
+    await executeAutoLayout('hierarchical', {
       store,
       animateToPositions: targets => {
         for (const [id, pos] of targets) store.updateNodePosition(id, pos.x, pos.y)
       },
-      applyFrameConstraints: positions => positions,
-      pushOutOfFrames: positions => positions,
-      expandFramesToFitNodes: async () => {},
     })
 
     const [root, c1, c2] = nodes

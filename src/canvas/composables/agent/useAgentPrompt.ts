@@ -31,6 +31,15 @@ export function useAgentPrompt(ctx: AgentPromptContext) {
    */
   const runSelection = ref<string[] | null>(null)
 
+  /**
+   * Release the captured selection unless the run paused for approval: the
+   * resumed execution is the same run and must act on the same nodes. Called
+   * when the prompt's run returns and when a resumed run returns.
+   */
+  function releaseRunSelectionUnlessPaused(result: { status: string } | undefined): void {
+    if (result?.status !== 'paused') runSelection.value = null
+  }
+
   async function sendPrompt(): Promise<void> {
     if (!ctx.prompt.value.trim() || ctx.isLoading.value) return
 
@@ -39,22 +48,23 @@ export function useAgentPrompt(ctx: AgentPromptContext) {
 
     ctx.isLoading.value = true
     runSelection.value = [...ctx.getSelectedNodeIds()]
+    // Emptied now, not when the run ends: the transcript shows the prompt from
+    // here on, and a field still holding it reads as a prompt that was not sent
+    // (PRODUCT_DESIGN.md > The prompt field after sending)
+    ctx.prompt.value = ''
 
     let result: { status: string } | undefined
     try {
       result = await ctx.run(prompt)
-      ctx.prompt.value = ''
     } catch (e) {
+      // Put back so it can be sent again, unless something was typed since
+      if (!ctx.prompt.value) ctx.prompt.value = prompt
       ctx.reportError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
       ctx.isLoading.value = false
-      // Held while the run is paused for approval: the resumed execution is the
-      // same run and must act on the same nodes. Released once it truly ends.
-      if (result?.status !== 'paused') {
-        runSelection.value = null
-      }
+      releaseRunSelectionUnlessPaused(result)
     }
   }
 
-  return { sendPrompt, runSelection }
+  return { sendPrompt, runSelection, releaseRunSelectionUnlessPaused }
 }

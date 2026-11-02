@@ -9,7 +9,12 @@ const DEFAULT_CELL_SIZE = 200 // Roughly average node size
 
 export class SpatialIndex {
   private cellSize: number
-  private grid: Map<string, NodeRect[]> = new Map()
+  /**
+   * Nodes per cell: row -> column -> nodes. Numeric keys, not "col,row"
+   * strings: a long edge's query region spans hundreds of cells, and building a
+   * string per cell per query dominated routing (PRODUCT_DESIGN.md > Routing cost).
+   */
+  private grid: Map<number, Map<number, NodeRect[]>> = new Map()
   private allNodes: NodeRect[] = []
 
   constructor(cellSize: number = DEFAULT_CELL_SIZE) {
@@ -24,87 +29,63 @@ export class SpatialIndex {
     this.allNodes = nodes instanceof Map ? Array.from(nodes.values()) : nodes
 
     for (const node of this.allNodes) {
-      const cells = this.getNodeCells(node)
-      for (const cell of cells) {
-        const existing = this.grid.get(cell)
-        if (existing) {
-          existing.push(node)
-        } else {
-          this.grid.set(cell, [node])
+      const startCol = Math.floor(node.canvas_x / this.cellSize)
+      const endCol = Math.floor((node.canvas_x + (node.width || 200)) / this.cellSize)
+      const startRow = Math.floor(node.canvas_y / this.cellSize)
+      const endRow = Math.floor((node.canvas_y + (node.height || 120)) / this.cellSize)
+
+      for (let row = startRow; row <= endRow; row++) {
+        let cols = this.grid.get(row)
+        if (!cols) {
+          cols = new Map()
+          this.grid.set(row, cols)
+        }
+        for (let col = startCol; col <= endCol; col++) {
+          const existing = cols.get(col)
+          if (existing) {
+            existing.push(node)
+          } else {
+            cols.set(col, [node])
+          }
         }
       }
     }
   }
 
   /**
-   * Get all cells that a node occupies
+   * Query nodes in a bounding box region
+   * Returns unique nodes that potentially intersect the region, in row-major
+   * cell order
    */
-  private getNodeCells(node: NodeRect): string[] {
-    const cells: string[] = []
-    const left = node.canvas_x
-    const right = node.canvas_x + (node.width || 200)
-    const top = node.canvas_y
-    const bottom = node.canvas_y + (node.height || 120)
-
-    const startCol = Math.floor(left / this.cellSize)
-    const endCol = Math.floor(right / this.cellSize)
-    const startRow = Math.floor(top / this.cellSize)
-    const endRow = Math.floor(bottom / this.cellSize)
-
-    for (let row = startRow; row <= endRow; row++) {
-      for (let col = startCol; col <= endCol; col++) {
-        cells.push(`${col},${row}`)
-      }
-    }
-
-    return cells
-  }
-
-  /**
-   * Get cells for a bounding box region
-   */
-  private getRegionCells(minX: number, minY: number, maxX: number, maxY: number): string[] {
-    const cells: string[] = []
+  queryRegion(minX: number, minY: number, maxX: number, maxY: number, excludeIds?: Set<string>): NodeRect[] {
     const startCol = Math.floor(minX / this.cellSize)
     const endCol = Math.floor(maxX / this.cellSize)
     const startRow = Math.floor(minY / this.cellSize)
     const endRow = Math.floor(maxY / this.cellSize)
-
-    for (let row = startRow; row <= endRow; row++) {
-      for (let col = startCol; col <= endCol; col++) {
-        cells.push(`${col},${row}`)
-      }
-    }
-
-    return cells
-  }
-
-  /**
-   * Query nodes in a bounding box region
-   * Returns unique nodes that potentially intersect the region
-   */
-  queryRegion(minX: number, minY: number, maxX: number, maxY: number, excludeIds?: Set<string>): NodeRect[] {
-    const cells = this.getRegionCells(minX, minY, maxX, maxY)
     const seen = new Set<string>()
     const results: NodeRect[] = []
 
-    for (const cell of cells) {
-      const nodes = this.grid.get(cell)
-      if (!nodes) continue
+    for (let row = startRow; row <= endRow; row++) {
+      const cols = this.grid.get(row)
+      if (!cols) continue
+      for (let col = startCol; col <= endCol; col++) {
+        const nodes = cols.get(col)
+        if (!nodes) continue
 
-      for (const node of nodes) {
-        if (node.id && seen.has(node.id)) continue
-        if (node.id && excludeIds?.has(node.id)) continue
+        for (const node of nodes) {
+          if (node.id && seen.has(node.id)) continue
+          if (node.id && excludeIds?.has(node.id)) continue
 
-        // Verify actual intersection with region
-        const nodeLeft = node.canvas_x
-        const nodeRight = node.canvas_x + (node.width || 200)
-        const nodeTop = node.canvas_y
-        const nodeBottom = node.canvas_y + (node.height || 120)
+          // Verify actual intersection with region
+          const nodeLeft = node.canvas_x
+          const nodeRight = node.canvas_x + (node.width || 200)
+          const nodeTop = node.canvas_y
+          const nodeBottom = node.canvas_y + (node.height || 120)
 
-        if (nodeLeft < maxX && nodeRight > minX && nodeTop < maxY && nodeBottom > minY) {
-          if (node.id) seen.add(node.id)
-          results.push(node)
+          if (nodeLeft < maxX && nodeRight > minX && nodeTop < maxY && nodeBottom > minY) {
+            if (node.id) seen.add(node.id)
+            results.push(node)
+          }
         }
       }
     }

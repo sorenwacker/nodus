@@ -6,13 +6,13 @@
  * are the seams it is cut along.
  */
 import type { McpToolDeclaration } from './types'
-import { READ_TOOLS } from './readTools'
-import { WORKSPACE_TOOLS } from './workspaceTools'
-import { NODE_TOOLS } from './nodeTools'
-import { EDGE_TOOLS } from './edgeTools'
-import { FRAME_TOOLS } from './frameTools'
-import { STORYLINE_TOOLS } from './storylineTools'
-import { CANVAS_TOOLS } from './canvasTools'
+import { READ_TOOLS } from './readTools.js'
+import { WORKSPACE_TOOLS } from './workspaceTools.js'
+import { NODE_TOOLS } from './nodeTools.js'
+import { EDGE_TOOLS } from './edgeTools.js'
+import { STORYLINE_TOOLS } from './storylineTools.js'
+import { CANVAS_TOOLS } from './canvasTools.js'
+import { ZOTERO_TOOLS } from './zoteroTools.js'
 
 export type { McpToolDeclaration } from './types'
 
@@ -22,9 +22,9 @@ export const NODUS_TOOLS: McpToolDeclaration[] = [
   ...WORKSPACE_TOOLS,
   ...NODE_TOOLS,
   ...EDGE_TOOLS,
-  ...FRAME_TOOLS,
   ...STORYLINE_TOOLS,
   ...CANVAS_TOOLS,
+  ...ZOTERO_TOOLS,
 ]
 
 /**

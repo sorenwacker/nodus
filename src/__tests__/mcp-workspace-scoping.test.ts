@@ -3,8 +3,8 @@
  * (PRODUCT_DESIGN.md > Workspace scoping for MCP connections).
  *
  * Scoping only the list getters produced a store that contradicted itself:
- * list_frames returned the target workspace's frames while get_frame on those
- * same ids resolved against whichever workspace the user had open.
+ * a list returned the target workspace's items while a lookup of those same
+ * ids resolved against whichever workspace the user had open.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -52,12 +52,6 @@ const ADDRESSED_BY_ID = [
   'updateEdgeDirected',
   'updateEdgeLabel',
   'updateEdgeColor',
-  'updateFramePosition',
-  'updateFrameSize',
-  'updateFrameTitle',
-  'updateFrameColor',
-  'deleteFrame',
-  'assignNodesToFrame',
   'getStorylineNodes',
   'updateStoryline',
   'deleteStoryline',
@@ -74,13 +68,19 @@ const ADDRESSED_BY_ID = [
  */
 const BUILDS_THE_SCOPE = [
   'getAllNodes',
-  'getAllFrames',
   'getAllStorylines',
   'getWorkspaces',
   'loadWorkspaceEdges',
   'createEdgeRaw',
   'deleteEdgeRaw',
 ]
+
+/**
+ * Methods that act on the set of workspaces rather than inside one. A scope
+ * selects a workspace; it has nothing to say about adding another.
+ */
+const ACTS_ON_THE_WORKSPACE_LIST = ['createWorkspace']
+
 const scoped = handler.slice(
   handler.indexOf('async function scopedStoreFor'),
   handler.indexOf('/** Forget a connection')
@@ -89,29 +89,29 @@ const scoped = handler.slice(
 describe('the scoped store', () => {
   it('scopes single-entity lookups, not only the lists', () => {
     expect(scoped).toContain('getNode:')
-    expect(scoped).toContain('getFrame:')
+    expect(scoped).toContain('getStoryline:')
   })
 
   it('derives those lookups from its own scoped collections', () => {
     // Deriving them from the app's filtered lists is what let the two drift
     expect(scoped).toMatch(/getNode:.*nodesInScope\(\)/)
-    expect(scoped).toMatch(/getFrame:.*framesInScope\(\)/)
+    expect(scoped).toMatch(/getStoryline:.*storylinesInScope\(\)/)
     expect(scoped).not.toMatch(/getNode:\s*store\.getNode/)
   })
 
   it('keeps the list getters and the lookups on one definition each', () => {
     expect(scoped).toContain('getFilteredNodes: nodesInScope')
-    expect(scoped).toContain('getFilteredFrames: framesInScope')
+    expect(scoped).toContain('getFilteredStorylines: storylinesInScope')
   })
 })
 
 describe('every method of the store', () => {
   // A store that scopes some methods and inherits the rest cannot be read for
-  // what it does: frame creation and every storyline operation were inherited,
+  // what it does: every storyline operation was inherited,
   // so a scoped connection wrote into whichever workspace the user had open
   // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
   it('is scoped, or recorded as not needing to be', () => {
-    const accounted = new Set([...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE])
+    const accounted = new Set([...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE, ...ACTS_ON_THE_WORKSPACE_LIST])
     const unaccounted = interfaceMethods().filter(name => !accounted.has(name))
 
     expect(unaccounted, 'inherited from the app store without a reason').toEqual([])
@@ -119,7 +119,7 @@ describe('every method of the store', () => {
 
   it('appears in one group only', () => {
     const seen = new Map<string, number>()
-    for (const name of [...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE]) {
+    for (const name of [...scopedMethods(), ...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE, ...ACTS_ON_THE_WORKSPACE_LIST]) {
       seen.set(name, (seen.get(name) ?? 0) + 1)
     }
     const twice = [...seen].filter(([, count]) => count > 1).map(([name]) => name)
@@ -129,14 +129,14 @@ describe('every method of the store', () => {
 
   it('keeps the ledger free of methods the interface no longer has', () => {
     const declared = new Set(interfaceMethods())
-    const stale = [...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE].filter(name => !declared.has(name))
+    const stale = [...ADDRESSED_BY_ID, ...BUILDS_THE_SCOPE, ...ACTS_ON_THE_WORKSPACE_LIST].filter(name => !declared.has(name))
 
     expect(stale, 'recorded, but no longer on the interface').toEqual([])
   })
 
   it('scopes the writes, not only the reads', () => {
     const scopedNow = new Set(scopedMethods())
-    for (const write of ['createNode', 'createFrame', 'createStoryline']) {
+    for (const write of ['createNode', 'createStoryline']) {
       expect(scopedNow.has(write), `${write} lands in whichever workspace is open`).toBe(true)
     }
   })

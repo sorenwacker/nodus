@@ -8,17 +8,11 @@ import { onMounted, onUnmounted, type Ref } from 'vue'
 import { uiStorage } from '../../../lib/storage'
 
 export interface UseCanvasKeyboardShortcutsContext {
-  // Frame operations
-  pendingFramePlacement: Ref<boolean>
-  cancelFramePlacement: () => void
-
   // Node operations
   selectedNodeIds: Ref<string[]>
   selectedEdge: Ref<string | null>
-  selectedFrameId: Ref<string | null>
   deleteSelectedNodes: () => void
   deleteSelectedEdge: () => void
-  deleteSelectedFrame: () => void
   selectAllNodes: () => void
   copySelectedNodes: () => void
   pasteNodes: () => void
@@ -30,10 +24,11 @@ export interface UseCanvasKeyboardShortcutsContext {
   // Layout
   layoutNodes: () => void
   fitToContent: () => void
-  fitSelectedFrameToContents: () => void
 
   // Neighborhood mode
   toggleNeighborhoodMode: (nodeId?: string) => void
+  // Physics mode (PRODUCT_DESIGN.md > Physics Mode)
+  togglePhysics: () => void
 
   // Font scale
   fontScale: Ref<number>
@@ -48,20 +43,13 @@ export interface UseCanvasKeyboardShortcutsContext {
   showHelp: () => void
 }
 
-export interface UseCanvasKeyboardShortcutsReturn {
-  // No exposed state needed - all event-based
-}
-
-export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContext): UseCanvasKeyboardShortcutsReturn {
+// Exposes no state: every shortcut acts through the context's callbacks
+export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContext): void {
   const {
-    pendingFramePlacement,
-    cancelFramePlacement,
     selectedNodeIds,
     selectedEdge,
-    selectedFrameId,
     deleteSelectedNodes,
     deleteSelectedEdge,
-    deleteSelectedFrame,
     selectAllNodes,
     copySelectedNodes,
     pasteNodes,
@@ -69,8 +57,8 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     startEditingAndSearch,
     layoutNodes,
     fitToContent,
-    fitSelectedFrameToContents,
     toggleNeighborhoodMode,
+    togglePhysics,
     fontScale,
     increaseFontScale,
     decreaseFontScale,
@@ -80,13 +68,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
   } = ctx
 
   function handleKeydown(e: KeyboardEvent) {
-    // Escape cancels frame placement mode
-    if (e.key === 'Escape' && pendingFramePlacement.value) {
-      e.preventDefault()
-      cancelFramePlacement()
-      return
-    }
-
     // Cmd+E exports graph as YAML (works even in inputs)
     if ((e.key === 'e' || e.key === 'E') && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault()
@@ -147,10 +128,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       else if (selectedEdge.value) {
         deleteSelectedEdge()
       }
-      // Delete selected frame
-      else if (selectedFrameId.value) {
-        deleteSelectedFrame()
-      }
     }
 
     // L key triggers force layout
@@ -165,6 +142,12 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
       toggleNeighborhoodMode(selectedNodeIds.value[0])
     }
 
+    // P key toggles physics mode
+    if ((e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault()
+      togglePhysics()
+    }
+
     // Shift+R (without Ctrl/Cmd) resets all node sizes to default.
     // Exclude Ctrl/Cmd so Ctrl+Shift+R triggers only refreshFromFiles below.
     if ((e.key === 'R' || e.key === 'r') && e.shiftKey && !e.metaKey && !e.ctrlKey) {
@@ -176,12 +159,6 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
     if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       fitToContent()
-    }
-
-    // S key snugs/shrinks selected frame to fit its contents
-    if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey && selectedFrameId.value) {
-      e.preventDefault()
-      fitSelectedFrameToContents()
     }
 
     // Cmd+A / Ctrl+A selects all nodes
@@ -241,6 +218,4 @@ export function useCanvasKeyboardShortcuts(ctx: UseCanvasKeyboardShortcutsContex
   onUnmounted(() => {
     window.removeEventListener('keydown', handleKeydown)
   })
-
-  return {}
 }

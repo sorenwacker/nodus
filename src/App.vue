@@ -129,7 +129,7 @@ watch(
     readerEverOpened.value = true
     readerNodeId.value = id
     readerStorylineId.value = null
-    // A single node is read at full width, where its anchored nodes expand
+    // A single node is read at full width
     readerFullWidth.value = true
     displayStore.readingNodeId = null
   }
@@ -217,12 +217,12 @@ import { invoke, surveyOkfBackfill, applyOkfBackfill, getWorkspace, setWorkspace
 
 // MCP Server
 import { useMcpServer } from './composables/useMcpServer'
-import { appMcpStore } from './mcp/appStore'
+import { appMcpStore, canvasMcpAccess, type McpCanvas } from './mcp/appStore'
 import { useEdgesStore } from './stores/edges'
 import { useStorylinesStore } from './stores/storylines'
 
 // GraphCanvas ref for MCP viewport integration
-const graphCanvasRef = ref<ComponentPublicInstance<{ focusNode: (id: string) => void; getViewport: () => { x: number; y: number; zoom: number } }> | null>(null)
+const graphCanvasRef = ref<ComponentPublicInstance<McpCanvas> | null>(null)
 
 const syncingFiles = ref(false)
 const exportingOkf = ref(false)
@@ -268,10 +268,6 @@ const undoRedo = useUndoRedo({
     restoreNode: store.restoreNode,
     restoreEdge: store.restoreEdge,
     deleteNode: store.deleteNode,
-    // Frame operations for undo
-    getFilteredFrames: () => store.filteredFrames,
-    updateFramePosition: store.updateFramePosition,
-    assignNodesToFrame: store.assignNodesToFrame,
     // Storyline operations for undo
     getStorylineNodeIds: storylinesStore.getStorylineNodeIds,
     reorderStorylineNodes: storylinesStore.reorderStorylineNodes,
@@ -321,10 +317,7 @@ provide('storylineService', storylineService)
 const edgesStore = useEdgesStore()
 const mcpServer = useMcpServer({
   store: appMcpStore({ store, edgesStore, storylinesStore, invoke }),
-  viewport: {
-    getViewport: () => graphCanvasRef.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
-    focusNode: (id: string) => graphCanvasRef.value?.focusNode(id),
-  },
+  ...canvasMcpAccess(graphCanvasRef),
   undo: {
     pushPositionUndo,
     pushDeletionUndo,
@@ -571,10 +564,10 @@ async function confirmDeleteWorkspace() {
   const name = editingWorkspace.value.name
   const keepFiles = deleteWorkspaceKeepFiles.value
 
-  await store.deleteWorkspace(id, !keepFiles)
+  const remaining = await store.deleteWorkspace(id, !keepFiles)
   showDeleteWorkspaceDialog.value = false
   showWorkspaceEditor.value = false
-  showToast(t('toasts.workspaceDeleted', { name }), 'info')
+  showToast(remaining.length ? t('toasts.workspaceFilesRemain', { name, count: remaining.length }) : t('toasts.workspaceDeleted', { name }), remaining.length ? 'error' : 'info')
 }
 
 async function resetDefaultWorkspace() {
@@ -607,9 +600,6 @@ function handleDelete() {
       // A refusal has already been reported by the store, and the node stays
       nodeService.deleteNode(id).catch(() => undefined)
     }
-  } else if (store.selectedFrameId) {
-    store.deleteFrame(store.selectedFrameId)
-    store.selectFrame(null)
   }
 }
 
@@ -721,7 +711,7 @@ async function importVault() {
 
     const imported = await store.importVault(vaultPath.value.trim(), deleteOriginalFiles.value, targetWorkspaceId)
 
-    // Force refresh to ensure frames and edges are visible
+    // Force refresh to ensure edges are visible
     await store.switchWorkspace(store.currentWorkspaceId)
     showImportDialog.value = false
     vaultPath.value = ''

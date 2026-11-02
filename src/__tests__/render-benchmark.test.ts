@@ -160,6 +160,7 @@ function edgeLines(count: number) {
     renderStrokeWidth: 2,
     glowStrokeWidth: 4,
     arrowMarkerId: 'arrow',
+    linePath: 'M0,0 L100,100',
   }))
 }
 

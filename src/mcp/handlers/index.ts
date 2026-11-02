@@ -10,7 +10,6 @@ export {
   edgeToMcp,
   COLOR_NAME_MAP,
   normalizeColor,
-  clampToFrame,
   McpError,
   handleGetGraphSummary,
   handleListNodes,
@@ -24,9 +23,11 @@ export {
   handleGetRootNodes,
   handleGetHubNodes,
   handleGetNodesByColor,
+  handleGetNodesByTag,
   handleCreateNode,
   handleUpdateNode,
   handleBatchUpdateNodes,
+  BATCH_TIME_BUDGET_MS,
   handleDeleteNode,
   handleResizeNode,
   handleBatchResizeNodes,
@@ -38,8 +39,10 @@ export {
 // Edge handlers
 export {
   handleGetEdges,
+  handleGetEdgeLabels,
   handleCreateEdge,
   handleUpdateEdge,
+  handleBatchUpdateEdges,
   handleDeleteEdge,
   handleBatchCreateEdges,
   handleBatchDeleteEdges,
@@ -48,26 +51,6 @@ export {
   handleCleanupDuplicateEdges,
   handleArrangeRadial,
 } from './edgeHandlers'
-
-// Frame handlers
-export {
-  frameToMcp,
-  handleListFrames,
-  handleGetFrame,
-  handleCreateFrame,
-  handleUpdateFrame,
-  handleDeleteFrame,
-  handleGetNodesInFrame,
-  handleAssignNodeToFrame,
-  handleRemoveNodeFromFrame,
-  handleBatchAssignNodesToFrame,
-  handleBatchMoveFrames,
-  handleBatchResizeFrames,
-  handleFitFrameToContents,
-  handleFitAllFrames,
-  handleCheckFrameOverlaps,
-  handleResolveFrameOverlaps,
-} from './frameHandlers'
 
 // Storyline handlers
 export {
@@ -82,3 +65,6 @@ export {
   handleRemoveNodeFromStoryline,
   handleReorderStorylineNodes,
 } from './storylineHandlers'
+
+// Tag handlers
+export { handleListTags, handleRebuildTagNodes } from './tagHandlers'

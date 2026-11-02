@@ -6,7 +6,7 @@
  */
 import { ref, type Ref } from 'vue'
 import { resolveWikilink } from '../../../lib/wikilink'
-import type { Node, Frame } from '../../../types'
+import type { Node } from '../../../types'
 
 /**
  * Context for fullscreen modal operations
@@ -14,8 +14,6 @@ import type { Node, Frame } from '../../../types'
 export interface UseFullscreenModalContext {
   /** Get filtered nodes */
   getFilteredNodes: () => Node[]
-  /** Get filtered frames */
-  getFilteredFrames: () => Frame[]
 }
 
 /**
@@ -66,7 +64,6 @@ export function useFullscreenModal(ctx: UseFullscreenModalContext): UseFullscree
   function handleNavigateToNode(title: string) {
     const linkedNode = resolveWikilink(title, {
       nodes: ctx.getFilteredNodes(),
-      frames: ctx.getFilteredFrames(),
     })
     if (linkedNode) {
       // Open the linked node in fullscreen

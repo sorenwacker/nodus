@@ -29,7 +29,6 @@ export interface UseNodeResizingContext {
   isSemanticZoomCollapsed?: Ref<boolean>
   isLODMode?: Ref<boolean>
   getVisualNode?: (id: string) => { canvas_x: number; canvas_y: number } | undefined
-  expandFrameToFitNode?: (nodeId: string, width: number, height: number, x: number, y: number) => void
 }
 
 export interface UseNodeResizingReturn {
@@ -64,7 +63,6 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
     setLastDragEndTime,
     pushSizeUndo,
     getVisualNode,
-    expandFrameToFitNode,
   } = ctx
 
   // State
@@ -223,19 +221,6 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
         }
       }
     }
-
-    // Live frame expansion during resize - for all selected nodes
-    if (expandFrameToFitNode) {
-      expandFrameToFitNode(resizingNode.value, width, height, x, y)
-      // Also expand frames for other nodes in multi-select
-      for (const [id] of multiResizeInitial.value) {
-        if (id === resizingNode.value) continue
-        const n = store.getNode(id)
-        if (n) {
-          expandFrameToFitNode(id, width, height, n.canvas_x, n.canvas_y)
-        }
-      }
-    }
   }
 
   function stopResize() {
@@ -265,22 +250,6 @@ export function useNodeResizing(ctx: UseNodeResizingContext): UseNodeResizingRet
       // In neighborhood mode, re-layout to adapt to new sizes
       if (neighborhoodMode.value && focusNodeId.value) {
         setTimeout(() => layoutNeighborhood(focusNodeId.value!), 10)
-      }
-      // Collision pushing disabled - was causing layout chaos by pushing nodes across frame boundaries
-      // TODO: If re-enabling, must respect frame boundaries (only push nodes in same frame)
-
-      // Auto-expand frame if node extends beyond frame boundaries
-      if (expandFrameToFitNode) {
-        expandFrameToFitNode(nodeId, width, height, x, y)
-        // Also expand frames for other resized nodes in multi-select
-        for (const [id] of multiResizeInitial.value) {
-          if (id !== nodeId) {
-            const n = store.getNode(id)
-            if (n) {
-              expandFrameToFitNode(id, width, height, n.canvas_x, n.canvas_y)
-            }
-          }
-        }
       }
     }
     resizingNode.value = null

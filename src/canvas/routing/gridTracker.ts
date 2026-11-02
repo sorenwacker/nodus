@@ -23,8 +23,18 @@ export const DEFAULT_GRID_SIZE = 20
 /**
  * GridTracker manages edge occupancy on a grid to prevent overlapping paths
  */
+/** One bit per direction, so a cell's occupancy is a small integer */
+const DIRECTION_BIT: Record<Direction, number> = { h: 1, v: 2, 'd+': 4, 'd-': 8 }
+
 export class GridTracker {
-  private grid: Map<string, Set<Direction>> = new Map()
+  /**
+   * Occupied directions per cell: row index -> column index -> direction
+   * bits. Small-integer keys and bitmasks, not strings and Sets: routing walks
+   * every cell of every segment, often several times while it looks for a
+   * free lane, and allocating a key and a point per cell cost more than the
+   * routing itself (PRODUCT_DESIGN.md > Routing cost).
+   */
+  private grid: Map<number, Map<number, number>> = new Map()
   private gridSize: number
 
   constructor(gridSize: number = DEFAULT_GRID_SIZE) {
@@ -38,11 +48,21 @@ export class GridTracker {
     return Math.round(val / this.gridSize) * this.gridSize
   }
 
-  /**
-   * Get grid key for a point
-   */
-  private getKey(x: number, y: number): string {
-    return `${this.snap(x)},${this.snap(y)}`
+  private index(val: number): number {
+    return Math.round(val / this.gridSize)
+  }
+
+  private bits(ix: number, iy: number): number {
+    return this.grid.get(iy)?.get(ix) ?? 0
+  }
+
+  private setBits(ix: number, iy: number, bits: number): void {
+    let row = this.grid.get(iy)
+    if (!row) {
+      row = new Map()
+      this.grid.set(iy, row)
+    }
+    row.set(ix, bits)
   }
 
   /**
@@ -80,16 +100,8 @@ export class GridTracker {
     y2: number,
     dir: Direction
   ): boolean {
-    const points = this.getSegmentPoints(x1, y1, x2, y2, dir)
-
-    for (const { x, y } of points) {
-      const key = this.getKey(x, y)
-      const dirs = this.grid.get(key)
-      if (dirs && dirs.has(dir)) {
-        return false
-      }
-    }
-    return true
+    const bit = DIRECTION_BIT[dir]
+    return this.forEachCell(x1, y1, x2, y2, dir, (ix, iy) => (this.bits(ix, iy) & bit) === 0)
   }
 
   /**
@@ -110,46 +122,38 @@ export class GridTracker {
     y2: number,
     dir: Direction
   ): void {
-    const points = this.getSegmentPoints(x1, y1, x2, y2, dir)
-
-    for (const { x, y } of points) {
-      const key = this.getKey(x, y)
-      if (!this.grid.has(key)) {
-        this.grid.set(key, new Set())
-      }
-      this.grid.get(key)!.add(dir)
-    }
+    const bit = DIRECTION_BIT[dir]
+    this.forEachCell(x1, y1, x2, y2, dir, (ix, iy) => {
+      this.setBits(ix, iy, this.bits(ix, iy) | bit)
+      return true
+    })
   }
 
   /**
-   * Get all grid points along a segment
+   * Visit every grid cell along a segment, in order, until the visitor
+   * returns false. Returns whether every visit returned true.
    */
-  private getSegmentPoints(
+  private forEachCell(
     x1: number,
     y1: number,
     x2: number,
     y2: number,
-    dir: Direction
-  ): Array<{ x: number; y: number }> {
-    const points: Array<{ x: number; y: number }> = []
-
+    dir: Direction,
+    visit: (ix: number, iy: number) => boolean
+  ): boolean {
     if (dir === 'h') {
       // Horizontal: iterate X, fixed Y
-      const gx1 = this.snap(Math.min(x1, x2))
-      const gx2 = this.snap(Math.max(x1, x2))
-      const gy = this.snap(y1)
-
-      for (let gx = gx1; gx <= gx2; gx += this.gridSize) {
-        points.push({ x: gx, y: gy })
+      const iy = this.index(y1)
+      const last = this.index(Math.max(x1, x2))
+      for (let ix = this.index(Math.min(x1, x2)); ix <= last; ix++) {
+        if (!visit(ix, iy)) return false
       }
     } else if (dir === 'v') {
       // Vertical: iterate Y, fixed X
-      const gx = this.snap(x1)
-      const gy1 = this.snap(Math.min(y1, y2))
-      const gy2 = this.snap(Math.max(y1, y2))
-
-      for (let gy = gy1; gy <= gy2; gy += this.gridSize) {
-        points.push({ x: gx, y: gy })
+      const ix = this.index(x1)
+      const last = this.index(Math.max(y1, y2))
+      for (let iy = this.index(Math.min(y1, y2)); iy <= last; iy++) {
+        if (!visit(ix, iy)) return false
       }
     } else {
       // Diagonal: step along both axes
@@ -158,15 +162,11 @@ export class GridTracker {
       const steps = Math.round(Math.max(Math.abs(dx), Math.abs(dy)) / this.gridSize)
       const stepX = dx >= 0 ? this.gridSize : -this.gridSize
       const stepY = dy >= 0 ? this.gridSize : -this.gridSize
-
       for (let i = 0; i <= steps; i++) {
-        const gx = this.snap(x1 + i * stepX)
-        const gy = this.snap(y1 + i * stepY)
-        points.push({ x: gx, y: gy })
+        if (!visit(this.index(x1 + i * stepX), this.index(y1 + i * stepY))) return false
       }
     }
-
-    return points
+    return true
   }
 
   /**
@@ -263,8 +263,10 @@ export class GridTracker {
    */
   getUsedCount(): number {
     let count = 0
-    for (const dirs of this.grid.values()) {
-      count += dirs.size
+    for (const row of this.grid.values()) {
+      for (const bits of row.values()) {
+        for (let b = bits; b; b &= b - 1) count++
+      }
     }
     return count
   }

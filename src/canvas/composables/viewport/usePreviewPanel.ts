@@ -27,6 +27,16 @@ export interface UsePreviewPanelReturn {
   suppressPreviewPanel: () => void
 }
 
+/**
+ * Whether a node's content cannot be read on the canvas, so the preview is
+ * what shows it: cards collapsed to their titles, or nodes drawn as bubbles.
+ * The rule holds in every mode, neighbourhood mode included
+ * (PRODUCT_DESIGN.md > Neighborhood Mode > Reading a node).
+ */
+export function contentUnreadableOnCanvas(cardsCollapsed: boolean, bubbleMode: boolean): boolean {
+  return cardsCollapsed || bubbleMode
+}
+
 export function usePreviewPanel(ctx: UsePreviewPanelContext): UsePreviewPanelReturn {
   const { selectedNodeIds, isSemanticZoomCollapsed, contextMenuVisible, getNode, zoomToNode } = ctx
 

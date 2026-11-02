@@ -14,7 +14,6 @@ function makeNode(id: string, title: string, workspaceId: string | null): Node {
     width: 200,
     height: 120,
     z_index: 0,
-    frame_id: null,
     color_theme: null,
     is_collapsed: false,
     tags: null,
@@ -51,15 +50,10 @@ function makeFakeStore() {
   const loadWorkspaceEdges = vi.fn(async (workspaceId: string | null) =>
     workspaceId === 'ws-research' ? [researchEdge] : []
   )
-  const allFrames = [
-    { id: 'f-open', title: 'Open frame', workspace_id: null },
-    { id: 'f-research', title: 'Research frame', workspace_id: 'ws-research' },
-  ]
   const allStorylines = [
     { id: 's-open', title: 'Open storyline', workspace_id: null },
     { id: 's-research', title: 'Research storyline', workspace_id: 'ws-research' },
   ]
-  const createFrame = vi.fn()
   const createStoryline = vi.fn(async (title: string) => ({ id: 'new-storyline', title }))
 
   const store = {
@@ -68,9 +62,7 @@ function makeFakeStore() {
     getFilteredEdges: () => [] as Edge[],
     getNode: (id: string) => allNodes.find(n => n.id === id),
     getAllNodes: () => allNodes,
-    getAllFrames: () => allFrames,
     getAllStorylines: () => allStorylines,
-    createFrame,
     // The app's own views, which follow the workspace the user has open
     getFilteredStorylines: () => allStorylines.filter(s => s.workspace_id === null),
     getStoryline: (id: string) =>
@@ -84,17 +76,13 @@ function makeFakeStore() {
     createEdgeRaw: vi.fn(),
     deleteEdgeRaw: vi.fn(),
     createNode,
-    getFilteredFrames: () => allFrames.filter(f => f.workspace_id === null),
-    getFrame: (id: string) =>
-      allFrames.filter(f => f.workspace_id === null).find(f => f.id === id),
   } as unknown as McpStoreInterface
-  return { store, createNode, loadWorkspaceEdges, createFrame, createStoryline }
+  return { store, createNode, loadWorkspaceEdges, createStoryline }
 }
 
 describe('MCP workspace scoping', () => {
   let store: McpStoreInterface
   let createNode: ReturnType<typeof vi.fn>
-  let createFrame: ReturnType<typeof vi.fn>
   let createStoryline: ReturnType<typeof vi.fn>
   let handler: ReturnType<typeof createMcpMessageHandler>
 
@@ -102,7 +90,6 @@ describe('MCP workspace scoping', () => {
     const fake = makeFakeStore()
     store = fake.store
     createNode = fake.createNode
-    createFrame = fake.createFrame
     createStoryline = fake.createStoryline
     handler = createMcpMessageHandler(store)
   })
@@ -148,21 +135,6 @@ describe('MCP workspace scoping', () => {
     await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
     const res = await handler.handleRequest(request('get_edges'), 'conn-a')
     expect((res.result as Edge[]).map(e => e.id)).toEqual(['e-research'])
-  })
-
-  it('creates frames in the scoped workspace', async () => {
-    await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
-    await handler.handleRequest(request('create_frame', { title: 'Agent frame' }), 'conn-a')
-
-    // The workspace is the sixth argument the frames store takes
-    expect(createFrame).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      'Agent frame',
-      'ws-research'
-    )
   })
 
   it('lists the scoped workspace storylines, not the open one', async () => {

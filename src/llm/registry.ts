@@ -64,6 +64,14 @@ export interface ToolContext {
     edges: Array<{ source: string; target: string }>,
     options?: { centerX?: number; centerY?: number; iterations?: number }
   ) => Promise<Map<string, { x: number; y: number }>>
+  /**
+   * Add nodes to the Zotero library. Supplied by whoever composes the
+   * application, as the same function the context-menu action calls
+   * (PRODUCT_DESIGN.md > Adding to Zotero from an agent).
+   */
+  addNodesToZotero?: (
+    nodes: Array<Pick<Node, 'title' | 'markdown_content' | 'node_type'>>
+  ) => Promise<{ added: number; duplicates: number; skipped: number; errors: string[] }>
   // Selection state for selection-aware tools
   selectedNodeIds?: string[]
   editingNodeId?: string | null
@@ -81,17 +89,8 @@ export interface INodeStore {
   updateNodeContent: (id: string, content: string) => Promise<void>
   updateNodeTitle: (id: string, title: string) => Promise<void>
   updateNodeTags?: (id: string, tags: string[]) => Promise<void>
-  // Frames and storylines: optional so contexts that do not provide them
-  // simply report the capability as unavailable rather than crashing
-  getFrames?: () => Array<{ id: string; title?: string }>
-  createFrame?: (
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    title: string
-  ) => Promise<{ id: string; title?: string }> | { id: string; title?: string }
-  assignNodesToFrame?: (nodeIds: string[], frameId: string | null) => void
+  // Storylines: optional so contexts that do not provide them simply report
+  // the capability as unavailable rather than crashing
   getStorylines?: () => Array<{ id: string; title: string; description?: string | null }>
   createStoryline?: (title: string, description?: string) => Promise<{ id: string }>
   addNodeToStoryline?: (storylineId: string, nodeId: string) => Promise<void>

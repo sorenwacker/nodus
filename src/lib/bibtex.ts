@@ -22,7 +22,7 @@ export interface BibEntry {
   file?: string         // Path to attached PDF
   zoteroKey?: string    // Zotero item key for future sync
   attachments?: string[] // Paths to attached PDFs
-  collections?: string[] // Collection names for Frame mapping
+  collections?: string[] // Zotero collection names
   [key: string]: string | string[] | undefined
 }
 

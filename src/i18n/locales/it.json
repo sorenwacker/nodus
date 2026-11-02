@@ -8,6 +8,7 @@
     "noResults": "Nessun risultato trovato"
   },
   "canvas": {
+    "printFailed": "Impossibile stampare la tela: {error}",
     "agent": {
       "placeholder": "Chiedi informazioni sul grafo...",
       "placeholderSelected": "Chiedi sui nodi selezionati...",
@@ -62,11 +63,6 @@
       "deleteEdgeTooltip": "Elimina questo arco",
       "labelSaved": "Etichetta del collegamento salvata"
     },
-    "frame": {
-      "delete": "Elimina cornice",
-      "addFrame": "Aggiungi cornice - Raggruppa nodi selezionati",
-      "clickToPlace": "Clicca sulla tela per posizionare la cornice (Esc per annullare)"
-    },
     "hover": {
       "incoming": "Archi entranti (citato da)",
       "outgoing": "Archi uscenti (cita)",
@@ -78,6 +74,8 @@
       "perfMode": "PERF",
       "nodes": "nodi",
       "edges": "archi",
+      "edgesHiddenHover": "{count} archi nascosti: sopra la soglia di {threshold}. Passa sopra o seleziona una nota, o aumenta la soglia nelle Impostazioni",
+      "edgesHiddenLimit": "{count} archi nascosti: sopra il limite di {threshold} nelle impostazioni della tela",
       "hideAgentLog": "Nascondi registro agente",
       "showAgentLog": "Mostra registro agente",
       "log": "Registro",
@@ -94,6 +92,7 @@
       "forceLayout": "Layout a forza - Disponi per connessioni",
       "hierarchicalLayout": "Layout gerarchico - Disponi come albero (per DAG/ontologie)",
       "radialLayout": "Layout radiale - Disponi i vicini in cerchi concentrici attorno al nodo selezionato",
+      "smartLayout": "Layout intelligente - Disponi i nodi selezionati o tutti come gerarchia con il modello IA",
       "fitNodesToContent": "Adatta nodi al contenuto - Ridimensiona tutti i nodi",
       "edgeStyle": "Stile archi",
       "magnifier": "Lente - Mostra vista ingrandita quando rimpicciolito",
@@ -103,8 +102,10 @@
       "hops": "salti",
       "highlightEdges": "Evidenzia tutti gli archi - Rendi tutti gli archi più visibili",
       "bubbleMode": "Modalità bolla - Mostra nodi come cerchi",
-      "help": "Aiuto - Scorciatoie da tastiera e utilizzo",
-      "organizeFrames": "Organizza cornici - Attira membri, respingi altri"
+      "physics": "Modalità fisica - Il grafo visibile si dispone mentre trascini (P)",
+      "physicsUnavailable": "Modalità fisica - Solo in modalità bolle, fuori dalla vista vicinato, fino a 2000 nodi visibili",
+      "printToPdf": "Stampa in PDF - I nodi selezionati, o tutti, su una pagina",
+      "help": "Aiuto - Scorciatoie da tastiera e utilizzo"
     },
     "search": {
       "placeholder": "Cerca nodi...",
@@ -128,9 +129,13 @@
     },
     "connected": "Connesso a {provider}",
     "connectionFailed": "Connessione al provider fallita",
-    "streaming": {
-      "label": "Abilita streaming",
-      "hint": "Trasmetti le risposte token per token (richiede supporto del provider)"
+    "testMessage": {
+      "label": "Messaggio di prova",
+      "hint": "Invia questo prompt al provider come fa l'agente e mostra la risposta e i suoi tempi.",
+      "defaultPrompt": "Rispondi con una frase breve: cos'è un grafo della conoscenza?",
+      "send": "Invia",
+      "sending": "Invio...",
+      "timing": "Primo byte dopo {firstByte} s, completato in {total} s, {chars} caratteri, {attempts} tentativo/i"
     },
     "apiKey": {
       "label": "Chiave API",
@@ -214,7 +219,10 @@
     "default": "Predefinito",
     "switch": "Cambia spazio di lavoro",
     "filter": "Filtra spazi...",
-    "recent": "recente",
+    "sortBy": "Ordina spazi",
+    "sortUsed": "Ultimo uso",
+    "sortName": "Nome",
+    "sortCreated": "Creazione",
     "noMatch": "Nessuno spazio corrispondente"
   },
   "onboarding": {
@@ -311,6 +319,7 @@
       "redo": "Ripristina",
       "autoLayout": "Disposizione automatica",
       "resetSizes": "Reimposta dimensioni",
+      "physicsMode": "Attiva/disattiva la modalità fisica",
       "importFiles": "Importa .bib .md .pdf",
       "exportYaml": "Esporta grafo come YAML",
       "refreshFiles": "Aggiorna dai file",
@@ -346,7 +355,7 @@
     "options": {
       "title": "Opzioni di importazione",
       "entriesFound": "{count} citazione trovata | {count} citazioni trovate",
-      "createFrame": "Crea cornice per la collezione",
+      "tagCollection": "Etichetta le citazioni con il nome della collezione",
       "collectionDetected": "Collezione: {name}",
       "noCollection": "Nessuna collezione rilevata nell'esportazione",
       "importAttachments": "Importa PDF allegati",
@@ -473,6 +482,7 @@
     "workspaceCreateFailed": "Impossibile creare lo spazio di lavoro",
     "workspaceUpdated": "Spazio di lavoro aggiornato",
     "workspaceDeleted": "Spazio di lavoro \"{name}\" eliminato",
+    "workspaceFilesRemain": "Spazio di lavoro \"{name}\" eliminato, ma {count} file non sono stati eliminati e restano sul disco",
     "cannotDeleteDefault": "Impossibile eliminare lo spazio di lavoro predefinito",
     "workspaceReset": "Spazio di lavoro reimpostato al contenuto iniziale",
     "importSuccess": "{count} nodi importati",
@@ -524,12 +534,6 @@
     },
     "zotero": {
       "description": "Importa citazioni da Zotero e costruisci grafi di citazioni",
-      "library": "Libreria Zotero",
-      "detect": "Rileva Zotero",
-      "detecting": "Rilevamento...",
-      "detectHint": "Rileva automaticamente l'installazione locale di Zotero",
-      "connected": "Connesso",
-      "disconnect": "Disconnetti",
       "collections": "Collezioni",
       "loading": "Caricamento collezioni...",
       "noCollections": "Nessuna collezione trovata",
@@ -539,7 +543,7 @@
       "importing": "Importazione",
       "cloud": {
         "title": "Zotero Cloud",
-        "hint": "Connetti a Zotero Cloud per sincronizzare le citazioni bidirezionalmente",
+        "hint": "Importa riferimenti dalla tua libreria Zotero e aggiungine di nuovi. Nulla viene sincronizzato",
         "userId": "ID utente",
         "userIdPlaceholder": "Il tuo ID utente Zotero (numerico)",
         "apiKey": "Chiave API",
@@ -556,7 +560,7 @@
         "title": "Grafo citazioni",
         "build": "Costruisci grafo citazioni",
         "building": "Costruzione...",
-        "hint": "Scopri relazioni di citazione usando Semantic Scholar",
+        "hint": "Interroga Semantic Scholar per riferimenti e citazioni di ogni articolo: almeno tre richieste per articolo, a 3 secondi di distanza",
         "scanning": "Analisi articoli...",
         "fetching": "Recupero citazioni...",
         "creating": "Creazione archi...",
@@ -564,7 +568,11 @@
         "result": "{edges} archi e {stubs} nodi provvisori creati",
         "noPapers": "Nessun articolo con DOI trovato",
         "createStubs": "Crea nodi provvisori per articoli mancanti",
-        "stubsHint": "I nodi provvisori mostrano i link di citazione ad articoli non presenti nella tua libreria"
+        "stubsHint": "I nodi provvisori mostrano i link di citazione ad articoli non presenti nella tua libreria",
+        "stop": "Ferma",
+        "stopping": "Arresto dopo questo articolo...",
+        "position": "({current} di {total})",
+        "stopped": "Fermato dopo {current} articoli su {total}."
       },
       "export": {
         "toZotero": "Salva in Zotero",
@@ -655,25 +663,11 @@
     "hideWikilinkEdges": "Nascondi collegamenti [[wikilink]]",
     "hideWikilinkEdgesHint": "Nascondi i collegamenti generati dai [[link]] nel contenuto",
     "repairTagNodes": "Ripara i nodi tag",
-    "repairTagNodesHint": "Unisci i nodi tag duplicati e ripristina il prefisso # mancante",
+    "repairTagNodesHint": "Unisci i nodi tag duplicati, ripristina il prefisso # mancante ed elimina quelli che nessuna nota usa",
     "repairTagNodesNone": "I nodi tag sono già coerenti",
-    "repairTagNodesResult": "{merged} uniti, {renamed} rinominati, {edges} archi adattati",
+    "repairTagNodesResult": "{merged} uniti, {renamed} rinominati, {edges} archi adattati, {removed} inutilizzati rimossi",
     "showPerfOverlay": "Mostra le misure di prestazione",
     "showPerfOverlayHint": "Tempi di fotogramma sul grafo durante la panoramica o lo zoom, per diagnosticare gli scatti"
-  },
-  "fileMove": {
-    "collision": {
-      "title": "Il file esiste già",
-      "message": "Un file con lo stesso nome esiste già nella cartella di destinazione.",
-      "moving": "Spostamento:",
-      "to": "In:",
-      "existing": "Esistente:",
-      "options": "Scegli un'opzione:",
-      "rename": "Rinomina",
-      "renameDesc": "Salva con un nuovo nome",
-      "replace": "Sostituisci",
-      "replaceDesc": "Sovrascrivi il file esistente (non può essere annullato)"
-    }
   },
   "updates": {
     "available": "Nodus {version} e disponibile",
@@ -729,7 +723,7 @@
     "title": "Espandere in un grafo",
     "lead": "Questo documento ha una struttura. Scegli cosa entra nel grafo; il nodo singolo resta comunque.",
     "sections": "{count} sezioni come nodi",
-    "sectionsHint": "Un nodo per titolo, collegati secondo la struttura del documento, raggruppati in una cornice",
+    "sectionsHint": "Un nodo per titolo, collegati secondo la struttura del documento, etichettati con il titolo del documento",
     "references": "{count} riferimenti come nodi di citazione",
     "referencesHint": "Ogni voce della bibliografia diventa un nodo di citazione",
     "verify": "Verifica con Semantic Scholar",
@@ -779,6 +773,7 @@
     "noOtherWorkspaces": "Nessun altro spazio di lavoro",
     "readNode": "Leggi il nodo",
     "exportSelection": "Esporta selezione...",
+    "printToPdf": "Stampa in PDF",
     "defaultWorkspace": "Predefinito"
   },
   "reader": {

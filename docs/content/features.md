@@ -30,14 +30,20 @@ Hashtags in node content become node tags:
 - `#tag` tokens are extracted whenever content is set: on node creation and on every content edit, from any interface (canvas editor, MCP tools, LLM agent)
 - Loading a workspace scans every node's body as well, so content that arrived before tags were extracted, or that another editor wrote into the vault, is tagged like anything else. The pass writes only the nodes whose tags changed, so a workspace already current costs no writes
 - A `#tag` in the text always creates its tag node and the edge to it. Whether those are drawn is a separate, view-only question answered by the tag filter, which never creates or destroys anything
+- Text inside code is not read for tags: a fenced code block (``` or ~~~) and an inline code span hold literal text. Read as tags, the colour codes of a Mermaid diagram (`fill:#f3e5f5`) became tags, tag nodes and edges between every note with a diagram. Loading a workspace withdraws any recorded tag that its note's text holds only inside code, with its edge and the tag node it leaves empty
 - Deleting a `#tag` from the text withdraws it: the tag leaves the node, its edge is deleted, and the tag node goes too once the last note using it lets go
+- Deleting a note withdraws its tags the same way: a tag node that the deleted notes were the last to use is deleted with them. It stayed behind as an unconnected node. Undoing the deletion brings the note back and reconnects its tags, which draws the tag node again once two notes share the tag
+- Settings > Canvas > Repair Tag Nodes also deletes tag nodes that no note is connected to, left behind by deletions made before this rule
 - A tag added by hand from a card's chips was never in the text, so an edit never withdraws it. Only a tag the previous body carried and the new one does not is taken away
+- Tags are how nodes are grouped. Frames were removed: upgrading gives each node that was in a titled frame that title as a tag, shown as a chip on the card ("Kapitel 1-30" becomes `kapitel-1-30`). The tag is stored with the node, not written into its text; like any tag shared by two or more notes, it is drawn as a tag node connected to them when the workspace loads
+- The node preview panel lists the tags as chips beside the date chip, each with its remove button inside the chip, and the row wraps when they do not fit on one line
 - A node's tags appear as chips at the bottom of its card; on a selected node, chips gain a remove button and a "+ #" chip adds tags directly
-- Whether tag nodes are drawn is remembered between sessions. Hiding them is a view choice, so it neither creates nor deletes anything, and it holds across a restart
+- Whether tag nodes are drawn is remembered between sessions. Hiding them is a view choice, so it neither creates nor deletes anything, and it holds across a restart. An MCP client reads the graph as data, so tag nodes and their `tagged` edges are listed whether or not the layer is drawn; an unscoped connection used to see the open workspace through the canvas filter, which removed every tag node and tagged edge from its listings while the layer was hidden
 - Tag nodes and their edges are a toggleable canvas layer: the edge-filter cluster on the canvas (bottom left, beside the content it filters) switches manual, storyline, wikilink, and tag layers
 - A tag becomes a tag node once at least two notes share it. One node per distinct tag put 606 tag nodes into a workspace holding 360 real ones, and 542 of them - 89% - were reachable from a single note or none: a tag used once labels that note rather than linking it to anything, and its card already shows it as a chip. What earns a node is a tag that joins notes together
 - Loading a workspace connects any node whose tags have no edges, so tags that arrived without them - from the body scan, or from an agent setting a node's tags over MCP - are shown like any other. An existing connection is never duplicated, so a connected workspace costs nothing
 - Settings > Canvas > Repair Tag Nodes merges tag nodes that duplicate each other and restores a missing # prefix, left behind by an earlier lookup that compared a bare name against a title stored with its hash
+- An MCP client can do the same without the settings panel: `list_tags` reports every tag in use with its note count, its tag node if one is drawn and the edges at that node, and `rebuild_tag_nodes` runs the repair and then connects every shared tag, as loading the workspace does. Deleting a tag node over MCP is recoverable that way instead of by guessing
 
 YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treated as structured node metadata, never as text:
 
@@ -45,9 +51,6 @@ YAML frontmatter at the top of a note (Open Knowledge Format metadata) is treate
 - Its fields surface as chips on the node card: tags, the date (or date range), and the OKF lifecycle `status` when it is `draft` or `deprecated` (`stable` is the silent default)
 - Click the date chip (or the "+ Set date" chip on a selected node) to set or change the node's `date` and `date_end` in place — no YAML editing needed
 - Title and tags from frontmatter also feed the node record during vault sync
-
-### Frames
-Group related nodes visually. Frames act as containers that can be moved together with all contained nodes.
 
 ### Selection & Multi-Select
 - Click to select single node
@@ -59,6 +62,7 @@ Group related nodes visually. Frames act as containers that can be moved togethe
 Open any node in a fullscreen split-view editor for focused writing:
 
 - **Trigger**: Cmd+Click (Mac) or Ctrl+Click (Windows/Linux) on any node
+- **Fills the window**: The view covers the whole application window, edge to edge. The canvas, toolbar and panels are hidden until it is closed; it is not a dialog over the canvas, and there is no area outside it to click to close it
 - **Split view**: Markdown editor on left, live preview on right
 - **Auto-save**: Changes save automatically with 500ms debounce
 - **Keyboard shortcuts**:
@@ -91,6 +95,7 @@ Writing `[[link]]` in a node's content creates a wikilink edge to the referenced
 - Links resolve by note title, by relative path (`[[folder/note]]`), and with section anchors (`[[note#section]]`)
 - A pair already connected by a manual edge does not receive a parallel wikilink edge
 - Removing the link removes the wikilink edge; manual edges are kept
+- Renaming a node rewrites the links to it in every note that has a wikilink edge to it, so the edges and the `.md` files stay consistent. The link keeps its form: `[[Old]]` becomes `[[New]]`, `[[Old|alias]]` becomes `[[New|alias]]`, `[[Old#section]]` becomes `[[New#section]]`, and `[[folder/Old]]` becomes `[[folder/New]]`. Plain text that mentions the old title is not changed. A rewritten note's file is written only while folder sync is active for it, as with any content edit. One Undo restores the title and every rewritten link.
 
 ### Edge Routing
 Multiple routing styles for visual clarity:
@@ -113,24 +118,55 @@ Focus on a specific node and its connections:
 
 ---
 
+### Physics Mode
+Let the graph arrange itself while you pull on it. Press `P` or use the atom button in the canvas controls.
+
+**Prerequisite:** the canvas is in bubble mode (zoomed out, or bubble mode switched on in the canvas controls). Physics mode is not available with cards.
+
+1. Zoom so the part of the graph you want to arrange is on screen (up to 2000 nodes).
+2. Press `P`. Connected nodes pull together, the others make room, and nodes stop overlapping.
+3. Drag a node: its connections follow, and the graph settles again when you let go.
+4. Press `P` again to stop. The positions are saved when the graph comes to rest, when you stop, or when you leave bubble mode.
+
+Nodes off screen stay where they are. One Undo restores every position from before you switched the mode on. Running a layout command or Undo switches the mode off. The mode is not available in the neighborhood view. While nodes are moving, edges are drawn as straight lines between the bubbles; they are routed in their style again when the motion stops.
+
+### Smart Layout
+Arrange nodes as a tree from broad to specific. The tree is built from each node's kind (its node type: tag, term, note, citation, ...) and its connections, with a language model deciding the order of the kinds and the parent of each node where the graph leaves a choice. The tree is drawn top-down with the hierarchical layout algorithm.
+
+**Prerequisite:** an AI provider is configured and the AI features are enabled.
+
+1. Select the nodes to arrange. With nothing selected, all visible nodes are arranged.
+2. Click the smart layout button in the canvas controls, or ask the agent, for example "arrange these with the sources at the top". The agent passes your wording to the model; the button lets the model decide.
+3. The nodes move into a top-down tree: broader nodes above, the nodes that belong to them below.
+
+How the tree is built:
+
+- **Rank of kinds.** The model receives the kinds present with example titles and orders them from broad to specific, for example tag above term above note above citation. With a single kind no request is made. Among nodes of the same kind, the node with more connections ranks broader.
+- **Parent of a node.** A node's parent is one of its connected neighbours of broader rank. With one such neighbour the choice is made without the model; with several, the model picks the most specific one the node belongs under, so a note goes under `#prohibited-ai-practices-art-5` rather than under `#ai-act`.
+- **Few requests.** One short request orders the kinds; the nodes with several candidate parents are sent together, up to 80 per request, instead of one request per node.
+- **Other edges.** Edges that are not parent links stay drawn but do not affect positions.
+- **Separate trees** are placed side by side. Nodes without a connection are placed in rows below the trees.
+
+One Undo restores every position. The log shows how the run ended. The layout is never run automatically, including when the app starts or a workspace opens.
+
 ## Storylines
 
 Create linear narratives through your knowledge graph:
 
 - Order nodes into a sequence
 - Navigate through storyline in reader mode
+- Edit a section where you read it: double-click its text or its title, then save with Cmd/Ctrl+Enter or by clicking away, or cancel with Escape
 - Export storylines as documents
 - Color-code storyline edges
 
 ### Anchored notes and comments
 
-A note about a passage sits at that passage. Write a `[[wikilink]]` where it belongs, and while reading that node at full width the linked node opens as a callout at exactly that point. Narrower reader widths keep links inline, because a callout needs the room.
+A note about a passage sits at that passage. Write a `[[wikilink]]` where it belongs; the reader shows it as an inline link, and the links sidebar (link icon in the reader header, "Show references") shows the linked note beside it.
 
-- Expansion goes one level deep: links inside an expanded note stay links.
-- A link to a node that does not exist stays an inline link, marked as missing.
+- A link to a node that does not exist is marked as missing.
 - Creating a comment writes such a link into the text it comments on, so the comment travels with the passage rather than with a position in the sequence.
 
-To read one node on its own, right-click it on the canvas and choose **Read node**. It opens in the same reader the storylines use, at full width, with its anchored notes expanded.
+To read one node on its own, right-click it on the canvas and choose **Read node**. It opens in the same reader the storylines use, at full width.
 
 ### Agent log
 
@@ -162,7 +198,7 @@ The backfill only adds a frontmatter block above the existing text. Bodies, `[[w
 
 When a dropped PDF has structure - several sections or a bibliography - Nodus offers to expand it after the document imports. The single node stays either way; the dialog chooses what is added:
 
-- **Sections as nodes.** One node per heading, connected along the document outline, grouped in a frame named after the paper.
+- **Sections as nodes.** One node per heading, connected along the document outline, tagged with the paper's title.
 - **References as citation nodes.** Each bibliography entry becomes a citation node, cited by the paper.
 - **Verify against Semantic Scholar.** Each reference is marked `verified`, `not_found`, or `not_checked` in its frontmatter. A reference is only marked not found when the service answered; if the service is unreachable, the state is not checked - an outage never invalidates your bibliography.
 - **Add references to Zotero.** Shown when the Zotero integration is configured; nothing is written to Zotero without this choice.
@@ -209,7 +245,8 @@ Each edge is active only at a handle in the middle of that edge, marked on scree
 
 - Push right once: the storyline overview slides open on the right
 - Push right again: the reader opens at half the window, keeping the graph visible, with the last-read storyline (the first storyline initially)
-- Push right a third time: the reader expands to the full window
+- Push right a third time: the reader expands to the full window, and the text spans its whole width instead of a centred column
+- The text pane scrolls vertically only; a wide table, formula or diagram scrolls inside its own box, so a sideways swipe does not shift the text
 - Push left: each push steps back down — full reader to half, half to the overview (or the timelines view, if the reader was opened from there), overview to the plain graph
 - Open layers stay open while you work in them; only a left-edge push or the toolbar book button steps back
 - While a layer is open, stepping deeper requires pressing the pointer against the very edge of the window, so using the panel near the border does not skip ahead
@@ -241,6 +278,18 @@ Timelines live along the bottom of the window: dwelling the pointer at the botto
 - Clicking a lane or bead opens that storyline in the reader; a left-edge push or the close button slides the sheet away
 
 ---
+
+### Importing an ontology
+Drop an ontology file (`.ttl`, `.rdf`, `.owl`, `.jsonld`) on the canvas to import its classes and, optionally, its individuals as nodes, with their relations as edges.
+
+An ontology published as several files (for example OBOE's `oboe-core`, `oboe-characteristics` and `oboe-standards`) can be imported one file at a time, in any order: a class that refers to a class from another file is linked once both are in the workspace.
+
+To add the links missing from an ontology imported before this worked:
+
+1. Open the workspace that holds the ontology.
+2. Drop the ontology's files on the canvas again.
+
+Classes already in the workspace are not created again and existing edges are not duplicated, so only the missing links are added.
 
 ## Math with Typst
 
@@ -281,28 +330,80 @@ Changes sync between Nodus and your vault folder:
 - Edit in Nodus → updates Obsidian vault
 - Edit in Obsidian → updates Nodus canvas
 - File watcher detects external changes
-- With sync disabled, edits change only the Nodus database; vault files are never written
+- Renaming a node in Nodus renames its vault file to the new title, with the same character substitutions Nodus applies when it creates a file; the file's content, frontmatter included, is left as it is. If another file already carries the target name, the node keeps its current file name. The rename is invisible to the watcher, so it is never read back as a deleted note and a new one
+- With sync disabled, edits change only the Nodus database; vault files are never written or renamed
 
 ### Workspace Separation
 Each imported vault becomes a separate workspace, keeping projects organized.
+
+The workspace switcher in the toolbar lists workspaces by last use, by name or by creation date; choose the order from the menu next to the filter field. Nodus remembers the choice.
 
 ---
 
 ## Citation Management
 
 ### Zotero Integration
-Connect to your local Zotero database:
+Nodus exchanges references with a Zotero library through the Zotero Web API. Each direction is a single action you start; nothing is synchronised afterwards, so a later change on one side does not reach the other.
 
-- Browse and import collections
-- DOI extraction and linking
-- Create citation nodes with metadata
+Nodus reads the library as it is stored on zotero.org, not the local Zotero database: items and collections that the Zotero desktop application has not yet synced are not visible. It reaches your personal library only, not group libraries, and the same account serves every workspace.
+
+#### Connect to Zotero
+
+**Prerequisite:** a Zotero account whose library is synced to zotero.org.
+
+1. Open `zotero.org/settings/keys` and create a private API key. Allow library access; allow write access only if you want to add references from Nodus.
+2. Note the numeric user ID shown on the same page.
+3. In Nodus, open Settings > Zotero.
+4. Enter the user ID and the API key under "Zotero Cloud".
+5. Select "Test connection".
+
+**Result:** the status shows "Connected" and the collections of the library are listed. A library without collections lists none; its items can still be imported.
+
+A key without write access is enough for importing and makes "Add to Zotero" fail without changing the library.
+
+#### Import references
+
+1. Open the workspace that should receive the references.
+2. Open Settings > Zotero.
+3. Select "Import" beside a collection, or "Import All Items" for the whole library.
+
+**Result:** each top-level item becomes a citation node in the open workspace, with its title, authors, date, journal, DOI and abstract, and the Zotero item key in its frontmatter (`zotero_key`). Attachments and notes are not imported. The nodes are laid out in a grid and are not connected; see Citation Graph below for connecting them. Importing the same items again creates the nodes again.
+
+#### Add references to Zotero
+
+**Prerequisite:** the API key has write access.
+
+1. Select one or more citation nodes on the canvas.
+2. Right-click and select "Add to Zotero".
+
+The action is offered when the selection holds a citation node or a citation stub, and adds only those: notes in the same selection are left out.
+
+**Result:** each selected node becomes a new item at the top level of the library. A node whose DOI already exists in the library is skipped and counted as a duplicate; a node without content is skipped. An existing Zotero item is never changed or deleted. If the library cannot be read, nothing is added, because duplicates could not be checked.
+
+Dropping a PDF offers the same step for its extracted references ("Add references to Zotero").
+
+An agent can take the same step: the `add_to_zotero` tool, available to MCP clients and to the in-app agent, takes the ids of the nodes to add and follows the same rules.
 
 ### Semantic Scholar Integration
 Fetch citations for papers with DOIs:
 
 - Right-click citation nodes and select "Fetch Citations"
-- Automatically creates nodes for referenced papers
+- Creates a citation node for each referenced or citing paper that is not on the canvas yet
 - Builds citation network on your canvas
+
+### Citation Graph
+Connect the papers on the canvas by who cites whom.
+
+**Prerequisite:** the open workspace holds citation nodes with a DOI or a Semantic Scholar id, for example from a Zotero or BibTeX import. Papers without either are skipped.
+
+1. Open Settings > Zotero > Citation Graph.
+2. Leave "Create stub nodes for missing papers" on to add a stub node for a cited paper that is not on the canvas, at most 10 per paper; switch it off to connect only the papers already there.
+3. Select "Build Citation Graph".
+4. To end the build early, select "Stop". The build ends before the next paper, and the edges and stub nodes created so far are kept.
+
+**Result:** a `cites` edge joins each pair of papers on the canvas where one cites the other, and the panel reports the number of edges and stub nodes created.
+
+The build asks Semantic Scholar for each paper, its references and its citations: at least three requests per paper, at least 3 seconds apart, and longer when the service limits the rate, so 100 papers take 15 minutes or more. The progress line shows the paper being processed and its position (`12 of 130`). Answers are kept for 24 hours, so a build that was stopped and started again does not repeat the requests it already made.
 
 ### BibTeX Import
 Import `.bib` files directly to create citation nodes with:
@@ -382,6 +483,15 @@ Export canvas as Typst document for further editing.
 
 ### PDF Generation
 Generate PDFs directly using Typst compilation.
+
+### Print to PDF
+Save the canvas as a picture on one PDF page.
+
+1. Select the nodes to print, or select none to print every node of the workspace.
+2. Select "Print to PDF" in the canvas controls, or right-click a node and select "Print to PDF".
+3. Choose where to save the file.
+
+**Result:** a single vector page as large as the printed nodes, showing each as a card with its title and content, joined by the edges that run between them. Selection and hover highlights are not printed, and the light theme's colours are used. Math, images and diagrams are printed as their source text.
 
 ### Markdown Export
 Export nodes as standard Markdown files.

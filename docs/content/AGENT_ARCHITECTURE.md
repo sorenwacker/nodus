@@ -34,7 +34,7 @@ flowchart TB
     end
 
     subgraph State["Application state"]
-        Stores[Pinia stores<br/>nodes, edges, frames, storylines]
+        Stores[Pinia stores<br/>nodes, edges, storylines]
         DB[(SQLite)]
         Files[(Markdown vault)]
     end

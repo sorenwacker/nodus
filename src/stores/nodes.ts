@@ -16,7 +16,7 @@ import { useNodeEditLocking } from '../composables/useNodeEditLocking'
 import { useNodeLayout } from '../composables/useNodeLayout'
 import { useEntityOperations } from '../composables/useEntityOperations'
 import { storeLogger } from '../lib/logger'
-import { planTagEdgeRemoval } from '../lib/tagSync'
+import { planTagEdgeRemoval, withdrawCodeTags, tagNodesTaggedBy, emptiedTagNodes } from '../lib/tagSync'
 
 // Import from submodules
 import {
@@ -34,6 +34,7 @@ import { getNeighborIds as getNeighborIdsFn } from '../canvas/utils/graphTravers
 
 import {
   updateNodePosition as updateNodePositionFn,
+  setNodePositionsInMemory as setNodePositionsInMemoryFn,
   persistNodePosition as persistNodePositionFn,
   triggerLayoutUpdate as triggerLayoutUpdateFn,
   updateNodeSize as updateNodeSizeFn,
@@ -41,6 +42,7 @@ import {
   updateNodeContent as updateNodeContentFn,
   updateNodeTitle as updateNodeTitleFn,
   updateNodeTags as updateNodeTagsFn,
+  resetInvalidNodeColors as resetInvalidNodeColorsFn,
   updateNodeColor as updateNodeColorFn,
   moveNodesToWorkspace as moveNodesToWorkspaceFn,
   createNode as createNodeFn,
@@ -61,25 +63,6 @@ import {
   deduplicateEdges as deduplicateEdgesFn,
 } from './nodes/edges'
 
-import {
-  checkFileCollision as checkFileCollisionFn,
-  moveNodeFile as moveNodeFileFn,
-  updateNodeFilePath as updateNodeFilePathFn,
-  getVaultPath as getVaultPathFn,
-} from './nodes/files'
-
-import {
-  createFrame as createFrameFn,
-  updateFramePosition as updateFramePositionFn,
-  persistFramePosition as persistFramePositionFn,
-  updateFrameSize as updateFrameSizeFn,
-  persistFrameSize as persistFrameSizeFn,
-  updateFrameTitle as updateFrameTitleFn,
-  updateFrameColor as updateFrameColorFn,
-  deleteFrame as deleteFrameFn,
-  selectFrame as selectFrameFn,
-  assignNodesToFrame as assignNodesToFrameFn,
-} from './nodes/frames'
 
 import {
   createWorkspace as createWorkspaceFn,
@@ -113,7 +96,6 @@ import {
 import type {
   Node,
   Edge,
-  Frame,
   Workspace,
   CreateNodeInput,
   CreateEdgeInput,
@@ -124,7 +106,7 @@ import type {
 } from '../types'
 
 // Re-export types for consumers
-export type { Node, Edge, Frame, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
+export type { Node, Edge, Workspace, CreateNodeInput, CreateEdgeInput, FileChangeEvent, Storyline, StorylineNode }
 
 export const useNodesStore = defineStore('nodes', () => {
   // Create core state
@@ -133,13 +115,13 @@ export const useNodesStore = defineStore('nodes', () => {
 
   // Create store instances
   const stores = createStoreInstances()
-  const { storylinesStore, edgesStore, framesStore, workspaceStore } = stores
+  const { storylinesStore, edgesStore, workspaceStore } = stores
 
   // Create computed properties
   const computed = createComputedProperties(state, stores)
   const {
-    edges, frames, selectedFrameId, workspaces, currentWorkspaceId,
-    selectedNodeId, selectedNode, filteredNodes, filteredEdges, graphEdges, filteredFrames,
+    edges, workspaces, currentWorkspaceId,
+    selectedNodeId, selectedNode, graphNodes, filteredNodes, filteredEdges, graphEdges,
     storylines, storylineNodes, storylineNodesVersion, filteredStorylines,
   } = computed
 
@@ -185,27 +167,10 @@ export const useNodesStore = defineStore('nodes', () => {
     },
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
     reloadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
-    // Frame sync dependencies for folder-frame sync
-    getFrames: () => filteredFrames.value,
-    assignNodeToFrame: (nodeId: string, frameId: string | null) => {
-      const node = nodes.value.find((n) => n.id === nodeId)
-      if (node && node.frame_id !== frameId) {
-        node.frame_id = frameId
-        invoke('assign_node_to_frame', { nodeId, frameId }).catch((e) =>
-          storeLogger.error('Failed to assign node to frame:', e)
-        )
-      }
-    },
-    getVaultPath: () => workspaceStore.currentVaultPath,
     // Frontmatter sync
-    updateNodeTitle: async (id: string, title: string) => {
-      const node = nodes.value.find(n => n.id === id)
-      if (node) {
-        node.title = title
-        node.updated_at = Date.now()
-        await invoke('update_node_title', { id, title })
-      }
-    },
+    // A title changed in the file is an outside edit: it relinks like any
+    // rename, but is not an undo step of this app
+    updateNodeTitle: (id: string, title: string) => updateNodeTitleFn(nodes, id, title, { skipUndo: true }),
     updateNodeTags: async (id: string, tags: string[]) => {
       const node = nodes.value.find(n => n.id === id)
       if (node) {
@@ -228,12 +193,31 @@ export const useNodesStore = defineStore('nodes', () => {
 
   async function initialize() {
     await initializeStore(deps, createNode)
+    // Not awaited: it writes only the nodes holding a value that is not a colour
+    // (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+    resetInvalidNodeColorsFn(nodes).catch(e => storeLogger.error('[Nodes] Colour reset failed:', e))
     // Tags can arrive without their edges: the load-time body scan writes them,
     // and an agent can set a node's tags over MCP. Both leave a node tagged and
     // unconnected, and nothing else puts that right - the whole-vault sync used
     // to run only when the setting was toggled
     // (docs/content/features.md > Tags).
-    syncTagEdgesIfEnabled()
+    // Tags read out of code go first, so the pass does not connect one that is
+    // about to be withdrawn (PRODUCT_DESIGN.md > Tags are not read from code)
+    withdrawTagsReadFromCode().finally(() => syncTagEdgesIfEnabled())
+  }
+
+  /**
+   * Withdraw the recorded tags the open workspace's notes hold only inside
+   * code, with their edges. The open workspace, because its edges are the ones
+   * loaded (PRODUCT_DESIGN.md > Tags are not read from code).
+   */
+  async function withdrawTagsReadFromCode() {
+    try {
+      const written = await withdrawCodeTags(filteredNodes.value, updateNodeTags, removeTagEdges)
+      if (written > 0) storeLogger.debug(`[Tags] Withdrew tags read from code on ${written} nodes`)
+    } catch (e) {
+      storeLogger.error('[Tags] Withdrawing tags read from code failed:', e)
+    }
   }
 
   /**
@@ -268,9 +252,13 @@ export const useNodesStore = defineStore('nodes', () => {
     id: string,
     x: number,
     y: number,
-    options?: { enforceFrame?: boolean; skipLayoutTrigger?: boolean; skipPersist?: boolean }
+    options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }
   ) {
     await updateNodePositionFn(deps, id, x, y, options)
+  }
+
+  function setNodePositionsInMemory(positions: Map<string, { x: number; y: number }>) {
+    setNodePositionsInMemoryFn(deps, positions)
   }
 
   async function persistNodePosition(id: string) {
@@ -313,8 +301,8 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  async function updateNodeTitle(id: string, title: string) {
-    await updateNodeTitleFn(nodes, id, title)
+  async function updateNodeTitle(id: string, title: string, options?: { skipUndo?: boolean }) {
+    await updateNodeTitleFn(nodes, id, title, options)
   }
 
   async function updateNodeTags(id: string, tags: string[]) {
@@ -334,15 +322,38 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   async function deleteNode(id: string) {
+    const tagNodeIds = tagNodesTaggedBy([id], edgesStore.edges)
     await deleteNodeFn(deps, id)
+    await deleteEmptiedTagNodes(tagNodeIds)
   }
 
   async function deleteNodes(ids: string[]) {
+    const tagNodeIds = tagNodesTaggedBy(ids, edgesStore.edges)
     await deleteNodesFn(deps, ids)
+    await deleteEmptiedTagNodes(tagNodeIds)
+  }
+
+  /**
+   * Delete the tag nodes that deleted notes were the last to use. Deleting a
+   * note left its tag node behind as an unconnected node
+   * (docs/content/features.md > Tags).
+   */
+  async function deleteEmptiedTagNodes(tagNodeIds: string[]) {
+    for (const tagNodeId of emptiedTagNodes(tagNodeIds, nodes.value, edgesStore.edges)) {
+      // The notes are already gone; a tag node that cannot be deleted stays
+      // for Repair Tag Nodes and must not turn the deletion into a failure
+      try {
+        await deleteNodeFn(deps, tagNodeId)
+      } catch (e) {
+        storeLogger.error('[Tags] Could not delete an emptied tag node:', e)
+      }
+    }
   }
 
   async function restoreNode(node: Node) {
     await restoreNodeFn(nodes, node)
+    // Its tag node may have gone with it; reconnect what its tags call for
+    if (node.node_type !== 'tag') syncTagEdgesIfEnabled()
   }
 
   // Edge operations
@@ -354,7 +365,15 @@ export const useNodesStore = defineStore('nodes', () => {
     )
   }
 
-  const restoreEdge = (edge: Edge) => restoreEdgeFn(edgesStore, edge)
+  /**
+   * Restore an edge, unless a node it joined no longer exists: a tag node that
+   * went with its last note is not brought back by undoing the note's deletion
+   * (docs/content/features.md > Tags).
+   */
+  const restoreEdge = (edge: Edge) => {
+    const present = (id: string) => nodes.value.some(n => n.id === id)
+    if (present(edge.source_node_id) && present(edge.target_node_id)) restoreEdgeFn(edgesStore, edge)
+  }
   const updateEdgeLinkType = (id: string, linkType: string) => updateEdgeLinkTypeFn(edgesStore, id, linkType)
   const updateEdgeColor = (id: string, color: string | null) => updateEdgeColorFn(edgesStore, id, color)
   const updateEdgeLabel = (id: string, label: string | null) => updateEdgeLabelFn(edgesStore, id, label)
@@ -362,63 +381,12 @@ export const useNodesStore = defineStore('nodes', () => {
   const cleanupOrphanEdges = () => cleanupOrphanEdgesFn(edgesStore, nodes.value)
   const deduplicateEdges = () => deduplicateEdgesFn(edgesStore)
 
-  // File operations
-  const checkFileCollision = (nodeId: string, targetFolder: string) =>
-    checkFileCollisionFn(nodeId, targetFolder)
-
-  async function moveNodeFile(nodeId: string, targetFolder: string, collisionResolution?: string): Promise<string> {
-    return moveNodeFileFn(deps, nodeId, targetFolder, collisionResolution, updateNodeContent)
-  }
-
-  function updateNodeFilePath(nodeId: string, filePath: string) {
-    updateNodeFilePathFn(nodes.value, nodeId, filePath)
-  }
-
-  function getVaultPath(): string | null {
-    return getVaultPathFn(workspaceStore)
-  }
-
-  // Frame operations
-  function createFrame(
-    x: number,
-    y: number,
-    width = 400,
-    height = 300,
-    title = 'Frame',
-    workspaceId?: string | null
-  ) {
-    return createFrameFn(deps, x, y, width, height, title, workspaceId)
-  }
-
-  const updateFramePosition = (id: string, x: number, y: number, options?: { skipPersist?: boolean }) => updateFramePositionFn(framesStore, id, x, y, options)
-  const persistFramePosition = (id: string) => persistFramePositionFn(framesStore, id)
-  const updateFrameSize = (
-    id: string,
-    width: number,
-    height: number,
-    options?: { skipPersist?: boolean }
-  ) => updateFrameSizeFn(framesStore, id, width, height, options)
-  const persistFrameSize = (id: string) => persistFrameSizeFn(framesStore, id)
-  const updateFrameTitle = (id: string, title: string) => updateFrameTitleFn(framesStore, id, title)
-  const updateFrameColor = (id: string, color: string | null) => updateFrameColorFn(framesStore, id, color)
-
-  function deleteFrame(id: string) {
-    deleteFrameFn(deps, id)
-  }
-
-  function selectFrame(id: string | null) {
-    selectFrameFn(deps, id)
-  }
-
-  function assignNodesToFrame(nodeIds: string[], frameId: string | null) {
-    assignNodesToFrameFn(nodes.value, nodeIds, frameId)
-  }
-
   // Workspace operations
   const createWorkspace = (name: string) => createWorkspaceFn(workspaceStore, name)
 
   async function switchWorkspace(workspaceId: string | null) {
     await switchWorkspaceFn(deps, fileSync, workspaceId)
+    await withdrawTagsReadFromCode()
   }
 
   const deleteWorkspace = (id: string, deleteFiles?: boolean) => deleteWorkspaceFn(workspaceStore, id, deleteFiles)
@@ -468,30 +436,12 @@ export const useNodesStore = defineStore('nodes', () => {
   // Initialize composables that depend on functions defined above
   importComposable = useImport({
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
-    getNodes: () => nodes.value,
     setNodes: (n) => { nodes.value = n },
     addNodes: (n) => { nodes.value.push(...n) },
     setEdges: (e) => { edgesStore.edges.splice(0, edgesStore.edges.length, ...e) },
     deduplicateEdges: (e) => edgesStore.deduplicateEdgesLocal(e),
-    reloadFrames: () => framesStore.initialize(),
     createNode,
     watchVault: (path) => fileSync.watchVault(path),
-    // Frame-folder sync: create frames from folder structure during import
-    createFrame: (x, y, width, height, title, wsId, folderPath, parentFrameId) =>
-      framesStore.createFrame(x, y, width, height, title, wsId, folderPath, parentFrameId),
-    createFrameAsync: (x, y, width, height, title, wsId, folderPath, parentFrameId) =>
-      framesStore.createFrameAsync(x, y, width, height, title, wsId, folderPath, parentFrameId),
-    assignNodesToFrame: (nodeIds, frameId) => {
-      for (const node of nodes.value) {
-        if (nodeIds.includes(node.id) && node.frame_id !== frameId) {
-          node.frame_id = frameId
-          // Persist to backend
-          invoke('assign_node_to_frame', { nodeId: node.id, frameId }).catch((e) =>
-            storeLogger.error('Failed to assign node to frame:', e)
-          )
-        }
-      }
-    },
     updateNodePosition: (id, x, y) => {
       const node = nodes.value.find((n) => n.id === id)
       if (node) {
@@ -503,9 +453,6 @@ export const useNodesStore = defineStore('nodes', () => {
         )
       }
     },
-    updateFrameSize: (id, width, height) => framesStore.updateFrameSize(id, width, height),
-    getFrames: () => framesStore.frames,
-    getVaultPath: () => workspaceStore.currentVaultPath,
   })
 
   tagNodesComposable = useTagNodes({
@@ -521,7 +468,6 @@ export const useNodesStore = defineStore('nodes', () => {
     getNodes: () => nodes.value,
     getFilteredNodes: () => filteredNodes.value,
     getFilteredEdges: () => filteredEdges.value,
-    getFilteredFrames: () => filteredFrames.value,
     updateNodePosition,
     updateNodeSize: async (id, width, height) => {
       // Update without push to avoid infinite recursion
@@ -584,7 +530,6 @@ export const useNodesStore = defineStore('nodes', () => {
     options?: { createClassNodes?: boolean; createIndividualNodes?: boolean; workspaceId?: string; layout?: 'grid' | 'hierarchical' }
   ) => importComposable.importOntology(filePath, options)
   const refreshWorkspace = () => importComposable.refreshWorkspace()
-  const syncFramesFromFolders = () => importComposable.syncFramesFromFolders()
 
   // File sync forwarding
   const watchVault = (path: string) => fileSync.watchVault(path)
@@ -598,8 +543,6 @@ export const useNodesStore = defineStore('nodes', () => {
       centerY?: number
       chargeStrength?: number
       linkDistance?: number
-      frameId?: string
-      fitToFrame?: boolean
     }
   ) => layoutComposable.layoutNodes(nodeIds, options)
 
@@ -615,16 +558,14 @@ export const useNodesStore = defineStore('nodes', () => {
     setEditingNode,
     nodes,
     edges,
-    frames,
+    graphNodes,
     filteredNodes,
     filteredEdges,
     graphEdges,
-    filteredFrames,
     nodeLayoutVersion,
     selectedNodeIds,
     selectedNodeId,
     selectedNode,
-    selectedFrameId,
     loading,
     error,
     // Edge category visibility filters
@@ -647,6 +588,7 @@ export const useNodesStore = defineStore('nodes', () => {
     getNeighborIds,
     findNodeByTitle,
     updateNodePosition,
+    setNodePositionsInMemory,
     persistNodePosition,
     triggerLayoutUpdate,
     updateNodeSize,
@@ -670,23 +612,11 @@ export const useNodesStore = defineStore('nodes', () => {
     updateEdgeLabel,
     updateEdgeDirected,
     updateStorylineEdgeColors,
-    // Frame operations
-    createFrame,
-    updateFramePosition,
-    persistFramePosition,
-    persistFrameSize,
-    updateFrameSize,
-    updateFrameTitle,
-    updateFrameColor,
-    deleteFrame,
-    selectFrame,
-    assignNodesToFrame,
     // Import operations
     importVault,
     importCitations,
     importOntology,
     refreshWorkspace,
-    syncFramesFromFolders,
     watchVault,
     stopWatching,
     // Workspace operations
@@ -737,11 +667,5 @@ export const useNodesStore = defineStore('nodes', () => {
     getNodesReferencingEntity,
     createEntityNode,
     linkToEntity,
-    // File-folder sync
-    checkFileCollision,
-    moveNodeFile,
-    updateNodeFilePath,
-    getVaultPath,
-    markProgrammaticMove: fileSync.markProgrammaticMove,
   }
 })

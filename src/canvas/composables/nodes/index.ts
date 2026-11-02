@@ -57,3 +57,4 @@ export {
   type UseColorOperationsContext,
   type UseColorOperationsReturn,
 } from './useColorOperations'
+export { useNodeFitNow, type UseNodeFitNowDeps } from './useNodeFitNow'

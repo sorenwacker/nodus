@@ -11,7 +11,6 @@ export interface Node {
   canvas_y: number
   width?: number
   height?: number
-  frame_id?: string | null
 }
 
 export interface Edge {
@@ -20,26 +19,11 @@ export interface Edge {
   target_node_id: string
 }
 
-export interface Frame {
-  id: string
-  canvas_x: number
-  canvas_y: number
-  width: number
-  height: number
-  title?: string
-}
-
 export interface RadialLayoutOptions {
   getSelectedNodeIds: () => string[]
   getNode: (id: string) => Node | undefined
   getFilteredNodes: () => Node[]
   getFilteredEdges: () => Edge[]
-  getFilteredFrames: () => Frame[]
-  applyFrameConstraints: (
-    positions: Map<string, { x: number; y: number }>,
-    nodes: Node[],
-    targetFrame?: Frame
-  ) => Map<string, { x: number; y: number }>
 }
 
 export interface RadialLayoutResult {
@@ -49,9 +33,6 @@ export interface RadialLayoutResult {
 
 /**
  * Compute radial layout positions
- * Only affects nodes in the same frame context as the center node:
- * - If center is in a frame, only nodes in that same frame are moved
- * - If center is NOT in a frame, only unframed nodes are moved (framed nodes are NEVER touched)
  */
 export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutResult | null {
   const {
@@ -59,8 +40,6 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
     getNode,
     getFilteredNodes,
     getFilteredEdges,
-    getFilteredFrames,
-    applyFrameConstraints,
   } = options
 
   const selectedIds = getSelectedNodeIds()
@@ -78,38 +57,6 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
   const allNodes = getFilteredNodes()
   const allEdges = getFilteredEdges()
 
-  // frame_id is the ONLY source of truth - no spatial fallback
-  const getNodeFrameId = (node: Node): string | null => {
-    return node.frame_id || null
-  }
-
-  // Determine center node's frame (frame_id only)
-  const centerFrameId = getNodeFrameId(centerNode)
-  const centerIsFramed = !!centerFrameId
-
-  // Where no frames are shown, frame membership constrains nothing.
-  //
-  // The neighbourhood view is an overlay: it positions nodes above the canvas
-  // rather than in it, and passes an empty frame list to say so. The filter
-  // below read each node's stored frame regardless, so an unframed focus
-  // refused to place any neighbour belonging to a frame, and a framed focus
-  // refused every unframed one - they stayed wherever they sat on the canvas
-  // (PRODUCT_DESIGN.md > Radial rings).
-  const framesAreShown = getFilteredFrames().length > 0
-
-  // Filter nodes to only those that should be laid out (frame_id only)
-  const nodesToLayout = allNodes.filter(n => {
-    if (!framesAreShown) return true
-    const nodeFrameId = getNodeFrameId(n)
-    if (centerIsFramed) {
-      // Center is in a frame - only include nodes in the SAME frame
-      return nodeFrameId === centerFrameId
-    } else {
-      // Center is NOT in a frame - NEVER move nodes that are in any frame
-      return !nodeFrameId
-    }
-  })
-  const nodeIdsToLayout = new Set(nodesToLayout.map(n => n.id))
 
   // Build adjacency map
   const adjacency = new Map<string, Set<string>>()
@@ -153,8 +100,7 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
   }
 
   // Find unconnected nodes that should be laid out (not reachable from center via BFS)
-  // IMPORTANT: Only include nodes from nodesToLayout, not all nodes
-  const unconnectedNodes = nodesToLayout.filter(n => !depths.has(n.id))
+  const unconnectedNodes = allNodes.filter(n => !depths.has(n.id))
   if (unconnectedNodes.length > 0) {
     // Add them as an outer ring beyond maxDepth
     const outerDepth = maxDepth + 1
@@ -189,7 +135,7 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
   const diagonal = (node: Node) =>
     Math.hypot(node.width || NODE_DEFAULTS.WIDTH, node.height || NODE_DEFAULTS.HEIGHT)
   const gap = isCompact ? 40 : 160
-  const cardDiagonal = nodesToLayout.reduce((widest, n) => Math.max(widest, diagonal(n)), 0)
+  const cardDiagonal = allNodes.reduce((widest, n) => Math.max(widest, diagonal(n)), 0)
   const clearance = cardDiagonal + gap
 
   // Calculate positions for each level
@@ -243,9 +189,7 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
     const capacityAt = (radius: number) =>
       Math.max(1, Math.floor((2 * Math.PI * radius) / minNodeSpacing))
 
-    // Only nodes that are actually placed count towards the rings
-    const placeable = nodesAtDepth.filter(id => nodeIdsToLayout.has(id))
-    const nodeCount = placeable.length
+    const nodeCount = nodesAtDepth.length
 
     if (nodeCount > capacityAt(depthRadius)) {
       // Split into multiple rings, each sized for its own radius
@@ -264,15 +208,13 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
         const startAngle = -Math.PI / 2 + (ring * 0.1) // Slight offset for each ring
 
         for (let i = 0; i < nodesInThisRing && nodeIndex < nodeCount; i++, nodeIndex++) {
-          const nodeId = placeable[nodeIndex]
+          const nodeId = nodesAtDepth[nodeIndex]
           const node = allNodes.find(n => n.id === nodeId)
           if (!node) continue
 
           const angle = startAngle + i * angleStep
           nodeAngles.set(nodeId, angle)
 
-          // Only move nodes that should be laid out (skip nodes in other frames)
-          if (!nodeIdsToLayout.has(nodeId)) continue
 
           const x = centerX + Math.cos(angle) * ringRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
           const y = centerY + Math.sin(angle) * ringRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
@@ -298,20 +240,13 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
       const startAngle = -Math.PI / 2 // Start from top
 
       for (let i = 0; i < nodeCount; i++) {
-        // The nodes this layout may move, as the split-ring branch above also
-        // reads. Walking the unfiltered level with this count stopped early,
-        // never reaching the placeable nodes further along, and spread the
-        // angles over the indices of the wrong list
-        // (PRODUCT_DESIGN.md > Radial rings)
-        const nodeId = placeable[i]
+        const nodeId = nodesAtDepth[i]
         const node = allNodes.find(n => n.id === nodeId)
         if (!node) continue
 
         const angle = startAngle + i * angleStep
         nodeAngles.set(nodeId, angle)
 
-        // Only move nodes that should be laid out (skip nodes in other frames)
-        if (!nodeIdsToLayout.has(nodeId)) continue
 
         const x = centerX + Math.cos(angle) * adjustedRadius - (node.width || NODE_DEFAULTS.WIDTH) / 2
         const y = centerY + Math.sin(angle) * adjustedRadius - (node.height || NODE_DEFAULTS.HEIGHT) / 2
@@ -321,11 +256,6 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
     }
   }
 
-  // Constrain to frame OR push out of frames
-  const targetFrame = centerFrameId
-    ? getFilteredFrames().find(f => f.id === centerFrameId)
-    : undefined
-  const finalTargets = applyFrameConstraints(targets, allNodes, targetFrame)
 
   // Build z-order based on angles (angle increases clockwise from top)
   // Nodes with higher angles should render on top
@@ -337,5 +267,5 @@ export function computeRadialLayout(options: RadialLayoutOptions): RadialLayoutR
   angleOrder.sort((a, b) => a.angle - b.angle)
   const zOrder = angleOrder.map(item => item.id)
 
-  return { targets: finalTargets, zOrder }
+  return { targets, zOrder }
 }

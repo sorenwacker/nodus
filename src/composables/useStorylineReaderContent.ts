@@ -60,7 +60,6 @@ export function useStorylineReaderContent(options: UseStorylineReaderContentOpti
 
     const linkedNode = resolveWikilink(linkTarget, {
       nodes: store.filteredNodes,
-      frames: store.filteredFrames,
     })
 
     if (!linkedNode) return

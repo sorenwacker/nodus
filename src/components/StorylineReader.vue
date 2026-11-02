@@ -24,6 +24,7 @@ import { useStorylineReaderComments } from '../composables/useStorylineReaderCom
 import { useStorylineReaderEntities } from '../composables/useStorylineReaderEntities'
 import type { Node, Storyline, CommentType } from '../types'
 import { COMMENT_STYLES } from '../types'
+import { doubleClickEditsSection } from '../lib/readerEditGesture'
 
 const { t } = useI18n()
 
@@ -59,6 +60,7 @@ const storylineEdges = computed(() => {
 })
 const loading = ref(true)
 const contentRef = ref<HTMLElement | null>(null)
+const textColumnRef = ref<HTMLElement | null>(null)
 // The contents sidebar keeps its state across folding the reader away and
 // back, and across sessions
 const showToc = ref(uiStorage.getReaderTocVisible())
@@ -86,8 +88,8 @@ function goToHeading(sectionIndex: number, headingIndex: number) {
   container.scrollTo({ top: top - 12, behavior: 'smooth' })
 }
 
-// Inline section editing, from a double-click on a section title - not on the
-// body, where that gesture selects a word (PRODUCT_DESIGN.md > Editing)
+// Inline section editing, from a double-click on a section's title or text
+// (PRODUCT_DESIGN.md > Editing in the reader)
 const editingSectionId = ref<string | null>(null)
 const editingText = ref('')
 const editingLockError = ref<string | null>(null)
@@ -228,18 +230,6 @@ function handleScroll() {
 // Markdown rendering composable
 const markdownRendering = useStorylineMarkdownRendering()
 const { renderNodeContent, renderAllNodes, processPendingContent, getRenderedContent } = markdownRendering
-
-// Only the full-width reader has room for anchored callouts; narrower steps
-// keep links inline (PRODUCT_DESIGN.md > Anchored nodes)
-watch(
-  () => props.fullWidth,
-  full => {
-    markdownRendering.expandAnchors.value = !!full
-    markdownRendering.clearCache()
-    void renderAllNodes(nodes.value)
-  },
-  { immediate: true }
-)
 
 // Content interaction composable
 const contentInteraction = useStorylineReaderContent({
@@ -460,15 +450,16 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
           </nav>
         </aside>
 
-        <!-- Main Content -->
+        <!-- Text and link cards share one scroller, so the browser moves the
+             cards with the text (PRODUCT_DESIGN.md > Anchored nodes) -->
+        <div ref="contentRef" class="reader-scroll" @scroll="handleScroll">
         <div
           id="reader-main-content"
-          ref="contentRef"
+          ref="textColumnRef"
           class="reader-content"
-          :class="{ 'full-width': !showToc }"
+          :class="{ 'toc-hidden': !showToc, 'fills-window': fullWidth }"
           role="region"
           :aria-label="t('reader.content')"
-          @scroll="handleScroll"
         >
           <div v-if="loading" class="loading-state">
             <div class="spinner"></div>
@@ -547,6 +538,7 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
                     class="section-content"
                     :title="t('storyline.editHint')"
                     @click="handleContentClick"
+                    @dblclick="doubleClickEditsSection($event.target) && startSectionEdit(node)"
                     v-html="getRenderedContent(node.id) || ''"
                   ></div>
                   <p v-if="editingLockError" class="section-lock-error">
@@ -557,6 +549,20 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
               </article>
             </template>
           </template>
+        </div>
+
+        <!-- References Sidebar -->
+        <StorylineReferencesSidebar
+          v-if="showReferencesSidebar"
+          :nodes="nodes"
+          :active-index="activeNodeIndex"
+          :content-ref="textColumnRef"
+          @navigate-to-node="(nodeId) => {
+            const idx = nodes.findIndex(n => n.id === nodeId)
+            if (idx >= 0) goToNode(idx)
+          }"
+          @pan-to-canvas="panToEntity"
+        />
         </div>
 
         <!-- Entity Sidebar -->
@@ -573,18 +579,6 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
           />
         </aside>
 
-        <!-- References Sidebar -->
-        <StorylineReferencesSidebar
-          v-if="showReferencesSidebar"
-          :nodes="nodes"
-          :active-index="activeNodeIndex"
-          :content-ref="contentRef"
-          @navigate-to-node="(nodeId) => {
-            const idx = nodes.findIndex(n => n.id === nodeId)
-            if (idx >= 0) goToNode(idx)
-          }"
-          @pan-to-canvas="panToEntity"
-        />
       </div>
 
       <!-- Navigation Footer -->
@@ -647,42 +641,6 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--danger-color, #dc2626);
-}
-
-/* Anchored nodes read like comments, at the point in the text that links them
-   (PRODUCT_DESIGN.md > Anchored nodes) */
-:deep(.anchored-node) {
-  display: block;
-  margin: 14px 0;
-  padding: 12px 16px;
-  border-left: 3px solid var(--primary-color);
-  border-radius: 0 6px 6px 0;
-  background: var(--bg-surface-alt);
-}
-
-:deep(.anchored-title) {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-:deep(.anchored-body) {
-  display: block;
-  font-size: 0.94em;
-  color: var(--text-secondary);
-}
-
-:deep(.anchored-para) {
-  display: block;
-  margin: 0 0 8px;
-}
-
-:deep(.anchored-para:last-child) {
-  margin-bottom: 0;
 }
 
 /* Overlays the canvas (no layout reflow); enter/leave slide via App's
@@ -812,18 +770,31 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   overscroll-behavior: contain;
 }
 
-.reader-content {
+.reader-scroll {
   flex: 1;
-  overflow-y: auto;
-  padding: 40px 60px;
-  max-width: 800px;
-  margin: 0 auto;
+  display: flex;
+  min-width: 0;
   min-height: 0;
+  overflow-y: auto;
+  /* Wide blocks scroll in their own boxes (features.md > Storyline Panel) */
+  overflow-x: hidden;
   overscroll-behavior: contain;
 }
 
-.reader-content.full-width {
+.reader-content {
+  flex: 1;
+  min-width: 0;
+  padding: 40px 60px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.reader-content.toc-hidden {
   max-width: 900px;
+}
+
+.reader-content.fills-window {
+  max-width: none;
 }
 
 .loading-state,
@@ -1008,176 +979,6 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   color: var(--text-secondary);
 }
 
-.section-content :deep(h1),
-.section-content :deep(h2),
-.section-content :deep(h3) {
-  color: var(--text-main);
-  margin: 1.5em 0 0.5em;
-}
-
-.section-content :deep(h1) { font-size: 1.5em; }
-.section-content :deep(h2) { font-size: 1.3em; }
-.section-content :deep(h3) { font-size: 1.1em; }
-
-.section-content :deep(p) {
-  margin: 0 0 1em;
-}
-
-.section-content :deep(ul),
-.section-content :deep(ol) {
-  margin: 0 0 1em;
-  padding-left: 1.5em;
-}
-
-.section-content :deep(li) {
-  margin-bottom: 0.5em;
-}
-
-.section-content :deep(code) {
-  background: var(--bg-surface-alt);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.9em;
-}
-
-.section-content :deep(pre) {
-  background: var(--bg-surface-alt);
-  padding: 16px;
-  border-radius: 8px;
-  overflow-x: auto;
-  margin: 1em 0;
-}
-
-.section-content :deep(pre code) {
-  background: none;
-  padding: 0;
-}
-
-.section-content :deep(a) {
-  color: var(--primary-color);
-  text-decoration: none;
-}
-
-.section-content :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.section-content :deep(a.wikilink) {
-  color: var(--primary-color);
-  cursor: pointer;
-}
-
-.section-content :deep(a.wikilink.missing) {
-  color: var(--danger-color, #dc2626);
-  opacity: 0.7;
-}
-
-.comment-text :deep(a.wikilink) {
-  color: var(--primary-color);
-  cursor: pointer;
-}
-
-.comment-text :deep(a.wikilink.missing) {
-  color: var(--danger-color, #dc2626);
-  opacity: 0.7;
-}
-
-.section-content :deep(strong) {
-  color: var(--text-main);
-  font-weight: 600;
-}
-
-/* Math rendering styles */
-.section-content :deep(.typst-display) {
-  display: block;
-  text-align: center;
-  margin: 1em 0;
-  overflow-x: auto;
-}
-
-.section-content :deep(.typst-inline) {
-  display: inline;
-  vertical-align: middle;
-}
-
-.section-content :deep(.typst-math svg) {
-  vertical-align: middle;
-}
-
-.section-content :deep(.typst-pending) {
-  color: var(--text-muted);
-  font-family: ui-monospace, monospace;
-  font-size: 0.9em;
-}
-
-/* Mermaid diagram styles */
-.section-content :deep(.mermaid-wrapper) {
-  margin: 1em 0;
-  overflow-x: auto;
-}
-
-.section-content :deep(.mermaid) {
-  display: flex;
-  justify-content: center;
-}
-
-.section-content :deep(.mermaid svg) {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Blockquote styles */
-.section-content :deep(blockquote) {
-  border-left: 3px solid var(--primary-color);
-  margin: 1em 0;
-  padding: 0.5em 1em;
-  background: var(--bg-surface-alt);
-  border-radius: 0 4px 4px 0;
-}
-
-.section-content :deep(blockquote p) {
-  margin: 0;
-}
-
-/* Table styles */
-.section-content :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1em 0;
-}
-
-.section-content :deep(th),
-.section-content :deep(td) {
-  border: 1px solid var(--border-default);
-  padding: 8px 12px;
-  text-align: left;
-}
-
-.section-content :deep(th) {
-  background: var(--bg-surface-alt);
-  font-weight: 600;
-}
-
-.section-content :deep(tr:nth-child(even)) {
-  background: var(--bg-surface-alt);
-}
-
-/* Horizontal rule */
-.section-content :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--border-default);
-  margin: 2em 0;
-}
-
-/* Image styles */
-.section-content :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-  margin: 1em 0;
-}
-
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .reading-progress,
@@ -1193,3 +994,5 @@ watch(() => [props.storylineId, props.singleNodeId], loadStoryline)
   }
 }
 </style>
+
+<style scoped src="./storylineReaderContent.css"></style>

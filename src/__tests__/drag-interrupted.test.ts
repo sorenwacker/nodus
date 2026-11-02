@@ -22,7 +22,6 @@ function makeNode(id: string): Node {
     canvas_y: 0,
     width: 200,
     height: 120,
-    frame_id: null,
     workspace_id: null,
     created_at: 0,
     updated_at: 0,

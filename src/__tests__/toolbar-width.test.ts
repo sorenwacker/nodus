@@ -33,3 +33,16 @@ describe('workspace selector width', () => {
     expect(ruleFor('.toolbar')).not.toMatch(/overflow-x\s*:\s*(auto|scroll)/)
   })
 })
+
+describe('search box position', () => {
+  // PRODUCT_DESIGN.md > Toolbar
+  it('is centred in the window: equal side columns around it', () => {
+    const rule = ruleFor('.toolbar')
+    expect(rule).toMatch(/display\s*:\s*grid/)
+    expect(rule).toMatch(/grid-template-columns\s*:\s*1fr auto 1fr/)
+  })
+
+  it('keeps the right-hand icons at the right edge', () => {
+    expect(ruleFor('.toolbar-actions')).toMatch(/justify-self\s*:\s*end/)
+  })
+})

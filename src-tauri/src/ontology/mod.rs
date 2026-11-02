@@ -10,5 +10,5 @@ pub mod transformer;
 pub mod types;
 
 pub use parser::parse_ontology;
-pub use transformer::transform_to_nodus;
+pub use transformer::transform_into_workspace;
 pub use types::*;

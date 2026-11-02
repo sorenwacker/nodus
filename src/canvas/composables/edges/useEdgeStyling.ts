@@ -46,7 +46,6 @@ export interface UseEdgeStylingReturn {
   selectedColor: ComputedRef<string>
   nodeColors: ComputedRef<Array<{ value: string | null; display: string | null }>>
   allMarkerColors: ComputedRef<Array<{ value: string }>>
-  frameColors: Array<{ value: string | null }>
 
   // Functions
   cycleEdgeStyle: () => void
@@ -115,18 +114,6 @@ const cyberHighlightColors: Record<string, string> = {
   '#f3e8ff': '#9933ff', // purple pastel -> neon purple
   '#fce7f3': '#ff00ff', // pink pastel -> neon magenta
 }
-
-// Frame border colors - neon palette
-const frameColors = [
-  { value: null },
-  { value: '#ff3366' }, // neon red
-  { value: '#ffaa00' }, // neon orange
-  { value: '#ffff00' }, // neon yellow
-  { value: '#00ff66' }, // neon green
-  { value: '#00ccff' }, // neon blue
-  { value: '#9933ff' }, // neon purple
-  { value: '#ff00ff' }, // neon magenta
-]
 
 // Stroke width constants
 const EDGE_SCREEN_WIDTH = 1.5 // Target screen pixels
@@ -395,7 +382,6 @@ export function useEdgeStyling(ctx: UseEdgeStylingContext): UseEdgeStylingReturn
     selectedColor,
     nodeColors,
     allMarkerColors,
-    frameColors,
     cycleEdgeStyle,
     getEdgeStyle,
     setEdgeStyle,
