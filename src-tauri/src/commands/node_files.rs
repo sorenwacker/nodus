@@ -136,62 +136,6 @@ pub(crate) async fn create_node_from_file_impl(
     Ok(node)
 }
 
-/// Create a file in the vault for a node
-#[tauri::command]
-pub async fn create_file_for_node(node_id: String) -> Result<String, String> {
-    let pool = database::get_pool().map_err(|e| e.to_string())?;
-
-    let node = database::nodes::get_by_id(pool, &node_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or("Node not found")?;
-
-    // Node already has a file
-    if node.file_path.is_some() {
-        return Err("Node already has a file".to_string());
-    }
-
-    // Get workspace to find vault path
-    let workspace_id = node.workspace_id.as_ref().ok_or("Node has no workspace")?;
-    let workspace = database::workspaces::get_by_id(pool, workspace_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or("Workspace not found")?;
-
-    let vault_path = workspace.vault_path.ok_or("Workspace has no vault path")?;
-
-    let file_path = std::path::Path::new(&vault_path).join(file_name_for_title(&node.title));
-
-    // Verify the resolved path is within the vault (defense in depth)
-    let canonical_vault = std::path::Path::new(&vault_path)
-        .canonicalize()
-        .map_err(|e| format!("Invalid vault path: {}", e))?;
-    let canonical_file = file_path
-        .parent()
-        .ok_or("Invalid file path")?
-        .canonicalize()
-        .unwrap_or_else(|_| canonical_vault.clone());
-    if !canonical_file.starts_with(&canonical_vault) {
-        return Err("Path traversal detected".to_string());
-    }
-
-    let file_path_str = file_path.to_string_lossy().to_string();
-
-    // Write content with OKF frontmatter (new files only carry it from birth)
-    let content = super::okf::with_frontmatter(&node);
-    std::fs::write(&file_path, &content).map_err(|e| e.to_string())?;
-
-    // Compute checksum
-    let checksum = crate::checksum::compute_string(&content);
-
-    // Update node with file path
-    database::nodes::update_file_path(pool, &node_id, &file_path_str, &checksum)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(file_path_str)
-}
-
 /// The file name a node's title maps to, for files Nodus creates and for
 /// files it renames with their node: path separators and characters that
 /// are not portable across file systems become underscores, and `..` is
