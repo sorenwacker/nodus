@@ -40,12 +40,21 @@ const STRING = new RegExp(
 /** A bare key: an identifier followed by a colon, outside any string. */
 const BARE_KEY = /([{,]\s*|^\s*)([A-Za-z_]\w*)\s*:/g
 
+/**
+ * Brackets for a lifted string's index, from the Unicode private use area so
+ * they cannot occur in the call. A bare number as the placeholder collided
+ * with numeric arguments: `x: 0 ,` was read back as a string.
+ */
+const SLOT_OPEN = '\uE000'
+const SLOT_CLOSE = '\uE001'
+const SLOT = new RegExp(SLOT_OPEN + String.raw`(\d+)` + SLOT_CLOSE, 'g')
+
 function argumentsToJson(body: string): string | null {
   const strings: string[] = []
   // Lift the strings out, so their commas, colons and braces stay content
   const withoutStrings = body.replace(STRING, (_match, content: string) => {
     strings.push(content)
-    return ` ${strings.length - 1} `
+    return `${SLOT_OPEN}${strings.length - 1}${SLOT_CLOSE}`
   })
 
   // A delimiter left behind means the markers did not pair up, and the rest
@@ -58,7 +67,7 @@ function argumentsToJson(body: string): string | null {
   )
 
   // Restore the strings, JSON-escaped
-  const restored = quoted.replace(/ (\d+) /g, (_match, index: string) =>
+  const restored = quoted.replace(SLOT, (_match, index: string) =>
     JSON.stringify(strings[Number(index)])
   )
 
