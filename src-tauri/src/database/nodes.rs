@@ -34,6 +34,20 @@ pub async fn get_all(pool: &DbPool) -> Result<Vec<Node>, DatabaseError> {
     Ok(nodes)
 }
 
+/// The file paths of a workspace's live nodes that have a file
+pub async fn file_paths_in_workspace(
+    pool: &DbPool,
+    workspace_id: &str,
+) -> Result<Vec<String>, DatabaseError> {
+    let paths = sqlx::query_scalar::<_, String>(
+        "SELECT file_path FROM nodes WHERE deleted_at IS NULL AND workspace_id = ? AND file_path IS NOT NULL",
+    )
+    .bind(workspace_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(paths)
+}
+
 /// Get all soft-deleted nodes for a workspace
 pub async fn get_deleted(pool: &DbPool, workspace_id: &str) -> Result<Vec<Node>, DatabaseError> {
     let nodes = sqlx::query_as::<_, Node>(

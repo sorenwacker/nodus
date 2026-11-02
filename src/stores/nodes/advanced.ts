@@ -91,7 +91,7 @@ export function deleteWorkspace(
   workspaceStore: NodeStoreDependencies['workspaceStore'],
   id: string,
   deleteFiles?: boolean
-): Promise<void> {
+): Promise<string[]> {
   return workspaceStore.deleteWorkspace(id, deleteFiles)
 }
 

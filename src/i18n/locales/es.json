@@ -482,6 +482,7 @@
     "workspaceCreateFailed": "Error al crear el espacio de trabajo",
     "workspaceUpdated": "Espacio de trabajo actualizado",
     "workspaceDeleted": "Espacio de trabajo \"{name}\" eliminado",
+    "workspaceFilesRemain": "Espacio de trabajo \"{name}\" eliminado, pero {count} archivos no se pudieron eliminar y siguen en el disco",
     "cannotDeleteDefault": "No se puede eliminar el espacio de trabajo predeterminado",
     "workspaceReset": "Espacio de trabajo restablecido al contenido inicial",
     "importSuccess": "{count} nodos importados",
