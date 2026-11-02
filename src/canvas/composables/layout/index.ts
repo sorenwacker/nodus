@@ -7,5 +7,5 @@ export {
   useNeighborhoodMode,
   type UseNeighborhoodModeOptions,
 } from './useNeighborhoodMode'
-export { useLivePhysics } from './useLivePhysics'
+export { useLivePhysics, graphKey } from './useLivePhysics'
 export { createWorkerEngine } from './physicsEngine'

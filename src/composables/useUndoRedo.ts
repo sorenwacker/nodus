@@ -69,7 +69,7 @@ export interface UndoRedoStore {
     content: string,
     options?: { skipUndo?: boolean }
   ) => Promise<void>
-  updateNodeTitle: (id: string, title: string) => Promise<void>
+  updateNodeTitle: (id: string, title: string, options?: { skipUndo?: boolean }) => Promise<void>
   updateNodeColor: (id: string, color: string | null) => Promise<void>
   restoreNode: (node: Node) => Promise<void>
   restoreEdge: (edge: Edge) => void
@@ -243,7 +243,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodeContent(node.id, snapshot.content.oldContent || '', {
           skipUndo: true,
         })
-        await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
+        await store.updateNodeTitle(node.id, snapshot.content.oldTitle, { skipUndo: true })
         showToast('Undo content', 'info')
       }
     } else if (snapshot.type === 'deletion') {
@@ -275,7 +275,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
       for (const [id, previous] of snapshot.contents) {
         // skipUndo: replaying a step must not record a new one
         await store.updateNodeContent(id, previous.content || '', { skipUndo: true })
-        await store.updateNodeTitle(id, previous.title)
+        await store.updateNodeTitle(id, previous.title, { skipUndo: true })
       }
       showToast(`Undo: restored ${snapshot.contents.size} nodes`, 'info')
     } else if (snapshot.type === 'color') {
@@ -356,7 +356,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
         await store.updateNodeContent(node.id, snapshot.content.oldContent || '', {
           skipUndo: true,
         })
-        await store.updateNodeTitle(node.id, snapshot.content.oldTitle)
+        await store.updateNodeTitle(node.id, snapshot.content.oldTitle, { skipUndo: true })
         showToast('Redo content', 'info')
       }
     } else if (snapshot.type === 'deletion') {
@@ -383,7 +383,7 @@ export function useUndoRedo(options: UseUndoRedoOptions) {
       undoStack.value.push({ type: 'contents', contents: current })
       for (const [id, next] of snapshot.contents) {
         await store.updateNodeContent(id, next.content || '', { skipUndo: true })
-        await store.updateNodeTitle(id, next.title)
+        await store.updateNodeTitle(id, next.title, { skipUndo: true })
       }
       showToast(`Redo: restored ${snapshot.contents.size} nodes`, 'info')
     } else if (snapshot.type === 'color') {

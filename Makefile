@@ -1,7 +1,7 @@
 # Nodus Makefile
 # Development workflow automation
 
-.PHONY: help install dev build test clean docker-dev docker-build lint fmt audit kill docs docs-build docs-rust build-mac install-mac
+.PHONY: help rc install dev build test clean docker-dev docker-build lint fmt audit kill docs docs-build docs-rust build-mac install-mac
 
 # Default target
 help:
@@ -24,6 +24,7 @@ help:
 	@echo "  make clean        Clean build artifacts"
 	@echo ""
 	@echo "Release:"
+	@echo "  make rc              1.6.0-rc.15 -> 1.6.0-rc.16"
 	@echo "  make release-patch   0.4.7 -> 0.4.8"
 	@echo "  make release-minor   0.4.7 -> 0.5.0"
 	@echo "  make release-major   0.4.7 -> 1.0.0"
@@ -174,6 +175,10 @@ docs-rust:
 # =============================================================================
 # Release
 # =============================================================================
+
+# Next release candidate (development.md > Continuous integration and releases)
+rc:
+	./scripts/release-candidate.sh
 
 # Auto-increment and release
 release-patch:

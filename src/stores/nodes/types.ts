@@ -53,6 +53,7 @@ export interface NodeStoreComputed {
   currentWorkspaceId: ComputedRef<string | null>
   selectedNodeId: ComputedRef<string | null>
   selectedNode: ComputedRef<Node | undefined>
+  graphNodes: ComputedRef<Node[]>
   filteredNodes: ComputedRef<Node[]>
   filteredEdges: ComputedRef<Edge[]>
   graphEdges: ComputedRef<Edge[]>

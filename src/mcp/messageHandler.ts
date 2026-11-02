@@ -5,10 +5,12 @@
  */
 
 import type { Node, Edge, Storyline } from '../types'
+import { cleanWorkspaceName } from '../lib/workspaceName'
 import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpViewport,
+  McpTagNodeRebuild,
 } from './types'
 import {
   createSuccessResponse,
@@ -31,6 +33,7 @@ import {
   handleGetRootNodes,
   handleGetHubNodes,
   handleGetNodesByColor,
+  handleGetNodesByTag,
   handleCreateNode,
   handleUpdateNode,
   handleBatchUpdateNodes,
@@ -41,8 +44,10 @@ import {
   handleSetNodeColor,
   handleBatchSetNodeColors,
   handleGetEdges,
+  handleGetEdgeLabels,
   handleCreateEdge,
   handleUpdateEdge,
+  handleBatchUpdateEdges,
   handleDeleteEdge,
   handleBatchCreateEdges,
   handleBatchDeleteEdges,
@@ -59,6 +64,8 @@ import {
   handleAddNodeToStoryline,
   handleRemoveNodeFromStoryline,
   handleReorderStorylineNodes,
+  handleListTags,
+  handleRebuildTagNodes,
 } from './handlers'
 
 /**
@@ -76,6 +83,7 @@ export interface McpStoreInterface {
   // one open in the app (parallel agents on parallel workspaces)
   getAllNodes: () => Node[]
   getWorkspaces: () => Array<{ id: string; name: string; current: boolean }>
+  createWorkspace: (name: string) => Promise<{ id: string; name: string }>
   loadWorkspaceEdges: (workspaceId: string | null) => Promise<Edge[]>
   createEdgeRaw: (data: {
     source_node_id: string
@@ -121,6 +129,10 @@ export interface McpStoreInterface {
   updateEdgeLabel: (id: string, label: string | null) => Promise<void>
   updateEdgeColor: (id: string, color: string | null) => Promise<void>
 
+  // Tag nodes: repair and reconnect the open workspace's tag layer
+  // (PRODUCT_DESIGN.md > Tag nodes over MCP)
+  rebuildTagNodes: () => Promise<McpTagNodeRebuild>
+
   // Storyline operations
   getAllStorylines: () => Storyline[]
   getFilteredStorylines: () => Storyline[]
@@ -158,12 +170,23 @@ export interface McpUndoInterface {
 }
 
 /**
+ * Adding nodes to the Zotero library, supplied by the application
+ * (PRODUCT_DESIGN.md > Adding to Zotero from an agent)
+ */
+export interface McpZoteroInterface {
+  addNodes: (
+    nodes: Array<Pick<Node, 'title' | 'markdown_content' | 'node_type'>>
+  ) => Promise<{ added: number; duplicates: number; skipped: number; errors: string[] }>
+}
+
+/**
  * Create an MCP message handler with store access
  */
 export function createMcpMessageHandler(
   store: McpStoreInterface,
   viewport?: McpViewportInterface,
-  undo?: McpUndoInterface
+  undo?: McpUndoInterface,
+  zotero?: McpZoteroInterface
 ) {
   // Workspace each connection targets; absent = follow the open workspace.
   // The stored value uses null for the default workspace.
@@ -192,6 +215,26 @@ export function createMcpMessageHandler(
     const storylinesInScope = () =>
       store.getAllStorylines().filter(s => (s.workspace_id ?? null) === workspaceId)
 
+    // The rebuild reads and connects the edges the app has loaded, which are
+    // the open workspace's. For any other workspace it would act on the wrong
+    // one, so it is refused with both names
+    // (PRODUCT_DESIGN.md > Tag nodes over MCP)
+    const rebuildTagNodesInScope = () => {
+      const workspaces = store.getWorkspaces()
+      const open = workspaces.find(w => w.current)
+      const openId = !open || open.id === 'default' ? null : open.id
+      if (openId !== workspaceId) {
+        const target = workspaces.find(w => (w.id === 'default' ? null : w.id) === workspaceId)
+        throw new McpError(
+          JsonRpcErrorCodes.INVALID_PARAMS,
+          `rebuild_tag_nodes acts on the workspace open in the app (${open?.name ?? 'Default'}); ` +
+            `this connection is scoped to ${target?.name ?? workspaceId}. ` +
+            'Open that workspace in the app, or use an unscoped connection'
+        )
+      }
+      return store.rebuildTagNodes()
+    }
+
     return {
       ...store,
       getFilteredNodes: nodesInScope,
@@ -211,6 +254,7 @@ export function createMcpMessageHandler(
       getStoryline: (id: string) => storylinesInScope().find(s => s.id === id),
       createStoryline: (title, description, color) =>
         store.createStoryline(title, description, color, workspaceId),
+      rebuildTagNodes: rebuildTagNodesInScope,
     }
   }
 
@@ -286,6 +330,24 @@ export function createMcpMessageHandler(
         const id = scopedTo === null ? 'default' : scopedTo
         return { scoped: true, workspace: store.getWorkspaces().find(w => w.id === id)?.name }
       }
+
+      // PRODUCT_DESIGN.md > MCP Server > Creating a workspace
+      case 'create_workspace': {
+        const name = typeof params.name === 'string' ? cleanWorkspaceName(params.name) : ''
+        if (!name) {
+          throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, 'name required')
+        }
+        // set_workspace resolves a name to the first match, so a second
+        // workspace with the same name could not be reached by name
+        if (resolveWorkspace(name)) {
+          throw new McpError(
+            JsonRpcErrorCodes.INVALID_PARAMS,
+            `A workspace named "${name}" already exists`
+          )
+        }
+        const created = await store.createWorkspace(name)
+        return { id: created.id, name: created.name }
+      }
     }
 
     const hasScope = connectionId !== undefined && connectionWorkspaces.has(connectionId)
@@ -313,7 +375,10 @@ export function createMcpMessageHandler(
         return handleGetGraphSummary(store)
 
       case 'list_nodes':
-        return handleListNodes(store, params as { include_content?: boolean; limit?: number; offset?: number })
+        return handleListNodes(
+          store,
+          params as { include_content?: boolean; fields?: string[]; limit?: number; offset?: number }
+        )
 
       case 'get_node':
         return handleGetNode(store, params as { id: string })
@@ -345,8 +410,30 @@ export function createMcpMessageHandler(
       case 'get_nodes_by_color':
         return handleGetNodesByColor(store, params as { color: string })
 
+      case 'get_nodes_by_tag':
+        return handleGetNodesByTag(store, params as { tag?: string; fields?: string[] })
+
+      case 'list_tags':
+        return handleListTags(store)
+
+      case 'rebuild_tag_nodes':
+        return handleRebuildTagNodes(store)
+
       case 'get_edges':
-        return handleGetEdges(store, params as { node_id?: string; limit?: number; offset?: number })
+        return handleGetEdges(
+          store,
+          params as {
+            node_id?: string
+            label?: string
+            unlabelled_only?: boolean
+            include_titles?: boolean
+            limit?: number
+            offset?: number
+          }
+        )
+
+      case 'get_edge_labels':
+        return handleGetEdgeLabels(store)
 
       // Write operations
       case 'create_node':
@@ -415,11 +502,14 @@ export function createMcpMessageHandler(
         return handleCreateEdge(
           store,
           params as {
-            source_node_id: string
-            target_node_id: string
+            source_node_id?: string
+            target_node_id?: string
+            source_title?: string
+            target_title?: string
             label?: string
             link_type?: string
             directed?: boolean
+            color?: string
           }
         )
 
@@ -431,6 +521,12 @@ export function createMcpMessageHandler(
             label?: string
             directed?: boolean
           }
+        )
+
+      case 'batch_update_edges':
+        return handleBatchUpdateEdges(
+          store,
+          params as { updates: Array<{ id: string; label?: string; directed?: boolean; color?: string }> }
         )
 
       case 'delete_edge':
@@ -482,6 +578,10 @@ export function createMcpMessageHandler(
       case 'reorder_storyline_nodes':
         return handleReorderStorylineNodes(store, params as { storyline_id: string; node_ids: string[] })
 
+      // Zotero
+      case 'add_to_zotero':
+        return localHandleAddToZotero(store, params as { node_ids?: unknown })
+
       // Canvas operations
       case 'get_viewport':
         return localHandleGetViewport()
@@ -495,6 +595,27 @@ export function createMcpMessageHandler(
           `Method not found: ${request.method}`
         )
     }
+  }
+
+  /** Add the named nodes of the connection's workspace to the Zotero library */
+  async function localHandleAddToZotero(scopedStore: McpStoreInterface, params: { node_ids?: unknown }) {
+    const ids = params.node_ids
+    if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => typeof id !== 'string')) {
+      throw new McpError(JsonRpcErrorCodes.INVALID_PARAMS, 'node_ids (a non-empty array of node ids) required')
+    }
+    if (!zotero) {
+      throw new McpError(JsonRpcErrorCodes.INTERNAL_ERROR, 'Adding to Zotero is not available in this application')
+    }
+    const nodes: Node[] = []
+    const errors: string[] = []
+    for (const id of ids as string[]) {
+      const node = scopedStore.getNode(id)
+      if (node) nodes.push(node)
+      else errors.push(`Node not found: ${id}`)
+    }
+    if (nodes.length === 0) return { added: 0, duplicates: 0, skipped: 0, errors }
+    const report = await zotero.addNodes(nodes)
+    return { added: report.added, duplicates: report.duplicates, skipped: report.skipped, errors: [...errors, ...report.errors] }
   }
 
   // Local viewport handlers (not extracted since they need viewport closure)

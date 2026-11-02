@@ -11,7 +11,7 @@ export interface UseNodeFitNowDeps {
   getSelectedNodeIds: () => string[]
   getEditingNodeId: () => string | null
   /** Save the open editor's content and close it */
-  finishEditing: (nodeId: string) => void
+  finishEditing: () => void
   setRenderedContent: (nodeId: string, html: string) => void
   renderMarkdown: (content: string | null) => string
   renderTypstMath: () => Promise<void>
@@ -54,7 +54,7 @@ export function useNodeFitNow(deps: UseNodeFitNowDeps) {
   /** One-shot fit to content (does NOT enable auto_fit) */
   async function fitNodeNow(nodeId: string): Promise<void> {
     // Exit edit mode first to measure rendered view, not textarea
-    if (deps.getEditingNodeId() === nodeId) deps.finishEditing(nodeId)
+    if (deps.getEditingNodeId() === nodeId) deps.finishEditing()
 
     // Force update rendered content for this node
     const node = deps.getNode(nodeId)

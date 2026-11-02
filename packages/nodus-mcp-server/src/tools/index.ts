@@ -12,6 +12,7 @@ import { NODE_TOOLS } from './nodeTools.js'
 import { EDGE_TOOLS } from './edgeTools.js'
 import { STORYLINE_TOOLS } from './storylineTools.js'
 import { CANVAS_TOOLS } from './canvasTools.js'
+import { ZOTERO_TOOLS } from './zoteroTools.js'
 
 export type { McpToolDeclaration } from './types'
 
@@ -23,6 +24,7 @@ export const NODUS_TOOLS: McpToolDeclaration[] = [
   ...EDGE_TOOLS,
   ...STORYLINE_TOOLS,
   ...CANVAS_TOOLS,
+  ...ZOTERO_TOOLS,
 ]
 
 /**

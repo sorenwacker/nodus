@@ -8,8 +8,20 @@ import { computed, ref, type Ref, type ComputedRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { EdgeLine } from './useEdgeRouting'
 import { useDisplayStore } from '../../../stores/display'
+import { HIGHLIGHT_WIDTH_FACTOR, lineUnderArrowHead } from '../../routing/arrowHead'
+
+/**
+ * The path to stroke for an edge: the routed path, ending under the arrowhead
+ * where the edge carries one (PRODUCT_DESIGN.md > The line under an arrowhead).
+ * An undirected, bidirectional or short edge has no head and keeps its full path.
+ */
+export function strokedPath(edge: Pick<EdgeLine, 'path' | 'isBidirectional' | 'isShortEdge'>, strokeWidth: number): string {
+  return edge.isBidirectional || edge.isShortEdge ? edge.path : lineUnderArrowHead(edge.path, strokeWidth)
+}
 
 export interface VisibleEdgeLine extends EdgeLine {
+  /** The path to stroke: `path`, ending under the arrowhead where the edge carries one */
+  linePath: string
   isHighlighted: boolean
   isSelected: boolean
   isNeighborEdge: boolean
@@ -232,7 +244,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       // Use getEdgeColor for theme-aware color remapping
       const color = getEdgeColor({ link_type: e.link_type || '', color: e.color })
       // Simple stroke width: base for normal, slightly thicker for selected/highlighted
-      const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * 1.3 : baseStrokeWidth
+      const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * HIGHLIGHT_WIDTH_FACTOR : baseStrokeWidth
 
       // Get highlight color based on whether connected node is selected or just hovered
       // When "highlight all edges" is on, keep original color - don't change to highlight color
@@ -263,6 +275,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
       return {
         ...e,
+        linePath: strokedPath(e, baseStrokeWidth),
         isHighlighted,
         isSelected,
         isNeighborEdge,

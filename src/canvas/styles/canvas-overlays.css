@@ -223,53 +223,6 @@
   color: white;
 }
 
-/* Hover tooltip for zoomed-out view */
-.hover-tooltip {
-  position: fixed;
-  z-index: 9999;
-  max-width: 300px;
-  padding: 12px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px var(--shadow-md);
-  pointer-events: none;
-  animation: tooltip-fade-in 0.15s ease-out;
-}
-
-@keyframes tooltip-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.hover-tooltip-title {
-  font-weight: 600;
-  font-size: calc(14px * var(--font-scale, 1));
-  color: var(--text-main);
-  margin-bottom: 6px;
-  line-height: 1.3;
-}
-
-.hover-tooltip-content {
-  font-size: calc(12px * var(--font-scale, 1));
-  color: var(--text-secondary);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* Cyber theme tooltip glow */
-:is([data-theme='cyber']) .hover-tooltip {
-  border-color: rgba(0, 255, 204, 0.4);
-  box-shadow: 0 0 20px rgba(0, 255, 204, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
 /* Node agent mode toggle */
 .agent-mode-toggle,
 .agent-log-toggle {
@@ -513,6 +466,7 @@
 /* Date metadata row in the node preview panel */
 .preview-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 4px 16px 8px;
@@ -539,6 +493,50 @@
 .preview-date-chip.ghost {
   border-style: dashed;
   opacity: 0.75;
+}
+
+/* A tag in the preview panel: a chip like the date chip, its remove button
+   inside it on the same line (docs/content/features.md > Tags) */
+.preview-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+}
+
+.preview-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.preview-tag-remove:hover {
+  color: var(--danger-color);
+  background: var(--danger-bg);
+}
+
+.preview-tag-input {
+  flex: 0 1 120px;
+}
+
+.preview-date-chip {
+  white-space: nowrap;
 }
 
 .preview-date-input {

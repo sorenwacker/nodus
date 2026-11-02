@@ -48,11 +48,11 @@ export function useLLM() {
   // `computed` over a plain call caches the value held at load
   // (PRODUCT_DESIGN.md > Reads that stay live).
   const model = computed(() => {
-    providerRegistry.configVersion.value
+    void providerRegistry.configVersion.value
     return (getProviderConfig().model as string) || 'llama3.2'
   })
   const contextLength = computed(() => {
-    providerRegistry.configVersion.value
+    void providerRegistry.configVersion.value
     return (getProviderConfig().contextLength as number) || 4096
   })
 

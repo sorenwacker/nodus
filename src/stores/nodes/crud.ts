@@ -3,11 +3,12 @@
  */
 
 import type { Ref } from 'vue'
+import { isColorValue } from '../../lib/colorValue'
 import { syncWikilinks } from './wikilinkSync'
 import { invoke, isTauri } from '../../lib/tauri'
 import { storeLogger } from '../../lib/logger'
 import { notifications$ } from '../../composables/useNotifications'
-import { recordContentBefore } from './undoRecorder'
+import { asOneUndoStep, recordContentBefore } from './undoRecorder'
 import { generateShortId } from '../../lib/ids'
 import { planTagChange } from '../../lib/tagSync'
 
@@ -434,28 +435,49 @@ export async function updateNodeTags(
   }
 }
 
+/** What the backend answers a rename with */
+interface TitleUpdate {
+  filePath: string | null
+  relinked: Array<{ id: string; content: string }>
+}
+
 /**
- * Update node title
+ * Update node title.
+ *
+ * The backend renames the node's vault file and rewrites the links to the
+ * node in the notes linking to it; the title and those notes form one undo
+ * step (features.md > Wikilink Edges).
  */
 export async function updateNodeTitle(
   nodes: Ref<Node[]>,
   id: string,
-  title: string
+  title: string,
+  options?: { skipUndo?: boolean }
 ): Promise<void> {
   const trimmedTitle = title.trim()
   const node = nodes.value.find(n => n.id === id)
-  if (node) {
+  if (!node) return
+  const record = (n: Node) => {
+    if (!options?.skipUndo) recordContentBefore({ nodeId: n.id, content: n.markdown_content, title: n.title })
+  }
+  await asOneUndoStep(async () => {
+    if (node.title !== trimmedTitle) record(node)
     node.title = trimmedTitle
     node.updated_at = Date.now()
     try {
-      // The backend renames the node's vault file with it and answers with
-      // the file's new path, or null when nothing moved
-      const filePath = await invoke<string | null>('update_node_title', { id, title: trimmedTitle })
-      if (filePath) node.file_path = filePath
+      const update = await invoke<TitleUpdate>('update_node_title', { id, title: trimmedTitle })
+      if (update.filePath) node.file_path = update.filePath
+      for (const { id: linkerId, content } of update.relinked) {
+        const linker = nodes.value.find(n => n.id === linkerId)
+        if (!linker) continue
+        record(linker)
+        linker.markdown_content = content
+        linker.updated_at = Date.now()
+      }
     } catch (e) {
       console.error('Failed to update title:', e)
     }
-  }
+  })
 }
 
 /**
@@ -468,14 +490,34 @@ export async function updateNodeColor(
 ): Promise<void> {
   const node = nodes.value.find(n => n.id === id)
   if (node) {
-    node.color_theme = color
+    // Only a colour value is stored; anything else leaves the card without a
+    // background (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+    const stored = color && isColorValue(color) ? color : null
+    node.color_theme = stored
     node.updated_at = Date.now()
     try {
-      await invoke('update_node_color', { id, color })
+      await invoke('update_node_color', { id, color: stored })
     } catch (e) {
       console.error('Failed to update color:', e)
     }
   }
+}
+
+/**
+ * Reset the nodes whose stored colour is not a colour value.
+ *
+ * Args:
+ *   nodes: The loaded nodes, corrected in place.
+ *
+ * Returns:
+ *   The number of nodes reset. None on a vault already consistent.
+ */
+export async function resetInvalidNodeColors(nodes: Ref<Node[]>): Promise<number> {
+  const invalid = nodes.value.filter(n => n.color_theme && !isColorValue(n.color_theme))
+  for (const node of invalid) {
+    await updateNodeColor(nodes, node.id, null)
+  }
+  return invalid.length
 }
 
 /**

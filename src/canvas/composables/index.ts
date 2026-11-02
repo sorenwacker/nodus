@@ -122,7 +122,6 @@ export {
   useStorylines,
   useUndoHandlers,
   type UseCanvasKeyboardShortcutsContext,
-  type UseCanvasKeyboardShortcutsReturn,
   type BibEntry,
   type PendingBibImport,
   type UsePdfDropOptions,

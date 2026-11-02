@@ -70,16 +70,21 @@ export function createComputedProperties(
     nodes.value.find(n => n.id === selectedNodeId.value)
   )
 
-  // Filtered nodes/edges for current workspace. Tag nodes are a display
-  // layer: hidden together with their tagged edges when the toggle is off.
-  const filteredNodes = computed(() => {
+  // The open workspace's nodes as data, whatever the canvas draws: the set the
+  // MCP adapter and analytics read
+  // (PRODUCT_DESIGN.md > MCP reads are independent of the canvas layers)
+  const graphNodes = computed(() => {
     const wsId = workspaceStore.currentWorkspaceId
-    const inWorkspace =
-      !wsId || wsId === 'default'
-        ? nodes.value.filter(n => !n.workspace_id)
-        : nodes.value.filter(n => n.workspace_id === wsId)
-    return showTagEdges.value ? inWorkspace : inWorkspace.filter(n => n.node_type !== 'tag')
+    return !wsId || wsId === 'default'
+      ? nodes.value.filter(n => !n.workspace_id)
+      : nodes.value.filter(n => n.workspace_id === wsId)
   })
+
+  // The nodes the canvas draws. Tag nodes are a display layer: hidden together
+  // with their tagged edges when the toggle is off.
+  const filteredNodes = computed(() =>
+    showTagEdges.value ? graphNodes.value : graphNodes.value.filter(n => n.node_type !== 'tag')
+  )
 
   const filteredEdges = computed(() => {
     const nodeIds = new Set(filteredNodes.value.map(n => n.id))
@@ -107,9 +112,11 @@ export function createComputedProperties(
 
   // Edges whose endpoints both exist in the current workspace, ignoring the
   // category visibility toggles: the graph as data (MCP, analytics), as
-  // opposed to filteredEdges, the graph as displayed on the canvas
+  // opposed to filteredEdges, the graph as displayed on the canvas. Derived
+  // from graphNodes: derived from the drawn nodes, it lost every tagged edge
+  // while the tag layer was hidden
   const graphEdges = computed(() => {
-    const nodeIds = new Set(filteredNodes.value.map(n => n.id))
+    const nodeIds = new Set(graphNodes.value.map(n => n.id))
     return edgesStore.edges.filter(
       e => nodeIds.has(e.source_node_id) && nodeIds.has(e.target_node_id)
     )
@@ -127,6 +134,7 @@ export function createComputedProperties(
     currentWorkspaceId,
     selectedNodeId,
     selectedNode,
+    graphNodes,
     filteredNodes,
     filteredEdges,
     graphEdges,

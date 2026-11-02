@@ -26,7 +26,6 @@ const KEYS = {
   llmProvider: 'nodus_llm_provider',
   llmProviderConfigs: 'nodus_llm_provider_configs',
   llmEnabled: 'nodus_llm_enabled',
-  llmStreaming: 'nodus_llm_streaming',
   canvasGridSnap: 'nodus_canvas_grid_snap',
   canvasGridSize: 'nodus_canvas_grid_size',
   canvasEdgeStyle: 'nodus_canvas_edge_style',
@@ -258,12 +257,6 @@ export const llmStorage = {
   },
   setLLMEnabled(value: boolean): void {
     localStorage.setItem(KEYS.llmEnabled, String(value))
-  },
-  getLLMStreaming(): boolean {
-    return localStorage.getItem(KEYS.llmStreaming) === 'true'
-  },
-  setLLMStreaming(value: boolean): void {
-    localStorage.setItem(KEYS.llmStreaming, String(value))
   },
   /**
    * Check if LLM is configured based on provider requirements.

@@ -8,6 +8,7 @@
     "noResults": "Aucun résultat trouvé"
   },
   "canvas": {
+    "printFailed": "Impossible d'imprimer le canevas : {error}",
     "agent": {
       "placeholder": "Poser une question sur le graphe...",
       "placeholderSelected": "Question sur les nœuds sélectionnés...",
@@ -91,6 +92,7 @@
       "forceLayout": "Disposition par force - Arranger par connexions",
       "hierarchicalLayout": "Disposition hiérarchique - Arranger en arbre (pour DAGs/ontologies)",
       "radialLayout": "Disposition radiale - Disposer les voisins en cercles concentriques autour du nœud sélectionné",
+      "smartLayout": "Disposition intelligente - Disposer les nœuds sélectionnés ou tous en hiérarchie avec le modèle IA",
       "fitNodesToContent": "Ajuster les nœuds au contenu - Redimensionner tous les nœuds",
       "edgeStyle": "Style des arêtes",
       "magnifier": "Loupe - Afficher une vue agrandie en zoom arrière",
@@ -102,6 +104,7 @@
       "bubbleMode": "Mode bulle - Afficher les nœuds comme des cercles",
       "physics": "Mode physique - Le graphe visible s'organise pendant que vous déplacez (P)",
       "physicsUnavailable": "Mode physique - En mode bulles uniquement, hors de la vue de voisinage, jusqu'à 2000 nœuds visibles",
+      "printToPdf": "Imprimer en PDF - Les nœuds sélectionnés, ou tous, sur une page",
       "help": "Aide - Raccourcis clavier et utilisation"
     },
     "search": {
@@ -126,9 +129,13 @@
     },
     "connected": "Connecté à {provider}",
     "connectionFailed": "Échec de la connexion au fournisseur",
-    "streaming": {
-      "label": "Activer le streaming",
-      "hint": "Streamer les réponses token par token (nécessite le support du fournisseur)"
+    "testMessage": {
+      "label": "Message de test",
+      "hint": "Envoie cette invite au fournisseur comme le fait l'agent et affiche la réponse et ses délais.",
+      "defaultPrompt": "Réponds en une courte phrase : qu'est-ce qu'un graphe de connaissances ?",
+      "send": "Envoyer",
+      "sending": "Envoi...",
+      "timing": "Premier octet après {firstByte} s, terminé en {total} s, {chars} caractères, {attempts} tentative(s)"
     },
     "apiKey": {
       "label": "Clé API",
@@ -212,7 +219,10 @@
     "default": "Par defaut",
     "switch": "Changer d'espace de travail",
     "filter": "Filtrer les espaces...",
-    "recent": "recent",
+    "sortBy": "Trier les espaces",
+    "sortUsed": "Derniere utilisation",
+    "sortName": "Nom",
+    "sortCreated": "Creation",
     "noMatch": "Aucun espace correspondant"
   },
   "onboarding": {
@@ -472,6 +482,7 @@
     "workspaceCreateFailed": "Échec de la création de l'espace de travail",
     "workspaceUpdated": "Espace de travail mis à jour",
     "workspaceDeleted": "Espace de travail \"{name}\" supprimé",
+    "workspaceFilesRemain": "Espace de travail \"{name}\" supprimé, mais {count} fichiers n'ont pas pu être supprimés et restent sur le disque",
     "cannotDeleteDefault": "Impossible de supprimer l'espace de travail par défaut",
     "workspaceReset": "Espace de travail réinitialisé au contenu de démarrage",
     "importSuccess": "{count} noeuds importés",
@@ -523,12 +534,6 @@
     },
     "zotero": {
       "description": "Importer des citations depuis Zotero et construire des graphes de citations",
-      "library": "Bibliothèque Zotero",
-      "detect": "Détecter Zotero",
-      "detecting": "Détection...",
-      "detectHint": "Détecter automatiquement l'installation locale de Zotero",
-      "connected": "Connecté",
-      "disconnect": "Déconnecter",
       "collections": "Collections",
       "loading": "Chargement des collections...",
       "noCollections": "Aucune collection trouvée",
@@ -538,7 +543,7 @@
       "importing": "Importation",
       "cloud": {
         "title": "Zotero Cloud",
-        "hint": "Connectez-vous à Zotero Cloud pour synchroniser les citations bidirectionnellement",
+        "hint": "Importer des références de votre bibliothèque Zotero et y ajouter des références. Rien n'est synchronisé",
         "userId": "ID utilisateur",
         "userIdPlaceholder": "Votre ID utilisateur Zotero (numérique)",
         "apiKey": "Clé API",
@@ -555,7 +560,7 @@
         "title": "Graphe de citations",
         "build": "Construire le graphe de citations",
         "building": "Construction...",
-        "hint": "Découvrir les relations de citation avec Semantic Scholar",
+        "hint": "Interroger Semantic Scholar sur les références et citations de chaque article : au moins trois requêtes par article, espacées de 3 secondes",
         "scanning": "Analyse des articles...",
         "fetching": "Récupération des citations...",
         "creating": "Création des arêtes...",
@@ -563,7 +568,11 @@
         "result": "{edges} arêtes et {stubs} nœuds provisoires créés",
         "noPapers": "Aucun article avec DOI trouvé",
         "createStubs": "Créer des nœuds provisoires pour les articles manquants",
-        "stubsHint": "Les nœuds provisoires montrent les liens de citation vers des articles absents de votre bibliothèque"
+        "stubsHint": "Les nœuds provisoires montrent les liens de citation vers des articles absents de votre bibliothèque",
+        "stop": "Arrêter",
+        "stopping": "Arrêt après cet article...",
+        "position": "({current} sur {total})",
+        "stopped": "Arrêté après {current} articles sur {total}."
       },
       "export": {
         "toZotero": "Enregistrer dans Zotero",
@@ -764,6 +773,7 @@
     "noOtherWorkspaces": "Aucun autre espace de travail",
     "readNode": "Lire le nœud",
     "exportSelection": "Exporter la sélection...",
+    "printToPdf": "Imprimer en PDF",
     "defaultWorkspace": "Par défaut"
   },
   "reader": {

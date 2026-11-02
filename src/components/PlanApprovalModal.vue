@@ -192,7 +192,7 @@ watch(() => props.visible, (visible) => {
                   class="step-input"
                   autofocus
                   @keydown.enter="saveEdit"
-                  @keydown.escape="cancelEdit"
+                  @keydown.escape.stop="cancelEdit"
                 />
                 <button class="btn-sm btn-primary" @click="saveEdit">{{ t('common.save') }}</button>
                 <button class="btn-sm btn-secondary" @click="cancelEdit">{{ t('common.cancel') }}</button>
@@ -240,7 +240,7 @@ watch(() => props.visible, (visible) => {
                 :placeholder="t('plan.newStepPlaceholder')"
                 autofocus
                 @keydown.enter="submitNewStep"
-                @keydown.escape="toggleAddStep"
+                @keydown.escape.stop="toggleAddStep"
               />
               <button class="btn-sm btn-primary" @click="submitNewStep">{{ t('common.add') }}</button>
               <button class="btn-sm btn-secondary" @click="toggleAddStep">{{ t('common.cancel') }}</button>

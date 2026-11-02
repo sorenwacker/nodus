@@ -58,3 +58,33 @@ describe('port ordering', () => {
     expect(source).toContain('optimizePortAssignments')
   })
 })
+
+describe('the drawn path', () => {
+  it('starts and ends at the ports the caller assigned, so hit areas and labels match the line', async () => {
+    const { routeAllEdges, analyzeEdges, getPortPoint, calculatePortOffset } = await import('../canvas/routing')
+    const nodes: NodeRect[] = [
+      { id: 'center', canvas_x: 200, canvas_y: 200, width: 200, height: 120 },
+      { id: 'r1', canvas_x: 500, canvas_y: 100, width: 200, height: 120 },
+      { id: 'r2', canvas_x: 500, canvas_y: 200, width: 200, height: 120 },
+      { id: 'r3', canvas_x: 500, canvas_y: 300, width: 200, height: 120 },
+    ]
+    const nodeMap = new Map(nodes.map(n => [n.id!, n]))
+    const edges = ['r1', 'r2', 'r3'].map((t, i) => ({ id: `e${i + 1}`, source_node_id: 'center', target_node_id: t }))
+    const ports = assignPorts(analyzeEdges(edges, nodeMap))
+    // Reverse the order on the hub's side, which the default assignment would not choose
+    for (const a of ports.sourceAssignments.values()) a.index = a.total - 1 - a.index
+
+    const routed = routeAllEdges(edges, nodes, nodeMap, 'orthogonal', ports)
+
+    for (const edge of edges) {
+      const a = ports.sourceAssignments.get(edge.id)!
+      const expected = getPortPoint(nodeMap.get('center')!, a.side, calculatePortOffset(a.index, a.total))
+      expect(routed.get(edge.id)!.path![0]).toEqual(expected)
+    }
+  })
+
+  it('is routed from the optimised assignments the canvas computed', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/canvas/composables/edges/useEdgeRouting.ts'), 'utf8')
+    expect(source).toMatch(/routeAllEdges\([^)]*\{ sourceAssignments, targetAssignments \}\)/)
+  })
+})

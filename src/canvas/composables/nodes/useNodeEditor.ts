@@ -64,6 +64,27 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   let autosaveContentTimer: ReturnType<typeof setTimeout> | null = null
   let autosaveTitleTimer: ReturnType<typeof setTimeout> | null = null
 
+  // What the file holds: the text as opened, then as last autosaved. Opening
+  // fills the edit refs, which the watchers below see as a change; only a
+  // departure from these values is the user's edit, so opening a node never
+  // writes its file
+  let openedContent = ''
+  let openedTitle = ''
+
+  function clearContentTimer() {
+    if (autosaveContentTimer) {
+      clearTimeout(autosaveContentTimer)
+      autosaveContentTimer = null
+    }
+  }
+
+  function clearTitleTimer() {
+    if (autosaveTitleTimer) {
+      clearTimeout(autosaveTitleTimer)
+      autosaveTitleTimer = null
+    }
+  }
+
   // Autosave content on change.
   //
   // The target node and its frontmatter are captured when the timer is armed,
@@ -73,10 +94,12 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   watch(editContent, (newContent) => {
     const nodeId = editingNodeId.value
     if (!nodeId) return
+    clearContentTimer()
+    if (newContent === openedContent) return
     const frontmatter = editingFrontmatter
-    if (autosaveContentTimer) clearTimeout(autosaveContentTimer)
     autosaveContentTimer = setTimeout(() => {
       autosaveContentTimer = null
+      if (editingNodeId.value === nodeId) openedContent = newContent
       store.updateNodeContent(nodeId, joinFrontmatter(frontmatter, newContent))
     }, autosaveDelay)
   })
@@ -86,9 +109,11 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     // Captured when armed, for the same reason as the content timer
     const titleId = editingTitleId.value
     if (!titleId) return
-    if (autosaveTitleTimer) clearTimeout(autosaveTitleTimer)
+    clearTitleTimer()
+    if (newTitle === openedTitle || !newTitle.trim()) return
     autosaveTitleTimer = setTimeout(() => {
       autosaveTitleTimer = null
+      if (editingTitleId.value === titleId) openedTitle = newTitle
       store.updateNodeTitle(titleId, newTitle)
     }, autosaveDelay)
   })
@@ -111,6 +136,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     void store.beginEdit?.(nodeId).then(granted => {
       // Refused: the file belongs to another application for now
       if (!granted && editingNodeId.value === nodeId) {
+        clearContentTimer()
         editingNodeId.value = null
         editContent.value = ''
         editingFrontmatter = null
@@ -121,6 +147,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
     // and out of reach of accidental edits
     const { frontmatter, body } = splitFrontmatter(node.markdown_content || '')
     editingFrontmatter = frontmatter
+    openedContent = body
     editContent.value = body
     // Focus the textarea after Vue updates the DOM (but not if editing title)
     setTimeout(() => {
@@ -140,7 +167,8 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
 
     editingTitleId.value = nodeId
     publishEditingNode()
-    editTitle.value = node.title || ''
+    openedTitle = node.title || ''
+    editTitle.value = openedTitle
     setTimeout(() => {
       const input = document.querySelector('.title-editor') as HTMLInputElement
       if (input) {
@@ -151,19 +179,13 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   }
 
   function saveTitleEditing() {
+    // An explicit save supersedes any pending autosave, and a blank title is
+    // never written
+    clearTitleTimer()
     if (editingTitleId.value && editTitle.value.trim()) {
-      // Clear any pending autosave timer
-      if (autosaveTitleTimer) {
-        clearTimeout(autosaveTitleTimer)
-        autosaveTitleTimer = null
-      }
-      // Update local state
-      const node = store.getNode(editingTitleId.value)
-      if (node) {
-        node.title = editTitle.value
-      }
-      // Persist to database
-      store.updateNodeTitle(editingTitleId.value, editTitle.value)
+      // The store sets the title itself; changing the node first hid the
+      // change from it, so no undo step was recorded
+      void store.updateNodeTitle(editingTitleId.value, editTitle.value)
     }
     editingTitleId.value = null
     editTitle.value = ''
@@ -171,6 +193,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   }
 
   function cancelTitleEditing() {
+    clearTitleTimer()
     editingTitleId.value = null
     editTitle.value = ''
     publishEditingNode()
@@ -182,10 +205,7 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
    */
   function saveEditing() {
     // An explicit save supersedes any pending autosave
-    if (autosaveContentTimer) {
-      clearTimeout(autosaveContentTimer)
-      autosaveContentTimer = null
-    }
+    clearContentTimer()
 
     const nodeId = editingNodeId.value
     if (nodeId) {
@@ -391,14 +411,8 @@ export function useNodeEditor(options: UseNodeEditorOptions) {
   }
 
   function clearAutosaveTimers() {
-    if (autosaveContentTimer) {
-      clearTimeout(autosaveContentTimer)
-      autosaveContentTimer = null
-    }
-    if (autosaveTitleTimer) {
-      clearTimeout(autosaveTitleTimer)
-      autosaveTitleTimer = null
-    }
+    clearContentTimer()
+    clearTitleTimer()
   }
 
   return {

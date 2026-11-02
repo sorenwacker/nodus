@@ -1,5 +1,5 @@
 /**
- * Targeting a workspace
+ * Targeting and creating workspaces
  */
 import type { McpToolDeclaration } from './types'
 
@@ -34,6 +34,21 @@ export const WORKSPACE_TOOLS: McpToolDeclaration[] = [
     inputSchema: {
       type: 'object',
       properties: {},
+    },
+  },
+  {
+    name: 'create_workspace',
+    description:
+      'Create an empty workspace and return its id and name. A name already in use is rejected. Neither the workspace open in the app nor the scope of this connection changes - call set_workspace to work in the new workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name of the new workspace; must not match an existing workspace (case-insensitive).',
+        },
+      },
+      required: ['name'],
     },
   },
 ]

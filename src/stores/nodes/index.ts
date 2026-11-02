@@ -40,6 +40,7 @@ export {
   updateNodeContent,
   updateNodeTitle,
   updateNodeTags,
+  resetInvalidNodeColors,
   updateNodeColor,
   moveNodesToWorkspace,
   createNode,

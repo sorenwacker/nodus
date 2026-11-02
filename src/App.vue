@@ -217,12 +217,12 @@ import { invoke, surveyOkfBackfill, applyOkfBackfill, getWorkspace, setWorkspace
 
 // MCP Server
 import { useMcpServer } from './composables/useMcpServer'
-import { appMcpStore } from './mcp/appStore'
+import { appMcpStore, canvasMcpAccess, type McpCanvas } from './mcp/appStore'
 import { useEdgesStore } from './stores/edges'
 import { useStorylinesStore } from './stores/storylines'
 
 // GraphCanvas ref for MCP viewport integration
-const graphCanvasRef = ref<ComponentPublicInstance<{ focusNode: (id: string) => void; getViewport: () => { x: number; y: number; zoom: number } }> | null>(null)
+const graphCanvasRef = ref<ComponentPublicInstance<McpCanvas> | null>(null)
 
 const syncingFiles = ref(false)
 const exportingOkf = ref(false)
@@ -317,10 +317,7 @@ provide('storylineService', storylineService)
 const edgesStore = useEdgesStore()
 const mcpServer = useMcpServer({
   store: appMcpStore({ store, edgesStore, storylinesStore, invoke }),
-  viewport: {
-    getViewport: () => graphCanvasRef.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
-    focusNode: (id: string) => graphCanvasRef.value?.focusNode(id),
-  },
+  ...canvasMcpAccess(graphCanvasRef),
   undo: {
     pushPositionUndo,
     pushDeletionUndo,
@@ -567,10 +564,10 @@ async function confirmDeleteWorkspace() {
   const name = editingWorkspace.value.name
   const keepFiles = deleteWorkspaceKeepFiles.value
 
-  await store.deleteWorkspace(id, !keepFiles)
+  const remaining = await store.deleteWorkspace(id, !keepFiles)
   showDeleteWorkspaceDialog.value = false
   showWorkspaceEditor.value = false
-  showToast(t('toasts.workspaceDeleted', { name }), 'info')
+  showToast(remaining.length ? t('toasts.workspaceFilesRemain', { name, count: remaining.length }) : t('toasts.workspaceDeleted', { name }), remaining.length ? 'error' : 'info')
 }
 
 async function resetDefaultWorkspace() {

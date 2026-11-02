@@ -18,6 +18,7 @@ import {
   useCanvasZoom,
   useCanvasDisplay,
   usePreviewPanel,
+  contentUnreadableOnCanvas,
 } from './composables/viewport'
 import {
   useNodeClipboard,
@@ -49,7 +50,7 @@ import {
   type AgentContext,
 } from './composables/agent'
 import { useContentRenderer, useViewportCulling, useGraphMetrics } from './composables/rendering'
-import { useLayout, useNeighborhoodMode, useLivePhysics, createWorkerEngine } from './composables/layout'
+import { useLayout, useNeighborhoodMode, useLivePhysics, createWorkerEngine, graphKey } from './composables/layout'
 import { agentToolStoreAdapter } from './composables/agent/agentToolStoreAdapter'
 import { buildAgentToolContext } from './composables/agent/agentToolContext'
 import { useAgentPrompt } from './composables/agent/useAgentPrompt'
@@ -64,7 +65,7 @@ import {
   useCanvasSettings,
   useCanvasEventHandlers,
   useCanvasTheme,
-  useCanvasZotero,
+  useCanvasZotero, useCanvasPrint,
   useFullscreenModal,
 } from './composables/util'
 import { measureNodeContent } from './utils/nodeSizing'
@@ -431,9 +432,6 @@ watch(
   }
 )
 
-
-// Expose functions with original names for compatibility
-
 // Handle double-click on node: navigate in neighborhood mode, zoom when zoomed out, otherwise edit
 function handleNodeDoubleClick(nodeId: string) {
   // In neighborhood mode, double-click navigates to clicked node's neighborhood
@@ -474,7 +472,7 @@ const contextMenuVisibleRef = ref(false)
 // Preview panel composable - auto-shows when single node selected while zoomed out
 const previewPanel = usePreviewPanel({
   selectedNodeIds: computed(() => store.selectedNodeIds),
-  isSemanticZoomCollapsed: computed(() => (isSemanticZoomCollapsed.value || isLODMode.value) && !neighborhoodMode.value),
+  isSemanticZoomCollapsed: computed(() => contentUnreadableOnCanvas(isSemanticZoomCollapsed.value, isLODMode.value)),
   contextMenuVisible: contextMenuVisibleRef,
   getNode: store.getNode,
   zoomToNode,
@@ -713,7 +711,7 @@ const { selectedNodeIds: storeSelectedNodeIds, filteredEdges: storeFilteredEdges
 
 // Node hover composable - handles hover state, tooltips, and active node tracking
 const nodeHover = useNodeHover({
-  scale,
+  isCollapsed: isSemanticZoomCollapsed,
   isLODMode,
   selectedNodeIds: storeSelectedNodeIds,
   filteredEdges: storeFilteredEdges,
@@ -758,7 +756,7 @@ function openExportForSelection(nodeIds: string[]) {
     .map(id => store.nodes.find(n => n.id === id))
     .filter((n): n is Node => n !== undefined)
 }
-
+const { printToPdf } = useCanvasPrint({ getNodes: () => store.filteredNodes, getEdges: () => store.filteredEdges, reportFailure: error => showToast?.(t('canvas.printFailed', { error }), 'error') })
 // Context menu composable
 const contextMenu = useContextMenu({
   getSelectedNodeIds: () => store.selectedNodeIds,
@@ -806,7 +804,7 @@ const {
 } = citationFetch
 
 // Zotero integration composable
-const { zotero, handleAddToZotero } = useCanvasZotero({
+const { zotero, addNodesToZotero, citationNodeCount, handleAddToZotero } = useCanvasZotero({
   store: {
     getNode: store.getNode,
   },
@@ -1024,7 +1022,7 @@ async function handleGraphImport(choices: {
     const nodes = result.citationNodeIds
       .map((id: string) => store.getNode(id))
       .filter((n: Node | undefined): n is Node => n !== undefined)
-    await zotero.addNodesToZotero(nodes)
+    await addNodesToZotero(nodes)
   }
 }
 
@@ -1093,7 +1091,7 @@ const markerHandlers = useMarkerHandlers({
 })
 
 // LLM tools composable for handling LLM-dependent tools
-const { sendPrompt: sendGraphPrompt, runSelection } = useAgentPrompt({
+const { sendPrompt: sendGraphPrompt, runSelection, releaseRunSelectionUnlessPaused } = useAgentPrompt({
   prompt: graphPrompt,
   isLoading: isGraphLLMLoading,
   getSelectedNodeIds: () => store.selectedNodeIds,
@@ -1131,6 +1129,7 @@ async function executeAgentTool(name: string, args: Record<string, unknown>): Pr
     service: nodeService ?? undefined,
     getRunSelection: () => runSelection.value,
     getEditingNodeId: () => editingNodeId.value,
+    addNodesToZotero,
   })
 
   // Try extracted executor (handles simple tools)
@@ -1214,8 +1213,8 @@ function stopAgent() {
 const planHandlers = usePlanHandlers({
   planState,
   agentRunner,
-  agentLog,
-  agentTasksStore,
+  agentLog, agentTasksStore,
+  onResumeSettled: releaseRunSelectionUnlessPaused,
 })
 const {
   handlePlanApprove,
@@ -1450,7 +1449,7 @@ const physics = useLivePhysics({
   getRadius: getLODRadius, isBlocked: () => neighborhoodMode.value || !isLODMode.value,
   updateNodePosition: store.updateNodePosition, snap: snapToGrid, pushUndo, toCanvasPoint: screenToCanvas,
   requestFrame: cb => requestAnimationFrame(cb), cancelFrame: id => cancelAnimationFrame(id as number),
-  createEngine: createWorkerEngine, getLayoutVersion: () => store.nodeLayoutVersion,
+  createEngine: createWorkerEngine, getLayoutVersion: () => store.nodeLayoutVersion, getGraphKey: () => graphKey(store.filteredNodes, store.filteredEdges),
 })
 // Its positions belong to this workspace and bubble view; leaving any stores them
 watch([neighborhoodMode, isLODMode, () => store.currentWorkspaceId], () => physics.stop())
@@ -1532,7 +1531,7 @@ const { updateSelectedNodesColor } = useColorOperations({
 
 const { fitSelectedNodes, fitNodeNow } = useNodeFitNow({
   getNode: store.getNode, getSelectedNodeIds: () => store.selectedNodeIds, getEditingNodeId: () => editingNodeId.value,
-  finishEditing: nodeId => { store.updateNodeContent(nodeId, editContent.value); editingNodeId.value = null; editContent.value = '' },
+  finishEditing: () => nodeEditor.saveEditing(),
   setRenderedContent: (nodeId, html) => { nodeRenderedContent.value = { ...nodeRenderedContent.value, [nodeId]: html } },
   renderMarkdown, renderTypstMath, renderMermaidDiagrams, fitNodeToContent, pushSizeUndo,
 })
@@ -1694,6 +1693,7 @@ function getViewport() {
 defineExpose({
   focusNode,
   getViewport,
+  addNodesToZotero,
 })
 </script>
 
@@ -1948,11 +1948,11 @@ defineExpose({
         :neighborhood-depth="neighborhoodDepth"
         :highlight-all-edges="highlightAllEdges"
         :bubble-mode-active="isBubbleModeForced"
-        :physics-active="physics.active.value" :physics-available="physics.available.value" @toggle-physics="physics.toggle()"
-        @zoom-in="zoomIn" @zoom-out="zoomOut"
+        :physics-active="physics.active.value" :physics-available="physics.available.value" :smart-layout-available="llmEnabled" @toggle-physics="physics.toggle()"
+        @print-to-pdf="printToPdf(store.selectedNodeIds)" @zoom-in="zoomIn"
+        @zoom-out="zoomOut"
         @fit-to-content="fitToContent"
-        @toggle-grid-lock="gridLockEnabled = !gridLockEnabled"
-        @layout="autoLayoutNodes"
+        @toggle-grid-lock="gridLockEnabled = !gridLockEnabled" @layout="autoLayoutNodes" @smart-layout="llmTools.executeLLMTool('smart_layout', {})"
         @fit-nodes-to-content="fitAllNodesToContent"
         @cycle-edge-style="cycleEdgeStyle"
         @toggle-neighborhood-mode="neighborhood.toggle()"
@@ -2030,13 +2030,13 @@ defineExpose({
         :entities="store.getEntities()"
         :current-workspace-id="store.currentWorkspaceId"
         :has-d-o-i="contextMenuNodeHasDOI"
-        :doi-count="contextMenuDOICount"
+        :doi-count="contextMenuDOICount" :citation-node-count="citationNodeCount"
         @close="closeContextMenu"
         @fit-to-content="fitNodeNow"
         @zoom-to-node="zoomToNodeDefault"
         @open-link-picker="openLinkPicker"
         @delete-nodes="deleteSelectedNodes(contextMenu.affectedNodeIds.value)"
-        @export-selection="openExportForSelection(contextMenu.affectedNodeIds.value)"
+        @export-selection="openExportForSelection(contextMenu.affectedNodeIds.value)" @print-to-pdf="printToPdf(contextMenu.affectedNodeIds.value)"
         @read-node="contextMenuNodeId && displayStore.readNode(contextMenuNodeId)"
         @add-to-storyline="addNodeToStoryline"
         @create-storyline="createStorylineFromNode"

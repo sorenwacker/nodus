@@ -58,3 +58,10 @@ describe('a call written in the model own syntax', () => {
     expect(decodeCallSyntax('I created seven nodes about Seek and connected them.')).toEqual([])
   })
 })
+
+describe('a call with numeric arguments', () => {
+  it('keeps a number written with spaces around it, beside a string argument', () => {
+    const reply = '<|tool_call>call:move_node(x: 0 , title:<|"|>Alpha<|"|>)<tool_call|>'
+    expect(decodeCallSyntax(reply)[0].args).toEqual({ x: 0, title: 'Alpha' })
+  })
+})

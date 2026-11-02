@@ -339,7 +339,9 @@ The integral is: $ integral_a^b f(x) dif x $
 **Required behavior:** A response that arrives as one buffered body is indistinguishable from a stalled connection while the model is still generating, and gateways cut it. Streaming keeps bytes flowing.
 
 - Generation requests ask the provider to stream, and the backend forwards each chunk to the interface as it arrives rather than accumulating the whole body.
+- Chat requests with tools, which is every request an agent run makes, stream as well. Only generation streamed at first, so the agent's requests still arrived as one body: an agent that had searched the notes and read the one it needed then asked for the answer, and the gateway in front of the model gave up on that buffered answer with a 504 while the two shorter requests before it had gone through. A streamed tool call arrives as fragments, one per delta, each carrying the index of the call it belongs to; the fragments are joined by index into whole calls, so a call whose name arrives in one delta and whose arguments arrive over the next twenty is one call.
 - A provider or endpoint that does not stream still works: the response is read whole, as before.
+- There is no streaming switch in the settings. One existed, and saved a value that no provider read, so it promised control over something it did not touch.
 - A stream that ends mid-message is an error, not a short answer. Silently returning a truncated generation would corrupt the text it was cleaning.
 
 ### Localisation
@@ -381,6 +383,14 @@ Two consequences this prevents. Duplicate checking against a library that could 
 
 A partial result is treated the same way: a paged lookup whose later page fails throws rather than returning the pages gathered so far, because a partial list cannot be told from a complete one.
 
+### A batch that ends before the request times out
+
+**Required behavior:** A batch request answers within the server's request timeout, and what it reports is what happened. A batch of 19 node bodies outran the server's 30 second timeout: the client was told the request timed out while the app went on writing, so the result was unknown until the client diffed a fresh listing.
+
+- `batch_update_nodes` works through its items in order and stops starting new ones once a time budget below the server's timeout is used up. The item in progress is finished, never abandoned.
+- The result lists the ids not attempted under `not_attempted`, beside the counts of updated and failed items and the per-item errors, so the client knows exactly which items to resend. `success` is true only when every item was attempted and none failed.
+- The budget is bound to the server's timeout by a gate, so lengthening one without the other fails a test. Nothing writes after the response has been sent.
+
 ### Reporting MCP server failures
 
 Starting the MCP server can fail for an ordinary reason: the port is already in use. The settings panel says so, and the stored "enabled" flag records what the user asked for and got, so a failed start is not retried on the next launch.
@@ -410,6 +420,16 @@ Every provider answers the question the same way, through one shared probe:
 - The endpoint is the one used for work, with the **configured** model. A model listing answers whenever the server is up, including when the configured model was never pulled or the account cannot reach it. Probing a hardcoded model tests something the user never chose.
 - Any failing status means unavailable. Reading "any status other than 401" as online showed green beside a model that answered nothing.
 - The reason is recorded on the provider and declared on the interface, because "could not be reached", "refused the key" and "no such model" call for different fixes. Reaching into one implementation's field with a cast left the other three reporting nothing.
+
+### Sending a test message
+
+**Required behavior:** The status light says whether the provider accepts a one-token request. It cannot say whether the provider can finish a written answer, which is what every agent run needs, and a provider that passes the probe but cuts every answer is found only by running the agent and reading its failure. The AI settings offer a test message: a real prompt, sent the way the agent sends its work, with the reply and its timing shown in place.
+
+- The panel holds an editable prompt with a default that asks for one short sentence, and a button that sends it. One request is in flight at a time; the button is disabled while it runs.
+- The request goes through the queue to the configured provider, streamed, with the same retries as agent work. What the test measures is what the agent gets.
+- The panel shows the reply as it streams in, then the time to the first byte, the total time, and the length of the reply in characters. Time to first byte separates a model that is slow to start from one that is slow to write, which call for different fixes.
+- A failure shows the message the agent would have shown, including the attempt count and elapsed time, so a provider that cannot finish a sentence is diagnosed here rather than in a run.
+- Progress is reported by every streaming provider. Only Ollama reported it; the OpenAI-compatible provider streamed but told the caller nothing until the end, so a test could not have timed its first byte.
 
 ### PDF text cleanup
 
@@ -464,11 +484,24 @@ Every provider answers the question the same way, through one shared probe:
 
 **Known limitation:** a highlight can only be imported when the PDF stores the highlighted text with the annotation, which annotators such as Zotero and Acrobat do and some, notably macOS Preview, do not. Recovering the text for the rest means locating it geometrically in the page content stream, which is not implemented. Highlights whose text cannot be recovered are reported as such rather than imported as empty nodes.
 
+### Printing the canvas
+
+**Required behavior:** "Print to PDF" produces a picture of the canvas, where document export produces a text. It prints the selected nodes, or every node of the workspace when nothing is selected, and not merely the nodes on screen.
+
+- One page, sized to the bounding box of the printed nodes plus a margin, with one canvas unit as one point. A fixed paper size would shrink a large graph until nothing could be read; a page of the graph's own size is printed or scaled by whatever opens it.
+- The page is vector: text stays sharp and can be searched and copied.
+- Each node is drawn as a card at its stored position and size, whatever the zoom level or bubble mode shows, with its title and as much of its content as fits; the rest is clipped, as on the canvas. A tag node is drawn with its title alone.
+- Only edges with both ends among the printed nodes are drawn; an edge to a node that is not printed would point at nothing. An edge is a straight line from border to border, with an arrowhead when it is directed and a label when it has one. Routed paths are not used: they avoid nodes that may not be printed, and they exist only for the part of the canvas that is on screen.
+- No interaction state is printed: no selection border, hover highlight, dimming, grid or overlay. Colours are those of the light theme, with a node's own colour as its tint, whichever theme is active. A card whose colour is dark gets light text. The typeface is the one the compiler carries, a serif, not the canvas typeface.
+- Content is printed as text. Headings, bold, italic, code and list items keep their formatting; quote markers, rules and the separator row of a table are left out; math, images, diagrams and table rows appear as their source.
+- The page is compiled, by the backend compiler that document export uses, before the save dialog opens, so a page that cannot be produced leaves no file behind.
+- The action is in the context menu of a node, for the nodes the menu acts on, and in the canvas controls, for the selection or else for all nodes.
+
 ### Document export
 
 **Required behavior:** Everything in Nodus moves thinking onto the canvas; export is the only path that takes finished work back off it. Without it a completed argument has to be retyped somewhere else to become a document, which is where the tool stops being useful and the user goes back to a word processor.
 
-Two formats, one code path: the Typst source is generated first and PDF is that source compiled by the Typst WASM the application already loads for math.
+Two formats, one code path: the Typst source is generated first and PDF is that source compiled by the Typst compiler in the backend, the one that renders math, with the fonts it bundles. The compiler that runs in the web view is not used for PDF: it could not be loaded there, and it fetches its fonts from a content delivery network that the application's content security policy does not allow and an offline machine cannot reach, so every PDF export failed. A test that replaced the compiler with a stub reported it as working; the backend compiler is tested on real source.
 
 | Format | Purpose |
 |--------|---------|
@@ -556,6 +589,10 @@ default 0.5) configurable via a slider in Settings > Appearance next to the
 semantic zoom threshold; setting it to 0 keeps labels visible at every zoom
 level.
 
+**Hover tooltip visibility (required behavior):** The tooltip appears exactly when the hovered card does not show its content: below the semantic zoom threshold, where cards collapse to titles, or in dense mode. It reads the same collapse state as the cards, so the two cannot disagree. A fixed limit of 50% zoom had been used instead, so a threshold set to 100% collapsed cards at 80% zoom while hovering them showed nothing. With the threshold at 0, cards never collapse and the tooltip appears only in dense mode.
+
+**Hover tooltip content (required behavior):** Hovering a node while zoomed out, or a bead on a timeline, opens a tooltip with the node's title, its edge counts and the start of the note. The note is shown as rendered Markdown, and its vertical spacing comes only from the block margins the tooltip defines for paragraphs, headings and lists. Line breaks in the rendered HTML are not content: the renderer emits one between every pair of block elements, and a container that preserves whitespace turns each into an empty line, which enlarged every gap and reduced how much of the note fits in the tooltip's fixed height. Whitespace is preserved only in the plain-text fallback shown when no rendered content exists, where line breaks are the only structure the text has. The tooltip is styled in its component alone; a gate test fails if another stylesheet declares rules for the tooltip's own elements or if the rendered-content container preserves whitespace.
+
 **Pan and zoom cost (required behavior):** Panning and zooming change the viewport on every frame, and the culling result feeds everything downstream - the rendered node list and all edge styling. The culled result therefore keeps its identity while the same nodes are on screen: a frame that moves the viewport a few pixels returns the previous array and set, so no dependent recomputes. A new result is produced only when a node actually enters or leaves the viewport, or when the node set itself is replaced (new objects must never be served from the cache). Enforced by tests that pan without changing visibility and assert referential stability, on both the linear-scan and spatial-index paths.
 
 **Panel sizing (required behavior):** Every panel the user can resize uses one composable, so the drag behaviour, clamping and persistence cannot drift between them: the storyline overview (width), the agent panel (width) and the timelines sheet (height). Each grows in the direction that points away from its edge - a right-hand panel widens as its separator is dragged left, a bottom sheet grows taller as it is dragged up - within a clamped range, and the chosen size is stored per panel and restored on the next launch. The timelines sheet keeps sizing itself to its lane count until the user drags it, after which their height wins. While a separator is being dragged the panel's own slide transition is suspended, for the same reason the canvas overlays suspend theirs: a transition lags behind the pointer.
@@ -621,7 +658,7 @@ Drag and drop files directly onto the canvas to import them. Supported formats:
 
 ### Zotero Integration
 
-Two methods for importing citations from Zotero:
+Two methods for bringing citations in from Zotero:
 
 **Method 1: File Drop (Export/Import)**
 1. In Zotero: Right-click collection → Export Collection → CSL-JSON (Better BibTeX recommended)
@@ -632,10 +669,18 @@ Two methods for importing citations from Zotero:
    - Layout choice (grid/force)
 4. Citation nodes created in a grid
 
-**Method 2: Direct Library Access (Settings)**
-1. Settings → Zotero → Detect (auto-detects local Zotero installation)
-2. Browse collections with item counts
-3. (Future: Click to import collection directly)
+**Method 2: Zotero Web API (Settings)**
+1. Settings → Zotero → enter the Zotero user ID and an API key, then test the connection
+2. Import one collection, or all items, into the open workspace as citation nodes
+3. Selected citation nodes can be added to the library as new items ("Add to Zotero"); an item whose DOI is already there is skipped
+
+Both directions are single actions: nothing is synchronised, an existing Zotero item is never changed, and only the personal library is reached. The steps are in `features.md` > Zotero Integration.
+
+**Zotero takes citation nodes (required behavior):** "Add to Zotero" accepts citation nodes and citation stubs, and nothing else: a note that mentions a DOI is a note, not a reference. The menu offers the action when the selection holds at least one such node and adds those; the tool names every other node it was given as not a citation node and adds the rest. The rule sits in the one function behind the menu action and both tools.
+
+Until this rule the action took any node carrying a DOI, because the papers that "Fetch Citations" and "Fetch References" bring in from Semantic Scholar were created without a type and stored as notes. In the database the rule was measured on, 2080 nodes were such notes against 202 nodes of type citation, so restricting the action first would have refused nine in ten of the nodes it existed for. Fetched papers are therefore created as citation nodes, and a migration converts the existing ones: a note whose frontmatter carries `semantic_scholar_id`, a field only the Semantic Scholar import writes, becomes a citation node. Nothing else about the node changes, and none of the 2080 had a file, so no file is touched. The migration finds nothing to do on a later start.
+
+**Adding to Zotero from an agent (required behavior):** The `add_to_zotero` tool takes node ids and adds each named node to the library as a new top-level item. It is the context-menu action under another name: both call one function, so their rules cannot differ. A node whose DOI is already in the library is skipped and counted as a duplicate, a node without content is skipped, nothing is added when the library cannot be read, and no existing item is changed or deleted. An id that names no node is reported in the result and affects nothing else. The tool returns the counts of added, duplicate and skipped nodes with any errors, and the app shows the toast the menu action shows, so an addition made by an agent is visible to the user. It needs an API key with write access. The tool exists on both agent surfaces: the MCP server, where a connection scoped to a workspace names nodes of that workspace, and the in-app agent in execute mode.
 
 **Supported Formats:**
 - CSL-JSON (Zotero native, Better BibTeX extended)
@@ -683,6 +728,8 @@ Right-click on a node to access:
 
 Multi-selection: All context menu actions work on multiple selected nodes.
 
+**Bubble mode:** A right-click on a bubble opens the same menu as a right-click on a card, and a right-click on empty canvas closes it. The bubble canvas reports which node was pressed, since a bubble is a painted circle and not an element; the viewport around it answers only the right-clicks the bubble canvas has not answered. Treating every right-click that did not land on a card element as a click elsewhere closed the menu in the same event that had opened it, so in bubble mode it never appeared.
+
 **Placement:** The menu opens at the pointer and is kept inside the window. When it does not fit below or to the right of the pointer it opens above or to the left instead, so a right-click on a node near the bottom or right edge shows the whole menu rather than running off screen. A menu taller than the window is pinned to the top edge, because the first item must be reachable.
 
 ### Physics Mode
@@ -691,13 +738,15 @@ Multi-selection: All context menu actions work on multiple selected nodes.
 
 - The mode is off by default and toggled from the canvas controls or with `P`. It is not remembered across sessions: where a node sits is the user's decision, and a simulation that starts on its own would move nodes nobody asked to move.
 - It runs in bubble mode only. Cards are DOM elements with routed edges, and moving hundreds of them every frame re-runs card layout and the edge pipeline each time; bubbles are circles and straight lines on one 2D canvas. Leaving bubble mode switches the mode off and stores the positions.
-- The simulation covers the nodes on screen when the mode is switched on, at most 2000 of them; above that the toggle is disabled and says so. Nodes off screen that are connected to them stay fixed and act as anchors, so the visible part keeps its place in the whole graph. Switching the mode off and on again takes the nodes on screen at that moment.
-- Forces: edges pull connected nodes together, nodes within 1200 units repel each other, and nodes do not overlap. There is no centring force and repulsion does not reach further, so the graph does not drift and distant nodes do not nudge each other.
-- A dragged node follows the pointer and stays pinned while held; the simulation reheats and the others respond. Releasing the node lets it move again. The held node stays the hovered node until the pointer is released. A simulated node is painted a frame or two after the pointer moves, so the pointer runs ahead of the circle; with hover read from the pointer, hover ended and began again several times a second, and each change switched the dimming of every other edge, showed and hid the tooltip and, above the edge hover threshold, showed and hid the edges themselves.
+- The simulation covers the nodes on screen when the mode is switched on, at most 2000 of them; above that the toggle is disabled and says so. Nodes off screen that are connected to them stay fixed and act as anchors, so the visible part keeps its place in the whole graph. An edge to an anchor is a tether: it keeps the length it has when the simulation is built, and at least the length of an edge between simulated nodes, so the anchor holds its neighbour where it is and pulls it back when it is dragged away. Given the common edge length instead, an anchor reeled its neighbour in from any distance: on a graph of 309 nodes with three anchors 80 000 units away, one run moved the simulated nodes a median of 3100 units toward them and left the nodes in between strung across the canvas. Switching the mode off and on again takes the nodes on screen at that moment.
+- Forces: edges pull connected nodes together, nodes within 1200 units repel each other, and nodes do not overlap. There is no centring force and repulsion does not reach further, so distant nodes do not nudge each other.
+- The graph does not drift: forces between simulated nodes rearrange them and never carry them off as a whole. The edge force moves the two ends of an edge by unequal shares, the end with fewer edges further, and the collision force does the same by size, so neither cancels out over the graph. The remainder pushed the whole graph a few hundred units in one direction on every reheat - switching the mode on, a grab, a node or edge added by an MCP client - which accumulates over a session and carries the graph away from the nodes that were off screen. The net push is removed on each step: from the edge force for every connected group that contains no anchor and no held node, and from repulsion and collision over all nodes, since a push between two nodes is equal and opposite whichever of them is fixed. The edges of a group held by an anchor or a held node keep their net pull, since that is the fixed node pulling on it.
+- A dragged node follows the pointer and stays pinned while held; the simulation reheats and the others respond. Releasing the node lets it move again. The held node stays the hovered node until the pointer is released. A simulated node is painted a frame or two after the pointer moves, so the pointer runs ahead of the circle; with hover read from the pointer, hover ended and began again several times a second, and each change switched the dimming of every other edge, showed and hid the tooltip and, above the edge hover threshold, showed and hid the edges themselves. The release ends the hold wherever it lands: pressing a bubble selects it, which opens the preview panel, and the panel keeps pointer releases to itself, so a release over it never reached the canvas and the node stayed hovered, its edges thick and highlighted, until another node was pressed and released elsewhere.
 - The simulation runs in a Web Worker, so a slow step never blocks input. Each step returns the node centres as one flat array (`Float64Array`, x and y per node), and the bubble canvas paints circles and straight edges from that array directly: no store write, no reactive update and no edge routing happens while the nodes move. One step is requested per painted frame, so the simulation never runs ahead of the display.
 - Positions are written to the store once, for the nodes that moved, when the simulation comes to rest or the mode is switched off; edges are routed again at that moment. Switching the mode on records one undo step, so one Undo restores every position from before the session.
 - With snap-to-grid on, stored positions are snapped; the simulation itself runs unsnapped.
 - Anything else that moves nodes while the mode is on - a layout command, Undo, a change from another window - ends the mode without storing the simulation's positions. The simulation holds its own copy of every position and the bubble canvas paints that copy, so a layout run during the mode changed the store but nothing on screen moved, and switching the mode off then stored the simulation's copy over the layout.
+- A change to the graph while the mode is on - a node or an edge added or removed, by an MCP client, the agent or the user - is taken into the simulation. The positions reached so far are stored, the simulation is rebuilt from the nodes on screen and their edges as they now are, and it reheats, so a new node settles among its neighbours and a new edge pulls its ends together. No further undo step is recorded: one Undo still restores the positions from before the session. Creating or deleting a node also counts as a position write, which used to end the mode like a layout does, discarding what the simulation had reached; a change of the graph now takes precedence over that rule. A change that leaves more than 2000 nodes on screen ends the mode and stores the positions.
 - The mode is unavailable in neighbourhood mode, whose positions are an overlay that is never stored.
 
 ### Neighborhood Mode
@@ -711,6 +760,7 @@ Focus view that isolates a node and its connected neighbors:
 - **Positions are not stored:** Every arrangement computed in this mode is an ephemeral overlay. Stored coordinates are untouched, so leaving the mode restores the canvas exactly as it was.
 - **The minimap follows:** it shows the subgraph on screen at its overlay positions, not the workspace behind it.
 - **Visual highlighting:** Focus node and neighbors highlighted, rest dimmed
+- **Reading a node:** Selecting a single node opens its preview panel wherever the card does not show the content - cards collapsed to their titles, or bubbles - exactly as outside the mode. The mode had been excluded from that rule, so in a zoomed-out neighbourhood a click selected a node and showed nothing of it. Double-click keeps its meaning of moving the focus.
 - **Moving the focus:** Double-clicking any neighbour card, on its title or its body, collapsed or expanded, makes that node the focus and re-arranges the subgraph around it. The title's double-click-to-rename is suspended for neighbours while the mode is open, because the header's rename handler used to stop the event before the card saw it: a double-click on a neighbour's title opened the rename input, with the title selected, instead of navigating. Renaming by double-click stays available on the focus node and outside the mode.
 
 ### Edge Routing (PCB-Style)
@@ -1111,6 +1161,7 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 | `create_nodes_batch(nodes)` | Create or update multiple nodes. Handles any size array by processing in chunks |
 | `update_node(title, new_content, date, date_end, tags)` | Update ONE node: content, date or tags. For multiple nodes use batch_update |
 | `update_edge(from_title, to_title, label, color)` | Update an edge label or color by specifying the connected node titles |
+| `add_to_zotero(node_ids)` | Add nodes to the user's Zotero library as new items; a DOI already in the library is not added again |
 | `update_title(title)` | Change the note title |
 | `update_content(content)` | Update the note content with new text. THIS SAVES YOUR WORK |
 | `append_content(text)` | Append text to the end of the note |
@@ -1138,7 +1189,8 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 |------|-------------|
 | `read_graph(mode, include_content, max_content_length)` | Read the current graph state. Auto-adapts to available context. Modes: "auto" (default), "titles", "summary", "full" |
 | `get_connected_components()` | How many separate groups the graph falls into, and which nodes are in each. Without it, a claim that the graph is connected can only be a guess |
-| `query_nodes(filter)` | Query nodes from database. Returns list of {title, content} for planning |
+| `query_nodes(filter)` | Search node titles and content. Returns each hit with a preview of its content; the search term also matches the other number of a plural ("FIPs" finds "FIP") |
+| `read_node(title)` | Read one node's full content by title. For a question about one note, this follows a search in place of reading the whole graph |
 | `for_each_node(filter, action, template)` | Process nodes: set/append content with templates, or use LLM to generate/transform content |
 | `check_completeness(topic, findings)` | Assess if research on a topic is complete. Returns coverage score and suggests follow-up queries if gaps exist |
 
@@ -1161,6 +1213,7 @@ The transcript persists for the session, scrolls to the newest turn as it arrive
 |------|-------------|
 | `auto_layout(layout, sort)` | Arrange nodes in a layout |
 | `smart_move(instruction)` | Move nodes based on semantic criteria. LLM reasons about each node. Use for "move cars left, animals right" |
+| `smart_layout(instruction?)` | Arrange the selected or all visible nodes as a top-down tree from node kind and connections. See features.md > Smart Layout |
 | `smart_connect(groups)` | Connect nodes within semantic groups. E.g., "connect animals together, connect cars together, but not across" |
 | `smart_color(instruction)` | Color nodes into multiple categories based on what they represent. LLM semantically classifies each node |
 | `color_matching(pattern, color)` | Color nodes by SEMANTIC criterion (what nodes represent). Use for categories like "person", "organization", "question". NOT for text patterns - use color_regex instead |
@@ -1306,7 +1359,8 @@ Resetting the default workspace also removes its previous storylines before rese
 
 **Required behavior:** Reading is where the gaps show, so the reader is where the fix should happen. Leaving the reader to edit a paragraph and coming back loses the place and the flow.
 
-- Double-click a section's text to edit that node's markdown in place. Save with **Cmd/Ctrl+Enter** or by clicking away; cancel with **Escape**.
+- Double-click a section's text or its title to edit that node's markdown in place. Save with **Cmd/Ctrl+Enter** or by clicking away; cancel with **Escape**.
+- A double-click on a link or a control inside the text keeps its own meaning and does not open the editor. For a time only the title took the gesture, to keep double-click word selection in the body; the body went on saying "Double-click to edit" and did nothing, which is the worse of the two. Text in the body is selected by dragging.
 - Saving writes through the same store path as canvas editing, so file sync, undo and the anchored-wikilink rendering behave identically. The section re-renders on save.
 - Editing acquires the node's file lock first, exactly as the canvas does. If the file is locked by another program, the reader says so and the text stays read-only; it must never silently fork a locked file.
 - One section edits at a time. Starting an edit in another section saves the current one first.
@@ -1395,6 +1449,8 @@ Side padding is narrow at this type size. With 24px each side, a default card le
 **The type size follows the card, not the other way round.** A fixed 28px meant a 200px card held about ten characters a line, so two lines showed about twenty of them. Ordinary titles are longer than that - "General-purpose AI model obligations" is thirty-five characters, "Non-consensual intimate imagery generation" is forty-two - so the clamp truncated almost every title on a default card, and the ellipsis was the normal case rather than the exception. Adjusting the padding, the line bound and the box model each corrected a different artifact of that truncation without removing the truncation itself.
 
 The card therefore chooses the largest type size, up to the base size, at which the whole title fits the lines its height allows. Only a title too long for the smallest readable size is truncated, which makes the ellipsis rare and meaningful again. The line budget and the type size are chosen together, because each depends on the other: a smaller size yields more lines and more characters a line.
+
+Whether a title fits is decided the way the browser wraps it: word by word, with each word's width measured at the title's font, weight and letter spacing. Counting characters assumed a title could break anywhere and that every glyph had an average width, so a title of three medium words, such as "DataCite Metadata Schema", was judged to fit two lines at full size and was cut on the third. A word wider than a whole line is broken across lines, as the stylesheet's `overflow-wrap: break-word` does.
 
 The budget subtracts the border the card actually draws. The collapsed card's border is written inline from the zoom, so it is not the 2px the stylesheet declares; assuming the declared value overestimated the height available at every zoom where cards are collapsed.
 
@@ -1490,6 +1546,28 @@ Progress never advanced, for two reasons at once. There were two task lists - a 
 The model writes markdown, and the transcript renders it. Interpolating the text showed `**emphasis**` and list markers literally.
 
 The reply passes through the same renderer the canvas uses, so it crosses the sanitisation boundary: a model's output is untrusted text like any other.
+
+### Answering a question
+
+A request that asks what the notes say, and asks for no change, is answered: the agent reads what the answer needs and replies.
+
+Every mode's instructions described building. The default mode told the model to read the graph, research on the web, synthesize, draft a plan and request approval, whatever the request was, so a plain question about the workspace set off that whole sequence: nine tool calls and still running, for a question the notes answer.
+
+- The instructions state the rule ahead of the mode's method and say it takes precedence over it.
+- For a question the agent makes at most the reads the answer needs - a search of the notes, then the notes the search turned up, or one reading of the graph for a question about the graph as a whole - and then gives the answer as its final message. It makes no plan, requests no approval, changes nothing, and uses web research only when the question asks for information the notes do not hold.
+- Whether a request is a question is the model's judgement, stated in the instructions; the request is not classified by pattern matching (Classifying what the user wrote).
+- The rule is an instruction to the model, so it lowers the number of calls without bounding it. The gate test checks that every mode's instructions carry the rule, not what a model does with it.
+
+#### Reading the note the question is about
+
+A question about one note is answered from that note. The agent searches the notes with `query_nodes`, reads the hits it needs with `read_node`, and answers.
+
+Asked what one note's subject was for, the agent searched, found the note, and then had no way to read it: the search returned titles only, and the agent had no tool that reads one node. Its only path to the content was `read_graph` in full mode, which sent all 216 notes of the workspace with content in one request, and the provider's gateway gave up waiting for the model. The instructions had also told the model to read the whole graph first for any question.
+
+- `read_node(title)` returns one node's full content and is available in every mode. A title that names no node is reported, so the model can search again rather than guess.
+- `query_nodes` returns a preview of each hit's content next to its title, so the model can pick the relevant hit without a second call per node.
+- The search term matches the other number of a plural: "FIPs" finds a note titled "FIP" and "FIP" finds "FIPs". The term is matched as typed and, when it ends in a plural suffix, as its stem, provided the stem is at least three characters long so a short word does not match everything. Nothing is inferred beyond that; a term in another language or an irregular plural is matched as typed.
+- The instructions say to search and then read the hits, and to read the whole graph only for a question about the graph as a whole, such as duplicates or counts.
 
 ### What the agent acts on
 
@@ -1598,6 +1676,10 @@ A gateway timeout was missing from the list. Something between the application a
 
 - A gateway status - it timed out, or it could not reach the model - is retried like the other transient ones.
 - A status with no body says what the status means, rather than showing an empty body as if the provider had said nothing worth repeating.
+- The retries wait for the backend to recover: about 5, 15 and 45 seconds, rather than 1 and 2. A backend that stalls does so for longer than a second or two, so three attempts within three seconds all landed in the same stall and the user saw one failure. The waits are the same for every transient status, since none of them clears in a second.
+- Each retry is written to the run's transcript as an action on the current turn, naming the failure and the wait, so a provider that is failing looks different from an application that crashed. Before, the retries were written to the browser console only and the user saw a single final error.
+- Stopping the run interrupts the wait. A retry that is waiting 45 seconds would otherwise keep the run alive that long after the user pressed stop.
+- A connection the gateway drops mid-body is transient and is retried. Once chat requests streamed, a gateway that had answered 504 to a buffered request instead sent the response headers, waited for the model, and closed the connection, which reaches the application as a body read ending in an unexpected end of file. The text carries no status and matched none of the retry patterns, so the run ended on the first drop.
 
 ### Reporting a provider failure
 
@@ -1606,6 +1688,7 @@ A failed request says what the provider said. The message the API returned was p
 - The parsed message survives to the caller.
 - A failure that is not a connection failure is not reported as one. A malformed chunk from a running server was reported as "Cannot connect to Ollama. Start it with: ollama serve", which sends the user to start a server that is already running.
 - Availability is decided by the one shared probe, for every provider. Three providers delegate to it and one re-implemented it by hand, so a change to the shared rule would have skipped that provider silently.
+- A request failure that ends a run says how many attempts were made and how long they took, as in "after 4 attempts over 4 min 50 s" or "on the first attempt, after 62 s". A transcript that showed only the final status could not say whether the retries had run at all, and a stall of a minute per attempt looked the same as a refusal that came at once. Stopping the run is not a failure and carries no such note.
 
 ### Reading an event stream
 
@@ -1641,6 +1724,14 @@ The MCP server outlives any one Nodus session, so it reconnects. A tool call att
 
 Each queued paper carries the direction it was queued for. The direction used to be read once when the run began, from a value a later request overwrote: papers queued mid-run were fetched in whichever direction the run started with, and papers already queued could have their direction changed under them.
 
+### Updating edges in batches
+
+**Required behavior:** An MCP client can change the label, direction, or color of many edges in one request. Edges could be created and deleted in batches but only updated one at a time, so relabelling a workspace's edges took one round trip per edge: 63 edges took 63 calls.
+
+- `batch_update_edges` takes a list of updates, each naming an edge by id with any of `label`, `directed`, and `color`. An empty label or color clears it, as in `update_edge`.
+- Every item is attempted. The result counts the edges updated and failed and lists each failure with the edge id and the reason, as `batch_update_nodes` does, so an edge that does not exist does not stop the rest and is not silently skipped.
+- `success` is true only when no item failed.
+
 ### Reporting MCP errors
 
 A failure says what went wrong, and its code says what kind of failure it was.
@@ -1651,9 +1742,24 @@ A failure says what went wrong, and its code says what kind of failure it was.
 - "Not connected" covers three situations - never reached, dropped, and waiting for approval - and each says which, because the advice differs.
 - A rejection is recognised by the code and the state it carries, never by the words in its message. The text was matched against "reject", "denied" and "declined", so a refusal phrased any other way read as a wait. The refusal names no request to settle, so the connection itself records it: every later call then says the user refused, rather than that approval is still pending.
 
+### Reading edges by label
+
+**Required behavior:** An MCP client can find the edges with a given label, the edges with none, and the vocabulary of labels in use, without dumping every edge and joining against a node dump. Finding four unlabelled edges among 280, and the 80 distinct labels they carried, needed a full dump and a script.
+
+- `get_edges` filters by `label`, matched exactly after trimming, and by `unlabelled_only`, which keeps edges whose label is null or blank. Both combine with the existing `node_id` filter and the limit and offset.
+- `get_edges` with `include_titles` adds `source_title` and `target_title` to each edge, so a small edge query reads on its own. Without it the result is unchanged, since titles enlarge a full dump.
+- `get_edge_labels` returns each distinct label with the number of edges carrying it, most frequent first, and the number of unlabelled edges. Labels are distinguished exactly, so `Supports` and `supports` are listed as two entries: the census exists to show such inconsistencies, not to hide them.
+
 ### A result keyed by what identifies a node
 
 A result that maps to nodes is keyed by the node's id. Titles are not unique, and keying by title silently merges the nodes that share one: the adjacency list came back with fewer entries than the graph has nodes, and which of them survived depended on the order they were walked. The tool's own description already promised ids.
+
+### Listing nodes by field and by tag
+
+**Required behavior:** An MCP client can shape a node listing to what it needs and can read the nodes carrying a tag directly. A listing of 134 notes with every field overran the client's context, while the compact form lacked the degree, so a tag-driven audit needed a full dump of nodes and edges and a script.
+
+- `list_nodes` takes `fields`, a list of the node fields to return. `id` is always present. `degree`, the number of edges at the node in the workspace, is a field like any other, computed only when asked for. A field name the node does not have is an invalid-parameters error naming the known fields, so a typo does not silently return less.
+- `get_nodes_by_tag` returns the nodes whose recorded tags include the given tag, matched without the leading hash and without regard to case, as the tag nodes match. Tag nodes are not themselves listed. It takes the same `fields`, and returns id, title and tags by default.
 
 ### A routed tool is an advertised tool
 
@@ -1661,6 +1767,14 @@ A name the request router accepts is one the server advertises, and the reverse.
 
 - Every case the router handles names an advertised tool, and every advertised tool is routed.
 - A gate compares the two lists, so they cannot drift apart.
+
+### Tag nodes over MCP
+
+**Required behavior:** An MCP client can see the tags of a workspace with the tag nodes that stand for them, and can regenerate those nodes and their edges from the notes' tags. After a client deleted one tag node it had no way to tell what else had changed, and no way to put the tag layer back other than guessing.
+
+- `list_tags` lists every tag in use, with the number of notes recording it, the id of its tag node when one is drawn, and the number of `tagged` edges at that node. A tag node that no note records any more is listed too, with no notes, so an orphan is visible. Most used first.
+- `rebuild_tag_nodes` runs the tag node repair that Settings > Canvas > Repair Tag Nodes runs - merging duplicates, restoring a missing hash, deleting tag nodes no note uses - and then connects every shared tag as loading the workspace does. It reports what it changed: tag nodes merged, renamed and removed, edges repointed, deleted and added.
+- The rebuild acts on the workspace open in the app, because the edges it reads and connects are the ones the app has loaded. A connection scoped to another workspace is refused with an error that names both workspaces, rather than silently rebuilding the wrong one. The settings panel and the MCP tool share one repair function, so the two cannot drift.
 
 ### An import the built MCP server can resolve
 
@@ -1682,6 +1796,28 @@ The MCP server kept a second palette of its own: eight saturated hex values. The
 - Edges and storylines keep solid values: an edge stroke is drawn as given, a timeline lane is painted opaque on purpose.
 - The node palette holds seven colours and no grey, so grey is not offered for a node. It stays available where it already works.
 - The row of colours in use offers only what the presets do not. Its purpose is to reach a colour the palette does not carry, so listing a colour that is already a swatch directly below it repeats the same choice twice and crowds out the custom ones it exists for. A colour the current theme's palette does not offer still belongs there, because in that theme it is not otherwise reachable. When every colour in use is a preset the row is empty and disappears, separator included.
+
+
+### Placing the colour bar
+
+The colour bar, shown while nodes are selected, is centred in the part of the canvas that is left free.
+
+Other layers cover the canvas: the agent panel and the node preview panel from the left, the storyline reader from the right, the minimap in the top right corner. The bar was centred on the whole canvas, so with the reader open its right half ran under the reader, and it lay over the minimap.
+
+- The free part runs from the right edge of the agent panel and of the preview panel, when shown, to the left edge of the minimap, when shown, and of the reader.
+- The bar is centred in that part and no wider than it; when its colours do not fit on one line they wrap onto the next.
+- The bar follows the reader as it slides, in step with the minimap.
+
+### A node's colour is a colour or nothing
+
+A node's stored colour is a value a stylesheet accepts as a colour, or it is empty. Nothing else is stored, and nothing else is painted.
+
+The MCP colour tools declared their colour parameter as a string and described resetting as "or null", so a caller sent the word `null`. It was stored as the colour. The card background is the colour layered over the surface, and a background written with a word that is not a colour is discarded when it is computed, which leaves the card with no background at all: the card was see-through and the edges behind it showed.
+
+- Resetting a colour over MCP takes JSON `null`, an empty string or the word `null`; all three store an empty colour. A value that is neither a colour name the tools offer nor a colour value is refused with an error rather than stored.
+- The store refuses to write a colour that is not a colour value, whoever asks, and writes an empty colour instead.
+- A node already holding such a value is reset to an empty colour when the application loads. Measured on the vault this was written against: 4 nodes, all holding `null`.
+- The card background is built only from a colour value, so a card is never left without a background.
 
 ### Finding nodes by colour
 
@@ -1807,6 +1943,10 @@ Since the zoom cannot be prevented, it is undone: after any gesture that could h
 An undirected edge has no arrowhead at any zoom level. Above the level-of-detail threshold the arrowhead-suppression flag was hardcoded to false, so an edge with `directed === false` drew no arrow at normal zoom and grew one as soon as the graph crossed the threshold.
 
 A marker id is derived from a colour by removing everything that is not a letter or digit. Stripping only `#` assumed hex, and an `rgba(...)` colour produced an id whose spaces, commas and parentheses are invalid in both an `id` and a `url(#...)` reference, so arrowheads vanished while hovering a colour-tinted node. The marker definition and the reference derive the id from the same function, because they must agree.
+
+### The line under an arrowhead
+
+**Required behavior:** An arrowhead ends the line: the visible line stops inside the base of the head, and the tip of the head marks where the edge arrives. A line keeps a constant thickness on screen, so in canvas units it widens as the view zooms out, while the head had a fixed size of 20 canvas units and was drawn over the last 20 units of the line. Zoomed out, the line was wider than the pointed end of the head and its square end showed through the tip, so a head looked like two barbs on a blunt bar. The head is therefore at least four widths of a highlighted line, and never smaller than the 20 units it has at normal zoom, and the stroked line ends a tenth of the way into the head. The tip lies the arrow offset beyond the end of the routed path, which for an edge arriving at right angles is the border of the node. Routing is unchanged: the routers, the hit area and the label use the full path, and only the visible stroke of an edge that carries a head is shortened, by moving the last point of the path back along its final direction. A final segment shorter than the head keeps a stub, so the head keeps its direction.
 
 ### Rendering queued diagrams
 
@@ -1970,11 +2110,16 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 
 ### Choosing a workspace
 
-**Required behavior:** The workspace list is searchable, ordered by what the user touched most recently, and says how large each workspace is.
+**Required behavior:** The workspace list is searchable, sortable by last use, name or creation date, and says how large each workspace is.
 
 - The workspace scopes the canvas, search, the agent's context and file sync, so choosing one is the most consequential control in the toolbar. A plain dropdown of every workspace in creation order stops being usable somewhere around a dozen entries; this installation has thirty-seven.
 - Typing filters the list by name, ignoring case and accents. The keyboard alone can reach any workspace: arrows move, Enter switches, Escape closes.
-- Recently opened workspaces come first, in the order they were last opened, and the rest follow alphabetically. Recency is the only ordering that reflects how the list is actually used, and alphabetical order underneath keeps a workspace findable when it has not been opened before.
+- A sort control in the list header offers three orders, and the chosen one is remembered across sessions:
+    - **Last used** (default): workspaces in the order they were last opened, most recent first, then the never-opened ones by name. Every opened workspace is tracked, not only the latest few, so the order covers the whole list. Recency reflects how the list is actually used; the name order underneath keeps a workspace findable before it has been opened.
+    - **Name**: alphabetical, ignoring case and accents, as the filter does.
+    - **Created**: newest first, by the workspace's stored creation date, so a workspace made yesterday is at the top even if it was never opened.
+- Last use is recorded in the app's local storage when a workspace is chosen in the switcher. Opening a workspace through MCP or the agent does not count as a use.
+- Filtering narrows the list and keeps the chosen order.
 - Each row carries its node count, taken from the nodes already in memory rather than a query, so the list says which workspaces hold work and which are empty.
 
 ### Workspace settings
@@ -1985,6 +2130,7 @@ Twenty-five call sites called `logger.debug()`. None could ever emit: the thresh
 - Restoring a deleted workspace restores its vault path and its sync setting.
 - The description field is removed. No workspace description is stored anywhere, so text typed there was discarded on save.
 - A rename that fails is reported. A new workspace is opened only after it has been created.
+- Deleting a workspace with "Keep original markdown files" unchecked permanently deletes the files of its nodes, as the dialog warns. A file that cannot be deleted is reported: the workspace is still deleted, and the notice names how many files remain on disk. Failures used to reach only the log, so the user was told the workspace and its files were gone while some files remained.
 
 ### What a card's chip row shows
 
@@ -2049,6 +2195,14 @@ The web view of the packaged application connects only to the hosts its content 
 - The frontend reaches outside services through one function, which hands the request to the backend when running in the packaged application.
 - A direct `fetch` is permitted only in the files a gate test lists, each for a host the policy names: the local Ollama server and the Semantic Scholar API.
 
+### MCP reads are independent of the canvas layers
+
+**Required behavior:** An MCP connection reads the graph as data: the nodes and edges of its workspace, whatever the canvas is currently drawing. The edge reads already ignored the layer toggles, but the node reads went through the canvas filter, which hides tag nodes while the tag layer is off, and the edge reads were derived from those nodes. With the layer hidden, the default, an unscoped connection listed no tag nodes and no `tagged` edges, and reported a graph without a tag type.
+
+- The store exposes the workspace's nodes as data, independent of the tag layer toggle, beside the nodes it draws. The graph edges as data derive from the data nodes, not from the drawn ones.
+- The MCP adapter reads nodes and edges from the data views. The layer toggles change what the canvas draws and nothing an MCP client sees.
+- A scoped connection already read the workspace's nodes directly; the unscoped one now reads the same set for the open workspace.
+
 ### Workspace scoping for MCP connections
 
 **Required behavior:** A connection scoped to a workspace sees that workspace, consistently. Scoping only the list getters produced a store that contradicted itself: a listing returned the target workspace's items while a lookup of those same ids failed, because it resolved against whichever workspace the user happened to have open.
@@ -2058,6 +2212,14 @@ The web view of the packaged application connects only to the hosts its content 
 - A write lands in the connection's workspace, as its reads come from it.
 - Storylines are scoped like nodes and edges. They were read and written through the application's open workspace throughout, so a scoped connection listed the wrong workspace's storylines and created its own in the wrong place.
 - A store that scopes some of its methods and inherits the rest cannot be read for what it does. Each method is either scoped or recorded as independent of the workspace, and a gate holds the list.
+
+### Creating an edge by node titles
+
+**Required behavior:** An MCP client can create an edge by naming its endpoints by title, so a small addition does not need an id lookup for each end. Ids stay the precise address: a title names a node only when it names exactly one.
+
+- `create_edge` takes `source_title` and `target_title` as alternatives to `source_node_id` and `target_node_id`. Each end may be given either way, and an id and a title may be mixed.
+- A title matches a node of the connection's workspace by its whole title, ignoring case and surrounding whitespace. A title no node has is an invalid-parameters error, and a title several nodes share is one too, listing the ids it names, so the client can choose rather than have one chosen for it.
+- An end given neither way is an invalid-parameters error.
 
 ### Deleting a merged wikilink edge
 
@@ -2202,6 +2364,8 @@ Settings modal with six tabs: General, Appearance, Canvas, AI, Citations, Integr
 ### MCP Server
 
 Workspace scoping: each connection can target its own workspace via `list_workspaces` / `set_workspace` (id or name), independent of the workspace open in the app — multiple agents can work different workspaces in parallel. An unscoped connection follows the open workspace. Scoped reads serve that workspace's nodes, edges, and storylines; node creation lands there; scoped changes stay off the user's undo stack.
+
+Creating a workspace: `create_workspace` takes a `name` and returns the new workspace's `id` and `name`. The workspace is created as the New Workspace dialog creates it - empty, with no vault folder and sync off - and appears in the app's workspace list at once. It changes neither the workspace open in the app nor the scope of the calling connection; the client calls `set_workspace` to work in it. The name is sanitized as in the dialog. A name that is empty after sanitizing, or that matches an existing workspace or `Default` without regard to case, is rejected as invalid parameters: `set_workspace` resolves a name to the first match, so a second workspace with the same name could not be reached by name.
 
 Connection trust: a client's first connection requires user approval in the app. On approval the server issues a random token whose SHA-256 hash is stored in the `mcp_trusted_clients` table; the client persists the token (`~/.nodus/mcp-token`) and presents it via an `authenticate` request on later connections, which are then approved without a prompt. Clients that present no valid token get the approval prompt after a short grace period or on their first request. Settings > Integrations shows the number of trusted clients and can forget them all, which revokes every stored token.
 

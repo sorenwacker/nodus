@@ -36,6 +36,16 @@ function agentToolNames(): string[] {
  * needs plumbing the in-app agent gets implicitly from the running app.
  */
 const INTENTIONAL_MCP_ONLY: Record<string, string> = {
+  create_workspace: 'the in-app agent acts on the workspace and view the user already has open',
+  batch_update_edges:
+    'a bulk update of edges addressed by id; the in-app agent addresses one edge at a time by its endpoint titles through update_edge',
+  get_edge_labels:
+    'a count per edge label for a client that cannot see the canvas; the in-app agent\'s user sees the labels drawn on the edges',
+  get_nodes_by_tag:
+    'reads the nodes carrying a tag for a client that works on the graph as data; the in-app agent sets tags through tag_nodes and has no read by tag',
+  list_tags:
+    'a tag census with the tag nodes behind it for a client that cannot see the canvas; the in-app user sees the tag chips and tag nodes drawn',
+  rebuild_tag_nodes: 'the in-app user runs the same repair from Settings > Canvas > Repair Tag Nodes',
   focus_node: 'the in-app agent acts on the workspace and view the user already has open',
   get_viewport: 'the in-app agent acts on the workspace and view the user already has open',
   get_workspace: 'the in-app agent acts on the workspace and view the user already has open',
@@ -89,7 +99,7 @@ const BASELINE_MCP_ONLY: Record<string, string> = {
   get_graph_summary: 'baseline debt: no in-app agent counterpart yet',
   get_hub_nodes: 'baseline debt: no in-app agent counterpart yet',
   get_leaf_nodes: 'baseline debt: no in-app agent counterpart yet',
-  get_node: 'baseline debt: no in-app agent counterpart yet',
+  get_node: 'the in-app agent has read_node, which names its target by title rather than id',
   get_node_neighbors: 'baseline debt: no in-app agent counterpart yet',
   get_nodes_by_color: 'baseline debt: no in-app agent counterpart yet',
   get_orphan_nodes: 'baseline debt: no in-app agent counterpart yet',
@@ -136,6 +146,7 @@ const BASELINE_AGENT_ONLY: Record<string, string> = {
   move_node: 'baseline debt: no MCP counterpart yet',
   query_nodes: 'baseline debt: no MCP counterpart yet',
   read_graph: 'baseline debt: no MCP counterpart yet',
+  read_node: 'MCP clients read one node by id through get_node',
   rename_selected: 'baseline debt: no MCP counterpart yet',
   research: 'baseline debt: no MCP counterpart yet',
   research_topic: 'baseline debt: no MCP counterpart yet',
@@ -143,6 +154,7 @@ const BASELINE_AGENT_ONLY: Record<string, string> = {
   smart_color: 'baseline debt: no MCP counterpart yet',
   smart_connect: 'baseline debt: no MCP counterpart yet',
   smart_move: 'baseline debt: no MCP counterpart yet',
+  smart_layout: 'classifies with the app\'s configured AI provider; an MCP client already is a model and can call batch_move_nodes',
   summarize_selected: 'baseline debt: no MCP counterpart yet',
   update_content: 'baseline debt: no MCP counterpart yet',
   update_selected_content: 'baseline debt: no MCP counterpart yet',
@@ -191,9 +203,9 @@ const FIELD_EXCEPTIONS: Record<string, { mcpOnly?: string[]; agentOnly?: string[
     reason: 'the agent works in the workspace the user has open',
   },
   create_edge: {
-    mcpOnly: ['source_node_id', 'target_node_id', 'label', 'directed', 'weight', 'color', 'link_type'],
+    mcpOnly: ['source_node_id', 'target_node_id', 'source_title', 'target_title', 'label', 'directed', 'weight', 'color', 'link_type'],
     agentOnly: ['from_title', 'to_title', 'type'],
-    reason: 'MCP addresses nodes by id; the app addresses by title',
+    reason: 'MCP addresses nodes by id, or by title under its own field names; the app addresses nodes by title',
   },
   update_edge: {
     mcpOnly: ['id', 'label', 'link_type', 'directed', 'color', 'weight'],

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 // The definition and the reference must agree on the id, so both use the one
 // function (PRODUCT_DESIGN.md > One rule, one place)
 import { arrowMarkerIdFor as getArrowMarkerId } from '../composables/edges/useEdgeVisibility'
+import { ARROW_HEAD_OVERLAP, HIGHLIGHT_WIDTH_FACTOR, arrowHeadLength } from '../routing/arrowHead'
 import type { VisibleEdgeLine } from '../composables/edges'
 
 const props = defineProps<{
@@ -68,6 +69,9 @@ const markerColors = computed(() => {
   return Array.from(colors)
 })
 
+// The head grows with the line, which widens in canvas units as the view zooms
+// out (PRODUCT_DESIGN.md > The line under an arrowhead)
+const arrowHeadSize = computed(() => arrowHeadLength(props.edgeStrokeWidth))
 
 </script>
 
@@ -80,10 +84,10 @@ const markerColors = computed(() => {
         :id="getArrowMarkerId(color)"
         :key="color"
         viewBox="0 0 10 10"
-        markerWidth="20"
-        markerHeight="20"
+        :markerWidth="arrowHeadSize"
+        :markerHeight="arrowHeadSize"
         markerUnits="userSpaceOnUse"
-        refX="10"
+        :refX="10 * ARROW_HEAD_OVERLAP"
         refY="5"
         orient="auto"
       >
@@ -98,9 +102,9 @@ const markerColors = computed(() => {
       <path
         v-for="edge in group"
         :key="edge.id"
-        :d="edge.path"
+        :d="edge.isHighlighted ? edge.linePath : edge.path"
         :stroke="edge.isHighlighted ? edge.edgeHighlightColor : (edge.color ?? undefined)"
-        :stroke-width="edge.isHighlighted ? edgeStrokeWidth * 1.3 : edgeStrokeWidth"
+        :stroke-width="edge.isHighlighted ? edgeStrokeWidth * HIGHLIGHT_WIDTH_FACTOR : edgeStrokeWidth"
         :stroke-opacity="edge.opacity"
         :marker-end="edge.isHighlighted && !edge.isBidirectional && !edge.isShortEdge ? `url(#${edge.arrowMarkerId})` : undefined"
         fill="none"
@@ -135,7 +139,7 @@ const markerColors = computed(() => {
         />
         <!-- Visible edge path (branch for bundled, full path for unbundled) -->
         <path
-          :d="edge.path"
+          :d="edge.linePath"
           :stroke="edge.isHighlighted ? edge.edgeHighlightColor : (edge.color ?? undefined)"
           :stroke-width="edge.renderStrokeWidth"
           :stroke-opacity="edge.opacity"

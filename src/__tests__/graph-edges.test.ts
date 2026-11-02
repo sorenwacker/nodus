@@ -28,13 +28,13 @@ vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }))
 
-function makeNode(id: string): Node {
+function makeNode(id: string, nodeType = 'note'): Node {
   return {
     id,
     title: id,
     file_path: null,
     markdown_content: null,
-    node_type: 'note',
+    node_type: nodeType,
     canvas_x: 0,
     canvas_y: 0,
     width: 200,
@@ -96,6 +96,46 @@ describe('graphEdges', () => {
 
     expect(store.filteredEdges).toEqual([])
     expect(store.graphEdges.map((e: Edge) => e.id)).toEqual(['e1'])
+  })
+})
+
+describe('the graph as data while the tag layer is hidden', () => {
+  // The tag layer toggle is a view choice. The MCP adapter read nodes through
+  // the canvas filter, so with the layer hidden - the default - an unscoped
+  // connection listed no tag nodes and, since the data edges derived from
+  // those nodes, no tagged edges either
+  // (PRODUCT_DESIGN.md > MCP reads are independent of the canvas layers)
+  beforeEach(() => {
+    localStorageMock.clear()
+    setActivePinia(createPinia())
+  })
+
+  it('graphNodes keeps tag nodes that filteredNodes hides', () => {
+    const store = useNodesStore()
+    store.nodes.push(makeNode('a'), makeNode('#tag', 'tag'))
+    store.showTagEdges = false
+
+    expect(store.filteredNodes.map((n: Node) => n.id)).toEqual(['a'])
+    expect(store.graphNodes.map((n: Node) => n.id)).toEqual(['a', '#tag'])
+  })
+
+  it('graphEdges keeps the tagged edges of hidden tag nodes', () => {
+    const store = useNodesStore()
+    const edgesStore = useEdgesStore()
+    store.nodes.push(makeNode('a'), makeNode('#tag', 'tag'))
+    edgesStore.edges.push(makeEdge('t1', 'a', '#tag', 'tagged'))
+    store.showTagEdges = false
+
+    expect(store.filteredEdges).toEqual([])
+    expect(store.graphEdges.map((e: Edge) => e.id)).toEqual(['t1'])
+  })
+
+  it('graphNodes still stops at the workspace boundary', () => {
+    const store = useNodesStore()
+    const elsewhere = { ...makeNode('b', 'tag'), workspace_id: 'other' }
+    store.nodes.push(makeNode('a'), elsewhere)
+
+    expect(store.graphNodes.map((n: Node) => n.id)).toEqual(['a'])
   })
 })
 

@@ -8,6 +8,7 @@
     "noResults": "Keine Ergebnisse gefunden"
   },
   "canvas": {
+    "printFailed": "Die Leinwand konnte nicht gedruckt werden: {error}",
     "agent": {
       "placeholder": "Frage zum Graph stellen...",
       "placeholderSelected": "Frage zu ausgewählten Knoten stellen...",
@@ -91,6 +92,7 @@
       "forceLayout": "Kraftbasiertes Layout - Nach Verbindungen anordnen",
       "hierarchicalLayout": "Hierarchisches Layout - Als Baum anordnen (für DAGs/Ontologien)",
       "radialLayout": "Radiales Layout - Nachbarn in konzentrischen Kreisen um ausgewählten Knoten anordnen",
+      "smartLayout": "Intelligentes Layout - Ausgewählte oder alle Knoten mit dem KI-Modell als Hierarchie anordnen",
       "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
       "edgeStyle": "Kantenform",
       "highlightEdges": "Alle Kanten hervorheben - Alle Kanten sichtbarer machen",
@@ -99,6 +101,7 @@
       "bubbleMode": "Blasenmodus - Knoten als Kreise anzeigen",
       "physics": "Physikmodus - Der sichtbare Graph ordnet sich beim Ziehen selbst an (P)",
       "physicsUnavailable": "Physikmodus - Nur im Blasenmodus, außerhalb der Nachbarschaftsansicht, mit bis zu 2000 sichtbaren Knoten",
+      "printToPdf": "Als PDF drucken - Die ausgewählten oder alle Knoten auf einer Seite",
       "neighborhoodDepth": "Nachbarschaftstiefe (Schritte)",
       "hop": "Schritt",
       "hops": "Schritte",
@@ -126,9 +129,13 @@
     },
     "connected": "Verbunden mit {provider}",
     "connectionFailed": "Verbindung zum Anbieter fehlgeschlagen",
-    "streaming": {
-      "label": "Streaming aktivieren",
-      "hint": "Antworten Token für Token streamen (erfordert Anbieterunterstützung)"
+    "testMessage": {
+      "label": "Testnachricht",
+      "hint": "Sendet diesen Prompt wie der Agent an den Anbieter und zeigt Antwort und Zeiten.",
+      "defaultPrompt": "Antworte mit einem kurzen Satz: Was ist ein Wissensgraph?",
+      "send": "Senden",
+      "sending": "Wird gesendet...",
+      "timing": "Erstes Byte nach {firstByte} s, fertig nach {total} s, {chars} Zeichen, {attempts} Versuch(e)"
     },
     "apiKey": {
       "label": "API-Schlüssel",
@@ -212,7 +219,10 @@
     "default": "Standard",
     "switch": "Arbeitsbereich wechseln",
     "filter": "Arbeitsbereiche filtern...",
-    "recent": "zuletzt",
+    "sortBy": "Arbeitsbereiche sortieren",
+    "sortUsed": "Zuletzt verwendet",
+    "sortName": "Name",
+    "sortCreated": "Erstellt",
     "noMatch": "Kein passender Arbeitsbereich"
   },
   "onboarding": {
@@ -472,6 +482,7 @@
     "workspaceCreateFailed": "Arbeitsbereich konnte nicht erstellt werden",
     "workspaceUpdated": "Arbeitsbereich aktualisiert",
     "workspaceDeleted": "Arbeitsbereich \"{name}\" gelöscht",
+    "workspaceFilesRemain": "Arbeitsbereich \"{name}\" gelöscht, aber {count} Dateien konnten nicht gelöscht werden und liegen noch auf der Festplatte",
     "cannotDeleteDefault": "Standard-Arbeitsbereich kann nicht gelöscht werden",
     "workspaceReset": "Standard-Arbeitsbereich auf Startinhalt zurückgesetzt",
     "importSuccess": "{count} Knoten importiert",
@@ -523,12 +534,6 @@
     },
     "zotero": {
       "description": "Zitate aus Zotero importieren und Zitationsgraphen erstellen",
-      "library": "Zotero-Bibliothek",
-      "detect": "Zotero erkennen",
-      "detecting": "Erkennung...",
-      "detectHint": "Lokale Zotero-Installation automatisch erkennen",
-      "connected": "Verbunden",
-      "disconnect": "Trennen",
       "collections": "Sammlungen",
       "loading": "Sammlungen werden geladen...",
       "noCollections": "Keine Sammlungen gefunden",
@@ -538,7 +543,7 @@
       "importing": "Importiere",
       "cloud": {
         "title": "Zotero Cloud",
-        "hint": "Mit Zotero Cloud verbinden für bidirektionale Zitat-Synchronisation",
+        "hint": "Referenzen aus der Zotero-Bibliothek importieren und Referenzen hinzufügen. Es wird nichts synchronisiert",
         "userId": "Benutzer-ID",
         "userIdPlaceholder": "Ihre Zotero Benutzer-ID (numerisch)",
         "apiKey": "API-Schlüssel",
@@ -555,7 +560,7 @@
         "title": "Zitationsgraph",
         "build": "Zitationsgraph erstellen",
         "building": "Erstelle...",
-        "hint": "Zitationsbeziehungen mit Semantic Scholar entdecken",
+        "hint": "Referenzen und Zitationen jedes Artikels bei Semantic Scholar abfragen: mindestens drei Anfragen pro Artikel im Abstand von 3 Sekunden",
         "scanning": "Scanne Paper...",
         "fetching": "Hole Zitate...",
         "creating": "Erstelle Kanten...",
@@ -563,7 +568,11 @@
         "result": "{edges} Kanten und {stubs} Stub-Knoten erstellt",
         "noPapers": "Keine Paper mit DOI gefunden",
         "createStubs": "Stub-Knoten für fehlende Paper erstellen",
-        "stubsHint": "Stub-Knoten zeigen Zitationslinks zu Papern die nicht in Ihrer Bibliothek sind"
+        "stubsHint": "Stub-Knoten zeigen Zitationslinks zu Papern die nicht in Ihrer Bibliothek sind",
+        "stop": "Stopp",
+        "stopping": "Stoppt nach diesem Artikel...",
+        "position": "({current} von {total})",
+        "stopped": "Nach {current} von {total} Artikeln gestoppt."
       },
       "export": {
         "toZotero": "In Zotero speichern",
@@ -764,6 +773,7 @@
     "noOtherWorkspaces": "Keine weiteren Arbeitsbereiche",
     "readNode": "Knoten lesen",
     "exportSelection": "Auswahl exportieren ...",
+    "printToPdf": "Als PDF drucken",
     "defaultWorkspace": "Standard"
   },
   "reader": {

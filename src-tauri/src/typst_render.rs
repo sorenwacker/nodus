@@ -83,6 +83,24 @@ impl World for MathWorld {
     }
 }
 
+/// Compile a Typst document to PDF bytes, with the bundled fonts.
+///
+/// The document is self-contained: it can read no file and import no package.
+pub fn compile_to_pdf(source: &str) -> Result<Vec<u8>, String> {
+    let describe = |errors: &[typst::diag::SourceDiagnostic]| {
+        errors
+            .iter()
+            .map(|e| e.message.to_string())
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    let world = MathWorld::new(source);
+    let document = typst::compile(&world)
+        .output
+        .map_err(|errors| describe(&errors))?;
+    typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).map_err(|errors| describe(&errors))
+}
+
 /// Render a Typst math expression to SVG
 pub fn render_math_to_svg(math: &str, display_mode: bool) -> Result<String, String> {
     // Check cache first
@@ -174,5 +192,32 @@ mod tests {
         // Alternative: accent(x, arrow)
         let result = render_math_to_svg("accent(x, arrow)", false);
         assert!(result.is_ok(), "accent failed: {:?}", result);
+    }
+}
+
+#[cfg(test)]
+mod pdf_tests {
+    use super::compile_to_pdf;
+
+    /// The shape of a printed canvas page (src/lib/canvasPrint.ts)
+    const CANVAS_PAGE: &str = r##"#set page(width: 400pt, height: 300pt, margin: 0pt, fill: white)
+#set text(font: ("Inter", "Helvetica Neue", "Arial", "Libertinus Serif"), size: 12pt, fill: rgb("#18181b"))
+#set par(leading: 0.5em, spacing: 0.7em)
+#place(top + left, line(start: (10pt, 10pt), end: (200pt, 150pt), stroke: (paint: rgb("#64748b"), thickness: 1.5pt, cap: "round")))
+#place(top + left, polygon(fill: rgb("#64748b"), (200pt, 150pt), (190pt, 140pt), (186pt, 148pt)))
+#place(top + left, dx: 100pt, dy: 80pt, box(width: 200pt, align(center, box(fill: white, inset: 2pt, text(size: 10pt, "supports")))))
+#place(top + left, dx: 200pt, dy: 150pt, block(width: 150pt, height: 100pt, fill: white, stroke: 1.5pt + rgb("#94a3b8"), radius: 8pt, clip: true, block(width: 100%, height: 100%, fill: rgb(59, 130, 246, 18%), inset: 10pt)[#set text(fill: white);#text(weight: "bold", size: 14pt, "Title #1 $x$")#parbreak()#"plain @x "#strong("bold")#emph("it")#raw("code")#linebreak()#"• "#"item"#parbreak()#text(weight: "bold", "Head")]))
+"##;
+
+    #[test]
+    fn compiles_a_canvas_page() {
+        let pdf = compile_to_pdf(CANVAS_PAGE).expect("pdf");
+        assert!(pdf.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn reports_why_a_document_does_not_compile() {
+        let error = compile_to_pdf("#unknown-function()").expect_err("must fail");
+        assert!(error.contains("unknown"), "{error}");
     }
 }

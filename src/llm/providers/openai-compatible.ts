@@ -40,6 +40,27 @@ function sanitizeContent(content: string | undefined): string {
  * - "API error 504: {}" - which tells the user nothing
  * (PRODUCT_DESIGN.md > Retrying a provider failure).
  */
+/**
+ * The message in an error body the provider sent as plain JSON rather than
+ * as a stream. null, not {}: a body that failed to parse and a body that is
+ * genuinely empty both used to be shown as the provider's own words
+ * (PRODUCT_DESIGN.md > Retrying a provider failure).
+ */
+function quotedError(body: string): string | null {
+  if (!body.trim()) return null
+  try {
+    const error = JSON.parse(body)
+    return (
+      error?.error?.message ||
+      error?.message ||
+      error?.detail ||
+      (error && Object.keys(error).length > 0 ? JSON.stringify(error) : null)
+    )
+  } catch {
+    return body.slice(0, 300)
+  }
+}
+
 function statusMeaning(status: number): string {
   switch (status) {
     case 504:
@@ -167,6 +188,7 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     // stalled connection to anything in between, and gets cut
     // (PRODUCT_DESIGN.md > Streaming responses)
     const sse = createSseAccumulator()
+    let raw = ''
     const status = await httpStreamFetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -177,7 +199,14 @@ export class OpenAICompatibleProvider implements ILLMProvider {
         stream: true,
       }),
       connectTimeout: this.timeout,
-      onChunk: chunk => sse.push(chunk),
+      onChunk: chunk => {
+        raw += chunk
+        const before = sse.text().length
+        sse.push(chunk)
+        // Reported per chunk so a caller can time the first byte
+        // (PRODUCT_DESIGN.md > Sending a test message)
+        if (sse.text().length > before) options.onProgress?.(sse.text())
+      },
     })
 
     // The stream has closed: dispatch whatever it left buffered, since a server
@@ -186,9 +215,7 @@ export class OpenAICompatibleProvider implements ILLMProvider {
     sse.flush()
 
     if (status < 200 || status >= 300) {
-      throw new Error(
-        `API error ${status}: ${sse.error() || sse.text().slice(0, 300) || statusMeaning(status)}`
-      )
+      throw new Error(`API error ${status}: ${sse.error() || quotedError(raw) || statusMeaning(status)}`)
     }
     const streamError = sse.error()
     if (streamError) throw new Error(`API error: ${streamError}`)
@@ -219,39 +246,43 @@ export class OpenAICompatibleProvider implements ILLMProvider {
       content: typeof m.content === 'string' ? sanitizeContent(m.content) : m.content,
     }))
 
-    const response = await httpFetch(`${this.baseUrl}/chat/completions`, {
+    // Streamed like generate: buffered, the answer after a long read looked
+    // stalled to the gateway in front of the model
+    // (PRODUCT_DESIGN.md > Streaming responses)
+    const sse = createSseAccumulator()
+    // A refusal arrives as a plain JSON body, not as events
+    let raw = ''
+    const status = await httpStreamFetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
         model: this.model,
         messages: sanitizedMessages,
+        stream: true,
         ...(tools && tools.length > 0 ? { tools, tool_choice: 'auto' } : {}),
       }),
       connectTimeout: this.timeout,
+      onChunk: chunk => {
+        raw += chunk
+        sse.push(chunk)
+      },
     })
+    sse.flush()
 
-    if (!response.ok) {
-      // null, not {}: a body that failed to parse and a body that is genuinely
-      // empty both used to stringify to "{}" and be shown as the provider's
-      // own words (PRODUCT_DESIGN.md > Retrying a provider failure)
-      const error = await response.json().catch(() => null)
-      const quoted =
-        error?.error?.message ||
-        error?.message ||
-        error?.detail ||
-        (error && Object.keys(error).length > 0 ? JSON.stringify(error) : null)
-      throw new Error(`API error ${response.status}: ${quoted || statusMeaning(response.status)}`)
+    if (status < 200 || status >= 300) {
+      throw new Error(`API error ${status}: ${sse.error() || quotedError(raw) || statusMeaning(status)}`)
     }
+    const streamError = sse.error()
+    if (streamError) throw new Error(`API error: ${streamError}`)
 
-    const data = await response.json()
-    const choice = data.choices?.[0]
     const message: LLMMessage = {
       role: 'assistant',
-      content: choice?.message?.content || '',
+      content: sse.text(),
     }
 
-    if (choice?.message?.tool_calls) {
-      message.tool_calls = parseOpenAIToolCalls(choice.message.tool_calls)
+    const streamed = sse.toolCalls()
+    if (streamed.length > 0) {
+      message.tool_calls = parseOpenAIToolCalls(streamed.map(c => ({ id: c.id ?? '', function: c.function })))
     }
 
     // Fallback: extract tool calls from content if model outputs raw format

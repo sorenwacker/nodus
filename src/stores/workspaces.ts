@@ -8,32 +8,14 @@ import { invoke } from '../lib/tauri'
 import { workspaceStorage } from '../lib/storage'
 import { notifications$ } from '../composables/useNotifications'
 import { storeLogger } from '../lib/logger'
-import { stripHtmlTags } from '../lib/sanitize'
+import { cleanWorkspaceName } from '../lib/workspaceName'
 import type { Workspace } from '../types'
 
-// Maximum workspace name length
-const MAX_WORKSPACE_NAME_LENGTH = 100
-
 /**
- * Sanitize workspace name to prevent XSS and ensure valid format
+ * Clean a workspace name, falling back to a placeholder when nothing is left
  */
 function sanitizeWorkspaceName(name: string): string {
-  // Trim whitespace
-  let sanitized = name.trim()
-  // Remove HTML/script tags using DOMPurify-based stripping
-  sanitized = stripHtmlTags(sanitized)
-  // Remove control characters
-  // eslint-disable-next-line no-control-regex
-  sanitized = sanitized.replace(/[\x00-\x1f\x7f]/g, '')
-  // Truncate to max length
-  if (sanitized.length > MAX_WORKSPACE_NAME_LENGTH) {
-    sanitized = sanitized.slice(0, MAX_WORKSPACE_NAME_LENGTH)
-  }
-  // Ensure not empty after sanitization
-  if (!sanitized) {
-    sanitized = 'Untitled Workspace'
-  }
-  return sanitized
+  return cleanWorkspaceName(name) || 'Untitled Workspace'
 }
 
 interface DbWorkspace {
@@ -170,10 +152,17 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     saveWorkspacesToStorage()
   }
 
-  async function deleteWorkspace(id: string, deleteFiles?: boolean) {
+  /**
+   * Delete a workspace, and optionally its nodes' files.
+   *
+   * @returns The files that could not be deleted and remain on disk
+   *   (PRODUCT_DESIGN.md > Workspace settings)
+   */
+  async function deleteWorkspace(id: string, deleteFiles?: boolean): Promise<string[]> {
+    let remaining: string[] = []
     // Delete from database (and optionally files)
     try {
-      await invoke('delete_workspace', { id, deleteFiles: deleteFiles ?? false })
+      remaining = (await invoke<string[]>('delete_workspace', { id, deleteFiles: deleteFiles ?? false })) ?? []
     } catch (e) {
       storeLogger.error('Failed to delete workspace from database:', e)
       // Continue with local deletion anyway
@@ -185,6 +174,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
       currentWorkspaceId.value = null
     }
     saveWorkspacesToStorage()
+    return remaining
   }
 
   async function renameWorkspace(id: string, newName: string) {

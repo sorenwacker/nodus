@@ -1,3 +1,4 @@
+import { isColorValue } from '../../lib/colorValue'
 /**
  * Node color utilities
  *
@@ -172,7 +173,10 @@ function convertColorForTheme(color: string, currentTheme: string): string {
  * Handles legacy color normalization and theme-aware color conversion
  */
 export function getNodeBackground(colorTheme: string | null, currentTheme: string): string | undefined {
-  if (!colorTheme) return undefined
+  // A word that is not a colour would be discarded when the background is
+  // computed, leaving the card with none
+  // (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+  if (!colorTheme || !isColorValue(colorTheme)) return undefined
 
   // Convert color to appropriate palette for current theme
   const themeColor = convertColorForTheme(colorTheme, currentTheme)

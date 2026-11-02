@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
 pub mod edges;
+pub mod fetched_papers;
 pub mod mcp_trust;
 pub mod models;
 pub mod nodes;
@@ -231,6 +232,13 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     let (frames, tagged) = remove_frames::run(pool).await?;
     if frames > 0 {
         println!("Removed {frames} frames; {tagged} nodes gained a tag from their frame's title");
+    }
+
+    // Papers fetched from Semantic Scholar were stored as notes
+    // (docs/content/PRODUCT_DESIGN.md > Zotero takes citation nodes)
+    let converted = fetched_papers::run(pool).await?;
+    if converted > 0 {
+        println!("Converted {converted} fetched papers from notes to citation nodes");
     }
 
     Ok(())

@@ -3,7 +3,7 @@
 use crate::database::{self, nodes::Node};
 use crate::import_helpers;
 use crate::watcher::write_file_locked;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Node Commands
@@ -204,20 +204,84 @@ async fn file_write_allowed(pool: &database::DbPool, node: &Node, path: &std::pa
 }
 
 /// Rename a node. Returns the new path of its vault file when the file was
-/// renamed with it (features.md > Bi-directional Sync).
+/// renamed with it (features.md > Bi-directional Sync), and the notes whose
+/// links to it were rewritten (features.md > Wikilink Edges).
 #[tauri::command]
 pub async fn update_node_title(
     id: String,
     title: String,
     watcher_state: tauri::State<'_, super::WatcherState>,
-) -> Result<Option<String>, String> {
+) -> Result<TitleUpdate, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     let before_rename = |old: &std::path::Path, new: &std::path::Path| {
         if let Some(watcher) = watcher_state.0.lock().unwrap().as_ref() {
             watcher.remap_path(old, new);
         }
     };
-    update_node_title_impl(pool, &id, &title, &before_rename).await
+    let old_title = database::nodes::get_by_id(pool, &id)
+        .await
+        .map_err(|e| e.to_string())?
+        .map(|n| n.title);
+    let file_path = update_node_title_impl(pool, &id, &title, &before_rename).await?;
+    let relinked = match old_title {
+        Some(old) if old != title => relink_after_rename(pool, &id, &old, &title).await?,
+        _ => Vec::new(),
+    };
+    Ok(TitleUpdate {
+        file_path,
+        relinked,
+    })
+}
+
+/// What a rename changed: the node's new file path, and the notes whose
+/// links to it were rewritten
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TitleUpdate {
+    file_path: Option<String>,
+    relinked: Vec<RelinkedNote>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct RelinkedNote {
+    pub id: String,
+    pub content: String,
+}
+
+/// Rewrite the links to a renamed node in every note with a wikilink edge to
+/// it, through the ordinary content write so files and locks are honoured
+/// (features.md > Wikilink Edges).
+pub(crate) async fn relink_after_rename(
+    pool: &database::DbPool,
+    id: &str,
+    old_title: &str,
+    new_title: &str,
+) -> Result<Vec<RelinkedNote>, String> {
+    let edges = database::edges::get_edges_for_node(pool, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut relinked = Vec::new();
+    for edge in edges
+        .iter()
+        .filter(|e| e.link_type == "wikilink" && e.target_node_id == id)
+    {
+        let Some(source) = database::nodes::get_by_id(pool, &edge.source_node_id)
+            .await
+            .map_err(|e| e.to_string())?
+        else {
+            continue;
+        };
+        let content = source.markdown_content.unwrap_or_default();
+        let rewritten = import_helpers::rename_wikilinks(&content, old_title, new_title);
+        if rewritten != content {
+            update_node_content_impl(pool, &source.id, &rewritten).await?;
+            relinked.push(RelinkedNote {
+                id: source.id,
+                content: rewritten,
+            });
+        }
+    }
+    Ok(relinked)
 }
 
 pub(crate) async fn update_node_title_impl(
@@ -563,6 +627,46 @@ mod tests {
 
         assert!(result.is_some());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "changed");
+    }
+
+    /// Renaming rewrites the links to the node in the notes linking to it
+    /// (features.md > Wikilink Edges).
+    #[tokio::test]
+    async fn renaming_rewrites_the_links_in_linking_notes() {
+        let pool = memory_pool().await;
+        let (vault, file) = vault_with_file("see [[target]] and [[target|it]]");
+        insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
+        insert_file_node(&pool, "source", &file, Some("ws")).await;
+        database::nodes::update_content(&pool, "source", "see [[target]] and [[target|it]]")
+            .await
+            .unwrap();
+        insert_file_node(&pool, "target", "/nonexistent/target.md", Some("ws")).await;
+        insert_file_node(&pool, "bystander", "/nonexistent/b.md", Some("ws")).await;
+        super::super::wikilinks::sync_wikilinks_for_node(&pool, "source", &["target".to_string()])
+            .await
+            .unwrap();
+
+        database::nodes::update_title(&pool, "target", "Renamed")
+            .await
+            .unwrap();
+        let relinked = relink_after_rename(&pool, "target", "target", "Renamed")
+            .await
+            .unwrap();
+
+        let expected = "see [[Renamed]] and [[Renamed|it]]";
+        assert_eq!(relinked.len(), 1);
+        assert_eq!(relinked[0].id, "source");
+        assert_eq!(relinked[0].content, expected);
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            expected,
+            "the file follows"
+        );
+        let source = database::nodes::get_by_id(&pool, "source")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(source.markdown_content.as_deref(), Some(expected));
     }
 
     #[tokio::test]

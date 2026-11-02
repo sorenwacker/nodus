@@ -42,6 +42,7 @@ import {
   updateNodeContent as updateNodeContentFn,
   updateNodeTitle as updateNodeTitleFn,
   updateNodeTags as updateNodeTagsFn,
+  resetInvalidNodeColors as resetInvalidNodeColorsFn,
   updateNodeColor as updateNodeColorFn,
   moveNodesToWorkspace as moveNodesToWorkspaceFn,
   createNode as createNodeFn,
@@ -120,7 +121,7 @@ export const useNodesStore = defineStore('nodes', () => {
   const computed = createComputedProperties(state, stores)
   const {
     edges, workspaces, currentWorkspaceId,
-    selectedNodeId, selectedNode, filteredNodes, filteredEdges, graphEdges,
+    selectedNodeId, selectedNode, graphNodes, filteredNodes, filteredEdges, graphEdges,
     storylines, storylineNodes, storylineNodesVersion, filteredStorylines,
   } = computed
 
@@ -167,15 +168,9 @@ export const useNodesStore = defineStore('nodes', () => {
     getCurrentWorkspaceId: () => workspaceStore.currentWorkspaceId,
     reloadEdges: () => edgesStore.loadEdges(workspaceStore.currentWorkspaceId),
     // Frontmatter sync
-    updateNodeTitle: async (id: string, title: string) => {
-      const node = nodes.value.find(n => n.id === id)
-      if (node) {
-        node.title = title
-        node.updated_at = Date.now()
-        const filePath = await invoke<string | null>('update_node_title', { id, title })
-        if (filePath) node.file_path = filePath
-      }
-    },
+    // A title changed in the file is an outside edit: it relinks like any
+    // rename, but is not an undo step of this app
+    updateNodeTitle: (id: string, title: string) => updateNodeTitleFn(nodes, id, title, { skipUndo: true }),
     updateNodeTags: async (id: string, tags: string[]) => {
       const node = nodes.value.find(n => n.id === id)
       if (node) {
@@ -198,6 +193,9 @@ export const useNodesStore = defineStore('nodes', () => {
 
   async function initialize() {
     await initializeStore(deps, createNode)
+    // Not awaited: it writes only the nodes holding a value that is not a colour
+    // (PRODUCT_DESIGN.md > A node's colour is a colour or nothing)
+    resetInvalidNodeColorsFn(nodes).catch(e => storeLogger.error('[Nodes] Colour reset failed:', e))
     // Tags can arrive without their edges: the load-time body scan writes them,
     // and an agent can set a node's tags over MCP. Both leave a node tagged and
     // unconnected, and nothing else puts that right - the whole-vault sync used
@@ -303,8 +301,8 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  async function updateNodeTitle(id: string, title: string) {
-    await updateNodeTitleFn(nodes, id, title)
+  async function updateNodeTitle(id: string, title: string, options?: { skipUndo?: boolean }) {
+    await updateNodeTitleFn(nodes, id, title, options)
   }
 
   async function updateNodeTags(id: string, tags: string[]) {
@@ -342,7 +340,13 @@ export const useNodesStore = defineStore('nodes', () => {
    */
   async function deleteEmptiedTagNodes(tagNodeIds: string[]) {
     for (const tagNodeId of emptiedTagNodes(tagNodeIds, nodes.value, edgesStore.edges)) {
-      await deleteNodeFn(deps, tagNodeId)
+      // The notes are already gone; a tag node that cannot be deleted stays
+      // for Repair Tag Nodes and must not turn the deletion into a failure
+      try {
+        await deleteNodeFn(deps, tagNodeId)
+      } catch (e) {
+        storeLogger.error('[Tags] Could not delete an emptied tag node:', e)
+      }
     }
   }
 
@@ -554,6 +558,7 @@ export const useNodesStore = defineStore('nodes', () => {
     setEditingNode,
     nodes,
     edges,
+    graphNodes,
     filteredNodes,
     filteredEdges,
     graphEdges,

@@ -29,6 +29,13 @@ async fn render_typst_math(math: String, display_mode: bool) -> Result<String, S
     .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn compile_typst_pdf(source: String) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || typst_render::compile_to_pdf(&source))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 // MCP Server state wrapper
 pub struct McpState(pub Arc<mcp_websocket::McpServerState>);
 
@@ -321,7 +328,6 @@ fn main() {
             commands::create_node_from_file,
             commands::sync_node_wikilinks,
             commands::sync_all_wikilinks,
-            commands::create_file_for_node,
             commands::export_nodes_to_files,
             commands::export_okf_bundle,
             commands::survey_okf_backfill,
@@ -365,6 +371,7 @@ fn main() {
             commands::validate_theme_yaml,
             commands::import_ontology,
             render_typst_math,
+            compile_typst_pdf,
             start_mcp_server,
             stop_mcp_server,
             approve_mcp_connection,

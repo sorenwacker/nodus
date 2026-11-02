@@ -9,8 +9,34 @@
  * Everything it needs is passed in. Reaching for the stores here would give
  * the boundary a hidden dependency that no caller could substitute.
  */
-import type { McpStoreInterface } from './messageHandler'
+import type { Ref } from 'vue'
+import type { McpStoreInterface, McpViewportInterface, McpZoteroInterface } from './messageHandler'
 import type { Edge } from '../types'
+import { repairTagNodes } from '../composables/tagNodeRepair'
+
+/** What the canvas component exposes for MCP requests */
+export interface McpCanvas {
+  focusNode: (id: string) => void
+  getViewport: () => { x: number; y: number; zoom: number }
+  addNodesToZotero: McpZoteroInterface['addNodes']
+}
+
+/**
+ * The canvas's part of the MCP interfaces. The canvas mounts after the server
+ * is set up and can be absent, so each request reads the reference when it
+ * arrives.
+ */
+export function canvasMcpAccess(canvas: Ref<McpCanvas | null>): { viewport: McpViewportInterface; zotero: McpZoteroInterface } {
+  return {
+    viewport: {
+      getViewport: () => canvas.value?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
+      focusNode: (id: string) => canvas.value?.focusNode(id),
+    },
+    zotero: {
+      addNodes: nodes => canvas.value?.addNodesToZotero(nodes) ?? Promise.reject(new Error('The canvas is not open')),
+    },
+  }
+}
 
 type NodesStore = ReturnType<typeof import('../stores/nodes').useNodesStore>
 type EdgesStore = ReturnType<typeof import('../stores/edges').useEdgesStore>
@@ -28,7 +54,10 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
   const { store, edgesStore, storylinesStore, invoke } = deps
 
   return {
-    getFilteredNodes: () => store.filteredNodes,
+    // The graph as data, not as drawn: the canvas filter hides tag nodes while
+    // the tag layer is off, and that is a view choice
+    // (PRODUCT_DESIGN.md > MCP reads are independent of the canvas layers)
+    getFilteredNodes: () => store.graphNodes,
     getFilteredEdges: () => store.graphEdges,
     getNode: store.getNode,
     // Workspace scoping: lets each MCP connection target its own workspace
@@ -40,6 +69,7 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
         ...store.workspaces.map(w => ({ id: w.id, name: w.name, current: w.id === current })),
       ]
     },
+    createWorkspace: store.createWorkspace,
     loadWorkspaceEdges: workspaceId => invoke<Edge[]>('get_edges', { workspaceId }),
     createEdgeRaw: data => invoke<Edge>('create_edge', { input: data }),
     deleteEdgeRaw: id => invoke('delete_edge', { id }).then(() => undefined),
@@ -60,6 +90,27 @@ export function appMcpStore(deps: AppMcpStoreDeps): McpStoreInterface {
     updateEdgeDirected: edgesStore.updateEdgeDirected,
     updateEdgeLabel: edgesStore.updateEdgeLabel,
     updateEdgeColor: edgesStore.updateEdgeColor,
+    // The repair the settings panel runs, then the connection pass that
+    // loading the workspace runs (PRODUCT_DESIGN.md > Tag nodes over MCP)
+    rebuildTagNodes: async () => {
+      const repair = (await repairTagNodes(store)) ?? {
+        merged: 0,
+        renamed: 0,
+        removedUnused: 0,
+        edgesRepointed: 0,
+        edgesDeleted: 0,
+      }
+      const before = edgesStore.edges.length
+      await store.syncAllTagNodes()
+      return {
+        merged: repair.merged,
+        renamed: repair.renamed,
+        removed_unused: repair.removedUnused,
+        edges_repointed: repair.edgesRepointed,
+        edges_deleted: repair.edgesDeleted,
+        edges_added: edgesStore.edges.length - before,
+      }
+    },
     // Storyline operations
     // All of them, so a scoped connection can filter to its own workspace the
     // way it already does for nodes

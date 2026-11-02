@@ -14,6 +14,8 @@ import {
   batchClassifyForMove,
   batchClassifyForConnect,
 } from '../../../llm/batchClassifier'
+import { parentCandidates, layoutForest } from '../../layout/smartHierarchy'
+import { orderKinds, chooseParents, type ParentChoice } from '../../../llm/hierarchyPlanner'
 import {
   executeRegisteredTool,
   hasToolHandler,
@@ -239,6 +241,56 @@ export function useLLMTools(ctx: LLMToolsContext) {
           groupX += spacing
         }
         return `Moved ${moved} nodes into ${groups.size} groups`
+      }
+
+      case 'smart_layout': {
+        const visible = store.getFilteredNodes()
+        const selected = new Set(store.selectedNodeIds ?? [])
+        const nodes = selected.size > 0 ? visible.filter(n => selected.has(n.id)) : visible
+        if (nodes.length === 0) return 'No nodes to arrange'
+        log(`> Smart layout: ${nodes.length} nodes`)
+        const instruction = (args.instruction as string) || ''
+        const items = nodes.map(n => ({
+          id: n.id, title: n.title, kind: n.node_type || 'note', width: n.width || 200, height: n.height || 120,
+        }))
+        const titleOf = new Map(items.map(n => [n.id, n.title]))
+
+        let parents: Map<string, string>
+        try {
+          const examples = new Map<string, string[]>()
+          for (const n of items) examples.set(n.kind, [...(examples.get(n.kind) ?? []), n.title])
+          const kindOrder = await orderKinds(
+            [...examples].map(([kind, titles]) => ({ kind, examples: titles })), instruction, llmQueue, log
+          )
+          const candidates = parentCandidates(items, store.getFilteredEdges(), kindOrder)
+          parents = new Map()
+          const open: ParentChoice[] = []
+          for (const [id, options] of candidates) {
+            if (options.length === 1) parents.set(id, options[0])
+            else if (options.length > 1) {
+              open.push({ id, title: titleOf.get(id)!, candidates: options.slice(0, 26).map(o => ({ id: o, title: titleOf.get(o)! })) })
+            }
+          }
+          log(`> ${parents.size} parents from the graph, ${open.length} for the model`)
+          for (const [id, parent] of await chooseParents(open, instruction, llmQueue, log)) parents.set(id, parent)
+        } catch (e) {
+          // The canvas button discards the return value; the log is where a
+          // failure must show
+          const failure = `Smart layout failed, nothing was moved: ${e instanceof Error ? e.message : e}`
+          log(`> ${failure}`)
+          return failure
+        }
+
+        const origin = {
+          x: Math.min(...nodes.map(n => n.canvas_x)),
+          y: Math.min(...nodes.map(n => n.canvas_y)),
+        }
+        const positions = layoutForest(items, parents, origin)
+        await Promise.all([...positions].map(([id, p]) => store.updateNodePosition(id, p.x, p.y)))
+        const roots = new Set(items.filter(n => !parents.has(n.id) && [...parents.values()].includes(n.id)).map(n => n.id))
+        const summary = `Arranged ${positions.size} nodes in ${roots.size} trees`
+        log(`> ${summary}`)
+        return summary
       }
 
       case 'smart_connect': {

@@ -7,7 +7,7 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
   // Edge operations
   {
     name: 'create_edge',
-    description: 'Create an edge (connection) between two nodes.',
+    description: 'Create an edge (connection) between two nodes. Name each end by id, or by title when exactly one node has that title.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -18,6 +18,14 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
         target_node_id: {
           type: 'string',
           description: 'Target node ID',
+        },
+        source_title: {
+          type: 'string',
+          description: 'Source node title, instead of source_node_id. Must name exactly one node.',
+        },
+        target_title: {
+          type: 'string',
+          description: 'Target node title, instead of target_node_id. Must name exactly one node.',
         },
         label: {
           type: 'string',
@@ -36,7 +44,6 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
           description: 'Edge color as a name or hex value (optional)',
         },
       },
-      required: ['source_node_id', 'target_node_id'],
     },
   },
   {
@@ -63,6 +70,30 @@ export const EDGE_TOOLS: McpToolDeclaration[] = [
         },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'batch_update_edges',
+    description: 'Update the label, direction, or color of many edges in one call. Every item is attempted; the result counts updated and failed edges and lists each failure with its edge id.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        updates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'The edge ID to update' },
+              label: { type: 'string', description: 'New label; empty string clears it' },
+              directed: { type: 'boolean', description: 'Whether the edge is directed' },
+              color: { type: 'string', description: 'Edge color as a name or hex value; empty string clears it' },
+            },
+            required: ['id'],
+          },
+          description: 'Array of edge updates',
+        },
+      },
+      required: ['updates'],
     },
   },
   {

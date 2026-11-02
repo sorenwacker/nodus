@@ -26,7 +26,7 @@ make dev
 |---------|-------------|
 | `make dev` | Start development server |
 | `npm test` | Run tests |
-| `npm run lint` | Lint code |
+| `npm run lint` | Lint the frontend with ESLint 9 (see Linting) |
 | `npm run build` | Build frontend |
 | `npm run tauri build` | Build for production |
 | `cargo test` | Run Rust tests (in src-tauri/) |
@@ -34,6 +34,11 @@ make dev
 | `npm ci && npm run build` | Install and type-check the MCP server (in packages/nodus-mcp-server/) |
 | `scripts/setup-hooks.sh` | Install the pre-commit hook, which runs the CI checks for the parts of the tree a commit touches |
 | `scripts/ci-check.sh` | Run every check CI runs, on the whole tree |
+| `make rc` | Cut the next release candidate: bump to `X.Y.Z-rc.N+1`, commit, tag and push |
+
+## Linting
+
+`eslint.config.js` is an ESLint 9 flat config. It applies the recommended rule sets of ESLint, typescript-eslint and eslint-plugin-vue to `src/**/*.ts` and `src/**/*.vue`, parses `.vue` files with vue-eslint-parser and their script blocks with the typescript-eslint parser, and ends with eslint-config-prettier so no rule contradicts Prettier. Unused function arguments are allowed when their name starts with an underscore, and `v-html` is a warning rather than an error. The pre-commit hook and CI run the same `npm run lint`, so a finding fails the commit and the build alike.
 
 ## Project Structure
 
@@ -117,6 +122,13 @@ it transitively through `gtk` 0.18 and `muda`. Nodus contains no direct `glib`
 usage and never calls the affected API, and the issue is Linux-only. The alert is
 dismissed as tolerable risk and should be revisited when Tauri's gtk stack moves
 to `glib` 0.20.
+
+## Continuous integration and releases
+
+- **Pull requests and `main`:** `ci.yml` runs the check jobs - Rust tests, frontend tests, MCP server build. `main` requires these three to pass before a pull request merges; no review is required. Platform builds are not run here: a three-platform Tauri build took about 50 runner minutes per push, and the release workflow builds the same platforms from the tag.
+- **Releases:** pushing a `v*` tag runs `release.yml`. Its test job runs every check `ci.yml` runs, so a tag cut from a commit that never passed a pull request is checked the same way; a gate test fails when the two drift apart. The tag must equal the version in `package.json` and `Cargo.toml`.
+- **Release candidates:** `make rc` reads the current version, increments the `-rc.N` suffix, updates both manifests and lockfiles, and refuses to continue unless `CHANGELOG.md` has a section for the new version, since that section becomes the release notes. It then commits, tags and pushes. The project allows at most one full release a month; everything else is a release candidate.
+- **Branches:** a merged pull request's branch is deleted automatically.
 
 ## Release signing
 

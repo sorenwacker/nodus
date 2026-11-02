@@ -83,6 +83,31 @@ describe('hover while a node is held', () => {
   })
 })
 
+describe('releasing a held node over something that keeps the release to itself', () => {
+  function move(wrapper: ReturnType<typeof mountCanvas>, x: number, y: number) {
+    wrapper.find('canvas').element.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y, bubbles: true }))
+  }
+
+  it('still ends the hold, so the hover can end', () => {
+    // Pressing a bubble selects it and opens the preview panel, which stops
+    // pointerup from travelling on; the release then never reached the canvas
+    // and the node stayed hovered, its edges highlighted, for good
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const panel = document.createElement('div')
+    panel.addEventListener('pointerup', event => event.stopPropagation())
+    document.body.appendChild(panel)
+    const wrapper = mountCanvas(null)
+    move(wrapper, 100, 60)
+    press(wrapper, 100, 60)
+
+    panel.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+    move(wrapper, 400, 400)
+
+    expect(wrapper.emitted('node-pointerleave')).toHaveLength(1)
+    panel.remove()
+  })
+})
+
 describe('the canvas wiring', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/canvas/GraphCanvas.vue'), 'utf8')
 

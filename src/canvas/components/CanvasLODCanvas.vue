@@ -261,16 +261,19 @@ let held = false
 
 function releaseHold() {
   held = false
-  window.removeEventListener('pointerup', releaseHold)
-  window.removeEventListener('pointercancel', releaseHold)
+  window.removeEventListener('pointerup', releaseHold, true)
+  window.removeEventListener('pointercancel', releaseHold, true)
 }
 
 function onPointerDown(e: PointerEvent) {
   const nodeId = hitTest(e)
   if (nodeId) {
     held = true
-    window.addEventListener('pointerup', releaseHold)
-    window.addEventListener('pointercancel', releaseHold)
+    // In the capture phase: the press selects the node, which opens the preview
+    // panel, and the panel stops pointerup. A release landing on it never
+    // reached a bubbling listener, so the node stayed hovered for good
+    window.addEventListener('pointerup', releaseHold, true)
+    window.addEventListener('pointercancel', releaseHold, true)
     emit('node-pointerdown', e, nodeId)
   }
 }

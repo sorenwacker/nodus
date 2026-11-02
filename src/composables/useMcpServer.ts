@@ -15,12 +15,13 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
 } from '../mcp/types'
-import { createMcpMessageHandler, type McpStoreInterface, type McpViewportInterface, type McpUndoInterface } from '../mcp/messageHandler'
+import { createMcpMessageHandler, type McpStoreInterface, type McpViewportInterface, type McpUndoInterface, type McpZoteroInterface } from '../mcp/messageHandler'
 
 export interface UseMcpServerOptions {
   store: McpStoreInterface
   viewport?: McpViewportInterface
   undo?: McpUndoInterface
+  zotero?: McpZoteroInterface
   onConnectionRequest?: (connectionId: string) => void
   onConnectionClosed?: (connectionId: string) => void
 }
@@ -36,7 +37,8 @@ export function useMcpServer(options: UseMcpServerOptions) {
   const { handleRequest, handleConnectionClosed } = createMcpMessageHandler(
     options.store,
     options.viewport,
-    options.undo
+    options.undo,
+    options.zotero
   )
 
   // Event listeners
