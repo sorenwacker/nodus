@@ -32,7 +32,7 @@
     "dagre": "^0.8.5",
     "dompurify": "^3.4.16",
     "marked": "^17.0.3",
-    "mermaid": "^11.16.1",
+    "mermaid": "^12.3.0",
     "pinia": "^2.1.0",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.6.0",
