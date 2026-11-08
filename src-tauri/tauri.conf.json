@@ -52,6 +52,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
     "linux": {
       "deb": {
         "desktopTemplate": "nodus.desktop"

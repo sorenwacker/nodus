@@ -1,12 +1,11 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import wasm from 'vite-plugin-wasm'
-import topLevelAwait from 'vite-plugin-top-level-await'
 import { resolve } from 'path'
 
 export default defineConfig({
   base: './',
-  plugins: [vue(), wasm(), topLevelAwait()],
+  plugins: [vue(), wasm()],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -44,7 +43,8 @@ export default defineConfig({
     ],
   },
   build: {
-    target: ['es2021', 'chrome100', 'safari13'],
+    // Top-level await (used by the wasm modules) needs Safari 15 / macOS 10.15+
+    target: ['es2022', 'chrome100', 'safari15'],
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
     commonjsOptions: {
