@@ -58,6 +58,15 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
+      # The npm Tauri packages and the Rust crates must stay on the same
+      # minor versions. Only `tauri build` checks that, and only the release
+      # workflow ran it, so a dependency bump could break every release build
+      # without any CI job failing. The frontend was built above, so the
+      # beforeBuildCommand is skipped.
+      - name: Check Tauri build
+        run: npx tauri build --debug --no-bundle --config '{"build":{"beforeBuildCommand":""}}'
+        working-directory: .
+
       - name: Check formatting
         run: cargo fmt --check
 
