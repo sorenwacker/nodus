@@ -32,6 +32,10 @@ export interface RoutedEdge {
     tgtOffset: number
     srcSide: Side
     tgtSide: Side
+    /** Which router produced the path */
+    router?: 'maze' | 'legacy'
+    /** Why the maze router passed on this edge, when it did */
+    mazeFailure?: 'walled-in' | 'no-path' | 'budget'
   }
 }
 

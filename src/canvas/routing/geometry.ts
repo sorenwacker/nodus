@@ -33,9 +33,17 @@ export function getSide(node: NodeRect, targetX: number, targetY: number): Side 
 }
 
 /**
- * Get point on node edge with port offset
+ * Get point on node edge with port offset.
+ *
+ * With `lanePitch` the point is moved along the side onto the nearest lane
+ * centre of the routing grid (lanes sit at odd multiples of half the pitch
+ * in canvas coordinates), staying clear of the corners. The maze router
+ * leaves a card along a lane, so a port on a lane centre gives a straight
+ * exit; everything that derives geometry from the port (hit areas, labels)
+ * must pass the same pitch so it lands on the same point
+ * (PRODUCT_DESIGN.md > Edge Routing (PCB-Style)).
  */
-export function getPortPoint(node: NodeRect, side: Side, offset: number): Point {
+export function getPortPoint(node: NodeRect, side: Side, offset: number, lanePitch?: number): Point {
   const w = node.width || 200
   const h = node.height || 120
   const cx = node.canvas_x + w / 2
@@ -48,15 +56,24 @@ export function getPortPoint(node: NodeRect, side: Side, offset: number): Point 
   const clampedY = Math.max(-maxOffsetY, Math.min(maxOffsetY, offset))
   const clampedX = Math.max(-maxOffsetX, Math.min(maxOffsetX, offset))
 
+  const snap = (v: number, lo: number, hi: number): number => {
+    if (!lanePitch) return v
+    const lane = Math.round(v / lanePitch - 0.5)
+    const minLane = Math.ceil(lo / lanePitch - 0.5)
+    const maxLane = Math.floor(hi / lanePitch - 0.5)
+    if (minLane > maxLane) return v // side too narrow for a lane: keep the raw point
+    return (Math.min(maxLane, Math.max(minLane, lane)) + 0.5) * lanePitch
+  }
+
   switch (side) {
     case 'right':
-      return { x: node.canvas_x + w, y: cy + clampedY }
+      return { x: node.canvas_x + w, y: snap(cy + clampedY, cy - maxOffsetY, cy + maxOffsetY) }
     case 'left':
-      return { x: node.canvas_x, y: cy + clampedY }
+      return { x: node.canvas_x, y: snap(cy + clampedY, cy - maxOffsetY, cy + maxOffsetY) }
     case 'bottom':
-      return { x: cx + clampedX, y: node.canvas_y + h }
+      return { x: snap(cx + clampedX, cx - maxOffsetX, cx + maxOffsetX), y: node.canvas_y + h }
     case 'top':
-      return { x: cx + clampedX, y: node.canvas_y }
+      return { x: snap(cx + clampedX, cx - maxOffsetX, cx + maxOffsetX), y: node.canvas_y }
   }
 }
 

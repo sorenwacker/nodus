@@ -29,6 +29,7 @@ export {
 export { SpatialIndex, getSpatialIndex, invalidateSpatialIndex } from './spatialIndex'
 export { routeDiagonal, validateDiagonalPath, type DiagonalRouteParams, type DiagonalRouteResult } from './diagonalRouter'
 export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, type OrthogonalRouteResult } from './orthogonalRouter'
+export { routeEdgesMaze, MazeRouter, MAZE_CELL, MAZE_MAX_EDGES, portLanePitch, type MazeEdgeRequest, type MazeRoute, type MazeFailure } from './mazeRouter'
 
 // Internal imports
 import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side, PortAssignment } from './types'
@@ -37,6 +38,7 @@ import { analyzeEdges, assignPorts, calculatePortOffset } from './portAssignment
 import { GridTracker } from './gridTracker'
 import { routeDiagonal } from './diagonalRouter'
 import { routeOrthogonal } from './orthogonalRouter'
+import { routeEdgesMaze, portLanePitch, type MazeEdgeRequest, type MazeFailure } from './mazeRouter'
 import { findObstacles, getObstacleBounds, OBSTACLE_MARGIN } from './obstacleAvoider'
 
 // Minimum orthogonal standoff distance from node edge
@@ -233,12 +235,27 @@ export function adjustPathEndpointForArrow(
  *   (PRODUCT_DESIGN.md > Reducing edge crossings). Without them the ports
  *   are spread in the order assignPorts meets the edges.
  */
+export interface LiveRouting {
+  /** Nodes being moved by the current interaction */
+  movingNodeIds: ReadonlySet<string>
+  /** The routes of the previous frame; edges not attached to a moving node keep theirs */
+  previous: Map<string, RoutedEdge>
+}
+
 export function routeAllEdges(
   edges: EdgeDef[],
   nodes: NodeRect[],
   nodeMap: Map<string, NodeRect>,
   style: EdgeStyle = 'orthogonal',
-  ports?: { sourceAssignments: Map<string, PortAssignment>; targetAssignments: Map<string, PortAssignment> }
+  ports?: { sourceAssignments: Map<string, PortAssignment>; targetAssignments: Map<string, PortAssignment> },
+  /**
+   * While a node is dragged, only the edges attached to it are searched; the
+   * rest keep last frame's paths, whose lanes the moving edges then avoid.
+   * A full pass at 90 edges costs tens of milliseconds, a frame does not have
+   * that, and the untouched edges did not change
+   * (PRODUCT_DESIGN.md > Edge Routing (PCB-Style)).
+   */
+  live?: LiveRouting
 ): Map<string, RoutedEdge> {
   const result = new Map<string, RoutedEdge>()
 
@@ -307,9 +324,46 @@ export function routeAllEdges(
     }
   })
 
+  // The PCB styles are routed together on one lane grid, shortest edge first,
+  // so every trace knows about the ones already placed. The per-edge routers
+  // below remain for graphs beyond the maze router's budget and for the rare
+  // edge it cannot reach (PRODUCT_DESIGN.md > Edge Routing (PCB-Style)).
+  const lanePitch = portLanePitch(style, edgeInfos.length)
+  let mazeRoutes: Map<string, { path: Point[] }> | null = null
+  let mazeFailures: Map<string, MazeFailure> | null = null
+  const keepsPrevious = (edge: EdgeDef): RoutedEdge | undefined =>
+    live && !live.movingNodeIds.has(edge.source_node_id) && !live.movingNodeIds.has(edge.target_node_id)
+      ? live.previous.get(edge.id)
+      : undefined
+  if (lanePitch) {
+    const requests: MazeEdgeRequest[] = []
+    const reserved: Point[][] = []
+    for (const { edge, source, target, sourceSide, targetSide } of edgeInfos) {
+      const kept = keepsPrevious(edge)
+      if (kept) { reserved.push(kept.path); continue }
+      const srcAssign = sourceAssignments.get(edge.id)
+      const tgtAssign = targetAssignments.get(edge.id)
+      const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
+      const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
+      requests.push({
+        id: edge.id,
+        sourceId: edge.source_node_id,
+        targetId: edge.target_node_id,
+        sourcePort: getPortPoint(source, sourceSide, srcOffset, lanePitch),
+        sourceSide,
+        targetPort: getPortPoint(target, targetSide, tgtOffset, lanePitch),
+        targetSide,
+      })
+    }
+    ;({ routes: mazeRoutes, failures: mazeFailures } = routeEdgesMaze(requests, nodes, { diagonal: style === 'diagonal' }, reserved))
+  }
+
   // Route each edge
   for (const info of sortedInfos) {
     const { edge, source, target, sourceSide, targetSide } = info
+
+    const kept = lanePitch ? keepsPrevious(edge) : undefined
+    if (kept) { result.set(edge.id, kept); continue }
 
     const srcAssign = sourceAssignments.get(edge.id)
     const tgtAssign = targetAssignments.get(edge.id)
@@ -317,8 +371,8 @@ export function routeAllEdges(
     const srcOffset = srcAssign ? calculatePortOffset(srcAssign.index, srcAssign.total) : 0
     const tgtOffset = tgtAssign ? calculatePortOffset(tgtAssign.index, tgtAssign.total) : 0
 
-    const sourcePort = getPortPoint(source, sourceSide, srcOffset)
-    const targetPort = getPortPoint(target, targetSide, tgtOffset)
+    const sourcePort = getPortPoint(source, sourceSide, srcOffset, lanePitch)
+    const targetPort = getPortPoint(target, targetSide, tgtOffset, lanePitch)
     const sourceStandoff = getStandoff(sourcePort, sourceSide, STANDOFF)
     const targetStandoff = getStandoff(targetPort, targetSide, STANDOFF)
 
@@ -327,7 +381,10 @@ export function routeAllEdges(
 
     let routeResult: { path: Point[]; svgPath: string }
 
-    if (style === 'direct') {
+    const mazeRoute = mazeRoutes?.get(edge.id)
+    if (mazeRoute) {
+      routeResult = { path: mazeRoute.path, svgPath: pathToSvgString(mazeRoute.path) }
+    } else if (style === 'direct') {
       // True straight line: center-to-edge, no ports, no obstacle avoidance
       const sw = source.width || 200
       const sh = source.height || 120
@@ -572,7 +629,7 @@ export function routeAllEdges(
       id: edge.id,
       path: adjusted.path,
       svgPath: adjusted.svgPath,
-      debugInfo: { srcOffset, tgtOffset, srcSide: sourceSide, tgtSide: targetSide },
+      debugInfo: { srcOffset, tgtOffset, srcSide: sourceSide, tgtSide: targetSide, router: mazeRoute ? 'maze' : 'legacy', mazeFailure: mazeFailures?.get(edge.id) },
     })
   }
 

@@ -17,8 +17,10 @@ import {
   getAngledStandoff,
   SpatialIndex,
   setRoutingSpatialIndex,
+  portLanePitch,
   type NodeRect,
   type EdgeStyle,
+  type RoutedEdge,
 } from '../../routing'
 import type { Node, Edge } from '../../../types'
 
@@ -54,6 +56,7 @@ export interface UseEdgeRoutingContext {
     nodes: Node[]
     edges: Edge[]
     filteredEdges: Edge[]
+    selectedNodeIds?: string[]
   }
   displayNodes: ComputedRef<Node[]>
   neighborhoodMode: Ref<boolean>
@@ -73,6 +76,13 @@ export interface UseEdgeRoutingContext {
    * (PRODUCT_DESIGN.md > Re-routing edges during an interaction).
    */
   isDragging?: Ref<boolean>
+  /**
+   * The node under the pointer during a drag. It moves alone, or with the
+   * whole selection when it is part of one; while the drag is in progress
+   * only the moving nodes' edges are re-routed, the others keep their paths
+   * (PRODUCT_DESIGN.md > Edge Routing (PCB-Style)).
+   */
+  draggingNodeId?: Ref<string | null>
   /**
    * A layout animation is moving the nodes. Edges are drawn as
    * direct lines meanwhile and routed in their style when the motion ends
@@ -98,6 +108,7 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
     edgeStyleMap,
     getNodeHeight,
     isDragging,
+    draggingNodeId,
     isMoving,
   } = ctx
 
@@ -112,6 +123,12 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
    * (PRODUCT_DESIGN.md > Re-routing edges during an interaction).
    */
   const mustRerouteLive = () => isDragging?.value === true
+  const movingNodeIds = (): Set<string> => {
+    const id = draggingNodeId?.value
+    if (!id) return new Set()
+    const selected = store.selectedNodeIds ?? []
+    return new Set(selected.length > 1 && selected.includes(id) ? selected : [id])
+  }
 
   // Cache for routed edges - only recalculate when not dragging
   const cachedRoutedEdges = ref<Map<
@@ -396,7 +413,12 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
       setRoutingSpatialIndex(spatialIndex)
 
       try {
-        routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle, { sourceAssignments, targetAssignments })
+        // Mid-drag, with last frame's routes at hand, only the moving edges are searched
+        const previous = cachedRoutedEdges.value as Map<string, RoutedEdge> | null
+        const live = mustRerouteLive() && previous
+          ? { movingNodeIds: movingNodeIds(), previous }
+          : undefined
+        routedEdges = routeAllEdges(edgeDefs, nodeRects, nodeMap, effectiveStyle, { sourceAssignments, targetAssignments }, live)
         cachedRoutedEdges.value = routedEdges
         if (!mustRerouteLive()) {
           lastRoutingKey.value = routingKey
@@ -451,11 +473,13 @@ export function useEdgeRouting(ctx: UseEdgeRoutingContext): UseEdgeRoutingReturn
         const sourceSide = sourceRect ? getSide(sourceRect, targetCx, targetCy) : 'right'
         const targetSide = targetRect ? getSide(targetRect, sourceCx, sourceCy) : 'left'
 
+        // Ports on the lane grid for the PCB styles, as the router places them
+        const lanePitch = portLanePitch(effectiveStyle, edgeDefs.length)
         const startPort = sourceRect
-          ? getPortPoint(sourceRect, sourceSide, srcOffset)
+          ? getPortPoint(sourceRect, sourceSide, srcOffset, lanePitch)
           : { x: sourceCx, y: sourceCy }
         const endPort = targetRect
-          ? getPortPoint(targetRect, targetSide, tgtOffset)
+          ? getPortPoint(targetRect, targetSide, tgtOffset, lanePitch)
           : { x: targetCx, y: targetCy }
 
         const STANDOFF_DIST = 120

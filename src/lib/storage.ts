@@ -302,7 +302,8 @@ export const canvasStorage = {
     if (value === 'orthogonal' || value === 'diagonal' || value === 'curved' || value === 'hyperbolic' || value === 'straight' || value === 'direct') {
       return value
     }
-    return 'hyperbolic'
+    // Orthogonal traces are the default: they route on the lane grid and keep out of cards
+    return 'orthogonal'
   },
   setEdgeStyle(value: 'orthogonal' | 'diagonal' | 'curved' | 'hyperbolic' | 'straight' | 'direct', workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasEdgeStyle, workspaceId), value)
