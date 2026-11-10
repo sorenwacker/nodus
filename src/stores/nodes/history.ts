@@ -23,7 +23,7 @@ export interface VersionWriter {
  * minutes after the edit that made it, when an ordinary write would be
  * coalesced into the last version.
  */
-export const RESTORE_SOURCE = 'restore'
+const RESTORE_SOURCE = 'restore'
 
 /** Every kept version of a node, newest first. Empty outside the desktop app. */
 export async function getNodeHistory(id: string): Promise<NodeVersion[]> {
