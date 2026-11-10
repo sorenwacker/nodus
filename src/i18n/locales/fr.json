@@ -101,6 +101,7 @@
       "hop": "saut",
       "hops": "sauts",
       "highlightEdges": "Surligner toutes les arêtes - Rendre toutes les arêtes plus visibles",
+      "colorEdgesBySource": "Colorer les arêtes par source - Chaque carte donne sa couleur à ses arêtes sortantes",
       "bubbleMode": "Mode bulle - Afficher les nœuds comme des cercles",
       "physics": "Mode physique - Le graphe visible s'organise pendant que vous déplacez (P)",
       "physicsUnavailable": "Mode physique - En mode bulles uniquement, hors de la vue de voisinage, jusqu'à 2000 nœuds visibles",

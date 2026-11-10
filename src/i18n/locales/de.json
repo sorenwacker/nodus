@@ -96,6 +96,7 @@
       "fitNodesToContent": "Knoten an Inhalt anpassen - Alle Knoten für vollständigen Inhalt anpassen",
       "edgeStyle": "Kantenform",
       "highlightEdges": "Alle Kanten hervorheben - Alle Kanten sichtbarer machen",
+      "colorEdgesBySource": "Kanten nach Quelle färben - Die ausgehenden Kanten jeder Karte in eigener Farbe",
       "magnifier": "Lupe - Vergrößerte Ansicht bei Verkleinerung anzeigen",
       "neighborhoodView": "Nachbarschaftsansicht - Nur ausgewählten Knoten und Nachbarn anzeigen (N)",
       "bubbleMode": "Blasenmodus - Knoten als Kreise anzeigen",

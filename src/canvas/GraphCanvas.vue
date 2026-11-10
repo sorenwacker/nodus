@@ -845,7 +845,7 @@ const { getLinkedEntities, handleEntityClick, linkToEntity, handleCreateEntity }
 const canvasSettings = useCanvasSettings(store.currentWorkspaceId || undefined)
 const {
   gridLockEnabled,
-  highlightAllEdges,
+  highlightAllEdges, colorEdgesBySource, toggleColorEdgesBySource,
   edgeHideThreshold,
   edgeLabelSize,
   hideWikilinkEdges,
@@ -1505,7 +1505,7 @@ const { visibleEdgeLines, canvasEdges, hiddenEdges } = useEdgeVisibility({
   selectedNodeIds: computed(() => store.selectedNodeIds),
   selectedEdge,
   highlightedEdgeIds,
-  highlightAllEdges,
+  highlightAllEdges, colorEdgesBySource,
   edgeHideThreshold,
   hideWikilinkEdges,
   hideStorylineEdges,
@@ -1944,7 +1944,7 @@ defineExpose({
         :global-edge-style="globalEdgeStyle"
         :neighborhood-mode="neighborhoodMode"
         :neighborhood-depth="neighborhoodDepth"
-        :highlight-all-edges="highlightAllEdges"
+        :highlight-all-edges="highlightAllEdges" :color-edges-by-source="colorEdgesBySource"
         :bubble-mode-active="isBubbleModeForced"
         :physics-active="physics.active.value" :physics-available="physics.available.value" :smart-layout-available="llmEnabled" @toggle-physics="physics.toggle()"
         @print-to-pdf="printToPdf(store.selectedNodeIds)" @zoom-in="zoomIn"
@@ -1956,7 +1956,7 @@ defineExpose({
         @toggle-neighborhood-mode="neighborhood.toggle()"
         @set-neighborhood-depth="setDepth"
         @show-help="showHelpModal = true"
-        @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
+        @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges" @toggle-color-edges-by-source="toggleColorEdgesBySource"
         @toggle-bubble-mode="toggleBubbleMode"
       />
 

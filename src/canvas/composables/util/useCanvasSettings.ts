@@ -12,6 +12,7 @@ export function useCanvasSettings(workspaceId?: string) {
 
   // Edge display settings
   const highlightAllEdges = ref(false)
+  const colorEdgesBySource = ref(canvasStorage.getColorEdgesBySource(workspaceId))
   const edgeHideThreshold = ref(canvasStorage.getEdgeHideThreshold(workspaceId))
   const edgeLabelSize = ref(canvasStorage.getEdgeLabelSize(workspaceId))
   const hideWikilinkEdges = ref(canvasStorage.getHideWikilinkEdges(workspaceId))
@@ -26,6 +27,11 @@ export function useCanvasSettings(workspaceId?: string) {
 
   function toggleHighlightAllEdges() {
     highlightAllEdges.value = !highlightAllEdges.value
+  }
+
+  function toggleColorEdgesBySource() {
+    colorEdgesBySource.value = !colorEdgesBySource.value
+    canvasStorage.setColorEdgesBySource(colorEdgesBySource.value, workspaceId)
   }
 
   function showHelp() {
@@ -84,6 +90,7 @@ export function useCanvasSettings(workspaceId?: string) {
     gridLockEnabled,
     gridSize,
     highlightAllEdges,
+    colorEdgesBySource,
     edgeHideThreshold,
     edgeLabelSize,
     hideWikilinkEdges,
@@ -93,6 +100,7 @@ export function useCanvasSettings(workspaceId?: string) {
     // Toggles
     toggleGridLock,
     toggleHighlightAllEdges,
+    toggleColorEdgesBySource,
     showHelp,
     hideHelp,
 

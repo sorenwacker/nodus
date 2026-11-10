@@ -96,6 +96,7 @@
       "fitNodesToContent": "Fit Nodes to Content - Resize all nodes to show full content",
       "edgeStyle": "Edge Style",
       "highlightEdges": "Highlight All Edges - Make all edges more visible",
+      "colorEdgesBySource": "Colour Edges by Source - Give each card's outgoing edges their own colour",
       "magnifier": "Magnifier - Show magnified view when zoomed out",
       "neighborhoodView": "Neighborhood View - Show only selected node and neighbors (N)",
       "bubbleMode": "Bubble Mode - Show nodes as circles",
