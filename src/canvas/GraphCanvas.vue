@@ -840,12 +840,14 @@ const entityOperations = useCanvasEntityLinking({
   showToast,
 })
 const { getLinkedEntities, handleEntityClick, linkToEntity, handleCreateEntity } = entityOperations
+// Pin every affected card, or unpin them all when every one is pinned (PRODUCT_DESIGN.md > Pinned cards)
+const togglePin = (ids: string[]) => { const pin = !ids.every(id => store.getNode(id)?.is_pinned); for (const id of ids) void store.setNodePinned(id, pin) }
 
 // Canvas settings composable
 const canvasSettings = useCanvasSettings(store.currentWorkspaceId || undefined)
 const {
   gridLockEnabled,
-  highlightAllEdges,
+  highlightAllEdges, colorEdgesBySource, toggleColorEdgesBySource,
   edgeHideThreshold,
   edgeLabelSize,
   hideWikilinkEdges,
@@ -1505,7 +1507,7 @@ const { visibleEdgeLines, canvasEdges, hiddenEdges } = useEdgeVisibility({
   selectedNodeIds: computed(() => store.selectedNodeIds),
   selectedEdge,
   highlightedEdgeIds,
-  highlightAllEdges,
+  highlightAllEdges, colorEdgesBySource,
   edgeHideThreshold,
   hideWikilinkEdges,
   hideStorylineEdges,
@@ -1944,7 +1946,7 @@ defineExpose({
         :global-edge-style="globalEdgeStyle"
         :neighborhood-mode="neighborhoodMode"
         :neighborhood-depth="neighborhoodDepth"
-        :highlight-all-edges="highlightAllEdges"
+        :highlight-all-edges="highlightAllEdges" :color-edges-by-source="colorEdgesBySource"
         :bubble-mode-active="isBubbleModeForced"
         :physics-active="physics.active.value" :physics-available="physics.available.value" :smart-layout-available="llmEnabled" @toggle-physics="physics.toggle()"
         @print-to-pdf="printToPdf(store.selectedNodeIds)" @zoom-in="zoomIn"
@@ -1956,7 +1958,7 @@ defineExpose({
         @toggle-neighborhood-mode="neighborhood.toggle()"
         @set-neighborhood-depth="setDepth"
         @show-help="showHelpModal = true"
-        @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges"
+        @toggle-highlight-edges="highlightAllEdges = !highlightAllEdges" @toggle-color-edges-by-source="toggleColorEdgesBySource"
         @toggle-bubble-mode="toggleBubbleMode"
       />
 
@@ -2028,12 +2030,12 @@ defineExpose({
         :entities="store.getEntities()"
         :current-workspace-id="store.currentWorkspaceId"
         :has-d-o-i="contextMenuNodeHasDOI"
-        :doi-count="contextMenuDOICount" :citation-node-count="citationNodeCount"
+        :doi-count="contextMenuDOICount" :citation-node-count="citationNodeCount" :pinned="contextMenu.affectedNodeIds.value.every(id => store.getNode(id)?.is_pinned)"
         @close="closeContextMenu"
         @fit-to-content="fitNodeNow"
         @zoom-to-node="zoomToNodeDefault"
         @open-link-picker="openLinkPicker"
-        @delete-nodes="deleteSelectedNodes(contextMenu.affectedNodeIds.value)"
+        @delete-nodes="deleteSelectedNodes(contextMenu.affectedNodeIds.value)" @toggle-pin="togglePin(contextMenu.affectedNodeIds.value)"
         @export-selection="openExportForSelection(contextMenu.affectedNodeIds.value)" @print-to-pdf="printToPdf(contextMenu.affectedNodeIds.value)"
         @read-node="contextMenuNodeId && displayStore.readNode(contextMenuNodeId)"
         @add-to-storyline="addNodeToStoryline"

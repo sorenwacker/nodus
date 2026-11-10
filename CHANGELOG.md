@@ -6,11 +6,14 @@ All notable changes to Nodus are documented in this file.
 
 ### Added
 - Node history: the fullscreen editor's History button lists the earlier versions of a card, shows each one rendered, and restores the chosen one as a single undo step. A version is kept by every write that replaces a card's title or content, from the editor, the agent, MCP clients or the vault file alike; writes within ten minutes of the last kept version extend it, a change from another source is kept at once, and a hundred versions per card are kept
+- Cards can be pinned from the context menu: a pinned card keeps its position through every layout, physics and drag until it is unpinned, and shows a small pin
+- A canvas control colours every edge by the card it leaves, with twelve palette colours for uncoloured cards and a card's own colour where it has one, so a bundle of traces can be followed to where it goes; remembered per workspace
 
 ### Changed
+- The hierarchical layout packs the cards in each rank to 24 px, centred over the cards they connect to, instead of leaving dagre's room for edges the canvas never draws; the 40-card test graph is 1800 px wide instead of 4600
 - The orthogonal and diagonal edge styles are routed like a circuit board: traces run on a 12 px lane grid, keep out of every card they are not attached to, leave and enter cards straight on, and bend only where they must. Measured on 40 cards in a grid layout with 90 edges, 62 edges used to run through other cards and 557 segment pairs lay on top of each other; now none run through a card and the overlaps that remain are confined to gutters too narrow for their traffic. Orthogonal is the default style for workspaces that have not chosen one
 - While a card is dragged only its own edges are re-routed; the others keep their paths, so the drag stays smooth on dense graphs
-- The grid, horizontal and vertical layouts leave 60 px between cards instead of 24 px: room for four routing lanes, so edges between neighbouring cards run side by side instead of on top of each other
+- The grid, horizontal and vertical layouts leave 96 px between cards instead of 24 px: room for seven routing lanes, so edges between neighbouring cards run side by side instead of on top of each other
 
 ## [1.6.0] - 2026-10-22
 

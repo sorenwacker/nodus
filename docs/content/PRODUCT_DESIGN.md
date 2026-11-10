@@ -841,10 +841,10 @@ ends, the routing key changes and every edge is routed once more.
 
 ### Grid layout gutters
 
-**Required behavior:** The grid, horizontal and vertical layouts leave 60 px between cards: four 12 px routing lanes plus the 6 px keep-out on each side (see Edge Routing (PCB-Style)). Edges between neighbouring cards then run on separate lanes instead of on top of each other.
+**Required behavior:** The grid, horizontal and vertical layouts leave 96 px between cards: seven 12 px routing lanes plus the 6 px keep-out on each side (see Edge Routing (PCB-Style)). Edges between neighbouring cards then run on separate lanes instead of on top of each other.
 
 - The gap was 24 px, which holds exactly one lane. On the 40-card, 90-edge test workspace the maze router kept every edge out of the cards but still laid about 300 segment pairs on top of each other, and many traces had to go round the outside of the graph because the gutters were full.
-- The gutter is the layout's choice, not the router's: the router can only use the room it is given. A 60 px gutter is wide enough for the traffic of a hub with nine edges and narrow enough that the grid still reads as one block.
+- The gutter is the layout's choice, not the router's: the router can only use the room it is given. Measured on the 40-card, 90-edge unit-test graph (three hubs with nine edges each): 60 px leaves 21 segment pairs sharing a lane, 84 px 2, 96 px 1, 108 px 0; crossings stay near a thousand whatever the gap, because they come from the edge count. Seven lanes is where the sharing stops mattering while the grid still reads as one block.
 - The hierarchical layout keeps its own spacing (24 px within a rank, 60 px between ranks), because its edges run between ranks.
 
 ### Themes
@@ -1925,6 +1925,14 @@ Edges are re-routed when the graph changes, and live while a node is dragged, be
 
 Zooming is not such a case. Pan and zoom are one container transform, so edge geometry in canvas coordinates does not change and the cache stays correct. Counting zoom as a reason to re-route ran the most expensive path on every recompute while zooming.
 
+### Colouring edges by source card
+
+**Required behavior:** A control next to "Highlight All Edges" colours every edge by the card it leaves: an edge with a colour of its own keeps it, an edge leaving a coloured card takes that card's colour, and an edge leaving an uncoloured card takes one of twelve palette colours: the cards with the most outgoing edges take the palette first, so the big bundles never share a colour while colours are left, and the assignment is the same for the same graph. Resting edges are drawn at 60 % opacity instead of 30 % while the mode is on, so the hues can be told apart. Hovering and selection work as before: the focused card's edges go to the highlight colour at full opacity. The setting is remembered per workspace.
+
+- Why: with the PCB router every trace in a gutter is the same grey at the same weight, and a bundle of eight cannot be followed by eye to where it goes. Hovering shows one card's edges, but reading the graph should not need the pointer. Colouring by source is what board viewers do with nets: a bundle keeps its colour through every bend, so it can be followed.
+- Twelve palette colours, not one per card: arrowheads need a marker per colour and a reader cannot tell more hues apart anyway. Two cards may share a colour; their bundles separate where they leave their cards.
+- Off by default. Plain grey is the quieter picture and the right one for a small graph.
+
 ### Showing edges only around the focus
 
 Above its own threshold, the canvas draws only the edges touching what is hovered or selected, plus one hop for context.
@@ -2324,12 +2332,20 @@ The web view of the packaged application connects only to the hosts its content 
 - With a selection, exactly the selected nodes are laid out.
 - Without a selection, the whole graph is laid out.
 
+### Pinned cards
+
+**Required behavior:** A card can be pinned from its context menu ("Pin position"; "Unpin" when every affected card is pinned). A pinned card keeps its position: the grid, force, hierarchical and smart layouts arrange the other cards and leave it where it is, physics mode treats it as an anchor, and it cannot be dragged, though it can still be selected, edited and resized. The store refuses every position write for a pinned card, so no path that moves cards, including the agent's tools, can move one. A pinned card shows a small pin in its top-right corner. The flag is stored with the node (`is_pinned`).
+
+- Why: a layout is a starting point, and the cards the user has placed by hand are the part worth keeping. Without pinning, one layout run throws away every manual placement.
+- The layouts exclude pinned cards from the set they arrange rather than routing around them: the grid and hierarchical algorithms have no notion of fixed obstacles, so a pinned card can end up under the new arrangement. That is visible at once and fixed by one more layout run with the card unpinned, or by moving the others.
+
 ### Hierarchical layout spacing
 
 **Required behavior:** A hierarchical layout places nodes as close together as they can go without overlapping. Nodes in the same rank are 24 px apart and consecutive ranks are 60 px apart, which keeps the edges between them visible.
 
 - Gaps are measured between card borders. The layout sizes each node by its stored width and height (default 200 x 120), which is the size the card renders at, so no gap is needed to absorb a size mismatch.
 - The spacing is defined once, in the layout module. The canvas layout command does not pass values of its own.
+- The ranks and the order within each rank come from dagre; the positions along a rank do not. dagre leaves room in every rank for the edges it would draw through it: an edge spanning several ranks gets a placeholder in each rank between, and on the 40-card test graph that was 1058 placeholders, a median gap of about 1000 px between neighbours in a rank, and a layout 4600 px wide. The canvas routes its own edges and never uses dagre's. So after dagre a compaction pass (`rankCompaction.ts`) re-places the cards along each rank: packed to the gap, each centred over the cards it connects to in the neighbouring ranks as far as the packing allows, order preserved. The same graph is 1800 px wide with a median gap of 30 px.
 
 The gaps were 150 px within a rank and 360 px between ranks, three times the height of a default card between consecutive rows. The canvas command also passed its own values over the module's defaults, so the layout had two spacings and the one in effect was not the one the module declared.
 

@@ -101,6 +101,7 @@
       "hop": "salto",
       "hops": "saltos",
       "highlightEdges": "Resaltar todas las aristas - Hacer todas las aristas más visibles",
+      "colorEdgesBySource": "Colorear aristas por origen - Cada tarjeta da su color a sus aristas salientes",
       "bubbleMode": "Modo burbuja - Mostrar nodos como círculos",
       "physics": "Modo física - El grafo visible se ordena mientras arrastras (P)",
       "physicsUnavailable": "Modo física - Solo en modo burbuja, fuera de la vista de vecindario, hasta 2000 nodos visibles",
@@ -758,6 +759,8 @@
     "warningMessage": "Aprueba solo conexiones de herramientas en las que confíes. La herramienta conectada podrá leer, crear, actualizar y eliminar nodos."
   },
   "contextMenu": {
+    "pin": "Fijar posición",
+    "unpin": "Soltar",
     "fitToContent": "Ajustar al contenido",
     "findOnCanvas": "Buscar en el lienzo",
     "linkTo": "Enlazar con...",

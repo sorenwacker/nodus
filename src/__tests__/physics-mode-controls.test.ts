@@ -21,6 +21,7 @@ function mountControls(physicsActive: boolean, physicsAvailable: boolean) {
       neighborhoodMode: false,
       neighborhoodDepth: 1,
       highlightAllEdges: false,
+      colorEdgesBySource: false,
       bubbleModeActive: false,
       physicsActive,
       physicsAvailable,

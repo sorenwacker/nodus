@@ -558,6 +558,7 @@ mod tests {
             z_index: 0,
             color_theme: None,
             is_collapsed: false,
+            is_pinned: false,
             tags: Some("[\"alpha\",\"beta\"]".to_string()),
             workspace_id: None,
             checksum: None,

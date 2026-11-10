@@ -21,6 +21,8 @@ defineProps<{
   neighborhoodDepth: number
   /** Whether all edges are highlighted */
   highlightAllEdges: boolean
+  /** Whether edges are coloured by the card they leave */
+  colorEdgesBySource: boolean
   /** Whether bubble mode is active (LOD circles) */
   bubbleModeActive: boolean
   /** Whether physics mode is running, and whether it can start here */
@@ -43,6 +45,7 @@ const emit = defineEmits<{
   (e: 'setNeighborhoodDepth', depth: number): void
   (e: 'showHelp'): void
   (e: 'toggleHighlightEdges'): void
+  (e: 'toggleColorEdgesBySource'): void
   (e: 'toggleBubbleMode'): void
   (e: 'togglePhysics'): void
   (e: 'printToPdf'): void
@@ -229,6 +232,20 @@ const emit = defineEmits<{
         <line x1="4" y1="20" x2="20" y2="4" stroke-width="3" />
         <line x1="4" y1="12" x2="12" y2="4" />
         <line x1="12" y1="20" x2="20" y2="12" />
+      </svg>
+    </button>
+    <button
+      data-tooltip-pos="top"
+      :class="{ active: colorEdgesBySource }"
+      :data-tooltip="t('canvas.controls.colorEdgesBySource')"
+      @click="emit('toggleColorEdgesBySource')"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- three bundles leaving one card, each its own weight -->
+        <rect x="3" y="9" width="6" height="6" />
+        <line x1="9" y1="10" x2="21" y2="4" stroke-width="3" />
+        <line x1="9" y1="12" x2="21" y2="12" stroke-width="2" />
+        <line x1="9" y1="14" x2="21" y2="20" stroke-width="1" />
       </svg>
     </button>
     <button

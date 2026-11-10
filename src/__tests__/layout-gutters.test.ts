@@ -1,13 +1,13 @@
 /**
  * The grid, horizontal and vertical layouts leave room between cards for
  * edges to run side by side (PRODUCT_DESIGN.md > Grid layout gutters):
- * four routing lanes plus the keep-out on each side.
+ * seven routing lanes plus the keep-out on each side.
  */
 import { describe, it, expect } from 'vitest'
 import { executeAutoLayout, type AutoLayoutStore } from '../canvas/composables/layout/useAutoLayout'
 import { MAZE_CELL, NODE_MARGIN } from '../canvas/routing'
 
-const GUTTER = 4 * MAZE_CELL + 2 * NODE_MARGIN
+const GUTTER = 7 * MAZE_CELL + 2 * NODE_MARGIN
 
 function cards() {
   return [
@@ -56,8 +56,8 @@ function smallestGap(nodes: { canvas_x: number; canvas_y: number; width: number;
 }
 
 describe('layout gutters', () => {
-  it('is four lanes plus the keep-out on each side', () => {
-    expect(GUTTER).toBe(60)
+  it('is seven lanes plus the keep-out on each side', () => {
+    expect(GUTTER).toBe(96)
   })
 
   it('leaves a gutter between cards in a row', async () => {

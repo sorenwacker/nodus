@@ -101,6 +101,7 @@
       "hop": "salto",
       "hops": "salti",
       "highlightEdges": "Evidenzia tutti gli archi - Rendi tutti gli archi più visibili",
+      "colorEdgesBySource": "Colora gli archi per origine - Ogni scheda dà il suo colore agli archi in uscita",
       "bubbleMode": "Modalità bolla - Mostra nodi come cerchi",
       "physics": "Modalità fisica - Il grafo visibile si dispone mentre trascini (P)",
       "physicsUnavailable": "Modalità fisica - Solo in modalità bolle, fuori dalla vista vicinato, fino a 2000 nodi visibili",
@@ -758,6 +759,8 @@
     "warningMessage": "Approva solo connessioni da strumenti di cui ti fidi. Lo strumento connesso potrà leggere, creare, aggiornare ed eliminare nodi."
   },
   "contextMenu": {
+    "pin": "Fissa la posizione",
+    "unpin": "Sblocca",
     "fitToContent": "Adatta al contenuto",
     "findOnCanvas": "Trova sulla tela",
     "linkTo": "Collega a...",

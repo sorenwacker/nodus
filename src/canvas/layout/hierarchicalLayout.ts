@@ -3,6 +3,7 @@
  * Arranges nodes in layers based on their relationships
  */
 import dagre from 'dagre'
+import { compactRanks, type RankedNode } from './rankCompaction'
 
 export interface LayoutNode {
   id: string
@@ -107,6 +108,17 @@ export function applyHierarchicalLayout(
   // Run layout
   dagre.layout(g)
 
+  // dagre leaves room in each rank for the edges it would draw through it;
+  // the canvas routes its own, so pack the cards along their ranks instead
+  const horizontal = direction === 'LR' || direction === 'RL'
+  const ranked: RankedNode[] = g.nodes().map(id => {
+    const d = g.node(id)
+    return horizontal
+      ? { id, rankPos: d.x, pos: d.y, size: d.height }
+      : { id, rankPos: d.y, pos: d.x, size: d.width }
+  })
+  const compacted = compactRanks(ranked, edges, nodeSpacingX)
+
   // Extract positions
   const positions = new Map<string, { x: number; y: number }>()
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
@@ -115,8 +127,9 @@ export function applyHierarchicalLayout(
     const nodeData = g.node(nodeId)
     if (nodeData) {
       // dagre returns center positions, convert to top-left
-      const x = nodeData.x - nodeData.width / 2
-      const y = nodeData.y - nodeData.height / 2
+      const centre = compacted.get(nodeId)!
+      const x = (horizontal ? nodeData.x : centre) - nodeData.width / 2
+      const y = (horizontal ? centre : nodeData.y) - nodeData.height / 2
       positions.set(nodeId, { x, y })
 
       minX = Math.min(minX, x)

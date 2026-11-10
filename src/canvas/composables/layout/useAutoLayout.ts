@@ -14,6 +14,8 @@ export interface Node {
   canvas_y: number
   width?: number
   height?: number
+  /** A pinned card keeps its position (PRODUCT_DESIGN.md > Pinned cards) */
+  is_pinned?: boolean
 }
 
 export interface Edge {
@@ -53,7 +55,8 @@ export async function executeAutoLayout(
   }
 
   const selectedIds = store.getSelectedNodeIds()
-  const allNodes = store.getFilteredNodes()
+  // Pinned cards stay where they are; the layout arranges the rest (PRODUCT_DESIGN.md > Pinned cards)
+  const allNodes = store.getFilteredNodes().filter(n => !n.is_pinned)
   const nodes = selectedIds.length > 0
     ? allNodes.filter(n => selectedIds.includes(n.id))
     : allNodes
@@ -106,10 +109,10 @@ export async function executeAutoLayout(
   const centerX = sumX / nodes.length
   const centerY = sumY / nodes.length
 
-  // Gap between cards in the grid, horizontal and vertical layouts: four
+  // Gap between cards in the grid, horizontal and vertical layouts: seven
   // 12 px routing lanes plus the 6 px keep-out on each side, so edges can
   // run between cards on separate lanes (PRODUCT_DESIGN.md > Grid layout gutters)
-  const gridGap = 60
+  const gridGap = 96
 
   if (layout === 'force' || layout === 'hierarchical') {
     const edges = store.getFilteredEdges()

@@ -41,6 +41,8 @@ export interface UseEdgeVisibilityContext {
   selectedEdge: Ref<string | null>
   highlightedEdgeIds: ComputedRef<Set<string>>
   highlightAllEdges?: Ref<boolean>
+  /** Colour each edge without a colour of its own by the card it leaves */
+  colorEdgesBySource?: Ref<boolean>
   edgeHideThreshold?: Ref<number> // User setting: hide all edges when total count > this (0 = disabled)
   hideWikilinkEdges?: Ref<boolean> // User setting: hide edges auto-generated from [[links]]
   hideStorylineEdges?: Ref<boolean> // User setting: hide edges that connect storyline nodes
@@ -83,6 +85,33 @@ export interface UseEdgeVisibilityReturn {
 const EDGE_VIEWPORT_FILTER_THRESHOLD = 500
 
 /**
+ * Colours for edges coloured by their source card (PRODUCT_DESIGN.md >
+ * Colouring edges by source card): twelve hues apart enough to tell two
+ * bundles apart, dark enough to read on a light canvas and light enough on
+ * a dark one.
+ */
+export const SOURCE_EDGE_PALETTE = [
+  '#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2',
+  '#db2777', '#65a30d', '#ea580c', '#0d9488', '#4f46e5', '#b45309',
+]
+
+/** Opacity of a resting edge when edges are coloured by source: hues need more ink than grey to tell apart */
+export const SOURCE_COLORED_OPACITY = 0.6
+
+/**
+ * A palette colour per source card: the cards with the most outgoing edges
+ * take the palette first, so the big bundles never share a colour while
+ * there are colours left; ties and the rest go by id, so the assignment is
+ * the same for the same graph.
+ */
+export function sourceEdgeColors(edges: { source_node_id: string }[]): Map<string, string> {
+  const count = new Map<string, number>()
+  for (const e of edges) count.set(e.source_node_id, (count.get(e.source_node_id) ?? 0) + 1)
+  const sources = [...count.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+  return new Map(sources.map(([id], i) => [id, SOURCE_EDGE_PALETTE[i % SOURCE_EDGE_PALETTE.length]]))
+}
+
+/**
  * A marker id for a colour, safe to use in an `id` and in `url(#...)`.
  *
  * Stripping only `#` assumed hex. An rgba colour produced ids such as
@@ -104,6 +133,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     selectedEdge,
     highlightedEdgeIds,
     highlightAllEdges = ref(false), // Default to false if not provided
+    colorEdgesBySource = ref(false),
     edgeHideThreshold = ref(0), // User setting: 0 = disabled (show all)
     hideWikilinkEdges = ref(false), // User setting: hide [[wikilink]] edges
     hideStorylineEdges = ref(false), // User setting: hide storyline edges
@@ -226,6 +256,8 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     const selected = selectedEdge.value
     const baseStrokeWidth = edgeStrokeWidth.value
     const allHighlighted = highlightAllEdges?.value ?? false
+    const bySource = colorEdgesBySource.value
+    const sourceColors = bySource ? sourceEdgeColors(edges) : null
 
     return edges.map(e => {
       const isHighlighted = allHighlighted || highlighted.has(e.id)
@@ -239,10 +271,16 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       // Opacity: highlighted edges are full, others are dimmed by default
       // Neighbor edges (2nd hop) are even more transparent
       // When all edges are highlighted, show full opacity
-      const opacity = isHighlighted ? 1.0 : (isNeighborEdge ? 0.2 : 0.3)
+      const opacity = isHighlighted ? 1.0 : (isNeighborEdge ? 0.2 : bySource ? SOURCE_COLORED_OPACITY : 0.3)
 
-      // Use getEdgeColor for theme-aware color remapping
-      const color = getEdgeColor({ link_type: e.link_type || '', color: e.color })
+      // Use getEdgeColor for theme-aware color remapping; by source, an edge
+      // without a colour of its own takes its source card's colour or, for
+      // an uncoloured card, the card's palette colour
+      let color = getEdgeColor({ link_type: e.link_type || '', color: e.color })
+      if (bySource && !e.color) {
+        const sourceTheme = getNode(e.source_node_id)?.color_theme
+        color = sourceTheme ? getEdgeHighlightColor(sourceTheme) : sourceColors!.get(e.source_node_id)!
+      }
       // Simple stroke width: base for normal, slightly thicker for selected/highlighted
       const renderStrokeWidth = isSelected || isHighlighted ? baseStrokeWidth * HIGHLIGHT_WIDTH_FACTOR : baseStrokeWidth
 

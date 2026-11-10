@@ -64,6 +64,7 @@ pub(crate) async fn create_node_impl(
         z_index: 0,
         color_theme: input.color_theme,
         is_collapsed: false,
+        is_pinned: false,
         tags: input.tags.map(|t| serde_json::to_string(&t).unwrap()),
         workspace_id: input.workspace_id,
         checksum: None,
@@ -110,6 +111,14 @@ pub(crate) async fn create_node_impl(
 pub async fn update_node_position(id: String, x: f64, y: f64) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
     database::nodes::update_position(pool, &id, x, y)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_node_pinned(id: String, pinned: bool) -> Result<(), String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::nodes::update_pinned(pool, &id, pinned)
         .await
         .map_err(|e| e.to_string())
 }
@@ -479,6 +488,7 @@ mod tests {
             z_index: 0,
             color_theme: None,
             is_collapsed: false,
+            is_pinned: false,
             tags: None,
             workspace_id: workspace_id.map(|w| w.to_string()),
             checksum: None,

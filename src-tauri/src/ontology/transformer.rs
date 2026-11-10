@@ -172,6 +172,7 @@ pub fn transform_into_workspace(
                 z_index: 0,
                 color_theme,
                 is_collapsed: false,
+                is_pinned: false,
                 tags: None,
                 workspace_id: options.workspace_id.clone(),
                 checksum: None,
@@ -224,6 +225,7 @@ pub fn transform_into_workspace(
                 z_index: 0,
                 color_theme: Some("#9333ea".to_string()), // Purple for classes
                 is_collapsed: false,
+                is_pinned: false,
                 tags: None,
                 workspace_id: options.workspace_id.clone(),
                 checksum: None,

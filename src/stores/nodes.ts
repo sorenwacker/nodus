@@ -34,6 +34,7 @@ import { getNeighborIds as getNeighborIdsFn } from '../canvas/utils/graphTravers
 
 import {
   updateNodePosition as updateNodePositionFn,
+  setNodePinned as setNodePinnedFn,
   setNodePositionsInMemory as setNodePositionsInMemoryFn,
   persistNodePosition as persistNodePositionFn,
   triggerLayoutUpdate as triggerLayoutUpdateFn,
@@ -257,6 +258,10 @@ export const useNodesStore = defineStore('nodes', () => {
     options?: { skipLayoutTrigger?: boolean; skipPersist?: boolean }
   ) {
     await updateNodePositionFn(deps, id, x, y, options)
+  }
+
+  async function setNodePinned(id: string, pinned: boolean) {
+    await setNodePinnedFn(deps, id, pinned)
   }
 
   function setNodePositionsInMemory(positions: Map<string, { x: number; y: number }>) {
@@ -595,6 +600,7 @@ export const useNodesStore = defineStore('nodes', () => {
     getNeighborIds,
     findNodeByTitle,
     updateNodePosition,
+    setNodePinned,
     setNodePositionsInMemory,
     persistNodePosition,
     triggerLayoutUpdate,

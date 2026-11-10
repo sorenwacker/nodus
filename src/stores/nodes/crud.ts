@@ -60,7 +60,8 @@ export async function updateNodePosition(
 ): Promise<void> {
   const { state } = deps
   const node = state.nodes.value.find(n => n.id === id)
-  if (node) {
+  // A pinned card keeps its position (PRODUCT_DESIGN.md > Pinned cards)
+  if (node && !node.is_pinned) {
     const finalX = clampCoord(x)
     const finalY = clampCoord(y)
 
@@ -96,12 +97,29 @@ export function setNodePositionsInMemory(
   let moved = false
   for (const node of state.nodes.value) {
     const pos = positions.get(node.id)
-    if (!pos) continue
+    if (!pos || node.is_pinned) continue
     node.canvas_x = clampCoord(pos.x)
     node.canvas_y = clampCoord(pos.y)
     moved = true
   }
   if (moved) state.nodeLayoutVersion.value++
+}
+
+/**
+ * Pin or unpin a card. Pinned, it keeps its position through every layout,
+ * physics and drag until it is unpinned (PRODUCT_DESIGN.md > Pinned cards).
+ */
+export async function setNodePinned(deps: NodeStoreDependencies, id: string, pinned: boolean): Promise<void> {
+  const node = deps.state.nodes.value.find(n => n.id === id)
+  if (!node || !!node.is_pinned === pinned) return
+  node.is_pinned = pinned
+  node.updated_at = Date.now()
+  deps.state.nodeLayoutVersion.value++
+  try {
+    await invoke('update_node_pinned', { id, pinned })
+  } catch (e) {
+    console.error('Failed to update pinned state:', e)
+  }
 }
 
 /**
@@ -625,6 +643,7 @@ export async function createNode(
       z_index: 0,
       color_theme: data.color_theme ?? null,
       is_collapsed: false,
+      is_pinned: false,
       tags: data.tags ? JSON.stringify(data.tags) : null,
       workspace_id: validWorkspaceId,
       checksum: null,

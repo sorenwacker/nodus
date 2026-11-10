@@ -229,6 +229,8 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     .execute(pool)
     .await?;
 
+    // Pinned cards keep their position (PRODUCT_DESIGN.md > Pinned cards)
+    run_add_column_migration(pool, include_str!("../../migrations/015_pinned_nodes.sql")).await?;
     // Earlier versions of a node (docs/content/PRODUCT_DESIGN.md > Node history)
     sqlx::query(include_str!("../../migrations/016_node_history.sql"))
         .execute(pool)
@@ -673,6 +675,7 @@ mod tests {
             z_index: 0,
             color_theme: None,
             is_collapsed: false,
+            is_pinned: false,
             tags: None,
             workspace_id: None,
             checksum: None,

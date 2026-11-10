@@ -299,6 +299,7 @@ fn main() {
             commands::get_deleted_nodes,
             commands::restore_nodes_with_files,
             commands::update_node_position,
+            commands::update_node_pinned,
             commands::update_node_content,
             commands::update_node_content_from_file,
             commands::get_node_history,
