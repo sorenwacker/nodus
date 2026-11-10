@@ -113,6 +113,10 @@ jobs:
         run: cargo test --verbose
         working-directory: src-tauri
 
+      - name: Check Tauri build
+        run: npx tauri build --debug --no-bundle --config '{"build":{"beforeBuildCommand":""}}'
+        working-directory: .
+
       - name: Check Rust formatting
         run: cargo fmt --check
         working-directory: src-tauri
