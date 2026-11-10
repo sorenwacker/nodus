@@ -20,6 +20,8 @@ export interface PhysicsNode {
   canvas_y: number
   width?: number
   height?: number
+  /** A pinned card holds still, like an off-screen anchor */
+  is_pinned?: boolean
 }
 
 /** Node centres from the latest step, x and y per node at index * 2 */
@@ -141,8 +143,10 @@ export function useLivePhysics(deps: LivePhysicsDeps): LivePhysics {
       xy[2 * i] = n.canvas_x + width / 2
       xy[2 * i + 1] = n.canvas_y + height / 2
       radius[i] = deps.getRadius(n.id)
-      anchor[i] = visibleIds.has(n.id) ? 0 : 1
-      return { id: n.id, width, height, storedX: n.canvas_x, storedY: n.canvas_y, anchor: !visibleIds.has(n.id) }
+      // Off-screen nodes and pinned cards hold still (PRODUCT_DESIGN.md > Pinned cards)
+      const held = !visibleIds.has(n.id) || !!n.is_pinned
+      anchor[i] = held ? 1 : 0
+      return { id: n.id, width, height, storedX: n.canvas_x, storedY: n.canvas_y, anchor: held }
     })
     const links: number[] = []
     for (const e of edges) {

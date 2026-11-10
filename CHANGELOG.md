@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Cards can be pinned from the context menu: a pinned card keeps its position through every layout, physics and drag until it is unpinned, and shows a small pin
 - A canvas control colours every edge by the card it leaves, with twelve palette colours for uncoloured cards and a card's own colour where it has one, so a bundle of traces can be followed to where it goes; remembered per workspace
 
 ### Changed

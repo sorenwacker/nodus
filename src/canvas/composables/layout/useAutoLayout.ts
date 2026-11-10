@@ -14,6 +14,8 @@ export interface Node {
   canvas_y: number
   width?: number
   height?: number
+  /** A pinned card keeps its position (PRODUCT_DESIGN.md > Pinned cards) */
+  is_pinned?: boolean
 }
 
 export interface Edge {
@@ -53,7 +55,8 @@ export async function executeAutoLayout(
   }
 
   const selectedIds = store.getSelectedNodeIds()
-  const allNodes = store.getFilteredNodes()
+  // Pinned cards stay where they are; the layout arranges the rest (PRODUCT_DESIGN.md > Pinned cards)
+  const allNodes = store.getFilteredNodes().filter(n => !n.is_pinned)
   const nodes = selectedIds.length > 0
     ? allNodes.filter(n => selectedIds.includes(n.id))
     : allNodes

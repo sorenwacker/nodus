@@ -759,6 +759,8 @@
     "semanticSkipped": "{count} sections skipped by the AI pass"
   },
   "contextMenu": {
+    "pin": "Pin position",
+    "unpin": "Unpin",
     "fitToContent": "Fit to Content",
     "findOnCanvas": "Find on Canvas",
     "linkTo": "Link to...",

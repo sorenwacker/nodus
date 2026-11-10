@@ -17,6 +17,7 @@ pub struct Node {
     pub z_index: i32,
     pub color_theme: Option<String>,
     pub is_collapsed: bool,
+    pub is_pinned: bool,
     pub tags: Option<String>,
     pub workspace_id: Option<String>,
     pub checksum: Option<String>,
@@ -218,6 +219,17 @@ pub async fn get_many_by_ids(pool: &DbPool, ids: &[String]) -> Result<Vec<Node>,
 
 pub async fn restore(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
     sqlx::query("UPDATE nodes SET deleted_at = NULL WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Pin or unpin a card: a pinned card keeps its position through layouts,
+/// physics and drags (PRODUCT_DESIGN.md > Pinned cards)
+pub async fn update_pinned(pool: &DbPool, id: &str, pinned: bool) -> Result<(), DatabaseError> {
+    sqlx::query("UPDATE nodes SET is_pinned = ? WHERE id = ?")
+        .bind(pinned)
         .bind(id)
         .execute(pool)
         .await?;

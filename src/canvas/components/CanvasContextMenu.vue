@@ -10,6 +10,8 @@ const props = defineProps<{
   position: { x: number; y: number }
   nodeId: string | null
   nodeCount: number
+  /** Whether every affected card is pinned, so the item offers to unpin */
+  pinned?: boolean
   storylineSubmenu: boolean
   workspaceSubmenu: boolean
   entitySubmenu: boolean
@@ -28,6 +30,7 @@ const { t } = useI18n()
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'fit-to-content', nodeId: string): void
+  (e: 'toggle-pin'): void
   (e: 'zoom-to-node', nodeId: string): void
   (e: 'open-link-picker'): void
   (e: 'delete-nodes'): void
@@ -153,6 +156,11 @@ function handleExportSelection() {
 
 function handlePrintToPdf() {
   emit('print-to-pdf')
+  emit('close')
+}
+
+function handleTogglePin() {
+  emit('toggle-pin')
   emit('close')
 }
 
@@ -437,6 +445,14 @@ function handleCreateEntity(type: EntityNodeType) {
     </div>
 
     <div class="context-menu-divider"></div>
+
+    <div class="context-menu-item" @click="handleTogglePin">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 3h6l-1 7 3 3v2H7v-2l3-3z"/>
+        <line x1="12" y1="15" x2="12" y2="21"/>
+      </svg>
+      <span>{{ pinned ? t('contextMenu.unpin') : t('contextMenu.pin') }}</span>
+    </div>
 
     <div class="context-menu-item danger" @click="handleDelete">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -759,6 +759,8 @@
     "warningMessage": "Aprueba solo conexiones de herramientas en las que confíes. La herramienta conectada podrá leer, crear, actualizar y eliminar nodos."
   },
   "contextMenu": {
+    "pin": "Fijar posición",
+    "unpin": "Soltar",
     "fitToContent": "Ajustar al contenido",
     "findOnCanvas": "Buscar en el lienzo",
     "linkTo": "Enlazar con...",
