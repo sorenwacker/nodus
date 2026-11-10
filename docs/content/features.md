@@ -71,6 +71,7 @@ Open any node in a fullscreen split-view editor for focused writing:
 - **Features**:
   - Title editing in header
   - Wikilink autocomplete (type `[[` to trigger)
+  - **History**: lists the earlier versions of the card's title and content, newest first, shows each one rendered, and restores the chosen one as a single undo step. A version is kept whenever the card changes after a pause of ten minutes or more, from the editor, the agent, MCP clients or the vault file alike; a restore is always kept
   - Mermaid diagram preview
   - "Zoom to Node" button to locate node on canvas
 

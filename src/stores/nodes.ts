@@ -51,6 +51,7 @@ import {
   deleteNodes as deleteNodesFn,
   restoreNode as restoreNodeFn,
 } from './nodes/crud'
+import { getNodeHistory, restoreNodeVersion as restoreNodeVersionFn } from './nodes/history'
 
 import {
   createEdge as createEdgeFn,
@@ -96,6 +97,7 @@ import {
 
 import type {
   Node,
+  NodeVersion,
   Edge,
   Workspace,
   CreateNodeInput,
@@ -285,7 +287,7 @@ export const useNodesStore = defineStore('nodes', () => {
   async function updateNodeContent(
     id: string,
     content: string,
-    options?: { skipUndo?: boolean; skipWikilinkSync?: boolean }
+    options?: { skipUndo?: boolean; skipWikilinkSync?: boolean; source?: string }
   ) {
     await updateNodeContentFn(deps, id, content, tagNodesComposable, createEdge, options, removeTagEdges)
   }
@@ -306,8 +308,13 @@ export const useNodesStore = defineStore('nodes', () => {
     }
   }
 
-  async function updateNodeTitle(id: string, title: string, options?: { skipUndo?: boolean }) {
+  async function updateNodeTitle(id: string, title: string, options?: { skipUndo?: boolean; source?: string }) {
     await updateNodeTitleFn(nodes, id, title, options)
+  }
+
+  /** Make an earlier version current again, as one undo step (PRODUCT_DESIGN.md > Node history) */
+  async function restoreNodeVersion(version: NodeVersion) {
+    await restoreNodeVersionFn({ updateNodeContent, updateNodeTitle }, version)
   }
 
   async function updateNodeTags(id: string, tags: string[]) {
@@ -600,6 +607,8 @@ export const useNodesStore = defineStore('nodes', () => {
     updateNodeSize,
     updateNodeContent,
     updateNodeTitle,
+    getNodeHistory,
+    restoreNodeVersion,
     updateNodeTags,
     updateNodeColor,
     moveNodesToWorkspace,

@@ -811,9 +811,19 @@
     "editor": "Editor (Markdown)",
     "readingMode": "Reading Mode",
     "editMode": "Edit Mode",
-    "zoomToNode": "Zoom to Node"
+    "zoomToNode": "Zoom to Node",
+    "history": "History"
   },
   "agent": {
     "tasks": "Tasks"
+  },
+  "history": {
+    "title": "Earlier versions",
+    "back": "Back",
+    "restore": "Restore this version",
+    "empty": "No earlier versions yet. A version is kept whenever this card changes after a pause of ten minutes or more.",
+    "sourceApp": "before an edit in Nodus",
+    "sourceFile": "before a change on disk",
+    "sourceRestore": "before a restore"
   }
 }

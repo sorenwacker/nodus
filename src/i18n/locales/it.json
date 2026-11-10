@@ -811,9 +811,19 @@
     "editor": "Editor (Markdown)",
     "readingMode": "Modalità lettura",
     "editMode": "Modalità modifica",
-    "zoomToNode": "Ingrandisci sul nodo"
+    "zoomToNode": "Ingrandisci sul nodo",
+    "history": "Cronologia"
   },
   "agent": {
     "tasks": "Attività"
+  },
+  "history": {
+    "title": "Versioni precedenti",
+    "back": "Indietro",
+    "restore": "Ripristina questa versione",
+    "empty": "Nessuna versione precedente. Una versione viene conservata ogni volta che questa scheda cambia dopo una pausa di almeno dieci minuti.",
+    "sourceApp": "prima di una modifica in Nodus",
+    "sourceFile": "prima di una modifica sul disco",
+    "sourceRestore": "prima di un ripristino"
   }
 }

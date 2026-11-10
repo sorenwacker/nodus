@@ -549,7 +549,7 @@ mod tests {
         assert!(database::edges::get_all(&pool).await.unwrap().is_empty());
 
         // Rename b to the dangling target (mirrors the update_node_title command)
-        database::nodes::update_title(&pool, "b", "newname")
+        database::nodes::update_title(&pool, "b", "newname", database::node_history::SOURCE_APP)
             .await
             .unwrap();
         let node = database::nodes::get_by_id(&pool, "b")

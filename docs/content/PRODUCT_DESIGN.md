@@ -922,6 +922,16 @@ CREATE TABLE nodes (
     FOREIGN KEY(workspace_id) REFERENCES workspaces(id)
 );
 
+-- 1b. Node history: the states that writes replaced (see Node history)
+CREATE TABLE node_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    markdown_content TEXT,
+    source TEXT NOT NULL,            -- 'app' or 'file': the write that replaced this state
+    saved_at INTEGER NOT NULL
+);
+
 -- 2. Edges: Visual connections between nodes
 CREATE TABLE edges (
     id TEXT PRIMARY KEY,
@@ -1036,6 +1046,16 @@ Edges are reloaded once per burst of external changes, not once per file: the re
 - Leaving the editor clears the editing guard. The guard stops the watcher from writing a file over an open editor, so a guard left set after the editor closes makes the watcher ignore that node's file for the rest of the session.
 
 Two save functions existed, and the canvas was wired to the one that did neither. Every canvas save dropped the frontmatter from the node and its database copy, and left the guard on the last edited node.
+
+### Node history
+
+**Required behavior:** Every earlier version of a card's title and content can be read and brought back.
+
+- A version is the state a write replaced. The backend keeps it in `node_history` inside the same functions that overwrite a node's content or title, so the editor, the agent, the MCP server, undo and the vault watcher all leave versions without doing anything for it, and a new writer cannot forget. A write that changes nothing keeps nothing.
+- Autosave writes every second while typing; a version per write would bury the ones worth returning to. Writes from the same source within ten minutes of the last kept version extend it, so a stretch of work leaves one version per ten minutes. A change from another source - the file on disk against Nodus itself - is kept at once, so an edit the watcher overwrites is never lost. A hundred versions per card are kept; older ones go.
+- Each version names the write that replaced it: an edit in Nodus, a change on disk, or a restore.
+- Restoring is an ordinary write of the version's content and title through the store: one undo step, wikilinks and tags synced, the vault file written. The write names itself a restore, its own source, so the state it replaces is kept even a minute after the edit that made it, when an ordinary write would be folded into the last version; a restore can therefore itself be undone or restored from.
+- The history lives in the fullscreen editor in place of the preview, where a version can be read before it is restored. Keystrokes still on the autosave timer are written first, so they are not written over the restored text afterwards.
 
 ### Typst Rendering Workflow
 

@@ -596,9 +596,14 @@ pub async fn refresh_workspace(workspace_id: Option<String>) -> Result<u32, Stri
         }
 
         // Update the node content AND checksum
-        if let Err(e) =
-            database::nodes::update_content_and_checksum(pool, &node.id, &content, &new_checksum)
-                .await
+        if let Err(e) = database::nodes::update_content_and_checksum(
+            pool,
+            &node.id,
+            &content,
+            &new_checksum,
+            database::node_history::SOURCE_FILE,
+        )
+        .await
         {
             eprintln!("Failed to update node {}: {}", node.id, e);
             continue;

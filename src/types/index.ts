@@ -80,6 +80,21 @@ export interface Node {
   deleted_at: number | null
 }
 
+/**
+ * An earlier state of a node, kept by the write that replaced it
+ * (PRODUCT_DESIGN.md > Node history).
+ */
+export interface NodeVersion {
+  id: number
+  node_id: string
+  title: string
+  markdown_content: string | null
+  /** The write that replaced this version: 'app' for Nodus itself, 'file' for the vault file, 'restore' for a restore */
+  source: 'app' | 'file' | 'restore' | string
+  /** Unix seconds */
+  saved_at: number
+}
+
 export interface Edge {
   id: string
   source_node_id: string

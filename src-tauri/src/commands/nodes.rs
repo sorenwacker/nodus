@@ -1,6 +1,6 @@
 //! Node commands for CRUD operations on graph nodes
 
-use crate::database::{self, nodes::Node};
+use crate::database::{self, node_history::NodeVersion, nodes::Node};
 use crate::import_helpers;
 use crate::watcher::write_file_locked;
 use serde::{Deserialize, Serialize};
@@ -132,22 +132,54 @@ pub async fn update_node_content_from_file(
     checksum: String,
 ) -> Result<(), String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    database::nodes::update_content_and_checksum(pool, &id, &content, &checksum)
+    database::nodes::update_content_and_checksum(
+        pool,
+        &id,
+        &content,
+        &checksum,
+        database::node_history::SOURCE_FILE,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Earlier versions of a node, newest first
+/// (docs/content/PRODUCT_DESIGN.md > Node history).
+#[tauri::command]
+pub async fn get_node_history(id: String) -> Result<Vec<NodeVersion>, String> {
+    let pool = database::get_pool().map_err(|e| e.to_string())?;
+    database::node_history::list(pool, &id)
         .await
         .map_err(|e| e.to_string())
 }
 
 /// Update node content. Returns the new checksum if file was written.
+/// `source` names the writer for the node's history; a restore says so, any
+/// other caller leaves it out (docs/content/PRODUCT_DESIGN.md > Node history).
 #[tauri::command]
-pub async fn update_node_content(id: String, content: String) -> Result<Option<String>, String> {
+pub async fn update_node_content(
+    id: String,
+    content: String,
+    source: Option<String>,
+) -> Result<Option<String>, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
-    update_node_content_impl(pool, &id, &content).await
+    let source = database::node_history::history_source(source.as_deref());
+    update_node_content_with_source(pool, &id, &content, source).await
 }
 
 pub(crate) async fn update_node_content_impl(
     pool: &database::DbPool,
     id: &str,
     content: &str,
+) -> Result<Option<String>, String> {
+    update_node_content_with_source(pool, id, content, database::node_history::SOURCE_APP).await
+}
+
+async fn update_node_content_with_source(
+    pool: &database::DbPool,
+    id: &str,
+    content: &str,
+    source: &str,
 ) -> Result<Option<String>, String> {
     // Write back to the backing file only while folder sync is active for it
     if let Some(node) = database::nodes::get_by_id(pool, id)
@@ -166,7 +198,7 @@ pub(crate) async fn update_node_content_impl(
                 let checksum = write_file_locked(path, &to_write).map_err(|e| e.to_string())?;
 
                 // Update content and checksum in database
-                database::nodes::update_content_and_checksum(pool, id, content, &checksum)
+                database::nodes::update_content_and_checksum(pool, id, content, &checksum, source)
                     .await
                     .map_err(|e| e.to_string())?;
 
@@ -176,7 +208,7 @@ pub(crate) async fn update_node_content_impl(
     }
 
     // Sync off, no file_path, or file doesn't exist - just update database
-    database::nodes::update_content(pool, id, content)
+    database::nodes::update_content(pool, id, content, source)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -219,9 +251,11 @@ async fn file_write_allowed(pool: &database::DbPool, node: &Node, path: &std::pa
 pub async fn update_node_title(
     id: String,
     title: String,
+    source: Option<String>,
     watcher_state: tauri::State<'_, super::WatcherState>,
 ) -> Result<TitleUpdate, String> {
     let pool = database::get_pool().map_err(|e| e.to_string())?;
+    let source = database::node_history::history_source(source.as_deref());
     let before_rename = |old: &std::path::Path, new: &std::path::Path| {
         if let Some(watcher) = watcher_state.0.lock().unwrap().as_ref() {
             watcher.remap_path(old, new);
@@ -231,7 +265,7 @@ pub async fn update_node_title(
         .await
         .map_err(|e| e.to_string())?
         .map(|n| n.title);
-    let file_path = update_node_title_impl(pool, &id, &title, &before_rename).await?;
+    let file_path = update_node_title_impl(pool, &id, &title, source, &before_rename).await?;
     let relinked = match old_title {
         Some(old) if old != title => relink_after_rename(pool, &id, &old, &title).await?,
         _ => Vec::new(),
@@ -297,9 +331,10 @@ pub(crate) async fn update_node_title_impl(
     pool: &database::DbPool,
     id: &str,
     title: &str,
+    source: &str,
     before_rename: &(dyn Fn(&std::path::Path, &std::path::Path) + Sync),
 ) -> Result<Option<String>, String> {
-    database::nodes::update_title(pool, id, title)
+    database::nodes::update_title(pool, id, title, source)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -647,18 +682,28 @@ mod tests {
         let (vault, file) = vault_with_file("see [[target]] and [[target|it]]");
         insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
         insert_file_node(&pool, "source", &file, Some("ws")).await;
-        database::nodes::update_content(&pool, "source", "see [[target]] and [[target|it]]")
-            .await
-            .unwrap();
+        database::nodes::update_content(
+            &pool,
+            "source",
+            "see [[target]] and [[target|it]]",
+            database::node_history::SOURCE_APP,
+        )
+        .await
+        .unwrap();
         insert_file_node(&pool, "target", "/nonexistent/target.md", Some("ws")).await;
         insert_file_node(&pool, "bystander", "/nonexistent/b.md", Some("ws")).await;
         super::super::wikilinks::sync_wikilinks_for_node(&pool, "source", &["target".to_string()])
             .await
             .unwrap();
 
-        database::nodes::update_title(&pool, "target", "Renamed")
-            .await
-            .unwrap();
+        database::nodes::update_title(
+            &pool,
+            "target",
+            "Renamed",
+            database::node_history::SOURCE_APP,
+        )
+        .await
+        .unwrap();
         let relinked = relink_after_rename(&pool, "target", "target", "Renamed")
             .await
             .unwrap();
@@ -686,9 +731,15 @@ mod tests {
         insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
         insert_file_node(&pool, "n", &file, Some("ws")).await;
 
-        let renamed = update_node_title_impl(&pool, "n", "New Title", &|_, _| {})
-            .await
-            .unwrap();
+        let renamed = update_node_title_impl(
+            &pool,
+            "n",
+            "New Title",
+            database::node_history::SOURCE_APP,
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
 
         let expected = vault.path().join("New Title.md");
         let expected_str = expected.to_string_lossy().to_string();
@@ -717,9 +768,15 @@ mod tests {
         insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), false).await;
         insert_file_node(&pool, "n", &file, Some("ws")).await;
 
-        let renamed = update_node_title_impl(&pool, "n", "New Title", &|_, _| {})
-            .await
-            .unwrap();
+        let renamed = update_node_title_impl(
+            &pool,
+            "n",
+            "New Title",
+            database::node_history::SOURCE_APP,
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
 
         assert_eq!(renamed, None);
         assert!(std::path::Path::new(&file).exists());
@@ -740,9 +797,15 @@ mod tests {
         insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
         insert_file_node(&pool, "n", &file, Some("ws")).await;
 
-        let renamed = update_node_title_impl(&pool, "n", "Taken", &|_, _| {})
-            .await
-            .unwrap();
+        let renamed = update_node_title_impl(
+            &pool,
+            "n",
+            "Taken",
+            database::node_history::SOURCE_APP,
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
 
         assert_eq!(renamed, None);
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
@@ -767,14 +830,20 @@ mod tests {
         let seen: Arc<Mutex<Seen>> = Arc::new(Mutex::new(None));
         let record = seen.clone();
 
-        update_node_title_impl(&pool, "n", "Moved", &move |old, new| {
-            *record.lock().unwrap() = Some((
-                old.to_path_buf(),
-                new.to_path_buf(),
-                old.exists(),
-                new.exists(),
-            ));
-        })
+        update_node_title_impl(
+            &pool,
+            "n",
+            "Moved",
+            database::node_history::SOURCE_APP,
+            &move |old, new| {
+                *record.lock().unwrap() = Some((
+                    old.to_path_buf(),
+                    new.to_path_buf(),
+                    old.exists(),
+                    new.exists(),
+                ));
+            },
+        )
         .await
         .unwrap();
 
@@ -794,10 +863,15 @@ mod tests {
         insert_workspace(&pool, "ws", &vault.path().to_string_lossy(), true).await;
         insert_file_node(&pool, "n", &file, Some("ws")).await;
 
-        let renamed =
-            update_node_title_impl(&pool, "n", "note", &|_, _| panic!("no move expected"))
-                .await
-                .unwrap();
+        let renamed = update_node_title_impl(
+            &pool,
+            "n",
+            "note",
+            database::node_history::SOURCE_APP,
+            &|_, _| panic!("no move expected"),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(renamed, None);
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");

@@ -14,6 +14,7 @@ pub mod edges;
 pub mod fetched_papers;
 pub mod mcp_trust;
 pub mod models;
+pub mod node_history;
 pub mod nodes;
 pub mod ontology_pending;
 pub mod remove_frames;
@@ -230,6 +231,10 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
 
     // Pinned cards keep their position (PRODUCT_DESIGN.md > Pinned cards)
     run_add_column_migration(pool, include_str!("../../migrations/015_pinned_nodes.sql")).await?;
+    // Earlier versions of a node (docs/content/PRODUCT_DESIGN.md > Node history)
+    sqlx::query(include_str!("../../migrations/016_node_history.sql"))
+        .execute(pool)
+        .await?;
 
     // Frames are removed; their titles become tags (docs/design/remove-frames.md)
     let (frames, tagged) = remove_frames::run(pool).await?;

@@ -5,6 +5,7 @@ All notable changes to Nodus are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Node history: the fullscreen editor's History button lists the earlier versions of a card, shows each one rendered, and restores the chosen one as a single undo step. A version is kept by every write that replaces a card's title or content, from the editor, the agent, MCP clients or the vault file alike; writes within ten minutes of the last kept version extend it, a change from another source is kept at once, and a hundred versions per card are kept
 - Cards can be pinned from the context menu: a pinned card keeps its position through every layout, physics and drag until it is unpinned, and shows a small pin
 - A canvas control colours every edge by the card it leaves, with twelve palette colours for uncoloured cards and a card's own colour where it has one, so a bundle of traces can be followed to where it goes; remembered per workspace
 

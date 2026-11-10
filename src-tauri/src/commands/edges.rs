@@ -113,7 +113,7 @@ pub async fn delete_edge(id: String) -> Result<(), String> {
                     let new_content =
                         import_helpers::remove_wikilinks_to_target(content, other_title);
                     if new_content != *content {
-                        update_node_content(node.id.clone(), new_content)
+                        update_node_content(node.id.clone(), new_content, None)
                             .await
                             .map_err(|e| e.to_string())?;
                     }
