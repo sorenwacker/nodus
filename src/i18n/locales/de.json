@@ -759,6 +759,8 @@
     "warningMessage": "Lassen Sie nur Verbindungen von Werkzeugen zu, denen Sie vertrauen. Das verbundene Werkzeug kann Knoten lesen, erstellen, ändern und löschen."
   },
   "contextMenu": {
+    "pin": "Position anheften",
+    "unpin": "Lösen",
     "fitToContent": "An Inhalt anpassen",
     "findOnCanvas": "Auf der Leinwand finden",
     "linkTo": "Verknüpfen mit ...",

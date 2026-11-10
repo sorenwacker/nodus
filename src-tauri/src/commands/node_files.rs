@@ -99,6 +99,7 @@ pub(crate) async fn create_node_from_file_impl(
         z_index: 0,
         color_theme: None,
         is_collapsed: false,
+        is_pinned: false,
         tags: None,
         workspace_id,
         checksum: Some(checksum),

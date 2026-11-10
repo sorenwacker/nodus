@@ -228,6 +228,9 @@ pub(crate) async fn run_migrations(pool: &DbPool) -> Result<(), DatabaseError> {
     .execute(pool)
     .await?;
 
+    // Pinned cards keep their position (PRODUCT_DESIGN.md > Pinned cards)
+    run_add_column_migration(pool, include_str!("../../migrations/015_pinned_nodes.sql")).await?;
+
     // Frames are removed; their titles become tags (docs/design/remove-frames.md)
     let (frames, tagged) = remove_frames::run(pool).await?;
     if frames > 0 {
@@ -667,6 +670,7 @@ mod tests {
             z_index: 0,
             color_theme: None,
             is_collapsed: false,
+            is_pinned: false,
             tags: None,
             workspace_id: None,
             checksum: None,

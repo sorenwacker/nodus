@@ -69,6 +69,8 @@ export interface Node {
   z_index: number
   color_theme: string | null
   is_collapsed: boolean
+  /** A pinned card keeps its position through layouts, physics and drags (PRODUCT_DESIGN.md > Pinned cards) */
+  is_pinned?: boolean
   auto_fit?: boolean
   tags: string | null
   workspace_id: string | null

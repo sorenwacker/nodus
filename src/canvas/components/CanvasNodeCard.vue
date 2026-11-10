@@ -24,6 +24,8 @@ interface Node {
   height?: number
   color_theme?: string | null
   tags?: string | null
+  /** A pinned card keeps its position (PRODUCT_DESIGN.md > Pinned cards) */
+  is_pinned?: boolean
 }
 
 const props = defineProps<{
@@ -90,6 +92,7 @@ const classes = computed(() => ({
   resizing: props.isResizing,
   editing: props.isEditing,
   collapsed: props.isCollapsed && !isTagNode.value, // Tag nodes never collapse
+  pinned: !!props.node.is_pinned,
   'text-hidden': props.isTextHidden && !isTagNode.value, // Tag nodes always show text
   'neighborhood-mode': props.isNeighborhoodMode,
   'neighborhood-focus': props.isNeighborhoodFocus,
@@ -221,6 +224,11 @@ async function saveDate() {
     @pointerleave="emit('pointerleave')"
     @dblclick.stop="emit('dblclick')"
   >
+    <!-- Pinned: keeps its position through layouts, physics and drags -->
+    <svg v-if="node.is_pinned" class="pin-badge" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5">
+      <path d="M9 3h6l-1 7 3 3v2H7v-2l3-3z"/>
+      <line x1="12" y1="15" x2="12" y2="21"/>
+    </svg>
     <!-- Tag node title (always visible, simplified display) -->
     <div v-if="isTagNode" class="node-header">
       <span>{{ displayTitle }}</span>
@@ -501,5 +509,16 @@ async function saveDate() {
 
 :global([data-theme='dark']) .more-entities {
   background: rgba(255, 255, 255, 0.08);
+}
+.node-card.pinned {
+  cursor: default;
+}
+
+.pin-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0.55;
+  pointer-events: none;
 }
 </style>

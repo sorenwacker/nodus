@@ -759,6 +759,8 @@
     "warningMessage": "N’autorisez que les outils auxquels vous faites confiance. L’outil connecté pourra lire, créer, modifier et supprimer des nœuds."
   },
   "contextMenu": {
+    "pin": "Épingler la position",
+    "unpin": "Détacher",
     "fitToContent": "Ajuster au contenu",
     "findOnCanvas": "Trouver sur le canevas",
     "linkTo": "Lier à...",

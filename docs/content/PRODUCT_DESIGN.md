@@ -2312,6 +2312,13 @@ The web view of the packaged application connects only to the hosts its content 
 - With a selection, exactly the selected nodes are laid out.
 - Without a selection, the whole graph is laid out.
 
+### Pinned cards
+
+**Required behavior:** A card can be pinned from its context menu ("Pin position"; "Unpin" when every affected card is pinned). A pinned card keeps its position: the grid, force, hierarchical and smart layouts arrange the other cards and leave it where it is, physics mode treats it as an anchor, and it cannot be dragged, though it can still be selected, edited and resized. The store refuses every position write for a pinned card, so no path that moves cards, including the agent's tools, can move one. A pinned card shows a small pin in its top-right corner. The flag is stored with the node (`is_pinned`).
+
+- Why: a layout is a starting point, and the cards the user has placed by hand are the part worth keeping. Without pinning, one layout run throws away every manual placement.
+- The layouts exclude pinned cards from the set they arrange rather than routing around them: the grid and hierarchical algorithms have no notion of fixed obstacles, so a pinned card can end up under the new arrangement. That is visible at once and fixed by one more layout run with the card unpinned, or by moving the others.
+
 ### Hierarchical layout spacing
 
 **Required behavior:** A hierarchical layout places nodes as close together as they can go without overlapping. Nodes in the same rank are 24 px apart and consecutive ranks are 60 px apart, which keeps the edges between them visible.

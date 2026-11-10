@@ -125,6 +125,13 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     const node = store.getNode(nodeId)
     if (!node) return
 
+    // A pinned card can be selected but not dragged (PRODUCT_DESIGN.md > Pinned cards)
+    if (node.is_pinned) {
+      if (!store.selectedNodeIds.includes(nodeId)) store.selectNode(nodeId, e.shiftKey || e.metaKey || e.ctrlKey)
+      selectedEdge.value = null
+      return
+    }
+
     // Note: File sync is handled by the file watcher composable, not on click.
     // Removed refreshNodeFromFile(nodeId) call to avoid file I/O blocking UI.
 
@@ -154,7 +161,7 @@ export function useNodeDragging(ctx: UseNodeDraggingContext): UseNodeDraggingRet
     if (store.selectedNodeIds.length > 1 && store.selectedNodeIds.includes(nodeId)) {
       for (const id of store.selectedNodeIds) {
         const n = store.getNode(id)
-        if (n) {
+        if (n && !n.is_pinned) {
           multiDragInitial.value.set(id, { x: n.canvas_x, y: n.canvas_y })
         }
       }
