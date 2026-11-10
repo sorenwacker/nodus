@@ -36,6 +36,7 @@ const KEYS = {
   canvasEdgeHideThreshold: 'nodus_canvas_edge_hide_threshold',
   canvasEdgeLabelSize: 'nodus_canvas_edge_label_size',
   canvasHideWikilinkEdges: 'nodus_canvas_hide_wikilink_edges',
+  canvasColorEdgesBySource: 'nodus_canvas_color_edges_by_source',
   canvasHideStorylineEdges: 'nodus_canvas_hide_storyline_edges',
   canvasZoomMode: 'nodus_canvas_zoom_mode',
   chainContextLimit: 'nodus_chain_context_limit',
@@ -363,6 +364,13 @@ export const canvasStorage = {
   },
   setHideWikilinkEdges(value: boolean, workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasHideWikilinkEdges, workspaceId), String(value))
+  },
+  // Colour each edge by the card it leaves (PRODUCT_DESIGN.md > Colouring edges by source card)
+  getColorEdgesBySource(workspaceId?: string): boolean {
+    return localStorage.getItem(this._key(KEYS.canvasColorEdgesBySource, workspaceId)) === 'true'
+  },
+  setColorEdgesBySource(value: boolean, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasColorEdgesBySource, workspaceId), String(value))
   },
   // Hide storyline edges - edges that connect nodes in a storyline
   getHideStorylineEdges(workspaceId?: string): boolean {

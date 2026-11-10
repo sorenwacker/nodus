@@ -105,7 +105,7 @@ describe('the smart layout control', () => {
     return mount(CanvasControls, {
       props: {
         scale: 1, gridLockEnabled: false, isLargeGraph: false, globalEdgeStyle: 'orthogonal',
-        neighborhoodMode: false, neighborhoodDepth: 1, highlightAllEdges: false, bubbleModeActive: false,
+        neighborhoodMode: false, neighborhoodDepth: 1, highlightAllEdges: false, colorEdgesBySource: false, bubbleModeActive: false,
         physicsActive: false, physicsAvailable: true, smartLayoutAvailable,
       },
       global: { plugins: [i18n] },
