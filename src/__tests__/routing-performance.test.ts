@@ -1,6 +1,10 @@
 /**
  * Edge routing gets faster without changing any route
  * (PRODUCT_DESIGN.md > Routing cost).
+ *
+ * The baseline was re-recorded when the maze router took over the
+ * orthogonal and diagonal styles (PRODUCT_DESIGN.md > Edge Routing
+ * (PCB-Style)); since then it guards every style's routes again.
  */
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
@@ -52,9 +56,9 @@ function fingerprint(): string {
 }
 
 describe('edge routing', () => {
-  it('routes exactly as before the lane tracker and spatial index were rewritten', () => {
+  it('routes exactly as it did when the baseline was recorded', () => {
     expect(fingerprint()).toBe(BASELINE)
   })
 })
 
-const BASELINE = '6910b89c83b5222148fee179413f6ffc0fa479f3451a174a9ec00cbe3a4d13ee'
+const BASELINE = '8749b9a71a43bd047a0a5b19bb7d64dae5a5382509322cc7b2759fb235e4590c'

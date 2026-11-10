@@ -61,7 +61,7 @@ describe('port ordering', () => {
 
 describe('the drawn path', () => {
   it('starts and ends at the ports the caller assigned, so hit areas and labels match the line', async () => {
-    const { routeAllEdges, analyzeEdges, getPortPoint, calculatePortOffset } = await import('../canvas/routing')
+    const { routeAllEdges, analyzeEdges, getPortPoint, calculatePortOffset, portLanePitch } = await import('../canvas/routing')
     const nodes: NodeRect[] = [
       { id: 'center', canvas_x: 200, canvas_y: 200, width: 200, height: 120 },
       { id: 'r1', canvas_x: 500, canvas_y: 100, width: 200, height: 120 },
@@ -78,13 +78,14 @@ describe('the drawn path', () => {
 
     for (const edge of edges) {
       const a = ports.sourceAssignments.get(edge.id)!
-      const expected = getPortPoint(nodeMap.get('center')!, a.side, calculatePortOffset(a.index, a.total))
+      // The PCB styles put ports on the lane grid; the canvas passes the same pitch
+      const expected = getPortPoint(nodeMap.get('center')!, a.side, calculatePortOffset(a.index, a.total), portLanePitch('orthogonal', edges.length))
       expect(routed.get(edge.id)!.path![0]).toEqual(expected)
     }
   })
 
   it('is routed from the optimised assignments the canvas computed', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/canvas/composables/edges/useEdgeRouting.ts'), 'utf8')
-    expect(source).toMatch(/routeAllEdges\([^)]*\{ sourceAssignments, targetAssignments \}\)/)
+    expect(source).toMatch(/routeAllEdges\([^)]*\{ sourceAssignments, targetAssignments \}/)
   })
 })

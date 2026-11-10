@@ -765,24 +765,31 @@ Focus view that isolates a node and its connected neighbors:
 
 ### Edge Routing (PCB-Style)
 
-Edges are routed using a motherboard/PCB-inspired lane system:
+The orthogonal and diagonal styles are routed the way a board autorouter routes traces: on a lane grid, by search, all edges together.
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
-| `STANDOFF` | 80px | Minimum distance from node edge before routing |
-| `LANE_WIDTH` | 12px | Spacing between parallel edge lanes |
+| `MAZE_CELL` | 12px | Lane pitch of the routing grid; ports sit on lane centres |
+| `NODE_MARGIN` | 6px | Keep-out around a card; a lane closer than this is blocked |
 | `PORT_SPACING` | 25px | Spacing between connection ports on same side |
+| `MAZE_MAX_EDGES` | 400 | Above this the per-edge routers below take over |
 
-**Routing algorithm:**
+**Routing algorithm (`routeAllEdges`):**
 1. Analyze edges and determine exit/entry sides based on relative positions
-2. Assign ports on each node side, sorted to minimize crossings
-3. Route each edge through dedicated lanes using GridTracker
-4. Obstacle avoidance via spatial indexing
+2. Assign ports on each node side, sorted to minimize crossings, and snap each port onto a lane centre (`getPortPoint` with the lane pitch; the canvas passes the same pitch, so hit areas and labels start where the line does)
+3. Build the lane grid over the canvas: cells under a card are blocked, cells in its keep-out margin cost 6 extra per step (so a card pushed against a neighbour still gets its traces out, hugging the border), and the ring beyond carries a small penalty
+4. Route every edge, shortest first, by weighted A* over (cell, direction) states. A step costs 1, a 90° bend 3, a 45° bend 1.5, the lane right next to a card 1.5, crossing another trace 1.5 and running on top of one 14. The search leaves the source along the lane in front of its port and must finish on the lane in front of the target port, heading into the card; arriving from the side costs 6 and is only taken when a neighbouring card leaves no room. A straight run or a single bend over free lanes is taken without searching
+5. Each routed edge marks the lanes it uses, so the next one steers clear of them
+6. Diagonal: the same search with 45° moves (no turn sharper than 90°, no cutting a blocked corner)
+
+**Why search rather than rules:** the previous router placed a fixed 80 px standoff and built two- or three-segment paths from it, detouring around whole cards when one was in the way. In a grid layout with 40 px gutters the standoff point landed inside the neighbouring card, so every route from it crossed that card, and the detours went round the outside of the graph. Measured on 40 cards and 90 edges in the grid layout (`maze-router.test.ts`): 62 of 90 orthogonal edges ran through a card they were not attached to and 557 segment pairs overlapped; the maze router runs no edge through a card and overlaps only where a gutter is narrower than its traffic (118 pairs at 40 px gutters, which hold two lanes; 4 pairs at 80 px).
+
+**Cost and bounds (required behavior):** a search is capped at 40 000 expansions and a routing pass at 600 000, and a port walled in by an overlapping card is detected before searching; edges the maze router gives up on, and all edges above `MAZE_MAX_EDGES`, are routed by the per-edge routers. Canvases wider than 4 000 px route on a 24 px pitch, above 12 000 px on 48 px. The 40-card graph routes in about 60 ms; a drag does not pay that, see below.
 
 **Edge styles:**
 - `straight`: Direct line between nodes
-- `orthogonal`: 90-degree turns only (default)
-- `diagonal`: Angled routing with obstacle avoidance
+- `orthogonal`: 90-degree turns only on the lane grid (default)
+- `diagonal`: 45- and 90-degree turns on the lane grid
 - `curved`: Smooth Bezier curve
 - `hyperbolic`: S-curve that exits/enters nodes orthogonally
 
@@ -805,6 +812,14 @@ and the styled appearance. If per-frame routing ever becomes a measured
 bottleneck on very large graphs, gate any simplification behind a node-count
 threshold rather than applying it to all graphs.
 
+**Routing while a card is dragged (required behavior):** on the lane grid, a
+frame routes only the edges attached to the moving cards (the dragged card,
+or the selection it belongs to). The other edges keep last frame's paths,
+and their lanes are reserved before the moving edges are searched, so the
+moving edges avoid them. The untouched edges did not change, and a full pass
+over 90 edges costs tens of milliseconds a frame does not have. When the drag
+ends, the routing key changes and every edge is routed once more.
+
 **Routing while a layout moves the nodes (required behavior):** A layout animation moves every node on every frame, which a drag does not. Routing every edge in its style on each of those frames cost 117 ms per frame at 300 nodes in the orthogonal style (36 ms after the routing work under Routing cost), so a layout reached its end in one or two frames and looked like a jump. While a layout animation is moving nodes, edges are drawn as direct lines between the cards; when the motion ends they are routed once in their style. A drag keeps live styled routing as described above. Physics mode does not route while it runs at all (Physics Mode).
 
 ### Routing cost
@@ -823,6 +838,14 @@ threshold rather than applying it to all graphs.
 - Each candidate position was tested for overlap against every placed card, and every candidate was built before most were thrown away. The cost grew with roughly the fourth power of the node count: 1.3 s at 300 nodes, 9.5 s at 500, about 100 s at 800 (measured 260930), and the canvas waited that long before anything moved.
 - Overlap is now tested against the cards in the same grid cells only, candidates are tested as they are generated, and distances to connected cards are summed over those cards only: 0.27 s at 300 nodes, 1.1 s at 500.
 - No card moves as a result: a test fingerprints the layout of generated graphs and requires it unchanged. The remaining cost is the search over pairs of placed cards, which decides where gaps are filled.
+
+### Grid layout gutters
+
+**Required behavior:** The grid, horizontal and vertical layouts leave 60 px between cards: four 12 px routing lanes plus the 6 px keep-out on each side (see Edge Routing (PCB-Style)). Edges between neighbouring cards then run on separate lanes instead of on top of each other.
+
+- The gap was 24 px, which holds exactly one lane. On the 40-card, 90-edge test workspace the maze router kept every edge out of the cards but still laid about 300 segment pairs on top of each other, and many traces had to go round the outside of the graph because the gutters were full.
+- The gutter is the layout's choice, not the router's: the router can only use the room it is given. A 60 px gutter is wide enough for the traffic of a hub with nine edges and narrow enough that the grid still reads as one block.
+- The hierarchical layout keeps its own spacing (24 px within a rank, 60 px between ranks), because its edges run between ranks.
 
 ### Themes
 
@@ -2283,7 +2306,7 @@ The web view of the packaged application connects only to the hosts its content 
 
 ### Hierarchical layout spacing
 
-**Required behavior:** A hierarchical layout places nodes as close together as they can go without overlapping. Nodes in the same rank are 24 px apart, the gap the grid layout packs with, and consecutive ranks are 60 px apart, which keeps the edges between them visible.
+**Required behavior:** A hierarchical layout places nodes as close together as they can go without overlapping. Nodes in the same rank are 24 px apart and consecutive ranks are 60 px apart, which keeps the edges between them visible.
 
 - Gaps are measured between card borders. The layout sizes each node by its stored width and height (default 200 x 120), which is the size the card renders at, so no gap is needed to absorb a size mismatch.
 - The spacing is defined once, in the layout module. The canvas layout command does not pass values of its own.

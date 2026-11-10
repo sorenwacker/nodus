@@ -1481,8 +1481,6 @@ const {
 } = edgeStyling
 
 // Edge routing composable - computes edge paths with routing, port assignments, and optimization
-// Note: Pass store directly so computed properties remain reactive
-// isDragging skips complex routing during drag for performance
 const isDraggingRef = computed(() => draggingNode.value !== null)
 const { edgeLines } = useEdgeRouting({
   store,
@@ -1495,7 +1493,7 @@ const { edgeLines } = useEdgeRouting({
   globalEdgeStyle,
   edgeStyleMap,
   getNodeHeight,
-  isDragging: isDraggingRef, isMoving: computed(() => layout.isAnimating.value),
+  isDragging: isDraggingRef, draggingNodeId: draggingNode, isMoving: computed(() => layout.isAnimating.value),
 })
 
 // Edge visibility composable - filters edges and pre-computes rendering properties
