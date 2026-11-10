@@ -7,6 +7,7 @@ All notable changes to Nodus are documented in this file.
 ### Changed
 - The orthogonal and diagonal edge styles are routed like a circuit board: traces run on a 12 px lane grid, keep out of every card they are not attached to, leave and enter cards straight on, and bend only where they must. Measured on 40 cards in a grid layout with 90 edges, 62 edges used to run through other cards and 557 segment pairs lay on top of each other; now none run through a card and the overlaps that remain are confined to gutters too narrow for their traffic. Orthogonal is the default style for workspaces that have not chosen one
 - While a card is dragged only its own edges are re-routed; the others keep their paths, so the drag stays smooth on dense graphs
+- The grid, horizontal and vertical layouts leave 60 px between cards instead of 24 px: room for four routing lanes, so edges between neighbouring cards run side by side instead of on top of each other
 
 ## [1.6.0] - 2026-10-22
 

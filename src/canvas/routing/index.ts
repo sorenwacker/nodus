@@ -29,7 +29,7 @@ export {
 export { SpatialIndex, getSpatialIndex, invalidateSpatialIndex } from './spatialIndex'
 export { routeDiagonal, validateDiagonalPath, type DiagonalRouteParams, type DiagonalRouteResult } from './diagonalRouter'
 export { routeOrthogonal, validateOrthogonalPath, type OrthogonalRouteParams, type OrthogonalRouteResult } from './orthogonalRouter'
-export { routeEdgesMaze, MazeRouter, MAZE_CELL, MAZE_MAX_EDGES, portLanePitch, type MazeEdgeRequest, type MazeRoute, type MazeFailure } from './mazeRouter'
+export { routeEdgesMaze, MazeRouter, MAZE_CELL, NODE_MARGIN, MAZE_MAX_EDGES, portLanePitch, type MazeEdgeRequest, type MazeRoute, type MazeFailure } from './mazeRouter'
 
 // Internal imports
 import type { NodeRect, EdgeDef, RoutedEdge, Point, EdgeStyle, Side, PortAssignment } from './types'

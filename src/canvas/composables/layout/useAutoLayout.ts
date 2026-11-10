@@ -106,8 +106,10 @@ export async function executeAutoLayout(
   const centerX = sumX / nodes.length
   const centerY = sumY / nodes.length
 
-  // Gap between nodes in grid layout
-  const gridGap = 24 // Tight packing gap
+  // Gap between cards in the grid, horizontal and vertical layouts: four
+  // 12 px routing lanes plus the 6 px keep-out on each side, so edges can
+  // run between cards on separate lanes (PRODUCT_DESIGN.md > Grid layout gutters)
+  const gridGap = 60
 
   if (layout === 'force' || layout === 'hierarchical') {
     const edges = store.getFilteredEdges()

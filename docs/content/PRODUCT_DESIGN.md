@@ -839,6 +839,14 @@ ends, the routing key changes and every edge is routed once more.
 - Overlap is now tested against the cards in the same grid cells only, candidates are tested as they are generated, and distances to connected cards are summed over those cards only: 0.27 s at 300 nodes, 1.1 s at 500.
 - No card moves as a result: a test fingerprints the layout of generated graphs and requires it unchanged. The remaining cost is the search over pairs of placed cards, which decides where gaps are filled.
 
+### Grid layout gutters
+
+**Required behavior:** The grid, horizontal and vertical layouts leave 60 px between cards: four 12 px routing lanes plus the 6 px keep-out on each side (see Edge Routing (PCB-Style)). Edges between neighbouring cards then run on separate lanes instead of on top of each other.
+
+- The gap was 24 px, which holds exactly one lane. On the 40-card, 90-edge test workspace the maze router kept every edge out of the cards but still laid about 300 segment pairs on top of each other, and many traces had to go round the outside of the graph because the gutters were full.
+- The gutter is the layout's choice, not the router's: the router can only use the room it is given. A 60 px gutter is wide enough for the traffic of a hub with nine edges and narrow enough that the grid still reads as one block.
+- The hierarchical layout keeps its own spacing (24 px within a rank, 60 px between ranks), because its edges run between ranks.
+
 ### Themes
 
 YAML-based theme system with SQLite storage. Four built-in themes, plus LLM-generated custom themes.
@@ -2298,7 +2306,7 @@ The web view of the packaged application connects only to the hosts its content 
 
 ### Hierarchical layout spacing
 
-**Required behavior:** A hierarchical layout places nodes as close together as they can go without overlapping. Nodes in the same rank are 24 px apart, the gap the grid layout packs with, and consecutive ranks are 60 px apart, which keeps the edges between them visible.
+**Required behavior:** A hierarchical layout places nodes as close together as they can go without overlapping. Nodes in the same rank are 24 px apart and consecutive ranks are 60 px apart, which keeps the edges between them visible.
 
 - Gaps are measured between card borders. The layout sizes each node by its stored width and height (default 200 x 120), which is the size the card renders at, so no gap is needed to absorb a size mismatch.
 - The spacing is defined once, in the layout module. The canvas layout command does not pass values of its own.

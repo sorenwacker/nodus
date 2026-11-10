@@ -82,7 +82,7 @@ const MAX_CELLS = 400_000
 const PADDING_CELLS = 6
 
 /** Keep-out around a card, in px: a lane centre closer than this to a card is blocked. */
-const NODE_MARGIN = MAZE_CELL / 2
+export const NODE_MARGIN = MAZE_CELL / 2
 
 // Costs, in units of one orthogonal step
 const BEND_90 = 3
