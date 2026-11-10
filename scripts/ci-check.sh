@@ -10,38 +10,46 @@ echo ""
 
 cd "$(git rev-parse --show-toplevel)"
 
-echo "[1/8] Frontend tests..."
+echo "[1/9] Frontend tests..."
 npm test -- --run
 
 echo ""
-echo "[2/8] Frontend lint..."
+echo "[2/9] Frontend lint..."
 npm run lint
 
 echo ""
-echo "[3/8] Frontend types..."
+echo "[3/9] Frontend types..."
 npm run typecheck
 
 echo ""
-echo "[4/8] Frontend build..."
+echo "[4/9] Frontend build..."
 npm run build
 
 echo ""
-echo "[5/8] Rust formatting..."
+echo "[5/9] Rust formatting..."
 cd src-tauri
 cargo fmt --check
 
 echo ""
-echo "[6/8] Rust tests..."
+echo "[6/9] Rust tests..."
 cargo test --verbose
+cd ..
 
 echo ""
-echo "[7/8] Rust clippy..."
+echo "[7/9] Tauri build..."
+# Checks that the npm Tauri packages and the Rust crates share minor versions, as CI does
+npx tauri build --debug --no-bundle --config '{"build":{"beforeBuildCommand":""}}'
+
+cd src-tauri
+
+echo ""
+echo "[8/9] Rust clippy..."
 # --all-targets so test code is linted too, as CI does
 cargo clippy --all-targets -- -D warnings
 cd ..
 
 echo ""
-echo "[8/8] MCP server build..."
+echo "[9/9] MCP server build..."
 (cd packages/nodus-mcp-server && npm ci && npm run build)
 
 echo ""

@@ -20,7 +20,7 @@ npm run typecheck
 echo "Frontend tests..."
 npm test -- --run
 
-if echo "$STAGED" | grep -q "^src-tauri/"; then
+if echo "$STAGED" | grep -qE "^src-tauri/|^package(-lock)?\.json$"; then
     echo "Rust checks..."
     cd src-tauri
     cargo fmt --check || {
@@ -32,6 +32,10 @@ if echo "$STAGED" | grep -q "^src-tauri/"; then
     cargo clippy --all-targets -- -D warnings
     cargo test --quiet
     cd ..
+    # Checks that the npm Tauri packages and the Rust crates share minor
+    # versions; only tauri build does, and CI runs it after cargo test
+    echo "Tauri build..."
+    npx tauri build --debug --no-bundle --config '{"build":{"beforeBuildCommand":""}}'
 else
     echo "Rust checks skipped: no Rust changes"
 fi
