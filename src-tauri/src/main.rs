@@ -301,6 +301,7 @@ fn main() {
             commands::update_node_position,
             commands::update_node_content,
             commands::update_node_content_from_file,
+            commands::get_node_history,
             commands::update_node_title,
             commands::update_node_file_path,
             commands::update_node_size,

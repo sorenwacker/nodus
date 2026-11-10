@@ -1,6 +1,6 @@
 //! Node CRUD operations
 
-use super::{DatabaseError, DbPool};
+use super::{node_history, DatabaseError, DbPool};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -224,7 +224,19 @@ pub async fn restore(pool: &DbPool, id: &str) -> Result<(), DatabaseError> {
     Ok(())
 }
 
-pub async fn update_content(pool: &DbPool, id: &str, content: &str) -> Result<(), DatabaseError> {
+/// Replace a node's content. `source` names the writer for the node's history
+/// (`node_history::SOURCE_APP` or `SOURCE_FILE`), which keeps the text replaced.
+pub async fn update_content(
+    pool: &DbPool,
+    id: &str,
+    content: &str,
+    source: &str,
+) -> Result<(), DatabaseError> {
+    let change = node_history::Change {
+        content: Some(content),
+        ..Default::default()
+    };
+    node_history::record_before_write(pool, id, source, change).await?;
     let now = chrono::Utc::now().timestamp();
     sqlx::query("UPDATE nodes SET markdown_content = ?, updated_at = ? WHERE id = ?")
         .bind(content)
@@ -252,7 +264,18 @@ pub async fn update_file_path(
     Ok(())
 }
 
-pub async fn update_title(pool: &DbPool, id: &str, title: &str) -> Result<(), DatabaseError> {
+/// Rename a node; `source` as in [`update_content`].
+pub async fn update_title(
+    pool: &DbPool,
+    id: &str,
+    title: &str,
+    source: &str,
+) -> Result<(), DatabaseError> {
+    let change = node_history::Change {
+        title: Some(title),
+        ..Default::default()
+    };
+    node_history::record_before_write(pool, id, source, change).await?;
     let now = chrono::Utc::now().timestamp();
     sqlx::query("UPDATE nodes SET title = ?, updated_at = ? WHERE id = ?")
         .bind(title)
@@ -319,12 +342,20 @@ pub async fn update_size(
     Ok(())
 }
 
+/// Replace a node's content together with the checksum of the file holding
+/// it; `source` as in [`update_content`].
 pub async fn update_content_and_checksum(
     pool: &DbPool,
     id: &str,
     content: &str,
     checksum: &str,
+    source: &str,
 ) -> Result<(), DatabaseError> {
+    let change = node_history::Change {
+        content: Some(content),
+        ..Default::default()
+    };
+    node_history::record_before_write(pool, id, source, change).await?;
     let now = chrono::Utc::now().timestamp();
     sqlx::query("UPDATE nodes SET markdown_content = ?, checksum = ?, updated_at = ? WHERE id = ?")
         .bind(content)

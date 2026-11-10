@@ -808,9 +808,19 @@
     "editor": "Editor (Markdown)",
     "readingMode": "Modo de lectura",
     "editMode": "Modo de edición",
-    "zoomToNode": "Ampliar hasta el nodo"
+    "zoomToNode": "Ampliar hasta el nodo",
+    "history": "Historial"
   },
   "agent": {
     "tasks": "Tareas"
+  },
+  "history": {
+    "title": "Versiones anteriores",
+    "back": "Volver",
+    "restore": "Restaurar esta versión",
+    "empty": "Aún no hay versiones anteriores. Se guarda una versión cada vez que esta tarjeta cambia tras una pausa de al menos diez minutos.",
+    "sourceApp": "antes de una edición en Nodus",
+    "sourceFile": "antes de un cambio en el disco",
+    "sourceRestore": "antes de una restauración"
   }
 }

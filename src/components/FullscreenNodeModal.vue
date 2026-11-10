@@ -20,6 +20,8 @@ import {
 import { COMMENT_STYLES } from '../types'
 import { parseCommentMeta } from '../composables/useCommentMeta'
 import NodePicker from './NodePicker.vue'
+import NodeHistoryPanel from './NodeHistoryPanel.vue'
+import type { NodeVersion } from '../types'
 
 const props = defineProps<{
   nodeId: string | null
@@ -60,6 +62,10 @@ const hasUnsavedChanges = ref(false)
 // Reading mode (hide editor, show only preview) - default to reading mode
 const readingMode = ref(true)
 
+// Earlier versions in place of the preview (PRODUCT_DESIGN.md > Node history)
+const showHistory = ref(false)
+const historyRefresh = ref(0)
+
 // Auto-save timer, and what it was armed to write. The target is captured when
 // the timer is armed rather than resolved when it fires: clicking a wikilink
 // swaps the open node inside the debounce window, and the pending write belongs
@@ -93,20 +99,37 @@ const dateEndInput = ref('')
 // Metadata header of the loaded node: hidden from the editor, kept on save
 let editingFrontmatter: string | null = null
 
+/** Fill the buffers from the stored node */
+function loadFromNode() {
+  if (!node.value) return
+  editTitle.value = node.value.title || ''
+  const { frontmatter, body } = splitFrontmatter(node.value.markdown_content || '')
+  editingFrontmatter = frontmatter
+  const stored = node.value.markdown_content || ''
+  dateInput.value = extractFrontmatterField(stored, 'date') || ''
+  dateEndInput.value = extractFrontmatterField(stored, 'date_end') || ''
+  editContent.value = body
+  hasUnsavedChanges.value = false
+}
+
 watch(() => props.nodeId, (id) => {
   // Store the previous node's keystrokes before the buffers are replaced
   void flushPendingSave()
-  if (id && node.value) {
-    editTitle.value = node.value.title || ''
-    const { frontmatter, body } = splitFrontmatter(node.value.markdown_content || '')
-    editingFrontmatter = frontmatter
-    const stored = node.value.markdown_content || ''
-    dateInput.value = extractFrontmatterField(stored, 'date') || ''
-    dateEndInput.value = extractFrontmatterField(stored, 'date_end') || ''
-    editContent.value = body
-    hasUnsavedChanges.value = false
-  }
+  if (id) loadFromNode()
 }, { immediate: true })
+
+/**
+ * Make an earlier version current. The keystrokes still on the timer are
+ * written first, so they are not written over the restored text afterwards;
+ * the restore itself is one undo step (PRODUCT_DESIGN.md > Node history).
+ */
+async function restoreVersion(version: NodeVersion) {
+  await flushPendingSave()
+  await store.restoreNodeVersion(version)
+  loadFromNode()
+  historyRefresh.value++
+  await triggerRender()
+}
 
 // Reset state when modal closes
 watch(() => props.visible, async (visible) => {
@@ -114,6 +137,7 @@ watch(() => props.visible, async (visible) => {
     // Store any pending changes rather than dropping them
     await flushPendingSave()
     showLinkPicker.value = false
+    showHistory.value = false
   } else {
     // Focus editor when modal opens
     await nextTick()
@@ -526,8 +550,17 @@ onUnmounted(() => {
               />
             </div>
 
+            <!-- Earlier versions, in place of the preview -->
+            <NodeHistoryPanel
+              v-if="showHistory && nodeId"
+              :node-id="nodeId"
+              :refresh="historyRefresh"
+              @restore="restoreVersion"
+              @close="showHistory = false"
+            />
+
             <!-- Preview pane -->
-            <div class="preview-pane">
+            <div v-else class="preview-pane">
               <div class="pane-header">{{ t('fullscreen.preview') }}</div>
               <!-- Safe: renderMarkdown returns sanitizeHtml() output, so this
                    markup has already been through DOMPurify -->
@@ -567,6 +600,13 @@ onUnmounted(() => {
                 @click="readingMode = !readingMode"
               >
                 {{ readingMode ? t('fullscreen.editMode') : t('fullscreen.readingMode') }}
+              </button>
+              <button
+                class="fullscreen-btn-secondary history-toggle"
+                :class="{ active: showHistory }"
+                @click="showHistory = !showHistory"
+              >
+                {{ t('fullscreen.history') }}
               </button>
             </div>
             <div class="footer-hint">
@@ -809,13 +849,15 @@ onUnmounted(() => {
   color: var(--text-main);
 }
 
-.mode-toggle.active {
+.mode-toggle.active,
+.history-toggle.active {
   background: var(--primary-color);
   color: white;
   border-color: var(--primary-color);
 }
 
-.mode-toggle.active:hover {
+.mode-toggle.active:hover,
+.history-toggle.active:hover {
   background: var(--primary-hover);
 }
 

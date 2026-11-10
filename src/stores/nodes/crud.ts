@@ -225,6 +225,8 @@ export async function updateNodeContent(
      * re-sync of the rewritten text would race that delete
      */
     skipWikilinkSync?: boolean
+    /** Names the writer for the node's history; only a restore sets it */
+    source?: string
   },
   tagCleanup?: TagCleanup
 ): Promise<void> {
@@ -255,7 +257,11 @@ export async function updateNodeContent(
     node.markdown_content = trimmedContent
     node.updated_at = Date.now()
     try {
-      const newChecksum = await invoke<string | null>('update_node_content', { id, content: trimmedContent })
+      const newChecksum = await invoke<string | null>('update_node_content', {
+        id,
+        content: trimmedContent,
+        source: options?.source,
+      })
       // Update checksum if file was written (prevents watcher reload loop)
       if (newChecksum) {
         node.checksum = newChecksum
@@ -452,7 +458,7 @@ export async function updateNodeTitle(
   nodes: Ref<Node[]>,
   id: string,
   title: string,
-  options?: { skipUndo?: boolean }
+  options?: { skipUndo?: boolean; source?: string }
 ): Promise<void> {
   const trimmedTitle = title.trim()
   const node = nodes.value.find(n => n.id === id)
@@ -465,7 +471,11 @@ export async function updateNodeTitle(
     node.title = trimmedTitle
     node.updated_at = Date.now()
     try {
-      const update = await invoke<TitleUpdate>('update_node_title', { id, title: trimmedTitle })
+      const update = await invoke<TitleUpdate>('update_node_title', {
+        id,
+        title: trimmedTitle,
+        source: options?.source,
+      })
       if (update.filePath) node.file_path = update.filePath
       for (const { id: linkerId, content } of update.relinked) {
         const linker = nodes.value.find(n => n.id === linkerId)

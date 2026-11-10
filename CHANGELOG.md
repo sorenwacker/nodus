@@ -4,6 +4,9 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Node history: the fullscreen editor's History button lists the earlier versions of a card, shows each one rendered, and restores the chosen one as a single undo step. A version is kept by every write that replaces a card's title or content, from the editor, the agent, MCP clients or the vault file alike; writes within ten minutes of the last kept version extend it, a change from another source is kept at once, and a hundred versions per card are kept
+
 ### Changed
 - The orthogonal and diagonal edge styles are routed like a circuit board: traces run on a 12 px lane grid, keep out of every card they are not attached to, leave and enter cards straight on, and bend only where they must. Measured on 40 cards in a grid layout with 90 edges, 62 edges used to run through other cards and 557 segment pairs lay on top of each other; now none run through a card and the overlaps that remain are confined to gutters too narrow for their traffic. Orthogonal is the default style for workspaces that have not chosen one
 - While a card is dragged only its own edges are re-routed; the others keep their paths, so the drag stays smooth on dense graphs
