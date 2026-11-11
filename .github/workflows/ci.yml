@@ -34,6 +34,7 @@ jobs:
               libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libglib2.0-dev && break
             echo "apt attempt $attempt failed, retrying" && sleep 20
           done
+          dpkg -s libwebkit2gtk-4.1-dev > /dev/null
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
