@@ -30,6 +30,9 @@ export interface UseEntityOperationsOptions {
  * entities exist. Two exported functions of one name is how a fix reaches only
  * one of them (PRODUCT_DESIGN.md > One rule, one place).
  */
+/** The linked entities of a node that has none: one list, so the prop never changes */
+const NO_ENTITIES: Node[] = Object.freeze([]) as unknown as Node[]
+
 export function useCanvasEntityLinking(options: UseEntityOperationsOptions) {
   const { store, contextMenu, showToast } = options
 
@@ -46,9 +49,12 @@ export function useCanvasEntityLinking(options: UseEntityOperationsOptions) {
     return map
   })
 
-  // Get linked entities for a node (uses cached map)
+  // Get linked entities for a node (uses cached map). A node without any gets
+  // the one shared empty list: the list is a card prop, and a fresh array per
+  // render made every card re-render on every hover
+  // (PRODUCT_DESIGN.md > Hovering a card)
   function getLinkedEntities(nodeId: string): Node[] {
-    return linkedEntitiesMap.value.get(nodeId) || []
+    return linkedEntitiesMap.value.get(nodeId) || NO_ENTITIES
   }
 
   // Handle entity badge click - zoom to entity

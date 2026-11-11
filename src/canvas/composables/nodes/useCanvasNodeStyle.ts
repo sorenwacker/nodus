@@ -92,6 +92,16 @@ export interface UseCanvasNodeStyleReturn {
  * style objects for node cards, handling resize preview, zoom scaling,
  * color themes, and z-ordering.
  */
+/** Type size, line height and padding of the collapsed title, mirroring the collapsed header's own */
+const COLLAPSED_FONT = 28
+const COLLAPSED_LINE_HEIGHT = 1.2
+const COLLAPSED_PADDING = 14
+const COLLAPSED_SIDE_PADDING = 10
+/** Smallest type the collapsed title may shrink to before it is truncated. */
+const MIN_COLLAPSED_FONT = 11
+/** The title fit sees the border in steps of this many px */
+const BORDER_STEP = 4
+
 export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNodeStyleReturn {
   const {
     fontScale,
@@ -125,6 +135,66 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
    * - Color theme backgrounds
    * - Collapsed semantic zoom styling
    */
+  /** The fitted collapsed title size and line count, by title and the room it has */
+  const titleFitCache = new Map<string, { size: number; lines: number }>()
+  /** The last style object of each card and the inputs it was built from */
+  const styleCache = new Map<string, { key: string; style: Record<string, string> }>()
+  const CACHE_LIMIT = 10000
+
+  /**
+   * How many lines of the collapsed title the card can hold, and at what size.
+   * A fixed count cuts a long title mid-line on a tall card and wastes space on
+   * a short one (PRODUCT_DESIGN.md > Collapsed node titles). Mirrors the
+   * collapsed header's own type size, line height and padding.
+   *
+   * Size and line count are chosen together: a smaller size yields both more
+   * lines and more characters a line, so neither can be settled alone. The
+   * largest size at which the whole title fits wins, and only a title too
+   * long for the smallest readable size is truncated. The search measures
+   * text on a canvas, so its result is kept by its inputs: without that, every
+   * render of the canvas measured every card's title again
+   * (PRODUCT_DESIGN.md > Hovering a card).
+   */
+  function fitCollapsedTitle(
+    renderedTitle: string,
+    availableWidth: number,
+    availableHeight: number,
+    textScale: number
+  ): { size: number; lines: number } {
+    const key = `${renderedTitle}\u0000${availableWidth}|${availableHeight}|${textScale}`
+    const cached = titleFitCache.get(key)
+    if (cached) return cached
+    let size = COLLAPSED_FONT
+    let lines = 1
+    for (size = COLLAPSED_FONT; size >= MIN_COLLAPSED_FONT; size--) {
+      const lineBox = size * textScale * COLLAPSED_LINE_HEIGHT
+      lines = Math.max(1, Math.floor(availableHeight / lineBox))
+      if (wrappedLineCount(renderedTitle, availableWidth, size * textScale, measureTitle) <= lines) break
+    }
+    if (size < MIN_COLLAPSED_FONT) size = MIN_COLLAPSED_FONT
+    const fit = { size, lines }
+    if (titleFitCache.size >= CACHE_LIMIT) titleFitCache.clear()
+    titleFitCache.set(key, fit)
+    return fit
+  }
+
+  /**
+   * Get computed style for a node card
+   *
+   * Handles:
+   * - Resize preview state
+   * - Canvas position transform (the container applies pan and zoom)
+   * - Tag node sizing (fit-content)
+   * - Border width scaling
+   * - Z-order from radial layout
+   * - Color theme backgrounds
+   * - Collapsed semantic zoom styling
+   *
+   * The style is a prop of the card, so the same object is returned while its
+   * inputs are the same: a fresh object per render made Vue re-render every
+   * card, and set every one of its style properties again, on every hover
+   * (PRODUCT_DESIGN.md > Hovering a card).
+   */
   function getNodeStyle(node: NodeForStyle): Record<string, string> {
     const isResizing = resizingNode.value === node.id
     const isTagNode = node.node_type === 'tag'
@@ -132,6 +202,36 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     const y = isResizing ? resizePreview.value.y : node.canvas_y
     const width = isResizing ? resizePreview.value.width : node.width || NODE_DEFAULTS.WIDTH
     const height = isResizing ? resizePreview.value.height : node.height || NODE_DEFAULTS.HEIGHT
+    const textScale = fontScale?.value ?? 1
+    // The border the card actually draws, not the 2px the stylesheet declares:
+    // it is written inline from the zoom, so at every scale where cards are
+    // collapsed it is wider than the declared value, and assuming the declared
+    // one overestimated the height available
+    // (PRODUCT_DESIGN.md > Collapsed node titles)
+    // The border is painted from --node-border-width, which the nodes layer
+    // sets once per zoom frame; the title fit, which must know the border,
+    // takes it to the nearest 4 px so that a zoom changes a card's style only
+    // at a few points instead of on every frame
+    // (PRODUCT_DESIGN.md > Zooming a canvas of cards)
+    const border = Math.round(nodeBorderWidth.value / BORDER_STEP) * BORDER_STEP
+    const renderedTitle = nodeDisplayTitle(node)
+    const zIndex = nodeZOrder.value.get(node.id)
+    const bg = node.color_theme ? getNodeBackground(node.color_theme) : undefined
+    const collapsed = isSemanticZoomCollapsed.value
+    const selected = selectedNodeIds.value.includes(node.id)
+    // Read only where it shows, like the border rule below, so a hover over a
+    // neighbour of an expanded card does not touch its style
+    const highlighted = collapsed && !selected && !bg && !isTagNode ? highlightedNodeIds.value.has(node.id) : false
+
+    const key =
+      `${x}|${y}|${width}|${height}|${isTagNode}|${textScale}|${border}|${zIndex}|${bg}|` +
+      `${collapsed}|${selected}|${highlighted}\u0000${renderedTitle}`
+    const previous = styleCache.get(node.id)
+    if (previous && previous.key === key) return previous.style
+
+    const availableHeight = height - COLLAPSED_PADDING * 2 - border * 2
+    const availableWidth = width - COLLAPSED_SIDE_PADDING * 2 - border * 2
+    const fit = fitCollapsedTitle(renderedTitle, availableWidth, availableHeight, textScale)
 
     // Canvas coordinates only: the node layer's container carries the single
     // pan-and-zoom transform, so this style never depends on scale or offset
@@ -140,78 +240,41 @@ export function useCanvasNodeStyle(ctx: UseCanvasNodeStyleContext): UseCanvasNod
     // text exactly as the per-card scale() it replaces did.
     // --zoom-scale is pinned to 1 so calc(... * var(--zoom-scale)) rules
     // resolve to their base sizes; the container transform applies the zoom.
-    const logicalWidth = isTagNode ? 'fit-content' : width + 'px'
-    const logicalHeight = isTagNode ? 'fit-content' : height + 'px'
-
-    // How many lines of the collapsed title the card can hold. A fixed count
-    // cuts a long title mid-line on a tall card and wastes space on a short
-    // one (PRODUCT_DESIGN.md > Collapsed node titles). Mirrors the collapsed
-    // header's own type size, line height and padding.
-    const COLLAPSED_FONT = 28
-    const COLLAPSED_LINE_HEIGHT = 1.2
-    const COLLAPSED_PADDING = 14
-    const COLLAPSED_SIDE_PADDING = 10
-    /** Smallest type the collapsed title may shrink to before it is truncated. */
-    const MIN_COLLAPSED_FONT = 11
-    const textScale = fontScale?.value ?? 1
-    // The border the card actually draws, not the 2px the stylesheet declares:
-    // it is written inline from the zoom, so at every scale where cards are
-    // collapsed it is wider than the declared value, and assuming the declared
-    // one overestimated the height available
-    // (PRODUCT_DESIGN.md > Collapsed node titles)
-    const border = nodeBorderWidth.value
-    const availableHeight = height - COLLAPSED_PADDING * 2 - border * 2
-    const availableWidth = width - COLLAPSED_SIDE_PADDING * 2 - border * 2
-    // Size and line count are chosen together: a smaller size yields both more
-    // lines and more characters a line, so neither can be settled alone. The
-    // largest size at which the whole title fits wins, and only a title too
-    // long for the smallest readable size is truncated.
-    const renderedTitle = nodeDisplayTitle(node)
-    let titleSize = COLLAPSED_FONT
-    let titleLines = 1
-    for (let size = COLLAPSED_FONT; size >= MIN_COLLAPSED_FONT; size--) {
-      const lineBox = size * textScale * COLLAPSED_LINE_HEIGHT
-      const lines = Math.max(1, Math.floor(availableHeight / lineBox))
-      titleSize = size
-      titleLines = lines
-      if (wrappedLineCount(renderedTitle, availableWidth, size * textScale, measureTitle) <= lines) break
-    }
-
     const style: Record<string, string> = {
       '--zoom-scale': '1',
-      '--title-lines': String(titleLines),
-      '--title-size': titleSize + 'px',
+      '--title-lines': String(fit.lines),
+      '--title-size': fit.size + 'px',
       transform: `translate(${x}px, ${y}px)`,
       transformOrigin: '0 0',
-      width: logicalWidth,
-      height: logicalHeight,
-      borderWidth: nodeBorderWidth.value + 'px',
+      width: isTagNode ? 'fit-content' : width + 'px',
+      height: isTagNode ? 'fit-content' : height + 'px',
+      borderWidth: 'var(--node-border-width, 2px)',
     }
 
     // Apply z-index from radial layout angle order (if set)
-    const zIndex = nodeZOrder.value.get(node.id)
     if (zIndex !== undefined) {
       style.zIndex = String(zIndex)
     }
 
     // Apply color theme background if set
-    const bg = node.color_theme ? getNodeBackground(node.color_theme) : undefined
     if (bg) {
       style.background = bg
       // Tag nodes use background color for border too
       if (isTagNode) {
         style.borderColor = bg
       }
-    } else if (!isTagNode && isSemanticZoomCollapsed.value && !selectedNodeIds.value.includes(node.id)) {
+    } else if (!isTagNode && collapsed && !selected) {
       // Collapsed non-selected nodes get canvas background
       style.background = 'var(--bg-canvas)'
       // A highlighted neighbour keeps the stylesheet's border. Writing one here
       // would win on inline weight alone and blank the highlight out.
-      if (!highlightedNodeIds.value.has(node.id)) {
+      if (!highlighted) {
         style.borderColor = 'var(--text-muted)'
       }
     }
 
+    if (styleCache.size >= CACHE_LIMIT) styleCache.clear()
+    styleCache.set(node.id, { key, style })
     return style
   }
 

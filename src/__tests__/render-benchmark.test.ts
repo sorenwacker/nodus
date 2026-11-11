@@ -155,6 +155,8 @@ function edgeLines(count: number) {
     isHighlighted: false,
     isSelected: false,
     isNeighborEdge: false,
+    inFocus: false,
+    baseOpacity: 0.3,
     opacity: 1,
     edgeHighlightColor: '#3b82f6',
     renderStrokeWidth: 2,

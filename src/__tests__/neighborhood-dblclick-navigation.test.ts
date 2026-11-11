@@ -41,7 +41,6 @@ function mountCard(opts: { neighborhood: boolean; focus: boolean; collapsed: boo
       editingTitleId: null,
       editTitle: '',
       editContent: '',
-      scale: 1,
       showNodeSearch: false,
       nodeSearchQuery: '',
       nodeSearchMatchCount: 0,

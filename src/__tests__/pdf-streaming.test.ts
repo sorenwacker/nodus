@@ -99,7 +99,10 @@ describe('canvas working highlight', () => {
     const { readFileSync } = await import('fs')
     const card = readFileSync('src/canvas/components/CanvasNodeCard.vue', 'utf-8')
 
-    expect(card).toContain("'ai-working': nodesStore.aiWorkingNodeId === props.node.id")
+    // The flag is a boolean of its own, so the class object is rebuilt only
+    // for the card it concerns (PRODUCT_DESIGN.md > Hovering a card)
+    expect(card).toContain('const isAiWorking = computed(() => nodesStore.aiWorkingNodeId === props.node.id)')
+    expect(card).toContain("'ai-working': isAiWorking.value")
     expect(card).toMatch(/\.node-card\.ai-working\s*\{[^}]*animation/s)
     expect(card).toContain('@keyframes ai-working-pulse')
   })

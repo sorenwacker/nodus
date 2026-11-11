@@ -4,7 +4,7 @@
  * Filters edges for viewport visibility and pre-computes rendering properties
  */
 
-import { computed, ref, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, type Ref, type ComputedRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { EdgeLine } from './useEdgeRouting'
 import { useDisplayStore } from '../../../stores/display'
@@ -25,7 +25,15 @@ export interface VisibleEdgeLine extends EdgeLine {
   isHighlighted: boolean
   isSelected: boolean
   isNeighborEdge: boolean
+  /**
+   * Lit by the hover or the selection, so drawn again in the focus layer on
+   * top of its plain self (PRODUCT_DESIGN.md > Hovering a card)
+   */
+  inFocus: boolean
+  /** The opacity the edge is drawn with: 1 while lit */
   opacity: number
+  /** The opacity of the plain edge in the base layer, which no hover changes */
+  baseOpacity: number
   edgeHighlightColor: string
   renderStrokeWidth: number
   glowStrokeWidth: number
@@ -36,6 +44,8 @@ export interface UseEdgeVisibilityContext {
   edgeLines: ComputedRef<EdgeLine[]>
   totalEdgeCount: ComputedRef<number> // Total edges in store (before any filtering)
   visibleNodeIds: ComputedRef<Set<string>>
+  /** True while a viewport gesture is live: the culled edge set is held for its duration */
+  gestureActive?: Ref<boolean>
   hoveredNodeId: Ref<string | null>
   selectedNodeIds: Ref<string[]> | ComputedRef<string[]>
   selectedEdge: Ref<string | null>
@@ -128,6 +138,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     edgeLines,
     totalEdgeCount,
     visibleNodeIds,
+    gestureActive,
     hoveredNodeId,
     selectedNodeIds,
     selectedEdge,
@@ -149,10 +160,20 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
   const displayStore = useDisplayStore()
   const { edgeHoverThreshold: displayEdgeThreshold } = storeToRefs(displayStore)
 
+  // The node set edges are culled by. Held while a gesture is live: an edge
+  // entering the viewport mid-zoom is a change to the edge layer, and any
+  // change to the layer repaints every path in it, so a zoom-out at 30% paid
+  // a quarter second a frame for edges alone. The edges around what the zoom
+  // uncovered arrive when it ends (PRODUCT_DESIGN.md > Zooming a canvas of cards)
+  const cullingIds = ref<Set<string>>(visibleNodeIds.value)
+  watch([visibleNodeIds, () => gestureActive?.value ?? false], ([ids, live]) => {
+    if (!live) cullingIds.value = ids
+  })
+
   // The edges the settings and the viewport let through, before the focus rule
   const candidateEdges = computed((): EdgeLine[] => {
     let edges = edgeLines.value
-    const visIds = visibleNodeIds.value
+    const visIds = cullingIds.value
 
     // Filter out wikilink edges if user setting is enabled
     if (hideWikilinkEdges.value) {
@@ -194,6 +215,17 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       return { count, threshold: displayEdgeThreshold.value, reason: 'hover' }
     }
     return null
+  })
+
+  // The stroked path of every routed edge, keyed by edge. It depends on the
+  // routing and the line width only, so a hover, which recomputes
+  // visibleEdgeLines for every candidate edge, does not trim a thousand paths
+  // again (PRODUCT_DESIGN.md > Hovering a card)
+  const strokedPaths = computed((): Map<string, string> => {
+    const width = edgeStrokeWidth.value
+    const paths = new Map<string, string>()
+    for (const e of edgeLines.value) paths.set(e.id, strokedPath(e, width))
+    return paths
   })
 
   const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
@@ -258,9 +290,16 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     const allHighlighted = highlightAllEdges?.value ?? false
     const bySource = colorEdgesBySource.value
     const sourceColors = bySource ? sourceEdgeColors(edges) : null
+    const stroked = strokedPaths.value
+
+    // The base layer's opacity: what every plain edge is drawn with, whatever
+    // is hovered. Dimming around a focus is the base layer's own opacity
+    // (CanvasEdgesSVG), not a per-edge value, so a hover rewrites no plain edge
+    const baseOpacity = allHighlighted ? 1.0 : bySource ? SOURCE_COLORED_OPACITY : 0.3
 
     return edges.map(e => {
-      const isHighlighted = allHighlighted || highlighted.has(e.id)
+      const inFocus = highlighted.has(e.id) || selected === e.id
+      const isHighlighted = allHighlighted || inFocus
       const isSelected = selected === e.id
 
       // Determine if this is a direct edge or a 2nd-hop neighbor edge
@@ -313,11 +352,13 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
 
       return {
         ...e,
-        linePath: strokedPath(e, baseStrokeWidth),
+        linePath: stroked.get(e.id) ?? strokedPath(e, baseStrokeWidth),
         isHighlighted,
         isSelected,
         isNeighborEdge,
+        inFocus,
         opacity,
+        baseOpacity,
         color,
         edgeHighlightColor,
         renderStrokeWidth,

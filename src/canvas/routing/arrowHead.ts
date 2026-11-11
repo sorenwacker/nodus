@@ -27,12 +27,45 @@ const POINT_BEFORE = new RegExp(`(${NUMBER})[\\s,]+(${NUMBER})[\\s,]*[a-z]?\\s*$
 /** What is left of a segment shorter than the cut, so the head keeps its direction */
 const STUB = 0.01
 
-/** Move the last point of an SVG path back along its final direction */
+/** A character that can be part of a run of coordinates: digits, signs, exponents, separators */
+function isCoordinateChar(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) || // 0-9
+    code === 46 || code === 43 || code === 45 || // . + -
+    code === 101 || code === 69 || // e E
+    code === 44 || code === 32 || code === 9 || code === 10 || code === 13 // , and whitespace
+  )
+}
+
+/** Where the run of coordinates that ends at `end` begins */
+function coordinateRunStart(d: string, end: number): number {
+  let i = end
+  while (i > 0 && isCoordinateChar(d.charCodeAt(i - 1))) i--
+  return i
+}
+
+/**
+ * Move the last point of an SVG path back along its final direction.
+ *
+ * The two patterns are anchored at the end only, so they are run on the
+ * trailing run of coordinates and not on the whole path: given the whole
+ * path, the engine tried a match from every position of a routed path
+ * hundreds of characters long, and with a thousand edges re-stroked per
+ * hover this one function was the largest share of a hover
+ * (PRODUCT_DESIGN.md > Hovering a card).
+ */
 export function shortenPathEnd(d: string, by: number): string {
   if (by <= 0) return d
-  const last = LAST_POINT.exec(d)
+  const lastRun = coordinateRunStart(d, d.length)
+  const last = LAST_POINT.exec(d.slice(lastRun))
   if (!last) return d
-  const before = POINT_BEFORE.exec(d.slice(0, last.index))
+  last.index += lastRun
+  // The pair before may sit behind a command letter: "L94,0 Q100,0 100,6 L"
+  const head = d.slice(0, last.index)
+  let k = head.length
+  while (k > 0 && (head[k - 1] === ' ' || head[k - 1] === ',')) k--
+  if (k > 0 && /[a-z]/i.test(head[k - 1])) k--
+  const before = POINT_BEFORE.exec(head.slice(coordinateRunStart(head, k)))
   if (!before) return d
 
   const endX = Number(last[1])
