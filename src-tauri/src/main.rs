@@ -202,6 +202,45 @@ fn main() {
                 app.set_menu(menu)?;
             }
 
+            // On macOS, WebKit treats a window that another window covers as an
+            // invisible one: it stops the page's animation frames, throttles its
+            // timers and, since the window is not the active one either, lets
+            // the web process take an App Nap. Coming back to Nodus after a
+            // while in another app then meant a second or two of lag on the
+            // first scroll or hover while the process woke and the canvas
+            // repainted (PRODUCT_DESIGN.md > The window behind another window).
+            // Both switches are WebKit's own, reached by key-value coding the
+            // way wry reaches `developerExtrasEnabled`: a key without the
+            // leading underscore resolves to the private `_set<Key>:` setter.
+            #[cfg(target_os = "macos")]
+            {
+                use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding};
+                use objc2_web_kit::WKWebView;
+                if let Some(window) = app.get_webview_window("main") {
+                    let attached = window.with_webview(|webview| {
+                        // SAFETY: on macOS `inner()` is the WKWebView this window
+                        // wraps, and `with_webview` runs on the main thread while
+                        // the window, and so the view, is alive.
+                        let view = unsafe { &*(webview.inner() as *const WKWebView) };
+                        let no = NSNumber::numberWithBool(false);
+                        unsafe {
+                            // A covered window counts as visible, so nothing is
+                            // throttled while Nodus sits behind another app
+                            view.setValue_forKey(Some(&no), ns_string!("windowOcclusionDetectionEnabled"));
+                            // And the web process never naps on account of the
+                            // page being hidden - minimised or on another Space
+                            view.configuration().preferences().setValue_forKey(
+                                Some(&no),
+                                ns_string!("pageVisibilityBasedProcessSuppressionEnabled"),
+                            );
+                        }
+                    });
+                    if let Err(e) = attached {
+                        eprintln!("[macos] keeping the web view awake failed: {e}");
+                    }
+                }
+            }
+
             // A touchpad pinch scales the whole interface: WebKit treats it as a
             // viewport page-scale gesture, which pushed the toolbar and the
             // canvas controls outside the window with no way back - the

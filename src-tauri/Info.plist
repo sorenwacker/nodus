@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged into the generated Info.plist by the Tauri bundler, and embedded
+	     in dev builds. Only keys Tauri does not generate belong here.
+	     The app's own process stays out of App Nap, so a command sent the
+	     moment the user comes back to the window is answered at once
+	     (PRODUCT_DESIGN.md > The window behind another window). -->
+	<key>LSAppNapIsDisabled</key>
+	<true/>
+</dict>
+</plist>

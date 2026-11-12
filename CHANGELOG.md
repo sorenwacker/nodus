@@ -15,6 +15,9 @@ All notable changes to Nodus are documented in this file.
 - While a card is dragged only its own edges are re-routed; the others keep their paths, so the drag stays smooth on dense graphs
 - The grid, horizontal and vertical layouts leave 96 px between cards instead of 24 px: room for seven routing lanes, so edges between neighbouring cards run side by side instead of on top of each other
 
+### Fixed
+- macOS: coming back to Nodus after a while in another app no longer starts with a second or two of lag on the first scroll or hover. WebKit treated the covered window as hidden and let the web process nap; the window now counts as visible while covered, the web process is kept out of App Nap, and so is the app itself
+
 ## [1.6.0] - 2026-10-22
 
 Summary of 1.6.0-rc.1 to rc.15; the candidate sections in CHANGELOG.md give the detail and the measurements behind each change.

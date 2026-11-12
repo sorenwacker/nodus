@@ -78,3 +78,11 @@ custom-protocol = ["tauri/custom-protocol"]
 gtk = "0.18"
 gdk = "0.18"
 webkit2gtk = "2.0"
+
+# macOS only: the web view is told that a covered window is still a visible
+# one, and its web process is kept out of App Nap, so the canvas is not cold
+# when the user comes back to it (main.rs; PRODUCT_DESIGN.md > The window
+# behind another window). The versions match the ones Tauri itself depends on.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSKeyValueCoding", "NSString", "NSValue"] }
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKPreferences"] }

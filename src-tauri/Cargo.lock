@@ -3636,6 +3636,8 @@ dependencies = [
  "html-escape",
  "lopdf 0.44.0",
  "notify",
+ "objc2-foundation",
+ "objc2-web-kit",
  "once_cell",
  "oxiri",
  "pdf-extract",

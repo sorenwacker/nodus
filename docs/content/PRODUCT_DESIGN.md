@@ -456,6 +456,14 @@ Every provider answers the question the same way, through one shared probe:
 
 **Required behavior:** A file dropped on the canvas lands where the cursor released it. The drop event's position arrives in physical pixels on Windows and Linux but in logical pixels on macOS, while the canvas works in logical pixels throughout. Dividing by the display scale factor on macOS therefore halves the coordinates and places the node up and left of the cursor on any HiDPI display. The conversion is platform-aware and covered by unit tests per platform.
 
+### The window behind another window
+
+**Required behavior:** Coming back to Nodus after time in another app feels the same as never having left: the first scroll, hover or click answers at once.
+
+**Why it did not:** On macOS, WebKit counts a window that another window covers as an invisible one. For an invisible page it stops animation frames, throttles timers to once a second or slower and, because the window is not the active one either, drops the activity that keeps its web process out of App Nap. The process is then run at low priority with its timers coalesced, and the canvas it holds is stale. The first interaction after coming back paid for all of it at once: a second or two of lag, then everything normal, which read as the app "falling asleep". Linux WebKit has no occlusion detection and does not show it.
+
+**What is done:** The web view is told not to treat occlusion as invisibility, so a covered window stays live; the web process is told not to suppress itself on account of page visibility, which also covers a minimised window and one on another Space; and the app's own process opts out of App Nap in its `Info.plist`. Both WebKit switches are WebKit's own preferences, set once at startup on the macOS build only. The cost is that Nodus, with nothing animating while it is covered, is allowed to keep the little it does.
+
 ### PDF as a graph
 
 **Required behavior:** A paper is already a structure - sections, an argument, a bibliography - and flattening it into one node discards exactly what a graph tool is for. Dropping a PDF offers a choice of how it lands:
