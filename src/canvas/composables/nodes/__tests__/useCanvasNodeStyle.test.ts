@@ -32,15 +32,25 @@ describe('useCanvasNodeStyle.getNodeStyle (container-transform scaling)', () => 
     expect(style.transformOrigin).toBe('0 0')
   })
 
-  it('keeps a constant 2px on-screen border across zoom levels', () => {
-    // logical border * scale (applied by the container transform) reproduces
-    // the constant on-screen width
+  it('paints the border from the nodes layer, so a zoom frame restyles no card', () => {
+    // The layer sets --node-border-width once per frame; written per card, a
+    // zoom patched the style of every mounted card on every frame
+    // (PRODUCT_DESIGN.md > Zooming a canvas of cards)
     for (const scale of [0.5, 1, 2]) {
       const { getNodeStyle } = useCanvasNodeStyle(makeContext(scale))
       const style = getNodeStyle({ id: 'n1', canvas_x: 0, canvas_y: 0, width: 180, height: 90 })
-      const logicalBorder = parseFloat(style.borderWidth)
-      expect(logicalBorder * scale).toBeCloseTo(2, 5)
+      expect(style.borderWidth).toBe('var(--node-border-width, 2px)')
     }
+  })
+
+  it('returns the same object while nothing about the card changed', () => {
+    // The style is a prop of the card: a fresh object per render re-renders
+    // every card on every hover (PRODUCT_DESIGN.md > Hovering a card)
+    const { getNodeStyle } = useCanvasNodeStyle(makeContext(1))
+    const node = { id: 'n1', canvas_x: 10, canvas_y: 20, width: 180, height: 90 }
+    const first = getNodeStyle(node)
+    expect(getNodeStyle(node)).toBe(first)
+    expect(getNodeStyle({ ...node, canvas_x: 11 })).not.toBe(first)
   })
 
   it('lets tag nodes fit their content', () => {

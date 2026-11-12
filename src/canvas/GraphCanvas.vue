@@ -41,6 +41,7 @@ import {
   useEdgeVisibility,
 } from './composables/edges'
 import { useLasso, useContextMenu, useSelectionActions } from './composables/selection'
+import { useStyleScale } from './composables/viewport/useStyleScale'
 import {
   useAgentRunner,
   useLLMTools,
@@ -649,9 +650,8 @@ const {
 } = canvasDisplay
 
 // Node border width - scale inversely to maintain constant visual width (2px on screen)
-const nodeBorderWidth = computed(() => {
-  return Math.max(1, 2 / scale.value)
-})
+const { styleScale, nodeBorderWidth } = useStyleScale({ scale, gestureActive }) // held during a gesture, stepped: a zoom frame restyles no card and no edge
+const colorThemeOf = (id: string) => store.getNode(id)?.color_theme // one function for the colour bar's lifetime: an inline arrow re-rendered it on every hover
 
 // Minimap - using composable
 const minimap = useMinimap({
@@ -1465,7 +1465,7 @@ const edgeStyling = useEdgeStyling({
   },
   selectedEdgeId: selectedEdge,
   currentTheme,
-  scale,
+  scale: styleScale,
   workspaceId: computed(() => store.currentWorkspaceId),
 })
 const {
@@ -1507,7 +1507,7 @@ const { visibleEdgeLines, canvasEdges, hiddenEdges } = useEdgeVisibility({
   selectedNodeIds: computed(() => store.selectedNodeIds),
   selectedEdge,
   highlightedEdgeIds,
-  highlightAllEdges, colorEdgesBySource,
+  highlightAllEdges, colorEdgesBySource, gestureActive,
   edgeHideThreshold,
   hideWikilinkEdges,
   hideStorylineEdges,
@@ -1783,7 +1783,7 @@ defineExpose({
         :colors-in-use="colorsInUse"
         :selected-node-ids="store.selectedNodeIds"
         :is-collapsed="isSemanticZoomCollapsed"
-        :get-node-color="(id: string) => store.filteredNodes.find(n => n.id === id)?.color_theme"
+        :get-node-color="colorThemeOf"
         @update-node-color="updateSelectedNodesColor"
         @fit-nodes="fitSelectedNodes"
       />
@@ -1816,7 +1816,7 @@ defineExpose({
         <!-- SVG for edges -->
         <CanvasEdgesSVG
           :edges="isLODMode ? [] : visibleEdgeLines"
-          :simplified="useSimpleEdges"
+          :simplified="useSimpleEdges" :highlight-all="highlightAllEdges"
           :edge-stroke-width="edgeStrokeWidth"
           :edge-label-size="edgeLabelSize"
           :zoom="scale"
@@ -1847,7 +1847,7 @@ defineExpose({
       <div
         class="nodes-layer"
         :class="{ 'above-lod': isLODMode }"
-        :style="{ transform }"
+        :style="{ transform, '--node-border-width': nodeBorderWidth + 'px' }"
       >
         <CanvasNodeCard
           v-for="node in lodCardNodes"
@@ -1869,7 +1869,6 @@ defineExpose({
           :editing-title-id="editingTitleId"
           :edit-title="editTitle"
           :edit-content="editContent"
-          :scale="scale"
           :show-node-search="showNodeSearch && searchNodeId === node.id"
           :node-search-query="nodeSearchQuery"
           :node-search-match-count="nodeSearchMatches.length"

@@ -1,5 +1,13 @@
 
+/* Each card is composited on its own. The nodes layer is one painted surface
+   otherwise, and its bounds are the union of its cards: a card mounting or
+   moving outside the bounds so far grew the surface and re-rasterised every
+   card in it. Zooming out mounts cards at the periphery on every frame, so
+   every frame paid that - 180 to 420 ms on 93 collapsed cards, measured,
+   against 0 to 18 ms with a layer per card. A card changing inside the bounds
+   cost 1 ms either way (PRODUCT_DESIGN.md > Zooming a canvas of cards). */
 .node-card {
+  will-change: transform;
   /* A card that arrives mid-pan fades rather than pops. Newly visible cards are
      admitted a few per frame, and they normally mount in the viewport margin -
      off screen, fully faded by the time they are seen. The fade earns its place

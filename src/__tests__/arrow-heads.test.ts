@@ -109,7 +109,9 @@ describe('the edge layer', () => {
       isBidirectional: false,
       isShortEdge: false,
       isNeighborEdge: false,
+      inFocus: false,
       opacity: 1,
+      baseOpacity: 0.3,
       renderStrokeWidth: 7.5,
       glowStrokeWidth: 30,
       ...overrides,
@@ -155,12 +157,33 @@ describe('the edge layer', () => {
     expect(wrapper.find('.edge-line-visible').attributes('marker-end')).toBeUndefined()
   })
 
-  it('does the same in the simplified layer, where only highlighted edges carry a head', () => {
-    const wrapper = mountLayer([edge({ id: 'plain' }), edge({ id: 'lit', isHighlighted: true })], true, 7.5)
-    const [plain, lit] = wrapper.findAll('.edge-line-fast')
-    expect(plain.attributes('d')).toBe('M0,0 L400,0')
-    expect(plain.attributes('marker-end')).toBeUndefined()
+  it('does the same in the simplified layer, where only lit edges carry a head, in the focus layer', () => {
+    const wrapper = mountLayer(
+      [edge({ id: 'plain' }), edge({ id: 'lit', isHighlighted: true, inFocus: true })],
+      true,
+      7.5
+    )
+    // The base layer draws both plain, without heads
+    const fast = wrapper.findAll('.edge-line-fast')
+    expect(fast).toHaveLength(2)
+    for (const path of fast) {
+      expect(path.attributes('d')).toBe('M0,0 L400,0')
+      expect(path.attributes('marker-end')).toBeUndefined()
+    }
+    // The lit edge is drawn again in the focus layer, shortened under its head
+    const lit = wrapper.find('.edges-focus-layer .edge-line-visible')
     expect(lit.attributes('d')).toBe('M0,0 L387,0')
-    expect(lit.attributes('marker-end')).toBeDefined()
+    expect(lit.attributes('marker-end')).toBe('url(#arrow-222222)')
+  })
+
+  it('writes nothing into the base layer when an edge is lit', () => {
+    // A change in an SVG repaints every path whose box it touches, so the
+    // base layer must not change on a hover (PRODUCT_DESIGN.md > Hovering a card)
+    const plain = mountLayer([edge({ id: 'e' })], false, 7.5).find('.edges-layer').html()
+    const withLit = mountLayer([edge({ id: 'e', isHighlighted: true, inFocus: true, opacity: 1 })], false, 7.5)
+    expect(withLit.find('.edges-layer').html().replace(' dimmed', '')).toBe(plain)
+    expect(withLit.find('.edges-layer').classes()).toContain('dimmed')
+    expect(withLit.findAll('.edges-focus-layer .edge-line-visible')).toHaveLength(1)
+    expect(withLit.find('.edges-focus-layer .edge-glow').exists()).toBe(true)
   })
 })

@@ -47,7 +47,6 @@ const props = defineProps<{
   editTitle: string
   editContent: string
   spellcheckEnabled?: boolean
-  scale: number
   // In-node search
   showNodeSearch: boolean
   nodeSearchQuery: string
@@ -86,6 +85,15 @@ const { t } = useI18n()
 
 const isTagNode = computed(() => props.node.node_type === 'tag')
 
+// Each bus value as a boolean of its own first: the class object below is
+// rebuilt whenever any of its inputs change, and the shared hover id changes
+// on every hover anywhere on the canvas. Read directly, that rebuilt every
+// card's classes, and so re-rendered every mounted card, on every hover;
+// a boolean only changes for the two cards it concerns
+// (PRODUCT_DESIGN.md > Hovering a card).
+const isHoverHighlighted = computed(() => nodesStore.hoverHighlightNodeId === props.node.id)
+const isAiWorking = computed(() => nodesStore.aiWorkingNodeId === props.node.id)
+
 const classes = computed(() => ({
   selected: props.isSelected,
   dragging: props.isDragging,
@@ -99,9 +107,9 @@ const classes = computed(() => ({
   'neighbor-highlighted': props.isNeighborHighlighted,
   // Shared hover bus: lights up when this node is hovered anywhere
   // (timelines, storyline panel, canvas)
-  'hover-highlighted': nodesStore.hoverHighlightNodeId === props.node.id,
+  'hover-highlighted': isHoverHighlighted.value,
   // An AI task is writing into this node right now
-  'ai-working': nodesStore.aiWorkingNodeId === props.node.id,
+  'ai-working': isAiWorking.value,
   'tag-node': isTagNode.value,
 }))
 

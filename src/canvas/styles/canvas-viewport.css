@@ -84,10 +84,30 @@
   background-size: 24px 24px;
 }
 
+/* Two layers of edges, each composited on its own. The base layer holds every
+   edge in its plain form and nothing in it changes on a hover; the focus layer
+   above it holds only the lit edges. Any change inside an SVG repaints every
+   path whose box the change touches, and routed paths overlap each other
+   across the whole viewport, so one lit edge in a shared layer repainted all
+   of them: a quarter second on 350 paths, twice a hover. Dimming the rest is
+   the base layer's opacity, a compositor change
+   (PRODUCT_DESIGN.md > Hovering a card). */
 .edges-layer {
   pointer-events: none;
   overflow: visible;
   background: none;
+  will-change: opacity;
+}
+
+.edges-layer.dimmed {
+  opacity: 0.66;
+}
+
+.edges-focus-layer {
+  pointer-events: none;
+  overflow: visible;
+  background: none;
+  will-change: transform;
 }
 
 .edge-hit-area {
@@ -125,13 +145,12 @@
   stroke-linejoin: round;
 }
 
-.edge-highlighted {
-  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
-}
-
-:is([data-theme='cyber']) .edge-highlighted {
-  filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.8));
-}
+/* A highlighted edge glows by a wide translucent stroke drawn under it in
+   CanvasEdgesSVG, not by a filter. `filter: drop-shadow()` here rasterised a
+   region the size of each highlighted path's bounding box - a routed path can
+   span the canvas - and a hover that lit twenty edges painted for half a
+   second while its script took thirty milliseconds
+   (PRODUCT_DESIGN.md > Hovering a card). */
 
 /* Dimming non-highlighted edges is done per edge in useEdgeVisibility, which
    already gives each path a stroke-opacity of 1.0 highlighted, 0.3 plain or

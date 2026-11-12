@@ -2560,6 +2560,33 @@ OneNote creates duplicates because it syncs at file/section level. Nodus avoids 
 
 ---
 
+### Hovering a card
+
+**Required behavior.** Hovering a card lights its edges and its neighbours and must cost a frame, not a pause. Measured on 2026-11-11 on a 216-card, 973-edge workspace at 49% zoom with 43 cards mounted, a hover took 500 to 600 ms on the way in and the same on the way out; the user's report was "it's not keeping up".
+
+**What it cost, and the rule each cost left behind:**
+
+1. *Trimming every path under its arrowhead, on every hover.* `shortenPathEnd` ran two end-anchored regular expressions over each routed path; with no start anchor the engine tried a match from every character of a path hundreds of characters long, and the trim was recomputed for every candidate edge whenever the hover changed. 459 ms per pass over 1,087 edges, measured, against 8 ms once the patterns run on the trailing run of coordinates only. The trimmed paths are a computed of their own, keyed by the routing and the line width, so a hover never recomputes them. **Rule:** nothing that is the same for every hover is computed per hover.
+2. *Every card re-rendered.* A card re-renders when a prop changes by reference. Three did on every hover: its style object (rebuilt per render, and with it a title fit that measured text on a canvas), its linked-entity list (a fresh empty array for a card without any) and the class object of its own template, which read the shared hover id from the store. Each is now stable while nothing about that card changed: the style is cached by its inputs, the empty list is one shared constant, and the hover id is read into a boolean of its own, which only changes for the two cards it concerns. **Rule:** a card's props are the same objects until the card itself changes.
+3. *The edge layer repainted whole.* With script down to 30 ms a hover still took half a second, all of it paint. Changing one path in the edge SVG - its opacity, its class, its position in the document - repainted every path whose box the change touched, and routed paths overlap each other across the viewport, so one change cost as much as painting the layer: 220 to 350 ms on 350 paths, measured by changing a single attribute. A `filter: drop-shadow()` on lit edges and a 150 ms transition on stroke opacity added their own repaints on top. The edges now live in two SVG layers, each composited on its own: a base layer holding every edge in its plain form, which nothing about the hover touches, and a focus layer holding the lit edges only, drawn again on top of their plain selves. The rest dim while a focus is lit by the base layer's opacity, a compositor change, and the glow is a wide translucent stroke under the line, not a filter. **Rule:** a hover writes nothing into the base edge layer. A test holds the base layer's markup equal with and without a lit edge.
+
+**Measured after the change,** same workspace, same zoom: a hover takes 60 to 140 ms on the way in and 60 to 80 ms on the way out, 20 ms of it script. What remains is the focus layer's paint, the neighbour cards' glow and, where cards are collapsed, the hover tooltip.
+
+### Zooming a canvas of cards
+
+**Required behavior.** A zoom frame updates the container transform and nothing per card or per edge (see Canvas rendering above). Measured on 2026-11-11 while zooming out from 58% on the same workspace, frames grew with the number of mounted cards - 0.5 s at 31 cards, 1.6 s at 90, 2.9 s at 142 - and the switch to dense mode took 5 s. Script was a fraction of each frame; the rest was style, layout and paint.
+
+**What broke the rule:**
+
+1. *Two widths sized from the live scale.* Card borders and edge strokes are drawn in canvas units but meant to read as 2 px and 1.5 px on screen, so both were recomputed from the scale on every frame. A border change restyles every mounted card and a stroke change rewrites every edge path - at 30% on 71 collapsed cards and 563 paths, 0.9 s and 1.2 s a frame against 0.1 s for the transform itself. Both are now sized from a *style scale* (`useStyleScale`): held while a gesture is live, and taken in steps of 1.5x, so a short zoom restyles nothing and a long one restyles once, when it ends. Within a step a 2 px border is between 1.6 and 2.4 px on screen. The border is written once, as a custom property on the nodes layer, not per card.
+2. *An unused prop.* Every card received the live scale as a prop it never read, which re-rendered every card on every frame. Removed.
+3. *Edges entering the viewport.* Viewport culling admitted edges as the zoom uncovered them, and each admission was a change to the edge layer, which repaints whole (see Hovering a card). The culled edge set is now held while a gesture is live; the edges around what the zoom uncovered arrive when it ends.
+4. *One painted surface for all cards.* The nodes layer was one composited surface whose bounds were the union of its cards. A card mounting outside the bounds so far grew the surface and re-rasterised every card in it; zooming out mounts cards at the periphery on every frame, so every frame paid it - 180 to 420 ms on 93 collapsed cards, measured by moving one card outside the bounds, against 1 ms for a move inside them. Each card is now a compositing layer of its own (`will-change: transform` on `.node-card`), so a card mounting paints that card. A test holds the rule.
+
+What remains per frame is the transform, the paint of the few cards staged in that frame, and the collapse or dense-mode switch when the zoom crosses those thresholds. **Measured after the change,** the same zoom-out from 58% to 2%: 12 s of frames became under 2 s, the switch to dense mode 7 s became 0.2 s, and a frame in dense mode 50 ms became 15 ms. Frames in which a batch of cards mounts still reach 300 to 600 ms at 50 to 90 mounted cards; the staging budget and the cost of a card's first paint are the next things to look at.
+
+---
+
 ## Implementation Roadmap
 
 ### Recommended Approach: Hybrid (Bottom-Up + Visual)
