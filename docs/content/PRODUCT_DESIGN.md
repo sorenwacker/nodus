@@ -1940,6 +1940,7 @@ Zooming is not such a case. Pan and zoom are one container transform, so edge ge
 - Why: with the PCB router every trace in a gutter is the same grey at the same weight, and a bundle of eight cannot be followed by eye to where it goes. Hovering shows one card's edges, but reading the graph should not need the pointer. Colouring by source is what board viewers do with nets: a bundle keeps its colour through every bend, so it can be followed.
 - Twelve palette colours, not one per card: arrowheads need a marker per colour and a reader cannot tell more hues apart anyway. Two cards may share a colour; their bundles separate where they leave their cards.
 - Off by default. Plain grey is the quieter picture and the right one for a small graph.
+- Source colours are resolved once per change of the edges, the cards or the toggle, in their own computed map, never in the per-hover edge pass. The first version looked each edge's source card up inside that pass with a linear scan of the reactive node array, which cost edges x cards proxy reads on every hover and zoom frame: 560 edges on 200 cards held the web process at 100 % CPU. Each source card is now looked up once per change, not once per edge per frame. Gated by `src/__tests__/color-edges-by-source.test.ts`: a hover looks up only the hovered card, once per pass, and a recompute looks up each source card at most once.
 
 ### Showing edges only around the focus
 
