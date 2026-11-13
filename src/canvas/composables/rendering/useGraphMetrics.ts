@@ -65,7 +65,7 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
 
   // Get reactive refs from display store
   const displayStore = useDisplayStore()
-  const { lodThreshold, semanticZoomThreshold } = storeToRefs(displayStore)
+  const { lodThreshold, lodEdgeThreshold, semanticZoomThreshold } = storeToRefs(displayStore)
 
   // Persistent LOD mode override (user can manually toggle bubble mode) - per workspace
   const forceLODMode = ref(canvasStorage.getBubbleMode(workspaceId.value || undefined))
@@ -197,8 +197,27 @@ export function useGraphMetrics(ctx: UseGraphMetricsContext): UseGraphMetricsRet
     { immediate: true }
   )
 
+  // Edges on screen, counted as the canvas draws them: an edge is drawn when
+  // either end is visible (useEdgeVisibility), so an edge running off-screen
+  // counts and one entirely off-screen does not. Edges are paint as much as
+  // cards are - 560 of them on 200 cards made hover and zoom slow while the
+  // node count sat far below its threshold - so the edge count is a tier of
+  // its own, with its own setting (PRODUCT_DESIGN.md > Detail also drops by zoom)
+  const visibleEdgeCount = computed(() => {
+    const ids = new Set(visibleNodes.value.map(n => n.id))
+    let count = 0
+    for (const e of filteredEdges.value) {
+      if (ids.has(e.source_node_id) || ids.has(e.target_node_id)) count++
+    }
+    return count
+  })
+
   const isLODMode = computed(
-    () => forceLODMode.value || visibleNodes.value.length > lodThreshold.value || zoomForcesLOD.value
+    () =>
+      forceLODMode.value ||
+      visibleNodes.value.length > lodThreshold.value ||
+      visibleEdgeCount.value > lodEdgeThreshold.value ||
+      zoomForcesLOD.value
   )
 
   // Pre-computed LOD node lists so the template does not filter twice

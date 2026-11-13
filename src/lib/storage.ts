@@ -16,6 +16,7 @@ const KEYS = {
   fontScale: 'nodus-font-scale',
   // Display thresholds
   lodThreshold: 'nodus-lod-threshold',
+  lodEdgeThreshold: 'nodus-lod-edge-threshold',
   semanticZoomThreshold: 'nodus-semantic-zoom-threshold',
   edgeLabelZoomThreshold: 'nodus-edge-label-zoom-threshold',
   edgeHoverThreshold: 'nodus-edge-hover-threshold',
@@ -148,14 +149,33 @@ export const uiStorage = {
 /**
  * Display and performance thresholds storage
  */
+/** Visible nodes above which the canvas switches to bubble mode */
+export const LOD_THRESHOLD_DEFAULT = 500
+/**
+ * Edges on screen above which the canvas switches to bubble mode. Edges are
+ * paint as much as cards are: a graph of 200 cards and 560 edges was slow to
+ * hover and zoom while it stayed far below the node threshold. The default
+ * matches the large-graph tier, so nothing changes until the user lowers it.
+ */
+export const LOD_EDGE_THRESHOLD_DEFAULT = 1500
+
 export const displayStorage = {
-  // LOD (Level of Detail) mode threshold - show nodes as dots when this many visible
+  // Bubble mode (LOD) thresholds: nodes are drawn as circles when more than
+  // this many nodes are visible, or more than this many edges are on screen
+  // (PRODUCT_DESIGN.md > Detail also drops by zoom)
   getLodThreshold(): number {
     const val = localStorage.getItem(KEYS.lodThreshold)
-    return val ? parseInt(val, 10) : 500
+    return val ? parseInt(val, 10) : LOD_THRESHOLD_DEFAULT
   },
   setLodThreshold(value: number): void {
     localStorage.setItem(KEYS.lodThreshold, String(value))
+  },
+  getLodEdgeThreshold(): number {
+    const val = localStorage.getItem(KEYS.lodEdgeThreshold)
+    return val ? parseInt(val, 10) : LOD_EDGE_THRESHOLD_DEFAULT
+  },
+  setLodEdgeThreshold(value: number): void {
+    localStorage.setItem(KEYS.lodEdgeThreshold, String(value))
   },
 
   // Semantic zoom threshold - collapse nodes to title-only below this zoom level (0-1)

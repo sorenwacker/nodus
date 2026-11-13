@@ -10,6 +10,8 @@ Pan and zoom freely across an infinite workspace. Semantic zooming adjusts detai
 
 Edge labels have their own zoom threshold (Settings > Appearance): below it, labels are hidden to reduce clutter in the zoomed-out view.
 
+Bubble mode draws cards as circles. The canvas switches to it on its own when more than a set number of nodes are visible or more than a set number of edges are on screen (Settings > Appearance; 500 nodes and 1500 edges by default), when cards would be too small to read, or when you switch it on in the canvas controls. Lower the edge threshold for a dense graph that hovers or zooms slowly as cards.
+
 ### Node Types
 
 | Type | Description |

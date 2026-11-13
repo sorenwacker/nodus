@@ -6,7 +6,12 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemesStore } from '../../stores/themes'
-import { uiStorage, displayStorage } from '../../lib/storage'
+import {
+  uiStorage,
+  displayStorage,
+  LOD_THRESHOLD_DEFAULT,
+  LOD_EDGE_THRESHOLD_DEFAULT,
+} from '../../lib/storage'
 
 const { t } = useI18n()
 const themesStore = useThemesStore()
@@ -29,6 +34,15 @@ const hoverTooltipEnabled = ref(uiStorage.getHoverTooltipEnabled())
 // Display thresholds
 const semanticZoomThreshold = ref(displayStorage.getSemanticZoomThreshold())
 const edgeLabelZoomThreshold = ref(displayStorage.getEdgeLabelZoomThreshold())
+// Bubble mode by count: either threshold crossed switches the canvas to circles
+const lodThreshold = ref(displayStorage.getLodThreshold())
+const lodEdgeThreshold = ref(displayStorage.getLodEdgeThreshold())
+
+/** A count typed into a number field: whole, at least the minimum, or left as it was */
+function asCount(value: unknown, min: number, fallback: number): number {
+  const n = Math.round(Number(value))
+  return Number.isFinite(n) && n >= min ? n : fallback
+}
 
 // Save functions
 function saveFontScale() {
@@ -40,6 +54,10 @@ function saveFontScale() {
 function saveDisplaySettings() {
   displayStorage.setSemanticZoomThreshold(semanticZoomThreshold.value)
   displayStorage.setEdgeLabelZoomThreshold(edgeLabelZoomThreshold.value)
+  lodThreshold.value = asCount(lodThreshold.value, 1, displayStorage.getLodThreshold())
+  lodEdgeThreshold.value = asCount(lodEdgeThreshold.value, 1, displayStorage.getLodEdgeThreshold())
+  displayStorage.setLodThreshold(lodThreshold.value)
+  displayStorage.setLodEdgeThreshold(lodEdgeThreshold.value)
   window.dispatchEvent(new CustomEvent('nodus-display-settings-change'))
 }
 
@@ -57,6 +75,8 @@ function saveHoverTooltipSetting() {
 watch(fontScale, saveFontScale)
 watch(semanticZoomThreshold, saveDisplaySettings)
 watch(edgeLabelZoomThreshold, saveDisplaySettings)
+watch(lodThreshold, saveDisplaySettings)
+watch(lodEdgeThreshold, saveDisplaySettings)
 watch(spellcheckEnabled, saveSpellcheckSetting)
 watch(hoverTooltipEnabled, saveHoverTooltipSetting)
 
@@ -73,6 +93,8 @@ function resetDisplayDefaults() {
   hoverTooltipEnabled.value = true
   semanticZoomThreshold.value = 0.5
   edgeLabelZoomThreshold.value = 0.5
+  lodThreshold.value = LOD_THRESHOLD_DEFAULT
+  lodEdgeThreshold.value = LOD_EDGE_THRESHOLD_DEFAULT
   saveFontScale()
   saveSpellcheckSetting()
   saveHoverTooltipSetting()
@@ -180,6 +202,35 @@ function resetDisplayDefaults() {
       <span class="hint">{{ t('settings.display.edgeLabelZoomThresholdHint') }}</span>
     </div>
 
+    <!-- Bubble mode by count -->
+    <div class="setting-group">
+      <label>
+        {{ t('settings.display.lodThreshold') }}
+        <input
+          v-model.number.lazy="lodThreshold"
+          class="count-input"
+          type="number"
+          min="1"
+          step="50"
+        />
+      </label>
+      <span class="hint">{{ t('settings.display.lodThresholdHint') }}</span>
+    </div>
+
+    <div class="setting-group">
+      <label>
+        {{ t('settings.display.lodEdgeThreshold') }}
+        <input
+          v-model.number.lazy="lodEdgeThreshold"
+          class="count-input"
+          type="number"
+          min="1"
+          step="100"
+        />
+      </label>
+      <span class="hint">{{ t('settings.display.lodEdgeThresholdHint') }}</span>
+    </div>
+
     <hr class="divider" />
 
     <button class="reset-btn" @click="resetDisplayDefaults">
@@ -253,6 +304,24 @@ function resetDisplayDefaults() {
 
 :is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .setting-group input[type="range"] {
   background: #3f3f46;
+}
+
+.count-input {
+  width: 88px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-node, #e4e4e7);
+  border-radius: 4px;
+  background: var(--bg-canvas, #f4f4f5);
+  color: var(--text-main, #18181b);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+:is([data-theme='dark'], [data-theme='pitch-black'], [data-theme='cyber']) .count-input {
+  background: #18181b;
+  border-color: #3f3f46;
+  color: #f4f4f5;
 }
 
 .hint {
