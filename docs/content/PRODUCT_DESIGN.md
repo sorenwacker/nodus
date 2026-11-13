@@ -1979,10 +1979,12 @@ A count tier alone cannot decide how much detail to draw, because a small graph 
 
 | Mechanism | Count tier | Zoom tier |
 |---|---|---|
-| Bubble mode (`isLODMode`) | more visible nodes than the LOD threshold | a default-width card would render under 30 screen px, with a floor of 20 visible nodes |
+| Bubble mode (`isLODMode`) | more visible nodes than the node threshold, or more edges on screen than the edge threshold | a default-width card would render under 30 screen px, with a floor of 20 visible nodes |
 | Single-path edges (`useSimpleEdges`) | the large-graph tier | the 12px edge hit stroke would render under 4 screen px |
 
 The floor keeps a sparse workspace as cards: a handful of nodes costs nothing to draw properly, and bubbling them would only take detail away.
+
+**Two count thresholds, both settings (Settings > Appearance; 500 nodes and 1500 edges by default).** Edges are paint as much as cards are: a workspace of 200 cards and 560 edges was slow to hover and zoom while its node count sat far below any threshold, and the node count alone could never bubble it. An edge is counted as the canvas draws it: when either end is visible, so an edge running off-screen counts and one entirely off-screen does not. The edge default matches the large-graph tier, so nothing changes until a user lowers it for a graph that is dense rather than large.
 
 Without the zoom tier the count tier could never fire for the case that needs it most. Fitting a workspace whose layout spans tens of thousands of canvas px puts every node on screen at once at a zoom near the floor, so viewport culling culls nothing and the node count never changes. A card is a composited DOM subtree of some sixty elements, and the compositor backs each one whatever its size on screen. Measured on a 215-node workspace with a 41,000 x 50,000 px layout: 6 GB of shared graphics memory and a kernel out-of-memory kill as cards, against 476 MB and a live application as circles. Card cost saturates by about 60 rendered cards, so the tier has to be reachable well below any node-count threshold.
 

@@ -32,6 +32,10 @@ async function metricsAt(opts: {
   nodeCount: number
   scale: number
   edgeCount?: number
+  /** Every edge runs between these two nodes (default n0 and n1) */
+  edgeEnds?: [string, string]
+  /** How many of the nodes are in the viewport (default all) */
+  visibleCount?: number
   neighborhood?: boolean
   gestureActive?: boolean
 }) {
@@ -39,15 +43,17 @@ async function metricsAt(opts: {
     '../canvas/composables/rendering/useGraphMetrics'
   )
   const nodes = makeNodes(opts.nodeCount)
+  const [from, to] = opts.edgeEnds ?? ['n0', 'n1']
   const edges = Array.from(
     { length: opts.edgeCount ?? 0 },
-    (_, i) => ({ id: `e${i}`, source_node_id: 'n0', target_node_id: 'n1' }) as Edge
+    (_, i) => ({ id: `e${i}`, source_node_id: from, target_node_id: to }) as Edge
   )
+  const visible = opts.visibleCount === undefined ? nodes : nodes.slice(0, opts.visibleCount)
   const scale = ref(opts.scale)
   const gestureActive = ref(opts.gestureActive ?? false)
   const metrics = useGraphMetrics({
     displayNodes: computed(() => nodes),
-    visibleNodes: computed(() => nodes),
+    visibleNodes: computed(() => visible),
     filteredNodes: computed(() => nodes),
     filteredEdges: computed(() => edges),
     neighborhoodMode: ref(opts.neighborhood ?? false),
@@ -94,6 +100,48 @@ describe('bubble mode from rendered card size', () => {
   it('still turns on from node count alone at a readable zoom', async () => {
     const m = await metricsAt({ nodeCount: 600, scale: 1 })
     expect(m.isLODMode.value).toBe(true)
+  })
+})
+
+describe('bubble mode from edge count', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
+
+  // Edges are paint as much as cards are: 560 edges on 200 cards made hover
+  // and zoom slow while the node count sat far below its threshold, so the
+  // edge count is a tier of its own (PRODUCT_DESIGN.md > Detail also drops by zoom)
+  it('turns on above the edge threshold with few nodes at a readable zoom', async () => {
+    const m = await metricsAt({ nodeCount: 50, scale: 1, edgeCount: 1600 })
+    expect(m.isLODMode.value).toBe(true)
+  })
+
+  it('stays off at the default threshold for a graph of 200 cards and 560 edges', async () => {
+    const m = await metricsAt({ nodeCount: 200, scale: 1, edgeCount: 560 })
+    expect(m.isLODMode.value).toBe(false)
+  })
+
+  it('follows the user setting, so that same graph can be bubbled', async () => {
+    const { useDisplayStore } = await import('../stores/display')
+    useDisplayStore().lodEdgeThreshold = 400
+    const m = await metricsAt({ nodeCount: 200, scale: 1, edgeCount: 560 })
+    expect(m.isLODMode.value).toBe(true)
+  })
+
+  it('counts an edge once either end is on screen, as the canvas draws it', async () => {
+    // Half on screen: the edge is drawn, so it counts
+    const half = await metricsAt({
+      nodeCount: 10, scale: 1, edgeCount: 1600, edgeEnds: ['n0', 'n9'], visibleCount: 1,
+    })
+    expect(half.isLODMode.value).toBe(true)
+  })
+
+  it('does not count edges that are entirely off screen', async () => {
+    const off = await metricsAt({
+      nodeCount: 10, scale: 1, edgeCount: 1600, edgeEnds: ['n8', 'n9'], visibleCount: 2,
+    })
+    expect(off.isLODMode.value).toBe(false)
   })
 })
 

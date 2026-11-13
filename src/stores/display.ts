@@ -9,6 +9,7 @@ import { displayStorage, uiStorage } from '../lib/storage'
 export const useDisplayStore = defineStore('display', () => {
   // Reactive refs for all display settings
   const lodThreshold = ref(displayStorage.getLodThreshold())
+  const lodEdgeThreshold = ref(displayStorage.getLodEdgeThreshold())
   const semanticZoomThreshold = ref(displayStorage.getSemanticZoomThreshold())
   const edgeLabelZoomThreshold = ref(displayStorage.getEdgeLabelZoomThreshold())
   const edgeHoverThreshold = ref(displayStorage.getEdgeHoverThreshold())
@@ -28,6 +29,7 @@ export const useDisplayStore = defineStore('display', () => {
   // Reload all values from storage
   function reload() {
     lodThreshold.value = displayStorage.getLodThreshold()
+    lodEdgeThreshold.value = displayStorage.getLodEdgeThreshold()
     semanticZoomThreshold.value = displayStorage.getSemanticZoomThreshold()
     edgeLabelZoomThreshold.value = displayStorage.getEdgeLabelZoomThreshold()
     edgeHoverThreshold.value = displayStorage.getEdgeHoverThreshold()
@@ -82,6 +84,7 @@ export const useDisplayStore = defineStore('display', () => {
   return {
     // State
     lodThreshold,
+    lodEdgeThreshold,
     semanticZoomThreshold,
     edgeLabelZoomThreshold,
     edgeHoverThreshold,
