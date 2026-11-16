@@ -10,7 +10,7 @@ import { openExternal } from '../lib/tauri'
 import { useLLM, executeTool, llmQueue } from '../llm'
 import { useI18n } from 'vue-i18n'
 import { usePanelReveal } from '../composables/usePanelReveal'
-import { memoryStorage, agentMemoryStorage } from '../lib/storage'
+import { memoryStorage, agentMemoryStorage, neighborhoodLayoutPreference } from '../lib/storage'
 import {
   useMinimap,
   useViewState,
@@ -303,7 +303,6 @@ watch(
   }
 )
 
-// Neighborhood mode composable
 const neighborhood = useNeighborhoodMode({
   store: {
     getFilteredNodes: () => [...store.filteredNodes],
@@ -318,6 +317,7 @@ const neighborhood = useNeighborhoodMode({
     offsetY,
     canvasRect: () => canvasRef.value?.getBoundingClientRect() || null,
   },
+  layoutPreference: neighborhoodLayoutPreference(() => store.currentWorkspaceId || undefined), arrange: (l, o) => layout.layoutOverlay(l, o), // late-bound: useLayout is created below
 })
 
 // Destructure for convenience

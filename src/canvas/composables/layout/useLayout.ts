@@ -70,6 +70,8 @@ export interface LayoutOverlay {
   centerId: string | null
   /** Receives the computed positions in place of the store. */
   apply: (positions: Map<string, { x: number; y: number }>) => void
+  /** Told which layout ran, so the mode can remember it */
+  onLayout?: (layout: LayoutType) => void
 }
 
 export interface UseLayoutOptions {
@@ -147,6 +149,7 @@ export function useLayout(options: UseLayoutOptions) {
    * an overlay position was never stored, so there is nothing to undo to.
    */
   async function layoutOverlay(layout: LayoutType, overlay: LayoutOverlay): Promise<void> {
+    overlay.onLayout?.(layout)
     const nodes = store.getFilteredNodes().filter(n => overlay.nodeIds.has(n.id))
     const edges = store
       .getFilteredEdges()
@@ -230,6 +233,7 @@ export function useLayout(options: UseLayoutOptions) {
     stopAnimation,
     animateToPositions,
     autoLayout,
+    layoutOverlay,
     radialLayout,
     fitToContent,
     // Strategy pattern methods
