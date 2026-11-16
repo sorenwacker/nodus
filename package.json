@@ -61,8 +61,6 @@
     "vue-tsc": "^3.2.6"
   },
   "overrides": {
-    "lodash-es": "^4.18.1",
-    "uuid": "^11.1.0",
     "katex": "^0.18.11",
     "js-beautify": {
       "glob": "^14.0.4"
