@@ -34,6 +34,7 @@ const KEYS = {
   canvasDefaultLayout: 'nodus_canvas_default_layout',
   canvasRadialStyle: 'nodus_canvas_radial_style',
   canvasBubbleMode: 'nodus_canvas_bubble_mode',
+  canvasNeighborhoodLayout: 'nodus_canvas_neighborhood_layout',
   canvasEdgeHideThreshold: 'nodus_canvas_edge_hide_threshold',
   canvasEdgeLabelSize: 'nodus_canvas_edge_label_size',
   canvasHideWikilinkEdges: 'nodus_canvas_hide_wikilink_edges',
@@ -297,6 +298,10 @@ export const llmStorage = {
   },
 }
 
+/** The layouts neighbourhood mode can remember; mirrors LayoutType in the canvas layer */
+const NEIGHBORHOOD_LAYOUTS = ['grid', 'horizontal', 'vertical', 'force', 'hierarchical', 'radial'] as const
+export type NeighborhoodLayout = (typeof NEIGHBORHOOD_LAYOUTS)[number]
+
 /**
  * Canvas settings storage (workspace-specific)
  */
@@ -352,6 +357,14 @@ export const canvasStorage = {
   },
   setRadialStyle(value: 'compact' | 'spacious', workspaceId?: string): void {
     localStorage.setItem(this._key(KEYS.canvasRadialStyle, workspaceId), value)
+  },
+  /** The layout neighbourhood mode arranges a subgraph with (PRODUCT_DESIGN.md > Neighborhood Mode) */
+  getNeighborhoodLayout(workspaceId?: string): NeighborhoodLayout {
+    const val = localStorage.getItem(this._key(KEYS.canvasNeighborhoodLayout, workspaceId))
+    return NEIGHBORHOOD_LAYOUTS.includes(val as NeighborhoodLayout) ? (val as NeighborhoodLayout) : 'radial'
+  },
+  setNeighborhoodLayout(value: NeighborhoodLayout, workspaceId?: string): void {
+    localStorage.setItem(this._key(KEYS.canvasNeighborhoodLayout, workspaceId), value)
   },
   getBubbleMode(workspaceId?: string): boolean {
     return localStorage.getItem(this._key(KEYS.canvasBubbleMode, workspaceId)) === 'true'
@@ -628,3 +641,11 @@ export const agentMemoryStorage = {
   },
 }
 
+
+/** The neighbourhood layout preference of the workspace a getter names, as useNeighborhoodMode takes it */
+export function neighborhoodLayoutPreference(workspaceId: () => string | undefined) {
+  return {
+    get: () => canvasStorage.getNeighborhoodLayout(workspaceId()),
+    set: (layout: NeighborhoodLayout) => canvasStorage.setNeighborhoodLayout(layout, workspaceId()),
+  }
+}

@@ -6,6 +6,7 @@ import { ref, computed, type Ref } from 'vue'
 import { NODE_DEFAULTS } from '../../constants'
 import { computeRadialLayout } from './useRadialLayout'
 import type { LayoutOverlay } from './useLayout'
+import type { LayoutType } from './useAutoLayout'
 import type { Node } from '../../../types'
 
 interface Edge {
@@ -34,10 +35,14 @@ interface ViewState {
 export interface UseNeighborhoodModeOptions {
   store: Store
   viewState: ViewState
+  /** Where the layout last chosen in the mode is kept; radial without one */
+  layoutPreference?: { get: () => LayoutType; set: (layout: LayoutType) => void }
+  /** Runs a layout against the mode's overlay; the canvas wires it to useLayout */
+  arrange?: (layout: LayoutType, overlay: LayoutOverlay) => Promise<void>
 }
 
 export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
-  const { store, viewState } = options
+  const { store, viewState, layoutPreference, arrange } = options
 
   // State
   const neighborhoodMode = ref(false)
@@ -115,8 +120,11 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     const targetId = nodeId || store.getSelectedNodeIds()[0]
     if (targetId) {
       focusNodeId.value = targetId
-      layout(targetId)
       neighborhoodMode.value = true
+      if (!layout(targetId)) {
+        neighborhoodMode.value = false
+        focusNodeId.value = null
+      }
     }
   }
 
@@ -179,6 +187,14 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     const focusNode = store.getNode(focusId)
     if (!focusNode) return false
 
+    // A remembered non-radial layout runs through the canvas layout path
+    const preferred = layoutPreference?.get() ?? 'radial'
+    const overlay = getLayoutOverlay()
+    if (preferred !== 'radial' && arrange && overlay) {
+      void arrange(preferred, overlay)
+      return true
+    }
+
     const ids = new Set<string>([focusId])
     for (const atDepth of computeNodesByDepth(focusId).values()) {
       for (const id of atDepth) ids.add(id)
@@ -197,18 +213,7 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     })
     if (!result) return false
 
-    neighborhoodPositions.value = result.targets
-
-    // Center view on focus node
-    const focusPos = result.targets.get(focusId) ?? {
-      x: focusNode.canvas_x,
-      y: focusNode.canvas_y,
-    }
-    const nodeCenterX = focusPos.x + (focusNode.width || NODE_DEFAULTS.WIDTH) / 2
-    const nodeCenterY = focusPos.y + (focusNode.height || NODE_DEFAULTS.HEIGHT) / 2
-    viewState.offsetX.value = rect.width / 2 - nodeCenterX * viewState.scale.value
-    viewState.offsetY.value = rect.height / 2 - nodeCenterY * viewState.scale.value
-
+    applyPositions(result.targets)
     return true
   }
 
@@ -225,10 +230,31 @@ export function useNeighborhoodMode(options: UseNeighborhoodModeOptions) {
     return {
       nodeIds: ids,
       centerId: focusNodeId.value,
-      apply: positions => {
-        neighborhoodPositions.value = positions
-      },
+      apply: applyPositions,
+      onLayout: l => layoutPreference?.set(l),
     }
+  }
+
+  /**
+   * Show an arrangement and centre the view on its bounding box at the current
+   * zoom, so no layout moves the subgraph out of sight
+   * (PRODUCT_DESIGN.md > Neighborhood Mode).
+   */
+  function applyPositions(positions: Map<string, { x: number; y: number }>) {
+    neighborhoodPositions.value = positions
+    const rect = viewState.canvasRect()
+    if (!rect || positions.size === 0) return
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const [id, p] of positions) {
+      const n = store.getNode(id)
+      minX = Math.min(minX, p.x)
+      minY = Math.min(minY, p.y)
+      maxX = Math.max(maxX, p.x + (n?.width || NODE_DEFAULTS.WIDTH))
+      maxY = Math.max(maxY, p.y + (n?.height || NODE_DEFAULTS.HEIGHT))
+    }
+    const scale = viewState.scale.value
+    viewState.offsetX.value = rect.width / 2 - ((minX + maxX) / 2) * scale
+    viewState.offsetY.value = rect.height / 2 - ((minY + maxY) / 2) * scale
   }
 
   // Navigate to a different node in neighborhood mode
