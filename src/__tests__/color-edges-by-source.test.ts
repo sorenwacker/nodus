@@ -109,3 +109,48 @@ describe('colouring edges by source card', () => {
     expect(new Set(colors.values()).size).toBe(SOURCE_EDGE_PALETTE.length)
   })
 })
+
+describe('cost of colouring by source', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  function counted() {
+    const edges = [line('a1', 'A', 'X'), line('a2', 'A', 'Y'), line('a3', 'A', 'Z'), line('b1', 'B', 'X')]
+    const hovered = ref<string | null>(null)
+    const highlighted = ref(new Set<string>())
+    let lookups = 0
+    const v = useEdgeVisibility({
+      edgeLines: computed(() => edges),
+      totalEdgeCount: computed(() => edges.length),
+      visibleNodeIds: computed(() => new Set<string>()),
+      hoveredNodeId: hovered,
+      selectedNodeIds: ref([]),
+      selectedEdge: ref(null),
+      highlightedEdgeIds: computed(() => highlighted.value),
+      colorEdgesBySource: ref(true),
+      edgeHideThreshold: ref(0),
+      edgeStrokeWidth: computed(() => 1),
+      highlightColor: computed(() => '#111111'),
+      selectedColor: computed(() => '#222222'),
+      getEdgeColor: e => e.color ?? GREY,
+      getEdgeHighlightColor: theme => (theme ? THEMED : '#111111'),
+      getNode: () => { lookups++; return {} },
+    })
+    return { v, hovered, highlighted, lookups: () => lookups }
+  }
+
+  it('looks each source card up once, not once per edge', () => {
+    const c = counted()
+    void c.v.visibleEdgeLines.value
+    expect(c.lookups()).toBeLessThanOrEqual(2)
+  })
+
+  it('looks up only the hovered card, once, when the hover changes', () => {
+    const c = counted()
+    void c.v.visibleEdgeLines.value
+    const before = c.lookups()
+    c.hovered.value = 'A'
+    c.highlighted.value = new Set(['a1', 'a2', 'a3'])
+    void c.v.visibleEdgeLines.value
+    expect(c.lookups() - before).toBeLessThanOrEqual(1)
+  })
+})

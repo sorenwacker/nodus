@@ -228,6 +228,19 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     return paths
   })
 
+  // Each source card's colour theme, resolved once per change of the edges or
+  // the cards - never inside the per-hover pass below, where a lookup per edge
+  // cost edges x cards reactive reads on every hover and zoom frame
+  // (PRODUCT_DESIGN.md > Colouring edges by source card)
+  const sourceThemes = computed(() => {
+    const themes = new Map<string, string | null | undefined>()
+    if (!colorEdgesBySource.value) return themes
+    for (const e of edgeLines.value) {
+      if (!themes.has(e.source_node_id)) themes.set(e.source_node_id, getNode(e.source_node_id)?.color_theme)
+    }
+    return themes
+  })
+
   const visibleEdgeLines = computed((): VisibleEdgeLine[] => {
     // Check user's edge hide threshold (from canvas settings)
     // 0 = disabled (show all edges), any other value = hide when count exceeds it
@@ -297,6 +310,12 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
     // (CanvasEdgesSVG), not a per-edge value, so a hover rewrites no plain edge
     const baseOpacity = allHighlighted ? 1.0 : bySource ? SOURCE_COLORED_OPACITY : 0.3
 
+    // The hovered card is the same for every edge, so it is looked up once per pass
+    const hoveredForColor = hoveredNodeId.value
+    const hoverHighlightColor = hoveredForColor
+      ? getEdgeHighlightColor(getNode(hoveredForColor)?.color_theme || null)
+      : highlightColor.value
+
     return edges.map(e => {
       const inFocus = highlighted.has(e.id) || selected === e.id
       const isHighlighted = allHighlighted || inFocus
@@ -317,7 +336,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
       // an uncoloured card, the card's palette colour
       let color = getEdgeColor({ link_type: e.link_type || '', color: e.color })
       if (bySource && !e.color) {
-        const sourceTheme = getNode(e.source_node_id)?.color_theme
+        const sourceTheme = sourceThemes.value.get(e.source_node_id)
         color = sourceTheme ? getEdgeHighlightColor(sourceTheme) : sourceColors!.get(e.source_node_id)!
       }
       // Simple stroke width: base for normal, slightly thicker for selected/highlighted
@@ -337,13 +356,7 @@ export function useEdgeVisibility(ctx: UseEdgeVisibilityContext): UseEdgeVisibil
           edgeHighlightColor = selectedColor.value
         } else {
           // Just hovered - use node's color or default highlight
-          const hoveredNode = hoveredNodeId.value
-          if (hoveredNode) {
-            const node = getNode(hoveredNode)
-            edgeHighlightColor = getEdgeHighlightColor(node?.color_theme || null)
-          } else {
-            edgeHighlightColor = highlightColor.value
-          }
+          edgeHighlightColor = hoverHighlightColor
         }
       } else if (isHighlighted && allHighlighted) {
         // "Highlight all edges" mode - keep original color
