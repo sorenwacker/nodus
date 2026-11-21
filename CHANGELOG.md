@@ -4,6 +4,11 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.0-rc.2] - 2026-11-21
+
+### Fixed
+- The Linux build of a release candidate failed: the RPM bundler rejects a `-` in the version. A release candidate is bundled for Linux as AppImage and deb; full releases also ship an RPM. 1.7.0-rc.1 has no Linux downloads; this candidate carries the same changes with them
+
 ## [1.7.0-rc.1] - 2026-11-21
 
 ### Added
