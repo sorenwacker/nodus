@@ -233,7 +233,9 @@ jobs:
           # remembers to press publish, which stranded six past versions
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
-          args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
+          # RPM refuses a '-' in its version, so a release candidate
+          # (v1.7.0-rc.1) is bundled for Linux as AppImage and deb only.
+          args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || (matrix.platform == 'ubuntu-22.04' && contains(github.ref_name, '-') && '--bundles appimage,deb') || '' }}
 
 
   # Upload release assets to R2 (full releases only)

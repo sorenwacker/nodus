@@ -127,7 +127,7 @@ to `glib` 0.20.
 
 - **Pull requests and `main`:** `ci.yml` runs the check jobs - Rust tests, frontend tests, MCP server build. `main` requires these three to pass before a pull request merges; no review is required. Platform builds are not run here: a three-platform Tauri build took about 50 runner minutes per push, and the release workflow builds the same platforms from the tag.
 - **Releases:** pushing a `v*` tag runs `release.yml`. Its test job runs every check `ci.yml` runs, so a tag cut from a commit that never passed a pull request is checked the same way; a gate test fails when the two drift apart. The tag must equal the version in `package.json` and `Cargo.toml`.
-- **Release candidates:** `make rc` reads the current version, increments the `-rc.N` suffix, updates both manifests and lockfiles, and refuses to continue unless `CHANGELOG.md` has a section for the new version, since that section becomes the release notes. It then commits, tags and pushes. The project allows at most one full release a month; everything else is a release candidate.
+- **Release candidates:** `make rc` reads the current version, increments the `-rc.N` suffix, updates both manifests and lockfiles, and refuses to continue unless `CHANGELOG.md` has a section for the new version, since that section becomes the release notes. It then commits, tags and pushes. The project allows at most one full release a month; everything else is a release candidate. RPM does not accept a `-` in a version, so a release candidate is bundled for Linux as AppImage and deb only; full releases also ship an RPM.
 - **Branches:** a merged pull request's branch is deleted automatically.
 
 ## Release signing
