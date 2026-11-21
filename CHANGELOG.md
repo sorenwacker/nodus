@@ -4,6 +4,8 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.0-rc.1] - 2026-11-21
+
 ### Added
 - Node history: the fullscreen editor's History button lists the earlier versions of a card, shows each one rendered, and restores the chosen one as a single undo step. A version is kept by every write that replaces a card's title or content, from the editor, the agent, MCP clients or the vault file alike; writes within ten minutes of the last kept version extend it, a change from another source is kept at once, and a hundred versions per card are kept
 - Cards can be pinned from the context menu: a pinned card keeps its position through every layout, physics and drag until it is unpinned, and shows a small pin
@@ -18,6 +20,8 @@ All notable changes to Nodus are documented in this file.
 - The grid, horizontal and vertical layouts leave 96 px between cards instead of 24 px: room for seven routing lanes, so edges between neighbouring cards run side by side instead of on top of each other
 
 ### Fixed
+- Neighbourhood mode remembers the layout chosen in it, per workspace, and uses it the next time the mode is entered or the focus moves; it was always radial again. Choosing a layout there also keeps the subgraph in view: grid, force and hierarchical runs could place it off screen
+- Colour edges by source made hovering and zooming lag on a few hundred cards: every edge looked up its source card with a linear scan of all cards on every frame. Each card's colour is now resolved once per change of the cards
 - macOS: coming back to Nodus after a while in another app no longer starts with a second or two of lag on the first scroll or hover. WebKit treated the covered window as hidden and let the web process nap; the window now counts as visible while covered, the web process is kept out of App Nap, and so is the app itself
 
 ## [1.6.0] - 2026-10-22
