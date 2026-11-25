@@ -201,6 +201,13 @@ export function createMcpMessageHandler(
     return { id: match.id === 'default' ? null : match.id, name: match.name }
   }
 
+  /** Whether the workspace is the one open in the app (null = default) */
+  function isOpenWorkspace(workspaceId: string | null): boolean {
+    const open = store.getWorkspaces().find(w => w.current)
+    const openId = !open || open.id === 'default' ? null : open.id
+    return openId === workspaceId
+  }
+
   /** Store view scoped to one workspace, regardless of what the app shows */
   async function scopedStoreFor(workspaceId: string | null): Promise<McpStoreInterface> {
     const edges = await store.loadWorkspaceEdges(workspaceId)
@@ -220,10 +227,9 @@ export function createMcpMessageHandler(
     // one, so it is refused with both names
     // (PRODUCT_DESIGN.md > Tag nodes over MCP)
     const rebuildTagNodesInScope = () => {
-      const workspaces = store.getWorkspaces()
-      const open = workspaces.find(w => w.current)
-      const openId = !open || open.id === 'default' ? null : open.id
-      if (openId !== workspaceId) {
+      if (!isOpenWorkspace(workspaceId)) {
+        const workspaces = store.getWorkspaces()
+        const open = workspaces.find(w => w.current)
         const target = workspaces.find(w => (w.id === 'default' ? null : w.id) === workspaceId)
         throw new McpError(
           JsonRpcErrorCodes.INVALID_PARAMS,
@@ -242,10 +248,15 @@ export function createMcpMessageHandler(
       getNode: (id: string) => nodesInScope().find(n => n.id === id),
       createNode: data =>
         store.createNode({ ...data, workspace_id: workspaceId === null ? 'default' : workspaceId }),
-      // Edge writes bypass the live edge store, which only holds the open
-      // workspace's edges
-      createEdge: data => store.createEdgeRaw(data),
-      deleteEdge: id => store.deleteEdgeRaw(id),
+      // The live edge store holds only the open workspace's edges. A write to
+      // the open workspace goes through it so the canvas shows it at once;
+      // any other workspace is written to the database alone. Decided per
+      // write, since the user may switch workspaces while connected
+      // (PRODUCT_DESIGN.md > Workspace scoping for MCP connections)
+      createEdge: data =>
+        isOpenWorkspace(workspaceId) ? store.createEdge(data) : store.createEdgeRaw(data),
+      deleteEdge: id =>
+        isOpenWorkspace(workspaceId) ? store.deleteEdge(id) : store.deleteEdgeRaw(id),
       // A write lands where the reads come from. Storylines are scoped like
       // nodes and edges: they were read and written through the app's open
       // workspace throughout

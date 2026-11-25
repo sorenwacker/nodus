@@ -2274,6 +2274,7 @@ The web view of the packaged application connects only to the hosts its content 
 - Single-entity lookups resolve within the connection's scope, exactly as the list getters do. An id a scoped listing returned must be usable by every operation that takes an id.
 - A scoped store derives its lookups from its own scoped collections rather than from the application's, so the two cannot drift.
 - A write lands in the connection's workspace, as its reads come from it.
+- A write to the workspace open in the app goes through the live store, so it appears on the canvas immediately. Edge writes for a scoped connection bypassed the live edge store even when the scoped workspace was the open one, and the edges stayed invisible until the workspace was reloaded. Only a write to a workspace that is not open goes to the database alone; it appears when that workspace is opened.
 - Storylines are scoped like nodes and edges. They were read and written through the application's open workspace throughout, so a scoped connection listed the wrong workspace's storylines and created its own in the wrong place.
 - A store that scopes some of its methods and inherits the rest cannot be read for what it does. Each method is either scoped or recorded as independent of the workspace, and a gate holds the list.
 
