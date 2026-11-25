@@ -48,7 +48,9 @@ function makeFakeStore() {
     makeNode('new', data.title, data.workspace_id ?? null)
   )
   const loadWorkspaceEdges = vi.fn(async (workspaceId: string | null) =>
-    workspaceId === 'ws-research' ? [researchEdge] : []
+    workspaceId === 'ws-research'
+      ? [researchEdge]
+      : [{ ...researchEdge, id: 'e-open', source_node_id: 'c1', target_node_id: 'c1' }]
   )
   const allStorylines = [
     { id: 's-open', title: 'Open storyline', workspace_id: null },
@@ -73,8 +75,10 @@ function makeFakeStore() {
       { id: 'ws-research', name: 'Research', current: false },
     ],
     loadWorkspaceEdges,
-    createEdgeRaw: vi.fn(),
-    deleteEdgeRaw: vi.fn(),
+    createEdgeRaw: vi.fn(async () => ({ ...researchEdge, id: 'raw' })),
+    deleteEdgeRaw: vi.fn(async () => undefined),
+    createEdge: vi.fn(async () => ({ ...researchEdge, id: 'live' })),
+    deleteEdge: vi.fn(async () => undefined),
     createNode,
   } as unknown as McpStoreInterface
   return { store, createNode, loadWorkspaceEdges, createStoryline }
@@ -135,6 +139,34 @@ describe('MCP workspace scoping', () => {
     await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
     const res = await handler.handleRequest(request('get_edges'), 'conn-a')
     expect((res.result as Edge[]).map(e => e.id)).toEqual(['e-research'])
+  })
+
+  it('writes edges of the open workspace through the live store', async () => {
+    await handler.handleRequest(request('set_workspace', { workspace: 'Default' }), 'conn-a')
+    await handler.handleRequest(
+      request('create_edge', { source_node_id: 'c1', target_node_id: 'c1' }),
+      'conn-a'
+    )
+    await handler.handleRequest(request('delete_edge', { id: 'e-open' }), 'conn-a')
+
+    expect(store.createEdge).toHaveBeenCalled()
+    expect(store.deleteEdge).toHaveBeenCalledWith('e-open')
+    expect(store.createEdgeRaw).not.toHaveBeenCalled()
+    expect(store.deleteEdgeRaw).not.toHaveBeenCalled()
+  })
+
+  it('writes edges of a workspace that is not open to the database only', async () => {
+    await handler.handleRequest(request('set_workspace', { workspace: 'Research' }), 'conn-a')
+    await handler.handleRequest(
+      request('create_edge', { source_node_id: 'r1', target_node_id: 'r2' }),
+      'conn-a'
+    )
+    await handler.handleRequest(request('delete_edge', { id: 'e-research' }), 'conn-a')
+
+    expect(store.createEdgeRaw).toHaveBeenCalled()
+    expect(store.deleteEdgeRaw).toHaveBeenCalledWith('e-research')
+    expect(store.createEdge).not.toHaveBeenCalled()
+    expect(store.deleteEdge).not.toHaveBeenCalled()
   })
 
   it('lists the scoped workspace storylines, not the open one', async () => {
