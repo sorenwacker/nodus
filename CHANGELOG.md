@@ -4,6 +4,14 @@ All notable changes to Nodus are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.0-rc.3] - 2026-11-27
+
+### Fixed
+- Edges an MCP client creates or deletes while scoped to the open workspace appear on the canvas at once; a reload was needed to see them
+
+### Security
+- rustls is updated to 0.23.46, past three TLS advisories: secrets exposed by debug formatting of a session, key-exchange poisoning by an unauthenticated ServerHello, and an unbounded allocation in Brotli certificate decompression
+
 ## [1.7.0-rc.2] - 2026-11-21
 
 ### Fixed
